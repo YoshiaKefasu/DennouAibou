@@ -56,6 +56,7 @@ import {
   mintCanvasCapabilityToken,
 } from "../../canvas-capability.js";
 import { normalizeDeviceMetadataForAuth } from "../../device-auth.js";
+import { getPreauthHandshakeTimeoutMsFromEnv } from "../../handshake-timeouts.js";
 import { ADMIN_SCOPE } from "../../method-scopes.js";
 import {
   isLocalishHost,
@@ -386,6 +387,30 @@ export function attachGatewayWsMessageHandler(params: {
           mode: connectParams.client.mode,
           version: connectParams.client.version,
         };
+        const connectAuthStartedAt = Date.now();
+        const connectAuthTimeoutMs = getPreauthHandshakeTimeoutMsFromEnv();
+        const connectAuthTimer = setTimeout(() => {
+          if (isClosed() || getClient()) {
+            return;
+          }
+          setHandshakeState("failed");
+          setCloseCause("connect-auth-timeout", {
+            ...clientMeta,
+            handshakeMs: Date.now() - connectAuthStartedAt,
+            endpoint,
+          });
+          logWsControl.warn(
+            `connect auth timeout conn=${connId} peer=${formatForLog(peerLabel)} remote=${remoteAddr ?? "?"}`,
+          );
+          close(1008, "connect auth timeout");
+        }, connectAuthTimeoutMs);
+        connectAuthTimer.unref?.();
+        const clearConnectAuthTimer = () => clearTimeout(connectAuthTimer);
+
+        // Clear the pre-auth challenge timer once the client has sent a valid
+        // connect request. The connect auth timer above still bounds stalled
+        // async auth work before the client is registered.
+        clearHandshakeTimer();
         const markHandshakeFailure = (cause: string, meta?: Record<string, unknown>) => {
           setHandshakeState("failed");
           setCloseCause(cause, { ...meta, ...clientMeta });
@@ -1130,6 +1155,49 @@ export function attachGatewayWsMessageHandler(params: {
         const instanceId = connectParams.client.instanceId;
         const presenceKey = shouldTrackPresence ? (device?.id ?? instanceId ?? connId) : undefined;
 
+        if (isClosed()) {
+          setCloseCause("connect-aborted-before-register", {
+            ...clientMeta,
+            auth: authMethod,
+          });
+          return;
+        }
+
+        const canvasCapability = canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
+        const canvasCapabilityExpiresAtMs = canvasCapability
+          ? Date.now() + CANVAS_CAPABILITY_TTL_MS
+          : undefined;
+        const usesSharedGatewayAuth = authMethod === "token" || authMethod === "password";
+        const sharedGatewaySessionGeneration = usesSharedGatewayAuth
+          ? resolveSharedGatewaySessionGeneration(resolvedAuth)
+          : undefined;
+        const scopedCanvasHostUrl =
+          canvasHostUrl && canvasCapability
+            ? (buildCanvasScopedHostUrl(canvasHostUrl, canvasCapability) ?? canvasHostUrl)
+            : canvasHostUrl;
+        clearConnectAuthTimer();
+        const nextClient: GatewayWsClient = {
+          socket,
+          connect: connectParams,
+          connId,
+          isDeviceTokenAuth: authMethod === "device-token",
+          usesSharedGatewayAuth,
+          sharedGatewaySessionGeneration,
+          presenceKey,
+          clientIp: reportedClientIp,
+          canvasHostUrl,
+          canvasCapability,
+          canvasCapabilityExpiresAtMs,
+        };
+        setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
+        if (!setClient(nextClient)) {
+          setCloseCause("connect-aborted-before-register", {
+            ...clientMeta,
+            auth: authMethod,
+          });
+          return;
+        }
+        setHandshakeState("connected");
         logWs("in", "connect", {
           connId,
           client: connectParams.client.id,
