@@ -235,6 +235,18 @@ export async function handleSessionHistoryHttpRequest(
     : new Set<string>();
 
   let sentHistory = history;
+  const sseState = new SessionHistorySseState({
+    target: {
+      sessionId: entry.sessionId,
+      storePath: target.storePath,
+      sessionFile: entry.sessionFile,
+    },
+    maxChars: effectiveMaxChars,
+    limit,
+    cursor,
+    initialRawMessages: rawSnapshot,
+  });
+  sentHistory = sseState.snapshot();
   setSseHeaders(res);
   res.write("retry: 1000\n\n");
   sseWrite(res, "history", {
