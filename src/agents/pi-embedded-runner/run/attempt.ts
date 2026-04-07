@@ -2078,6 +2078,8 @@ export async function runEmbeddedAttempt(
         timedOut,
         timedOutDuringCompaction,
         promptError,
+        promptErrorSource,
+        preflightRecovery,
         sessionIdUsed,
         bootstrapPromptWarningSignaturesSeen: bootstrapPromptWarning.warningSignaturesSeen,
         bootstrapPromptWarningSignature: bootstrapPromptWarning.signature,
