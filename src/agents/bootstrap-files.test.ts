@@ -7,7 +7,13 @@ import {
   type AgentBootstrapHookContext,
 } from "../hooks/internal-hooks.js";
 import { makeTempWorkspace } from "../test-helpers/workspace.js";
-import { resolveBootstrapContextForRun, resolveBootstrapFilesForRun } from "./bootstrap-files.js";
+import {
+  FULL_BOOTSTRAP_COMPLETED_CUSTOM_TYPE,
+  hasCompletedBootstrapTurn,
+  resolveBootstrapContextForRun,
+  resolveBootstrapFilesForRun,
+  resolveContextInjectionMode,
+} from "./bootstrap-files.js";
 import type { WorkspaceBootstrapFile } from "./workspace.js";
 
 function registerExtraBootstrapFileHook() {
@@ -126,6 +132,7 @@ describe("resolveBootstrapContextForRun", () => {
 
     expect(files).toEqual([]);
   });
+
   it("drops HEARTBEAT.md for non-heartbeat runs when the heartbeat prompt section is disabled", async () => {
     const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
     await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
@@ -138,29 +145,6 @@ describe("resolveBootstrapContextForRun", () => {
           defaults: {
             heartbeat: {
               includeSystemPromptSection: false,
-            },
-          },
-          list: [{ id: "main" }],
-        },
-      },
-    });
-
-    expect(files.some((file) => file.name === "HEARTBEAT.md")).toBe(false);
-    expect(files.some((file) => file.name === "AGENTS.md")).toBe(true);
-  });
-
-  it("drops HEARTBEAT.md for non-heartbeat runs when the heartbeat cadence is disabled", async () => {
-    const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
-    await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
-    await fs.writeFile(path.join(workspaceDir, "AGENTS.md"), "repo rules", "utf8");
-
-    const files = await resolveBootstrapFilesForRun({
-      workspaceDir,
-      config: {
-        agents: {
-          defaults: {
-            heartbeat: {
-              every: "0m",
             },
           },
           list: [{ id: "main" }],
@@ -371,5 +355,4 @@ describe("resolveContextInjectionMode", () => {
       } as never),
     ).toBe("continuation-skip");
   });
->>>>>>> 51633fc13a (fix: respect disabled heartbeat guidance)
 });
