@@ -1,6 +1,10 @@
 import type { OpenClawConfig } from "../config/config.js";
+import type { AgentContextInjection } from "../config/types.agent-defaults.js";
+import { normalizeOptionalString } from "../shared/string-coerce.js";
+import { resolveSessionAgentIds } from "./agent-scope.js";
 import { getOrLoadBootstrapFiles } from "./bootstrap-cache.js";
 import { applyBootstrapHookOverrides } from "./bootstrap-hooks.js";
+import { shouldIncludeHeartbeatGuidanceForSystemPrompt } from "./heartbeat-system-prompt.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
 import {
   buildBootstrapContextFiles,
@@ -61,6 +65,40 @@ function applyContextModeFilter(params: {
   return [];
 }
 
+function shouldExcludeHeartbeatBootstrapFile(params: {
+  config?: OpenClawConfig;
+  sessionKey?: string;
+  sessionId?: string;
+  agentId?: string;
+  runKind?: BootstrapContextRunKind;
+}): boolean {
+  if (!params.config || params.runKind === "heartbeat") {
+    return false;
+  }
+  const { defaultAgentId, sessionAgentId } = resolveSessionAgentIds({
+    sessionKey: params.sessionKey ?? params.sessionId,
+    config: params.config,
+    agentId: params.agentId,
+  });
+  if (sessionAgentId !== defaultAgentId) {
+    return false;
+  }
+  return !shouldIncludeHeartbeatGuidanceForSystemPrompt({
+    config: params.config,
+    agentId: sessionAgentId,
+    defaultAgentId,
+  });
+}
+
+function filterHeartbeatBootstrapFile(
+  files: WorkspaceBootstrapFile[],
+  excludeHeartbeatBootstrapFile: boolean,
+): WorkspaceBootstrapFile[] {
+  if (!excludeHeartbeatBootstrapFile) {
+    return files;
+  }
+  return files.filter((file) => file.name !== DEFAULT_HEARTBEAT_FILENAME);
+}
 export async function resolveBootstrapFilesForRun(params: {
   workspaceDir: string;
   config?: OpenClawConfig;
