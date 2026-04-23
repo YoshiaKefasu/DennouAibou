@@ -51,6 +51,7 @@ const TURN_PREFIX_INSTRUCTIONS =
 const MAX_TOOL_FAILURES = 8;
 const MAX_TOOL_FAILURE_CHARS = 240;
 const MAX_COMPACTION_SUMMARY_CHARS = 16_000;
+const MAX_DYNAMIC_COMPACTION_SUMMARY_CHARS = 200_000;
 const MAX_FILE_OPS_SECTION_CHARS = 2_000;
 const MAX_FILE_OPS_LIST_CHARS = 900;
 const SUMMARY_TRUNCATED_MARKER = "\n\n[Compaction summary truncated to fit budget]";
@@ -290,6 +291,20 @@ function capCompactionSummaryPreservingSuffix(
   const bodyBudget = Math.max(0, maxChars - suffix.length);
   const cappedBody = capCompactionSummary(summaryBody, bodyBudget);
   return `${cappedBody}${suffix}`;
+}
+
+function resolveCompactionSummaryMaxChars(keepRecentTokens: unknown): number {
+  if (typeof keepRecentTokens !== "number" || !Number.isFinite(keepRecentTokens)) {
+    return MAX_COMPACTION_SUMMARY_CHARS;
+  }
+  const normalized = Math.floor(keepRecentTokens);
+  if (normalized <= 0) {
+    return MAX_COMPACTION_SUMMARY_CHARS;
+  }
+  return Math.min(
+    MAX_DYNAMIC_COMPACTION_SUMMARY_CHARS,
+    Math.max(MAX_COMPACTION_SUMMARY_CHARS, normalized),
+  );
 }
 
 function extractMessageText(message: AgentMessage): string {
@@ -680,6 +695,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       const recentTurnsPreserve = resolveRecentTurnsPreserve(runtime?.recentTurnsPreserve);
       const qualityGuardEnabled = runtime?.qualityGuardEnabled ?? false;
       const qualityGuardMaxRetries = resolveQualityGuardMaxRetries(runtime?.qualityGuardMaxRetries);
+      const summaryMaxChars = resolveCompactionSummaryMaxChars(runtime?.keepRecentTokens);
       const structuredInstructions = buildCompactionStructureInstructions(
         customInstructions,
         summarizationInstructions,
@@ -916,7 +932,11 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           ? `\n\n${fullReservedSuffix}`
           : fullReservedSuffix;
       const bodyToCap = lastHistorySummary || summary;
-      summary = capCompactionSummaryPreservingSuffix(bodyToCap, normalizedSuffix ?? "");
+      summary = capCompactionSummaryPreservingSuffix(
+        bodyToCap,
+        normalizedSuffix ?? "",
+        summaryMaxChars,
+      );
 
       return {
         compaction: {
@@ -957,6 +977,7 @@ export const __testing = {
   auditSummaryQuality,
   capCompactionSummary,
   capCompactionSummaryPreservingSuffix,
+  resolveCompactionSummaryMaxChars,
   formatFileOperations,
   computeAdaptiveChunkRatio,
   isOversizedForSummary,
@@ -967,6 +988,7 @@ export const __testing = {
   MIN_CHUNK_RATIO,
   SAFETY_MARGIN,
   MAX_COMPACTION_SUMMARY_CHARS,
+  MAX_DYNAMIC_COMPACTION_SUMMARY_CHARS,
   MAX_FILE_OPS_SECTION_CHARS,
   MAX_FILE_OPS_LIST_CHARS,
   SUMMARY_TRUNCATED_MARKER,

@@ -41,6 +41,7 @@ const {
   auditSummaryQuality,
   capCompactionSummary,
   capCompactionSummaryPreservingSuffix,
+  resolveCompactionSummaryMaxChars,
   formatFileOperations,
   computeAdaptiveChunkRatio,
   isOversizedForSummary,
@@ -49,6 +50,7 @@ const {
   MIN_CHUNK_RATIO,
   SAFETY_MARGIN,
   MAX_COMPACTION_SUMMARY_CHARS,
+  MAX_DYNAMIC_COMPACTION_SUMMARY_CHARS,
   MAX_FILE_OPS_SECTION_CHARS,
   SUMMARY_TRUNCATED_MARKER,
 } = __testing;
@@ -287,6 +289,20 @@ describe("compaction-safeguard tool failures", () => {
 });
 
 describe("compaction-safeguard summary budgets", () => {
+  it("uses default max chars when keepRecentTokens is missing or invalid", () => {
+    expect(resolveCompactionSummaryMaxChars(undefined)).toBe(MAX_COMPACTION_SUMMARY_CHARS);
+    expect(resolveCompactionSummaryMaxChars(0)).toBe(MAX_COMPACTION_SUMMARY_CHARS);
+    expect(resolveCompactionSummaryMaxChars(Number.NaN)).toBe(MAX_COMPACTION_SUMMARY_CHARS);
+  });
+
+  it("raises summary cap when keepRecentTokens is larger than default", () => {
+    expect(resolveCompactionSummaryMaxChars(32_000)).toBe(32_000);
+  });
+
+  it("clamps raised summary cap to hard max", () => {
+    expect(resolveCompactionSummaryMaxChars(999_999)).toBe(MAX_DYNAMIC_COMPACTION_SUMMARY_CHARS);
+  });
+
   it("caps file operations summary and reports omitted entries", () => {
     const readFiles = Array.from(
       { length: 200 },
@@ -583,6 +599,7 @@ describe("compaction-safeguard runtime registry", () => {
         defaults: {
           compaction: {
             mode: "safeguard",
+            keepRecentTokens: 128000,
             recentTurnsPreserve: 99,
             qualityGuard: { maxRetries: 99 },
           },
@@ -603,6 +620,7 @@ describe("compaction-safeguard runtime registry", () => {
     const runtime = getCompactionSafeguardRuntime(sessionManager);
     expect(runtime?.qualityGuardMaxRetries).toBe(99);
     expect(runtime?.recentTurnsPreserve).toBe(99);
+    expect(runtime?.keepRecentTokens).toBe(128000);
     expect(resolveQualityGuardMaxRetries(runtime?.qualityGuardMaxRetries)).toBe(3);
     expect(resolveRecentTurnsPreserve(runtime?.recentTurnsPreserve)).toBe(12);
   });
