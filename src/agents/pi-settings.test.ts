@@ -7,6 +7,7 @@ import {
   applyPiCompactionSettingsFromConfig,
   DEFAULT_PI_COMPACTION_RESERVE_TOKENS_FLOOR,
   resolveCompactionReserveTokensFloor,
+  resolveTimeoutCompactionPromptUsageThreshold,
 } from "./pi-settings.js";
 
 describe("applyPiCompactionSettingsFromConfig", () => {
@@ -322,5 +323,50 @@ describe("resolveCompactionReserveTokensFloor", () => {
         agents: { defaults: { compaction: { reserveTokensFloor: 0 } } },
       }),
     ).toBe(0);
+  });
+});
+
+describe("resolveTimeoutCompactionPromptUsageThreshold", () => {
+  it("falls back to the default ratio when reserveTokens is not configured", () => {
+    expect(
+      resolveTimeoutCompactionPromptUsageThreshold({
+        contextTokenBudget: 1_000_000,
+      }),
+    ).toBe(0.65);
+  });
+
+  it("derives threshold from configured reserveTokens", () => {
+    expect(
+      resolveTimeoutCompactionPromptUsageThreshold({
+        cfg: {
+          agents: {
+            defaults: {
+              compaction: {
+                reserveTokens: 128_000,
+              },
+            },
+          },
+        },
+        contextTokenBudget: 1_000_000,
+      }),
+    ).toBe(0.872);
+  });
+
+  it("respects reserve floor when configured reserve is below floor", () => {
+    expect(
+      resolveTimeoutCompactionPromptUsageThreshold({
+        cfg: {
+          agents: {
+            defaults: {
+              compaction: {
+                reserveTokens: 10_000,
+                reserveTokensFloor: 20_000,
+              },
+            },
+          },
+        },
+        contextTokenBudget: 200_000,
+      }),
+    ).toBe(0.9);
   });
 });

@@ -8,6 +8,7 @@ import {
   mockedGlobalHookRunner,
   mockedPickFallbackThinkingLevel,
   mockedResolveAuthProfileOrder,
+  mockedResolveContextWindowInfo,
   mockedRunEmbeddedAttempt,
   mockedRunPostCompactionSideEffects,
   overflowBaseRunParams,
@@ -191,6 +192,40 @@ describe("timeout-triggered compaction", () => {
     const result = await runEmbeddedPiAgent(overflowBaseRunParams);
 
     // No compaction attempt for low usage
+    expect(mockedCompactDirect).not.toHaveBeenCalled();
+    expect(result.payloads?.[0]?.isError).toBe(true);
+    expect(result.payloads?.[0]?.text).toContain("timed out");
+  });
+
+  it("respects configured reserveTokens over the default 65% timeout threshold", async () => {
+    mockedResolveContextWindowInfo.mockReturnValueOnce({
+      tokens: 1_000_000,
+      source: "model",
+    });
+    mockedRunEmbeddedAttempt.mockResolvedValueOnce(
+      makeAttemptResult({
+        timedOut: true,
+        lastAssistant: {
+          usage: { input: 700_000 },
+        } as never,
+      }),
+    );
+
+    const result = await runEmbeddedPiAgent({
+      ...overflowBaseRunParams,
+      config: {
+        agents: {
+          defaults: {
+            compaction: {
+              reserveTokens: 128_000,
+              reserveTokensFloor: 128_000,
+            },
+          },
+        },
+      },
+    });
+
+    // 700k / 1,000k = 70%. With reserveTokens=128k, timeout threshold becomes 87.2%.
     expect(mockedCompactDirect).not.toHaveBeenCalled();
     expect(result.payloads?.[0]?.isError).toBe(true);
     expect(result.payloads?.[0]?.text).toContain("timed out");

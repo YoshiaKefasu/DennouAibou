@@ -116,6 +116,52 @@ export function applyPiCompactionSettingsFromConfig(params: {
   };
 }
 
+/**
+ * Resolve timeout-triggered compaction threshold from user-configured reserveTokens.
+ *
+ * If reserveTokens is explicitly configured, prefer that signal over the fixed 65%
+ * timeout trigger so compaction timing follows user intent.
+ */
+export function resolveTimeoutCompactionPromptUsageThreshold(params: {
+  cfg?: OpenClawConfig;
+  contextTokenBudget: number;
+  fallbackRatio?: number;
+}): number {
+  const fallbackRatio =
+    typeof params.fallbackRatio === "number" && Number.isFinite(params.fallbackRatio)
+      ? Math.min(0.99, Math.max(0.01, params.fallbackRatio))
+      : 0.65;
+
+  const ctxBudget =
+    typeof params.contextTokenBudget === "number" &&
+    Number.isFinite(params.contextTokenBudget) &&
+    params.contextTokenBudget > 0
+      ? Math.floor(params.contextTokenBudget)
+      : undefined;
+  if (!ctxBudget) {
+    return fallbackRatio;
+  }
+
+  const compactionCfg = params.cfg?.agents?.defaults?.compaction;
+  const configuredReserveTokens = toNonNegativeInt(compactionCfg?.reserveTokens);
+  if (configuredReserveTokens === undefined) {
+    return fallbackRatio;
+  }
+
+  let reserveTokensFloor = resolveCompactionReserveTokensFloor(params.cfg);
+  const minPromptBudget = Math.min(
+    MIN_PROMPT_BUDGET_TOKENS,
+    Math.max(1, Math.floor(ctxBudget * MIN_PROMPT_BUDGET_RATIO)),
+  );
+  const maxReserve = Math.max(0, ctxBudget - minPromptBudget);
+  reserveTokensFloor = Math.min(reserveTokensFloor, maxReserve);
+
+  const effectiveReserveTokens = Math.max(configuredReserveTokens, reserveTokensFloor);
+  const threshold = 1 - effectiveReserveTokens / ctxBudget;
+  // Guardrail: keep threshold meaningful and avoid zero/negative edge behavior.
+  return Math.min(0.99, Math.max(0.01, threshold));
+}
+
 /** Decide whether Pi's internal auto-compaction should be disabled for this run. */
 export function shouldDisablePiAutoCompaction(params: {
   contextEngineInfo?: ContextEngineInfo;

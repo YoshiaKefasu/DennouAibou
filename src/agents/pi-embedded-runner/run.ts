@@ -55,6 +55,7 @@ import {
   parseImageSizeError,
   pickFallbackThinkingLevel,
 } from "../pi-embedded-helpers.js";
+import { resolveTimeoutCompactionPromptUsageThreshold } from "../pi-settings.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
 import { derivePromptTokens, normalizeUsage, type UsageLike } from "../usage.js";
 import { redactRunIdentifier, resolveRunWorkspaceDir } from "../workspace-run.js";
@@ -221,6 +222,12 @@ export async function runEmbeddedPiAgent(
       });
       const ctxInfo = resolvedRuntimeModel.ctxInfo;
       let effectiveModel = resolvedRuntimeModel.effectiveModel;
+      const timeoutCompactionPromptUsageThreshold =
+        resolveTimeoutCompactionPromptUsageThreshold({
+          cfg: params.config,
+          contextTokenBudget: ctxInfo.tokens,
+          fallbackRatio: 0.65,
+        });
 
       const authStore = ensureAuthProfileStore(agentDir, {
         allowKeychainPrompt: false,
@@ -701,11 +708,11 @@ export async function runEmbeddedPiAgent(
               log.warn(
                 `[timeout-compaction] already attempted timeout compaction ${timeoutCompactionAttempts} time(s); falling through to failover rotation`,
               );
-            } else if (tokenUsedRatio > 0.65) {
+            } else if (tokenUsedRatio > timeoutCompactionPromptUsageThreshold) {
               const timeoutDiagId = createCompactionDiagId();
               timeoutCompactionAttempts++;
               log.warn(
-                `[timeout-compaction] LLM timed out with high prompt token usage (${Math.round(tokenUsedRatio * 100)}%); ` +
+                `[timeout-compaction] LLM timed out with high prompt token usage (${Math.round(tokenUsedRatio * 100)}%, threshold ${Math.round(timeoutCompactionPromptUsageThreshold * 100)}%); ` +
                   `attempting compaction before retry (attempt ${timeoutCompactionAttempts}/${MAX_TIMEOUT_COMPACTION_ATTEMPTS}) diagId=${timeoutDiagId}`,
               );
               let timeoutCompactResult: Awaited<ReturnType<typeof contextEngine.compact>>;
