@@ -1,5 +1,9 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { ContextEngineInfo } from "../context-engine/types.js";
+import {
+  MIN_PROMPT_BUDGET_RATIO,
+  MIN_PROMPT_BUDGET_TOKENS,
+} from "./pi-compaction-constants.js";
 
 export const DEFAULT_PI_COMPACTION_RESERVE_TOKENS_FLOOR = 20_000;
 
@@ -58,6 +62,8 @@ function toPositiveInt(value: unknown): number | undefined {
 export function applyPiCompactionSettingsFromConfig(params: {
   settingsManager: PiSettingsManagerLike;
   cfg?: OpenClawConfig;
+  /** When known, the resolved context window budget for the current model. */
+  contextTokenBudget?: number;
 }): {
   didOverride: boolean;
   compaction: { reserveTokens: number; keepRecentTokens: number };
@@ -68,7 +74,19 @@ export function applyPiCompactionSettingsFromConfig(params: {
 
   const configuredReserveTokens = toNonNegativeInt(compactionCfg?.reserveTokens);
   const configuredKeepRecentTokens = toPositiveInt(compactionCfg?.keepRecentTokens);
-  const reserveTokensFloor = resolveCompactionReserveTokensFloor(params.cfg);
+  let reserveTokensFloor = resolveCompactionReserveTokensFloor(params.cfg);
+
+  // Cap the floor to a safe fraction of the context window so that
+  // small-context models are not starved of prompt budget.
+  const ctxBudget = params.contextTokenBudget;
+  if (typeof ctxBudget === "number" && Number.isFinite(ctxBudget) && ctxBudget > 0) {
+    const minPromptBudget = Math.min(
+      MIN_PROMPT_BUDGET_TOKENS,
+      Math.max(1, Math.floor(ctxBudget * MIN_PROMPT_BUDGET_RATIO)),
+    );
+    const maxReserve = Math.max(0, ctxBudget - minPromptBudget);
+    reserveTokensFloor = Math.min(reserveTokensFloor, maxReserve);
+  }
 
   const targetReserveTokens = Math.max(
     configuredReserveTokens ?? currentReserveTokens,
