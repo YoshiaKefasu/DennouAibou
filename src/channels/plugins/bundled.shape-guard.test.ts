@@ -126,7 +126,8 @@ describe("bundled channel entry shape guards", () => {
     const offenders = [
       "extensions/googlechat/runtime-api.ts",
       "extensions/irc/src/runtime-api.ts",
-      "extensions/matrix/src/runtime-api.ts",
+      // extensions/matrix削除済み
+      // "extensions/matrix/src/runtime-api.ts",
     ].filter((filePath) =>
       fs.readFileSync(path.resolve(filePath), "utf8").includes("openclaw/plugin-sdk/core"),
     );
@@ -162,7 +163,8 @@ describe("bundled channel entry shape guards", () => {
   it("keeps bundled doctor surfaces off the broad runtime barrel", () => {
     const offenders = [
       "extensions/discord/src/doctor.ts",
-      "extensions/matrix/src/doctor.ts",
+      // extensions/matrix削除済み
+      // "extensions/matrix/src/doctor.ts",
       "extensions/slack/src/doctor.ts",
       "extensions/telegram/src/doctor.ts",
       "extensions/zalouser/src/doctor.ts",

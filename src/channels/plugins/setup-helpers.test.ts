@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  namedAccountPromotionKeys as matrixNamedAccountPromotionKeys,
-  resolveSingleAccountPromotionTarget as resolveMatrixSingleAccountPromotionTarget,
-  singleAccountKeysToMove as matrixSingleAccountKeysToMove,
-} from "../../../extensions/matrix/contract-api.js";
+// extensions/matrix削除済みのため、matrix関連のインポートを無効化
+// import {
+//   namedAccountPromotionKeys as matrixNamedAccountPromotionKeys,
+//   resolveSingleAccountPromotionTarget as resolveMatrixSingleAccountPromotionTarget,
+//   singleAccountKeysToMove as matrixSingleAccountKeysToMove,
+// } from "../../../extensions/matrix/contract-api.js";
 import { singleAccountKeysToMove as telegramSingleAccountKeysToMove } from "../../../extensions/telegram/contract-api.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";

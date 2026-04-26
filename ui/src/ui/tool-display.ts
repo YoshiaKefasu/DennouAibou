@@ -1,4 +1,6 @@
-import SHARED_TOOL_DISPLAY_JSON from "../../../apps/shared/OpenClawKit/Sources/OpenClawKit/Resources/tool-display.json" with { type: "json" };
+// import SHARED_TOOL_DISPLAY_JSON from "../../../apps/shared/OpenClawKit/Sources/OpenClawKit/Resources/tool-display.json" with { type: "json" };
+// apps/sharedフォルダ削除に伴い、tool-display.jsonは存在しないため、代わりのデフォルト設定を使用
+const SHARED_TOOL_DISPLAY_JSON = {};
 import {
   defaultTitle,
   formatToolDetailText,
@@ -91,7 +93,7 @@ const TOOL_MAP: Record<string, ToolDisplaySpec> = Object.fromEntries(
     convertSpec(spec),
   ]),
 );
-TOOL_MAP.slack = SLACK_SPEC;
+// TOOL_MAP.slack = SLACK_SPEC; // slack拡張機能削除に伴い、表示設定も削除
 
 function shortenHomeInString(input: string): string {
   if (!input) {

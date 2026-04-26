@@ -61,7 +61,7 @@ async function resolveSwiftFiles(cwd: string, candidates: string[]): Promise<str
 }
 
 describe("cron protocol conformance", () => {
-  it("ui + swift include all cron delivery modes from gateway schema", async () => {
+  it("ui include all cron delivery modes from gateway schema", async () => {
     const modes = extractDeliveryModes(CronDeliverySchema as SchemaLike);
     expect(modes.length).toBeGreaterThan(0);
 
@@ -75,28 +75,30 @@ describe("cron protocol conformance", () => {
       }
     }
 
-    const swiftModelFiles = await resolveSwiftFiles(cwd, SWIFT_MODEL_CANDIDATES);
-    for (const relPath of swiftModelFiles) {
-      const content = await fs.readFile(path.join(cwd, relPath), "utf-8");
-      for (const mode of modes) {
-        const pattern = new RegExp(`\\bcase\\s+${mode}\\b`);
-        expect(pattern.test(content), `${relPath} missing case ${mode}`).toBe(true);
-      }
-    }
+    // apps/macos削除に伴い、Swiftファイルチェックをスキップ
+    // const swiftModelFiles = await resolveSwiftFiles(cwd, SWIFT_MODEL_CANDIDATES);
+    // for (const relPath of swiftModelFiles) {
+    //   const content = await fs.readFile(path.join(cwd, relPath), "utf-8");
+    //   for (const mode of modes) {
+    //     const pattern = new RegExp(`\\bcase\\s+${mode}\\b`);
+    //     expect(pattern.test(content), `${relPath} missing case ${mode}`).toBe(true);
+    //   }
+    // }
   });
 
-  it("cron status shape matches gateway fields in UI + Swift", async () => {
+  it("cron status shape matches gateway fields in UI", async () => {
     const cwd = process.cwd();
     const uiTypes = await fs.readFile(path.join(cwd, "ui/src/ui/types.ts"), "utf-8");
     expect(uiTypes.includes("export type CronStatus")).toBe(true);
     expect(uiTypes.includes("jobs:")).toBe(true);
     expect(uiTypes.includes("jobCount")).toBe(false);
 
-    const [swiftRelPath] = await resolveSwiftFiles(cwd, SWIFT_STATUS_CANDIDATES);
-    const swiftPath = path.join(cwd, swiftRelPath);
-    const swift = await fs.readFile(swiftPath, "utf-8");
-    expect(swift.includes("struct CronSchedulerStatus")).toBe(true);
-    expect(swift.includes("let jobs:")).toBe(true);
+    // apps/macos削除に伴い、Swiftファイルチェックをスキップ
+    // const [swiftRelPath] = await resolveSwiftFiles(cwd, SWIFT_STATUS_CANDIDATES);
+    // const swiftPath = path.join(cwd, swiftRelPath);
+    // const swift = await fs.readFile(swiftPath, "utf-8");
+    // expect(swift.includes("struct CronSchedulerStatus")).toBe(true);
+    // expect(swift.includes("let jobs:")).toBe(true);
   });
 
   it("cron job state schema keeps the full failover reason set", () => {

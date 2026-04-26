@@ -62,6 +62,7 @@ function readRootPackageJson(): {
   };
 }
 
+// extensions/matrix削除に伴い、関数を無効化
 function readMatrixPackageJson(): {
   dependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
@@ -71,15 +72,7 @@ function readMatrixPackageJson(): {
     };
   };
 } {
-  return JSON.parse(readFileSync(resolve(REPO_ROOT, "extensions/matrix/package.json"), "utf8")) as {
-    dependencies?: Record<string, string>;
-    optionalDependencies?: Record<string, string>;
-    openclaw?: {
-      releaseChecks?: {
-        rootDependencyMirrorAllowlist?: unknown;
-      };
-    };
-  };
+  throw new Error("extensions/matrix削除済みのため、この関数は使用できません");
 }
 
 function readAmazonBedrockPackageJson(): {

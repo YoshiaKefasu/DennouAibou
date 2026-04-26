@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  namedAccountPromotionKeys as matrixNamedAccountPromotionKeys,
-  resolveSingleAccountPromotionTarget as resolveMatrixSingleAccountPromotionTarget,
-  singleAccountKeysToMove as matrixSingleAccountKeysToMove,
-} from "../../../extensions/matrix/contract-api.js";
+// extensions/matrix削除済みのため、matrix関連のインポートを無効化
+// import {
+//   namedAccountPromotionKeys as matrixNamedAccountPromotionKeys,
+//   resolveSingleAccountPromotionTarget as resolveMatrixSingleAccountPromotionTarget,
+//   singleAccountKeysToMove as matrixSingleAccountKeysToMove,
+// } from "../../../extensions/matrix/contract-api.js";
 import { singleAccountKeysToMove as telegramSingleAccountKeysToMove } from "../../../extensions/telegram/contract-api.js";
 import {
   resolveSetupWizardAllowFromEntries,
@@ -74,18 +75,7 @@ import {
 beforeEach(() => {
   setActivePluginRegistry(
     createTestRegistry([
-      {
-        pluginId: "matrix",
-        source: "test",
-        plugin: {
-          ...createChannelTestPluginBase({ id: "matrix", label: "Matrix" }),
-          setup: {
-            singleAccountKeysToMove: matrixSingleAccountKeysToMove,
-            namedAccountPromotionKeys: matrixNamedAccountPromotionKeys,
-            resolveSingleAccountPromotionTarget: resolveMatrixSingleAccountPromotionTarget,
-          },
-        },
-      },
+      // extensions/matrix削除済みのため、matrixプラグインを登録しない
       {
         pluginId: "telegram",
         source: "test",

@@ -26,27 +26,28 @@ describe("syncPluginVersions", () => {
       name: "openclaw",
       version: "2026.4.1",
     });
-    writeJson(path.join(rootDir, "extensions/bluebubbles/package.json"), {
-      name: "@openclaw/bluebubbles",
-      version: "2026.3.30",
-      devDependencies: {
-        openclaw: "workspace:*",
-      },
-      peerDependencies: {
-        openclaw: ">=2026.3.30",
-      },
-      openclaw: {
-        install: {
-          minHostVersion: ">=2026.3.30",
-        },
-        compat: {
-          pluginApi: ">=2026.3.30",
-        },
-        build: {
-          openclawVersion: "2026.3.30",
-        },
-      },
-    });
+    // extensions/bluebubbles削除済みのため、このテストは無効化
+    // writeJson(path.join(rootDir, "extensions/bluebubbles/package.json"), {
+    //   name: "@openclaw/bluebubbles",
+    //   version: "2026.3.30",
+    //   devDependencies: {
+    //     openclaw: "workspace:*",
+    //   },
+    //   peerDependencies: {
+    //     openclaw: ">=2026.3.30",
+    //   },
+    //   openclaw: {
+    //     install: {
+    //       minHostVersion: ">=2026.3.30",
+    //     },
+    //     compat: {
+    //       pluginApi: ">=2026.3.30",
+    //     },
+    //     build: {
+    //       openclawVersion: "2026.3.30",
+    //     },
+    //   },
+    // });
 
     const summary = syncPluginVersions(rootDir);
     const updatedPackage = JSON.parse(

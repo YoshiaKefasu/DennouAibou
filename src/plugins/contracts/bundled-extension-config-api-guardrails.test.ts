@@ -15,22 +15,25 @@ const BUNDLED_EXTENSION_CONFIG_IMPORT_GUARDS = [
     path: "extensions/discord/src/config-schema.ts",
     allowedSpecifier: "../config-api.js",
   },
-  {
-    path: "extensions/slack/src/config-schema.ts",
-    allowedSpecifier: "../config-api.js",
-  },
-  {
-    path: "extensions/signal/src/config-schema.ts",
-    allowedSpecifier: "../config-api.js",
-  },
+  // extensions/slack削除済み
+  // {
+  //   path: "extensions/slack/src/config-schema.ts",
+  //   allowedSpecifier: "../config-api.js",
+  // },
+  // extensions/signal削除済み
+  // {
+  //   path: "extensions/signal/src/config-schema.ts",
+  //   allowedSpecifier: "../config-api.js",
+  // },
   {
     path: "extensions/imessage/src/config-schema.ts",
     allowedSpecifier: "../config-api.js",
   },
-  {
-    path: "extensions/whatsapp/src/config-schema.ts",
-    allowedSpecifier: "../config-api.js",
-  },
+  // extensions/whatsapp削除済み
+  // {
+  //   path: "extensions/whatsapp/src/config-schema.ts",
+  //   allowedSpecifier: "../config-api.js",
+  // },
   {
     path: "extensions/googlechat/src/config-schema.ts",
     allowedSpecifier: "openclaw/plugin-sdk/googlechat",

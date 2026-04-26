@@ -452,7 +452,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes whatsapp extension tests to the whatsapp config", () => {
+  it.skip("routes whatsapp extension tests to the whatsapp config (extensions/whatsapp削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/whatsapp/src/send.test.ts"])).toEqual([
       {
         config: "vitest.extension-whatsapp.config.ts",
@@ -485,7 +485,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes zalo extension tests to the zalo config", () => {
+  it.skip("routes zalo extension tests to the zalo config (extensions/zalo削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/zalo/src/channel.test.ts"])).toEqual([
       {
         config: "vitest.extension-zalo.config.ts",
@@ -496,7 +496,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes matrix extension tests to the matrix config", () => {
+  it.skip("routes matrix extension tests to the matrix config (extensions/matrix削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/matrix/src/channel.test.ts"])).toEqual([
       {
         config: "vitest.extension-matrix.config.ts",
@@ -507,7 +507,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes bluebubbles extension tests to the bluebubbles config", () => {
+  it.skip("routes bluebubbles extension tests to the bluebubbles config (extensions/bluebubbles削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/bluebubbles/src/monitor.test.ts"])).toEqual([
       {
         config: "vitest.extension-bluebubbles.config.ts",
@@ -518,7 +518,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes feishu extension tests to the feishu config", () => {
+  it.skip("routes feishu extension tests to the feishu config (extensions/feishu削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/feishu/src/channel.test.ts"])).toEqual([
       {
         config: "vitest.extension-feishu.config.ts",
@@ -529,7 +529,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes irc extension tests to the irc config", () => {
+  it.skip("routes irc extension tests to the irc config (extensions/irc削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/irc/src/channel.test.ts"])).toEqual([
       {
         config: "vitest.extension-irc.config.ts",
@@ -663,7 +663,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("keeps non-provider extension file targets on the shared extensions config", () => {
+  it.skip("keeps non-provider extension file targets on the shared extensions config (extensions/firecrawl削除済み)", () => {
     expect(buildVitestRunPlans(["extensions/firecrawl/index.test.ts"])).toEqual([
       {
         config: "vitest.extensions.config.ts",

@@ -6,7 +6,7 @@ DennouAibou is not built in a day. We evolve in stages, starting from a stable b
 *Our foundation must be unshakeable before we give it a soul.*
 
 - [x] **Fork & Lock:** Secure the baseline at the known-stable `v2026.4.5` tag to escape recent upstream chaos.
-- [ ] **Fix Upstream Regressions:** 
+- [x] **Fix Upstream Regressions:** 
   - Overhaul the `cli-runner` pipeline. Upstream bypassed the `GlobalHookRunner` in `v2026.4.7`—we need to patch this so Ensemble hooks actually fire.
   - Resolve the aggressive model ID normalization (Gemini 3.1 -> 3.0 downgrade bug) so the inner backend can breathe.
   - Restore missing UI/Metadata (`groupId` for Gemini CLI providers).
