@@ -53,6 +53,23 @@ export {
   drainSessionStoreLockQueuesForTest,
   getSessionStoreLockQueueSizeForTest,
 } from "./store-lock-state.js";
+
+// ── DennouAibou hook ──────────────────────────────────────
+// Globally registered after-save callback. DennouAibou sets this at startup
+// to prune closed-session tool output after each store write.
+// Core does not import DennouAibou code — the hook is set externally.
+/** @internal */
+export type AfterSaveHook = (storePath: string) => void | Promise<void>;
+let _afterSaveHook: AfterSaveHook | undefined;
+
+/**
+ * Register a global hook invoked after every successful session store save.
+ * DennouAibou's session-maintenance-hook.ts calls this during agent init.
+ * Passing `undefined` unregisters the hook.
+ */
+export function setAfterSaveHook(hook: AfterSaveHook | undefined): void {
+  _afterSaveHook = hook;
+}
 export { loadSessionStore } from "./store-load.js";
 
 const log = createSubsystemLogger("sessions/store");
@@ -392,6 +409,7 @@ async function saveSessionStoreUnlocked(
   const json = JSON.stringify(store, null, 2);
   if (getSerializedSessionStore(storePath) === json) {
     updateSessionStoreWriteCaches({ storePath, store, serialized: json });
+    await _afterSaveHook?.(storePath);
     return;
   }
 
@@ -400,6 +418,7 @@ async function saveSessionStoreUnlocked(
     for (let i = 0; i < 5; i++) {
       try {
         await writeSessionStoreAtomic({ storePath, store, serialized: json });
+        await _afterSaveHook?.(storePath);
         return;
       } catch (err) {
         const code = getErrorCode(err);
@@ -420,6 +439,7 @@ async function saveSessionStoreUnlocked(
 
   try {
     await writeSessionStoreAtomic({ storePath, store, serialized: json });
+    await _afterSaveHook?.(storePath);
   } catch (err) {
     const code = getErrorCode(err);
 
@@ -428,6 +448,7 @@ async function saveSessionStoreUnlocked(
       // Best-effort: try a direct write (recreating the parent dir), otherwise ignore.
       try {
         await writeSessionStoreAtomic({ storePath, store, serialized: json });
+        await _afterSaveHook?.(storePath);
       } catch (err2) {
         const code2 = getErrorCode(err2);
         if (code2 === "ENOENT") {

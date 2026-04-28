@@ -163,6 +163,29 @@ export async function runCli(argv: string[] = process.argv) {
     ensureOpenClawCliOnPath();
   }
 
+  // DennouAibou: register session store post-save hook for closed-session pruning.
+  const { initSessionMaintenanceHook } = await import("../dennou-soul/session-maintenance-hook.js");
+  initSessionMaintenanceHook();
+
+  // DennouAibou: start idle prune watcher for active-session tool output pruning.
+  const { startIdlePruneWatcher } = await import("../dennou-soul/idle-prune-watcher.js");
+  // Resolve workspace paths for prune protection
+  let protection: import("../dennou-soul/types.js").DennouPruneProtectionConfig | undefined;
+  try {
+    const { getDennouConfig } = await import("../dennou-soul/config.js");
+    protection = getDennouConfig().pruneProtection;
+    const { resolveAgentWorkspaceDir, listAgentIds } = await import("../agents/agent-scope.js");
+    const { getRuntimeConfig } = await import("../config/config.js");
+    const cfg = getRuntimeConfig();
+    const wsPaths = listAgentIds(cfg).map(id => resolveAgentWorkspaceDir(cfg, id));
+    if (wsPaths.length > 0) {
+      protection = { ...protection!, resolvedWorkspacePaths: wsPaths };
+    }
+  } catch {
+    // Best-effort: workspace path resolution failure is non-fatal
+  }
+  startIdlePruneWatcher(protection);
+
   // Enforce the minimum supported runtime before doing any work.
   assertSupportedRuntime();
 

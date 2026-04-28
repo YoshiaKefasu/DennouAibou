@@ -41,6 +41,40 @@ const NodeHostSchema = z
   .strict()
   .optional();
 
+const DennouToolsPruneSchema = z
+  .object({
+    minPrunableToolChars: z.number().int().positive().optional(),
+    keepLastTools: z.number().int().min(0).optional(),
+    placeholder: z.string().optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+
+const DennouSessionToolsPruneSchema = DennouToolsPruneSchema.extend({
+  enabled: z.boolean().optional(),
+}).strict();
+
+const DennouActiveSessionToolsPruneSchema = DennouToolsPruneSchema.extend({
+  enabled: z.boolean().optional(),
+  idleDelayMinutes: z.number().int().positive().optional(),
+}).strict();
+
+const DennouPruneProtectionSchema = z
+  .object({
+    protectedContentKeywords: z.array(z.string()).optional(),
+  })
+  .strict();
+
+const DennouSchema = z
+  .object({
+    toolsPrune: DennouToolsPruneSchema.optional(),
+    sessionToolsPrune: DennouSessionToolsPruneSchema.optional(),
+    activeSessionToolsPrune: DennouActiveSessionToolsPruneSchema.optional(),
+    pruneProtection: DennouPruneProtectionSchema.optional(),
+  })
+  .strict()
+  .optional();
+
 const MemoryQmdPathSchema = z
   .object({
     path: z.string(),
@@ -417,6 +451,7 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    dennou: DennouSchema,
     secrets: SecretsConfigSchema,
     auth: z
       .object({

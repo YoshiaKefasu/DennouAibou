@@ -327,6 +327,15 @@ const sidebarIcons = {
       <line x1="6" y1="18" x2="6.01" y2="18"></line>
     </svg>
   `,
+  dennou: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="6" cy="6" r="3"></circle>
+      <circle cx="6" cy="18" r="3"></circle>
+      <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+      <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+      <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+    </svg>
+  `,
   __appearance__: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="5"></circle>
@@ -427,6 +436,13 @@ const SECTION_CATEGORIES: SectionCategory[] = [
       { key: "__appearance__", label: "Theme" },
       { key: "ui", label: "UI" },
       { key: "wizard", label: "Setup Wizard" },
+    ],
+  },
+  {
+    id: "dennouAibou",
+    label: "DennouAibou",
+    sections: [
+      { key: "dennou", label: "DennouAibou" },
     ],
   },
 ];
