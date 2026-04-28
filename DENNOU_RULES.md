@@ -28,5 +28,22 @@ To maintain sanity when reviewing history or preparing for an upstream sync, eve
 * `[FIX-UPSTREAM]` : Proactively fixing a bug or architectural flaw caused by the upstream developers.
 * `[SYNC]` : Merging changes, tags, or commits explicitly from the OpenClaw origin.
 
+## Rule 5: Versioning & Release Identity
+**DennouAibou is not OpenClaw wearing a mask.**
+
+OpenClaw uses date-based versions such as `2026.4.5`. DennouAibou must not continue to publish itself as if it were the same upstream product after the hard fork. That creates ambiguity for users, release notes, bug reports, and future sync work.
+
+Use this split instead:
+
+- **DennouAibou release version:** SemVer, starting from the current fork line as `v0.5.0` unless a later plan says otherwise.
+- **Git tag format:** `dennou-v0.5.0`, `dennou-v0.5.1`, `dennou-v0.6.0`, etc.
+- **Upstream base tracking:** record the OpenClaw base separately, for example `Base: OpenClaw 2026.4.5`.
+- **Release notes:** always show both identities:
+  - `DennouAibou v0.5.0`
+  - `Upstream base: OpenClaw 2026.4.5`
+- **Sync commits:** when importing upstream changes, use `[SYNC]` and mention the old and new upstream base versions.
+
+Do **not** rename the npm package, binary, service names, or install paths as part of a routine version bump. Those changes affect deployment and rollback. Treat them as a separate migration phase.
+
 ---
 *Follow these rules, and DennouAibou will outlive the tools it was born from.*
