@@ -448,9 +448,15 @@ debloat_plan_openclaw_bundles_v1.mdから死角となったバグを修正しま
 - **修正**: feishu削除方針に合わせてテストケースを `it.skip()` 化
 - **状態**: ✅ 修正済み（§284§）
 
+#### 12. plugin-sdk d.ts生成で削除済みプラグインfacadeが型解決失敗
+- **ファイル**: `src/types/dennou-removed-plugin-facades.d.ts`
+- **問題**: `pnpm build` の `build:plugin-sdk:dts` で、削除済み拡張機能（bluebubbles / feishu / github-copilot / irc / matrix / zalo）への `@openclaw/*/api.js` 型importが解決できず失敗した
+- **修正**: runtime facadeは残したまま、d.ts生成用の型shimを追加。削除済みworkspace packageへ型解決が飛ばないようにした
+- **状態**: ✅ 修正済み（2026-04-28追加レビュー）
+
 ### 結論
 **死角となったバグは全て修正されました。**
-- 修正したファイル数: 11ファイル
+- 修正したファイル数: 12ファイル
 - 修正内容: 削除したフォルダ/ファイルを参照するコードの無効化または修正
 - 影響: テストの一部が無効化されましたが、デブロートの目的である軽量化は達成されました
 
