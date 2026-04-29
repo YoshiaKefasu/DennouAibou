@@ -62,36 +62,15 @@ describe("detectChangedScope", () => {
     });
   });
 
-  it("keeps node lane off for native-only changes", () => {
-    expect(detectChangedScope(["apps/macos/Sources/Foo.swift"])).toEqual({
+  it("keeps node lane off for Android native-only changes", () => {
+    expect(detectChangedScope(["apps/android/app/src/main/java/ai/openclaw/app/MainActivity.kt"])).toEqual({
       runNode: false,
-      runMacos: true,
-      runAndroid: false,
-      runWindows: false,
-      runSkillsPython: false,
-      runChangedSmoke: false,
-    });
-    expect(detectChangedScope(["apps/shared/OpenClawKit/Sources/Foo.swift"])).toEqual({
-      runNode: false,
-      runMacos: true,
+      runMacos: false,
       runAndroid: true,
       runWindows: false,
       runSkillsPython: false,
       runChangedSmoke: false,
     });
-  });
-
-  it("does not force macOS for generated protocol model-only changes", () => {
-    expect(detectChangedScope(["apps/macos/Sources/OpenClawProtocol/GatewayModels.swift"])).toEqual(
-      {
-        runNode: false,
-        runMacos: false,
-        runAndroid: false,
-        runWindows: false,
-        runSkillsPython: false,
-        runChangedSmoke: false,
-      },
-    );
   });
 
   it("enables node lane for non-native non-doc files by fallback", () => {

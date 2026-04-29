@@ -1,3 +1,2 @@
-import { describeSlackPluginsCoreExtensionContract } from "../../../../test/helpers/channels/plugins-core-extension-contract.js";
-
-describeSlackPluginsCoreExtensionContract();
+// Note: slack extension has been removed (DennouAibou debloat).
+// Test suite removed intentionally.

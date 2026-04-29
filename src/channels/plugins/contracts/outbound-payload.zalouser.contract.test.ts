@@ -1,6 +1,2 @@
-import { describe } from "vitest";
-import { installZalouserOutboundPayloadContractSuite } from "../../../../test/helpers/channels/outbound-payload-contract.js";
-
-describe("zalouser outbound payload contract", () => {
-  installZalouserOutboundPayloadContractSuite();
-});
+// Note: zalouser extension has been removed (DennouAibou debloat).
+// Test suite removed intentionally.

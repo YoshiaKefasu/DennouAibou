@@ -32,15 +32,13 @@ const PROVIDER_BOUNDARY_TEST_SIGNALS = [
   /\bcreateTestPluginApi\s*\(/u,
 ] as const;
 const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContract> = {
-  "amazon-bedrock": {
-    replayFamilies: ["anthropic-by-model"],
-  },
   fireworks: {
     replayFamilies: ["openai-compatible"],
   },
   google: {
     replayFamilies: ["google-gemini"],
     streamFamilies: ["google-thinking"],
+    toolCompatFamilies: ["gemini"],
   },
   kilocode: {
     replayFamilies: ["passthrough-gemini"],
@@ -72,10 +70,6 @@ const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContr
   },
   xai: {
     replayFamilies: ["openai-compatible"],
-  },
-  zai: {
-    replayFamilies: ["openai-compatible"],
-    streamFamilies: ["tool-stream-default-on"],
   },
 };
 

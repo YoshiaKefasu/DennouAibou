@@ -1,8 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  matrixSetupAdapter,
-  matrixSetupWizard,
-} from "../../test/helpers/channels/matrix-setup-contract.js";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
@@ -114,33 +110,6 @@ function createMSTeamsCatalogEntry(): ChannelPluginCatalogEntry {
       npmSpec: "@openclaw/msteams",
     },
   };
-}
-
-async function setMatrixOnboardingRegistryForTests(): Promise<void> {
-  setActivePluginRegistry(
-    createTestRegistry([
-      {
-        pluginId: "matrix",
-        source: "test",
-        plugin: {
-          ...createChannelTestPluginBase({
-            id: "matrix",
-            label: "Matrix",
-            capabilities: { chatTypes: ["direct", "group", "thread"] },
-          }),
-          meta: {
-            id: "matrix",
-            label: "Matrix",
-            selectionLabel: "Matrix (plugin)",
-            docsPath: "/channels/matrix",
-            blurb: "open protocol; configure a homeserver + access token.",
-          },
-          setup: matrixSetupAdapter,
-          setupWizard: matrixSetupWizard,
-        },
-      },
-    ]),
-  );
 }
 
 async function withClearedMatrixSetupEnv<T>(run: () => Promise<T>): Promise<T> {
@@ -678,27 +647,6 @@ describe("setupChannels", () => {
 
   it("renders the QuickStart channel picker without requiring the LINE runtime", async () => {
     await expectQuickstartPickerSkipsWithoutRuntime();
-  });
-
-  it("runs Matrix guided setup through setupChannels without falling back", async () => {
-    await withClearedMatrixSetupEnv(async () => {
-      await setMatrixOnboardingRegistryForTests();
-
-      const notes: string[] = [];
-      const prompter = createMatrixQuickstartPrompter(notes);
-      const cfg = await runSetupChannels({} as OpenClawConfig, prompter, {
-        quickstartDefaults: true,
-      });
-
-      expect(cfg.channels?.matrix).toMatchObject({
-        enabled: true,
-        homeserver: "https://matrix.example.org",
-        accessToken: "matrix-token",
-        deviceName: "OpenClaw Gateway",
-        encryption: false,
-      });
-      expect(notes.join("\n")).not.toContain("matrix does not support guided setup yet.");
-    });
   });
 
   it("renders the QuickStart channel picker without requiring the Matrix runtime", async () => {

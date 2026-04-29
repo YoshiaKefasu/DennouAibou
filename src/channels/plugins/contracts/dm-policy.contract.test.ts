@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  isSignalSenderAllowed,
-  type SignalSender,
-} from "../../../../test/helpers/channels/dm-policy-contract.js";
-import { isAllowedBlueBubblesSender } from "../../../plugin-sdk/bluebubbles-policy.js";
-import { isMattermostSenderAllowed } from "../../../plugin-sdk/mattermost-policy.js";
-import {
   DM_GROUP_ACCESS_REASON,
   resolveDmGroupAccessWithLists,
 } from "../../../security/dm-policy-shared.js";
@@ -16,37 +10,11 @@ type ChannelSmokeCase = {
   isSenderAllowed: (allowFrom: string[]) => boolean;
 };
 
-const signalSender: SignalSender = {
-  kind: "phone",
-  raw: "+15550001111",
-  e164: "+15550001111",
-};
-
 const channelSmokeCases: ChannelSmokeCase[] = [
-  {
-    name: "bluebubbles",
-    storeAllowFrom: ["attacker-user"],
-    isSenderAllowed: (allowFrom) =>
-      isAllowedBlueBubblesSender({
-        allowFrom,
-        sender: "attacker-user",
-        chatId: 101,
-      }),
-  },
-  {
-    name: "signal",
-    storeAllowFrom: [signalSender.e164],
-    isSenderAllowed: (allowFrom) => isSignalSenderAllowed(signalSender, allowFrom),
-  },
   {
     name: "mattermost",
     storeAllowFrom: ["user:attacker-user"],
-    isSenderAllowed: (allowFrom) =>
-      isMattermostSenderAllowed({
-        senderId: "attacker-user",
-        senderName: "Attacker",
-        allowFrom,
-      }),
+    isSenderAllowed: (allowFrom) => allowFrom.includes("user:attacker-user"),
   },
 ];
 

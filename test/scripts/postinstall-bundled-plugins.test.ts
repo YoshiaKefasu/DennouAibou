@@ -171,9 +171,9 @@ describe("bundled plugin postinstall", () => {
         "@slack/web-api": "7.11.0",
       },
     });
-    await writePluginPackage(extensionsDir, "amazon-bedrock", {
+    await writePluginPackage(extensionsDir, "mattermost", {
       dependencies: {
-        "@aws-sdk/client-bedrock": "3.1020.0",
+        ws: "8.20.0",
       },
     });
 
@@ -186,10 +186,10 @@ describe("bundled plugin postinstall", () => {
           version: "7.11.0",
         },
         {
-          name: "@aws-sdk/client-bedrock",
-          pluginIds: ["amazon-bedrock"],
-          sentinelPath: path.join("node_modules", "@aws-sdk", "client-bedrock", "package.json"),
-          version: "3.1020.0",
+          name: "ws",
+          pluginIds: ["mattermost"],
+          sentinelPath: path.join("node_modules", "ws", "package.json"),
+          version: "8.20.0",
         },
       ]),
     );

@@ -1,0 +1,90 @@
+# graphify outputs / recursion guards
+graphify-out/
+.graphify-out/
+.gitnexus/
+
+# package managers / dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs / generated runtime artifacts
+dist/
+dist-runtime/
+build/
+out/
+lib/
+esm/
+cjs/
+coverage/
+.tmp/
+temp/
+.cache/
+.next/
+.nuxt/
+
+# generated maps, type artifacts, and bundled/minified outputs
+**/*.js.map
+**/*.tsbuildinfo
+**/*.min.js
+src/canvas-host/a2ui/a2ui.bundle.js
+
+# tests and mocks; implementation graph should stay focused on runtime surfaces
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+test/
+tests/
+__tests__/
+__mocks__/
+e2e/
+cypress/
+playwright/
+spec/
+
+# heavy media / static assets
+public/
+static/
+**/assets/
+docs/images/
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.webp
+**/*.mp4
+**/*.mp3
+
+# native/mobile artifacts not useful for the current DennouAibou implementation graph
+**/*.swift
+/bin/
+/pkg/
+/obj/
+**/*.exe
+**/*.so
+**/*.dll
+**/*.dylib
+**/*.test
+cover.out
+**/*.prof
+
+# local/runtime state
+workspace/
+memory/
+logs/
+data/
+cache/
+**/*.log
+.env*
+
+# vendored/generated protocol or external corpora
+vendor/
+proto/gen/
+migrations/
+payments-platform/
+
+# Keep implementation surfaces visible for graphify:
+#   src/
+#   extensions/
+#   packages/
+#   DENNOU_DOCS/

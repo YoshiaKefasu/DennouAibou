@@ -1,3 +1,2 @@
-import { describeWhatsAppPluginsCoreExtensionContract } from "../../../../test/helpers/channels/plugins-core-extension-contract.js";
-
-describeWhatsAppPluginsCoreExtensionContract();
+// Note: whatsapp extension has been removed (DennouAibou debloat).
+// Test suite removed intentionally.

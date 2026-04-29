@@ -1,1 +1,2 @@
-export { matrixSetupAdapter, matrixSetupWizard } from "../../../extensions/matrix/contract-api.js";
+// Note: matrix extension has been removed (DennouAibou debloat).
+// Re-export removed intentionally.

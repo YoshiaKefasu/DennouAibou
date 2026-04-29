@@ -1,5 +1,7 @@
-import { fetchFirecrawlContent } from "../extensions/firecrawl/api.ts";
 import { extractReadableContent } from "../src/agents/tools/web-tools.js";
+
+// Note: firecrawl extension has been removed (DennouAibou debloat).
+// The Firecrawl comparison path below is effectively dead code when FIRECRAWL_API_KEY is unset.
 
 const DEFAULT_URLS = [
   "https://en.wikipedia.org/wiki/Web_scraping",

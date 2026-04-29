@@ -1,5 +1,2 @@
-export { resolveWhatsAppRuntimeGroupPolicy } from "../../../extensions/whatsapp/test-api.js";
-export {
-  evaluateZaloGroupAccess,
-  resolveZaloRuntimeGroupPolicy,
-} from "../../../extensions/zalo/test-api.js";
+// Note: whatsapp and zalo extensions have been removed (DennouAibou debloat).
+// Re-exports removed intentionally.

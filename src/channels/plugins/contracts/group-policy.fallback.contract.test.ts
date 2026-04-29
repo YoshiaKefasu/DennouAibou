@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { installChannelRuntimeGroupPolicyFallbackSuite } from "../../../../test/helpers/channels/group-policy-contract-suites.js";
-import {
-  resolveZaloRuntimeGroupPolicy,
-  resolveWhatsAppRuntimeGroupPolicy,
-} from "../../../../test/helpers/channels/group-policy-contract.js";
 import { resolveOpenProviderRuntimeGroupPolicy } from "../../../config/runtime-group-policy.js";
 
 describe("channel runtime group policy fallback contract", () => {
@@ -24,16 +20,6 @@ describe("channel runtime group policy fallback contract", () => {
       defaultGroupPolicyUnderTest: "disabled",
       missingConfigLabel: "fails closed when channels.telegram is missing and no defaults are set",
       missingDefaultLabel: "ignores explicit defaults when provider config is missing",
-    });
-  });
-
-  describe("whatsapp", () => {
-    installChannelRuntimeGroupPolicyFallbackSuite({
-      resolve: resolveWhatsAppRuntimeGroupPolicy,
-      configuredLabel: "keeps open fallback when channels.whatsapp is configured",
-      defaultGroupPolicyUnderTest: "disabled",
-      missingConfigLabel: "fails closed when channels.whatsapp is missing and no defaults are set",
-      missingDefaultLabel: "ignores explicit global defaults when provider config is missing",
     });
   });
 
@@ -68,13 +54,5 @@ describe("channel runtime group policy fallback contract", () => {
     });
   });
 
-  describe("zalo", () => {
-    installChannelRuntimeGroupPolicyFallbackSuite({
-      resolve: resolveZaloRuntimeGroupPolicy,
-      configuredLabel: "keeps open fallback when channels.zalo is configured",
-      defaultGroupPolicyUnderTest: "open",
-      missingConfigLabel: "fails closed when channels.zalo is missing and no defaults are set",
-      missingDefaultLabel: "ignores explicit global defaults when provider config is missing",
-    });
-  });
+  // Note: zalo extension has been removed (DennouAibou debloat). describe block removed.
 });

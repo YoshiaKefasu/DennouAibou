@@ -3,12 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  collectFeishuSecurityAuditFindings,
   collectDiscordSecurityAuditFindings,
-  collectSlackSecurityAuditFindings,
-  collectSynologyChatSecurityAuditFindings,
   collectTelegramSecurityAuditFindings,
-  collectZalouserSecurityAuditFindings,
 } from "../../test/helpers/channels/security-audit-contract.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -60,27 +56,11 @@ function stubChannelPlugin(params: {
       ? (collectDiscordSecurityAuditFindings as NonNullable<
           ChannelPlugin["security"]
         >["collectAuditFindings"])
-      : params.id === "feishu"
-        ? (collectFeishuSecurityAuditFindings as NonNullable<
-            ChannelPlugin["security"]
-          >["collectAuditFindings"])
-        : params.id === "slack"
-          ? (collectSlackSecurityAuditFindings as NonNullable<
-              ChannelPlugin["security"]
-            >["collectAuditFindings"])
-          : params.id === "synology-chat"
-            ? (collectSynologyChatSecurityAuditFindings as NonNullable<
+      : params.id === "telegram"
+            ? (collectTelegramSecurityAuditFindings as NonNullable<
                 ChannelPlugin["security"]
               >["collectAuditFindings"])
-            : params.id === "telegram"
-              ? (collectTelegramSecurityAuditFindings as NonNullable<
-                  ChannelPlugin["security"]
-                >["collectAuditFindings"])
-              : params.id === "zalouser"
-                ? (collectZalouserSecurityAuditFindings as NonNullable<
-                    ChannelPlugin["security"]
-                  >["collectAuditFindings"])
-                : undefined);
+            : undefined);
   const defaultCommands =
     params.commands ??
     (params.id === "discord" || params.id === "telegram"

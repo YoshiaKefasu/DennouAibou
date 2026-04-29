@@ -252,7 +252,7 @@ jobs:
             macos_node_matrix: createMatrix(
               runMacos ? [{ check_name: "macos-node", runtime: "node", task: "test" }] : [],
             ),
-            run_macos_swift: runMacos,
+            run_macos_swift: false,
             run_android_job: runAndroid,
             android_matrix: createMatrix(
               runAndroid
@@ -1067,70 +1067,6 @@ jobs:
               exit 1
               ;;
           esac
-
-  macos-swift:
-    name: "macos-swift"
-    needs: [preflight]
-    if: needs.preflight.outputs.run_macos_swift == 'true'
-    runs-on: macos-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          submodules: false
-
-      - name: Select Xcode 26.1
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.1.app
-          xcodebuild -version
-
-      - name: Install XcodeGen / SwiftLint / SwiftFormat
-        run: brew install xcodegen swiftlint swiftformat
-
-      - name: Cache SwiftPM
-        uses: actions/cache@v5
-        with:
-          path: ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-swiftpm-${{ hashFiles('apps/macos/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-
-
-      - name: Show toolchain
-        run: |
-          sw_vers
-          xcodebuild -version
-          swift --version
-
-      - name: Swift lint
-        run: |
-          swiftlint --config .swiftlint.yml
-          swiftformat --lint apps/macos/Sources --config .swiftformat
-
-      - name: Swift build (release)
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if swift build --package-path apps/macos --configuration release; then
-              exit 0
-            fi
-            echo "swift build failed (attempt $attempt/3). Retrying…"
-            sleep $((attempt * 20))
-          done
-          exit 1
-
-      - name: Swift test
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if swift test --package-path apps/macos --parallel --enable-code-coverage --show-codecov-path; then
-              exit 0
-            fi
-            echo "swift test failed (attempt $attempt/3). Retrying…"
-            sleep $((attempt * 20))
-          done
-          exit 1
 
   android:
     name: ${{ matrix.check_name }}

@@ -1,6 +1,2 @@
-import { describe } from "vitest";
-import { installSlackInboundContractSuite } from "../../../../test/helpers/channels/inbound-contract.slack.js";
-
-describe("slack inbound contract", () => {
-  installSlackInboundContractSuite();
-});
+// Note: slack extension has been removed (DennouAibou debloat).
+// Test suite removed intentionally.
