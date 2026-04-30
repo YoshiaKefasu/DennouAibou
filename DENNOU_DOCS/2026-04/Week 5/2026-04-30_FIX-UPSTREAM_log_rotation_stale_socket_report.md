@@ -293,3 +293,45 @@ Fix B-1: 7/7 通過（health-monitor stale-socket 全ケース）
 Fix B-3: 5/5 通過（readiness 全ケース）
 
 Carbon の emit なしでも、60秒ポーリングにより Discord の transport activity が確実に記録される。stale-socket 誤判定は完全に防止される。
+
+---
+
+## 追記（2026-04-30）: DennouAibou 設定タブの表示位置と再デプロイ時の注意
+
+### 結論
+
+- DennouAibou は **サイドバー項目ではない**。
+- 表示位置は **`/config` ページ上部のカテゴリタブ**（`Settings / Environment / ... / DennouAibou`）である。
+
+### 根拠（実装）
+
+- `ui/src/ui/views/config.ts`
+  - `dennou` セクションのアイコン定義あり
+  - `id: "dennouAibou"` のカテゴリ定義あり
+  - `key: "dennou"` を持つ `DennouAibou` タブ定義あり
+- `src/config/zod-schema.ts`
+  - ルート schema に `dennou: DennouSchema` が含まれる
+- `src/config/schema.base.generated.ts`
+  - 生成済み base schema に `dennou` セクションが含まれる
+
+### 再発防止メモ（デプロイ運用）
+
+1. **ビルド順序を固定する**
+   - `pnpm build`（backend）
+   - `pnpm ui:build`（frontend）
+
+2. **配布前チェック**
+   - `dist/control-ui/index.html` が存在すること
+   - 配布 zip 内に `control-ui/index.html` が入っていること
+
+3. **起動コマンドの互換性確認**
+   - 本環境の `openclaw gateway` は `--host` 非対応
+   - 起動は `openclaw gateway --port 18789` を使用
+
+### 画面確認手順（オペレーター向け）
+
+1. 左サイドバーで **設定** を開く
+2. 画面上部タブ列を右へ確認
+3. **DennouAibou** タブを開く
+
+この表示仕様は upstream の WebUI 再構成に追従したもので、現行実装として正しい。
