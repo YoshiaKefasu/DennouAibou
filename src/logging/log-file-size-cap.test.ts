@@ -14,9 +14,11 @@ const DEFAULT_MAX_FILE_BYTES = 500 * 1024 * 1024;
 
 describe("log file size cap", () => {
   let logPath = "";
+  let logDir = "";
 
   beforeEach(() => {
-    logPath = path.join(os.tmpdir(), `openclaw-log-cap-${crypto.randomUUID()}.log`);
+    logDir = path.join(os.tmpdir(), `openclaw-log-cap-${crypto.randomUUID()}`);
+    logPath = path.join(logDir, "openclaw.log");
     resetLogger();
     setLoggerOverride(null);
   });
@@ -26,7 +28,7 @@ describe("log file size cap", () => {
     setLoggerOverride(null);
     vi.restoreAllMocks();
     try {
-      fs.rmSync(logPath, { force: true });
+      fs.rmSync(logDir, { force: true, recursive: true });
     } catch {
       // ignore cleanup errors
     }
@@ -64,5 +66,26 @@ describe("log file size cap", () => {
       .map(([firstArg]) => String(firstArg))
       .filter((line) => line.includes("log file size cap reached"));
     expect(capWarnings).toHaveLength(1);
+  });
+
+  it("writes rolling logs to the current date after midnight", () => {
+    vi.useFakeTimers();
+    // Use times deep within each local day to avoid timezone boundary issues:
+    // formatLocalDate uses getFullYear/getMonth/getDate (local-time), so UTC
+    // timestamps near midnight may shift to a different local date on JST/etc.
+    const firstDay = path.join(logDir, "openclaw-2026-04-29.log");
+    const secondDay = path.join(logDir, "openclaw-2026-04-30.log");
+
+    vi.setSystemTime(new Date("2026-04-29T12:00:00.000Z"));
+    setLoggerOverride({ level: "info", file: firstDay });
+    const logger = getLogger();
+    logger.info("before-midnight");
+
+    vi.setSystemTime(new Date("2026-04-30T12:00:00.000Z"));
+    logger.info("after-midnight");
+
+    expect(fs.readFileSync(firstDay, "utf8")).toContain("before-midnight");
+    expect(fs.readFileSync(firstDay, "utf8")).not.toContain("after-midnight");
+    expect(fs.readFileSync(secondDay, "utf8")).toContain("after-midnight");
   });
 });

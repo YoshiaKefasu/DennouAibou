@@ -24,9 +24,6 @@ function isRollingLogFile(file: string): boolean {
 
 async function resolveLogFile(file: string): Promise<string> {
   const stat = await fs.stat(file).catch(() => null);
-  if (stat) {
-    return file;
-  }
   if (!isRollingLogFile(file)) {
     return file;
   }
