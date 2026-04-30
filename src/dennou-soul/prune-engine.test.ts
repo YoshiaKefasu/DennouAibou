@@ -178,6 +178,29 @@ describe("isProtectedByWorkspacePath", () => {
     const parsed = parseLine(line)!;
     expect(isProtectedByWorkspacePath(parsed, undefined)).toBe(false);
   });
+
+  it("returns true when workspace path exists only in raw JSON fields", () => {
+    const line = JSON.stringify({
+      type: "message",
+      id: "tool-raw-path",
+      timestamp: "2026-01-01T00:00:03.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId: "call_read",
+        toolName: "readFile",
+        // content.text にはパスを含めない（取りこぼしケース）
+        content: [{ type: "text", text: "Read completed" }],
+      },
+      // 生JSON側にだけ workspace 配下パスが含まれる
+      sourcePath: "D:\\GitHub\\OpenClaw Related Repos\\DennouAibou\\src\\main.ts",
+    });
+    const parsed = parseLine(line)!;
+    const protection: DennouPruneProtectionConfig = {
+      protectedContentKeywords: [],
+      resolvedWorkspacePaths: ["d:/github/openclaw related repos/dennouaibou"],
+    };
+    expect(isProtectedByWorkspacePath(parsed, protection)).toBe(true);
+  });
 });
 
 // ── pruneToolOutputLines: 保護ルール統合テスト ────────────

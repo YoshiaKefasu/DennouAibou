@@ -81,6 +81,14 @@ function normalizePathSeparators(s: string): string {
 }
 
 /**
+ * JSON文字列中のエスケープされたバックスラッシュを緩和し、
+ * パス判定用の正規化へ通しやすくする。
+ */
+function unescapeJsonBackslashes(s: string): string {
+  return s.replace(/\\\\/g, "\\");
+}
+
+/**
  * コンテンツ内にprotectedContentKeywordsのいずれかが含まれるか（case-insensitive）。
  */
 export function isProtectedByKeyword(
@@ -103,10 +111,15 @@ export function isProtectedByWorkspacePath(
   protection?: DennouPruneProtectionConfig,
 ): boolean {
   if (!protection?.resolvedWorkspacePaths?.length) return false;
+  // 取りこぼしを避けるため、表示用テキストだけでなく JSONL 行全体も見る。
+  // 例: パスが構造化フィールドに入り text には出ないケース、
+  //     JSONエスケープで "D:\\..." になっているケース。
   const text = normalizePathSeparators(getToolResultTextContent(entry));
-  return protection.resolvedWorkspacePaths.some(
-    (wsPath) => text.includes(normalizePathSeparators(wsPath)),
-  );
+  const raw = normalizePathSeparators(unescapeJsonBackslashes(entry.raw));
+  return protection.resolvedWorkspacePaths.some((wsPath) => {
+    const normalizedWsPath = normalizePathSeparators(wsPath);
+    return text.includes(normalizedWsPath) || raw.includes(normalizedWsPath);
+  });
 }
 
 /**

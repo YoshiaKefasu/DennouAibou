@@ -249,3 +249,42 @@ function normalizePathSeparators(s: string): string {
 
 **批判的バグ: なし**
 
+---
+
+## 9. v1.1 Hardening（2026-04-30）
+
+### 目的
+
+「workspace配下に関する出力は常に保護」を、取りこぼしが出にくい形へ強化する。
+
+### 変更点
+
+- 変更ファイル: `src/dennou-soul/prune-engine.ts`
+- 変更関数: `isProtectedByWorkspacePath()`
+- 仕様:
+  - 従来どおり `message.content[].text` を判定対象にする
+  - 追加で JSONL 生行 (`entry.raw`) も判定対象にする
+  - `entry.raw` 側は JSON エスケープされた Windows パス（`\\\\`）を `\\` に戻してから比較する
+  - どちらか一方で workspace path に一致したら保護する
+
+### これで防げる取りこぼし
+
+- パスが `content[].text` ではなく、別フィールドに入っている toolResult
+- Windows パスが JSON エスケープされたまま保存されるケース
+
+### トレードオフ
+
+- 安全側（過保護）に寄せた判定。
+- 部分一致なので、稀に無関係な行を保護する可能性はある。
+- ただし DennouAibou の方針（誤削除回避優先）と整合するため許容。
+
+### テスト
+
+- 追加: `src/dennou-soul/prune-engine.test.ts`
+  - `content[].text` にパスが無くても、`entry.raw` 側に workspace path があれば保護されることを検証
+
+### 実行した検証コマンド
+
+- `pnpm test src/dennou-soul/prune-engine.test.ts` ✅
+- `pnpm test src/dennou-soul/prune-active-session.test.ts` ✅
+- `pnpm test src/dennou-soul/prune-closed-sessions.test.ts` ✅
