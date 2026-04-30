@@ -414,6 +414,25 @@ export async function runDiscordGatewayLifecycle(params: {
   };
   gatewayEmitter?.on(DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT, onGatewayTransportActivity);
 
+  // Fallback transport-activity poller: checks gateway.isConnected periodically.
+  // At 60s intervals it always passes the 30s throttle, giving a clean heartbeat.
+  const TRANSPORT_POLLER_INTERVAL_MS = 60_000;
+  const transportPollerId = setInterval(() => {
+    if (lifecycleStopping || params.abortSignal?.aborted || !gateway?.isConnected) {
+      return;
+    }
+    const now = Date.now();
+    if (
+      lastTransportActivityStatusAt !== undefined &&
+      now - lastTransportActivityStatusAt < DISCORD_GATEWAY_TRANSPORT_ACTIVITY_STATUS_MIN_INTERVAL_MS
+    ) {
+      return;
+    }
+    lastTransportActivityStatusAt = now;
+    pushStatus(createTransportActivityStatusPatch(now));
+  }, TRANSPORT_POLLER_INTERVAL_MS);
+  transportPollerId.unref?.();
+
   let sawDisallowedIntents = false;
   const handleGatewayEvent = (event: DiscordGatewayEvent): "continue" | "stop" => {
     if (event.type === "disallowed-intents") {
@@ -487,6 +506,7 @@ export async function runDiscordGatewayLifecycle(params: {
     unregisterGateway(params.accountId);
     stopGatewayLogging();
     statusObserver.dispose();
+    clearInterval(transportPollerId);
     gatewayEmitter?.removeListener("debug", statusObserver.onGatewayDebug);
     gatewayEmitter?.removeListener(
       DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT,

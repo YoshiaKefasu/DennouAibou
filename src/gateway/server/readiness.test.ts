@@ -32,7 +32,7 @@ function createManager(snapshot: ChannelRuntimeSnapshot): ChannelManager {
   };
 }
 
-function createHealthyDiscordManager(startedAt: number, lastEventAt: number): ChannelManager {
+function createHealthyDiscordManager(startedAt: number, lastTransportActivityAt: number): ChannelManager {
   return createManager(
     snapshotWith({
       discord: {
@@ -41,7 +41,24 @@ function createHealthyDiscordManager(startedAt: number, lastEventAt: number): Ch
         enabled: true,
         configured: true,
         lastStartAt: startedAt,
-        lastEventAt,
+        lastEventAt: lastTransportActivityAt,
+        lastTransportActivityAt,
+      },
+    }),
+  );
+}
+
+function createStaleSocketDiscordManager(startedAt: number, staleAt: number): ChannelManager {
+  return createManager(
+    snapshotWith({
+      discord: {
+        running: true,
+        connected: true,
+        enabled: true,
+        configured: true,
+        lastStartAt: startedAt,
+        lastEventAt: staleAt,
+        lastTransportActivityAt: staleAt,
       },
     }),
   );
@@ -168,19 +185,9 @@ describe("createReadinessChecker", () => {
   it("treats stale-socket channels as ready to avoid pulling healthy idle pods", () => {
     withReadinessClock(() => {
       const startedAt = Date.now() - 31 * 60_000;
-      const { readiness } = createReadinessHarness({
-        startedAgoMs: 31 * 60_000,
-        accounts: {
-          discord: {
-            running: true,
-            connected: true,
-            enabled: true,
-            configured: true,
-            lastStartAt: startedAt,
-            lastEventAt: Date.now() - 31 * 60_000,
-          },
-        },
-      });
+      const staleAt = Date.now() - 31 * 60_000;
+      const manager = createStaleSocketDiscordManager(startedAt, staleAt);
+      const readiness = createReadinessChecker({ channelManager: manager, startedAt });
       expect(readiness()).toEqual({ ready: true, failing: [], uptimeMs: 1_860_000 });
     });
   });

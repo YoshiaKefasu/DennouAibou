@@ -502,6 +502,7 @@ describe("channel-health-monitor", () => {
         runningConnectedSlackAccount({
           lastStartAt: now - STALE_THRESHOLD - 60_000,
           lastEventAt: now - STALE_THRESHOLD - 30_000,
+          lastTransportActivityAt: now - STALE_THRESHOLD - 30_000,
         }),
       );
       await expectRestartedChannel(manager, "slack");
@@ -513,6 +514,7 @@ describe("channel-health-monitor", () => {
         runningConnectedSlackAccount({
           lastStartAt: now - STALE_THRESHOLD - 60_000,
           lastEventAt: now - 5_000,
+          lastTransportActivityAt: now - 5_000,
         }),
       );
       await expectNoRestart(manager);
@@ -524,6 +526,7 @@ describe("channel-health-monitor", () => {
         runningConnectedSlackAccount({
           lastStartAt: now - 5_000,
           lastEventAt: null,
+          lastTransportActivityAt: null,
         }),
       );
       await expectNoRestart(manager);
@@ -535,6 +538,7 @@ describe("channel-health-monitor", () => {
         runningConnectedSlackAccount({
           lastStartAt: now - STALE_THRESHOLD - 60_000,
           lastEventAt: now - STALE_THRESHOLD - 60_000,
+          lastTransportActivityAt: now - STALE_THRESHOLD - 60_000,
         }),
       );
       await expectRestartedChannel(manager, "slack");
@@ -564,6 +568,7 @@ describe("channel-health-monitor", () => {
         runningConnectedSlackAccount({
           lastStartAt: now - customThreshold - 60_000,
           lastEventAt: now - customThreshold - 30_000,
+          lastTransportActivityAt: now - customThreshold - 30_000,
         }),
       );
       const monitor = await startAndRunCheck(manager, {
