@@ -10,6 +10,7 @@ export type ChannelHealthSnapshot = {
   activeRuns?: number;
   lastRunActivityAt?: number | null;
   lastEventAt?: number | null;
+  lastTransportActivityAt?: number | null;
   lastStartAt?: number | null;
   reconnectAttempts?: number;
   mode?: string;
@@ -78,6 +79,11 @@ export function evaluateChannelHealth(
     typeof snapshot.lastRunActivityAt === "number" && Number.isFinite(snapshot.lastRunActivityAt)
       ? snapshot.lastRunActivityAt
       : null;
+  const lastTransportActivityAt =
+    typeof snapshot.lastTransportActivityAt === "number" &&
+    Number.isFinite(snapshot.lastTransportActivityAt)
+      ? snapshot.lastTransportActivityAt
+      : null;
   const busyStateInitializedForLifecycle =
     lastStartAt == null || (lastRunActivityAt != null && lastRunActivityAt >= lastStartAt);
 
@@ -107,24 +113,24 @@ export function evaluateChannelHealth(
   if (snapshot.connected === false) {
     return { healthy: false, reason: "disconnected" };
   }
-  // Skip stale-socket checks for channels that declare this health policy and
-  // any channel explicitly operating in webhook mode. In these cases, there is
-  // no persistent outgoing socket that can go half-dead, so the lack of
-  // incoming events does not necessarily indicate a connection failure.
-  if (
+  // App-level events are not socket liveness: quiet Slack/Discord workspaces can
+  // legitimately go idle for long periods while the transport is still healthy.
+  // Providers should only publish this timestamp from transport/heartbeat/poll
+  // activity that proves the connection is still alive.
+  const shouldCheckStaleSocket =
     policy.skipStaleSocketCheck !== true &&
     snapshot.mode !== "webhook" &&
     snapshot.connected === true &&
-    snapshot.lastEventAt != null
-  ) {
-    if (lastStartAt != null && snapshot.lastEventAt < lastStartAt) {
+    lastTransportActivityAt != null;
+  if (shouldCheckStaleSocket) {
+    if (lastStartAt != null && lastTransportActivityAt < lastStartAt) {
       const lifecycleEventGap = Math.max(0, policy.now - lastStartAt);
       if (lifecycleEventGap <= policy.staleEventThresholdMs) {
         return { healthy: true, reason: "healthy" };
       }
       return { healthy: false, reason: "stale-socket" };
     }
-    const eventAge = policy.now - snapshot.lastEventAt;
+    const eventAge = policy.now - lastTransportActivityAt;
     if (eventAge > policy.staleEventThresholdMs) {
       return { healthy: false, reason: "stale-socket" };
     }

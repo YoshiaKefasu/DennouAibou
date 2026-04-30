@@ -754,6 +754,7 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount, DiscordProbe> 
               lastConnectedAt: runtime?.lastConnectedAt ?? null,
               lastDisconnect: runtime?.lastDisconnect ?? null,
               lastEventAt: runtime?.lastEventAt ?? null,
+              lastTransportActivityAt: runtime?.lastTransportActivityAt ?? null,
               application: app ?? undefined,
               bot: bot ?? undefined,
               audit,

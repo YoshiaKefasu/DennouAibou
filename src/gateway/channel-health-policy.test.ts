@@ -116,7 +116,7 @@ describe("evaluateChannelHealth", () => {
     expect(evaluation).toEqual({ healthy: false, reason: "disconnected" });
   });
 
-  it("flags stale sockets when no events arrive beyond threshold", () => {
+  it("flags stale sockets when no transport activity arrives beyond threshold", () => {
     const evaluation = evaluateChannelHealth(
       {
         running: true,
@@ -125,6 +125,7 @@ describe("evaluateChannelHealth", () => {
         configured: true,
         lastStartAt: 0,
         lastEventAt: 0,
+        lastTransportActivityAt: 0,
       },
       {
         channelId: "discord",
@@ -134,6 +135,27 @@ describe("evaluateChannelHealth", () => {
       },
     );
     expect(evaluation).toEqual({ healthy: false, reason: "stale-socket" });
+  });
+
+  it("does not treat quiet app-level events as stale when transport is active", () => {
+    const evaluation = evaluateChannelHealth(
+      {
+        running: true,
+        connected: true,
+        enabled: true,
+        configured: true,
+        lastStartAt: 0,
+        lastEventAt: 0,
+        lastTransportActivityAt: 90_000,
+      },
+      {
+        channelId: "discord",
+        now: 100_000,
+        channelConnectGraceMs: 10_000,
+        staleEventThresholdMs: 30_000,
+      },
+    );
+    expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
 
   it("skips stale-socket detection for telegram long-polling channels", () => {
@@ -169,14 +191,15 @@ describe("evaluateChannelHealth", () => {
     expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
 
-  it("does not flag stale sockets for channels without event tracking", () => {
+  it("does not flag stale sockets for channels without transport tracking", () => {
     const evaluation = evaluateDiscordHealth({
       running: true,
       connected: true,
       enabled: true,
       configured: true,
       lastStartAt: 0,
-      lastEventAt: null,
+      lastEventAt: 0,
+      lastTransportActivityAt: null,
     });
     expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
@@ -189,6 +212,7 @@ describe("evaluateChannelHealth", () => {
         configured: true,
         lastStartAt: 0,
         lastEventAt: 0,
+        lastTransportActivityAt: 0,
       },
       75_000,
       "slack",
@@ -196,7 +220,7 @@ describe("evaluateChannelHealth", () => {
     expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
 
-  it("ignores inherited event timestamps from a previous lifecycle", () => {
+  it("ignores inherited transport timestamps from a previous lifecycle", () => {
     const evaluation = evaluateDiscordHealth(
       {
         running: true,
@@ -205,6 +229,7 @@ describe("evaluateChannelHealth", () => {
         configured: true,
         lastStartAt: 50_000,
         lastEventAt: 10_000,
+        lastTransportActivityAt: 10_000,
       },
       75_000,
       "slack",
@@ -212,7 +237,7 @@ describe("evaluateChannelHealth", () => {
     expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
 
-  it("flags inherited event timestamps after the lifecycle exceeds the stale threshold", () => {
+  it("flags inherited transport timestamps after the lifecycle exceeds the stale threshold", () => {
     const evaluation = evaluateChannelHealth(
       {
         running: true,
@@ -221,6 +246,7 @@ describe("evaluateChannelHealth", () => {
         configured: true,
         lastStartAt: 50_000,
         lastEventAt: 10_000,
+        lastTransportActivityAt: 10_000,
       },
       {
         channelId: "slack",
