@@ -764,6 +764,158 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
         description:
           "UI presentation settings for accenting and assistant identity shown in control surfaces. Use this for branding and readability customization without changing runtime behavior.",
       },
+      dennou: {
+        type: "object",
+        properties: {
+          toolsPrune: {
+            type: "object",
+            properties: {
+              minPrunableToolChars: {
+                type: "integer",
+                exclusiveMinimum: 0,
+                maximum: 9007199254740991,
+                title: "Shared: Min Prunable Tool Chars",
+                description:
+                  "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
+              },
+              keepLastTools: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Shared: Keep Last Tools",
+                description:
+                  "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+              },
+              placeholder: {
+                type: "string",
+                title: "Shared: Placeholder",
+                description:
+                  "Text inserted where large tool output was pruned. Keep it short and recognizable so you can tell pruning happened without losing context.",
+              },
+              dryRun: {
+                type: "boolean",
+                title: "Shared: Dry Run",
+                description:
+                  "When true, pruning is simulated: logs show what would be pruned, but no content is changed. Keep true while tuning values; switch to false after you trust the behavior.",
+              },
+            },
+            additionalProperties: false,
+            title: "Shared Prune Defaults",
+            description:
+              "Shared defaults used by both closed-session prune and active-session prune. Set values here first, then override only when one mode needs different behavior.",
+          },
+          sessionToolsPrune: {
+            type: "object",
+            properties: {
+              minPrunableToolChars: {
+                type: "integer",
+                exclusiveMinimum: 0,
+                maximum: 9007199254740991,
+                title: "Session: Min Prunable Tool Chars",
+                description:
+                  "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
+              },
+              keepLastTools: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Session: Keep Last Tools",
+                description:
+                  "Closed-session override for how many latest tool outputs are always preserved.",
+              },
+              placeholder: {
+                type: "string",
+                title: "Session: Placeholder",
+                description: "Closed-session override for replacement text after pruning.",
+              },
+              dryRun: {
+                type: "boolean",
+                title: "Session: Dry Run",
+                description: "Closed-session override for dry-run behavior.",
+              },
+              enabled: {
+                type: "boolean",
+                title: "Session Prune Enabled",
+                description:
+                  "Master switch for closed-session pruning. Off = no pruning for closed sessions.",
+              },
+            },
+            additionalProperties: false,
+            title: "Session Tools Prune (Closed Sessions)",
+            description:
+              "Prune policy for closed sessions (finished chats). Use this to reduce disk/memory growth in old logs without touching your live conversation.",
+          },
+          activeSessionToolsPrune: {
+            type: "object",
+            properties: {
+              minPrunableToolChars: {
+                type: "integer",
+                exclusiveMinimum: 0,
+                maximum: 9007199254740991,
+                title: "Active: Min Prunable Tool Chars",
+                description: "Active-session override for min prunable size.",
+              },
+              keepLastTools: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Active: Keep Last Tools",
+                description:
+                  "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+              },
+              placeholder: {
+                type: "string",
+                title: "Active: Placeholder",
+                description: "Active-session override for replacement text after pruning.",
+              },
+              dryRun: {
+                type: "boolean",
+                title: "Active: Dry Run",
+                description: "Active-session override for dry-run behavior.",
+              },
+              enabled: {
+                type: "boolean",
+                title: "Active Prune Enabled",
+                description: "Master switch for active-session idle pruning.",
+              },
+              idleDelayMinutes: {
+                type: "integer",
+                exclusiveMinimum: 0,
+                maximum: 9007199254740991,
+                title: "Active: Idle Delay Minutes",
+                description:
+                  "How long the session must stay idle before active prune runs. Start with 30 minutes; lower for faster cleanup, higher to preserve more near-term context.",
+              },
+            },
+            additionalProperties: false,
+            title: "Active Session Tools Prune",
+            description:
+              "Prune policy for active sessions after idle time. This is for long-running chats that pause, then resume later.",
+          },
+          pruneProtection: {
+            type: "object",
+            properties: {
+              protectedContentKeywords: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+                title: "Protected Content Keywords",
+                description:
+                  "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
+              },
+            },
+            additionalProperties: false,
+            title: "Prune Protection",
+            description:
+              "Safety rules that prevent pruning when protected files/keywords are involved.",
+          },
+        },
+        additionalProperties: false,
+        title: "DennouAibou",
+        description:
+          "DennouAibou memory-prune controls. Think of this as a cleanup policy for long chat logs: what to trim, what to always keep, and when cleanup is only a rehearsal.",
+      },
       secrets: {
         type: "object",
         properties: {
@@ -22369,6 +22521,115 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       label: "Auto Update Beta Check Interval (hours)",
       help: "How often beta-channel checks run in hours (default: 1).",
       tags: ["performance"],
+    },
+    dennou: {
+      label: "DennouAibou",
+      help: "DennouAibou memory-prune controls. Think of this as a cleanup policy for long chat logs: what to trim, what to always keep, and when cleanup is only a rehearsal.",
+      tags: ["advanced"],
+    },
+    "dennou.toolsPrune": {
+      label: "Shared Prune Defaults",
+      help: "Shared defaults used by both closed-session prune and active-session prune. Set values here first, then override only when one mode needs different behavior.",
+      order: 10,
+      tags: ["advanced"],
+    },
+    "dennou.toolsPrune.minPrunableToolChars": {
+      label: "Shared: Min Prunable Tool Chars",
+      help: "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
+      tags: ["advanced"],
+    },
+    "dennou.toolsPrune.keepLastTools": {
+      label: "Shared: Keep Last Tools",
+      help: "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+      tags: ["media"],
+    },
+    "dennou.toolsPrune.placeholder": {
+      label: "Shared: Placeholder",
+      help: "Text inserted where large tool output was pruned. Keep it short and recognizable so you can tell pruning happened without losing context.",
+      tags: ["advanced"],
+    },
+    "dennou.toolsPrune.dryRun": {
+      label: "Shared: Dry Run",
+      help: "When true, pruning is simulated: logs show what would be pruned, but no content is changed. Keep true while tuning values; switch to false after you trust the behavior.",
+      tags: ["advanced"],
+    },
+    "dennou.sessionToolsPrune": {
+      label: "Session Tools Prune (Closed Sessions)",
+      help: "Prune policy for closed sessions (finished chats). Use this to reduce disk/memory growth in old logs without touching your live conversation.",
+      order: 30,
+      tags: ["storage"],
+    },
+    "dennou.sessionToolsPrune.enabled": {
+      label: "Session Prune Enabled",
+      help: "Master switch for closed-session pruning. Off = no pruning for closed sessions.",
+      tags: ["storage"],
+    },
+    "dennou.sessionToolsPrune.minPrunableToolChars": {
+      label: "Session: Min Prunable Tool Chars",
+      help: "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
+      tags: ["storage"],
+    },
+    "dennou.sessionToolsPrune.keepLastTools": {
+      label: "Session: Keep Last Tools",
+      help: "Closed-session override for how many latest tool outputs are always preserved.",
+      tags: ["storage", "media"],
+    },
+    "dennou.sessionToolsPrune.placeholder": {
+      label: "Session: Placeholder",
+      help: "Closed-session override for replacement text after pruning.",
+      tags: ["storage"],
+    },
+    "dennou.sessionToolsPrune.dryRun": {
+      label: "Session: Dry Run",
+      help: "Closed-session override for dry-run behavior.",
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune": {
+      label: "Active Session Tools Prune",
+      help: "Prune policy for active sessions after idle time. This is for long-running chats that pause, then resume later.",
+      order: 20,
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune.enabled": {
+      label: "Active Prune Enabled",
+      help: "Master switch for active-session idle pruning.",
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune.idleDelayMinutes": {
+      label: "Active: Idle Delay Minutes",
+      help: "How long the session must stay idle before active prune runs. Start with 30 minutes; lower for faster cleanup, higher to preserve more near-term context.",
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune.minPrunableToolChars": {
+      label: "Active: Min Prunable Tool Chars",
+      help: "Active-session override for min prunable size.",
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune.keepLastTools": {
+      label: "Active: Keep Last Tools",
+      help: "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+      tags: ["storage", "media"],
+    },
+    "dennou.activeSessionToolsPrune.placeholder": {
+      label: "Active: Placeholder",
+      help: "Active-session override for replacement text after pruning.",
+      tags: ["storage"],
+    },
+    "dennou.activeSessionToolsPrune.dryRun": {
+      label: "Active: Dry Run",
+      help: "Active-session override for dry-run behavior.",
+      tags: ["storage"],
+    },
+    "dennou.pruneProtection": {
+      label: "Prune Protection",
+      help: "Safety rules that prevent pruning when protected files/keywords are involved.",
+      order: 40,
+      tags: ["advanced"],
+    },
+    "dennou.pruneProtection.protectedContentKeywords": {
+      label: "Protected Content Keywords",
+      help: "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
+      tags: ["advanced"],
     },
     "diagnostics.enabled": {
       label: "Diagnostics Enabled",

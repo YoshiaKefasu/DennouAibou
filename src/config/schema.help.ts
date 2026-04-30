@@ -61,6 +61,48 @@ export const FIELD_HELP: Record<string, string> = {
   "update.auto.stableJitterHours":
     "Extra stable-channel rollout spread window in hours (default: 12).",
   "update.auto.betaCheckIntervalHours": "How often beta-channel checks run in hours (default: 1).",
+  dennou:
+    "DennouAibou memory-prune controls. Think of this as a cleanup policy for long chat logs: what to trim, what to always keep, and when cleanup is only a rehearsal.",
+  "dennou.toolsPrune":
+    "Shared defaults used by both closed-session prune and active-session prune. Set values here first, then override only when one mode needs different behavior.",
+  "dennou.toolsPrune.minPrunableToolChars":
+    "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
+  "dennou.toolsPrune.keepLastTools":
+    "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+  "dennou.toolsPrune.placeholder":
+    "Text inserted where large tool output was pruned. Keep it short and recognizable so you can tell pruning happened without losing context.",
+  "dennou.toolsPrune.dryRun":
+    "When true, pruning is simulated: logs show what would be pruned, but no content is changed. Keep true while tuning values; switch to false after you trust the behavior.",
+  "dennou.sessionToolsPrune":
+    "Prune policy for closed sessions (finished chats). Use this to reduce disk/memory growth in old logs without touching your live conversation.",
+  "dennou.sessionToolsPrune.enabled":
+    "Master switch for closed-session pruning. Off = no pruning for closed sessions.",
+  "dennou.sessionToolsPrune.minPrunableToolChars":
+    "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
+  "dennou.sessionToolsPrune.keepLastTools":
+    "Closed-session override for how many latest tool outputs are always preserved.",
+  "dennou.sessionToolsPrune.placeholder":
+    "Closed-session override for replacement text after pruning.",
+  "dennou.sessionToolsPrune.dryRun":
+    "Closed-session override for dry-run behavior.",
+  "dennou.activeSessionToolsPrune":
+    "Prune policy for active sessions after idle time. This is for long-running chats that pause, then resume later.",
+  "dennou.activeSessionToolsPrune.enabled":
+    "Master switch for active-session idle pruning.",
+  "dennou.activeSessionToolsPrune.idleDelayMinutes":
+    "How long the session must stay idle before active prune runs. Start with 30 minutes; lower for faster cleanup, higher to preserve more near-term context.",
+  "dennou.activeSessionToolsPrune.minPrunableToolChars":
+    "Active-session override for min prunable size.",
+  "dennou.activeSessionToolsPrune.keepLastTools":
+    "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+  "dennou.activeSessionToolsPrune.placeholder":
+    "Active-session override for replacement text after pruning.",
+  "dennou.activeSessionToolsPrune.dryRun":
+    "Active-session override for dry-run behavior.",
+  "dennou.pruneProtection":
+    "Safety rules that prevent pruning when protected files/keywords are involved.",
+  "dennou.pruneProtection.protectedContentKeywords":
+    "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
   gateway:
     "Gateway runtime surface for bind mode, auth, control UI, remote transport, and operational safety controls. Keep conservative defaults unless you intentionally expose the gateway beyond trusted local interfaces.",
   "gateway.port":

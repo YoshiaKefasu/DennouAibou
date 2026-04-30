@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { computeBaseConfigSchemaResponse } from "../src/config/schema-base.js";
+import { computeBaseConfigSchemaResponse } from "../src/config/schema-base.ts";
 import { formatGeneratedModule } from "./lib/format-generated-module.mjs";
 
 const GENERATED_BY = "scripts/generate-base-config-schema.ts";

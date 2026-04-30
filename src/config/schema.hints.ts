@@ -91,6 +91,13 @@ const FIELD_PLACEHOLDERS: Record<string, string> = {
   "agents.list[].identity.avatar": "avatars/openclaw.png",
 };
 
+const FIELD_ORDER: Record<string, number> = {
+  "dennou.toolsPrune": 10,
+  "dennou.activeSessionToolsPrune": 20,
+  "dennou.sessionToolsPrune": 30,
+  "dennou.pruneProtection": 40,
+};
+
 const CHANNEL_NAMESPACE_PREFIX = "channels.";
 const CHANNEL_KERNEL_HINT_PREFIXES = ["channels.defaults", "channels.modelByChannel"] as const;
 
@@ -183,6 +190,13 @@ export function buildBaseHints(): ConfigUiHints {
     }
     const current = hints[path];
     hints[path] = current ? { ...current, placeholder } : { placeholder };
+  }
+  for (const [path, order] of Object.entries(FIELD_ORDER)) {
+    if (isPluginOwnedChannelHintPath(path)) {
+      continue;
+    }
+    const current = hints[path];
+    hints[path] = current ? { ...current, order } : { order };
   }
   return applyDerivedTags(hints);
 }
