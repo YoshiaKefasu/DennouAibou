@@ -50,8 +50,9 @@ async function afterSavePrune(storePath: string): Promise<void> {
       return;
     }
 
-    // storePath から sessions ディレクトリを導出
-    const sessionsDir = path.join(path.dirname(storePath), "sessions");
+    // storePath は ".../sessions/sessions.json" の形で渡されるため、
+    // dirname が正しい sessions ディレクトリになる。
+    const sessionsDir = path.dirname(storePath);
 
     // protection設定（ワークスペースパス自動解決込み）
     const protection = await resolveProtectionWithWorkspacePaths();

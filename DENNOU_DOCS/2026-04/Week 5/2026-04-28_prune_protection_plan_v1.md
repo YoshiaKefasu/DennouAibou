@@ -288,3 +288,49 @@ function normalizePathSeparators(s: string): string {
 - `pnpm test src/dennou-soul/prune-engine.test.ts` ✅
 - `pnpm test src/dennou-soul/prune-active-session.test.ts` ✅
 - `pnpm test src/dennou-soul/prune-closed-sessions.test.ts` ✅
+
+---
+
+## 10. Bugfix: sessionsDir path doubled（2026-05-01）
+
+### 症状
+
+Kasou のログに以下の警告が常に出る：
+
+```
+[DennouAibou] SKIP (directory not found): /home/kasou_yoshia/.openclaw/agents/main/sessions/sessions
+```
+
+`/sessions/sessions` と sessions が2回重なっているため、存在しないディレクトリを参照し、閉じたセッションの prune が一切実行されていなかった。
+
+### 原因
+
+`src/dennou-soul/session-maintenance-hook.ts:54` で、
+上流から渡される `storePath` の形式を誤って仮定していた。
+
+- JSDoc コメントには `~/.openclaw/agents/{agentId}/store.json` と書かれていた。
+- しかし実際に上流から渡される `storePath` は `.../sessions/sessions.json` の形式。
+- `path.dirname(storePath)` で既に `sessions/` ディレクトリが得られるのに、さらに `path.join(..., "sessions")` で連結していた。
+
+結果：`/sessions/sessions` の二重化。
+
+### 修正
+
+| 項目 | 内容 |
+|---|---|
+| 変更ファイル | `src/dennou-soul/session-maintenance-hook.ts` |
+| 変更行 | 54行目（1行のみ） |
+| Before | `const sessionsDir = path.join(path.dirname(storePath), "sessions");` |
+| After | `const sessionsDir = path.dirname(storePath);` |
+| 理由 | `storePath` は既に `.../sessions/sessions.json` なので、`dirname` が正しい |
+
+### テスト結果
+
+- `pnpm test src/dennou-soul/prune-closed-sessions.test.ts` ✅
+- `pnpm test src/dennou-soul/prune-engine.test.ts` ✅
+- `pnpm test src/dennou-soul/prune-active-session.test.ts` ✅
+- 合計 39 passed
+
+### 影響
+
+この1行の修正で、閉じたセッションの prune が初めて実際に機能するようになる（今までは SKIP で何もできていなかった）。
