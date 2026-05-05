@@ -334,3 +334,56 @@ Kasou のログに以下の警告が常に出る：
 ### 影響
 
 この1行の修正で、閉じたセッションの prune が初めて実際に機能するようになる（今までは SKIP で何もできていなかった）。
+
+---
+
+## 11. Bugfix: DRY-RUN log flood suppression（2026-05-05）
+
+### 症状
+
+`dryRun: true` のとき、1ファイル内で prune 対象行が多いと、行ごとに以下ログが大量に出て `/logs` が洪水化する。
+
+```
+[DennouAibou] ... DRY-RUN would prune: line N (XXXX chars)
+```
+
+### 原因
+
+`src/dennou-soul/prune-engine.ts` の `pruneToolOutputLines()` が dry-run 分岐でも行単位ログを出していた。
+
+- 判定対象1行ごとに `logger(...)` を呼ぶ実装
+- 閉じたセッションの大型 JSONL では数百〜数千行が対象になり得る
+- 結果として、実害のない dry-run 観測ログが運用ログを埋める
+
+### 修正
+
+| 項目 | 内容 |
+|---|---|
+| 変更ファイル | `src/dennou-soul/prune-engine.ts` |
+| 変更点 | dry-run 分岐の行単位ログを停止 |
+| 維持した仕様 | `prunedCount` の計上、非dry-run時の `PRUNE: line ...` ログ、置換ロジック |
+
+### 設計意図（安全側）
+
+- dry-run の目的は「実際に削除せず件数を把握すること」。
+- 詳細は呼び出し元の**ファイル単位サマリー**で十分。
+- したがって、行単位ログは止め、情報価値の高いサマリーだけ残す方針に統一。
+
+### テスト
+
+- 変更: `src/dennou-soul/prune-engine.test.ts`
+  - 追加ケース: `does not emit per-line prune logs in dryRun mode`
+  - 検証内容:
+    1. dry-run でも `prunedCount` は正しく増える
+    2. logger は空（行単位ログなし）
+    3. `resultLines` は元行を保持（dry-runで非破壊）
+
+### 実行した検証コマンド
+
+- `pnpm test src/dennou-soul/prune-engine.test.ts src/dennou-soul/prune-closed-sessions.test.ts src/dennou-soul/prune-active-session.test.ts` ✅
+- `pnpm test src/dennou-soul/prune-engine.test.ts` ✅（追加入力後の再確認）
+
+### 影響
+
+- `/logs` のDRY-RUN洪水を抑制。
+- 実際の prune 判定・件数・保護判定ロジックには影響なし。

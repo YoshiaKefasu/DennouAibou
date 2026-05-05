@@ -325,4 +325,27 @@ describe("pruneToolOutputLines with protection", () => {
 
     expect(prunedCount).toBe(1);
   });
+
+  it("does not emit per-line prune logs in dryRun mode", () => {
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      makeLargeToolResult("x".repeat(120)),
+      makeUserMessage("tail-1"),
+      makeUserMessage("tail-2"),
+    ];
+
+    const dryCfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      dryRun: true,
+      keepLastTools: 0,
+      minPrunableToolChars: 50,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, dryCfg, testLogger);
+
+    expect(prunedCount).toBe(1);
+    expect(logs).toEqual([]);
+    expect(resultLines[2]).toBe(lines[2]);
+  });
 });

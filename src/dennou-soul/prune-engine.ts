@@ -185,7 +185,8 @@ export function pruneToolOutputLines(
 
     // Prune対象 → プレースホルダに置き換え
     if (config.dryRun) {
-      logger(`[DennouAibou] DRY-RUN would prune: line ${i + 1} (${contentLength} chars)`);
+      // DRY-RUN時は行ごとのログを出さない（ログ洪水防止）。
+      // 呼び出し元でファイル単位サマリーのみ出す。
       resultLines.push(line); // dry-run時は実際には置き換えない
     } else {
       logger(`[DennouAibou] PRUNE: line ${i + 1} (${contentLength} chars)`);
