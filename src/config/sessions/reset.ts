@@ -1,13 +1,14 @@
 import { resolveSessionThreadInfo } from "../../channels/plugins/session-conversation.js";
 import { normalizeMessageChannel } from "../../utils/message-channel.js";
-import type { SessionConfig, SessionResetConfig } from "../types.base.js";
+import type { SessionConfig, SessionResetConfig, SessionResetMode } from "../types.base.js";
 import { DEFAULT_IDLE_MINUTES } from "./types.js";
 
-export type SessionResetMode = "daily" | "idle";
+export type { SessionResetMode } from "../types.base.js";
 export type SessionResetType = "direct" | "group" | "thread";
 
 export type SessionResetPolicy = {
   mode: SessionResetMode;
+  /** Daily boundary hour. Only meaningful when mode === "daily". */
   atHour: number;
   idleMinutes?: number;
 };
@@ -97,13 +98,17 @@ export function resolveSessionResetPolicy(params: {
     typeReset?.mode ??
     baseReset?.mode ??
     (!hasExplicitReset && legacyIdleMinutes != null ? "idle" : DEFAULT_RESET_MODE);
+  // Keep the normalized hour in the policy shape for stable logging/consumers;
+  // daily mode uses it, other modes ignore it.
   const atHour = normalizeResetAtHour(
     typeReset?.atHour ?? baseReset?.atHour ?? DEFAULT_RESET_AT_HOUR,
   );
   const idleMinutesRaw = typeReset?.idleMinutes ?? baseReset?.idleMinutes ?? legacyIdleMinutes;
 
   let idleMinutes: number | undefined;
-  if (idleMinutesRaw != null) {
+  if (mode === "off") {
+    idleMinutes = undefined;
+  } else if (idleMinutesRaw != null) {
     const normalized = Math.floor(idleMinutesRaw);
     if (Number.isFinite(normalized)) {
       idleMinutes = Math.max(normalized, 0);

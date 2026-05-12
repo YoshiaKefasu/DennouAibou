@@ -169,6 +169,61 @@ describe("resolveSessionResetPolicy", () => {
       idleExpiresAt: undefined,
     });
   });
+
+  it("disables automatic resets when mode=off", () => {
+    const policy = resolveSessionResetPolicy({
+      sessionCfg: {
+        reset: {
+          mode: "off",
+          atHour: 9,
+          idleMinutes: 45,
+        },
+      },
+      resetType: "direct",
+    });
+
+    expect(policy).toEqual({
+      mode: "off",
+      atHour: 9,
+      idleMinutes: undefined,
+    });
+
+    expect(
+      evaluateSessionFreshness({
+        updatedAt: 1_000,
+        now: 60 * 60 * 1_000,
+        policy,
+      }),
+    ).toEqual({
+      fresh: true,
+      dailyResetAt: undefined,
+      idleExpiresAt: undefined,
+    });
+  });
+
+  it("lets type-specific off override a daily base reset", () => {
+    const policy = resolveSessionResetPolicy({
+      sessionCfg: {
+        reset: {
+          mode: "daily",
+          atHour: 4,
+          idleMinutes: 120,
+        },
+        resetByType: {
+          direct: {
+            mode: "off",
+          },
+        },
+      },
+      resetType: "direct",
+    });
+
+    expect(policy).toEqual({
+      mode: "off",
+      atHour: 4,
+      idleMinutes: undefined,
+    });
+  });
 });
 
 describe("session store lock (Promise chain mutex)", () => {
