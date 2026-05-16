@@ -186,6 +186,10 @@ export async function runCli(argv: string[] = process.argv) {
   }
   startIdlePruneWatcher(protection);
 
+  // DennouAibou: start liveness watchdog for event-loop timer health monitoring.
+  const { startLivenessWatchdog } = await import("../dennou-soul/liveness-watchdog.js");
+  startLivenessWatchdog();
+
   // Enforce the minimum supported runtime before doing any work.
   assertSupportedRuntime();
 
