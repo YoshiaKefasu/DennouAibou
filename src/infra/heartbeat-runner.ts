@@ -1089,6 +1089,7 @@ export function startHeartbeatRunner(opts: {
     runtime,
     agents: new Map<string, HeartbeatAgentState>(),
     timer: null as NodeJS.Timeout | null,
+    watchdogTimer: undefined as ReturnType<typeof setInterval> | undefined,
     stopped: false,
   };
   let initialized = false;
@@ -1134,7 +1135,45 @@ export function startHeartbeatRunner(opts: {
       state.timer = null;
       requestHeartbeatNow({ reason: "interval", coalesceMs: 0 });
     }, delay);
-    state.timer.unref?.();
+  };
+
+  // Watchdog: periodic poll that detects overdue agents.
+  // Safety net for the primary timer — if the event loop stalls (idle,
+  // App Nap, timer starvation) the watchdog fires overdue heartbeats.
+  // pollMsは最小interval/4、15秒〜5分にclamp。
+  // 15秒下限: CPUへの過剰な負荷を防ぐ。5分上限: 高interval agentでもタイマー飢餓を許容範囲内で検出する。
+  const WATCHDOG_POLL_MIN_MS = 15_000;
+  const WATCHDOG_POLL_MAX_MS = 300_000;
+  // primary timerが発火してからadvanceAgentScheduleが実行されるまでの
+  // ごく短いウィンドウでwatchdogが誤検出しないように2秒のグレース期間を設ける。
+  const WATCHDOG_GRACE_MS = 2_000;
+  const startWatchdog = () => {
+    if (state.agents.size === 0) return;
+    const minInterval = Array.from(state.agents.values()).reduce(
+      (min, a) => Math.min(min, a.intervalMs),
+      Number.POSITIVE_INFINITY,
+    );
+    const pollMs = Math.min(
+      WATCHDOG_POLL_MAX_MS,
+      Math.max(WATCHDOG_POLL_MIN_MS, Math.floor(minInterval / 4)),
+    );
+    state.watchdogTimer = setInterval(() => {
+      if (state.stopped) return;
+      const now = Date.now();
+      let overdue = false;
+      for (const agent of state.agents.values()) {
+        if (now >= agent.nextDueMs + WATCHDOG_GRACE_MS) {
+          overdue = true;
+          break;
+        }
+      }
+      if (overdue) {
+        // reason="watchdog" で primary timer と区別する。
+        // wake layer の重複排除ロジックで primary timer と同じ扱いになり、
+        // ログ/イベントでのみ区別可能。
+        requestHeartbeatNow({ reason: "watchdog", coalesceMs: 0 });
+      }
+    }, pollMs);
   };
 
   const updateConfig = (cfg: OpenClawConfig) => {
@@ -1182,6 +1221,17 @@ export function startHeartbeatRunner(opts: {
     }
 
     scheduleNext();
+    // config変更時にwatchdogを停止して再起動する。
+    // これにより:
+    // 1. poll間隔が現在のエージェント最小intervalに追従する
+    // 2. エージェントが0になったらwatchdogが停止する
+    if (state.watchdogTimer) {
+      clearInterval(state.watchdogTimer);
+      state.watchdogTimer = undefined;
+    }
+    if (state.agents.size > 0) {
+      startWatchdog();
+    }
   };
 
   const run: HeartbeatWakeHandler = async (params) => {
@@ -1313,6 +1363,10 @@ export function startHeartbeatRunner(opts: {
       clearTimeout(state.timer);
     }
     state.timer = null;
+    if (state.watchdogTimer) {
+      clearInterval(state.watchdogTimer);
+      state.watchdogTimer = undefined;
+    }
   };
 
   opts.abortSignal?.addEventListener("abort", cleanup, { once: true });
