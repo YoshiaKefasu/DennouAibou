@@ -21,6 +21,7 @@ import {
 import type { DennouPruneProtectionConfig } from "./types.js";
 import { getDennouConfig } from "./config.js";
 import { pruneActiveSessionFile } from "./prune-active-session.js";
+import { logDebug } from "../logger.js";
 
 /**
  * セッションキー（`agent:{agentId}:{wsHash}`）→ タイマーID のマップ
@@ -95,13 +96,13 @@ function handleIdleEvent(
     }
 
     const result = pruneActiveSessionFile(filePath, config, (msg) => {
-      console.log(msg);
+      logDebug(msg);
     }, protection);
 
     if (result === -1) {
       console.warn(`[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`);
     } else if (result > 0) {
-      console.log(
+      logDebug(
         `[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`,
       );
     }
@@ -110,7 +111,7 @@ function handleIdleEvent(
   idleTimers.set(sessionKey, timer);
 
   if (config.dryRun) {
-    console.log(
+    logDebug(
       `[DennouAibou] DRY-RUN idle timer set: sessionKey=${sessionKey} delay=${config.idleDelayMinutes}min`,
     );
   }
@@ -134,11 +135,11 @@ export function startIdlePruneWatcher(
   const dennocfg = getDennouConfig();
   const config = dennocfg.activeSessionToolsPrune;
   if (!config.enabled) {
-    console.log("[DennouAibou] Idle prune watcher disabled by config");
+    logDebug("[DennouAibou] Idle prune watcher disabled by config");
     return () => {};
   }
 
-  console.log(
+  logDebug(
     `[DennouAibou] Idle prune watcher started (delay=${config.idleDelayMinutes}min, dryRun=${config.dryRun})`,
   );
 
@@ -172,6 +173,6 @@ export function startIdlePruneWatcher(
       clearTimeout(timer);
     }
     idleTimers.clear();
-    console.log("[DennouAibou] Idle prune watcher stopped");
+    logDebug("[DennouAibou] Idle prune watcher stopped");
   };
 }

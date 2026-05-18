@@ -12,6 +12,7 @@ import * as path from "node:path";
 import { setAfterSaveHook } from "../config/sessions/store.js";
 import { getDennouConfig } from "./config.js";
 import { pruneAllClosedSessions } from "./prune-closed-sessions.js";
+import { logDebug } from "../logger.js";
 
 /** キャッシュ済みのワークスペースパス（初回呼び出し時に解決） */
 let cachedWsProtection: import("./types.js").DennouPruneProtectionConfig | null = null;
@@ -58,7 +59,7 @@ async function afterSavePrune(storePath: string): Promise<void> {
     const protection = await resolveProtectionWithWorkspacePaths();
 
     pruneAllClosedSessions(sessionsDir, config.sessionToolsPrune, (msg) => {
-      console.log(msg);
+      logDebug(msg);
     }, protection);
   } catch (err) {
     console.warn(

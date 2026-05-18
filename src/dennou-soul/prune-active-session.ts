@@ -12,6 +12,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 import { pruneToolOutputLines } from "./prune-engine.js";
+import { logDebug } from "../logger.js";
 
 /** 安全なatomic renameのための一時ファイル拡張子 */
 const TMP_EXT = ".prune-tmp";
@@ -143,7 +144,7 @@ export function pruneActiveSessionById(
   sessionsDir: string,
   sessionId: string,
   config: DennouSessionToolsPruneConfig,
-  logger: (msg: string) => void = console.log,
+  logger: (msg: string) => void = logDebug,
   protection?: DennouPruneProtectionConfig,
 ): number {
   if (!config.enabled) return 0;

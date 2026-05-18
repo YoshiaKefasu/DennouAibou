@@ -17,6 +17,7 @@
 import * as fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
+import { logDebug } from "../logger.js";
 
 // ============================================================
 // Constants
@@ -157,9 +158,9 @@ function watchdogTick(): void {
   }
 
   // ---- alive marker を log に書き込む ----
-  // console.log を使う（logger 経由でファイル + journalctl 両方に届く）
-  console.log(
-    `[DennouAibou] liveness marker tick=${tickCount} ` +
+  // logDebug を使う（ファイルログにのみ書き込み、CLI出力なし）
+  logDebug(
+    `liveness marker tick=${tickCount} ` +
     `logAge=${(logAgeMs / 1000).toFixed(0)}s ` +
     `elapsed=${elapsedMs}ms`,
   );
@@ -226,8 +227,8 @@ export function startLivenessWatchdog(): () => void {
   lastTickHrTime = 0n;
   tickCount = 0;
 
-  writeStderr(
-    `Starting liveness watchdog (interval=${CHECK_INTERVAL_MS}ms, ` +
+  logDebug(
+    `[DennouAibou/liveness] Starting liveness watchdog (interval=${CHECK_INTERVAL_MS}ms, ` +
     `logStaleThreshold=${LOG_STALE_THRESHOLD_MS / 1000}s)`,
   );
 

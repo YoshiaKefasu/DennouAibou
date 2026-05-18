@@ -18,6 +18,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 import { pruneToolOutputLines } from "./prune-engine.js";
+import { logDebug } from "../logger.js";
 
 /**
  * 単一の閉じたセッションファイルに対してPruneを実行する。
@@ -30,7 +31,7 @@ import { pruneToolOutputLines } from "./prune-engine.js";
 export function pruneClosedSessionFile(
   filePath: string,
   config: DennouSessionToolsPruneConfig,
-  logger: (msg: string) => void = console.log,
+  logger: (msg: string) => void = logDebug,
   protection?: DennouPruneProtectionConfig,
 ): number {
   // 閉じたセッションファイルのみ対象
@@ -80,7 +81,7 @@ export function pruneClosedSessionFile(
 export function pruneAllClosedSessions(
   sessionsDir: string,
   config: DennouSessionToolsPruneConfig,
-  logger: (msg: string) => void = console.log,
+  logger: (msg: string) => void = logDebug,
   protection?: DennouPruneProtectionConfig,
 ): number {
   if (!fs.existsSync(sessionsDir)) {
@@ -116,7 +117,7 @@ export function pruneAllClosedSessions(
  */
 export function pruneAllAgentsClosedSessions(
   config: DennouSessionToolsPruneConfig,
-  logger: (msg: string) => void = console.log,
+  logger: (msg: string) => void = logDebug,
   protection?: DennouPruneProtectionConfig,
 ): number {
   const agentsDir = path.join(os.homedir(), ".openclaw", "agents");
