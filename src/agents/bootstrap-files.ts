@@ -164,8 +164,8 @@ function shouldExcludeHeartbeatBootstrapFile(params: {
   }
   const defaults = params.config.agents?.defaults?.heartbeat;
   const overrides = resolveAgentConfig(params.config, sessionAgentId)?.heartbeat;
-  const merged = !defaults && !overrides ? overrides : { ...defaults, ...overrides };
-  return merged?.includeSystemPromptSection === false;
+  const merged = { ...defaults, ...overrides };
+  return merged.includeSystemPromptSection === false;
 }
 
 function filterHeartbeatBootstrapFile(

@@ -652,6 +652,7 @@ export async function cleanupTempPaths(tempPaths: string[]) {
 }
 
 export function createDefaultEmbeddedSession(params?: {
+  initialMessages?: AgentMessage[];
   prompt?: (
     session: MutableSession,
     prompt: string,
@@ -660,7 +661,7 @@ export function createDefaultEmbeddedSession(params?: {
 }): MutableSession {
   const session: MutableSession = {
     sessionId: "embedded-session",
-    messages: [],
+    messages: params?.initialMessages ?? [],
     isCompacting: false,
     isStreaming: false,
     agent: {
