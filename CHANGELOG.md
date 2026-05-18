@@ -1,112 +1,112 @@
 # Changelog
 
-DennouAibou は OpenClaw v2026.4.5 をベースとしたフォークです。
-上流の変更履歴は https://github.com/openclaw/openclaw を参照してください。
+DennouAibou is a fork based on OpenClaw v2026.4.5.
+For upstream history see https://github.com/openclaw/openclaw.
 
 ## dennou-v0.6.0 (2026-05-18)
 
-### 上流パッチ適用 (cherry-pick from v2026.4.5 → v2026.4.8)
+### Upstream Patches (cherry-pick v2026.4.5 → v2026.4.8)
 
-- **heartbeat / セッション安定性**
+- **Heartbeat / session stability**
   - fix(agents): heartbeat always targets main session — prevent routing to active subagent sessions
   - fix(heartbeat): add subagent guard to resolveHeartbeatSession production code
-  - fix: respect disabled heartbeat guidance — disabled heartbeat に system prompt を注入しない
+  - fix: respect disabled heartbeat guidance — omit system prompt section when heartbeat is disabled
   - fix: tighten TUI phase handling and heartbeat session guards
-- **SSE 履歴の競合修正**
-  - fix(gateway): eliminate SSE history double-read race — 単一スナップショットから sanitized/raw を派生
+- **SSE history race fixes**
+  - fix(gateway): eliminate SSE history double-read race — derive sanitized and raw views from single snapshot
   - fix: seed SSE history state from one snapshot
   - fix(gateway): seq-based cursor pagination + sanitize SSE fast path
-- **ログ・セキュリティ・パフォーマンス**
+- **Logging, security, performance**
   - fix(logging): correct levelToMinLevel mapping for tslog v4
   - fix(agents): replace `.*` with `\S*` in interpreter heuristic to prevent ReDoS
   - fix: approval boundary bypass
   - fix: multiple dangerous build tool environment variables leak
 - **Pi Embedded Runner**
   - fix: compaction after tool use abortion cause agent infinite loop calls
-  - fix(agents): backfill missing sessionKey in embedded PI runner — model selection / live-switch の undefined key 防止
+  - fix(agents): backfill missing sessionKey in embedded PI runner — prevent undefined key in model selection / live-switch
 
-### DennouAibou 独自機能
+### DennouAibou-Specific Features
 
-- **イベントループ死活監視 (Liveness Watchdog)**
-  - `src/dennou-soul/liveness-watchdog.ts` を新規追加
-  - 5分周期の setInterval で自己発火監視 (process.hrtime.bigint)
-  - タイマー飢餓検出時 → systemctl --user restart で自動復旧
-  - KASOU cron watchdog (systemd timer, 5分周期, ログファイルmtime監視) と二重化
-- **heartbeat-runner watchdog バックポート**
-  - 上流 PR #31226 と同じ修正を適用: `.unref()` 削除 + setInterval watchdog
-  - watchdog 発火時は `reason: "watchdog"` でログ区別可能
+- **Event-loop health monitor (Liveness Watchdog)**
+  - New `src/dennou-soul/liveness-watchdog.ts`
+  - 5-minute setInterval self-monitoring via process.hrtime.bigint
+  - Auto-recovery: systemctl --user restart on timer starvation detection
+  - Dual-layer with KASOU cron watchdog (systemd timer, 5-min, log mtime check)
+- **Heartbeat-runner watchdog backport**
+  - Upstream PR #31226: remove `.unref()` + add setInterval watchdog
+  - Watchdog-triggered heartbeats logged with `reason: "watchdog"` for distinguishability
 
-### セッション・設定
+### Session & Config
 
-- Session reset `off` 対応 — resetByType / resetByChannel も含めて完全無効化
-- DennouAibou 設定UIの追加 (Config → DennouAibou タブ)
-  - 3層 prune 設定: shared toolsPrune / closed-session sessionToolsPrune / active-session activeSessionToolsPrune
-  - 英語ヘルプコピー追加
-- 設定反映のビルド順序修正: `pnpm build` → `pnpm ui:build` を強制
-- ベーススキーマ生成スクリプト修正: `schema-base.ts` の import パス修正
+- Session reset `off` support — fully disables resetByType / resetByChannel
+- DennouAibou config tab (Config → DennouAibou)
+  - 3-layer prune settings: shared toolsPrune / closed-session sessionToolsPrune / active-session activeSessionToolsPrune
+  - English help copy
+- Build order enforcement: `pnpm build` → `pnpm ui:build`
+- Schema generation fix: corrected import path in `scripts/generate-base-config-schema.ts`
 
-### Prune 機能
+### Prune
 
-- ドライランのログ flood 抑制: ファイルレベルの集計のみ出力
-- セッションパスの二重化バグ修正 (sessions/sessions → sessions)
-- ワークスペースパス保護の強化: JSONL生テキストも保護対象に追加
+- Dry-run log flood suppression: file-level summary only, no per-line logs
+- Fix doubled sessions directory path (sessions/sessions → sessions)
+- Workspace-path protection hardening: raw JSONL text also checked
 
-### デプロイ・ビルド
+### Deployment
 
-- ビルド時に A2UI ソース欠落で prebuilt bundle を使う設定
 - `dennou-v0.5.1` GitHub Release (source tarball)
-- KASOU への全 deploy 手順確立: stop → overlay dist → restart → HTTP確認
+- KASOU deploy procedure established: stop → overlay dist → restart → HTTP health check
+- A2UI prebuilt bundle fallback when sources unavailable
 
 ## dennou-v0.5.1 (2026-04-30)
 
-### 上流パッチバックポート
+### Upstream Backports
 
-- **ログローテーション修正** (`[FIX-UPSTREAM]`)
-  - resolveActiveLogFile() で日付跨ぎのファイル切り替えを保証
-  - config 更新時も新しい日付ファイルを生成
-- **Discord stale-socket 誤検出修正** (`[FIX-UPSTREAM]`)
-  - lastTransportActivityAt でトランスポートレベルの活動を分離計測
-  - Carbon gateway に60秒ポーリングの isConnected 監視を追加
-  - Slack stale-socket テストのスナップショット修正
-  - readiness.test.ts の stale-socket → ready 状態遷移テスト復旧
+- **Log rotation fix** (`[FIX-UPSTREAM]`)
+  - resolveActiveLogFile() ensures correct dated file rollover after midnight
+  - Config reloads also create the correct date file
+- **Discord stale-socket false positive fix** (`[FIX-UPSTREAM]`)
+  - lastTransportActivityAt separates transport-level activity from app events
+  - Carbon gateway: 60s isConnected polling lifecycle
+  - Slack stale-socket test snapshot fix
+  - readiness.test.ts: restored stale-socket → ready state transition tests
 
-### DennouAibou 独自機能
+### DennouAibou-Specific Features
 
-- **Config UI: DennouAibou 設定タブ**
-  - `/config` ページのカテゴリタブに DennouAibou 設定を追加
-  - 設定項目: dennou.toolsPrune.*, dennou.sessionToolsPrune.*, dennou.activeSessionToolsPrune.*, dennou.pruneProtection.*
-  - ウェブソケット経由のランタイムスキーマ配信に対応
+- **Config UI: DennouAibou settings tab**
+  - Category tab under /config page
+  - Settings: dennou.toolsPrune.*, dennou.sessionToolsPrune.*, dennou.activeSessionToolsPrune.*, dennou.pruneProtection.*
+  - WebSocket runtime schema delivery
 
-### ビルド・デプロイ
+### Build & Deploy
 
-- pnpm locked gitnexus@1.6.3 (RCバージョンの回避)
-- デプロイチェックリスト確立: schema.dennou の有無確認 → Control UI アセット確認
-- KASOU へのデプロイ手順文書化
+- Pinned gitnexus@1.6.3 (avoid RC versions)
+- Deployment checklist established: verify schema.dennou presence → check Control UI assets
+- KASOU deploy procedure documented
 
 ## dennou-v0.4.30 (2026-04-30)
 
-ベース: OpenClaw v2026.4.5
+Base: OpenClaw v2026.4.5
 
-### DennouAibou 初期機能
+### Initial DennouAibou Features
 
-- **Session prune Dennou 管理機能**
-  - 3層 prune 設定フレームワーク: toolsPrune (共通) / sessionToolsPrune (closed) / activeSessionToolsPrune (active)
-  - minPrunableToolChars, keepLastTools, dryRun の各設定
-  - ワークスペースパス保護による会話コンテキスト保持
-  - アクティブセッション: 30分 idle 検出、直近10ツール保持
-  - Closed セッション: dryRun モード (デフォルト)
-- **Pi compaction 設定カスタマイズ**
-  - timeout compaction threshold を設定から変更可能 (`resolveTimeoutCompactionPromptUsageThreshold`)
-  - reserveTokens の尊重
-  - safeguard summary cap の keepRecentTokens 準拠
-- **[DEBLOAT]** 不要バンドルの削除
-  - Bedrock, Swift 関連
-  - 未使用プラグインの facade type shim
-  - テスト・ドキュメントの整合性調整
+- **Session prune Dennou framework**
+  - 3-layer prune config: toolsPrune (shared) / sessionToolsPrune (closed) / activeSessionToolsPrune (active)
+  - minPrunableToolChars, keepLastTools, dryRun
+  - Workspace path protection preserves conversation context
+  - Active sessions: 30-min idle detection, keep last 10 tools
+  - Closed sessions: dryRun mode (default)
+- **Pi compaction customization**
+  - Configurable timeout compaction threshold (`resolveTimeoutCompactionPromptUsageThreshold`)
+  - reserveTokens respected
+  - safeguard summary cap aligned with keepRecentTokens
+- **[DEBLOAT]** Removed unused bundles
+  - Bedrock, Swift
+  - Unused plugin facade type shims
+  - Test/doc alignment
 
-### 開発基盤
+### Project Infrastructure
 
-- DENNOU_RULES.md 確立 (commit tag taxonomy, deploy手順, ドキュメント規則)
-- DENNOU_DOCS/ アーカイブ開始
-- graphify + codesight インデックス
-- 古い README の整理
+- DENNOU_RULES.md established (commit tag taxonomy, deploy procedure, doc rules)
+- DENNOU_DOCS/ archive started
+- graphify + codesight indexing
+- README cleanup
