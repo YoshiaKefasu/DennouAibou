@@ -1284,4 +1284,523 @@ describe("runAgentTurnWithFallback", () => {
     expect(sessionStore.main.providerOverride).toBe("zai");
     expect(sessionStore.main.modelOverride).toBe("glm-5");
   });
+
+  it("drops authProfileId when fallback switches providers", async () => {
+    state.runWithModelFallbackMock.mockImplementation(
+      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => ({
+        result: await params.run("openai-codex", "gpt-5.4"),
+        provider: "openai-codex",
+        model: "gpt-5.4",
+        attempts: [],
+      }),
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const followupRun = createFollowupRun();
+    followupRun.run.provider = "anthropic";
+    followupRun.run.model = "claude-opus";
+    followupRun.run.authProfileId = "anthropic:openclaw";
+    followupRun.run.authProfileIdSource = "user";
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      totalTokens: 1,
+      compactionCount: 0,
+    };
+    const sessionStore = { main: sessionEntry };
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      commandBody: "hello",
+      followupRun,
+      sessionCtx: {
+        Provider: "telegram",
+        MessageSid: "msg",
+      } as unknown as TemplateContext,
+      opts: {},
+      typingSignals: createMockTypingSignaler(),
+      blockReplyPipeline: null,
+      blockStreamingEnabled: false,
+      resolvedBlockStreamingBreak: "message_end",
+      applyReplyToMode: (payload) => payload,
+      shouldEmitToolResult: () => true,
+      shouldEmitToolOutput: () => false,
+      pendingToolTasks: new Set(),
+      resetSessionAfterCompactionFailure: async () => false,
+      resetSessionAfterRoleOrderingConflict: async () => false,
+      isHeartbeat: false,
+      sessionKey: "main",
+      getActiveSessionEntry: () => sessionEntry,
+      activeSessionStore: sessionStore,
+      resolvedVerboseLevel: "off",
+    });
+
+    expect(result.kind).toBe("success");
+    expect(state.runEmbeddedPiAgentMock).toHaveBeenCalledTimes(1);
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 0, "embedded run params", {
+      provider: "openai-codex",
+      model: "gpt-5.4",
+      authProfileId: undefined,
+      authProfileIdSource: undefined,
+    });
+    expect(sessionEntry.providerOverride).toBe("openai-codex");
+    expect(sessionEntry.modelOverride).toBe("gpt-5.4");
+    expect(sessionEntry.modelOverrideSource).toBe("auto");
+    expect(sessionEntry.authProfileOverride).toBeUndefined();
+    expect(sessionEntry.authProfileOverrideSource).toBeUndefined();
+    expect(sessionStore.main.authProfileOverride).toBeUndefined();
+  });
+
+  it("does not persist fallback selection for one-turn image model overrides", async () => {
+    state.runWithModelFallbackMock.mockImplementation(
+      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => ({
+        result: await params.run("openai", "gpt-4o-mini"),
+        provider: "openai",
+        model: "gpt-4o-mini",
+        attempts: [],
+      }),
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const followupRun = createFollowupRun();
+    followupRun.run.provider = "openai";
+    followupRun.run.model = "gpt-4o";
+    followupRun.run.hasOneTurnModelOverride = true;
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      totalTokens: 1,
+      compactionCount: 0,
+    };
+    const sessionStore = { main: sessionEntry };
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      commandBody: "hello",
+      followupRun,
+      sessionCtx: {
+        Provider: "telegram",
+        MessageSid: "msg",
+      } as unknown as TemplateContext,
+      opts: {},
+      typingSignals: createMockTypingSignaler(),
+      blockReplyPipeline: null,
+      blockStreamingEnabled: false,
+      resolvedBlockStreamingBreak: "message_end",
+      applyReplyToMode: (payload) => payload,
+      shouldEmitToolResult: () => true,
+      shouldEmitToolOutput: () => false,
+      pendingToolTasks: new Set(),
+      resetSessionAfterCompactionFailure: async () => false,
+      resetSessionAfterRoleOrderingConflict: async () => false,
+      isHeartbeat: false,
+      sessionKey: "main",
+      getActiveSessionEntry: () => sessionEntry,
+      activeSessionStore: sessionStore,
+      resolvedVerboseLevel: "off",
+    });
+
+    expect(result.kind).toBe("success");
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 0, "embedded run params", {
+      provider: "openai",
+      model: "gpt-4o-mini",
+    });
+    expect(sessionEntry.providerOverride).toBeUndefined();
+    expect(sessionEntry.modelOverride).toBeUndefined();
+    expect(sessionEntry.modelOverrideSource).toBeUndefined();
+  });
+
+  it("does not persist fallback selection for legacy user overrides without modelOverrideSource", async () => {
+    // Regression: older persisted sessions can have a user-selected override
+    // (modelOverride set) but no modelOverrideSource field, because the field
+    // was added later.  These legacy entries must still be protected from
+    // fallback overwrite, matching the backward-compat treatment in
+    // session-reset-service.
+    state.runWithModelFallbackMock.mockImplementation(
+      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => ({
+        result: await params.run("openai-codex", "gpt-5.4"),
+        provider: "openai-codex",
+        model: "gpt-5.4",
+        attempts: [],
+      }),
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const followupRun = createFollowupRun();
+    followupRun.run.provider = "bailian";
+    followupRun.run.model = "qwen3.6-plus";
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      totalTokens: 1,
+      compactionCount: 0,
+      // Legacy entry: override is set but the source field is missing.
+      providerOverride: "anthropic",
+      modelOverride: "claude-opus-4-6",
+      // modelOverrideSource intentionally absent
+    };
+    const sessionStore = { main: sessionEntry };
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      commandBody: "hello",
+      followupRun,
+      sessionCtx: {
+        Provider: "telegram",
+        MessageSid: "msg",
+      } as unknown as TemplateContext,
+      opts: {},
+      typingSignals: createMockTypingSignaler(),
+      blockReplyPipeline: null,
+      blockStreamingEnabled: false,
+      resolvedBlockStreamingBreak: "message_end",
+      applyReplyToMode: (payload) => payload,
+      shouldEmitToolResult: () => true,
+      shouldEmitToolOutput: () => false,
+      pendingToolTasks: new Set(),
+      resetSessionAfterCompactionFailure: async () => false,
+      resetSessionAfterRoleOrderingConflict: async () => false,
+      isHeartbeat: false,
+      sessionKey: "main",
+      getActiveSessionEntry: () => sessionEntry,
+      activeSessionStore: sessionStore,
+      resolvedVerboseLevel: "off",
+    });
+
+    expect(result.kind).toBe("success");
+    // Legacy user override must survive the fallback unchanged.
+    expect(sessionEntry.providerOverride).toBe("anthropic");
+    expect(sessionEntry.modelOverride).toBe("claude-opus-4-6");
+    expect(sessionEntry.modelOverrideSource).toBeUndefined();
+  });
+
+  it("persists fallback selection for recovered auto overrides without modelOverrideSource", async () => {
+    state.runWithModelFallbackMock.mockImplementation(
+      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => ({
+        result: await params.run("openai-codex", "gpt-5.4"),
+        provider: "openai-codex",
+        model: "gpt-5.4",
+        attempts: [],
+      }),
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const followupRun = createFollowupRun();
+    followupRun.run.provider = "anthropic";
+    followupRun.run.model = "claude-opus-4-6";
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      totalTokens: 1,
+      compactionCount: 0,
+      providerOverride: "bailian",
+      modelOverride: "qwen3.6-plus",
+      modelOverrideFallbackOriginProvider: "minimax",
+      modelOverrideFallbackOriginModel: "MiniMax-M2.7",
+      // modelOverrideSource intentionally absent
+    };
+    const sessionStore = { main: sessionEntry };
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      commandBody: "hello",
+      followupRun,
+      sessionCtx: {
+        Provider: "telegram",
+        MessageSid: "msg",
+      } as unknown as TemplateContext,
+      opts: {},
+      typingSignals: createMockTypingSignaler(),
+      blockReplyPipeline: null,
+      blockStreamingEnabled: false,
+      resolvedBlockStreamingBreak: "message_end",
+      applyReplyToMode: (payload) => payload,
+      shouldEmitToolResult: () => true,
+      shouldEmitToolOutput: () => false,
+      pendingToolTasks: new Set(),
+      resetSessionAfterCompactionFailure: async () => false,
+      resetSessionAfterRoleOrderingConflict: async () => false,
+      isHeartbeat: false,
+      sessionKey: "main",
+      getActiveSessionEntry: () => sessionEntry,
+      activeSessionStore: sessionStore,
+      resolvedVerboseLevel: "off",
+    });
+
+    expect(result.kind).toBe("success");
+    expect(sessionEntry.providerOverride).toBe("openai-codex");
+    expect(sessionEntry.modelOverride).toBe("gpt-5.4");
+    expect(sessionEntry.modelOverrideSource).toBe("auto");
+    expect(sessionEntry.modelOverrideFallbackOriginProvider).toBe("minimax");
+    expect(sessionEntry.modelOverrideFallbackOriginModel).toBe("MiniMax-M2.7");
+  });
+
+  it("does not persist fallback selection when modelOverrideSource is user", async () => {
+    // Regression: fallback persistence overwrote user-initiated /models
+    // selections.  When the user explicitly picked a model, the fallback
+    // should NOT clobber it even when the primary model fails.
+    state.runWithModelFallbackMock.mockImplementation(
+      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => ({
+        result: await params.run("openai-codex", "gpt-5.4"),
+        provider: "openai-codex",
+        model: "gpt-5.4",
+        attempts: [],
+      }),
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const followupRun = createFollowupRun();
+    followupRun.run.provider = "anthropic";
+    followupRun.run.model = "claude-opus-4-6";
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      totalTokens: 1,
+      compactionCount: 0,
+      // User explicitly selected this model via /models
+      providerOverride: "anthropic",
+      modelOverride: "claude-opus-4-6",
+      modelOverrideSource: "user",
+    };
+    const sessionStore = { main: sessionEntry };
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      commandBody: "hello",
+      followupRun,
+      sessionCtx: {
+        Provider: "telegram",
+        MessageSid: "msg",
+      } as unknown as TemplateContext,
+      opts: {},
+      typingSignals: createMockTypingSignaler(),
+      blockReplyPipeline: null,
+      blockStreamingEnabled: false,
+      resolvedBlockStreamingBreak: "message_end",
+      applyReplyToMode: (payload) => payload,
+      shouldEmitToolResult: () => true,
+      shouldEmitToolOutput: () => false,
+      pendingToolTasks: new Set(),
+      resetSessionAfterCompactionFailure: async () => false,
+      resetSessionAfterRoleOrderingConflict: async () => false,
+      isHeartbeat: false,
+      sessionKey: "main",
+      getActiveSessionEntry: () => sessionEntry,
+      activeSessionStore: sessionStore,
+      resolvedVerboseLevel: "off",
+    });
+
+    expect(result.kind).toBe("success");
+    // The user's /models selection must survive the fallback.
+    expect(sessionEntry.providerOverride).toBe("anthropic");
+    expect(sessionEntry.modelOverride).toBe("claude-opus-4-6");
+    expect(sessionEntry.modelOverrideSource).toBe("user");
+  });
+
+  it("keeps same-provider auth profile when fallback only changes model", async () => {
+    const applyFallbackCandidateSelectionToEntry =
+      await getApplyFallbackCandidateSelectionToEntry();
+    const entry = {
+      sessionId: "session",
+      updatedAt: 1,
+      authProfileOverride: "anthropic:openclaw",
+      authProfileOverrideSource: "user" as const,
+    } as SessionEntry;
+
+    const { updated } = applyFallbackCandidateSelectionToEntry({
+      entry,
+      run: {
+        provider: "anthropic",
+        model: "claude-opus",
+        authProfileId: "anthropic:openclaw",
+        authProfileIdSource: "user",
+      } as FollowupRun["run"],
+      provider: "anthropic",
+      model: "claude-sonnet",
+      now: 123,
+    });
+
+    expect(updated).toBe(true);
+    expectRecordFields(entry as unknown as Record<string, unknown>, {
+      updatedAt: 123,
+      providerOverride: "anthropic",
+      modelOverride: "claude-sonnet",
+      modelOverrideSource: "auto",
+      modelOverrideFallbackOriginProvider: "anthropic",
+      modelOverrideFallbackOriginModel: "claude-opus",
+      authProfileOverride: "anthropic:openclaw",
+      authProfileOverrideSource: "user",
+    });
+  });
+
+  it("preserves original auto-fallback origin across chained fallbacks", async () => {
+    const applyFallbackCandidateSelectionToEntry =
+      await getApplyFallbackCandidateSelectionToEntry();
+    const entry = {
+      sessionId: "session",
+      updatedAt: 1,
+      providerOverride: "openrouter",
+      modelOverride: "fallback-b",
+      modelOverrideSource: "auto" as const,
+      modelOverrideFallbackOriginProvider: "anthropic",
+      modelOverrideFallbackOriginModel: "claude-opus",
+    } as SessionEntry;
+
+    const { updated } = applyFallbackCandidateSelectionToEntry({
+      entry,
+      run: {
+        provider: "openrouter",
+        model: "fallback-b",
+      } as FollowupRun["run"],
+      provider: "openrouter",
+      model: "fallback-c",
+      now: 123,
+    });
+
+    expect(updated).toBe(true);
+    expectRecordFields(entry as unknown as Record<string, unknown>, {
+      updatedAt: 123,
+      providerOverride: "openrouter",
+      modelOverride: "fallback-c",
+      modelOverrideSource: "auto",
+      modelOverrideFallbackOriginProvider: "anthropic",
+      modelOverrideFallbackOriginModel: "claude-opus",
+    });
+  });
+
+  it("latches assistant error stub suppression across main reply fallback candidates", async () => {
+    state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => {
+      await params.run("anthropic", "claude-opus-4-7").catch(() => undefined);
+      await params.run("anthropic", "claude-opus-4-6").catch(() => undefined);
+      return {
+        result: await params.run("openai", "gpt-5.4"),
+        provider: "openai",
+        model: "gpt-5.4",
+        attempts: [],
+      };
+    });
+    state.runEmbeddedPiAgentMock.mockImplementationOnce(
+      async (args: {
+        onAssistantErrorMessagePersisted?: (message: {
+          role: "assistant";
+          content: string;
+          stopReason: "error";
+        }) => void;
+      }) => {
+        args.onAssistantErrorMessagePersisted?.({
+          role: "assistant",
+          content: "[assistant turn failed before producing content]",
+          stopReason: "error",
+        });
+        throw new Error("upstream 500");
+      },
+    );
+    state.runEmbeddedPiAgentMock.mockRejectedValueOnce(new Error("upstream 500"));
+    state.runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    await runAgentTurnWithFallback(createMinimalRunAgentTurnParams());
+
+    expect(state.runEmbeddedPiAgentMock).toHaveBeenCalledTimes(3);
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 0, "primary candidate", {
+      suppressAssistantErrorPersistence: false,
+    });
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 1, "first fallback candidate", {
+      suppressAssistantErrorPersistence: true,
+    });
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 2, "second fallback candidate", {
+      suppressAssistantErrorPersistence: true,
+    });
+  });
+
+  it("does not suppress the first embedded assistant error after a CLI fallback failure", async () => {
+    state.isCliProviderMock.mockImplementation((provider: unknown) => provider === "anthropic");
+    state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => {
+      await params.run("anthropic", "claude-opus-4-7").catch(() => undefined);
+      return {
+        result: await params.run("openai", "gpt-5.4"),
+        provider: "openai",
+        model: "gpt-5.4",
+        attempts: [],
+      };
+    });
+    state.runCliAgentMock.mockRejectedValueOnce(new Error("cli failed"));
+    state.runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    await runAgentTurnWithFallback(createMinimalRunAgentTurnParams());
+
+    expect(state.runCliAgentMock).toHaveBeenCalledOnce();
+    expect(state.runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 0, "embedded fallback candidate", {
+      suppressAssistantErrorPersistence: false,
+    });
+  });
+
+  it("latches queued user message persistence across main reply fallback candidates", async () => {
+    state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => {
+      await params.run("anthropic", "claude-opus-4-7").catch(() => undefined);
+      return {
+        result: await params.run("openai", "gpt-5.4"),
+        provider: "openai",
+        model: "gpt-5.4",
+        attempts: [],
+      };
+    });
+    state.runEmbeddedPiAgentMock.mockImplementationOnce(
+      async (args: {
+        onUserMessagePersisted?: (m: {
+          role: "user";
+          content: Array<{ type: "text"; text: string }>;
+        }) => void;
+      }) => {
+        args.onUserMessagePersisted?.({
+          role: "user",
+          content: [{ type: "text", text: "queued" }],
+        });
+        throw new Error("upstream 500");
+      },
+    );
+    state.runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "ok" }],
+      meta: {},
+    });
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    await runAgentTurnWithFallback(createMinimalRunAgentTurnParams());
+
+    expect(state.runEmbeddedPiAgentMock).toHaveBeenCalledTimes(2);
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 0, "primary candidate", {
+      suppressNextUserMessagePersistence: false,
+    });
+    expectMockCallArgFields(state.runEmbeddedPiAgentMock, 1, "fallback candidate", {
+      suppressNextUserMessagePersistence: true,
+    });
+  });
 });

@@ -24,6 +24,8 @@ For upstream history see https://github.com/openclaw/openclaw.
 - **Pi Embedded Runner**
   - fix: compaction after tool use abortion cause agent infinite loop calls
   - fix(agents): backfill missing sessionKey in embedded PI runner — prevent undefined key in model selection / live-switch
+- **Session transcript stability**
+  - fix(followup,reply): stop model-fallback retries duplicating session entries (Closes #83404)
 
 ### Upstream Features (selected)
 

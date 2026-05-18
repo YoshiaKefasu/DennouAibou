@@ -118,6 +118,15 @@ export function installSessionToolResultGuard(
     beforeMessageWriteHook?: (
       event: PluginHookBeforeMessageWriteEvent,
     ) => PluginHookBeforeMessageWriteResult | undefined;
+    suppressNextUserMessagePersistence?: boolean;
+    suppressTranscriptOnlyAssistantPersistence?: boolean;
+    suppressAssistantErrorPersistence?: boolean;
+    onUserMessagePersisted?: (
+      message: Extract<AgentMessage, { role: "user" }>,
+    ) => void | Promise<void>;
+    onAssistantErrorMessagePersisted?: (
+      message: Extract<AgentMessage, { role: "assistant" }>,
+    ) => void | Promise<void>;
   },
 ): {
   flushPendingToolResults: () => void;
@@ -127,6 +136,7 @@ export function installSessionToolResultGuard(
   const originalAppend = getRawSessionAppendMessage(sessionManager);
   (sessionManager as SessionManagerWithRawAppend)[RAW_APPEND_MESSAGE] = originalAppend;
   const pendingState = createPendingToolCallState();
+  let suppressNextUserMessagePersistence = opts?.suppressNextUserMessagePersistence === true;
   const persistMessage = (message: AgentMessage) => {
     const transformer = opts?.transformMessageForPersistence;
     return transformer ? transformer(message) : message;
@@ -257,6 +267,25 @@ export function installSessionToolResultGuard(
     if (!finalMessage) {
       return undefined;
     }
+    if (
+      (finalMessage as { role?: unknown }).role === "assistant" &&
+      toolCalls.length === 0 &&
+      opts?.suppressTranscriptOnlyAssistantPersistence === true
+    ) {
+      return undefined;
+    }
+    if (
+      (finalMessage as { role?: unknown }).role === "assistant" &&
+      opts?.suppressAssistantErrorPersistence === true &&
+      (finalMessage as { stopReason?: string }).stopReason === "error"
+    ) {
+      return undefined;
+    }
+    const finalRole = (finalMessage as { role?: unknown }).role;
+    if (finalRole === "user" && suppressNextUserMessagePersistence) {
+      suppressNextUserMessagePersistence = false;
+      return undefined;
+    }
     const result = originalAppend(finalMessage as never);
 
     const sessionFile = (
@@ -273,6 +302,19 @@ export function installSessionToolResultGuard(
 
     if (toolCalls.length > 0) {
       pendingState.trackToolCalls(toolCalls);
+    }
+    if (finalRole === "user") {
+      void opts?.onUserMessagePersisted?.(
+        finalMessage as Extract<AgentMessage, { role: "user" }>,
+      );
+    }
+    if (
+      (finalMessage as { role?: unknown }).role === "assistant" &&
+      (finalMessage as { stopReason?: string }).stopReason === "error"
+    ) {
+      void opts?.onAssistantErrorMessagePersisted?.(
+        finalMessage as Extract<AgentMessage, { role: "assistant" }>,
+      );
     }
 
     return result;

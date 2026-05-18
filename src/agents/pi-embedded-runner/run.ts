@@ -588,6 +588,8 @@ export async function runEmbeddedPiAgent(
             resolvedStreamApiKey = (apiKeyInfo as ApiKeyInfo).apiKey;
           }
 
+          const onUserMessagePersisted = params.onUserMessagePersisted;
+          const suppressNextUserMessagePersistence = params.suppressNextUserMessagePersistence;
           const attempt = await runEmbeddedAttempt({
             sessionId: params.sessionId,
             sessionKey: resolvedSessionKey,
@@ -675,6 +677,12 @@ export async function runEmbeddedPiAgent(
             bootstrapPromptWarningSignaturesSeen,
             bootstrapPromptWarningSignature:
               bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
+            suppressNextUserMessagePersistence,
+            suppressTranscriptOnlyAssistantPersistence:
+              params.suppressTranscriptOnlyAssistantPersistence,
+            suppressAssistantErrorPersistence: params.suppressAssistantErrorPersistence,
+            onUserMessagePersisted,
+            onAssistantErrorMessagePersisted: params.onAssistantErrorMessagePersisted,
           });
 
           const {

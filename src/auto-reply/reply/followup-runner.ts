@@ -180,6 +180,8 @@ export function createFollowupRunner(params: {
         activeSessionEntry?.systemPromptReport,
       );
       replyOperation.setPhase("running");
+      let queuedUserMessagePersistedAcrossFallback = false;
+      let assistantErrorPersistedAcrossFallback = false;
       try {
         const fallbackResult = await runWithModelFallback({
           cfg: queued.run.config,
@@ -193,6 +195,11 @@ export function createFollowupRunner(params: {
             sessionKey: queued.run.sessionKey,
           }),
           run: async (provider, model, runOptions) => {
+            const suppressQueuedUserPersistenceForCandidate =
+              ((queued.run as { suppressNextUserMessagePersistence?: boolean }).suppressNextUserMessagePersistence ?? false) ||
+              queuedUserMessagePersistedAcrossFallback;
+            const suppressAssistantErrorPersistenceForCandidate =
+              assistantErrorPersistedAcrossFallback;
             const authProfile = resolveRunAuthProfile(queued.run, provider);
             let attemptCompactionCount = 0;
             try {
@@ -228,6 +235,14 @@ export function createFollowupRunner(params: {
                 skillsSnapshot: queued.run.skillsSnapshot,
                 prompt: queued.prompt,
                 extraSystemPrompt: queued.run.extraSystemPrompt,
+                suppressNextUserMessagePersistence: suppressQueuedUserPersistenceForCandidate,
+                onUserMessagePersisted: () => {
+                  queuedUserMessagePersistedAcrossFallback = true;
+                },
+                suppressAssistantErrorPersistence: suppressAssistantErrorPersistenceForCandidate,
+                onAssistantErrorMessagePersisted: () => {
+                  assistantErrorPersistedAcrossFallback = true;
+                },
                 ownerNumbers: queued.run.ownerNumbers,
                 enforceFinalTag: queued.run.enforceFinalTag,
                 provider,
