@@ -387,6 +387,7 @@ export function attachGatewayWsMessageHandler(params: {
           mode: connectParams.client.mode,
           version: connectParams.client.version,
         };
+        const endpointLabel = requestHost ?? requestOrigin ?? remoteAddr ?? "unknown";
         const connectAuthStartedAt = Date.now();
         const connectAuthTimeoutMs = getPreauthHandshakeTimeoutMsFromEnv();
         const connectAuthTimer = setTimeout(() => {
@@ -397,10 +398,10 @@ export function attachGatewayWsMessageHandler(params: {
           setCloseCause("connect-auth-timeout", {
             ...clientMeta,
             handshakeMs: Date.now() - connectAuthStartedAt,
-            endpoint,
+            endpoint: endpointLabel,
           });
           logWsControl.warn(
-            `connect auth timeout conn=${connId} peer=${formatForLog(peerLabel)} remote=${remoteAddr ?? "?"}`,
+            `connect auth timeout conn=${connId} peer=${formatForLog(clientLabel)} remote=${remoteAddr ?? "?"}`,
           );
           close(1008, "connect auth timeout");
         }, connectAuthTimeoutMs);
@@ -1163,32 +1164,9 @@ export function attachGatewayWsMessageHandler(params: {
           return;
         }
 
-        const canvasCapability = canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
-        const canvasCapabilityExpiresAtMs = canvasCapability
-          ? Date.now() + CANVAS_CAPABILITY_TTL_MS
-          : undefined;
         const usesSharedGatewayAuth = authMethod === "token" || authMethod === "password";
         clearConnectAuthTimer();
-        const nextClient: GatewayWsClient = {
-          socket,
-          connect: connectParams,
-          connId,
-          usesSharedGatewayAuth,
-          presenceKey,
-          clientIp: reportedClientIp,
-          canvasHostUrl,
-          canvasCapability,
-          canvasCapabilityExpiresAtMs,
-        };
-        setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
-        if (!setClient(nextClient)) {
-          setCloseCause("connect-aborted-before-register", {
-            ...clientMeta,
-            auth: authMethod,
-          });
-          return;
-        }
-        setHandshakeState("connected");
+        clearHandshakeTimer();
         logWs("in", "connect", {
           connId,
           client: connectParams.client.id,
@@ -1232,8 +1210,7 @@ export function attachGatewayWsMessageHandler(params: {
           snapshot.health = cachedHealth;
           snapshot.stateVersion.health = getHealthVersion();
         }
-        // Reuse canvas vars from token-auth path (declared as canvasCapability).
-        // For device-token connections, re-evaluate with node-only guard:
+        // For device-token connections, only node clients receive a scoped canvas URL.
         const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
         const deviceCanvasCapabilityExpiresAtMs = deviceCanvasCapability &&
@@ -1270,8 +1247,6 @@ export function attachGatewayWsMessageHandler(params: {
           },
         };
 
-        clearConnectAuthTimer();
-        clearHandshakeTimer();
         const deviceNextClient: GatewayWsClient = {
           socket,
           connect: connectParams,
@@ -1284,13 +1259,7 @@ export function attachGatewayWsMessageHandler(params: {
           canvasCapabilityExpiresAtMs: deviceCanvasCapabilityExpiresAtMs,
         };
         setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
-        if (!setClient(deviceNextClient)) {
-          setCloseCause("connect-aborted-before-register", {
-            ...clientMeta,
-            auth: authMethod,
-          });
-          return;
-        }
+        setClient(deviceNextClient);
         setHandshakeState("connected");
         if (role === "node") {
           const context = buildRequestContext();
