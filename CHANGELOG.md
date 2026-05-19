@@ -25,6 +25,16 @@ For upstream history see https://github.com/openclaw/openclaw.
   - fix: compaction after tool use abortion cause agent infinite loop calls
   - fix(agents): backfill missing sessionKey in embedded PI runner — prevent undefined key in model selection / live-switch
 
+### Upstream Features (selected)
+
+- **Prompt override & heartbeat controls**
+  - feat(agents): add agent-level prompt override for heartbeat instructions
+  - feat(agents): add `heartbeat.every` agent-level config for per-agent heartbeat frequency
+  - Config via `agents.defaults.heartbeat.prompt` in `openclaw.json`
+- **Prompt-cache runtime context**
+  - feat: expose prompt-cache runtime context to context engines
+  - Current-turn prompt-cache usage aligned with active attempt instead of stale prior-turn state
+
 ### DennouAibou-Specific Features
 
 - **Event-loop health monitor (Liveness Watchdog)**

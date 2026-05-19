@@ -32,20 +32,28 @@ HealingWorker のソースは上流の minified dist に含まれており、Den
 ## 対策
 
 ### 設計思想
-上流の修正アプローチ（PR #31226）を踏襲しつつ、**DennouAibou のレイヤーで 2 段階の防御** を実装する。
+上流の修正アプローチ（PR #31226）を踏襲しつつ、**DennouAibou のレイヤーで 3 段階の防御** を実装する。
 
 ```
-Layer 1: KASOU cron watchdog (OS level)
-  → systemd timer で 5 分ごとにログファイルの mtime を確認
-  → 30 分以上更新がなければ gateway 再起動
-  → コード修正不要、即効性重視
+Layer 3: heartbeat-runner watchdog (application level, internal)
+  → 同日追加（event_loop_timer_starvation_report.md 参照）
+  → setInterval で agent schedule を監視
+  → minInterval/4 周期（15s〜5min）
+  → overdue agent 検出時は `requestHeartbeatNow()` で自力回復（restart不要）
+  → WATCHDOG_GRACE_MS=2000 で primary timer との競合回避
+  → `.unref()` 削除＋watchdog によりタイマー飢餓の直接治療
 
-Layer 2: DennouAibou liveness watchdog (application level)
+Layer 2: DennouAibou liveness watchdog (application level, external)
   → setInterval で 5 分ごとに alive marker をログに書き込む
   → process.hrtime で自己のタイマー発火間隔を監視
   → 2x 遅延で警告 / 5x 遅延で gateway 再起動
   → ログファイルの mtime も副次的にチェック
   → process.stderr.write を使うため、ファイルログが死んでも journalctl に届く
+
+Layer 1: KASOU cron watchdog (OS level)
+  → systemd timer で 5 分ごとにログファイルの mtime を確認
+  → 30 分以上更新がなければ gateway 再起動
+  → コード修正不要、即効性重視
 ```
 
 ### Stage 1 — KASOU cron watchdog（即時対策）

@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 import { logDebug } from "../logger.js";
+import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 
 // ============================================================
 // Constants
@@ -50,7 +51,7 @@ const LOG_STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30分
 /**
  * ログファイルのベースディレクトリ
  */
-const LOG_DIR = "/tmp/openclaw";
+const LOG_DIR = resolvePreferredOpenClawTmpDir();
 
 /**
  * ログファイルのプレフィックス
