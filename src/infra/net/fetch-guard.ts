@@ -11,6 +11,9 @@ import {
 import {
   closeDispatcher,
   createPinnedDispatcher,
+  createPinnedDispatcherCached,
+  invalidateHostnameCache,
+  resolvePinnedHostnameCached,
   resolvePinnedHostnameWithPolicy,
   type LookupFn,
   type PinnedDispatcherPolicy,
@@ -244,12 +247,18 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
   });
 
   let released = false;
+  let cachedDispatcherForRelease: Dispatcher | null = null;
   const release = async (dispatcher?: Dispatcher | null) => {
     if (released) {
       return;
     }
     released = true;
     cleanup();
+    // Cached dispatchers are reused; do not close them here.
+    // They will be cleaned up on cache expiry.
+    if (dispatcher && dispatcher === cachedDispatcherForRelease) {
+      return;
+    }
     await closeDispatcher(dispatcher ?? undefined);
   };
 
@@ -275,7 +284,7 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
     try {
       assertExplicitProxySupportsPinnedDns(parsedUrl, params.dispatcherPolicy, params.pinDns);
       await assertExplicitProxyAllowed(params.dispatcherPolicy, params.lookupFn, params.policy);
-      const pinned = await resolvePinnedHostnameWithPolicy(parsedUrl.hostname, {
+      const pinned = await resolvePinnedHostnameCached(parsedUrl.hostname, {
         lookupFn: params.lookupFn,
         policy: params.policy,
       });
@@ -287,7 +296,10 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
       } else if (params.pinDns === false) {
         dispatcher = createPolicyDispatcherWithoutPinnedDns(params.dispatcherPolicy);
       } else {
-        dispatcher = createPinnedDispatcher(pinned, params.dispatcherPolicy, params.policy);
+        dispatcher = await createPinnedDispatcherCached(
+          pinned, params.dispatcherPolicy, params.policy,
+        );
+        cachedDispatcherForRelease = dispatcher;
       }
 
       const init: DispatcherAwareRequestInit = {
@@ -336,7 +348,10 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
         }
         visited.add(nextUrl);
         void response.body?.cancel();
-        await closeDispatcher(dispatcher);
+        // Cached dispatchers are reused; do not close them on redirect
+        if (dispatcher !== cachedDispatcherForRelease) {
+          await closeDispatcher(dispatcher);
+        }
         currentUrl = nextUrl;
         continue;
       }

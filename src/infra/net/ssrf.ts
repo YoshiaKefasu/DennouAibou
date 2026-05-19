@@ -432,6 +432,126 @@ export function createPinnedDispatcher(
   });
 }
 
+// ============================================================
+// DennouAibou: DNS + Dispatcher cache for trusted API hosts
+// Caches resolved hostnames and undici Agents to avoid
+// repetitive DNS lookups and TLS handshakes on every request.
+// Cache entries expire after DNS_TTL_CACHE_MS (default 5 min).
+// ============================================================
+
+const DNS_TTL_CACHE_MS = 5 * 60 * 1000;
+const DNS_CACHE_MAX = 50;
+
+type CachedPinnedEntry = {
+  pinned: PinnedHostname;
+  expiresAt: number;
+};
+
+const pinnedHostnameCache = new Map<string, CachedPinnedEntry>();
+
+function pinnedHostnameCacheKey(
+  hostname: string,
+  policy?: SsrFPolicy,
+): string {
+  // Include allowPrivateNetwork in the key so that request-specific
+  // policy changes invalidate the cache entry.
+  return `${hostname}::${policy?.allowPrivateNetwork === true ? "priv" : "pub"}`;
+}
+
+/**
+ * Cached wrapper around resolvePinnedHostnameWithPolicy.
+ * Returns cached result if available and not expired.
+ */
+export async function resolvePinnedHostnameCached(
+  hostname: string,
+  params: { lookupFn?: LookupFn; policy?: SsrFPolicy } = {},
+): Promise<PinnedHostname> {
+  const key = pinnedHostnameCacheKey(hostname, params.policy);
+  const cached = pinnedHostnameCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.pinned;
+  }
+  const pinned = await resolvePinnedHostnameWithPolicy(hostname, params);
+  pinnedHostnameCache.set(key, {
+    pinned,
+    expiresAt: Date.now() + DNS_TTL_CACHE_MS,
+  });
+  // Evict oldest entries when over limit
+  if (pinnedHostnameCache.size > DNS_CACHE_MAX) {
+    const oldest = pinnedHostnameCache.keys().next().value;
+    if (oldest) pinnedHostnameCache.delete(oldest);
+  }
+  return pinned;
+}
+
+type CachedDispatcherEntry = {
+  dispatcher: Dispatcher;
+  expiresAt: number;
+};
+
+const pinnedDispatcherCache = new Map<string, CachedDispatcherEntry>();
+
+function pinnedDispatcherCacheKey(
+  hostname: string,
+  policy?: PinnedDispatcherPolicy,
+): string {
+  const mode = policy?.mode ?? "direct";
+  return `${hostname}::${mode}`;
+}
+
+/**
+ * Cached wrapper around createPinnedDispatcher.
+ * Returns cached dispatcher if available and not expired, creating
+ * a new one otherwise. The old dispatcher is closed on eviction.
+ */
+export async function createPinnedDispatcherCached(
+  pinned: PinnedHostname,
+  policy?: PinnedDispatcherPolicy,
+  ssrfPolicy?: SsrFPolicy,
+): Promise<Dispatcher> {
+  const key = pinnedDispatcherCacheKey(pinned.hostname, policy);
+  const cached = pinnedDispatcherCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.dispatcher;
+  }
+  const dispatcher = createPinnedDispatcher(pinned, policy, ssrfPolicy);
+  pinnedDispatcherCache.set(key, {
+    dispatcher,
+    expiresAt: Date.now() + DNS_TTL_CACHE_MS,
+  });
+  // Close stale entry if one existed
+  if (cached) {
+    await closeDispatcher(cached.dispatcher).catch(() => {});
+  }
+  // Evict oldest entries when over limit
+  if (pinnedDispatcherCache.size > DNS_CACHE_MAX) {
+    const oldest = pinnedDispatcherCache.keys().next().value;
+    if (oldest) {
+      const entry = pinnedDispatcherCache.get(oldest);
+      pinnedDispatcherCache.delete(oldest);
+      if (entry) await closeDispatcher(entry.dispatcher).catch(() => {});
+    }
+  }
+  return dispatcher;
+}
+
+/**
+ * Close and remove a specific hostname from both caches.
+ * Useful when a connection error suggests stale DNS data.
+ */
+export function invalidateHostnameCache(hostname: string): void {
+  for (const [key] of pinnedHostnameCache) {
+    if (key.startsWith(`${hostname}::`)) {
+      pinnedHostnameCache.delete(key);
+    }
+  }
+  for (const [key] of pinnedDispatcherCache) {
+    if (key.startsWith(`${hostname}::`)) {
+      pinnedDispatcherCache.delete(key);
+    }
+  }
+}
+
 export async function closeDispatcher(dispatcher?: Dispatcher | null): Promise<void> {
   if (!dispatcher) {
     return;
