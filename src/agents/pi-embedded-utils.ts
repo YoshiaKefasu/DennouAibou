@@ -366,16 +366,67 @@ type ThinkTaggedSplitBlock =
   | { type: "thinking"; thinking: string }
   | { type: "text"; text: string };
 
+// Gemini CLI provider sometimes outputs thought text without proper XML tags.
+// Instead of <think>, it prefixes reasoning with "...94>thought\nCRITICAL INSTRUCTION 1: ..."
+// followed by <final>...</final> for the actual response. Detect this pattern
+// and treat content before <final> as thinking.
+// Must match at the very start of text only (no multiline flag) to avoid false
+// positives on "...94>thought" appearing mid-text in normal prose.
+const GEMINI_THOUGHT_LEAD_RE = /^\.\.\.\d+>thought\b/i;
+
+// Case-insensitive final tag search for reasoning leak handling.
+// Gemini CLI uses lowercase <final>, but providers may vary.
+const FINAL_TAG_SEARCH_RE = /<final>/i;
+
 export function splitThinkingTaggedText(text: string): ThinkTaggedSplitBlock[] | null {
   const trimmedStart = text.trimStart();
   // Avoid false positives: only treat it as structured thinking when it begins
   // with a think tag (common for local/OpenAI-compat providers that emulate
   // reasoning blocks via tags).
-  if (!trimmedStart.startsWith("<")) {
+  if (trimmedStart.startsWith("<")) {
+    const openRe = /<\s*(?:think(?:ing)?|thought|antthinking)\s*>/i;
+    const closeRe = /<\s*\/\s*(?:think(?:ing)?|thought|antthinking)\s*>/i;
+    if (!openRe.test(trimmedStart)) {
+      return null;
+    }
+    if (!closeRe.test(text)) {
+      return null;
+    }
+    return splitThinkingTaggedTextByRe(text, openRe, closeRe);
+  }
+
+  // Gemini CLI thought prefix (e.g. "...94>thought"). Only match at start of
+  // trimmed text — multiline flag is intentionally absent to prevent false
+  // positives when this string appears mid-text in normal prose.
+  if (GEMINI_THOUGHT_LEAD_RE.test(trimmedStart)) {
+    const finalMatch = text.match(FINAL_TAG_SEARCH_RE);
+    const finalIndex = finalMatch?.index ?? -1;
+    const thinkingEnd = finalIndex >= 0 ? finalIndex : text.length;
+    const thinking = text.slice(0, thinkingEnd).trim();
+    const afterText = finalIndex >= 0 ? text.slice(finalIndex) : "";
+
+    const blocks: ThinkTaggedSplitBlock[] = [];
+    if (thinking) {
+      blocks.push({ type: "thinking", thinking });
+    }
+    if (afterText) {
+      blocks.push({ type: "text", text: afterText });
+    }
+    if (blocks.some((b) => b.type === "thinking")) {
+      return blocks;
+    }
     return null;
   }
-  const openRe = /<\s*(?:think(?:ing)?|thought|antthinking)\s*>/i;
-  const closeRe = /<\s*\/\s*(?:think(?:ing)?|thought|antthinking)\s*>/i;
+
+  return null;
+}
+
+function splitThinkingTaggedTextByRe(
+  text: string,
+  openRe: RegExp,
+  closeRe: RegExp,
+): ThinkTaggedSplitBlock[] | null {
+  const trimmedStart = text.trimStart();
   if (!openRe.test(trimmedStart)) {
     return null;
   }
