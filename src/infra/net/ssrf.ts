@@ -436,10 +436,10 @@ export function createPinnedDispatcher(
 // DennouAibou: DNS + Dispatcher cache for trusted API hosts
 // Caches resolved hostnames and undici Agents to avoid
 // repetitive DNS lookups and TLS handshakes on every request.
-// Cache entries expire after DNS_TTL_CACHE_MS (default 5 min).
+// Cache entries expire after CACHE_TTL_MS (default 5 min).
 // ============================================================
 
-const DNS_TTL_CACHE_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 const DNS_CACHE_MAX = 50;
 
 type CachedPinnedEntry = {
@@ -453,9 +453,12 @@ function pinnedHostnameCacheKey(
   hostname: string,
   policy?: SsrFPolicy,
 ): string {
-  // Include allowPrivateNetwork in the key so that request-specific
+  // Include both private-network flags in the key so that request-specific
   // policy changes invalidate the cache entry.
-  return `${hostname}::${policy?.allowPrivateNetwork === true ? "priv" : "pub"}`;
+  const priv =
+    policy?.allowPrivateNetwork === true ||
+    policy?.dangerouslyAllowPrivateNetwork === true;
+  return `${hostname}::${priv ? "priv" : "pub"}`;
 }
 
 /**
@@ -469,12 +472,15 @@ export async function resolvePinnedHostnameCached(
   const key = pinnedHostnameCacheKey(hostname, params.policy);
   const cached = pinnedHostnameCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
+    // Touch to maintain LRU order (delete + re-insert moves to end)
+    pinnedHostnameCache.delete(key);
+    pinnedHostnameCache.set(key, cached);
     return cached.pinned;
   }
   const pinned = await resolvePinnedHostnameWithPolicy(hostname, params);
   pinnedHostnameCache.set(key, {
     pinned,
-    expiresAt: Date.now() + DNS_TTL_CACHE_MS,
+    expiresAt: Date.now() + CACHE_TTL_MS,
   });
   // Evict oldest entries when over limit
   if (pinnedHostnameCache.size > DNS_CACHE_MAX) {
@@ -496,7 +502,11 @@ function pinnedDispatcherCacheKey(
   policy?: PinnedDispatcherPolicy,
 ): string {
   const mode = policy?.mode ?? "direct";
-  return `${hostname}::${mode}`;
+  const extras: string[] = [];
+  if (policy?.mode === "explicit-proxy" && policy?.proxyUrl) {
+    extras.push(policy.proxyUrl);
+  }
+  return `${hostname}::${mode}${extras.length > 0 ? `::${extras.join("::")}` : ""}`;
 }
 
 /**
@@ -517,7 +527,7 @@ export async function createPinnedDispatcherCached(
   const dispatcher = createPinnedDispatcher(pinned, policy, ssrfPolicy);
   pinnedDispatcherCache.set(key, {
     dispatcher,
-    expiresAt: Date.now() + DNS_TTL_CACHE_MS,
+    expiresAt: Date.now() + CACHE_TTL_MS,
   });
   // Close stale entry if one existed
   if (cached) {
