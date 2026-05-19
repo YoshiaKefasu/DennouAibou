@@ -1241,14 +1241,15 @@ export function attachGatewayWsMessageHandler(params: {
           snapshot.health = cachedHealth;
           snapshot.stateVersion.health = getHealthVersion();
         }
-        const canvasCapability =
+        // Reuse canvas vars from token-auth path (declared above at ~line 1166).
+        // For device-token connections, re-evaluate with node-only guard:
+        const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
-        const canvasCapabilityExpiresAtMs = canvasCapability
-          ? Date.now() + CANVAS_CAPABILITY_TTL_MS
-          : undefined;
-        const scopedCanvasHostUrl =
-          canvasHostUrl && canvasCapability
-            ? (buildCanvasScopedHostUrl(canvasHostUrl, canvasCapability) ?? canvasHostUrl)
+        const deviceCanvasCapabilityExpiresAtMs = deviceCanvasCapability &&
+          (Date.now() + CANVAS_CAPABILITY_TTL_MS);
+        const deviceScopedCanvasHostUrl =
+          canvasHostUrl && deviceCanvasCapability
+            ? (buildCanvasScopedHostUrl(canvasHostUrl, deviceCanvasCapability) ?? canvasHostUrl)
             : canvasHostUrl;
         const helloOk = {
           type: "hello-ok",
@@ -1259,7 +1260,7 @@ export function attachGatewayWsMessageHandler(params: {
           },
           features: { methods: gatewayMethods, events },
           snapshot,
-          canvasHostUrl: scopedCanvasHostUrl,
+          canvasHostUrl: deviceScopedCanvasHostUrl,
           auth: deviceToken
             ? {
                 deviceToken: deviceToken.token,
@@ -1279,7 +1280,7 @@ export function attachGatewayWsMessageHandler(params: {
         };
 
         clearHandshakeTimer();
-        const nextClient: GatewayWsClient = {
+        const deviceNextClient: GatewayWsClient = {
           socket,
           connect: connectParams,
           connId,
@@ -1287,15 +1288,15 @@ export function attachGatewayWsMessageHandler(params: {
           presenceKey,
           clientIp: reportedClientIp,
           canvasHostUrl,
-          canvasCapability,
-          canvasCapabilityExpiresAtMs,
+          canvasCapability: deviceCanvasCapability,
+          canvasCapabilityExpiresAtMs: deviceCanvasCapabilityExpiresAtMs,
         };
         setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
-        setClient(nextClient);
+        setClient(deviceNextClient);
         setHandshakeState("connected");
         if (role === "node") {
           const context = buildRequestContext();
-          const nodeSession = context.nodeRegistry.register(nextClient, {
+          const nodeSession = context.nodeRegistry.register(deviceNextClient, {
             remoteIp: reportedClientIp,
           });
           const instanceIdRaw = connectParams.client.instanceId;

@@ -19,7 +19,7 @@ export type SessionFreshness = {
   idleExpiresAt?: number;
 };
 
-export const DEFAULT_RESET_MODE: SessionResetMode = "daily";
+export const DEFAULT_RESET_MODE: SessionResetMode = "off";
 export const DEFAULT_RESET_AT_HOUR = 4;
 
 const GROUP_SESSION_MARKERS = [":group:", ":channel:"];
