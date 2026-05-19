@@ -449,15 +449,11 @@ type CachedPinnedEntry = {
 
 const pinnedHostnameCache = new Map<string, CachedPinnedEntry>();
 
-function pinnedHostnameCacheKey(
-  hostname: string,
-  policy?: SsrFPolicy,
-): string {
+function pinnedHostnameCacheKey(hostname: string, policy?: SsrFPolicy): string {
   // Include both private-network flags in the key so that request-specific
   // policy changes invalidate the cache entry.
   const priv =
-    policy?.allowPrivateNetwork === true ||
-    policy?.dangerouslyAllowPrivateNetwork === true;
+    policy?.allowPrivateNetwork === true || policy?.dangerouslyAllowPrivateNetwork === true;
   return `${hostname}::${priv ? "priv" : "pub"}`;
 }
 
@@ -485,7 +481,9 @@ export async function resolvePinnedHostnameCached(
   // Evict oldest entries when over limit
   if (pinnedHostnameCache.size > DNS_CACHE_MAX) {
     const oldest = pinnedHostnameCache.keys().next().value;
-    if (oldest) pinnedHostnameCache.delete(oldest);
+    if (oldest) {
+      pinnedHostnameCache.delete(oldest);
+    }
   }
   return pinned;
 }
@@ -497,10 +495,7 @@ type CachedDispatcherEntry = {
 
 const pinnedDispatcherCache = new Map<string, CachedDispatcherEntry>();
 
-function pinnedDispatcherCacheKey(
-  hostname: string,
-  policy?: PinnedDispatcherPolicy,
-): string {
+function pinnedDispatcherCacheKey(hostname: string, policy?: PinnedDispatcherPolicy): string {
   const mode = policy?.mode ?? "direct";
   const extras: string[] = [];
   if (policy?.mode === "explicit-proxy" && policy?.proxyUrl) {
@@ -522,6 +517,9 @@ export async function createPinnedDispatcherCached(
   const key = pinnedDispatcherCacheKey(pinned.hostname, policy);
   const cached = pinnedDispatcherCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
+    // Touch to maintain LRU order (delete + re-insert moves to end)
+    pinnedDispatcherCache.delete(key);
+    pinnedDispatcherCache.set(key, cached);
     return cached.dispatcher;
   }
   const dispatcher = createPinnedDispatcher(pinned, policy, ssrfPolicy);
@@ -539,7 +537,9 @@ export async function createPinnedDispatcherCached(
     if (oldest) {
       const entry = pinnedDispatcherCache.get(oldest);
       pinnedDispatcherCache.delete(oldest);
-      if (entry) await closeDispatcher(entry.dispatcher).catch(() => {});
+      if (entry) {
+        await closeDispatcher(entry.dispatcher).catch(() => {});
+      }
     }
   }
   return dispatcher;

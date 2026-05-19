@@ -10,7 +10,6 @@ import {
 } from "./runtime-fetch.js";
 import {
   closeDispatcher,
-  createPinnedDispatcher,
   createPinnedDispatcherCached,
   invalidateHostnameCache,
   resolvePinnedHostnameCached,
@@ -297,7 +296,9 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
         dispatcher = createPolicyDispatcherWithoutPinnedDns(params.dispatcherPolicy);
       } else {
         dispatcher = await createPinnedDispatcherCached(
-          pinned, params.dispatcherPolicy, params.policy,
+          pinned,
+          params.dispatcherPolicy,
+          params.policy,
         );
         cachedDispatcherForRelease = dispatcher;
       }
