@@ -68,7 +68,8 @@ function resolveProviderVideoGenerationOverrides(params: {
   audio?: boolean;
   watermark?: boolean;
 }) {
-  const caps = params.provider.capabilities;
+  // Fall back: updated providers put mode capabilities under .generate
+  const caps = params.provider.capabilities.generate ?? params.provider.capabilities;
   const ignoredOverrides: VideoGenerationIgnoredOverride[] = [];
   let size = params.size;
   let aspectRatio = params.aspectRatio;

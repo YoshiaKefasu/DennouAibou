@@ -19,12 +19,14 @@ export function resolveVideoGenerationSupportedDurations(params: {
   model?: string;
 }): number[] | undefined {
   const caps = params.provider?.capabilities;
+  // Fall back: updated providers put mode capabilities under .generate
+  const modeCaps = caps?.generate ?? caps;
   const model = params.model?.trim();
   const modelSpecific =
-    model && caps?.supportedDurationSecondsByModel
-      ? caps.supportedDurationSecondsByModel[model]
+    model && modeCaps?.supportedDurationSecondsByModel
+      ? modeCaps.supportedDurationSecondsByModel[model]
       : undefined;
-  return normalizeSupportedDurationValues(modelSpecific ?? caps?.supportedDurationSeconds);
+  return normalizeSupportedDurationValues(modelSpecific ?? modeCaps?.supportedDurationSeconds);
 }
 
 export function normalizeVideoGenerationDuration(params: {

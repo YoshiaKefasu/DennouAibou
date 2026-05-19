@@ -268,7 +268,8 @@ function validateVideoGenerationCapabilities(params: {
   if (!provider) {
     return;
   }
-  const caps = provider.capabilities;
+  // Fall back: updated providers put mode capabilities under .generate
+  const caps = provider.capabilities.generate ?? provider.capabilities;
   if (params.inputImageCount > 0) {
     const maxInputImages = caps.maxInputImages ?? MAX_INPUT_IMAGES;
     if (params.inputImageCount > maxInputImages) {

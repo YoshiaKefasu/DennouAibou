@@ -21,7 +21,8 @@ function summarizeMusicGenerationCapabilities(
   provider: ReturnType<typeof listRuntimeMusicGenerationProviders>[number],
 ): string {
   const supportedModes = listSupportedMusicGenerationModes(provider);
-  const generate = provider.capabilities.generate;
+  // Fall back: skipped providers (Minimax) keep caps at flat level
+  const generate = provider.capabilities.generate ?? provider.capabilities;
   const edit = provider.capabilities.edit;
   const capabilities = [
     supportedModes.length > 0 ? `modes=${supportedModes.join("/")}` : null,

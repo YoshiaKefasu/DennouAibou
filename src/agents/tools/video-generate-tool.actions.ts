@@ -21,7 +21,8 @@ function summarizeVideoGenerationCapabilities(
   provider: ReturnType<typeof listRuntimeVideoGenerationProviders>[number],
 ): string {
   const supportedModes = listSupportedVideoGenerationModes(provider);
-  const generate = provider.capabilities.generate;
+  // Fall back: skipped providers keep caps at flat level
+  const generate = provider.capabilities.generate ?? provider.capabilities;
   const imageToVideo = provider.capabilities.imageToVideo;
   const videoToVideo = provider.capabilities.videoToVideo;
   const capabilities = [
