@@ -210,8 +210,6 @@ export type AgentDefaultsConfig = {
      * Default: false (only the final heartbeat payload is delivered).
      */
     includeReasoning?: boolean;
-    /** Include the ## Heartbeats system prompt section for the default agent (default: true). */
-    includeSystemPromptSection?: boolean;
   };
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;

@@ -339,7 +339,9 @@ describe("createVideoGenerateTool", () => {
         defaultModel: "sora-2",
         models: ["sora-2"],
         capabilities: {
-          supportsSize: true,
+          generate: {
+            supportsSize: true,
+          },
         },
         generateVideo: vi.fn(async () => {
           throw new Error("not used");
