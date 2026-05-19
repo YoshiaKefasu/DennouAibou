@@ -203,6 +203,11 @@ export async function dispatchReplyFromConfig(params: {
   const sessionKey = ctx.SessionKey;
   const startTime = diagnosticsEnabled ? Date.now() : 0;
   const canTrackSession = diagnosticsEnabled && Boolean(sessionKey);
+  const sessionStoreEntry = resolveSessionStoreLookup(ctx, cfg);
+  const trackedSessionId =
+    typeof sessionStoreEntry.entry?.sessionId === "string"
+      ? sessionStoreEntry.entry.sessionId
+      : undefined;
 
   const recordProcessed = (
     outcome: "completed" | "skipped" | "error",
@@ -232,6 +237,7 @@ export async function dispatchReplyFromConfig(params: {
     }
     logMessageQueued({ sessionKey, channel, source: "dispatch" });
     logSessionStateChange({
+      sessionId: trackedSessionId,
       sessionKey,
       state: "processing",
       reason: "message_start",
@@ -243,6 +249,7 @@ export async function dispatchReplyFromConfig(params: {
       return;
     }
     logSessionStateChange({
+      sessionId: trackedSessionId,
       sessionKey,
       state: "idle",
       reason,
@@ -254,7 +261,6 @@ export async function dispatchReplyFromConfig(params: {
     return { queuedFinal: false, counts: dispatcher.getQueuedCounts() };
   }
 
-  const sessionStoreEntry = resolveSessionStoreLookup(ctx, cfg);
   const acpDispatchSessionKey = sessionStoreEntry.sessionKey ?? sessionKey;
   const sessionAgentId = resolveSessionAgentId({ sessionKey: acpDispatchSessionKey, config: cfg });
   const sessionAgentCfg = resolveAgentConfig(cfg, sessionAgentId);

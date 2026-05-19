@@ -358,3 +358,59 @@ src/cli/run-main.ts        (+2行) startIdlePruneWatcher() 呼び出し
 
 **批判的バグ: なし**
 
+---
+
+## 12. 追記（2026-05-20）: active prune が実行されない問題の修正
+
+### 症状
+
+KASOU の `/status` で context が 739K〜768K 付近から下がらず、`activeSessionToolsPrune.dryRun=false` にしてもアクティブセッションの toolResult が置換されなかった。
+
+実セッション `93fcc1a8-7563-4cf2-b9f1-e4552e7e444f.jsonl` を確認したところ、削除候補は残っていた。
+
+```text
+toolResults=123
+largeToolResults=31
+maxToolText=350947
+placeholderCount=0
+```
+
+つまり、掃除する対象はあるのに、掃除係が実際の部屋番号を受け取れていなかった。
+
+### 原因
+
+`idle-prune-watcher.ts` は prune 実行時に `evt.sessionId` から対象 JSONL ファイルを組み立てる。
+
+```ts
+const filePath = buildSessionFilePath(agentId, evt.sessionId);
+```
+
+しかし `dispatch-from-config.ts` の最終 `markIdle("message_completed")` は `sessionKey` だけを `logSessionStateChange()` に渡し、`sessionId` を渡していなかった。
+
+その結果、次の流れで timer が壊れていた。
+
+```text
+run_completed
+  → sessionId ありの idle イベント
+  → prune timer セット
+
+message_completed
+  → sessionId なしの idle イベント
+  → 既存 timer をキャンセル
+  → sessionId なし timer に上書き
+
+timer 発火
+  → sessionId が無いので prune を SKIP
+```
+
+### 修正
+
+- `dispatch-from-config.ts` で session store の `sessionId` を読み、`processing` / `idle` の diagnostic state change に渡すようにした。
+- `idle-prune-watcher.ts` で、既に `sessionId` 付き timer がある場合は、後から来た `sessionId` なし idle イベントで上書きしないようにした。
+- `src/auto-reply/reply/dispatch-from-config.test.ts` に sessionId 伝搬の回帰テストを追加。
+- `src/dennou-soul/idle-prune-watcher.test.ts` を追加し、`sessionId` 付き timer が `sessionId` なし idle で潰されないことを確認。
+
+### 検証
+
+- `pnpm test src/dennou-soul/idle-prune-watcher.test.ts src/auto-reply/reply/dispatch-from-config.test.ts -t "sessionId|sessionId-less"` passed
+- `pnpm build` passed

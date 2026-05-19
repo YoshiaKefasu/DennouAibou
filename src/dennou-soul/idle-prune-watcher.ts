@@ -26,7 +26,17 @@ import { logDebug } from "../logger.js";
 /**
  * セッションキー（`agent:{agentId}:{wsHash}`）→ タイマーID のマップ
  */
-const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+type IdleTimerEntry = {
+  timer: ReturnType<typeof setTimeout>;
+  /**
+   * Session file id captured from the idle diagnostic event.
+   * Some higher-level completion events only carry sessionKey; those must not
+   * overwrite a richer timer that already knows the JSONL file to prune.
+   */
+  sessionId?: string;
+};
+
+const idleTimers = new Map<string, IdleTimerEntry>();
 
 /**
  * `sessionKey` からエージェントIDを抽出する。
@@ -72,8 +82,14 @@ function handleIdleEvent(
 
   // 既存のタイマーをクリア
   const existing = idleTimers.get(sessionKey);
+  if (!evt.sessionId && existing?.sessionId) {
+    logDebug(
+      `[DennouAibou] Keep existing idle prune timer with sessionId=${existing.sessionId}; ignored sessionId-less idle event for sessionKey=${sessionKey}`,
+    );
+    return;
+  }
   if (existing) {
-    clearTimeout(existing);
+    clearTimeout(existing.timer);
   }
 
   // 新しいIdleタイマーを起動
@@ -108,7 +124,7 @@ function handleIdleEvent(
     }
   }, delayMs);
 
-  idleTimers.set(sessionKey, timer);
+  idleTimers.set(sessionKey, { timer, sessionId: evt.sessionId });
 
   if (config.dryRun) {
     logDebug(
@@ -154,7 +170,7 @@ export function startIdlePruneWatcher(
         // セッションがアクティブに戻った → タイマーキャンセル
         const sessionKey = stateEvt.sessionKey;
         if (sessionKey && idleTimers.has(sessionKey)) {
-          clearTimeout(idleTimers.get(sessionKey)!);
+          clearTimeout(idleTimers.get(sessionKey)!.timer);
           idleTimers.delete(sessionKey);
         }
       }
@@ -169,8 +185,8 @@ export function startIdlePruneWatcher(
   return () => {
     removeListener();
     // 全タイマーをクリア
-    for (const [key, timer] of idleTimers) {
-      clearTimeout(timer);
+    for (const [key, entry] of idleTimers) {
+      clearTimeout(entry.timer);
     }
     idleTimers.clear();
     logDebug("[DennouAibou] Idle prune watcher stopped");

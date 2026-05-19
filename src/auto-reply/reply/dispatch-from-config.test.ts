@@ -2433,6 +2433,36 @@ describe("dispatchReplyFromConfig", () => {
     );
   });
 
+  it("includes the stored sessionId in diagnostic state changes", async () => {
+    setNoAbort();
+    const cfg = { diagnostics: { enabled: true } } as OpenClawConfig;
+    const dispatcher = createDispatcher();
+    sessionStoreMocks.currentEntry = {
+      sessionId: "session-for-prune",
+    };
+    const ctx = buildTestCtx({
+      Provider: "telegram",
+      Surface: "telegram",
+      SessionKey: "agent:main:telegram:slash:8000537189",
+    });
+
+    const replyResolver = async () => ({ text: "hi" }) satisfies ReplyPayload;
+    await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
+
+    expect(diagnosticMocks.logSessionStateChange).toHaveBeenCalledWith({
+      sessionId: "session-for-prune",
+      sessionKey: "agent:main:telegram:slash:8000537189",
+      state: "processing",
+      reason: "message_start",
+    });
+    expect(diagnosticMocks.logSessionStateChange).toHaveBeenCalledWith({
+      sessionId: "session-for-prune",
+      sessionKey: "agent:main:telegram:slash:8000537189",
+      state: "idle",
+      reason: "message_completed",
+    });
+  });
+
   it("routes plugin-owned bindings to the owning plugin before generic inbound claim broadcast", async () => {
     setNoAbort();
     hookMocks.runner.hasHooks.mockImplementation(
