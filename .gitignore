@@ -145,6 +145,9 @@ changelog/fragments/
 
 # Local scratch workspace
 .tmp/
+
+# DennouAibou deploy script (personal KASOU host config)
+scripts/deploy-kasou.ps1
 .artifacts/
 test/fixtures/openclaw-vitest-unit-report.json
 analysis/
