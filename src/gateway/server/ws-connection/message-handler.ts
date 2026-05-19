@@ -1232,7 +1232,7 @@ export function attachGatewayWsMessageHandler(params: {
           snapshot.health = cachedHealth;
           snapshot.stateVersion.health = getHealthVersion();
         }
-        // Reuse canvas vars from token-auth path (declared as canvasCapability / scopedCanvasHostUrl).
+        // Reuse canvas vars from token-auth path (declared as canvasCapability).
         // For device-token connections, re-evaluate with node-only guard:
         const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
@@ -1276,7 +1276,7 @@ export function attachGatewayWsMessageHandler(params: {
           socket,
           connect: connectParams,
           connId,
-          usesSharedGatewayAuth: authMethod === "token" || authMethod === "password",
+          usesSharedGatewayAuth,
           presenceKey,
           clientIp: reportedClientIp,
           canvasHostUrl,
