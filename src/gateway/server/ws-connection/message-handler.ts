@@ -1168,21 +1168,12 @@ export function attachGatewayWsMessageHandler(params: {
           ? Date.now() + CANVAS_CAPABILITY_TTL_MS
           : undefined;
         const usesSharedGatewayAuth = authMethod === "token" || authMethod === "password";
-        const sharedGatewaySessionGeneration = usesSharedGatewayAuth
-          ? resolveSharedGatewaySessionGeneration(resolvedAuth)
-          : undefined;
-        const scopedCanvasHostUrl =
-          canvasHostUrl && canvasCapability
-            ? (buildCanvasScopedHostUrl(canvasHostUrl, canvasCapability) ?? canvasHostUrl)
-            : canvasHostUrl;
         clearConnectAuthTimer();
         const nextClient: GatewayWsClient = {
           socket,
           connect: connectParams,
           connId,
-          isDeviceTokenAuth: authMethod === "device-token",
           usesSharedGatewayAuth,
-          sharedGatewaySessionGeneration,
           presenceKey,
           clientIp: reportedClientIp,
           canvasHostUrl,
@@ -1241,7 +1232,7 @@ export function attachGatewayWsMessageHandler(params: {
           snapshot.health = cachedHealth;
           snapshot.stateVersion.health = getHealthVersion();
         }
-        // Reuse canvas vars from token-auth path (declared above at ~line 1166).
+        // Reuse canvas vars from token-auth path (declared as canvasCapability / scopedCanvasHostUrl).
         // For device-token connections, re-evaluate with node-only guard:
         const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
@@ -1279,6 +1270,7 @@ export function attachGatewayWsMessageHandler(params: {
           },
         };
 
+        clearConnectAuthTimer();
         clearHandshakeTimer();
         const deviceNextClient: GatewayWsClient = {
           socket,
@@ -1292,7 +1284,13 @@ export function attachGatewayWsMessageHandler(params: {
           canvasCapabilityExpiresAtMs: deviceCanvasCapabilityExpiresAtMs,
         };
         setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
-        setClient(deviceNextClient);
+        if (!setClient(deviceNextClient)) {
+          setCloseCause("connect-aborted-before-register", {
+            ...clientMeta,
+            auth: authMethod,
+          });
+          return;
+        }
         setHandshakeState("connected");
         if (role === "node") {
           const context = buildRequestContext();
