@@ -2,7 +2,7 @@
 
 ## Most Imported Files (change these carefully)
 
-- `src\config\config.ts` — imported by **1471** files
+- `src\config\config.ts` — imported by **1470** files
 - `src\runtime.ts` — imported by **328** files
 - `src\utils.ts` — imported by **219** files
 - `src\channels\plugins\types.ts` — imported by **184** files
@@ -25,7 +25,7 @@
 
 ## Import Map (who imports what)
 
-- `src\config\config.ts` ← `extensions\comfy\comfy.live.test.ts`, `extensions\discord\src\client.proxy.test.ts`, `extensions\discord\src\send.webhook.proxy.test.ts`, `extensions\google\web-search-provider.test.ts`, `extensions\image-generation-core\src\runtime.test.ts` +1466 more
+- `src\config\config.ts` ← `extensions\comfy\comfy.live.test.ts`, `extensions\discord\src\client.proxy.test.ts`, `extensions\discord\src\send.webhook.proxy.test.ts`, `extensions\google\web-search-provider.test.ts`, `extensions\image-generation-core\src\runtime.test.ts` +1465 more
 - `src\runtime.ts` ← `src\agents\agent-command.ts`, `src\agents\channel-tools.test.ts`, `src\agents\command\delivery.ts`, `src\agents\sandbox\browser.ts`, `src\agents\sandbox\context.ts` +323 more
 - `src\utils.ts` ← `packages\memory-host-sdk\src\host\backend-config.ts`, `packages\memory-host-sdk\src\host\embeddings.ts`, `src\acp\translator.ts`, `src\agents\agent-paths.ts`, `src\agents\agent-scope.ts` +214 more
 - `src\channels\plugins\types.ts` ← `src\acp\persistent-bindings.test.ts`, `src\acp\persistent-bindings.types.ts`, `src\agents\channel-tools.test.ts`, `src\agents\channel-tools.ts`, `src\agents\command\delivery.test.ts` +179 more

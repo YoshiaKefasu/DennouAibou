@@ -3,9 +3,9 @@
 > **Stack:** hono, express, go-net-http | none | unknown | mixed
 > **Monorepo:** openclaw, openclaw-control-ui, clawdbot, @openclaw/memory-host-sdk, moltbot, @openclaw/plugin-package-contract, @openclaw/acpx, @openclaw/alibaba-provider, @openclaw/anthropic-provider, @openclaw/anthropic-vertex-provider, @openclaw/brave-plugin, @openclaw/browser-plugin, @openclaw/byteplus-provider, @openclaw/chutes-provider, @openclaw/cloudflare-ai-gateway-provider, @openclaw/comfy-provider, @openclaw/copilot-proxy, @openclaw/deepgram-provider, @openclaw/deepseek-provider, @openclaw/diagnostics-otel, @openclaw/diffs, @openclaw/discord, @openclaw/elevenlabs-speech, @openclaw/exa-plugin, @openclaw/fal-provider, @openclaw/fireworks-provider, @openclaw/google-plugin, @openclaw/googlechat, @openclaw/groq-provider, @openclaw/huggingface-provider, @openclaw/image-generation-core, @openclaw/imessage, @openclaw/kilocode-provider, @openclaw/kimi-provider, @openclaw/line, @openclaw/litellm-provider, @openclaw/llm-task, @openclaw/lobster, @openclaw/mattermost, @openclaw/media-understanding-core, @openclaw/memory-core, @openclaw/memory-lancedb, @openclaw/microsoft-speech, @openclaw/microsoft-foundry, @openclaw/minimax-provider, @openclaw/mistral-provider, @openclaw/moonshot-provider, @openclaw/msteams, @openclaw/nvidia-provider, @openclaw/ollama-provider, @openclaw/open-prose, @openclaw/openai-provider, @openclaw/opencode-provider, @openclaw/opencode-go-provider, @openclaw/openrouter-provider, @openclaw/openshell-sandbox, @openclaw/perplexity-plugin, @openclaw/qa-channel, @openclaw/qa-lab, @openclaw/qianfan-provider, @openclaw/qwen-provider, @openclaw/runway-provider, @openclaw/sglang-provider, @openclaw/speech-core, @openclaw/stepfun-provider, @openclaw/synthetic-provider, @openclaw/telegram, @openclaw/together-provider, @openclaw/twitch, @openclaw/venice-provider, @openclaw/vercel-ai-gateway-provider, @openclaw/video-generation-core, @openclaw/vllm-provider, @openclaw/voice-call, @openclaw/volcengine-provider, @openclaw/xai-plugin, @openclaw/xiaomi-provider, docs-i18n
 
-> 3 routes (57 inferred) + 57 ws | 0 models | 0 components | 3900 lib files | 464 env vars | 207 middleware | 59 events | 400% test coverage
-> **Token savings:** this file is ~283,800 tokens. Without it, AI exploration would cost ~1,161,400 tokens. **Saves ~877,600 tokens per conversation.**
-> **Last scanned:** 2026-05-19 09:00 — re-run after significant changes
+> 3 routes (57 inferred) + 57 ws | 0 models | 0 components | 3899 lib files | 464 env vars | 207 middleware | 59 events | 400% test coverage
+> **Token savings:** this file is ~283,700 tokens. Without it, AI exploration would cost ~1,161,200 tokens. **Saves ~877,400 tokens per conversation.**
+> **Last scanned:** 2026-05-19 15:58 — re-run after significant changes
 
 ---
 
@@ -3201,11 +3201,6 @@
   - function applyVercelAiGatewayConfig: (cfg) => OpenClawConfig
   - const VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF
 - `extensions\vercel-ai-gateway\provider-catalog.ts` — function buildVercelAiGatewayProvider: () => Promise<ModelProviderConfig>
-- `extensions\video-generation-core\src\runtime.ts`
-  - function listRuntimeVideoGenerationProviders: (params?) => void
-  - function generateVideo: (params) => Promise<GenerateVideoRuntimeResult>
-  - type GenerateVideoParams
-  - type GenerateVideoRuntimeResult
 - `extensions\vllm\models.ts` — function buildVllmProvider: (params?) => Promise<ProviderConfig>
 - `extensions\voice-call\src\allowlist.ts` — function normalizePhoneNumber: (input?) => string, function isAllowlistedCaller: (normalizedFrom, allowFrom) => boolean
 - `extensions\voice-call\src\cli.ts` — function registerVoiceCallCli: (params) => void
@@ -10943,7 +10938,7 @@
   - function isBlockedHostnameOrIp: (hostname, policy?) => boolean
   - function createPinnedLookup: (params) => typeof dnsLookupCb
   - function resolvePinnedHostnameWithPolicy: (hostname, params) => Promise<PinnedHostname>
-  - _...10 more_
+  - _...13 more_
 - `src\infra\net\undici-global-dispatcher.ts`
   - function ensureGlobalUndiciEnvProxyDispatcher: () => void
   - function ensureGlobalUndiciStreamTimeouts: (opts?) => void
@@ -15320,7 +15315,7 @@
 - `OPENCLAW_LIVE_OPENAI_VISION_MODEL` **required** — extensions\openai\openai.live.test.ts
 - `OPENCLAW_LIVE_OPENROUTER_PLUGIN_MODEL` **required** — extensions\openrouter\openrouter.live.test.ts
 - `OPENCLAW_LIVE_PROVIDERS` **required** — src\agents\models.profiles.live.test.ts
-- `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS` **required** — extensions\music-generation-providers.live.test.ts
+- `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS` **required** — src\image-generation\runtime.live.test.ts
 - `OPENCLAW_LIVE_SETUP_TIMEOUT_MS` **required** — src\agents\models.profiles.live.test.ts
 - `OPENCLAW_LIVE_SETUP_TOKEN` **required** — scripts\anthropic-prompt-probe.ts
 - `OPENCLAW_LIVE_SETUP_TOKEN_MODEL` **required** — src\agents\anthropic.setup-token.live.test.ts
@@ -15754,7 +15749,7 @@
 
 ## Most Imported Files (change these carefully)
 
-- `src\config\config.ts` — imported by **1471** files
+- `src\config\config.ts` — imported by **1470** files
 - `src\runtime.ts` — imported by **328** files
 - `src\utils.ts` — imported by **219** files
 - `src\channels\plugins\types.ts` — imported by **184** files
@@ -15777,7 +15772,7 @@
 
 ## Import Map (who imports what)
 
-- `src\config\config.ts` ← `extensions\comfy\comfy.live.test.ts`, `extensions\discord\src\client.proxy.test.ts`, `extensions\discord\src\send.webhook.proxy.test.ts`, `extensions\google\web-search-provider.test.ts`, `extensions\image-generation-core\src\runtime.test.ts` +1466 more
+- `src\config\config.ts` ← `extensions\comfy\comfy.live.test.ts`, `extensions\discord\src\client.proxy.test.ts`, `extensions\discord\src\send.webhook.proxy.test.ts`, `extensions\google\web-search-provider.test.ts`, `extensions\image-generation-core\src\runtime.test.ts` +1465 more
 - `src\runtime.ts` ← `src\agents\agent-command.ts`, `src\agents\channel-tools.test.ts`, `src\agents\command\delivery.ts`, `src\agents\sandbox\browser.ts`, `src\agents\sandbox\context.ts` +323 more
 - `src\utils.ts` ← `packages\memory-host-sdk\src\host\backend-config.ts`, `packages\memory-host-sdk\src\host\embeddings.ts`, `src\acp\translator.ts`, `src\agents\agent-paths.ts`, `src\agents\agent-scope.ts` +214 more
 - `src\channels\plugins\types.ts` ← `src\acp\persistent-bindings.test.ts`, `src\acp\persistent-bindings.types.ts`, `src\agents\channel-tools.test.ts`, `src\agents\channel-tools.ts`, `src\agents\command\delivery.test.ts` +179 more
@@ -15857,7 +15852,7 @@
 # Test Coverage
 
 > **400%** of routes and models are covered by tests
-> 3244 test files found
+> 3243 test files found
 
 ## Covered Routes
 

@@ -3120,11 +3120,6 @@
   - function applyVercelAiGatewayConfig: (cfg) => OpenClawConfig
   - const VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF
 - `extensions\vercel-ai-gateway\provider-catalog.ts` — function buildVercelAiGatewayProvider: () => Promise<ModelProviderConfig>
-- `extensions\video-generation-core\src\runtime.ts`
-  - function listRuntimeVideoGenerationProviders: (params?) => void
-  - function generateVideo: (params) => Promise<GenerateVideoRuntimeResult>
-  - type GenerateVideoParams
-  - type GenerateVideoRuntimeResult
 - `extensions\vllm\models.ts` — function buildVllmProvider: (params?) => Promise<ProviderConfig>
 - `extensions\voice-call\src\allowlist.ts` — function normalizePhoneNumber: (input?) => string, function isAllowlistedCaller: (normalizedFrom, allowFrom) => boolean
 - `extensions\voice-call\src\cli.ts` — function registerVoiceCallCli: (params) => void
@@ -10862,7 +10857,7 @@
   - function isBlockedHostnameOrIp: (hostname, policy?) => boolean
   - function createPinnedLookup: (params) => typeof dnsLookupCb
   - function resolvePinnedHostnameWithPolicy: (hostname, params) => Promise<PinnedHostname>
-  - _...10 more_
+  - _...13 more_
 - `src\infra\net\undici-global-dispatcher.ts`
   - function ensureGlobalUndiciEnvProxyDispatcher: () => void
   - function ensureGlobalUndiciStreamTimeouts: (opts?) => void

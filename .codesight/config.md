@@ -282,7 +282,7 @@
 - `OPENCLAW_LIVE_OPENAI_VISION_MODEL` **required** — extensions\openai\openai.live.test.ts
 - `OPENCLAW_LIVE_OPENROUTER_PLUGIN_MODEL` **required** — extensions\openrouter\openrouter.live.test.ts
 - `OPENCLAW_LIVE_PROVIDERS` **required** — src\agents\models.profiles.live.test.ts
-- `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS` **required** — extensions\music-generation-providers.live.test.ts
+- `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS` **required** — src\image-generation\runtime.live.test.ts
 - `OPENCLAW_LIVE_SETUP_TIMEOUT_MS` **required** — src\agents\models.profiles.live.test.ts
 - `OPENCLAW_LIVE_SETUP_TOKEN` **required** — scripts\anthropic-prompt-probe.ts
 - `OPENCLAW_LIVE_SETUP_TOKEN_MODEL` **required** — src\agents\anthropic.setup-token.live.test.ts
