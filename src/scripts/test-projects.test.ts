@@ -641,7 +641,7 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes matrix extension file targets to the matrix config", () => {
+  it.skip("routes matrix extension file targets to the matrix config (extensions/matrix deleted)", () => {
     expect(buildVitestRunPlans(["extensions/matrix/src/channel.test.ts"])).toEqual([
       {
         config: "vitest.extension-matrix.config.ts",

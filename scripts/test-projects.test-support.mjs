@@ -3,11 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { isChannelSurfaceTestFile } from "../vitest.channel-paths.mjs";
 import { isAcpxExtensionRoot } from "../vitest.extension-acpx-paths.mjs";
-import { isBlueBubblesExtensionRoot } from "../vitest.extension-bluebubbles-paths.mjs";
 import { isDiffsExtensionRoot } from "../vitest.extension-diffs-paths.mjs";
-import { isFeishuExtensionRoot } from "../vitest.extension-feishu-paths.mjs";
-import { isIrcExtensionRoot } from "../vitest.extension-irc-paths.mjs";
-import { isMatrixExtensionRoot } from "../vitest.extension-matrix-paths.mjs";
 import { isMattermostExtensionRoot } from "../vitest.extension-mattermost-paths.mjs";
 import { isMemoryExtensionRoot } from "../vitest.extension-memory-paths.mjs";
 import { isMessagingExtensionRoot } from "../vitest.extension-messaging-paths.mjs";
@@ -15,8 +11,6 @@ import { isMsTeamsExtensionRoot } from "../vitest.extension-msteams-paths.mjs";
 import { isProviderExtensionRoot } from "../vitest.extension-provider-paths.mjs";
 import { isTelegramExtensionRoot } from "../vitest.extension-telegram-paths.mjs";
 import { isVoiceCallExtensionRoot } from "../vitest.extension-voice-call-paths.mjs";
-import { isWhatsAppExtensionRoot } from "../vitest.extension-whatsapp-paths.mjs";
-import { isZaloExtensionRoot } from "../vitest.extension-zalo-paths.mjs";
 import { isBoundaryTestFile, isBundledPluginDependentUnitTestFile } from "../vitest.unit-paths.mjs";
 
 const DEFAULT_VITEST_CONFIG = "vitest.unit.config.ts";
@@ -33,21 +27,15 @@ const CRON_VITEST_CONFIG = "vitest.cron.config.ts";
 const DAEMON_VITEST_CONFIG = "vitest.daemon.config.ts";
 const E2E_VITEST_CONFIG = "vitest.e2e.config.ts";
 const EXTENSION_ACPX_VITEST_CONFIG = "vitest.extension-acpx.config.ts";
-const EXTENSION_BLUEBUBBLES_VITEST_CONFIG = "vitest.extension-bluebubbles.config.ts";
 const EXTENSION_CHANNELS_VITEST_CONFIG = "vitest.extension-channels.config.ts";
 const EXTENSION_DIFFS_VITEST_CONFIG = "vitest.extension-diffs.config.ts";
-const EXTENSION_FEISHU_VITEST_CONFIG = "vitest.extension-feishu.config.ts";
-const EXTENSION_IRC_VITEST_CONFIG = "vitest.extension-irc.config.ts";
 const EXTENSION_MATTERMOST_VITEST_CONFIG = "vitest.extension-mattermost.config.ts";
-const EXTENSION_MATRIX_VITEST_CONFIG = "vitest.extension-matrix.config.ts";
 const EXTENSION_MEMORY_VITEST_CONFIG = "vitest.extension-memory.config.ts";
 const EXTENSION_MSTEAMS_VITEST_CONFIG = "vitest.extension-msteams.config.ts";
 const EXTENSION_MESSAGING_VITEST_CONFIG = "vitest.extension-messaging.config.ts";
 const EXTENSION_PROVIDERS_VITEST_CONFIG = "vitest.extension-providers.config.ts";
 const EXTENSION_TELEGRAM_VITEST_CONFIG = "vitest.extension-telegram.config.ts";
 const EXTENSION_VOICE_CALL_VITEST_CONFIG = "vitest.extension-voice-call.config.ts";
-const EXTENSION_WHATSAPP_VITEST_CONFIG = "vitest.extension-whatsapp.config.ts";
-const EXTENSION_ZALO_VITEST_CONFIG = "vitest.extension-zalo.config.ts";
 const EXTENSIONS_VITEST_CONFIG = "vitest.extensions.config.ts";
 const GATEWAY_VITEST_CONFIG = "vitest.gateway.config.ts";
 const HOOKS_VITEST_CONFIG = "vitest.hooks.config.ts";
@@ -136,15 +124,6 @@ function classifyTarget(arg, cwd) {
     if (isDiffsExtensionRoot(extensionRoot)) {
       return "extensionDiffs";
     }
-    if (isBlueBubblesExtensionRoot(extensionRoot)) {
-      return "extensionBlueBubbles";
-    }
-    if (isFeishuExtensionRoot(extensionRoot)) {
-      return "extensionFeishu";
-    }
-    if (isIrcExtensionRoot(extensionRoot)) {
-      return "extensionIrc";
-    }
     if (isMattermostExtensionRoot(extensionRoot)) {
       return "extensionMattermost";
     }
@@ -153,15 +132,6 @@ function classifyTarget(arg, cwd) {
     }
     if (isVoiceCallExtensionRoot(extensionRoot)) {
       return "extensionVoiceCall";
-    }
-    if (isWhatsAppExtensionRoot(extensionRoot)) {
-      return "extensionWhatsApp";
-    }
-    if (isZaloExtensionRoot(extensionRoot)) {
-      return "extensionZalo";
-    }
-    if (isMatrixExtensionRoot(extensionRoot)) {
-      return "extensionMatrix";
     }
     if (isMemoryExtensionRoot(extensionRoot)) {
       return "extensionMemory";
@@ -369,16 +339,10 @@ export function buildVitestRunPlans(args, cwd = process.cwd()) {
     "e2e",
     "extensionAcpx",
     "extensionDiffs",
-    "extensionBlueBubbles",
-    "extensionFeishu",
-    "extensionIrc",
     "extensionMattermost",
     "extensionChannel",
     "extensionTelegram",
     "extensionVoiceCall",
-    "extensionWhatsApp",
-    "extensionZalo",
-    "extensionMatrix",
     "extensionMemory",
     "extensionMsTeams",
     "extensionMessaging",
@@ -453,38 +417,22 @@ export function buildVitestRunPlans(args, cwd = process.cwd()) {
                                                                 ? E2E_VITEST_CONFIG
                                                                 : kind === "extensionAcpx"
                                                                   ? EXTENSION_ACPX_VITEST_CONFIG
-                                                                  : kind === "extensionDiffs"
-                                                                    ? EXTENSION_DIFFS_VITEST_CONFIG
-                                                                    : kind ===
-                                                                        "extensionBlueBubbles"
-                                                                      ? EXTENSION_BLUEBUBBLES_VITEST_CONFIG
-                                                                      : kind === "extensionFeishu"
-                                                                        ? EXTENSION_FEISHU_VITEST_CONFIG
-                                                                        : kind === "extensionIrc"
-                                                                          ? EXTENSION_IRC_VITEST_CONFIG
-                                                                          : kind ===
-                                                                              "extensionMattermost"
-                                                                            ? EXTENSION_MATTERMOST_VITEST_CONFIG
-                                                                            : kind ===
+                                                                   : kind === "extensionDiffs"
+                                                                     ? EXTENSION_DIFFS_VITEST_CONFIG
+                                                                     : kind ===
+                                                                         "extensionMattermost"
+                                                                       ? EXTENSION_MATTERMOST_VITEST_CONFIG
+                                                                       : kind ===
                                                                                 "extensionChannel"
                                                                               ? EXTENSION_CHANNELS_VITEST_CONFIG
                                                                               : kind ===
                                                                                   "extensionTelegram"
                                                                                 ? EXTENSION_TELEGRAM_VITEST_CONFIG
-                                                                                : kind ===
-                                                                                    "extensionVoiceCall"
-                                                                                  ? EXTENSION_VOICE_CALL_VITEST_CONFIG
-                                                                                  : kind ===
-                                                                                      "extensionWhatsApp"
-                                                                                    ? EXTENSION_WHATSAPP_VITEST_CONFIG
-                                                                                    : kind ===
-                                                                                        "extensionZalo"
-                                                                                      ? EXTENSION_ZALO_VITEST_CONFIG
-                                                                                      : kind ===
-                                                                                          "extensionMatrix"
-                                                                                        ? EXTENSION_MATRIX_VITEST_CONFIG
-                                                                                        : kind ===
-                                                                                            "extensionMemory"
+                                                                                 : kind ===
+                                                                                     "extensionVoiceCall"
+                                                                                   ? EXTENSION_VOICE_CALL_VITEST_CONFIG
+                                                                                   : kind ===
+                                                                                       "extensionMemory"
                                                                                           ? EXTENSION_MEMORY_VITEST_CONFIG
                                                                                           : kind ===
                                                                                               "extensionMsTeams"
