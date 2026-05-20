@@ -15,25 +15,21 @@
 
 | 層 | 対象 | ランナー | 時間 | 状況 | 使い方 |
 |---|---|---|---|---|---|
-| **fast** | `src/dennou-soul/**`（prune/watchdog/guard）+ 自分が触った領域のテスト | **Bun** | 〜15秒 | ✅ 実証済み（40/42 pass） | 日常の edit → test サイクル |
-| **core** | vi.doMock / vi.resetModules を使わないテスト（2337ファイル） | **Bun** | 〜2分（推定） | ⚪ Bun互換性確認中 | push前の安全確認 |
-| **full** | 全3243 tests（87ファイルはvitest専用API使用） | vitest | 14分 | ❌ 149既存FAILあり | ship前の最終確認、週一メンテ |
+| **fast** | `src/dennou-soul/**`（prune/watchdog/guard） | **Bun** | 〜15秒 | ✅ 実証済み（40/42 pass） | 日常の edit → test サイクル |
+| **core** | vi.doMock / vi.resetModules 以外のvitest専用APIを使わないテスト | **Bun** | 未検証 | ⚪ 未実装 | push前の安全確認（任意） |
+| **full** | 全テスト（159ファイルはvitest専用API使用） | vitest | 14分 | ❌ 149既存FAILあり | ship前の最終確認、週一メンテ |
 
 ### なぜ全部Bunにしないのか
 
-2424テストファイル中87ファイルが `vi.doMock` / `vi.resetModules` を使っており、Bun のテストランナーはこれらに対応していない。1ファイルずつ `mock.module()` に移植する必要があり、数日単位の作業になる。速度面のリターンに対してコストが大きいため、部分置換を選択する。
+3417テストファイル中159ファイルが `vi.doMock` / `vi.resetModules` / その他vitest専用APIを使っており、Bun のテストランナーはこれらに対応していない。1ファイルずつ `mock.module()` に移植する必要があり、数日単位の作業になる。速度面のリターンに対してコストが大きいため、部分置換を選択する。
 
 参考: session-tool-result-guard.test.ts は Bun で 29 tests / 12.6秒 / 全パス。vitest では数分かかっていた。
 
-### 実行コマンド（予定）
+### 実行コマンド
 
-```json
-{
-  "scripts": {
-    "test:fast": "bun test src/dennou-soul/",
-    "test": "vitest run" // 現状維持
-  }
-}
+```bash
+pnpm test:dennou:fast  # → bun test src/dennou-soul/  — 日常のedit→test（15秒）
+pnpm test              # → vitest run                 — 既存full suite（14分、ship前）
 ```
 
 ### 149既存FAILの扱い
@@ -78,12 +74,19 @@ vitest.extension-zalo-paths.mjs
 vitest.extension-zalo.config.ts
 ```
 
-#### 参照元修正
+#### 参照元修正（9ファイル）
 
-`vitest.shared.config.ts` から上記12ファイルへの import / include 行を削除（6ブロック）。
+- `vitest.shared.config.ts` — 12行削除
+- `vitest.config.ts` — 6エントリ削除
+- `vitest.extensions.config.ts` — 6 import + 6 excludeエントリ削除
+- `scripts/lib/extension-test-plan.mjs` — imports/boolean分岐/ternary chain整理
+- `scripts/test-projects.test-support.mjs` — imports/constants/classifyTarget/orderedKinds/config mapping整理
+- `test/vitest-scoped-config.test.ts` — 6 import + 12テストケース削除
+- `test/scripts/test-extension.test.ts` — 6テストケース削除 + batch期待値更新
+- `src/scripts/test-projects.test.ts` — 1テストケースをskip化
 
 #### 効果
 
 - vitest 起動時の無駄なスキャンが減る
-- テストファイル数が 3417 → 3405 に減少（12ファイル削減）
+- テストファイル数が 3417 → 3405 に減少（12ファイル削減 + テストケース削除）
 - full 層の実行時間がわずかに短縮
