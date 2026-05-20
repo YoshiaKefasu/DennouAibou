@@ -654,7 +654,7 @@ export function renderApp(state: AppViewState) {
         </aside>
       </div>
       <main class="content ${isChat ? "content--chat" : ""}">
-        ${false /* DennouAibou hard fork: suppress upstream update banner */}
+        ${nothing /* DennouAibou hard fork: suppress upstream update banner */}
         ${state.tab === "config"
           ? nothing
           : html`<section class="content-header">
