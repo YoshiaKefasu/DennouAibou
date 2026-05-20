@@ -6,6 +6,7 @@ import type { SessionEntry } from "../../config/sessions/types.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 
 const runEmbeddedPiAgentMock = vi.fn();
+const runWithModelFallbackMock = vi.fn();
 const compactEmbeddedPiSessionMock = vi.fn();
 const routeReplyMock = vi.fn();
 const isRoutableChannelMock = vi.fn();
@@ -223,7 +224,7 @@ async function loadFreshFollowupRunnerModuleForTest() {
   vi.resetModules();
   vi.doMock(
     "../../agents/model-fallback.js",
-    async () => await import("../../test-utils/model-fallback.mock.js"),
+    () => ({ runWithModelFallback: runWithModelFallbackMock }),
   );
   vi.doMock("../../agents/session-write-lock.js", () => ({
     acquireSessionWriteLock: vi.fn(async () => ({
@@ -274,6 +275,7 @@ const ROUTABLE_TEST_CHANNELS = new Set([
 beforeEach(async () => {
   await loadFreshFollowupRunnerModuleForTest();
   runEmbeddedPiAgentMock.mockReset();
+  runWithModelFallbackMock.mockReset();
   compactEmbeddedPiSessionMock.mockReset();
   routeReplyMock.mockReset();
   routeReplyMock.mockResolvedValue({ ok: true });
