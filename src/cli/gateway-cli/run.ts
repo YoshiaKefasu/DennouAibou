@@ -84,6 +84,47 @@ const GATEWAY_RUN_BOOLEAN_KEYS = [
 
 const SUPERVISED_GATEWAY_LOCK_RETRY_MS = 5000;
 
+let dennouRuntimeHooksStarted = false;
+
+async function startDennouRuntimeHooksOnce(): Promise<void> {
+  if (dennouRuntimeHooksStarted) {
+    return;
+  }
+  try {
+    // DennouAibou runtime hooks keep timers/listeners alive, so they belong only to
+    // the long-lived gateway process after the server has actually started.
+    const { initSessionMaintenanceHook } = await import(
+      "../../dennou-soul/session-maintenance-hook.js"
+    );
+    initSessionMaintenanceHook();
+
+    const { startIdlePruneWatcher } = await import("../../dennou-soul/idle-prune-watcher.js");
+    let protection: import("../../dennou-soul/types.js").DennouPruneProtectionConfig | undefined;
+    try {
+      const { getDennouConfig } = await import("../../dennou-soul/config.js");
+      protection = getDennouConfig().pruneProtection;
+      const { resolveAgentWorkspaceDir, listAgentIds } = await import(
+        "../../agents/agent-scope.js"
+      );
+      const { getRuntimeConfig } = await import("../../config/config.js");
+      const cfg = getRuntimeConfig();
+      const wsPaths = listAgentIds(cfg).map((id) => resolveAgentWorkspaceDir(cfg, id));
+      if (wsPaths.length > 0) {
+        protection = { ...protection, resolvedWorkspacePaths: wsPaths };
+      }
+    } catch {
+      // Best-effort: workspace path resolution failure is non-fatal.
+    }
+    startIdlePruneWatcher(protection);
+
+    const { startLivenessWatchdog } = await import("../../dennou-soul/liveness-watchdog.js");
+    startLivenessWatchdog();
+    dennouRuntimeHooksStarted = true;
+  } catch (err) {
+    gatewayLog.warn(`DennouAibou runtime hooks failed to start: ${String(err)}`);
+  }
+}
+
 const GATEWAY_AUTH_MODES: readonly GatewayAuthMode[] = [
   "none",
   "token",
@@ -501,13 +542,16 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
     await runGatewayLoop({
       runtime: defaultRuntime,
       lockPort: port,
-      start: async ({ startupStartedAt } = {}) =>
-        await startGatewayServer(port, {
+      start: async ({ startupStartedAt } = {}) => {
+        const server = await startGatewayServer(port, {
           bind,
           auth: authOverride,
           tailscale: tailscaleOverride,
           startupStartedAt,
-        }),
+        });
+        await startDennouRuntimeHooksOnce();
+        return server;
+      },
     });
 
   try {
