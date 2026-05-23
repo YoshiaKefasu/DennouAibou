@@ -87,7 +87,8 @@ export function finalizeTransportStream(params: {
     throw new Error("Request was aborted");
   }
   if (output.stopReason === "aborted" || output.stopReason === "error") {
-    throw new Error("An unknown error occurred");
+    const detail = output.errorMessage ? ` (${output.errorMessage})` : "";
+    throw new Error(`An unknown error occurred${detail}`);
   }
   stream.push({ type: "done", reason: output.stopReason as never, message: output as never });
   stream.end();

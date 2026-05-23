@@ -730,6 +730,13 @@ export function createGoogleGenerativeAiTransportStreamFn(): StreamFn {
             if (output.content.some((block) => block.type === "toolCall")) {
               output.stopReason = "toolUse";
             }
+            // DennouAibou: preserve non-STOP finishReasons for diagnostics.
+            // Without this, mapStopReasonString collapses SAFETY/RECITATION/OTHER
+            // into "error", and finalizeTransportStream throws "An unknown error
+            // occurred", losing the actual reason.
+            if (output.stopReason === "error") {
+              output.errorMessage = `Google API finishReason: ${candidate.finishReason}`;
+            }
           }
         }
         if (currentBlockIndex >= 0) {

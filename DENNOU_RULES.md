@@ -23,10 +23,29 @@ As seen with the `cli-runner` regression, sometimes the upstream architects make
 ## Rule 4: Commit Taxonomy
 **Tag it or lose it.**
 To maintain sanity when reviewing history or preparing for an upstream sync, every commit must be prefixed:
-* `[SOUL]` : Adding or modifying our custom Cyber-VTuber/Partner logic.
-* `[DEBLOAT]` : Disabling, optimizing, or removing upstream bloatware.
-* `[FIX-UPSTREAM]` : Proactively fixing a bug or architectural flaw caused by the upstream developers.
-* `[SYNC]` : Merging changes, tags, or commits explicitly from the OpenClaw origin.
+
+| Tag | When to use | Example |
+|-----|-------------|---------|
+| `[SOUL]` | DennouAibou独自の新機能。**DennouAibouが書いたコード**を DennouAibou独自のファイルに追加 | `src/dennou-soul/liveness-watchdog.ts` を新規追加 |
+| `[FIX-SOUL]` | **DennouAibouが書いた機能のバグ修正**。DennouAibou独自ファイル or DennouAibouが追加したコードが対象 | `src/dennou-soul/prune-engine.ts` のバグを直す |
+| `[DEBLOAT]` | 上流の不要コンポーネントを削除・無効化 | Vydraプラグインフォルダごと削除 |
+| `[FIX-UPSTREAM]` | **上流由来のファイルに、DennouAibouが独自に修正を書いた**。上流にバグがあってまだ直っていない、または上流に提案中の修正 | `src/agents/google-transport-stream.ts` にfinishReason保存を追加 |
+| `[SYNC]` | **上流のコミットをそのまま取り込んだ**（cherry-pick / merge）。修正内容は上流が書いたもの | `git cherry-pick 1b82c0e3d9` で上流のpersistence latchを取り込み |
+
+**判定フロー：**
+
+```
+修正対象のファイルは誰が最初に書いた？
+├── DennouAibou（例: src/dennou-soul/）
+│   ├── 新機能追加 → [SOUL]
+│   └── バグ修正 → [FIX-SOUL]
+└── 上流OpenClaw（例: src/agents/, src/config/, など）
+    ├── 上流のコミットをそのまま持ってきた → [SYNC]
+    └── DennouAibouが独自に修正を書いた → [FIX-UPSTREAM]
+```
+
+**最重要ルール**: `[FIX-SOUL]` と `[FIX-UPSTREAM]` の分かれ目は **コードを最初に書いたのが誰か**。  
+「修正の大小」や「上流に同じバグがあるか」は関係ない。
 
 ## Rule 5: Versioning & Release Identity
 **DennouAibou is not OpenClaw wearing a mask.**
