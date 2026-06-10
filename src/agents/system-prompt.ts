@@ -30,6 +30,7 @@ export type PromptMode = "full" | "minimal" | "none";
 type OwnerIdDisplay = "raw" | "hash";
 
 const CONTEXT_FILE_ORDER = new Map<string, number>([
+  ["habits.md", 5],
   ["agents.md", 10],
   ["soul.md", 20],
   ["identity.md", 30],
@@ -87,10 +88,18 @@ function buildProjectContextSection(params: {
       "",
     );
   } else {
+    const hasHabitsFile = params.files.some(
+      (file) => getContextFileBasename(file.path) === "habits.md",
+    );
     const hasSoulFile = params.files.some(
       (file) => getContextFileBasename(file.path) === "soul.md",
     );
     lines.push("The following project context files have been loaded:");
+    if (hasHabitsFile) {
+      lines.push(
+        "If HABITS.md is present, treat its entries as hard behavioral rules. They take precedence over AGENTS.md and all other context files.",
+      );
+    }
     if (hasSoulFile) {
       lines.push(
         "If SOUL.md is present, embody its persona and tone. Avoid stiff, generic replies; follow its guidance unless higher-priority instructions override it.",

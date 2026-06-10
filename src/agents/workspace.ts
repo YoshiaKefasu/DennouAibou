@@ -22,6 +22,7 @@ export function resolveDefaultAgentWorkspaceDir(
 }
 
 export const DEFAULT_AGENT_WORKSPACE_DIR = resolveDefaultAgentWorkspaceDir();
+export const DEFAULT_HABITS_FILENAME = "HABITS.md";
 export const DEFAULT_AGENTS_FILENAME = "AGENTS.md";
 export const DEFAULT_SOUL_FILENAME = "SOUL.md";
 export const DEFAULT_TOOLS_FILENAME = "TOOLS.md";
@@ -130,6 +131,7 @@ async function loadTemplate(name: string): Promise<string> {
 }
 
 export type WorkspaceBootstrapFileName =
+  | typeof DEFAULT_HABITS_FILENAME
   | typeof DEFAULT_AGENTS_FILENAME
   | typeof DEFAULT_SOUL_FILENAME
   | typeof DEFAULT_TOOLS_FILENAME
@@ -167,6 +169,7 @@ type WorkspaceSetupState = {
 
 /** Set of recognized bootstrap filenames for runtime validation */
 const VALID_BOOTSTRAP_NAMES: ReadonlySet<string> = new Set([
+  DEFAULT_HABITS_FILENAME,
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_SOUL_FILENAME,
   DEFAULT_TOOLS_FILENAME,
@@ -330,6 +333,7 @@ export async function ensureAgentWorkspace(params?: {
 }): Promise<{
   dir: string;
   agentsPath?: string;
+  habitsPath?: string;
   soulPath?: string;
   toolsPath?: string;
   identityPath?: string;
@@ -346,6 +350,7 @@ export async function ensureAgentWorkspace(params?: {
   }
 
   const agentsPath = path.join(dir, DEFAULT_AGENTS_FILENAME);
+  const habitsPath = path.join(dir, DEFAULT_HABITS_FILENAME);
   const soulPath = path.join(dir, DEFAULT_SOUL_FILENAME);
   const toolsPath = path.join(dir, DEFAULT_TOOLS_FILENAME);
   const identityPath = path.join(dir, DEFAULT_IDENTITY_FILENAME);
@@ -355,7 +360,7 @@ export async function ensureAgentWorkspace(params?: {
   const statePath = resolveWorkspaceStatePath(dir);
 
   const isBrandNewWorkspace = await (async () => {
-    const templatePaths = [agentsPath, soulPath, toolsPath, identityPath, userPath, heartbeatPath];
+    const templatePaths = [agentsPath, habitsPath, soulPath, toolsPath, identityPath, userPath, heartbeatPath];
     const userContentPaths = [
       path.join(dir, "memory"),
       path.join(dir, DEFAULT_MEMORY_FILENAME),
@@ -376,12 +381,14 @@ export async function ensureAgentWorkspace(params?: {
   })();
 
   const agentsTemplate = await loadTemplate(DEFAULT_AGENTS_FILENAME);
+  const habitsTemplate = await loadTemplate(DEFAULT_HABITS_FILENAME);
   const soulTemplate = await loadTemplate(DEFAULT_SOUL_FILENAME);
   const toolsTemplate = await loadTemplate(DEFAULT_TOOLS_FILENAME);
   const identityTemplate = await loadTemplate(DEFAULT_IDENTITY_FILENAME);
   const userTemplate = await loadTemplate(DEFAULT_USER_FILENAME);
   const heartbeatTemplate = await loadTemplate(DEFAULT_HEARTBEAT_FILENAME);
   await writeFileIfMissing(agentsPath, agentsTemplate);
+  await writeFileIfMissing(habitsPath, habitsTemplate);
   await writeFileIfMissing(soulPath, soulTemplate);
   await writeFileIfMissing(toolsPath, toolsTemplate);
   await writeFileIfMissing(identityPath, identityTemplate);
@@ -455,6 +462,7 @@ export async function ensureAgentWorkspace(params?: {
   return {
     dir,
     agentsPath,
+    habitsPath,
     soulPath,
     toolsPath,
     identityPath,
@@ -491,6 +499,10 @@ export async function loadWorkspaceBootstrapFiles(dir: string): Promise<Workspac
     name: WorkspaceBootstrapFileName;
     filePath: string;
   }> = [
+    {
+      name: DEFAULT_HABITS_FILENAME,
+      filePath: path.join(resolvedDir, DEFAULT_HABITS_FILENAME),
+    },
     {
       name: DEFAULT_AGENTS_FILENAME,
       filePath: path.join(resolvedDir, DEFAULT_AGENTS_FILENAME),
@@ -547,6 +559,7 @@ export async function loadWorkspaceBootstrapFiles(dir: string): Promise<Workspac
 }
 
 const MINIMAL_BOOTSTRAP_ALLOWLIST = new Set([
+  DEFAULT_HABITS_FILENAME,
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_TOOLS_FILENAME,
   DEFAULT_SOUL_FILENAME,
