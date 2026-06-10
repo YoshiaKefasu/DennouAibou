@@ -1,7 +1,7 @@
 # KASOU OpenClaw npm Package Detach Plan
 
-Date: 2026-05-29
-Status: Plan only — not implemented yet
+Date: 2026-06-10
+Status: Phase 1 & 2 implemented (Phase 1: 2026-06-10, Phase 2: 2026-06-10)
 Scope: KASOU deployment layout and npm package ownership
 
 ## 1. Short version
