@@ -4,6 +4,13 @@
 
 Add `HABITS.md` as the highest-priority workspace bootstrap file, loaded and injected before `AGENTS.md`. This allows users to define agent behavioral habits/rules that override all other context files.
 
+## Status: ✅ IMPLEMENTED & DEPLOYED
+
+- **Commit**: `851cf0bdc96 [SOUL] Add HABITS.md as highest-priority workspace bootstrap file`
+- **Code-review fixes**: `f4dbf2c8198 [FIX-SOUL] Address code-review findings for HABITS.md implementation`
+- **Tests**: 44/44 PASS
+- **Deployed to KASOU**: HTTP 200 on `/` and `/logs`
+
 ## Motivation
 
 AGENTS.md is currently the highest-priority file (order 10), but there are use cases where users want an even higher-priority file for behavioral rules, habits, or hard constraints that must not be overridden by AGENTS.md content. HABITS.md serves this purpose.
@@ -250,3 +257,36 @@ Create template file with example content:
 - Update `AGENTS.md` to reference HABITS.md for behavioral rules
 - Add HABITS.md to workspace template documentation
 - Update `docs/reference/templates/` directory listing
+
+## Code-Review Findings (Fixed)
+
+**Commit**: `f4dbf2c8198 [FIX-SOUL] Address code-review findings for HABITS.md implementation`
+
+### 1. ✅ Remove export from DEFAULT_HABITS_FILENAME
+- **Before**: `export const DEFAULT_HABITS_FILENAME = "HABITS.md";`
+- **After**: `const DEFAULT_HABITS_FILENAME = "HABITS.md";`
+- **Reason**: Only used internally in `workspace.ts`. No external consumer needs this.
+
+### 2. ✅ Add lowercase key requirement comment to CONTEXT_FILE_ORDER
+- **Added**: `// Keys MUST be lowercase — getContextFileBasename() lowercases before lookup.`
+- **Reason**: Prevents future contributors from adding mixed-case keys that would silently fall to `Number.MAX_SAFE_INTEGER` sort order.
+
+### 3. ✅ Extract HABITS.md guidance string to constant
+- **Added**: `const HABITS_GUIDANCE = "If HABITS.md is present, treat its entries as hard behavioral rules. They take precedence over AGENTS.md and all other stable context files.";`
+- **Reason**: Improves discoverability and makes the text easier to maintain.
+
+### 4. ✅ Clarify HABITS.md guidance text
+- **Before**: "...all other context files."
+- **After**: "...all other stable context files."
+- **Reason**: HABITS.md guidance is only injected for stable (non-dynamic) context. The original text implied universal precedence, which was misleading.
+
+### 5. ✅ Add JSDoc for habitsPath in return type
+- **Added**: JSDoc comment for `ensureAgentWorkspace` return type and `habitsPath` property.
+- **Reason**: Documents when path properties are present vs undefined.
+
+## Open Items (Deferred)
+
+### Potential Future Improvements
+1. **Shared priority ordering**: The load order in `WORKSPACE_BOOTSTRAP_ENTRIES` and prompt order in `CONTEXT_FILE_ORDER` are separate. Could be unified into a single source of truth.
+2. **`memory.md` in VALID_BOOTSTRAP_NAMES**: Included for case-insensitive FS handling but not in main entries array. Documented inconsistency.
+3. **HABITS.md lint rule**: Template says "under 50 rules" but no enforcement. Could add CI check if needed.
