@@ -30,6 +30,7 @@ export type PromptMode = "full" | "minimal" | "none";
 type OwnerIdDisplay = "raw" | "hash";
 
 const CONTEXT_FILE_ORDER = new Map<string, number>([
+  // Keys MUST be lowercase — getContextFileBasename() lowercases before lookup.
   ["habits.md", 5],
   ["agents.md", 10],
   ["soul.md", 20],
@@ -41,6 +42,12 @@ const CONTEXT_FILE_ORDER = new Map<string, number>([
 ]);
 
 const DYNAMIC_CONTEXT_FILE_BASENAMES = new Set(["heartbeat.md"]);
+
+// Guidance messages injected into the system prompt when specific files are present.
+const HABITS_GUIDANCE =
+  "If HABITS.md is present, treat its entries as hard behavioral rules. They take precedence over AGENTS.md and all other stable context files.";
+const SOUL_GUIDANCE =
+  "If SOUL.md is present, embody its persona and tone. Avoid stiff, generic replies; follow its guidance unless higher-priority instructions override it.";
 
 function normalizeContextFilePath(pathValue: string): string {
   return pathValue.trim().replace(/\\/g, "/");
@@ -96,14 +103,10 @@ function buildProjectContextSection(params: {
     );
     lines.push("The following project context files have been loaded:");
     if (hasHabitsFile) {
-      lines.push(
-        "If HABITS.md is present, treat its entries as hard behavioral rules. They take precedence over AGENTS.md and all other context files.",
-      );
+      lines.push(HABITS_GUIDANCE);
     }
     if (hasSoulFile) {
-      lines.push(
-        "If SOUL.md is present, embody its persona and tone. Avoid stiff, generic replies; follow its guidance unless higher-priority instructions override it.",
-      );
+      lines.push(SOUL_GUIDANCE);
     }
     lines.push("");
   }

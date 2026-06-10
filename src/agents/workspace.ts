@@ -22,7 +22,7 @@ export function resolveDefaultAgentWorkspaceDir(
 }
 
 export const DEFAULT_AGENT_WORKSPACE_DIR = resolveDefaultAgentWorkspaceDir();
-export const DEFAULT_HABITS_FILENAME = "HABITS.md";
+const DEFAULT_HABITS_FILENAME = "HABITS.md";
 export const DEFAULT_AGENTS_FILENAME = "AGENTS.md";
 export const DEFAULT_SOUL_FILENAME = "SOUL.md";
 export const DEFAULT_TOOLS_FILENAME = "TOOLS.md";
@@ -327,12 +327,21 @@ async function ensureGitRepo(dir: string, isBrandNewWorkspace: boolean) {
   }
 }
 
+/**
+ * Ensure the agent workspace exists and optionally populate bootstrap files.
+ *
+ * @param params.dir - Workspace directory path. Defaults to `~/.openclaw/workspace`.
+ * @param params.ensureBootstrapFiles - If true, create missing bootstrap files from templates.
+ * @returns Workspace paths. Path properties are present only when `ensureBootstrapFiles` is true
+ *   and the corresponding file was created or already existed.
+ */
 export async function ensureAgentWorkspace(params?: {
   dir?: string;
   ensureBootstrapFiles?: boolean;
 }): Promise<{
   dir: string;
   agentsPath?: string;
+  /** Path to HABITS.md, present only when `ensureBootstrapFiles` is true. */
   habitsPath?: string;
   soulPath?: string;
   toolsPath?: string;
