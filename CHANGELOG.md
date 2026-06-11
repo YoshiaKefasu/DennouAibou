@@ -120,5 +120,5 @@ Base: OpenClaw v2026.4.5
 
 - DENNOU_RULES.md established (commit tag taxonomy, deploy procedure, doc rules)
 - DENNOU_DOCS/ archive started
-- graphify + codesight indexing
+- codesight indexing
 - README cleanup
