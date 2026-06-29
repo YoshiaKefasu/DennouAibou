@@ -6,6 +6,7 @@ import {
   logInboundDrop,
   matchesMentionPatterns,
   resolveEnvelopeFormatOptions,
+  temporalMarkerPrefix,
 } from "openclaw/plugin-sdk/channel-inbound";
 import { hasControlCommand } from "openclaw/plugin-sdk/command-auth";
 import { resolveDualTextControlCommandGate } from "openclaw/plugin-sdk/command-auth";
@@ -561,6 +562,10 @@ export function buildIMessageInboundContext(params: {
     chatType: decision.isGroup ? "group" : "direct",
     sender: { name: decision.senderNormalized, id: decision.sender },
     previousTimestamp: params.previousTimestamp,
+    temporalMarkerPrefix:
+      params.previousTimestamp && decision.createdAt
+        ? (temporalMarkerPrefix((decision.createdAt - params.previousTimestamp) / 1000) ?? undefined)
+        : undefined,
     envelope: envelopeOptions,
   });
 

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { MessageEvent, PostbackEvent } from "@line/bot-sdk";
@@ -412,5 +413,62 @@ describe("buildLineMessageContext", () => {
     expect(context!.route.agentId).toBe("codex");
     expect(context!.route.sessionKey).toBe("agent:codex:acp:binding:line:default:test123");
     expect(context!.route.matchedBy).toBe("binding.channel");
+  });
+
+  it("prepends temporal marker when conversational gap exceeds 5 minutes", async () => {
+    // Seed the session store with a prior updatedAt 6 minutes in the past.
+    const groupId = "group-ts-marker";
+    const sessionKey = `agent:main:line:group:${groupId}`;
+    const sixMinutesAgo = Date.now() - 6 * 60 * 1000;
+    const storeData = JSON.stringify({
+      [sessionKey]: { sessionId: "test", updatedAt: sixMinutesAgo },
+    });
+    fsSync.writeFileSync(storePath, storeData, "utf-8");
+
+    const event = createMessageEvent({
+      type: "group",
+      groupId,
+      userId: "user-marker",
+    });
+
+    const context = await buildLineMessageContext({
+      event,
+      allMedia: [],
+      cfg,
+      account,
+      commandAuthorized: true,
+    });
+
+    expect(context).not.toBeNull();
+    // The Body should start with the HTML comment temporal marker.
+    expect(context!.ctxPayload.Body).toMatch(/^<!-- \+\d+m -->\n/);
+  });
+
+  it("does not prepend temporal marker when gap is under 5 minutes", async () => {
+    const groupId = "group-ts-no-marker";
+    const sessionKey = `agent:main:line:group:${groupId}`;
+    const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+    const storeData = JSON.stringify({
+      [sessionKey]: { sessionId: "test", updatedAt: twoMinutesAgo },
+    });
+    fsSync.writeFileSync(storePath, storeData, "utf-8");
+
+    const event = createMessageEvent({
+      type: "group",
+      groupId,
+      userId: "user-no-marker",
+    });
+
+    const context = await buildLineMessageContext({
+      event,
+      allMedia: [],
+      cfg,
+      account,
+      commandAuthorized: true,
+    });
+
+    expect(context).not.toBeNull();
+    // Body should NOT start with an HTML comment marker.
+    expect(context!.ctxPayload.Body).not.toMatch(/^<!-- \+/);
   });
 });

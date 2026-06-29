@@ -18,6 +18,12 @@ export type AgentEnvelopeParams = {
   body: string;
   previousTimestamp?: number | Date;
   envelope?: EnvelopeFormatOptions;
+  /**
+   * Optional HTML-comment temporal marker prefix (e.g. "<!-- +3d 4h -->\n").
+   * When provided, it is prepended before the envelope text in the output.
+   * Produced by `temporalMarkerPrefix()` from `src/infra/format-time/temporal-marker.ts`.
+   */
+  temporalMarkerPrefix?: string;
 };
 
 export type EnvelopeFormatOptions = {
@@ -184,7 +190,8 @@ export function formatAgentEnvelope(params: AgentEnvelopeParams): string {
     parts.push(ts);
   }
   const header = `[${parts.join(" ")}]`;
-  return `${header} ${params.body}`;
+  const envelope = `${header} ${params.body}`;
+  return params.temporalMarkerPrefix ? `${params.temporalMarkerPrefix}${envelope}` : envelope;
 }
 
 export function formatInboundEnvelope(params: {
@@ -198,6 +205,7 @@ export function formatInboundEnvelope(params: {
   previousTimestamp?: number | Date;
   envelope?: EnvelopeFormatOptions;
   fromMe?: boolean;
+  temporalMarkerPrefix?: string;
 }): string {
   const chatType = normalizeChatType(params.chatType);
   const isDirect = !chatType || chatType === "direct";
@@ -215,6 +223,7 @@ export function formatInboundEnvelope(params: {
     timestamp: params.timestamp,
     previousTimestamp: params.previousTimestamp,
     envelope: params.envelope,
+    temporalMarkerPrefix: params.temporalMarkerPrefix,
     body,
   });
 }

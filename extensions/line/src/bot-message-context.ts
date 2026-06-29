@@ -320,11 +320,13 @@ async function finalizeLineInboundContext(params: {
     senderLabel,
   });
 
-  const { storePath, envelopeOptions, previousTimestamp } = resolveInboundSessionEnvelopeContext({
-    cfg: params.cfg,
-    agentId: params.route.agentId,
-    sessionKey: params.route.sessionKey,
-  });
+  const { storePath, envelopeOptions, previousTimestamp, temporalMarkerPrefix } =
+    resolveInboundSessionEnvelopeContext({
+      cfg: params.cfg,
+      agentId: params.route.agentId,
+      sessionKey: params.route.sessionKey,
+      timestamp: params.timestamp,
+    });
 
   const body = formatInboundEnvelope({
     channel: "LINE",
@@ -336,6 +338,7 @@ async function finalizeLineInboundContext(params: {
       id: senderId,
     },
     previousTimestamp,
+    temporalMarkerPrefix,
     envelope: envelopeOptions,
   });
 

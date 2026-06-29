@@ -563,16 +563,19 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
     quoteSenderName ??= quoteInfo?.sender;
 
     const envelopeFrom = isDirectMessage ? senderName : conversationType;
-    const { storePath, envelopeOptions, previousTimestamp } = resolveInboundSessionEnvelopeContext({
-      cfg,
-      agentId: route.agentId,
-      sessionKey: route.sessionKey,
-    });
+    const { storePath, envelopeOptions, previousTimestamp, temporalMarkerPrefix } =
+      resolveInboundSessionEnvelopeContext({
+        cfg,
+        agentId: route.agentId,
+        sessionKey: route.sessionKey,
+        timestamp,
+      });
     const body = core.channel.reply.formatAgentEnvelope({
       channel: "Teams",
       from: envelopeFrom,
       timestamp,
       previousTimestamp,
+      temporalMarkerPrefix,
       envelope: envelopeOptions,
       body: rawBody,
     });

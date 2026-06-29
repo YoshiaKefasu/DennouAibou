@@ -671,6 +671,14 @@ export function buildAgentSystemPrompt(params: {
       messageToolHints: params.messageToolHints,
     }),
     ...buildVoiceSection({ isMinimal, ttsHint: params.ttsHint }),
+    // Temporal awareness: teach the model to read HTML-comment gap markers
+    // that are prepended to inbound user messages when the conversational gap
+    // exceeds 5 minutes. Markers are deterministic from stored timestamps
+    // (cache-safe) and only emitted for meaningful pauses.
+    isMinimal
+      ? ""
+      : "**Temporal awareness**: User messages may be preceded by HTML comments like `<!-- +12m -->`, `<!-- +2h 15m -->`, or `<!-- +3d 4h -->` indicating elapsed time since the previous message. Use this for pacing, recaps, and context when the user returns after a long pause.",
+    isMinimal ? "" : "",
   ];
 
   if (params.reactionGuidance) {

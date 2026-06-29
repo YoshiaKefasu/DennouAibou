@@ -81,6 +81,9 @@ import {
   resolveDefaultGroupPolicy,
   resolveChannelMediaMaxBytes,
   warnMissingProviderGroupPolicyFallbackOnce,
+  readSessionUpdatedAt,
+  resolveStorePath,
+  temporalMarkerPrefix,
   type HistoryEntry,
 } from "./runtime-api.js";
 import { sendMessageMattermost } from "./send.js";
@@ -1304,13 +1307,27 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     });
 
     const textWithId = `${bodyText}\n[mattermost message id: ${post.id ?? "unknown"} channel: ${channelId}]`;
+    const storePath = resolveStorePath(cfg.session?.store, {
+      agentId: route.agentId,
+    });
+    const previousTimestamp = readSessionUpdatedAt({
+      storePath,
+      sessionKey,
+    });
+    const currentTimestamp = typeof post.create_at === "number" ? post.create_at : undefined;
+    const markerPrefix =
+      previousTimestamp && currentTimestamp
+        ? (temporalMarkerPrefix((currentTimestamp - previousTimestamp) / 1000) ?? undefined)
+        : undefined;
     const body = core.channel.reply.formatInboundEnvelope({
       channel: "Mattermost",
       from: fromLabel,
-      timestamp: typeof post.create_at === "number" ? post.create_at : undefined,
+      timestamp: currentTimestamp,
       body: textWithId,
       chatType,
       sender: { name: senderName, id: senderId },
+      previousTimestamp,
+      temporalMarkerPrefix: markerPrefix,
     });
     let combinedBody = body;
     if (historyKey) {

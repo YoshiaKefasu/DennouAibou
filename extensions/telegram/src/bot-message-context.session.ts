@@ -1,6 +1,7 @@
 import {
   formatInboundEnvelope,
   resolveEnvelopeFormatOptions,
+  temporalMarkerPrefix,
   toLocationContext,
   type NormalizedLocation,
 } from "openclaw/plugin-sdk/channel-inbound";
@@ -202,10 +203,15 @@ export async function buildTelegramInboundContextPayload(params: {
     storePath,
     sessionKey: route.sessionKey,
   });
+  const currentTimestamp = msg.date ? msg.date * 1000 : undefined;
+  const markerPrefix =
+    previousTimestamp && currentTimestamp
+      ? (temporalMarkerPrefix((currentTimestamp - previousTimestamp) / 1000) ?? undefined)
+      : undefined;
   const body = formatInboundEnvelope({
     channel: "Telegram",
     from: conversationLabel,
-    timestamp: msg.date ? msg.date * 1000 : undefined,
+    timestamp: currentTimestamp,
     body: `${forwardPrefix}${bodyText}${replySuffix}`,
     chatType: isGroup ? "group" : "direct",
     sender: {
@@ -214,6 +220,7 @@ export async function buildTelegramInboundContextPayload(params: {
       id: senderId || undefined,
     },
     previousTimestamp,
+    temporalMarkerPrefix: markerPrefix,
     envelope: envelopeOptions,
   });
   let combinedBody = body;

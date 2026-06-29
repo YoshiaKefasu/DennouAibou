@@ -78,6 +78,27 @@ describe("formatAgentEnvelope", () => {
     const body = formatAgentEnvelope({ channel: "Telegram", body: "hi" });
     expect(body).toBe("[Telegram] hi");
   });
+
+  it("prepends temporal marker prefix when provided", () => {
+    const body = formatAgentEnvelope({
+      channel: "Telegram",
+      from: "Alice",
+      body: "久しぶり",
+      temporalMarkerPrefix: "<!-- +3d 4h -->\n",
+      envelope: { includeTimestamp: false },
+    });
+    expect(body).toBe("<!-- +3d 4h -->\n[Telegram Alice] 久しぶり");
+  });
+
+  it("omits temporal marker when not provided", () => {
+    const body = formatAgentEnvelope({
+      channel: "Telegram",
+      from: "Alice",
+      body: "hello",
+      envelope: { includeTimestamp: false },
+    });
+    expect(body).toBe("[Telegram Alice] hello");
+  });
 });
 
 describe("formatInboundEnvelope", () => {
@@ -184,5 +205,17 @@ describe("formatInboundEnvelope", () => {
       includeElapsed: false,
       userTimezone: "Europe/Vienna",
     });
+  });
+
+  it("forwards temporal marker prefix through formatInboundEnvelope", () => {
+    const body = formatInboundEnvelope({
+      channel: "Telegram",
+      from: "Alice",
+      body: "follow-up",
+      chatType: "direct",
+      temporalMarkerPrefix: "<!-- +2h 15m -->\n",
+      envelope: { includeTimestamp: false },
+    });
+    expect(body).toBe("<!-- +2h 15m -->\n[Telegram Alice] follow-up");
   });
 });

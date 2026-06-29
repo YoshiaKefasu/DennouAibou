@@ -43,12 +43,13 @@ export {
   GROUP_POLICY_BLOCKED_LABEL,
   isDangerousNameMatchingEnabled,
   loadSessionStore,
+  readSessionUpdatedAt,
   resolveAllowlistProviderRuntimeGroupPolicy,
   resolveDefaultGroupPolicy,
   resolveStorePath,
   warnMissingProviderGroupPolicyFallbackOnce,
 } from "openclaw/plugin-sdk/config-runtime";
-export { formatInboundFromLabel } from "openclaw/plugin-sdk/channel-inbound";
+export { formatInboundFromLabel, temporalMarkerPrefix } from "openclaw/plugin-sdk/channel-inbound";
 export { logInboundDrop } from "openclaw/plugin-sdk/channel-inbound";
 export { createChannelPairingController } from "openclaw/plugin-sdk/channel-pairing";
 export {

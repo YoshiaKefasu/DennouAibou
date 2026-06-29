@@ -1,3 +1,5 @@
+import { temporalMarkerPrefix } from "../infra/format-time/temporal-marker.js";
+
 type RouteLike = {
   agentId: string;
   sessionKey: string;
@@ -15,6 +17,7 @@ type InboundEnvelopeFormatParams<TEnvelope> = {
   previousTimestamp?: number;
   envelope: TEnvelope;
   body: string;
+  temporalMarkerPrefix?: string;
 };
 
 type InboundRouteResolveParams<TConfig, TPeer extends RoutePeerLike> = {
@@ -43,12 +46,26 @@ export function createInboundEnvelopeBuilder<TConfig, TEnvelope>(params: {
       storePath,
       sessionKey: params.route.sessionKey,
     });
+
+    // Compute temporal marker prefix from the gap between current message and
+    // the previous session update. This mirrors the magic-context temporal
+    // awareness pattern: HTML comments like <!-- +3d 4h --> prepended before
+    // the envelope so the model can detect meaningful conversational gaps.
+    let marker: string | undefined;
+    if (previousTimestamp && input.timestamp) {
+      const elapsedMs = input.timestamp - previousTimestamp;
+      if (Number.isFinite(elapsedMs) && elapsedMs >= 0) {
+        marker = temporalMarkerPrefix(elapsedMs / 1000) ?? undefined;
+      }
+    }
+
     const body = params.formatAgentEnvelope({
       channel: input.channel,
       from: input.from,
       timestamp: input.timestamp,
       previousTimestamp,
       envelope: envelopeOptions,
+      temporalMarkerPrefix: marker,
       body: input.body,
     });
     return { storePath, body };

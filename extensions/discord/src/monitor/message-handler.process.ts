@@ -11,6 +11,7 @@ import {
 import {
   formatInboundEnvelope,
   resolveEnvelopeFormatOptions,
+  temporalMarkerPrefix,
 } from "openclaw/plugin-sdk/channel-inbound";
 import { createChannelReplyPipeline } from "openclaw/plugin-sdk/channel-reply-pipeline";
 import { isDangerousNameMatchingEnabled } from "openclaw/plugin-sdk/config-runtime";
@@ -292,14 +293,20 @@ export async function processDiscordMessage(
     storePath,
     sessionKey: route.sessionKey,
   });
+  const currentTimestampMs = resolveTimestampMs(message.timestamp);
+  const markerPrefix =
+    previousTimestamp && currentTimestampMs
+      ? (temporalMarkerPrefix((currentTimestampMs - previousTimestamp) / 1000) ?? undefined)
+      : undefined;
   let combinedBody = formatInboundEnvelope({
     channel: "Discord",
     from: fromLabel,
-    timestamp: resolveTimestampMs(message.timestamp),
+    timestamp: currentTimestampMs,
     body: text,
     chatType: isDirectMessage ? "direct" : "channel",
     senderLabel,
     previousTimestamp,
+    temporalMarkerPrefix: markerPrefix,
     envelope: envelopeOptions,
   });
   const shouldIncludeChannelHistory =

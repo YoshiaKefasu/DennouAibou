@@ -1060,4 +1060,22 @@ describe("buildSubagentSystemPrompt", () => {
       }
     }
   });
+
+  it("includes temporal awareness guidance in full mode", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+    });
+    expect(prompt).toContain("**Temporal awareness**");
+    expect(prompt).toContain("<!-- +12m -->");
+    expect(prompt).toContain("<!-- +2h 15m -->");
+    expect(prompt).toContain("<!-- +3d 4h -->");
+  });
+
+  it("omits temporal awareness guidance in minimal mode", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      promptMode: "minimal",
+    });
+    expect(prompt).not.toContain("**Temporal awareness**");
+  });
 });

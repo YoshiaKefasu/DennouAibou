@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatInboundEnvelope } from "openclaw/plugin-sdk/channel-inbound";
 import {
   decodeHtmlEntities,
   extractMSTeamsQuoteInfo,
@@ -216,6 +217,29 @@ describe("msteams inbound", () => {
         replyAttachment(),
       ]);
       expect(result).toEqual({ sender: "Alice", body: "Hello world" });
+    });
+  });
+
+  describe("temporal marker forwarding (MS Teams uses formatAgentEnvelope)", () => {
+    it("prepends temporal marker when temporalMarkerPrefix is provided", () => {
+      const body = formatInboundEnvelope({
+        channel: "Teams",
+        from: "user@example.com",
+        timestamp: Date.now(),
+        body: "hello",
+        temporalMarkerPrefix: "<!-- +12m -->\n",
+      });
+      expect(body).toMatch(/^<!-- \+12m -->\n/);
+    });
+
+    it("omits temporal marker when not provided", () => {
+      const body = formatInboundEnvelope({
+        channel: "Teams",
+        from: "user@example.com",
+        timestamp: Date.now(),
+        body: "hello",
+      });
+      expect(body).not.toMatch(/^<!-- \+/);
     });
   });
 });
