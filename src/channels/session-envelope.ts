@@ -24,8 +24,7 @@ export function resolveInboundSessionEnvelopeContext(params: {
   if (previousTimestamp && params.timestamp) {
     const currentMs =
       params.timestamp instanceof Date ? params.timestamp.getTime() : params.timestamp;
-    const previousMs =
-      previousTimestamp instanceof Date ? previousTimestamp.getTime() : previousTimestamp;
+    const previousMs = previousTimestamp;
     const elapsedMs = currentMs - previousMs;
     if (Number.isFinite(elapsedMs) && elapsedMs >= 0) {
       const gapSeconds = elapsedMs / 1000;
