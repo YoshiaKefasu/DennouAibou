@@ -123,6 +123,23 @@ export function isProtectedByWorkspacePath(
 }
 
 /**
+ * ツール結果エントリの content のみを placeholder に置き換え、
+ * JSON構造（id, parentId, toolCallId, toolName, isError など）を保持したまま
+ * JSON文字列として返す。
+ *
+ * これにより session-file-repair が malformed line として落とすことがなくなり、
+ * parent chain が切れない。
+ */
+function pruneToolResultEntry(entry: JsonlEntry, placeholder: string): string {
+  const cloned: Record<string, unknown> = JSON.parse(JSON.stringify(entry.parsed));
+  const msg = cloned.message as Record<string, unknown> | undefined;
+  if (msg && typeof msg === "object") {
+    msg.content = [{ type: "text", text: placeholder }];
+  }
+  return JSON.stringify(cloned);
+}
+
+/**
  * 行配列に対してPrune判定を行い、変換後の行配列とPrune行数を返す。
  *
  * @param lines - 元の行配列（末尾空行は除去済みであること）
@@ -190,7 +207,7 @@ export function pruneToolOutputLines(
       resultLines.push(line); // dry-run時は実際には置き換えない
     } else {
       logger(`[DennouAibou] PRUNE: line ${i + 1} (${contentLength} chars)`);
-      resultLines.push(config.placeholder);
+      resultLines.push(pruneToolResultEntry(entry, config.placeholder));
     }
     prunedCount++;
   }

@@ -278,7 +278,14 @@ describe("pruneToolOutputLines with protection", () => {
     );
 
     expect(prunedCount).toBe(1);
-    expect(resultLines[2]).toBe("[pruned]");
+    const parsed = JSON.parse(resultLines[2]);
+    expect(parsed.id).toBe("tool-1");
+    expect(parsed.parentId).toBe("msg-2");
+    expect(parsed.message.role).toBe("toolResult");
+    expect(parsed.message.toolCallId).toBe("call_1");
+    expect(parsed.message.toolName).toBe("test_tool");
+    expect(parsed.message.isError).toBe(false);
+    expect(parsed.message.content).toEqual([{ type: "text", text: "[pruned]" }]);
   });
 
   it("applies both keyword and path protection simultaneously", () => {
@@ -302,9 +309,79 @@ describe("pruneToolOutputLines with protection", () => {
     );
 
     expect(prunedCount).toBe(1);
-    expect(resultLines[2]).toBe("[pruned]");
+    const parsed = JSON.parse(resultLines[2]);
+    expect(parsed.id).toBe("tool-1");
+    expect(parsed.message.toolCallId).toBe("call_1");
+    expect(parsed.message.toolName).toBe("test_tool");
+    expect(parsed.message.content).toEqual([{ type: "text", text: "[pruned]" }]);
     expect(resultLines[3]).toBe(lines[3]);
     expect(resultLines[4]).toBe(lines[4]);
+  });
+
+  it("keeps pruned toolResult rows as valid JSON lines", () => {
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      makeLargeToolResult("x".repeat(200)),
+      makeUserMessage("tail-1"),
+      makeUserMessage("tail-2"),
+    ];
+
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastTools: 0,
+      minPrunableToolChars: 50,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, testLogger);
+
+    expect(prunedCount).toBe(1);
+    expect(() => JSON.parse(resultLines[2])).not.toThrow();
+    const reparsed = parseLine(resultLines[2]);
+    expect(reparsed).not.toBeNull();
+    expect(reparsed?.parsed.message.role).toBe("toolResult");
+  });
+
+  it("preserves tool metadata and error flag when pruning toolResult", () => {
+    const errorToolResult = JSON.stringify({
+      type: "message",
+      id: "tool-error-1",
+      parentId: "msg-error-parent",
+      timestamp: "2026-01-01T00:00:05.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId: "call_error_1",
+        toolName: "web_search",
+        content: [{ type: "text", text: "x".repeat(300) }],
+        isError: true,
+      },
+    });
+
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      errorToolResult,
+      makeUserMessage("tail-1"),
+      makeUserMessage("tail-2"),
+    ];
+
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastTools: 0,
+      minPrunableToolChars: 50,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, testLogger);
+
+    expect(prunedCount).toBe(1);
+    const parsed = JSON.parse(resultLines[2]);
+    expect(parsed.id).toBe("tool-error-1");
+    expect(parsed.parentId).toBe("msg-error-parent");
+    expect(parsed.message.role).toBe("toolResult");
+    expect(parsed.message.toolCallId).toBe("call_error_1");
+    expect(parsed.message.toolName).toBe("web_search");
+    expect(parsed.message.isError).toBe(true);
+    expect(parsed.message.content).toEqual([{ type: "text", text: "[pruned]" }]);
   });
 
   it("works without protection config (backward compatibility)", () => {
