@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import {
   loadConfig,
+  parseClawHubPluginSpec,
   registerPluginsCli,
   resetPluginsCliTestState,
   runPluginsCommand,
@@ -232,6 +233,43 @@ describe("plugins cli update", () => {
         pluginIds: ["openclaw-codex-app-server"],
         specOverrides: {
           "openclaw-codex-app-server": "openclaw-codex-app-server@0.2.0-beta.4",
+        },
+      }),
+    );
+  });
+
+  it("maps an explicit ClawHub selector update to the tracked plugin id", async () => {
+    const config = {
+      plugins: {
+        installs: {
+          "episodic-claw": {
+            source: "clawhub",
+            spec: "clawhub:episodic-claw@0.5.0",
+            installPath: "/tmp/episodic-claw",
+            clawhubUrl: "https://clawhub.ai",
+            clawhubPackage: "episodic-claw",
+            clawhubFamily: "code-plugin",
+            clawhubChannel: "official",
+          },
+        },
+      },
+    } as OpenClawConfig;
+    loadConfig.mockReturnValue(config);
+    parseClawHubPluginSpec.mockReturnValue({ name: "episodic-claw", version: "0.5.0" });
+    updateNpmInstalledPlugins.mockResolvedValue({
+      config,
+      changed: false,
+      outcomes: [],
+    });
+
+    await runPluginsCommand(["plugins", "update", "clawhub:episodic-claw@0.5.0"]);
+
+    expect(updateNpmInstalledPlugins).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config,
+        pluginIds: ["episodic-claw"],
+        specOverrides: {
+          "episodic-claw": "clawhub:episodic-claw@0.5.0",
         },
       }),
     );

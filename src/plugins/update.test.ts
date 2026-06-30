@@ -12,6 +12,7 @@ const installPluginFromNpmSpecMock = vi.fn();
 const installPluginFromMarketplaceMock = vi.fn();
 const installPluginFromClawHubMock = vi.fn();
 const resolveBundledPluginSourcesMock = vi.fn();
+const readInstalledPackageVersionMock = vi.fn();
 
 vi.mock("./install.js", () => ({
   installPluginFromNpmSpec: (...args: unknown[]) => installPluginFromNpmSpecMock(...args),
@@ -31,6 +32,28 @@ vi.mock("./clawhub.js", () => ({
 
 vi.mock("./bundled-sources.js", () => ({
   resolveBundledPluginSources: (...args: unknown[]) => resolveBundledPluginSourcesMock(...args),
+}));
+
+vi.mock("../infra/package-update-utils.js", () => ({
+  readInstalledPackageVersion: (...args: unknown[]) => readInstalledPackageVersionMock(...args),
+  expectedIntegrityForUpdate: (spec: string | undefined, integrity: string | undefined) => {
+    if (!integrity || !spec) {
+      return undefined;
+    }
+    const value = spec.trim();
+    if (!value) {
+      return undefined;
+    }
+    const at = value.lastIndexOf("@");
+    if (at <= 0 || at >= value.length - 1) {
+      return undefined;
+    }
+    const version = value.slice(at + 1).trim();
+    if (!/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
+      return undefined;
+    }
+    return integrity;
+  },
 }));
 
 const { syncPluginsForUpdateChannel, updateNpmInstalledPlugins } = await import("./update.js");
@@ -231,6 +254,7 @@ describe("updateNpmInstalledPlugins", () => {
     installPluginFromMarketplaceMock.mockReset();
     installPluginFromClawHubMock.mockReset();
     resolveBundledPluginSourcesMock.mockReset();
+    readInstalledPackageVersionMock.mockReset();
   });
 
   it.each([
@@ -472,6 +496,386 @@ describe("updateNpmInstalledPlugins", () => {
       clawhubFamily: "code-plugin",
       clawhubChannel: "official",
       integrity: "sha256-next",
+    });
+  });
+
+  it("resolves legacy exact ClawHub record by id to unversioned latest line", async () => {
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.5.1",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-next",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            "episodic-claw": {
+              source: "clawhub",
+              spec: "clawhub:episodic-claw@0.5.0",
+              installPath: "/tmp/episodic-claw",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "episodic-claw",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "0.5.0",
+            },
+          },
+        },
+      },
+      pluginIds: ["episodic-claw"],
+    });
+
+    // Should call with unversioned spec (latest line), not the legacy @0.5.0.
+    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw",
+        baseUrl: "https://clawhub.ai",
+        expectedPluginId: "episodic-claw",
+        mode: "update",
+      }),
+    );
+    // After successful update, saved spec should be normalized to unversioned.
+    expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
+      source: "clawhub",
+      spec: "clawhub:episodic-claw",
+      version: "0.5.1",
+    });
+  });
+
+  it("keeps explicit exact ClawHub selector pinned", async () => {
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.5.0",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-exact",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            "episodic-claw": {
+              source: "clawhub",
+              spec: "clawhub:episodic-claw@0.5.0",
+              installPath: "/tmp/episodic-claw",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "episodic-claw",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "0.5.0",
+            },
+          },
+        },
+      },
+      pluginIds: ["episodic-claw"],
+      specOverrides: {
+        "episodic-claw": "clawhub:episodic-claw@0.5.0",
+      },
+    });
+
+    // Should keep the explicit @0.5.0 selector.
+    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw@0.5.0",
+        baseUrl: "https://clawhub.ai",
+        expectedPluginId: "episodic-claw",
+        mode: "update",
+      }),
+    );
+    // Saved spec should remain pinned.
+    expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
+      source: "clawhub",
+      spec: "clawhub:episodic-claw@0.5.0",
+    });
+  });
+
+  it("keeps beta dist-tag ClawHub selector pinned", async () => {
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.6.0-beta.1",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-beta",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            "episodic-claw": {
+              source: "clawhub",
+              spec: "clawhub:episodic-claw@beta",
+              installPath: "/tmp/episodic-claw",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "episodic-claw",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "0.6.0-beta.1",
+            },
+          },
+        },
+      },
+      pluginIds: ["episodic-claw"],
+    });
+
+    // Should keep the @beta selector pinned.
+    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw@beta",
+        baseUrl: "https://clawhub.ai",
+        expectedPluginId: "episodic-claw",
+        mode: "update",
+      }),
+    );
+    // Saved spec should remain pinned.
+    expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
+      source: "clawhub",
+      spec: "clawhub:episodic-claw@beta",
+    });
+  });
+
+  it("skips ClawHub reinstall when version is unchanged", async () => {
+    // Mock readInstalledPackageVersion to return the installed version.
+    readInstalledPackageVersionMock.mockResolvedValue("1.2.4");
+
+    // Mock probe returns same version as installed.
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "demo",
+      targetDir: "/tmp/demo",
+      version: "1.2.4",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "demo",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-same",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            demo: {
+              source: "clawhub",
+              spec: "clawhub:demo",
+              installPath: "/tmp/demo",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "demo",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "1.2.4",
+            },
+          },
+        },
+      },
+      pluginIds: ["demo"],
+    });
+
+    // Should report unchanged and not re-download.
+    expect(result.outcomes).toEqual([
+      {
+        pluginId: "demo",
+        status: "unchanged",
+        currentVersion: "1.2.4",
+        nextVersion: "1.2.4",
+        message: "demo is up to date (1.2.4).",
+      },
+    ]);
+    // Should not have called the installer for the actual install (only for probe).
+    expect(installPluginFromClawHubMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes legacy exact ClawHub record after successful id-only update", async () => {
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.6.0",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-new",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            "episodic-claw": {
+              source: "clawhub",
+              spec: "clawhub:episodic-claw@0.5.0",
+              installPath: "/tmp/episodic-claw",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "episodic-claw",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "0.5.0",
+            },
+          },
+        },
+      },
+      pluginIds: ["episodic-claw"],
+    });
+
+    // After successful update, saved spec should be normalized to unversioned.
+    expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
+      source: "clawhub",
+      spec: "clawhub:episodic-claw",
+      version: "0.6.0",
+      integrity: "sha256-new",
+    });
+  });
+
+  it("stays on latest line after migration", async () => {
+    // Mock readInstalledPackageVersion to return installed versions.
+    readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
+
+    // First update: migrate from legacy exact to unversioned.
+    // The mock needs to return values for both the early skip probe AND the actual install.
+    installPluginFromClawHubMock
+      .mockResolvedValueOnce({
+        ok: true,
+        pluginId: "episodic-claw",
+        targetDir: "/tmp/episodic-claw",
+        version: "0.6.0",
+        clawhub: {
+          source: "clawhub",
+          clawhubUrl: "https://clawhub.ai",
+          clawhubPackage: "episodic-claw",
+          clawhubFamily: "code-plugin",
+          clawhubChannel: "official",
+          integrity: "sha256-v060",
+          resolvedAt: "2026-06-30T00:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        pluginId: "episodic-claw",
+        targetDir: "/tmp/episodic-claw",
+        version: "0.6.0",
+        clawhub: {
+          source: "clawhub",
+          clawhubUrl: "https://clawhub.ai",
+          clawhubPackage: "episodic-claw",
+          clawhubFamily: "code-plugin",
+          clawhubChannel: "official",
+          integrity: "sha256-v060",
+          resolvedAt: "2026-06-30T00:00:00.000Z",
+        },
+      });
+
+    const firstResult = await updateNpmInstalledPlugins({
+      config: {
+        plugins: {
+          installs: {
+            "episodic-claw": {
+              source: "clawhub",
+              spec: "clawhub:episodic-claw@0.5.0",
+              installPath: "/tmp/episodic-claw",
+              clawhubUrl: "https://clawhub.ai",
+              clawhubPackage: "episodic-claw",
+              clawhubFamily: "code-plugin",
+              clawhubChannel: "official",
+              version: "0.5.0",
+            },
+          },
+        },
+      },
+      pluginIds: ["episodic-claw"],
+    });
+
+    // First update should normalize the spec.
+    expect(firstResult.config.plugins?.installs?.["episodic-claw"]?.spec).toBe("clawhub:episodic-claw");
+
+    // Update mock to return 0.7.0 for the second call.
+    readInstalledPackageVersionMock.mockResolvedValue("0.6.0");
+    installPluginFromClawHubMock
+      .mockResolvedValueOnce({
+        ok: true,
+        pluginId: "episodic-claw",
+        targetDir: "/tmp/episodic-claw",
+        version: "0.7.0",
+        clawhub: {
+          source: "clawhub",
+          clawhubUrl: "https://clawhub.ai",
+          clawhubPackage: "episodic-claw",
+          clawhubFamily: "code-plugin",
+          clawhubChannel: "official",
+          integrity: "sha256-v070",
+          resolvedAt: "2026-07-01T00:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        pluginId: "episodic-claw",
+        targetDir: "/tmp/episodic-claw",
+        version: "0.7.0",
+        clawhub: {
+          source: "clawhub",
+          clawhubUrl: "https://clawhub.ai",
+          clawhubPackage: "episodic-claw",
+          clawhubFamily: "code-plugin",
+          clawhubChannel: "official",
+          integrity: "sha256-v070",
+          resolvedAt: "2026-07-01T00:00:00.000Z",
+        },
+      });
+
+    const secondResult = await updateNpmInstalledPlugins({
+      config: firstResult.config,
+      pluginIds: ["episodic-claw"],
+    });
+
+    // Second update should still use unversioned spec.
+    expect(installPluginFromClawHubMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw",
+        baseUrl: "https://clawhub.ai",
+        expectedPluginId: "episodic-claw",
+        mode: "update",
+      }),
+    );
+    expect(secondResult.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
+      source: "clawhub",
+      spec: "clawhub:episodic-claw",
+      version: "0.7.0",
     });
   });
 
