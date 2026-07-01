@@ -471,6 +471,11 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
       title: "Memory Get",
       detailKeys: ["path", "from", "lines"],
     },
+    chat_search: {
+      emoji: "💬",
+      title: "Chat Search",
+      detailKeys: ["query", "date", "from", "to", "messageId", "role", "channel"],
+    },
     web_search: {
       emoji: "🔎",
       title: "Web Search",

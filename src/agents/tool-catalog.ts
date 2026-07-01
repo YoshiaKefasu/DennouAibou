@@ -142,6 +142,14 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     includeInOpenClawGroup: true,
   },
   {
+    id: "chat_search",
+    label: "chat_search",
+    description: "Search raw chat history",
+    sectionId: "memory",
+    profiles: ["coding"],
+    includeInOpenClawGroup: true,
+  },
+  {
     id: "sessions_list",
     label: "sessions_list",
     description: SESSIONS_LIST_TOOL_DISPLAY_SUMMARY,

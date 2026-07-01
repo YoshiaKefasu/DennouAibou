@@ -22,6 +22,11 @@ ui/playwright-report/
 ui/test-results/
 packages/dashboard-next/.next/
 packages/dashboard-next/out/
+.gitnexus/
+.graphify-out/
+graphify-out/
+.codesight
+.codesight/*.md
 
 # Mise configuration files
 mise.toml
@@ -153,8 +158,4 @@ test/fixtures/openclaw-vitest-unit-report.json
 analysis/
 .artifacts/qa-e2e/
 extensions/qa-lab/web/dist/
-
-# Graphify & GitNexus
-.gitnexus/
-.graphify-out/
-graphify-out/
+*.exe

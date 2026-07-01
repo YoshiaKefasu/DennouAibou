@@ -175,6 +175,10 @@ const logChannels = log.child("channels");
 
 let cachedChannelRuntime: ReturnType<typeof createPluginRuntime>["channel"] | null = null;
 
+// Module-level reference to raw chat sidecar client for clean shutdown.
+let rawChatClientRef: InstanceType<typeof import("../dennou-soul/raw-chat/sidecar-client.js").RawChatClient> | null = null;
+let rawChatCleanupRef: (() => void) | null = null;
+
 function getChannelRuntime() {
   cachedChannelRuntime ??= createPluginRuntime().channel;
   return cachedChannelRuntime;
@@ -933,6 +937,28 @@ export async function startGatewayServer(
 
     if (!minimalTestGateway) {
       startTaskRegistryMaintenance();
+      // Raw chat indexer: Go sidecar manages SQLite schema, indexing, and search.
+      // TypeScript owns only: sidecar launch/shutdown, transcript hook, RPC client, tool registration.
+      try {
+        const { RawChatClient, setRawChatClient, startRawChatIndexer, stopRawChatIndexer } = await import(
+          "../dennou-soul/raw-chat/index.js"
+        );
+        const rawChatClient = new RawChatClient();
+        // Retain reference at module scope so shutdown hook can call stop().
+        rawChatClientRef = rawChatClient;
+        rawChatClient.start().then(() => {
+          console.log("[raw-chat] Go sidecar started successfully");
+          setRawChatClient(rawChatClient);
+        }).catch((err) => {
+          console.warn("[raw-chat] Go sidecar failed to start:", err.message);
+        });
+
+        // Start the transcript update hook (non-blocking, best-effort).
+        // Store cleanup function for shutdown.
+        rawChatCleanupRef = startRawChatIndexer();
+      } catch {
+        // Best-effort: raw chat indexer is optional and must never block gateway startup.
+      }
       ({ tickInterval, healthInterval, dedupeCleanup, mediaCleanup } =
         startGatewayMaintenanceTimers({
           broadcast,
@@ -1572,6 +1598,24 @@ export async function startGatewayServer(
       stopModelPricingRefresh();
       channelHealthMonitor?.stop();
       clearSecretsRuntimeSnapshot();
+      // Stop raw chat Go sidecar to avoid orphaned process.
+      if (rawChatClientRef) {
+        try {
+          rawChatClientRef.stop();
+        } catch (err) {
+          log.warn(`raw chat sidecar stop failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        rawChatClientRef = null;
+      }
+      // Clean up raw chat indexer hook (remove listener, clear pending timers).
+      if (rawChatCleanupRef) {
+        try {
+          rawChatCleanupRef();
+        } catch (err) {
+          log.warn(`raw chat hook cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        rawChatCleanupRef = null;
+      }
       await mcpServer?.close().catch(() => {});
       await close(opts);
     },
