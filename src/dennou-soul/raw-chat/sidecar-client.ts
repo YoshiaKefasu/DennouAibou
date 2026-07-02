@@ -166,12 +166,6 @@ export class RawChatClient {
       });
     }
 
-    // Close stdin so the Go sidecar can detect parent process death via stdin EOF.
-    // The Go sidecar watches stdin and exits cleanly when it closes.
-    if (this.child.stdin) {
-      this.child.stdin.end();
-    }
-
     this.child.on("error", (err: Error) => {
       console.error("[raw-chat] Failed to launch Go sidecar:", err.message);
     });
