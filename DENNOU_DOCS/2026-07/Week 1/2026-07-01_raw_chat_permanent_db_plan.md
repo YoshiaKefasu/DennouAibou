@@ -433,6 +433,7 @@ If a migration becomes risky, rebuild the DB from session JSONL instead of mutat
 - Add context-window expansion API.
 - Add Go unit tests for schema, idempotency, incremental indexing, FTS search, and context expansion.
 - After the Go sidecar passes targeted tests, remove or convert the TypeScript prototype DB/index/search modules so there is only one production path.
+- **Security: sanitize AgentID in handleBackfill to reject values containing `/` or `..` to prevent filesystem path injection.**
 
 ### Phase 3: DennouAibou integration
 
@@ -441,6 +442,7 @@ If a migration becomes risky, rebuild the DB from session JSONL instead of mutat
 - Add config flag and kill switch.
 - Ensure indexing failure logs are small and non-blocking.
 - Do not duplicate the Go DB/index/search logic in TypeScript.
+- **Note: the initial kill switch (`dennou.rawChat.indexing.enabled`) is evaluated at startup. Changing it at runtime requires a gateway restart. Document this in help text and config schema.**
 
 ### Phase 4: Agent tool
 

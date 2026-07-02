@@ -8,7 +8,9 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -245,6 +247,18 @@ func handleBackfill(conn net.Conn, req RPCRequest) {
 			ID:      req.ID,
 		}); sendErr != nil {
 			emitLog("backfill missing agent_id response write failed: %v", sendErr)
+		}
+		return
+	}
+
+	// Sanitize AgentID to prevent path injection.
+	if strings.Contains(params.AgentID, "/") || strings.Contains(params.AgentID, "..") || filepath.Base(params.AgentID) != params.AgentID {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32602, Message: "invalid agent ID"},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("backfill invalid agent_id response write failed: %v", sendErr)
 		}
 		return
 	}

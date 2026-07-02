@@ -108,7 +108,7 @@ export const FIELD_HELP: Record<string, string> = {
   "dennou.rawChat.indexing":
     "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
   "dennou.rawChat.indexing.enabled":
-    "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results.",
+    "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
   gateway:
     "Gateway runtime surface for bind mode, auth, control UI, remote transport, and operational safety controls. Keep conservative defaults unless you intentionally expose the gateway beyond trusted local interfaces.",
   "gateway.port":
