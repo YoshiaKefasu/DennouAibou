@@ -73,3 +73,18 @@ type SearchResults struct {
 	Results []SearchResult `json:"results"`
 	Count   int            `json:"count"`
 }
+
+// BackfillParams is the params for raw_chat.backfill.
+type BackfillParams struct {
+	AgentID   string `json:"agent_id"`
+	SessionDir string `json:"session_dir,omitempty"`
+}
+
+// BackfillResult is the result for raw_chat.backfill.
+type BackfillResult struct {
+	TotalFiles    int `json:"total_files"`
+	IndexedFiles  int `json:"indexed_files"`
+	SkippedFiles  int `json:"skipped_files"`
+	TotalMessages int `json:"total_messages"`
+	Errors        int `json:"errors"`
+}

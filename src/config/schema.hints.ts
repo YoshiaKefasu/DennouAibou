@@ -96,6 +96,7 @@ const FIELD_ORDER: Record<string, number> = {
   "dennou.activeSessionToolsPrune": 20,
   "dennou.sessionToolsPrune": 30,
   "dennou.pruneProtection": 40,
+  "dennou.rawChat": 50,
 };
 
 const CHANNEL_NAMESPACE_PREFIX = "channels.";

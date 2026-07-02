@@ -65,12 +65,25 @@ const DennouPruneProtectionSchema = z
   })
   .strict();
 
+const DennouRawChatSchema = z
+  .object({
+    indexing: z
+      .object({
+        enabled: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .optional();
+
 const DennouSchema = z
   .object({
     toolsPrune: DennouToolsPruneSchema.optional(),
     sessionToolsPrune: DennouSessionToolsPruneSchema.optional(),
     activeSessionToolsPrune: DennouActiveSessionToolsPruneSchema.optional(),
     pruneProtection: DennouPruneProtectionSchema.optional(),
+    rawChat: DennouRawChatSchema.optional(),
   })
   .strict()
   .optional();

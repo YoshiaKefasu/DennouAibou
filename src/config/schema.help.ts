@@ -103,6 +103,12 @@ export const FIELD_HELP: Record<string, string> = {
     "Safety rules that prevent pruning when protected files/keywords are involved.",
   "dennou.pruneProtection.protectedContentKeywords":
     "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
+  "dennou.rawChat":
+    "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
+  "dennou.rawChat.indexing":
+    "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+  "dennou.rawChat.indexing.enabled":
+    "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results.",
   gateway:
     "Gateway runtime surface for bind mode, auth, control UI, remote transport, and operational safety controls. Keep conservative defaults unless you intentionally expose the gateway beyond trusted local interfaces.",
   "gateway.port":

@@ -77,6 +77,19 @@ export interface SearchResults {
   count: number;
 }
 
+export interface BackfillParams {
+  agent_id: string;
+  session_dir?: string;
+}
+
+export interface BackfillResult {
+  total_files: number;
+  indexed_files: number;
+  skipped_files: number;
+  total_messages: number;
+  errors: number;
+}
+
 // --- Client ---
 
 type SidecarProcess = ReturnType<typeof import("child_process").spawn> | undefined;
@@ -141,6 +154,7 @@ export class RawChatClient {
         cwd: goDir,
         shell: false,
         windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
       });
     } else {
       // SECURITY: `shell: false` neutralizes command injection.
@@ -148,7 +162,14 @@ export class RawChatClient {
         cwd: goDir,
         shell: false,
         windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
       });
+    }
+
+    // Close stdin so the Go sidecar can detect parent process death via stdin EOF.
+    // The Go sidecar watches stdin and exits cleanly when it closes.
+    if (this.child.stdin) {
+      this.child.stdin.end();
     }
 
     this.child.on("error", (err: Error) => {
@@ -331,6 +352,10 @@ export class RawChatClient {
 
   async search(params: SearchParams): Promise<SearchResults> {
     return this.request<SearchResults>("raw_chat.search", params, 10000);
+  }
+
+  async backfill(params: BackfillParams): Promise<BackfillResult> {
+    return this.request<BackfillResult>("raw_chat.backfill", params, 60000);
   }
 
   /**

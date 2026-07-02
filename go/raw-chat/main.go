@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
+	"time"
 )
 
 var writeMu sync.Mutex
@@ -43,6 +46,19 @@ func main() {
 	}
 	defer listener.Close()
 
+	// Start stdin close detection goroutine.
+	// When the parent Node.js process dies, stdin closes and we exit cleanly.
+	go watchStdin()
+
+	// Also watch for OS signals (SIGTERM, SIGINT) for clean shutdown.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		sig := <-sigChan
+		emitLog("Received signal %v, shutting down", sig)
+		os.Exit(0)
+	}()
+
 	_ = ppid // Reserved for future use.
 
 	for {
@@ -53,6 +69,20 @@ func main() {
 		}
 		go handleConnection(conn)
 	}
+}
+
+// watchStdin monitors stdin for close (EOF). When the parent Node.js process
+// dies, stdin closes and this goroutine triggers a clean shutdown.
+func watchStdin() {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		// Discard any data on stdin; we only care about the close.
+	}
+	// stdin closed (EOF or error).
+	emitLog("stdin closed (parent process exited), shutting down in 5s")
+	// Give pending connections time to drain.
+	time.Sleep(5 * time.Second)
+	os.Exit(0)
 }
 
 func handleConnection(conn net.Conn) {
@@ -79,6 +109,8 @@ func handleConnection(conn net.Conn) {
 			go handleIndexSession(conn, req)
 		case "raw_chat.search":
 			go handleSearch(conn, req)
+		case "raw_chat.backfill":
+			go handleBackfill(conn, req)
 		case "ping":
 			if err := sendResponse(conn, RPCResponse{JSONRPC: "2.0", Result: "pong", ID: req.ID}); err != nil {
 				emitLog("ping response write failed: %v", err)
@@ -190,6 +222,71 @@ func handleSearch(conn net.Conn, req RPCRequest) {
 		ID:      req.ID,
 	}); sendErr != nil {
 		emitLog("search result response write failed: %v", sendErr)
+	}
+}
+
+func handleBackfill(conn net.Conn, req RPCRequest) {
+	var params BackfillParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32602, Message: "Invalid params: " + err.Error()},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("backfill invalid params response write failed: %v", sendErr)
+		}
+		return
+	}
+
+	if params.AgentID == "" {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32602, Message: "agent_id is required"},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("backfill missing agent_id response write failed: %v", sendErr)
+		}
+		return
+	}
+
+	db, err := OpenDB(params.AgentID)
+	if err != nil {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32000, Message: "Failed to open DB: " + err.Error()},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("backfill open DB response write failed: %v", sendErr)
+		}
+		return
+	}
+	defer db.Close()
+
+	// Use default session dir if not provided.
+	sessionDir := params.SessionDir
+	if sessionDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			if sendErr := sendResponse(conn, RPCResponse{
+				JSONRPC: "2.0",
+				Error:   &RPCError{Code: -32000, Message: "Failed to get home dir: " + err.Error()},
+				ID:      req.ID,
+			}); sendErr != nil {
+				emitLog("backfill home dir response write failed: %v", sendErr)
+			}
+			return
+		}
+		sessionDir = home + "/.openclaw/agents/" + params.AgentID + "/sessions"
+	}
+
+	result := BackfillSessionFiles(db, sessionDir, params.AgentID)
+
+	if sendErr := sendResponse(conn, RPCResponse{
+		JSONRPC: "2.0",
+		Result:  result,
+		ID:      req.ID,
+	}); sendErr != nil {
+		emitLog("backfill result response write failed: %v", sendErr)
 	}
 }
 

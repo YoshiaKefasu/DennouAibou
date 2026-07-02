@@ -940,7 +940,7 @@ export async function startGatewayServer(
       // Raw chat indexer: Go sidecar manages SQLite schema, indexing, and search.
       // TypeScript owns only: sidecar launch/shutdown, transcript hook, RPC client, tool registration.
       try {
-        const { RawChatClient, setRawChatClient, startRawChatIndexer, stopRawChatIndexer } = await import(
+        const { RawChatClient, setRawChatClient, startRawChatIndexer, stopRawChatIndexer, backfillSessionFiles } = await import(
           "../dennou-soul/raw-chat/index.js"
         );
         const rawChatClient = new RawChatClient();
@@ -949,13 +949,19 @@ export async function startGatewayServer(
         rawChatClient.start().then(() => {
           console.log("[raw-chat] Go sidecar started successfully");
           setRawChatClient(rawChatClient);
+          // Backfill existing session files on startup (idempotent, non-blocking).
+          const defaultAgentId = resolveDefaultAgentId(runtimeConfig);
+          backfillSessionFiles(defaultAgentId).catch(() => {
+            // Best-effort: backfill errors don't block startup.
+          });
         }).catch((err) => {
           console.warn("[raw-chat] Go sidecar failed to start:", err.message);
         });
 
         // Start the transcript update hook (non-blocking, best-effort).
         // Store cleanup function for shutdown.
-        rawChatCleanupRef = startRawChatIndexer();
+        // Pass runtime config so kill switch (dennou.rawChat.indexing.enabled) is respected.
+        rawChatCleanupRef = startRawChatIndexer(runtimeConfig);
       } catch {
         // Best-effort: raw chat indexer is optional and must never block gateway startup.
       }

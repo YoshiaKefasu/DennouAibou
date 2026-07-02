@@ -285,3 +285,41 @@ func extractChannelFromSessionKey(sessionKey string) string {
 	}
 	return ""
 }
+
+// BackfillSessionFiles iterates through all JSONL files in a session directory
+// and indexes them incrementally. This is idempotent via INSERT OR IGNORE.
+func BackfillSessionFiles(db *sql.DB, sessionDir string, agentID string) BackfillResult {
+	result := BackfillResult{}
+
+	entries, err := os.ReadDir(sessionDir)
+	if err != nil {
+		emitLog("backfill: failed to read session dir %s: %v", sessionDir, err)
+		return result
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+
+		result.TotalFiles++
+		filePath := sessionDir + "/" + entry.Name()
+
+		indexed, _, errors := IndexSessionFile(db, filePath, agentID, "")
+		if indexed > 0 {
+			result.IndexedFiles++
+			result.TotalMessages += indexed
+		} else {
+			result.SkippedFiles++
+		}
+		result.Errors += errors
+	}
+
+	emitLog("backfill: completed %d files, indexed %d messages, skipped %d, errors %d",
+		result.TotalFiles, result.TotalMessages, result.SkippedFiles, result.Errors)
+
+	return result
+}

@@ -8,6 +8,7 @@ import {
 import { resolveSessionAgentId } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
 import type { RawChatClient, SearchParams } from "./sidecar-client.js";
 import { getRawChatClient } from "./client-ref.js";
+import { isRawChatIndexingEnabled } from "./hook.js";
 
 /**
  * chat_search tool — searches the raw chat permanent DB via Go sidecar RPC.
@@ -35,6 +36,11 @@ export function createChatSearchTool(options: {
 }): AnyAgentTool | null {
   const cfg = options.config;
   if (!cfg) {
+    return null;
+  }
+
+  // Kill switch: do not register tool when indexing is disabled.
+  if (!isRawChatIndexingEnabled(cfg)) {
     return null;
   }
 

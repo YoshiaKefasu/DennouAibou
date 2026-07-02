@@ -64,5 +64,23 @@ Use this split instead:
 
 Do **not** rename the npm package, binary, service names, or install paths as part of a routine version bump. Those changes affect deployment and rollback. Treat them as a separate migration phase.
 
+## Rule 6: Raw Chat DB Ownership
+**Raw chat DB/index/search production logic must be Go-owned.**
+
+The raw chat permanent DB subsystem uses a Go sidecar (`go/raw-chat/`) for SQLite schema, indexing, FTS search, and context expansion. TypeScript must only own the gateway-facing boundary:
+- Go sidecar launch/shutdown
+- Transcript update hook and debounce
+- Typed RPC request/response validation
+- `chat_search` tool registration and compact result formatting
+- Config flag and kill switch wiring
+
+TypeScript must NOT own:
+- SQLite schema/migration body
+- JSONL tail indexer as production path
+- FTS search engine as production path
+- Context-window expansion as production path
+
+This separation ensures long-running DB work and memory pressure stay outside the interactive Node.js gateway process. The Go sidecar can be independently tested, profiled, and replaced without touching the TypeScript boundary.
+
 ---
 *Follow these rules, and DennouAibou will outlive the tools it was born from.*

@@ -1,6 +1,7 @@
 import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import { resolveSessionAgentIdFromKey } from "./resolve-agent.js";
 import { getRawChatClient } from "./client-ref.js";
+import type { OpenClawConfig } from "../../config/config.js";
 
 /**
  * Hook into session transcript updates to incrementally index raw chat messages.
@@ -15,13 +16,22 @@ const pendingIndexing = new Map<string, ReturnType<typeof setTimeout>>();
 
 let started = false;
 let unsubscribe: (() => void) | null = null;
+let indexingEnabled = true;
+
+/**
+ * Check if raw chat indexing is enabled in config.
+ * Defaults to true (enabled) when config is missing or flag is unset.
+ */
+export function isRawChatIndexingEnabled(config?: OpenClawConfig): boolean {
+  return config?.dennou?.rawChat?.indexing?.enabled !== false;
+}
 
 /**
  * Start the raw chat indexer hook.
  * Reads the global client reference set by the gateway.
  * Returns a cleanup function that removes the listener and clears pending timers.
  */
-export function startRawChatIndexer(): () => void {
+export function startRawChatIndexer(config?: OpenClawConfig): () => void {
   if (started) {
     return () => {
       // Already started; no-op cleanup.
@@ -29,7 +39,15 @@ export function startRawChatIndexer(): () => void {
   }
   started = true;
 
+  // Apply kill switch from config.
+  indexingEnabled = isRawChatIndexingEnabled(config);
+
   unsubscribe = onSessionTranscriptUpdate((update) => {
+    // Kill switch: skip indexing when disabled.
+    if (!indexingEnabled) {
+      return;
+    }
+
     const sessionFile = update.sessionFile;
     if (!sessionFile) {
       return;
@@ -82,4 +100,31 @@ export function stopRawChatIndexer(): void {
   }
   pendingIndexing.clear();
   started = false;
+  indexingEnabled = true;
+}
+
+/**
+ * Backfill existing session JSONL files into the raw chat DB.
+ * This is idempotent and safe to run multiple times.
+ * Must be called after the sidecar is connected.
+ */
+export async function backfillSessionFiles(agentId: string, sessionDir?: string): Promise<void> {
+  const client = getRawChatClient();
+  if (!client) {
+    return; // Sidecar not available; skip backfill.
+  }
+
+  try {
+    const result = await client.backfill({
+      agent_id: agentId,
+      session_dir: sessionDir,
+    });
+    if (result.total_files > 0) {
+      console.log(
+        `[raw-chat] Backfill completed: ${result.indexed_files}/${result.total_files} files indexed, ${result.total_messages} messages`,
+      );
+    }
+  } catch (err) {
+    console.warn("[raw-chat] Backfill failed:", err instanceof Error ? err.message : String(err));
+  }
 }
