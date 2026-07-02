@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
 )
 
 // Schema version for this implementation.
@@ -75,7 +76,7 @@ func EnsureSchema(db *sql.DB) error {
 	`); err != nil {
 		// FTS5 may not be available in all builds; log but don't fail.
 		// Search will degrade gracefully.
-		fmt.Printf("[raw-chat] Warning: FTS5 creation failed (may not be supported): %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: FTS5 creation failed (may not be supported): %v\n", err)
 	}
 
 	// Watermarks table for incremental indexing.

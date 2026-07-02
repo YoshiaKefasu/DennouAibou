@@ -344,5 +344,5 @@ func sendResponse(conn net.Conn, resp RPCResponse) error {
 }
 
 func emitLog(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "[raw-chat] "+format+"\n", args...)
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }
