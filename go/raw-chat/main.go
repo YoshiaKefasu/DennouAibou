@@ -155,6 +155,18 @@ func handleIndexSession(conn net.Conn, req RPCRequest) {
 		return
 	}
 
+	// Sanitize AgentID to prevent path injection.
+	if strings.Contains(params.AgentID, "/") || strings.Contains(params.AgentID, "..") || filepath.Base(params.AgentID) != params.AgentID {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32602, Message: "invalid agent ID"},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("index session invalid agent_id response write failed: %v", sendErr)
+		}
+		return
+	}
+
 	db, err := OpenDB(params.AgentID)
 	if err != nil {
 		if sendErr := sendResponse(conn, RPCResponse{
@@ -199,6 +211,18 @@ func handleSearch(conn net.Conn, req RPCRequest) {
 			ID:      req.ID,
 		}); sendErr != nil {
 			emitLog("search missing agent_id response write failed: %v", sendErr)
+		}
+		return
+	}
+
+	// Sanitize AgentID to prevent path injection.
+	if strings.Contains(params.AgentID, "/") || strings.Contains(params.AgentID, "..") || filepath.Base(params.AgentID) != params.AgentID {
+		if sendErr := sendResponse(conn, RPCResponse{
+			JSONRPC: "2.0",
+			Error:   &RPCError{Code: -32602, Message: "invalid agent ID"},
+			ID:      req.ID,
+		}); sendErr != nil {
+			emitLog("search invalid agent_id response write failed: %v", sendErr)
 		}
 		return
 	}
