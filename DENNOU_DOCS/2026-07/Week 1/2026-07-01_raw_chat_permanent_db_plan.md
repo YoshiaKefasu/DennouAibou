@@ -459,6 +459,19 @@ If a migration becomes risky, rebuild the DB from session JSONL instead of mutat
 - Verify keyword search.
 - Verify context expansion.
 
+**KASOU検証結果 (2026-07-02):**
+- 1 session JSONL (1346行) → **880 メッセージ indexed**, 0 errors
+- Go sidecar起動、SQLite DB作成、backfill自動実行まで確認
+- Go tests 14/14, TS tests 9/9 PASS
+
+**デプロイまでに発見・修正したバグ:**
+1. `__filename` not defined in ESM scope → `import.meta.url` に修正
+2. `__dirname` not defined in ESM scope → `fileURLToPath` で生成
+3. JSONL timestamp型不一致 (`int64` vs RFC3339 string) → 全行パース失敗していた。`string` + `time.Parse` に修正
+4. `catch {}` がエラーを飲み込む → error logging追加
+5. Backfill時のsessionKey無し → filename派生でsessionKey生成
+6. `truncateSnippet` byte境界でCJK文字を破損 → `[]rune` に変更
+
 ### Phase 6: Optional semantic search
 
 - Add sqlite-vec only if exact/FTS search is not enough.
