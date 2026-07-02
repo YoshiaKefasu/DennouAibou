@@ -332,8 +332,9 @@ func parseTimestampMs(iso string) int64 {
 }
 
 func truncateSnippet(text string, maxLen int) string {
-	if len(text) <= maxLen {
+	runes := []rune(text)
+	if len(runes) <= maxLen {
 		return text
 	}
-	return text[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }

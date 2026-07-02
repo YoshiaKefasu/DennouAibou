@@ -14,8 +14,11 @@ import * as net from "net";
 import * as os from "os";
 import * as fs from "fs";
 import * as readline from "readline";
+import { fileURLToPath } from "url";
 import { createRequire } from "node:module";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const modRequire = createRequire(__filename);
 
 const SOCKET_ADDR_FILE = path.join(os.tmpdir(), "dennou-raw-chat-socket.addr");
@@ -141,17 +144,29 @@ export class RawChatClient {
     }
 
     // Try prebuilt binary first, then fall back to `go run`.
-    const goDir = path.resolve(__dirname, "../../go/raw-chat");
+    // Resolve from source (src/dennou-soul/raw-chat/../../go/raw-chat) and from dist (dist/../go/raw-chat).
     const binaryName = isWin ? "raw-chat.exe" : "raw-chat";
-    const binaryPath = path.join(goDir, binaryName);
-    const usePrebuilt = fs.existsSync(binaryPath);
+    const candidates = [
+      path.resolve(__dirname, "../../go/raw-chat", binaryName),
+      path.resolve(__dirname, "../go/raw-chat", binaryName),
+    ];
+    let binaryPath = "";
+    let usePrebuilt = false;
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        binaryPath = candidate;
+        usePrebuilt = true;
+        break;
+      }
+    }
 
     const spawn = getSpawn();
     const args = ["-socket", actualAddr];
 
+    const workDir = usePrebuilt ? path.dirname(binaryPath) : path.dirname(candidates[0]);
     if (usePrebuilt) {
       this.child = spawn(binaryPath, args, {
-        cwd: goDir,
+        cwd: workDir,
         shell: false,
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
@@ -159,7 +174,7 @@ export class RawChatClient {
     } else {
       // SECURITY: `shell: false` neutralizes command injection.
       this.child = spawn(isWin ? "go.exe" : "go", ["run", "-tags", "fts5", ".", ...args], {
-        cwd: goDir,
+        cwd: workDir,
         shell: false,
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],

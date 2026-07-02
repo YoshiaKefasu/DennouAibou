@@ -962,8 +962,9 @@ export async function startGatewayServer(
         // Store cleanup function for shutdown.
         // Pass runtime config so kill switch (dennou.rawChat.indexing.enabled) is respected.
         rawChatCleanupRef = startRawChatIndexer(runtimeConfig);
-      } catch {
+      } catch (err) {
         // Best-effort: raw chat indexer is optional and must never block gateway startup.
+        console.error("[raw-chat] Failed to initialize raw chat indexer:", err instanceof Error ? err.message : String(err));
       }
       ({ tickInterval, healthInterval, dedupeCleanup, mediaCleanup } =
         startGatewayMaintenanceTimers({

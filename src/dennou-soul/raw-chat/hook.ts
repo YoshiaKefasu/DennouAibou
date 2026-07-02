@@ -23,7 +23,9 @@ let indexingEnabled = true;
  * Defaults to true (enabled) when config is missing or flag is unset.
  */
 export function isRawChatIndexingEnabled(config?: OpenClawConfig): boolean {
-  return config?.dennou?.rawChat?.indexing?.enabled !== false;
+  // dennou is a DennouAibou-specific config namespace not on the OpenClawConfig type.
+  const rawChat = (config as any)?.dennou?.rawChat;
+  return rawChat?.indexing?.enabled !== false;
 }
 
 /**

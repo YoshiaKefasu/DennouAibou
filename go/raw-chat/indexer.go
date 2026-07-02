@@ -15,13 +15,13 @@ import (
 type JsonlRecord struct {
 	Type      string `json:"type"`
 	ID        string `json:"id"`
-	Timestamp int64  `json:"timestamp"`
+	Timestamp string `json:"timestamp"` // RFC3339 string in OpenClaw JSONL
 	Message   *struct {
 		Role      string      `json:"role"`
 		Content   interface{} `json:"content"`
 		ID        string      `json:"id"`
 		ParentID  string      `json:"parentId"`
-		Timestamp int64       `json:"timestamp"`
+		Timestamp int64       `json:"timestamp"` // Millisecond timestamp inside message
 	} `json:"message"`
 }
 
@@ -142,8 +142,10 @@ func IndexSessionFile(db *sql.DB, sourceFile string, agentID string, sessionKey 
 
 		stableKey := buildStableKey(record, sourceFile, lastLine+i+1, line)
 		timestampMs := msg.Timestamp
-		if timestampMs == 0 {
-			timestampMs = record.Timestamp
+		if timestampMs == 0 && record.Timestamp != "" {
+			if t, err := time.Parse(time.RFC3339Nano, record.Timestamp); err == nil {
+				timestampMs = t.UnixMilli()
+			}
 		}
 		if timestampMs == 0 {
 			timestampMs = now
@@ -308,7 +310,11 @@ func BackfillSessionFiles(db *sql.DB, sessionDir string, agentID string) Backfil
 		result.TotalFiles++
 		filePath := sessionDir + "/" + entry.Name()
 
-		indexed, _, errors := IndexSessionFile(db, filePath, agentID, "")
+		// Derive a session key from filename: agent:<agentID>:backfill:<basename without .jsonl>
+		basename := strings.TrimSuffix(entry.Name(), ".jsonl")
+		sessionKey := "agent:" + agentID + ":backfill:" + basename
+
+		indexed, _, errors := IndexSessionFile(db, filePath, agentID, sessionKey)
 		if indexed > 0 {
 			result.IndexedFiles++
 			result.TotalMessages += indexed

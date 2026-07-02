@@ -82,9 +82,9 @@ func TestIndexBasic(t *testing.T) {
 
 	now := time.Now().UnixMilli()
 	jsonl := []string{
-		`{"type":"message","id":"msg-1","timestamp":` + int64Str(now-3000) + `,"message":{"role":"user","content":"Hello world","id":"msg-1"}}`,
-		`{"type":"message","id":"msg-2","timestamp":` + int64Str(now-2000) + `,"message":{"role":"assistant","content":"Hi there!","id":"msg-2"}}`,
-		`{"type":"message","id":"msg-3","timestamp":` + int64Str(now-1000) + `,"message":{"role":"user","content":"How are you?","id":"msg-3"}}`,
+		`{"type":"message","id":"msg-1","timestamp":"` + rfc3339Str(now-3000) + `","message":{"role":"user","content":"Hello world","id":"msg-1"}}`,
+		`{"type":"message","id":"msg-2","timestamp":"` + rfc3339Str(now-2000) + `","message":{"role":"assistant","content":"Hi there!","id":"msg-2"}}`,
+		`{"type":"message","id":"msg-3","timestamp":"` + rfc3339Str(now-1000) + `","message":{"role":"user","content":"How are you?","id":"msg-3"}}`,
 	}
 
 	path := testJSONLFile(t, jsonl)
@@ -114,8 +114,8 @@ func TestIndexIdempotent(t *testing.T) {
 
 	now := time.Now().UnixMilli()
 	jsonl := []string{
-		`{"type":"message","id":"msg-1","timestamp":` + int64Str(now-3000) + `,"message":{"role":"user","content":"Hello","id":"msg-1"}}`,
-		`{"type":"message","id":"msg-2","timestamp":` + int64Str(now-2000) + `,"message":{"role":"assistant","content":"Hi","id":"msg-2"}}`,
+		`{"type":"message","id":"msg-1","timestamp":"` + rfc3339Str(now-3000) + `","message":{"role":"user","content":"Hello","id":"msg-1"}}`,
+		`{"type":"message","id":"msg-2","timestamp":"` + rfc3339Str(now-2000) + `","message":{"role":"assistant","content":"Hi","id":"msg-2"}}`,
 	}
 
 	path := testJSONLFile(t, jsonl)
@@ -146,9 +146,9 @@ func TestIndexMalformedLines(t *testing.T) {
 	now := time.Now().UnixMilli()
 	jsonl := []string{
 		`this is not json`,
-		`{"type":"message","id":"msg-1","timestamp":` + int64Str(now) + `,"message":{"role":"user","content":"Valid","id":"msg-1"}}`,
+		`{"type":"message","id":"msg-1","timestamp":"` + rfc3339Str(now) + `","message":{"role":"user","content":"Valid","id":"msg-1"}}`,
 		``, // empty line
-		`{"type":"message","id":"msg-2","timestamp":` + int64Str(now) + `,"message":{"role":"assistant","content":"Also valid","id":"msg-2"}}`,
+		`{"type":"message","id":"msg-2","timestamp":"` + rfc3339Str(now) + `","message":{"role":"assistant","content":"Also valid","id":"msg-2"}}`,
 	}
 
 	path := testJSONLFile(t, jsonl)
@@ -342,7 +342,7 @@ func TestWatermarkUpdate(t *testing.T) {
 
 	now := time.Now().UnixMilli()
 	jsonl := []string{
-		`{"type":"message","id":"msg-1","timestamp":` + int64Str(now) + `,"message":{"role":"user","content":"First","id":"msg-1"}}`,
+		`{"type":"message","id":"msg-1","timestamp":"` + rfc3339Str(now) + `","message":{"role":"user","content":"First","id":"msg-1"}}`,
 	}
 
 	path := testJSONLFile(t, jsonl)
@@ -364,11 +364,11 @@ func indexTestMessages(t *testing.T, db *sql.DB) {
 	t.Helper()
 	now := time.Now().UnixMilli()
 	jsonl := []string{
-		`{"type":"message","id":"msg-1","timestamp":` + int64Str(now-5000) + `,"message":{"role":"user","content":"I need to study for EJU math","id":"msg-1"}}`,
-		`{"type":"message","id":"msg-2","timestamp":` + int64Str(now-4000) + `,"message":{"role":"assistant","content":"EJU math covers algebra and calculus","id":"msg-2"}}`,
-		`{"type":"message","id":"msg-3","timestamp":` + int64Str(now-3000) + `,"message":{"role":"user","content":"What topics should I focus on?","id":"msg-3"}}`,
-		`{"type":"message","id":"msg-4","timestamp":` + int64Str(now-2000) + `,"message":{"role":"assistant","content":"Focus on quadratic equations and integrals","id":"msg-4"}}`,
-		`{"type":"message","id":"msg-5","timestamp":` + int64Str(now-1000) + `,"message":{"role":"user","content":"Thank you!","id":"msg-5"}}`,
+		`{"type":"message","id":"msg-1","timestamp":"` + rfc3339Str(now-5000) + `","message":{"role":"user","content":"I need to study for EJU math","id":"msg-1"}}`,
+		`{"type":"message","id":"msg-2","timestamp":"` + rfc3339Str(now-4000) + `","message":{"role":"assistant","content":"EJU math covers algebra and calculus","id":"msg-2"}}`,
+		`{"type":"message","id":"msg-3","timestamp":"` + rfc3339Str(now-3000) + `","message":{"role":"user","content":"What topics should I focus on?","id":"msg-3"}}`,
+		`{"type":"message","id":"msg-4","timestamp":"` + rfc3339Str(now-2000) + `","message":{"role":"assistant","content":"Focus on quadratic equations and integrals","id":"msg-4"}}`,
+		`{"type":"message","id":"msg-5","timestamp":"` + rfc3339Str(now-1000) + `","message":{"role":"user","content":"Thank you!","id":"msg-5"}}`,
 	}
 
 	path := testJSONLFile(t, jsonl)
@@ -380,6 +380,10 @@ func indexTestMessages(t *testing.T, db *sql.DB) {
 
 func int64Str(n int64) string {
 	return fmt.Sprintf("%d", n)
+}
+
+func rfc3339Str(ms int64) string {
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
 }
 
 func contains(s, substr string) bool {

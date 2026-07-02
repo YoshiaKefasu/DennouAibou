@@ -8,6 +8,7 @@ import {
 import { resolveSessionAgentId } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
 import type { RawChatClient, SearchParams } from "./sidecar-client.js";
 import { getRawChatClient } from "./client-ref.js";
+import { textResult } from "../../agents/tools/common.js";
 import { isRawChatIndexingEnabled } from "./hook.js";
 
 /**
@@ -58,18 +59,14 @@ export function createChatSearchTool(options: {
     execute: async (_toolCallId, params) => {
       const client = getRawChatClient();
       if (!client) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                results: [],
-                error: "Raw chat sidecar is not available.",
-                hint: "The Go sidecar may not be running. Indexing is disabled until it starts.",
-              }),
-            },
-          ],
-        };
+          return textResult(
+            JSON.stringify({
+              results: [],
+              error: "Raw chat sidecar is not available.",
+              hint: "The Go sidecar may not be running. Indexing is disabled until it starts.",
+            }),
+            undefined,
+          );
       }
 
       const searchParams: SearchParams = {
@@ -88,28 +85,17 @@ export function createChatSearchTool(options: {
 
       try {
         const results = await client.search(searchParams);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(results, null, 2),
-            },
-          ],
-        };
+        return textResult(JSON.stringify(results, null, 2), undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                results: [],
-                error: message,
-                hint: "Raw chat search is unavailable. The Go sidecar may have crashed or the DB may not exist yet.",
-              }),
-            },
-          ],
-        };
+        return textResult(
+          JSON.stringify({
+            results: [],
+            error: message,
+            hint: "Raw chat search is unavailable. The Go sidecar may have crashed or the DB may not exist yet.",
+          }),
+          undefined,
+        );
       }
     },
   };
