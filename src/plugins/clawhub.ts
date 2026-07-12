@@ -224,6 +224,73 @@ function logClawHubPackageSummary(params: {
   }
 }
 
+export type ClawHubResolvedVersion = {
+  packageName: string;
+  version: string;
+  compatibility?: ClawHubPackageCompatibility | null;
+  detail: ClawHubPackageDetail;
+};
+
+export async function resolveClawHubPluginVersion(params: {
+  spec: string;
+  baseUrl?: string;
+  token?: string;
+  logger?: PluginInstallLogger;
+}): Promise<ClawHubResolvedVersion | ClawHubInstallFailure> {
+  const parsed = parseClawHubPluginSpec(params.spec);
+  if (!parsed?.name) {
+    return buildClawHubInstallFailure(
+      `invalid ClawHub plugin spec: ${params.spec}`,
+      CLAWHUB_INSTALL_ERROR_CODE.INVALID_SPEC,
+    );
+  }
+
+  params.logger?.info?.(`Resolving ${formatClawHubSpecifier(parsed)}…`);
+  let detail: ClawHubPackageDetail;
+  try {
+    detail = await fetchClawHubPackageDetail({
+      name: parsed.name,
+      baseUrl: params.baseUrl,
+      token: params.token,
+    });
+  } catch (error) {
+    return mapClawHubRequestError(error, {
+      stage: "package",
+      name: parsed.name,
+    });
+  }
+  const versionState = await resolveCompatiblePackageVersion({
+    detail,
+    requestedVersion: parsed.version,
+    baseUrl: params.baseUrl,
+    token: params.token,
+  });
+  if (!versionState.ok) {
+    return versionState;
+  }
+  const runtimeVersion = resolveCompatibilityHostVersion();
+  const validationFailure = validateClawHubPluginPackage({
+    detail,
+    compatibility: versionState.compatibility,
+    runtimeVersion,
+  });
+  if (validationFailure) {
+    return validationFailure;
+  }
+  logClawHubPackageSummary({
+    detail,
+    version: versionState.version,
+    compatibility: versionState.compatibility,
+    logger: params.logger,
+  });
+  return {
+    packageName: parsed.name,
+    version: versionState.version,
+    compatibility: versionState.compatibility,
+    detail,
+  };
+}
+
 export async function installPluginFromClawHub(
   params: InstallSafetyOverrides & {
     spec: string;

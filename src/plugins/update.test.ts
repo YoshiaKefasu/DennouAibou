@@ -11,6 +11,7 @@ function appBundledPluginRoot(pluginId: string): string {
 const installPluginFromNpmSpecMock = vi.fn();
 const installPluginFromMarketplaceMock = vi.fn();
 const installPluginFromClawHubMock = vi.fn();
+const resolveClawHubPluginVersionMock = vi.fn();
 const resolveBundledPluginSourcesMock = vi.fn();
 const readInstalledPackageVersionMock = vi.fn();
 
@@ -28,6 +29,7 @@ vi.mock("./marketplace.js", () => ({
 
 vi.mock("./clawhub.js", () => ({
   installPluginFromClawHub: (...args: unknown[]) => installPluginFromClawHubMock(...args),
+  resolveClawHubPluginVersion: (...args: unknown[]) => resolveClawHubPluginVersionMock(...args),
 }));
 
 vi.mock("./bundled-sources.js", () => ({
@@ -253,6 +255,7 @@ describe("updateNpmInstalledPlugins", () => {
     installPluginFromNpmSpecMock.mockReset();
     installPluginFromMarketplaceMock.mockReset();
     installPluginFromClawHubMock.mockReset();
+    resolveClawHubPluginVersionMock.mockReset();
     resolveBundledPluginSourcesMock.mockReset();
     readInstalledPackageVersionMock.mockReset();
   });
@@ -500,6 +503,20 @@ describe("updateNpmInstalledPlugins", () => {
   });
 
   it("resolves legacy exact ClawHub record by id to unversioned latest line", async () => {
+    readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: true,
+      packageName: "episodic-claw",
+      version: "0.5.1",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
+      },
+    });
     installPluginFromClawHubMock.mockResolvedValue({
       ok: true,
       pluginId: "episodic-claw",
@@ -536,7 +553,16 @@ describe("updateNpmInstalledPlugins", () => {
       pluginIds: ["episodic-claw"],
     });
 
-    // Should call with unversioned spec (latest line), not the legacy @0.5.0.
+    // Metadata resolver should be called once with the unversioned latest-line spec.
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw",
+        baseUrl: "https://clawhub.ai",
+      }),
+    );
+    // Should call installer once with unversioned spec (latest line), not the legacy @0.5.0.
+    expect(installPluginFromClawHubMock).toHaveBeenCalledTimes(1);
     expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
       expect.objectContaining({
         spec: "clawhub:episodic-claw",
@@ -554,19 +580,18 @@ describe("updateNpmInstalledPlugins", () => {
   });
 
   it("keeps explicit exact ClawHub selector pinned", async () => {
-    installPluginFromClawHubMock.mockResolvedValue({
+    readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
+    resolveClawHubPluginVersionMock.mockResolvedValue({
       ok: true,
-      pluginId: "episodic-claw",
-      targetDir: "/tmp/episodic-claw",
+      packageName: "episodic-claw",
       version: "0.5.0",
-      clawhub: {
-        source: "clawhub",
-        clawhubUrl: "https://clawhub.ai",
-        clawhubPackage: "episodic-claw",
-        clawhubFamily: "code-plugin",
-        clawhubChannel: "official",
-        integrity: "sha256-exact",
-        resolvedAt: "2026-06-30T00:00:00.000Z",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
       },
     });
 
@@ -593,15 +618,16 @@ describe("updateNpmInstalledPlugins", () => {
       },
     });
 
-    // Should keep the explicit @0.5.0 selector.
-    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+    // Metadata resolver should be called with the exact pinned spec.
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         spec: "clawhub:episodic-claw@0.5.0",
         baseUrl: "https://clawhub.ai",
-        expectedPluginId: "episodic-claw",
-        mode: "update",
       }),
     );
+    // Version is unchanged — installer should NOT be called.
+    expect(installPluginFromClawHubMock).not.toHaveBeenCalled();
     // Saved spec should remain pinned.
     expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
       source: "clawhub",
@@ -610,19 +636,18 @@ describe("updateNpmInstalledPlugins", () => {
   });
 
   it("keeps beta dist-tag ClawHub selector pinned", async () => {
-    installPluginFromClawHubMock.mockResolvedValue({
+    readInstalledPackageVersionMock.mockResolvedValue("0.6.0-beta.1");
+    resolveClawHubPluginVersionMock.mockResolvedValue({
       ok: true,
-      pluginId: "episodic-claw",
-      targetDir: "/tmp/episodic-claw",
+      packageName: "episodic-claw",
       version: "0.6.0-beta.1",
-      clawhub: {
-        source: "clawhub",
-        clawhubUrl: "https://clawhub.ai",
-        clawhubPackage: "episodic-claw",
-        clawhubFamily: "code-plugin",
-        clawhubChannel: "official",
-        integrity: "sha256-beta",
-        resolvedAt: "2026-06-30T00:00:00.000Z",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
       },
     });
 
@@ -646,15 +671,16 @@ describe("updateNpmInstalledPlugins", () => {
       pluginIds: ["episodic-claw"],
     });
 
-    // Should keep the @beta selector pinned.
-    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+    // Metadata resolver should be called with the beta dist-tag spec.
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         spec: "clawhub:episodic-claw@beta",
         baseUrl: "https://clawhub.ai",
-        expectedPluginId: "episodic-claw",
-        mode: "update",
       }),
     );
+    // Version is unchanged — installer should NOT be called.
+    expect(installPluginFromClawHubMock).not.toHaveBeenCalled();
     // Saved spec should remain pinned.
     expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
       source: "clawhub",
@@ -666,20 +692,18 @@ describe("updateNpmInstalledPlugins", () => {
     // Mock readInstalledPackageVersion to return the installed version.
     readInstalledPackageVersionMock.mockResolvedValue("1.2.4");
 
-    // Mock probe returns same version as installed.
-    installPluginFromClawHubMock.mockResolvedValue({
+    // Mock metadata resolver returns same version as installed.
+    resolveClawHubPluginVersionMock.mockResolvedValue({
       ok: true,
-      pluginId: "demo",
-      targetDir: "/tmp/demo",
+      packageName: "demo",
       version: "1.2.4",
-      clawhub: {
-        source: "clawhub",
-        clawhubUrl: "https://clawhub.ai",
-        clawhubPackage: "demo",
-        clawhubFamily: "code-plugin",
-        clawhubChannel: "official",
-        integrity: "sha256-same",
-        resolvedAt: "2026-06-30T00:00:00.000Z",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "demo",
+          family: "code-plugin",
+          channel: "official",
+        },
       },
     });
 
@@ -713,11 +737,133 @@ describe("updateNpmInstalledPlugins", () => {
         message: "demo is up to date (1.2.4).",
       },
     ]);
-    // Should not have called the installer for the actual install (only for probe).
+    // Should NOT have called the archive installer at all.
+    expect(installPluginFromClawHubMock).not.toHaveBeenCalled();
+    // Should have called the metadata resolver.
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls real installer exactly once when ClawHub version changes", async () => {
+    // Mock readInstalledPackageVersion to return the old installed version.
+    readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
+
+    // Mock metadata resolver returns a newer version.
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: true,
+      packageName: "episodic-claw",
+      version: "0.5.1",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
+      },
+    });
+
+    // Mock real installer returns success.
+    installPluginFromClawHubMock.mockResolvedValue({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.5.1",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-next",
+        resolvedAt: "2026-07-12T00:00:00.000Z",
+      },
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: createClawHubInstallConfig({
+        pluginId: "episodic-claw",
+        installPath: "/tmp/episodic-claw",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+      }),
+      pluginIds: ["episodic-claw"],
+    });
+
+    // Should have called metadata resolver once (for version check).
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+    // Should have called real installer exactly once (no dry-run probe).
     expect(installPluginFromClawHubMock).toHaveBeenCalledTimes(1);
+    expect(installPluginFromClawHubMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw",
+        baseUrl: "https://clawhub.ai",
+        expectedPluginId: "episodic-claw",
+        mode: "update",
+      }),
+    );
+    expect(result.outcomes).toEqual([
+      {
+        pluginId: "episodic-claw",
+        status: "updated",
+        currentVersion: "0.5.0",
+        nextVersion: "0.5.1",
+        message: "Updated episodic-claw: 0.5.0 -> 0.5.1.",
+      },
+    ]);
+  });
+
+  it("surfaces ClawHub metadata resolution error directly", async () => {
+    // Mock readInstalledPackageVersion to return the installed version.
+    readInstalledPackageVersionMock.mockResolvedValue("1.0.0");
+
+    // Mock metadata resolver returns an error.
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: false,
+      error: "Package not found on ClawHub.",
+      code: "package_not_found",
+    });
+
+    const result = await updateNpmInstalledPlugins({
+      config: createClawHubInstallConfig({
+        pluginId: "missing-pkg",
+        installPath: "/tmp/missing-pkg",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "missing-pkg",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+      }),
+      pluginIds: ["missing-pkg"],
+    });
+
+    // Should report the metadata error directly.
+    expect(result.outcomes).toEqual([
+      {
+        pluginId: "missing-pkg",
+        status: "error",
+        message: "Failed to check missing-pkg: Package not found on ClawHub. (ClawHub clawhub:missing-pkg).",
+      },
+    ]);
+    // Should NOT have called the real installer.
+    expect(installPluginFromClawHubMock).not.toHaveBeenCalled();
   });
 
   it("normalizes legacy exact ClawHub record after successful id-only update", async () => {
+    readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: true,
+      packageName: "episodic-claw",
+      version: "0.6.0",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
+      },
+    });
     installPluginFromClawHubMock.mockResolvedValue({
       ok: true,
       pluginId: "episodic-claw",
@@ -754,6 +900,16 @@ describe("updateNpmInstalledPlugins", () => {
       pluginIds: ["episodic-claw"],
     });
 
+    // Metadata resolver should be called once with unversioned spec.
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledTimes(1);
+    expect(resolveClawHubPluginVersionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: "clawhub:episodic-claw",
+        baseUrl: "https://clawhub.ai",
+      }),
+    );
+    // Installer should be called once (version changed from 0.5.0 to 0.6.0).
+    expect(installPluginFromClawHubMock).toHaveBeenCalledTimes(1);
     // After successful update, saved spec should be normalized to unversioned.
     expect(result.config.plugins?.installs?.["episodic-claw"]).toMatchObject({
       source: "clawhub",
@@ -767,39 +923,37 @@ describe("updateNpmInstalledPlugins", () => {
     // Mock readInstalledPackageVersion to return installed versions.
     readInstalledPackageVersionMock.mockResolvedValue("0.5.0");
 
+    // First update: metadata resolver says 0.6.0 is available (differs from 0.5.0).
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: true,
+      packageName: "episodic-claw",
+      version: "0.6.0",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
+        },
+      },
+    });
+
     // First update: migrate from legacy exact to unversioned.
-    // The mock needs to return values for both the early skip probe AND the actual install.
-    installPluginFromClawHubMock
-      .mockResolvedValueOnce({
-        ok: true,
-        pluginId: "episodic-claw",
-        targetDir: "/tmp/episodic-claw",
-        version: "0.6.0",
-        clawhub: {
-          source: "clawhub",
-          clawhubUrl: "https://clawhub.ai",
-          clawhubPackage: "episodic-claw",
-          clawhubFamily: "code-plugin",
-          clawhubChannel: "official",
-          integrity: "sha256-v060",
-          resolvedAt: "2026-06-30T00:00:00.000Z",
-        },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        pluginId: "episodic-claw",
-        targetDir: "/tmp/episodic-claw",
-        version: "0.6.0",
-        clawhub: {
-          source: "clawhub",
-          clawhubUrl: "https://clawhub.ai",
-          clawhubPackage: "episodic-claw",
-          clawhubFamily: "code-plugin",
-          clawhubChannel: "official",
-          integrity: "sha256-v060",
-          resolvedAt: "2026-06-30T00:00:00.000Z",
-        },
-      });
+    installPluginFromClawHubMock.mockResolvedValueOnce({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.6.0",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-v060",
+        resolvedAt: "2026-06-30T00:00:00.000Z",
+      },
+    });
 
     const firstResult = await updateNpmInstalledPlugins({
       config: {
@@ -826,37 +980,34 @@ describe("updateNpmInstalledPlugins", () => {
 
     // Update mock to return 0.7.0 for the second call.
     readInstalledPackageVersionMock.mockResolvedValue("0.6.0");
-    installPluginFromClawHubMock
-      .mockResolvedValueOnce({
-        ok: true,
-        pluginId: "episodic-claw",
-        targetDir: "/tmp/episodic-claw",
-        version: "0.7.0",
-        clawhub: {
-          source: "clawhub",
-          clawhubUrl: "https://clawhub.ai",
-          clawhubPackage: "episodic-claw",
-          clawhubFamily: "code-plugin",
-          clawhubChannel: "official",
-          integrity: "sha256-v070",
-          resolvedAt: "2026-07-01T00:00:00.000Z",
+    resolveClawHubPluginVersionMock.mockResolvedValue({
+      ok: true,
+      packageName: "episodic-claw",
+      version: "0.7.0",
+      compatibility: null,
+      detail: {
+        package: {
+          name: "episodic-claw",
+          family: "code-plugin",
+          channel: "official",
         },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        pluginId: "episodic-claw",
-        targetDir: "/tmp/episodic-claw",
-        version: "0.7.0",
-        clawhub: {
-          source: "clawhub",
-          clawhubUrl: "https://clawhub.ai",
-          clawhubPackage: "episodic-claw",
-          clawhubFamily: "code-plugin",
-          clawhubChannel: "official",
-          integrity: "sha256-v070",
-          resolvedAt: "2026-07-01T00:00:00.000Z",
-        },
-      });
+      },
+    });
+    installPluginFromClawHubMock.mockResolvedValueOnce({
+      ok: true,
+      pluginId: "episodic-claw",
+      targetDir: "/tmp/episodic-claw",
+      version: "0.7.0",
+      clawhub: {
+        source: "clawhub",
+        clawhubUrl: "https://clawhub.ai",
+        clawhubPackage: "episodic-claw",
+        clawhubFamily: "code-plugin",
+        clawhubChannel: "official",
+        integrity: "sha256-v070",
+        resolvedAt: "2026-07-01T00:00:00.000Z",
+      },
+    });
 
     const secondResult = await updateNpmInstalledPlugins({
       config: firstResult.config,

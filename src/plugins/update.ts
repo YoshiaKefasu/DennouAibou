@@ -6,7 +6,7 @@ import {
 import type { UpdateChannel } from "../infra/update-channels.js";
 import { resolveUserPath } from "../utils.js";
 import { resolveBundledPluginSources } from "./bundled-sources.js";
-import { installPluginFromClawHub } from "./clawhub.js";
+import { installPluginFromClawHub, resolveClawHubPluginVersion } from "./clawhub.js";
 import {
   installPluginFromNpmSpec,
   PLUGIN_INSTALL_ERROR_CODE,
@@ -531,31 +531,42 @@ export async function updateNpmInstalledPlugins(params: {
       | Awaited<ReturnType<typeof installPluginFromMarketplace>>;
 
     // Phase 3: ClawHub unchanged early skip.
-    // Before doing the real install, probe with dry-run to check if the target
-    // version matches the installed version. If they match, skip re-download.
+    // Use metadata-only resolver to check if the target version matches the installed version.
+    // This avoids downloading the archive when no update is needed.
     if (record.source === "clawhub") {
       try {
-        const probe = await installPluginFromClawHub({
+        const resolved = await resolveClawHubPluginVersion({
           spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
           baseUrl: record.clawhubUrl,
-          mode: "update",
-          dryRun: true,
-          dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
-          expectedPluginId: pluginId,
           logger,
         });
-        if (probe.ok && currentVersion && probe.version && currentVersion === probe.version) {
+        if (!resolved.ok) {
+          // Metadata resolution failed — report the error directly.
+          outcomes.push({
+            pluginId,
+            status: "error",
+            message: formatClawHubInstallFailure({
+              pluginId,
+              spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
+              phase: "check",
+              error: resolved.error,
+            }),
+          });
+          continue;
+        }
+        if (currentVersion && resolved.version === currentVersion) {
           outcomes.push({
             pluginId,
             status: "unchanged",
             currentVersion: currentVersion ?? undefined,
-            nextVersion: probe.version ?? undefined,
+            nextVersion: resolved.version ?? undefined,
             message: `${pluginId} is up to date (${currentVersion}).`,
           });
           continue;
         }
       } catch {
-        // If probe fails, fall through to the live install which will report the error.
+        // If metadata resolution fails unexpectedly, fall through to the live install
+        // which will report the error with full context.
       }
     }
 
