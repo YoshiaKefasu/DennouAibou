@@ -31,6 +31,7 @@ To maintain sanity when reviewing history or preparing for an upstream sync, eve
 | `[DEBLOAT]` | 上流の不要コンポーネントを削除・無効化 | Vydraプラグインフォルダごと削除 |
 | `[FIX-UPSTREAM]` | **上流由来のファイルに、DennouAibouが独自に修正を書いた**。上流にバグがあってまだ直っていない、または上流に提案中の修正 | `src/agents/google-transport-stream.ts` にfinishReason保存を追加 |
 | `[SYNC]` | **上流のコミットをそのまま取り込んだ**（cherry-pick / merge）。修正内容は上流が書いたもの | `git cherry-pick 1b82c0e3d9` で上流のpersistence latchを取り込み |
+| `[DOCS]` | ドキュメント、プラン、レポートだけを更新。実行コードの変更は含めない | `DENNOU_DOCS/` に移行プランを追加 |
 
 **判定フロー：**
 

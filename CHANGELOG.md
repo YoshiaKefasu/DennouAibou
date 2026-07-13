@@ -16,6 +16,11 @@ For upstream history see https://github.com/openclaw/openclaw.
 - Focused verification: 53 tests passed; build-equivalent pipeline passed; code-reviewer approved. Not deployed to KASOU.
 - Existing OpenAI/Codex provider sync remains deferred because current upstream behavior requires `openai-chatgpt-responses` and newer Plugin SDK/Agent Harness seams.
 
+### OpenAI Codex Provider
+
+- Added configured-only Track B forward compatibility for `gpt-5.5`, `gpt-5.5-pro`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` through the existing OpenAI Codex OAuth and `openai-codex-responses` path. Catalog exposure and live OAuth verification remain deferred.
+- Raised the existing GPT-5.4 default `contextTokens` to its verified maximum of 1,050,000 when no explicit override is configured; GPT-5.4 Mini and GPT-5.3 Codex Spark defaults remain unchanged.
+
 ## dennou-v0.6.0 (2026-05-18)
 
 ### Upstream Patches (cherry-pick v2026.4.5 → v2026.4.8)
