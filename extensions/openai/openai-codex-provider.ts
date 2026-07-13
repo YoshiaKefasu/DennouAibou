@@ -39,7 +39,7 @@ const OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api";
 const OPENAI_CODEX_GPT_54_MODEL_ID = "gpt-5.4";
 const OPENAI_CODEX_GPT_54_MINI_MODEL_ID = "gpt-5.4-mini";
 const OPENAI_CODEX_GPT_54_NATIVE_CONTEXT_TOKENS = 1_050_000;
-const OPENAI_CODEX_GPT_54_DEFAULT_CONTEXT_TOKENS = 272_000;
+const OPENAI_CODEX_GPT_54_DEFAULT_CONTEXT_TOKENS = 1_050_000;
 const OPENAI_CODEX_GPT_54_MINI_CONTEXT_TOKENS = 272_000;
 const OPENAI_CODEX_GPT_54_MAX_TOKENS = 128_000;
 const OPENAI_CODEX_GPT_54_COST = {
@@ -64,18 +64,41 @@ const OPENAI_CODEX_GPT_53_MODEL_ID = "gpt-5.3-codex";
 const OPENAI_CODEX_GPT_53_SPARK_MODEL_ID = "gpt-5.3-codex-spark";
 const OPENAI_CODEX_GPT_53_SPARK_CONTEXT_TOKENS = 128_000;
 const OPENAI_CODEX_GPT_53_SPARK_MAX_TOKENS = 128_000;
+// Track B forward-compat: configured-only future model IDs.
+// These use verified maximum native context from OpenAI model documentation (2026-07-13).
+// Both contextWindow and contextTokens use the approved maximum.
+const OPENAI_CODEX_GPT_55_CONTEXT_TOKENS = 400_000;
+const OPENAI_CODEX_GPT_55_MAX_TOKENS = 128_000;
+const OPENAI_CODEX_GPT_55_PRO_CONTEXT_TOKENS = 1_050_000;
+const OPENAI_CODEX_GPT_55_PRO_MAX_TOKENS = 128_000;
+const OPENAI_CODEX_GPT_56_SOL_CONTEXT_TOKENS = 1_050_000;
+const OPENAI_CODEX_GPT_56_SOL_MAX_TOKENS = 128_000;
+const OPENAI_CODEX_GPT_56_TERRA_CONTEXT_TOKENS = 1_050_000;
+const OPENAI_CODEX_GPT_56_TERRA_MAX_TOKENS = 128_000;
+const OPENAI_CODEX_GPT_56_LUNA_CONTEXT_TOKENS = 1_050_000;
+const OPENAI_CODEX_GPT_56_LUNA_MAX_TOKENS = 128_000;
 const OPENAI_CODEX_TEMPLATE_MODEL_IDS = ["gpt-5.2-codex"] as const;
 const OPENAI_CODEX_XHIGH_MODEL_IDS = [
   OPENAI_CODEX_GPT_54_MODEL_ID,
   OPENAI_CODEX_GPT_54_MINI_MODEL_ID,
   OPENAI_CODEX_GPT_53_MODEL_ID,
   OPENAI_CODEX_GPT_53_SPARK_MODEL_ID,
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5-pro",
+  "gpt-5.5",
   "gpt-5.2-codex",
   "gpt-5.1-codex",
 ] as const;
 const OPENAI_CODEX_MODERN_MODEL_IDS = [
   OPENAI_CODEX_GPT_54_MODEL_ID,
   OPENAI_CODEX_GPT_54_MINI_MODEL_ID,
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5-pro",
+  "gpt-5.5",
   "gpt-5.2",
   "gpt-5.2-codex",
   OPENAI_CODEX_GPT_53_MODEL_ID,
@@ -147,6 +170,56 @@ function resolveCodexForwardCompatModel(
     };
   } else if (lower === OPENAI_CODEX_GPT_53_MODEL_ID) {
     templateIds = OPENAI_CODEX_TEMPLATE_MODEL_IDS;
+  } else if (lower === "gpt-5.5") {
+    // Track B: configured-only forward-compat. text+image, reasoning.
+    templateIds = [OPENAI_CODEX_GPT_54_MODEL_ID, ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS];
+    patch = {
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: OPENAI_CODEX_GPT_55_CONTEXT_TOKENS,
+      contextTokens: OPENAI_CODEX_GPT_55_CONTEXT_TOKENS,
+      maxTokens: OPENAI_CODEX_GPT_55_MAX_TOKENS,
+    };
+  } else if (lower === "gpt-5.5-pro") {
+    // Track B: configured-only forward-compat. text+image, reasoning.
+    templateIds = [OPENAI_CODEX_GPT_54_MODEL_ID, ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS];
+    patch = {
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: OPENAI_CODEX_GPT_55_PRO_CONTEXT_TOKENS,
+      contextTokens: OPENAI_CODEX_GPT_55_PRO_CONTEXT_TOKENS,
+      maxTokens: OPENAI_CODEX_GPT_55_PRO_MAX_TOKENS,
+    };
+  } else if (lower === "gpt-5.6-sol") {
+    // Track B: configured-only forward-compat. text+image, reasoning.
+    templateIds = [OPENAI_CODEX_GPT_54_MODEL_ID, ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS];
+    patch = {
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: OPENAI_CODEX_GPT_56_SOL_CONTEXT_TOKENS,
+      contextTokens: OPENAI_CODEX_GPT_56_SOL_CONTEXT_TOKENS,
+      maxTokens: OPENAI_CODEX_GPT_56_SOL_MAX_TOKENS,
+    };
+  } else if (lower === "gpt-5.6-terra") {
+    // Track B: configured-only forward-compat. text+image, reasoning.
+    templateIds = [OPENAI_CODEX_GPT_54_MODEL_ID, ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS];
+    patch = {
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: OPENAI_CODEX_GPT_56_TERRA_CONTEXT_TOKENS,
+      contextTokens: OPENAI_CODEX_GPT_56_TERRA_CONTEXT_TOKENS,
+      maxTokens: OPENAI_CODEX_GPT_56_TERRA_MAX_TOKENS,
+    };
+  } else if (lower === "gpt-5.6-luna") {
+    // Track B: configured-only forward-compat. text+image, reasoning.
+    templateIds = [OPENAI_CODEX_GPT_54_MODEL_ID, ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS];
+    patch = {
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: OPENAI_CODEX_GPT_56_LUNA_CONTEXT_TOKENS,
+      contextTokens: OPENAI_CODEX_GPT_56_LUNA_CONTEXT_TOKENS,
+      maxTokens: OPENAI_CODEX_GPT_56_LUNA_MAX_TOKENS,
+    };
   } else {
     return undefined;
   }
