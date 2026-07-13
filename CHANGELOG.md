@@ -3,6 +3,19 @@
 DennouAibou is a fork based on OpenClaw v2026.4.5.
 For upstream history see https://github.com/openclaw/openclaw.
 
+## Unreleased
+
+### Google Gemini Provider Sync
+
+- Synced the bounded Google model-provider core from upstream commit `8a2da4b1bf1555fe0bfaf705eb57300c673c81be` without importing newer host, OAuth, or Plugin SDK architecture.
+- Added forward-compatible recognition for `gemini-3.5-flash`, current Gemini 3 Flash families, official `*-latest` aliases, and Gemma 4 models.
+- Aligned canonical IDs with current Google naming: `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, and `gemma-4-26b-a4b-it` pass through unchanged.
+- Preserved the Gemini CLI 3.1 mapping guard: persisted `gemini-3.1-flash-preview` requests select the 3.1 CLI template before current fallback templates.
+- Kept Google REST normalization separate from Gemini CLI resolution; deprecated aliases normalize one-way to current canonical IDs without routing current IDs to another family.
+- Split legacy compatibility templates from current 3/3.5/Gemma templates so new models do not inherit stale 3.1 metadata.
+- Focused verification: 53 tests passed; build-equivalent pipeline passed; code-reviewer approved. Not deployed to KASOU.
+- Existing OpenAI/Codex provider sync remains deferred because current upstream behavior requires `openai-chatgpt-responses` and newer Plugin SDK/Agent Harness seams.
+
 ## dennou-v0.6.0 (2026-05-18)
 
 ### Upstream Patches (cherry-pick v2026.4.5 → v2026.4.8)

@@ -135,4 +135,74 @@ git commit -m "[FIX-UPSTREAM] Restore Gemini 3.1 CLI template IDs (fix #65363, c
 > Rollback plan: Revert the two prepended string literals.
 
 ### ⚡ Quick Wins (implement regardless of option chosen)
-- [ ] Proceed with Option A's implementation immediately. Do you want me to apply the code changes to your repo now?
+- [x] Option A was preserved and expanded during the bounded provider sync described below.
+
+---
+
+## 6. 2026-07-13 Follow-up — Bounded Provider Core Sync
+
+The Google model-provider core was compared against upstream commit
+`8a2da4b1bf1555fe0bfaf705eb57300c673c81be`. Only the model-ID and
+forward-compatibility layer was adopted. OAuth, provider hooks, Plugin SDK
+changes, Antigravity-specific behavior, dependencies, and core runtime changes
+remained outside this phase.
+
+### 6.1 Official current IDs
+
+These current Google IDs are treated as canonical and pass through unchanged:
+
+- `gemini-3.1-pro-preview`
+- `gemini-3.5-flash`
+- `gemini-3-flash-preview`
+- `gemini-3.1-flash-lite`
+- `gemma-4-26b-a4b-it`
+
+Deprecated aliases normalize one-way to their current canonical IDs. Notably,
+`gemini-3.1-flash-lite-preview` maps to the GA
+`gemini-3.1-flash-lite`, while `gemma-4-26b` maps to
+`gemma-4-26b-a4b-it`.
+
+### 6.2 REST and Gemini CLI remain separate
+
+The two provider paths intentionally behave differently:
+
+- `google` REST owns `normalizeModelId`. Its legacy 3.1 Flash aliases map to
+  the current `gemini-3-flash-preview` ID.
+- `google-gemini-cli` does not own that normalization hook. A persisted raw
+  `gemini-3.1-flash-preview` request reaches dynamic resolution unchanged.
+
+The Gemini CLI template order remains:
+
+```text
+gemini-3.1-flash-preview
+gemini-3-flash-preview
+gemini-2.5-flash
+```
+
+This keeps the original 3.1 communication-failure fix while retaining current
+fallback templates.
+
+### 6.3 Current models do not reuse legacy metadata
+
+Current `gemini-3.5-flash`, Gemini 3 Flash, `gemini-flash-latest`, and Gemma
+families use a separate current template order:
+
+```text
+gemini-3-flash-preview
+gemini-2.5-flash
+```
+
+This prevents new models from inheriting context, reasoning, input, API, or
+base URL metadata from the legacy 3.1 compatibility template.
+
+### 6.4 Verification
+
+- Changed runtime/test files: 5
+- Focused tests: 53 passed
+- Build-equivalent pipeline: passed using the existing Git Bash A2UI workaround
+- Final code-reviewer result: APPROVED
+- KASOU deployment: not performed
+
+OpenAI/Codex provider synchronization was not included. Its current upstream
+implementation depends on `openai-chatgpt-responses` and newer Plugin SDK /
+Agent Harness seams, so it remains blocked behind the host-baseline assessment.
