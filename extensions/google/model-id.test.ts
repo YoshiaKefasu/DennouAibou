@@ -18,12 +18,41 @@ describe("google model id helpers", () => {
     expect(normalizeAntigravityModelId(id)).toBe(id);
   });
 
-  it("maps the deprecated 3.1 flash alias to the real preview model", () => {
-    expect(normalizeGoogleModelId("gemini-3.1-flash")).toBe("gemini-3-flash-preview");
-    expect(normalizeGoogleModelId("gemini-3.1-flash-preview")).toBe("gemini-3-flash-preview");
+  it("normalizes google/ prefixed 3.1 flash aliases to official current id", () => {
+    expect(normalizeGoogleModelId("google/gemini-3.1-flash")).toBe("google/gemini-3-flash-preview");
+    expect(normalizeGoogleModelId("google/gemini-3.1-flash-preview")).toBe(
+      "google/gemini-3-flash-preview",
+    );
   });
 
-  it("adds the preview suffix for gemini 3.1 flash-lite", () => {
-    expect(normalizeGoogleModelId("gemini-3.1-flash-lite")).toBe("gemini-3.1-flash-lite-preview");
+  it("normalizes google/ prefixed model ids", () => {
+    expect(normalizeGoogleModelId("google/gemini-3.1-pro")).toBe("google/gemini-3.1-pro-preview");
+    expect(normalizeGoogleModelId("google/gemini-3-pro")).toBe("google/gemini-3.1-pro-preview");
+  });
+});
+
+describe("official current Google model IDs", () => {
+  it.each([
+    "gemini-3.1-pro-preview",
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+    "gemma-4-26b-a4b-it",
+  ])("passes through normalizeGoogleModelId unchanged: %s", (id) => {
+    expect(normalizeGoogleModelId(id)).toBe(id);
+  });
+});
+
+describe("old alias normalization", () => {
+  it.each([
+    ["gemini-3-pro", "gemini-3.1-pro-preview"],
+    ["gemini-3-pro-preview", "gemini-3.1-pro-preview"],
+    ["gemini-3.1-pro", "gemini-3.1-pro-preview"],
+    ["gemini-3.1-flash", "gemini-3-flash-preview"],
+    ["gemini-3.1-flash-preview", "gemini-3-flash-preview"],
+    ["gemini-3.1-flash-lite-preview", "gemini-3.1-flash-lite"],
+    ["gemma-4-26b", "gemma-4-26b-a4b-it"],
+  ])("maps %s to %s", (input, expected) => {
+    expect(normalizeGoogleModelId(input)).toBe(expected);
   });
 });

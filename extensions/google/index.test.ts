@@ -180,4 +180,62 @@ describe("google provider plugin hooks", () => {
     runCase(googleProvider, "google");
     runCase(cliProvider, "google-gemini-cli");
   });
+
+  it("Gemini CLI resolveDynamicModel selects 3.1 template for raw gemini-3.1-flash-preview", async () => {
+    const { providers } = await registerProviderPlugin({
+      plugin: googlePlugin,
+      id: "google",
+      name: "Google Provider",
+    });
+    const cliProvider = requireRegisteredProvider(providers, "google-gemini-cli");
+
+    // Gemini CLI provider does not own normalizeModelId — the raw 3.1 ID
+    // reaches resolveDynamicModel directly from persisted config.
+    expect(cliProvider.normalizeModelId).toBeUndefined();
+
+    const cli31Template = {
+      id: "gemini-3.1-flash-preview",
+      name: "gemini-3.1-flash-preview",
+      provider: "google-gemini-cli",
+      api: "google-gemini-cli",
+      baseUrl: "https://cloudcode-pa.googleapis.com",
+      reasoning: false,
+      input: ["text", "image"] as readonly ("text" | "image")[],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 1_048_576,
+      maxTokens: 64_000,
+    };
+    const cli30Template = {
+      id: "gemini-3-flash-preview",
+      name: "gemini-3-flash-preview",
+      provider: "google-gemini-cli",
+      api: "google-gemini-cli",
+      baseUrl: "https://cloudcode-pa.googleapis.com",
+      reasoning: false,
+      input: ["text", "image"] as readonly ("text" | "image")[],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200_000,
+      maxTokens: 64_000,
+    };
+
+    const resolved = cliProvider.resolveDynamicModel?.({
+      provider: "google-gemini-cli",
+      modelId: "gemini-3.1-flash-preview",
+      modelRegistry: {
+        find(_providerId: string, modelId: string) {
+          if (modelId === "gemini-3.1-flash-preview") return cli31Template;
+          if (modelId === "gemini-3-flash-preview") return cli30Template;
+          return null;
+        },
+      },
+    } as never);
+
+    // Must select the 3.1 template, not the 3.0 fallback.
+    expect(resolved).toBeDefined();
+    expect(resolved).toMatchObject({
+      provider: "google-gemini-cli",
+      id: "gemini-3.1-flash-preview",
+      contextWindow: 1_048_576,
+    });
+  });
 });
