@@ -29,10 +29,15 @@ type SupportedOpenAICompatFields = Pick<
   | "requiresThinkingAsText"
 >;
 
-type SupportedThinkingFormat =
-  | NonNullable<OpenAICompletionsCompat["thinkingFormat"]>
-  | "openrouter"
-  | "qwen-chat-template";
+// TODO(debloat): once "openrouter" / "zai" are removed from pi-ai compat
+// (upstream), drop this Exclude and the cast sites in
+// pi-embedded-runner/{compact,attempt}.ts. The type/runtime divergence is
+// intentional: pi-ai still models the delete-target thinking formats while the
+// config surface only accepts what remains after the debloat (openai).
+type SupportedThinkingFormat = Exclude<
+  NonNullable<OpenAICompletionsCompat["thinkingFormat"]>,
+  "openrouter" | "zai" | "qwen" | "qwen-chat-template"
+>;
 
 export type ModelCompatConfig = SupportedOpenAICompatFields & {
   thinkingFormat?: SupportedThinkingFormat;

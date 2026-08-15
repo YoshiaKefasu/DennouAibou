@@ -3,10 +3,12 @@ import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHUTES_BASE_URL } from "./chutes-models.js";
 import { resolveOAuthApiKeyMarker } from "./model-auth-markers.js";
 import { resolveImplicitProvidersForTest } from "./models-config.e2e-harness.js";
 
+// Kept inline: src/agents/chutes-models.ts is a debloat delete target (its only
+// other consumers are the chutes-family tests removed in the same phase).
+const CHUTES_BASE_URL = "https://llm.chutes.ai/v1";
 const CHUTES_OAUTH_MARKER = resolveOAuthApiKeyMarker("chutes");
 const ORIGINAL_VITEST_ENV = process.env.VITEST;
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;

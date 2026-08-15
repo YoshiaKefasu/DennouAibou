@@ -49,10 +49,6 @@ export type PluginAutoEnableCandidate =
     }
   | {
       pluginId: string;
-      kind: "plugin-tool-configured";
-    }
-  | {
-      pluginId: string;
       kind: "setup-auto-enable";
       reason: string;
     };
@@ -176,19 +172,6 @@ function hasPluginOwnedWebSearchConfig(cfg: OpenClawConfig, pluginId: string): b
 function hasPluginOwnedWebFetchConfig(cfg: OpenClawConfig, pluginId: string): boolean {
   const pluginConfig = cfg.plugins?.entries?.[pluginId]?.config;
   return isRecord(pluginConfig) && isRecord(pluginConfig.webFetch);
-}
-
-function hasPluginOwnedToolConfig(cfg: OpenClawConfig, pluginId: string): boolean {
-  const pluginConfig = cfg.plugins?.entries?.xai?.config;
-  const web = cfg.tools?.web as Record<string, unknown> | undefined;
-  return (
-    pluginId === "xai" &&
-    Boolean(
-      isRecord(web?.x_search) ||
-      (isRecord(pluginConfig) &&
-        (isRecord(pluginConfig.xSearch) || isRecord(pluginConfig.codeExecution))),
-    )
-  );
 }
 
 function resolveProviderPluginsWithOwnedWebSearch(
@@ -355,8 +338,6 @@ export function resolvePluginAutoEnableCandidateReason(
       return `${candidate.pluginId} web search configured`;
     case "plugin-web-fetch-configured":
       return `${candidate.pluginId} web fetch configured`;
-    case "plugin-tool-configured":
-      return `${candidate.pluginId} tool configured`;
     case "setup-auto-enable":
       return candidate.reason;
   }
@@ -419,9 +400,6 @@ export function resolveConfiguredPluginAutoEnableCandidates(params: {
   for (const pluginId of resolveProviderPluginsWithOwnedWebSearch(params.registry)) {
     if (hasPluginOwnedWebSearchConfig(params.config, pluginId)) {
       changes.push({ pluginId, kind: "plugin-web-search-configured" });
-    }
-    if (hasPluginOwnedToolConfig(params.config, pluginId)) {
-      changes.push({ pluginId, kind: "plugin-tool-configured" });
     }
   }
 

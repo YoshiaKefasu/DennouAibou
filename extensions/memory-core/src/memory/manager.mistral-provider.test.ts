@@ -3,13 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/memory-core-host-engine-foundation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_OLLAMA_EMBEDDING_MODEL } from "./embeddings.js";
 import type {
   EmbeddingProvider,
   EmbeddingProviderRuntime,
   EmbeddingProviderResult,
 } from "./embeddings.js";
 import type { MemoryIndexManager } from "./index.js";
+import { registerBuiltInMemoryEmbeddingProviders } from "./provider-adapters.js";
+import { registerMemoryEmbeddingProvider } from "../../../../src/plugins/memory-embedding-providers.js";
 type MemoryIndexModule = typeof import("./index.js");
 
 const { createEmbeddingProviderMock } = vi.hoisted(() => ({
@@ -52,7 +53,7 @@ function buildConfig(params: {
   workspaceDir: string;
   indexPath: string;
   provider: "openai" | "mistral";
-  fallback?: "none" | "mistral" | "ollama";
+  fallback?: "none" | "mistral";
 }): OpenClawConfig {
   return {
     agents: {
@@ -79,6 +80,7 @@ describe("memory manager mistral provider wiring", () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    registerBuiltInMemoryEmbeddingProviders({ registerMemoryEmbeddingProvider });
     ({ getMemorySearchManager, closeAllMemorySearchManagers } = await import("./index.js"));
     vi.clearAllMocks();
     createEmbeddingProviderMock.mockReset();
@@ -169,14 +171,14 @@ describe("memory manager mistral provider wiring", () => {
     expect(internal.providerRuntime).toBe(mistralRuntime);
   });
 
-  it("uses default ollama model when activating ollama fallback", async () => {
+  it("uses default mistral model when activating mistral fallback", async () => {
     const openAiRuntime: EmbeddingProviderRuntime = {
       id: "openai",
       cacheKeyData: { provider: "openai", model: "text-embedding-3-small" },
     };
-    const ollamaRuntime: EmbeddingProviderRuntime = {
-      id: "ollama",
-      cacheKeyData: { provider: "ollama", model: DEFAULT_OLLAMA_EMBEDDING_MODEL },
+    const mistralRuntime: EmbeddingProviderRuntime = {
+      id: "mistral",
+      cacheKeyData: { provider: "mistral", model: "mistral-embed" },
     };
     createEmbeddingProviderMock.mockResolvedValueOnce({
       requestedProvider: "openai",
@@ -184,12 +186,12 @@ describe("memory manager mistral provider wiring", () => {
       runtime: openAiRuntime,
     } as EmbeddingProviderResult);
     createEmbeddingProviderMock.mockResolvedValueOnce({
-      requestedProvider: "ollama",
-      provider: createProvider("ollama"),
-      runtime: ollamaRuntime,
+      requestedProvider: "mistral",
+      provider: createProvider("mistral"),
+      runtime: mistralRuntime,
     } as EmbeddingProviderResult);
 
-    const cfg = buildConfig({ workspaceDir, indexPath, provider: "openai", fallback: "ollama" });
+    const cfg = buildConfig({ workspaceDir, indexPath, provider: "openai", fallback: "mistral" });
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     if (!result.manager) {
       throw new Error(`manager missing: ${result.error ?? "no error provided"}`);
@@ -204,14 +206,14 @@ describe("memory manager mistral provider wiring", () => {
 
     await internal.ensureProviderInitialized();
     expect(internal.providerRuntime?.id).toBe("openai");
-    const activated = await internal.activateFallbackProvider("forced ollama fallback");
+    const activated = await internal.activateFallbackProvider("forced mistral fallback");
     expect(activated).toBe(true);
-    expect(internal.providerRuntime).toBe(ollamaRuntime);
+    expect(internal.providerRuntime).toBe(mistralRuntime);
 
     const fallbackCall = createEmbeddingProviderMock.mock.calls[1]?.[0] as
       | { provider?: string; model?: string }
       | undefined;
-    expect(fallbackCall?.provider).toBe("ollama");
-    expect(fallbackCall?.model).toBe(DEFAULT_OLLAMA_EMBEDDING_MODEL);
+    expect(fallbackCall?.provider).toBe("mistral");
+    expect(fallbackCall?.model).toBe("mistral-embed");
   });
 });

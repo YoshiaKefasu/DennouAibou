@@ -8,14 +8,10 @@ import { mockPublicPinnedHostname } from "./test-helpers/ssrf.js";
 
 const {
   bedrockSendMock,
-  createOllamaEmbeddingProviderMock,
   defaultProviderMock,
   resolveCredentialsMock,
 } = vi.hoisted(() => ({
   bedrockSendMock: vi.fn(),
-  createOllamaEmbeddingProviderMock: vi.fn(async () => {
-    throw new Error("Unexpected ollama provider in embeddings.test.ts");
-  }),
   defaultProviderMock: vi.fn(),
   resolveCredentialsMock: vi.fn(),
 }));
@@ -37,10 +33,6 @@ vi.mock("../../infra/net/fetch-guard.js", () => ({
       release: async () => {},
     };
   },
-}));
-
-vi.mock("./embeddings-ollama.js", () => ({
-  createOllamaEmbeddingProvider: createOllamaEmbeddingProviderMock,
 }));
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => {

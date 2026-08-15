@@ -64,9 +64,68 @@ declare module "@openclaw/matrix/runtime-api.js" {
   export const setMatrixRuntime: RemovedPluginFunction;
 }
 
+declare module "@openclaw/ollama/api.js" {
+  export const resolveOllamaApiBase: RemovedPluginFunction;
+}
+
+declare module "@openclaw/ollama/runtime-api.js" {
+  export type OllamaEmbeddingClient = Record<string, unknown>;
+  export const buildAssistantMessage: RemovedPluginFunction;
+  export const buildOllamaChatRequest: RemovedPluginFunction;
+  export const convertToOllamaMessages: RemovedPluginFunction;
+  export const createConfiguredOllamaCompatNumCtxWrapper: RemovedPluginFunction;
+  export const createConfiguredOllamaCompatStreamWrapper: RemovedPluginFunction;
+  export const createConfiguredOllamaStreamFn: RemovedPluginFunction;
+  export const createOllamaStreamFn: RemovedPluginFunction;
+  export const createOllamaEmbeddingProvider: RemovedPluginFunction;
+  export const isOllamaCompatProvider: RemovedPluginFunction;
+  export const parseNdjsonStream: RemovedPluginFunction;
+  export const resolveOllamaBaseUrlForRun: RemovedPluginFunction;
+  export const resolveOllamaCompatNumCtxEnabled: RemovedPluginFunction;
+  export const shouldInjectOllamaCompatNumCtx: RemovedPluginFunction;
+  export const wrapOllamaCompatNumCtx: RemovedPluginFunction;
+}
+
 declare module "@openclaw/zalo/setup-api.js" {
   export const evaluateZaloGroupAccess: RemovedPluginFunction;
   export const resolveZaloRuntimeGroupPolicy: RemovedPluginFunction;
   export const zaloSetupAdapter: RemovedPluginObject;
   export const zaloSetupWizard: RemovedPluginObject;
+}
+
+declare module "@openclaw/litellm/api.js" {
+  export const applyLitellmConfig: RemovedPluginFunction;
+  export const applyLitellmProviderConfig: RemovedPluginFunction;
+  export const buildLitellmModelDefinition: RemovedPluginFunction;
+  export const LITELLM_BASE_URL: RemovedPluginObject;
+  export const LITELLM_DEFAULT_MODEL_ID: RemovedPluginObject;
+  export const LITELLM_DEFAULT_MODEL_REF: RemovedPluginObject;
+}
+
+declare module "@openclaw/openrouter/api.js" {
+  export const applyOpenrouterConfig: RemovedPluginFunction;
+  export const applyOpenrouterProviderConfig: RemovedPluginFunction;
+  export const buildOpenrouterProvider: RemovedPluginFunction;
+  export const OPENROUTER_DEFAULT_MODEL_REF: RemovedPluginObject;
+}
+
+declare module "@openclaw/vercel-ai-gateway/api.js" {
+  export const buildVercelAiGatewayProvider: RemovedPluginFunction;
+  export const discoverVercelAiGatewayModels: RemovedPluginFunction;
+  export const getStaticVercelAiGatewayModelCatalog: RemovedPluginFunction;
+  export const VERCEL_AI_GATEWAY_BASE_URL: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_DEFAULT_CONTEXT_WINDOW: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_DEFAULT_COST: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_DEFAULT_MAX_TOKENS: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_DEFAULT_MODEL_ID: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF: RemovedPluginObject;
+  export const VERCEL_AI_GATEWAY_PROVIDER_ID: RemovedPluginObject;
+}
+
+declare module "@openclaw/xiaomi/api.js" {
+  export const applyXiaomiConfig: RemovedPluginFunction;
+  export const applyXiaomiProviderConfig: RemovedPluginFunction;
+  export const buildXiaomiProvider: RemovedPluginFunction;
+  export const XIAOMI_DEFAULT_MODEL_ID: RemovedPluginObject;
+  export const XIAOMI_DEFAULT_MODEL_REF: RemovedPluginObject;
 }

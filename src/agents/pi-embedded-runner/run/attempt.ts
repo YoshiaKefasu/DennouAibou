@@ -8,18 +8,13 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { filterHeartbeatPairs } from "../../../auto-reply/heartbeat-filter.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
+import type { ModelCompatConfig } from "../../../config/types.models.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
 import {
   ensureGlobalUndiciEnvProxyDispatcher,
   ensureGlobalUndiciStreamTimeouts,
 } from "../../../infra/net/undici-global-dispatcher.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
-import {
-  isOllamaCompatProvider,
-  resolveOllamaCompatNumCtxEnabled,
-  shouldInjectOllamaCompatNumCtx,
-  wrapOllamaCompatNumCtx,
-} from "../../../plugin-sdk/ollama-runtime.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import { resolveToolCallArgumentsEncoding } from "../../../plugins/provider-model-compat.js";
 import { resolveProviderSystemPromptContribution } from "../../../plugins/provider-runtime.js";
@@ -227,13 +222,6 @@ export {
   queueSessionsYieldInterruptMessage,
   stripSessionsYieldArtifacts,
 } from "./attempt.sessions-yield.js";
-export {
-  isOllamaCompatProvider,
-  resolveOllamaCompatNumCtxEnabled,
-  shouldInjectOllamaCompatNumCtx,
-  wrapOllamaCompatNumCtx,
-} from "../../../plugin-sdk/ollama-runtime.js";
-
 function buildContextEnginePromptCacheInfo(params: {
   retention?: "none" | "short" | "long";
   lastCallUsage?: NormalizedUsage;
@@ -521,7 +509,10 @@ export async function runEmbeddedAttempt(
             abortSignal: runAbortController.signal,
             modelProvider: params.model.provider,
             modelId: params.modelId,
-            modelCompat: params.model.compat,
+            // TODO(debloat): pi-ai compat carries upstream thinking formats;
+            // the debloated config surface only accepts "openai". Same cast as
+            // extractModelCompat; remove once pi-ai drops "openrouter"/"zai".
+            modelCompat: params.model.compat as ModelCompatConfig | undefined,
             modelApi: params.model.api,
             modelContextWindowTokens: params.model.contextWindow,
             modelAuthMode: resolveModelAuthMode(params.model.provider, params.config),

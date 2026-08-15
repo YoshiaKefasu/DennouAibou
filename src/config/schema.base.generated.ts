@@ -910,6 +910,30 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
             description:
               "Safety rules that prevent pruning when protected files/keywords are involved.",
           },
+          rawChat: {
+            type: "object",
+            properties: {
+              indexing: {
+                type: "object",
+                properties: {
+                  enabled: {
+                    type: "boolean",
+                    title: "Indexing Enabled",
+                    description:
+                      "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
+                  },
+                },
+                additionalProperties: false,
+                title: "Raw Chat Indexing",
+                description:
+                  "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+              },
+            },
+            additionalProperties: false,
+            title: "Raw Chat DB",
+            description:
+              "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
+          },
         },
         additionalProperties: false,
         title: "DennouAibou",
@@ -2977,22 +3001,6 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                                 type: "string",
                                 const: "openai",
                               },
-                              {
-                                type: "string",
-                                const: "openrouter",
-                              },
-                              {
-                                type: "string",
-                                const: "zai",
-                              },
-                              {
-                                type: "string",
-                                const: "qwen",
-                              },
-                              {
-                                type: "string",
-                                const: "qwen-chat-template",
-                              },
                             ],
                           },
                           requiresToolResultName: {
@@ -3320,6 +3328,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 title: "Repo Root",
                 description:
                   "Optional repository root shown in the system prompt runtime line (overrides auto-detect).",
+              },
+              systemPromptOverride: {
+                type: "string",
               },
               skipBootstrap: {
                 type: "boolean",
@@ -5255,6 +5266,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   type: "string",
                 },
                 agentDir: {
+                  type: "string",
+                },
+                systemPromptOverride: {
                   type: "string",
                 },
                 model: {
@@ -22667,6 +22681,22 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       help: "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
       tags: ["advanced"],
     },
+    "dennou.rawChat": {
+      label: "Raw Chat DB",
+      help: "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
+      order: 50,
+      tags: ["advanced"],
+    },
+    "dennou.rawChat.indexing": {
+      label: "Raw Chat Indexing",
+      help: "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+      tags: ["advanced"],
+    },
+    "dennou.rawChat.indexing.enabled": {
+      label: "Indexing Enabled",
+      help: "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
+      tags: ["advanced"],
+    },
     "diagnostics.enabled": {
       label: "Diagnostics Enabled",
       help: "Master toggle for diagnostics instrumentation output in logs and telemetry wiring paths. Keep enabled for normal observability, and disable only in tightly constrained environments.",
@@ -26871,6 +26901,6 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       tags: ["advanced", "url-secret"],
     },
   },
-  version: "2026.4.5",
+  version: "2026.4.6",
   generatedAt: "2026-03-22T21:17:33.302Z",
 };

@@ -10,6 +10,7 @@ import {
 import type { ReasoningLevel, ThinkLevel } from "../../auto-reply/thinking.js";
 import { resolveChannelCapabilities } from "../../config/channel-capabilities.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import type { ModelCompatConfig } from "../../config/types.models.js";
 import {
   ensureContextEnginesInitialized,
   resolveContextEngine,
@@ -500,7 +501,10 @@ export async function compactEmbeddedPiSessionDirect(
       abortSignal: runAbortController.signal,
       modelProvider: model.provider,
       modelId,
-      modelCompat: effectiveModel.compat,
+      // TODO(debloat): pi-ai compat carries upstream thinking formats; the
+      // debloated config surface only accepts "openai". See extractModelCompat
+      // for the same cast; remove once pi-ai drops "openrouter"/"zai".
+      modelCompat: effectiveModel.compat as ModelCompatConfig | undefined,
       modelApi: model.api,
       modelContextWindowTokens: ctxInfo.tokens,
       modelAuthMode: resolveModelAuthMode(model.provider, params.config),

@@ -1,6 +1,9 @@
 // Manual facade. Keep loader boundary explicit.
 type FacadeModule = typeof import("@openclaw/openrouter/api.js");
-import { loadBundledPluginPublicSurfaceModuleSync } from "./facade-runtime.js";
+import {
+  createLazyFacadeObjectValue,
+  loadBundledPluginPublicSurfaceModuleSync,
+} from "./facade-runtime.js";
 
 function loadFacadeModule(): FacadeModule {
   return loadBundledPluginPublicSurfaceModuleSync<FacadeModule>({
@@ -20,5 +23,12 @@ export const buildOpenrouterProvider: FacadeModule["buildOpenrouterProvider"] = 
   loadFacadeModule()["buildOpenrouterProvider"](
     ...args,
   )) as FacadeModule["buildOpenrouterProvider"];
+// Inert constant: never imported by production code (verified 2026-08). The
+// extensions/openrouter package is scheduled for removal; this is a lazy
+// facade proxy so module import does not throw, and only first access triggers
+// the (throwing) bundled-surface load. Kept for SDK type-surface compatibility
+// only. Do not access.
 export const OPENROUTER_DEFAULT_MODEL_REF: FacadeModule["OPENROUTER_DEFAULT_MODEL_REF"] =
-  loadFacadeModule()["OPENROUTER_DEFAULT_MODEL_REF"];
+  createLazyFacadeObjectValue(
+    () => loadFacadeModule()["OPENROUTER_DEFAULT_MODEL_REF"] as object,
+  ) as FacadeModule["OPENROUTER_DEFAULT_MODEL_REF"];

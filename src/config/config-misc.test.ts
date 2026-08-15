@@ -384,7 +384,7 @@ describe("model compat config schema", () => {
                 compat: {
                   supportsUsageInStreaming: true,
                   supportsStrictMode: false,
-                  thinkingFormat: "qwen",
+                  thinkingFormat: "openai",
                   requiresToolResultName: true,
                   requiresAssistantAfterToolResult: false,
                   requiresThinkingAsText: false,

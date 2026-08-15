@@ -1522,6 +1522,63 @@ function warnOnConfigMiskeys(raw: unknown, logger: Pick<typeof console, "warn">)
   }
 }
 
+const REMOVED_THINKING_FORMATS = new Set([
+  "openrouter",
+  "zai",
+  "qwen",
+  "qwen-chat-template",
+]);
+
+/**
+ * Warns before config validation rejects persisted compat.thinkingFormat values
+ * that the debloat removed from the schema. Validation fails hard afterwards
+ * (INVALID_CONFIG); this diagnostic is the only place an upgrading operator
+ * learns WHY their legacy config no longer validates.
+ */
+function warnOnRemovedThinkingFormats(
+  raw: unknown,
+  logger: Pick<typeof console, "warn">,
+): void {
+  if (!raw || typeof raw !== "object") {
+    return;
+  }
+  const models = (raw as Record<string, unknown>).models;
+  if (!models || typeof models !== "object") {
+    return;
+  }
+  const providers = (models as Record<string, unknown>).providers;
+  if (!providers || typeof providers !== "object") {
+    return;
+  }
+  for (const [providerId, providerConfig] of Object.entries(
+    providers as Record<string, unknown>,
+  )) {
+    if (!providerConfig || typeof providerConfig !== "object") {
+      continue;
+    }
+    const providerModels = (providerConfig as Record<string, unknown>).models;
+    if (!Array.isArray(providerModels)) {
+      continue;
+    }
+    for (const model of providerModels) {
+      if (!model || typeof model !== "object") {
+        continue;
+      }
+      const compat = (model as Record<string, unknown>).compat;
+      if (!compat || typeof compat !== "object") {
+        continue;
+      }
+      const thinkingFormat = (compat as Record<string, unknown>).thinkingFormat;
+      if (typeof thinkingFormat === "string" && REMOVED_THINKING_FORMATS.has(thinkingFormat)) {
+        logger.warn(
+          `Config (models.providers.${providerId}): model compat.thinkingFormat "${thinkingFormat}" ` +
+            "is no longer supported and will be rejected. Remove or change it to \"openai\".",
+        );
+      }
+    }
+  }
+}
+
 function stampConfigVersion(cfg: OpenClawConfig): OpenClawConfig {
   const now = new Date().toISOString();
   return {
@@ -1759,6 +1816,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
         });
         return {};
       }
+      warnOnRemovedThinkingFormats(effectiveConfigRaw, deps.logger);
       const preValidationDuplicates = findDuplicateAgentDirs(effectiveConfigRaw as OpenClawConfig, {
         env: deps.env,
         homedir: deps.homedir,
