@@ -46,32 +46,32 @@ describe("plugin contract registry scoped retries", () => {
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "xai",
+            id: "provider-a",
             status: "error",
-            error: "transient xai load failure",
+            error: "transient provider-a load failure",
             providerIds: [],
             webFetchProviderIds: [],
             webSearchProviderIds: [],
           },
-          diagnostics: [{ pluginId: "xai", message: "transient xai load failure" }],
+          diagnostics: [{ pluginId: "provider-a", message: "transient provider-a load failure" }],
         }),
       )
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "xai",
+            id: "provider-a",
             status: "loaded",
-            providerIds: ["xai"],
+            providerIds: ["provider-a"],
             webFetchProviderIds: [],
-            webSearchProviderIds: ["grok"],
+            webSearchProviderIds: ["search-a"],
           },
           providers: [
             {
-              pluginId: "xai",
+              pluginId: "provider-a",
               provider: {
-                id: "xai",
-                label: "xAI",
-                docsPath: "/providers/xai",
+                id: "provider-a",
+                label: "Provider A",
+                docsPath: "/providers/provider-a",
                 auth: [],
               } as ProviderPlugin,
             },
@@ -86,8 +86,8 @@ describe("plugin contract registry scoped retries", () => {
     const { resolveProviderContractProvidersForPluginIds } = await import("./registry.js");
 
     expect(
-      resolveProviderContractProvidersForPluginIds(["xai"]).map((provider) => provider.id),
-    ).toEqual(["xai"]);
+      resolveProviderContractProvidersForPluginIds(["provider-a"]).map((provider) => provider.id),
+    ).toEqual(["provider-a"]);
     expect(loadBundledCapabilityRuntimeRegistry).toHaveBeenCalledTimes(2);
   });
 
@@ -97,36 +97,36 @@ describe("plugin contract registry scoped retries", () => {
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "xai",
+            id: "provider-b",
             status: "error",
-            error: "transient grok load failure",
+            error: "transient search-c load failure",
             providerIds: [],
             webFetchProviderIds: [],
             webSearchProviderIds: [],
           },
-          diagnostics: [{ pluginId: "xai", message: "transient grok load failure" }],
+          diagnostics: [{ pluginId: "provider-b", message: "transient search-c load failure" }],
         }),
       )
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "xai",
+            id: "provider-b",
             status: "loaded",
-            providerIds: ["xai"],
+            providerIds: ["provider-b"],
             webFetchProviderIds: [],
-            webSearchProviderIds: ["grok"],
+            webSearchProviderIds: ["search-c"],
           },
           webSearchProviders: [
             {
-              pluginId: "xai",
+              pluginId: "provider-b",
               provider: {
-                id: "grok",
-                label: "Grok Search",
-                hint: "Search the web with Grok",
-                envVars: ["XAI_API_KEY"],
-                placeholder: "XAI_API_KEY",
-                signupUrl: "https://x.ai",
-                credentialPath: "plugins.entries.xai.config.webSearch.apiKey",
+                id: "search-c",
+                label: "Search C",
+                hint: "Search the web with Search C",
+                envVars: ["SEARCH_C_API_KEY"],
+                placeholder: "search-c-key",
+                signupUrl: "https://example.com/search-c",
+                credentialPath: "plugins.entries.provider-b.config.webSearch.apiKey",
                 requiresCredential: true,
                 getCredentialValue: () => undefined,
                 setCredentialValue() {},
@@ -148,8 +148,10 @@ describe("plugin contract registry scoped retries", () => {
     const { resolveWebSearchProviderContractEntriesForPluginId } = await import("./registry.js");
 
     expect(
-      resolveWebSearchProviderContractEntriesForPluginId("xai").map((entry) => entry.provider.id),
-    ).toEqual(["grok"]);
+      resolveWebSearchProviderContractEntriesForPluginId("provider-b").map(
+        (entry) => entry.provider.id,
+      ),
+    ).toEqual(["search-c"]);
     expect(loadBundledCapabilityRuntimeRegistry).toHaveBeenCalledTimes(2);
   });
 
@@ -157,19 +159,19 @@ describe("plugin contract registry scoped retries", () => {
     const loadBundledCapabilityRuntimeRegistry = vi.fn().mockReturnValue(
       createMockRuntimeRegistry({
         plugin: {
-          id: "byteplus",
+          id: "openai",
           status: "loaded",
-          providerIds: ["byteplus"],
+          providerIds: ["openai"],
           webFetchProviderIds: [],
           webSearchProviderIds: [],
         },
         providers: [
           {
-            pluginId: "byteplus",
+            pluginId: "openai",
             provider: {
-              id: "byteplus",
-              label: "BytePlus",
-              docsPath: "/providers/byteplus",
+              id: "openai",
+              label: "OpenAI",
+              docsPath: "/providers/openai",
               auth: [],
             } as ProviderPlugin,
           },
@@ -183,7 +185,7 @@ describe("plugin contract registry scoped retries", () => {
 
     const { requireProviderContractProvider } = await import("./registry.js");
 
-    expect(requireProviderContractProvider("byteplus-plan").id).toBe("byteplus");
+    expect(requireProviderContractProvider("openai-codex").id).toBe("openai");
     expect(loadBundledCapabilityRuntimeRegistry).toHaveBeenCalledTimes(1);
   });
 
@@ -193,38 +195,38 @@ describe("plugin contract registry scoped retries", () => {
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "firecrawl",
+            id: "fetch-a",
             status: "error",
-            error: "transient firecrawl fetch load failure",
+            error: "transient fetch-a fetch load failure",
             providerIds: [],
             webFetchProviderIds: [],
             webSearchProviderIds: [],
           },
           diagnostics: [
-            { pluginId: "firecrawl", message: "transient firecrawl fetch load failure" },
+            { pluginId: "fetch-a", message: "transient fetch-a fetch load failure" },
           ],
         }),
       )
       .mockReturnValueOnce(
         createMockRuntimeRegistry({
           plugin: {
-            id: "firecrawl",
+            id: "fetch-a",
             status: "loaded",
             providerIds: [],
-            webFetchProviderIds: ["firecrawl"],
-            webSearchProviderIds: ["firecrawl"],
+            webFetchProviderIds: ["fetch-a"],
+            webSearchProviderIds: ["fetch-a"],
           },
           webFetchProviders: [
             {
-              pluginId: "firecrawl",
+              pluginId: "fetch-a",
               provider: {
-                id: "firecrawl",
-                label: "Firecrawl",
-                hint: "Fetch with Firecrawl",
-                envVars: ["FIRECRAWL_API_KEY"],
-                placeholder: "fc-...",
-                signupUrl: "https://firecrawl.dev",
-                credentialPath: "plugins.entries.firecrawl.config.webFetch.apiKey",
+                id: "fetch-a",
+                label: "Fetch A",
+                hint: "Fetch with Fetch A",
+                envVars: ["FETCH_A_API_KEY"],
+                placeholder: "fa-...",
+                signupUrl: "https://example.com/fetch-a",
+                credentialPath: "plugins.entries.fetch-a.config.webFetch.apiKey",
                 requiresCredential: true,
                 getCredentialValue: () => undefined,
                 setCredentialValue() {},
@@ -246,10 +248,10 @@ describe("plugin contract registry scoped retries", () => {
     const { resolveWebFetchProviderContractEntriesForPluginId } = await import("./registry.js");
 
     expect(
-      resolveWebFetchProviderContractEntriesForPluginId("firecrawl").map(
+      resolveWebFetchProviderContractEntriesForPluginId("fetch-a").map(
         (entry) => entry.provider.id,
       ),
-    ).toEqual(["firecrawl"]);
+    ).toEqual(["fetch-a"]);
     expect(loadBundledCapabilityRuntimeRegistry).toHaveBeenCalledTimes(2);
   });
 });

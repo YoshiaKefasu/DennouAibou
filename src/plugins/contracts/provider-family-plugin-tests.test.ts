@@ -32,44 +32,13 @@ const PROVIDER_BOUNDARY_TEST_SIGNALS = [
   /\bcreateTestPluginApi\s*\(/u,
 ] as const;
 const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContract> = {
-  fireworks: {
-    replayFamilies: ["openai-compatible"],
-  },
   google: {
     replayFamilies: ["google-gemini"],
     streamFamilies: ["google-thinking"],
     toolCompatFamilies: ["gemini"],
   },
-  kilocode: {
-    replayFamilies: ["passthrough-gemini"],
-    streamFamilies: ["kilocode-thinking"],
-  },
-  minimax: {
-    replayFamilies: ["hybrid-anthropic-openai"],
-    streamFamilies: ["minimax-fast-mode"],
-  },
-  moonshot: {
-    replayFamilies: ["openai-compatible"],
-    streamFamilies: ["moonshot-thinking"],
-  },
-  ollama: {
-    replayFamilies: ["openai-compatible"],
-  },
   openai: {
     streamFamilies: ["openai-responses-defaults"],
-  },
-  opencode: {
-    replayFamilies: ["passthrough-gemini"],
-  },
-  "opencode-go": {
-    replayFamilies: ["passthrough-gemini"],
-  },
-  openrouter: {
-    replayFamilies: ["passthrough-gemini"],
-    streamFamilies: ["openrouter-thinking"],
-  },
-  xai: {
-    replayFamilies: ["openai-compatible"],
   },
 };
 
