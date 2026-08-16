@@ -6,12 +6,6 @@ import { createEmbeddingProvider, DEFAULT_LOCAL_MODEL } from "./embeddings.js";
 import * as nodeLlamaModule from "./node-llama.js";
 import { mockPublicPinnedHostname } from "./test-helpers/ssrf.js";
 
-const { createOllamaEmbeddingProviderMock } = vi.hoisted(() => ({
-  createOllamaEmbeddingProviderMock: vi.fn(async () => {
-    throw new Error("Unexpected ollama provider in embeddings.test.ts");
-  }),
-}));
-
 vi.mock("../../../../src/infra/net/fetch-guard.js", () => ({
   fetchWithSsrFGuard: async (params: {
     url: string;
@@ -29,10 +23,6 @@ vi.mock("../../../../src/infra/net/fetch-guard.js", () => ({
       release: async () => {},
     };
   },
-}));
-
-vi.mock("./embeddings-ollama.js", () => ({
-  createOllamaEmbeddingProvider: createOllamaEmbeddingProviderMock,
 }));
 
 const createFetchMock = () =>
