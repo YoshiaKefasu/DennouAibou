@@ -114,19 +114,6 @@ external end-user instructions.
 - Google turn ordering fixup (prepend a tiny user bootstrap if history starts with assistant).
 - Antigravity Claude: normalize thinking signatures; drop unsigned thinking blocks.
 
-**Anthropic / Minimax (Anthropic-compatible)**
-
-- Tool result pairing repair and synthetic tool results.
-- Turn validation (merge consecutive user turns to satisfy strict alternation).
-
-**Mistral (including model-id based detection)**
-
-- Tool call id sanitization: strict9 (alphanumeric length 9).
-
-**OpenRouter Gemini**
-
-- Thought signature cleanup: strip non-base64 `thought_signature` values (keep base64).
-
 **Everything else**
 
 - Image sanitization only.

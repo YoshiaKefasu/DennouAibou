@@ -272,7 +272,7 @@ This guide sets up an Azure Linux VM with the Azure CLI, applies Network Securit
     openclaw gateway status
     ```
 
-    Most enterprise Azure teams already have GitHub Copilot licenses. If that is your case, we recommend choosing the GitHub Copilot provider in the OpenClaw onboarding wizard. See [GitHub Copilot provider](/providers/github-copilot).
+    Most enterprise Azure teams already have GitHub Copilot licenses, but the Copilot provider is no longer bundled with OpenClaw. We recommend configuring an OpenAI or Google API key in the OpenClaw onboarding wizard. See [Model providers](/concepts/model-providers).
 
   </Step>
 </Steps>

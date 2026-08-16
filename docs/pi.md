@@ -153,8 +153,8 @@ const result = await runEmbeddedPiAgent({
   workspaceDir: "/path/to/workspace",
   config: openclawConfig,
   prompt: "Hello, how are you?",
-  provider: "anthropic",
-  model: "claude-sonnet-4-6",
+  provider: "google",
+  model: "gemini-3.1-pro-preview",
   timeoutMs: 120_000,
   runId: "run-abc",
   onBlockReply: async (payload) => {
@@ -329,8 +329,8 @@ trackSessionManagerAccess(params.sessionFile);
 Auto-compaction triggers on context overflow. Common overflow signatures
 include `request_too_large`, `context length exceeded`, `input exceeds the
 maximum number of tokens`, `input token count exceeds the maximum number of
-input tokens`, `input is too long for the model`, and `ollama error: context
-length exceeded`. `compactEmbeddedPiSessionDirect()` handles manual
+input tokens`, and `input is too long for the model`.
+`compactEmbeddedPiSessionDirect()` handles manual
 compaction:
 
 ```typescript
@@ -498,12 +498,6 @@ if (sandboxRoot) {
 ```
 
 ## Provider-Specific Handling
-
-### Anthropic
-
-- Refusal magic string scrubbing
-- Turn validation for consecutive roles
-- Strict upstream Pi tool parameter validation
 
 ### Google/Gemini
 

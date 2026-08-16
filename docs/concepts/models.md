@@ -64,8 +64,8 @@ subscription** (OAuth) and **Anthropic** (API key or Claude CLI).
 Model refs are normalized to lowercase. Provider aliases like `z.ai/*` normalize
 to `zai/*`.
 
-Provider configuration examples (including OpenCode) live in
-[/providers/opencode](/providers/opencode).
+Provider configuration examples live in
+[Model providers](/concepts/model-providers).
 
 ## "Model is not allowed" (and why replies stop)
 

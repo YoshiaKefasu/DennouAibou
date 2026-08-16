@@ -134,12 +134,12 @@ When validation fails:
       agents: {
         defaults: {
           model: {
-            primary: "anthropic/claude-sonnet-4-6",
-            fallbacks: ["openai/gpt-5.4"],
+            primary: "openai/gpt-5.4",
+            fallbacks: ["google/gemini-3.1-pro-preview"],
           },
           models: {
-            "anthropic/claude-sonnet-4-6": { alias: "Sonnet" },
             "openai/gpt-5.4": { alias: "GPT" },
+            "google/gemini-3.1-pro-preview": { alias: "Gemini" },
           },
         },
       },
@@ -147,7 +147,7 @@ When validation fails:
     ```
 
     - `agents.defaults.models` defines the model catalog and acts as the allowlist for `/model`.
-    - Model refs use `provider/model` format (e.g. `anthropic/claude-opus-4-6`).
+    - Model refs use `provider/model` format (e.g. `openai/gpt-5.4`).
     - `agents.defaults.imageMaxDimensionPx` controls transcript/tool image downscaling (default `1200`); lower values usually reduce vision-token usage on screenshot-heavy runs.
     - See [Models CLI](/concepts/models) for switching models in chat and [Model Failover](/concepts/model-failover) for auth rotation and fallback behavior.
     - For custom/self-hosted providers, see [Custom providers](/gateway/configuration-reference#custom-providers-and-base-urls) in the reference.

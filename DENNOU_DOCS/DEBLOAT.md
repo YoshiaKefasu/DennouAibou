@@ -570,3 +570,56 @@ Phase 3 の extension 削除（commit `80f662c0c3c`）後に `pnpm test:contract
 - `registry.retry.test.ts` の残存モック id を neutral id（provider-a / provider-b / search-c / fetch-a）に置換（openai / openai-codex の alias ケースは変更なし）
 - フォローアップ後（実測）: **8 ファイル / 22 テスト失敗** — duckduckgo / firecrawl / searxng / tavily / zai グループは消滅。残りは全て pre-existing（8 章の一覧）
 
+---
+
+## 12. Phase 5 実施記録（2026-08-16）— ドキュメント・CHANGELOG
+
+### 対応内容
+
+1. **プロバイダー固有 docs ページ 45 件を削除**（削除前に全件の存在確認済み・全件存在）:
+   - `docs/providers/` 34 件: alibaba / anthropic / chutes / cloudflare-ai-gateway / comfy / deepseek / fal / fireworks / groq / huggingface / kilocode / litellm / minimax / mistral / moonshot / nvidia / ollama / opencode / opencode-go / openrouter / perplexity-provider / qianfan / qwen / sglang / stepfun / synthetic / together / venice / vercel-ai-gateway / vllm / volcengine / xai / xiaomi / runway
+   - 追加: `docs/perplexity.md`（root）、`docs/providers/qwen_modelstudio.md`
+   - 削除済みプロバイダーの search-tool ページ 5 件: `docs/tools/{minimax,kimi,grok,ollama,perplexity}-search.md`
+   - stale ページ 4 件（対応する extension が存在しない）: `docs/providers/{zai,glm,vydra,github-copilot}.md`
+2. **カタログ / テーブル docs 22 ファイルを編集**（削除プロバイダーの行・選択肢・プロバイダー固有節を除去）:
+   `docs/providers/models.md`、`docs/providers/index.md`、`docs/concepts/model-providers.md`、`docs/cli/{models,onboard,configure,index}.md`、`docs/start/wizard-cli-{automation,reference}.md`、`docs/start/wizard.md`（同クラスの web-search リスト）、`docs/reference/wizard.md`、`docs/gateway/configuration-{examples,reference}.md` + `docs/gateway/configuration.md`、`docs/tools/plugin.md`、`docs/help/{testing,faq}.md`、`docs/reference/{api-usage-costs,prompt-caching,transcript-hygiene}.md`、`docs/gateway/local-models.md`、`docs/pi.md`
+   - 具体的には: プロバイダー一覧からの行削除、onboard/configure/auth-choice リストのトリム、wizard のプロバイダー例アコーディオン削除、TTS（elevenlabs/microsoft/minimax）設定例の除去、memorySearch の mistral/ollama 行除去、web-search プロバイダーリスト（grok/kimi/minimax-search/ollama-search/perplexity）除去、usage-window プロバイダーリスト（anthropic/github-copilot/minimax/xiaomi/z.ai）除去、Anthropic 請求・setup-token・429 FAQ アコーディオンの除去
+   - **保持したもの**: モデル名文字列（`anthropic/claude-*` 等の例示）、`anthropic-messages` 共有 API タイプ、`OpenAI/Anthropic-compatible` 等のプロトコル用語、Microsoft Teams チャンネル言及、Cerebras（kept）節、`amazon-bedrock`（kept）節、Deepgram/Brave/Exa 言及
+3. **CHANGELOG.md** に Unreleased 直下へ `### Provider Debloat [DEBLOAT]` エントリ追加（3 行・ユーザー向け）:
+   - 41 個のプロバイダー拡張削除（35 モデルプロバイダー + 6 サブプロバイダー）、Google/OpenAI のみ残存・Deepgram/Brave/Exa は維持
+   - ollama embedding path の除去
+   - 死んだ契約テストの掃除と docs 更新
+4. **`src/agents/minimax-docs.test.ts` は既に削除済み**を確認（docs 行編集との整合性は成立）
+
+### 残存 docs 言及のトリアージ（git grep 925 ヒット → 分類）
+
+- **generic-prose-keep（編集対象外・意図的に維持）**: 「synthetic」「together」等の英語語 false positive、`OpenAI/Anthropic-compatible`・`anthropic-messages` 等のプロトコル用語、`anthropic/claude-*` 等のモデル名文字列、Anthropic-style cache 比較等のパラダイム説明、Microsoft Teams チャンネル言及、外部ツールリンク（Claude Code 等）、Cerebras/Bedrock（kept）の節内言及
+- **row-removed（本フェーズで除去済み）**: 上記 22 ファイル内のカタログ行・選択肢・プロバイダー固有節
+- **provider-specific — フォローアップ候補（本フェーズの指示スコープ外・未編集）**: `docs/tts.md` / `docs/tools/tts.md`（elevenlabs/microsoft/minimax TTS）、`docs/concepts/oauth.md` / `docs/gateway/authentication.md`（Anthropic OAuth/setup-token 節）、`docs/gateway/doctor.md` / `docs/gateway/troubleshooting.md` / `docs/help/troubleshooting.md`（Anthropic/OpenCode 節）、`docs/concepts/features.md` / `docs/concepts/usage-tracking.md` / `docs/concepts/models.md`（35+ provider 一覧・OpenRouter scan 節）、`docs/nodes/media-understanding.md` / `docs/nodes/audio.md` / `docs/nodes/talk.md`（プロバイダー能力表）、`docs/plugins/architecture.md` / `docs/plugins/sdk-provider-plugins.md` / `docs/plugins/manifest.md` / `docs/plugins/{sdk-overview,sdk-migration,sdk-runtime,building-plugins,voice-call}.md`（bundled plugin 表・SDK 例）、`docs/tools/web.md` / `docs/tools/{image,music,video}-generation.md` / `docs/tools/code-execution.md` / `docs/tools/thinking.md` / `docs/tools/pdf.md` / `docs/tools/acp-agents.md` / `docs/tools/{index,skills,skills-config,duckduckgo-search,searxng-search,brave-search,exa-search,gemini-search}.md`、`docs/reference/token-use.md` / `docs/reference/test.md` / `docs/reference/secretref-credential-surface.md` / `docs/reference/memory-config.md` / `docs/reference/session-management-compaction.md`、`docs/concepts/memory-{builtin,search}.md` / `docs/concepts/session-pruning.md` / `docs/concepts/model-failover.md` / `docs/concepts/compaction.md` / `docs/concepts/multi-agent.md` / `docs/concepts/session-tool.md`、`docs/gateway/heartbeat.md`、`docs/install/{fly,kubernetes,macos-vm,azure}.md`、`docs/platforms/raspberry-pi.md`、`docs/automation/cron-jobs.md`、`docs/reference/templates/AGENTS.md` 等
+- 上記フォローアップ候補は「行削除が中心」であり、プロバイダー固有ページの全削除（本フェーズ実施分）とは別扱い。第二段階で個別判断する
+
+### 作業ツリー・ハイジーン（本フェーズのスコープ外・未操作）
+
+- **DENNOU_DOCS 配下の既存削除エントリ（Phase 0 記載の 39 件）には触れていない**（別 workstream の状態。現 status では DENNOU_DOCS 配下 37 件の ` D` + `DENNOU_DOCS/ARCHIVE/` 未追跡を確認）
+- `go/raw-chat/go.mod` の drift（`M`）は本フェーズのスコープ外
+- 未追跡のビルド成果物（`dennou-dist.zip` / `dist.tar.gz` / `dist.zip` / `go/raw-chat/raw-chat` / `tmp-generated-schema.ts` / `tmp-rendered-schema.ts` / `InstallationLog.txt`）もスコープ外（Phase 0 のハイジーン方針通り checkpoint に混入させない）
+- `scripts/phase3-delete.ps1` / `scripts/reindex.ps1`（未追跡）もスコープ外
+- **コミットなし・staging なし**（Phase 5 は作業ツリーのみ）
+
+### Phase 5 フォローアップ（code-review findings fix, 2026-08-16）
+
+code-review で指摘された docs 残骸を修正（コミットなし・作業ツリーのみ。KASOU 非接触）。
+
+1. **docs.json の sidebar / redirects 修正**:
+   - `Providers` sidebar group を実存 8 ページに再構築（bedrock / bedrock-mantle / claude-max-api-proxy / deepgram / google / index / models / openai）
+   - `Web Tools` group から削除済み search ページ 4 件（grok-search / kimi-search / ollama-search / perplexity-search）を除去
+   - `redirects` の削除先参照 16 件を kept ページへ repoint（`/concepts/model-providers` または `/tools/web`）: modelstudio / perplexity / grok-search / kimi-search / minimax / xiaomi / anthropic(×2) / moonshot / mistral / openrouter / opencode / opencode-go / qianfan / glm / zai。削除先 destination は 0 件に
+2. **壊れたリンク修正**: 削除済み 45 ページへの markdown リンク **43 件** を除去 / repoint（加えて `gateway/troubleshooting.md` の削除済み FAQ アンカー参照 1 件、`video-generation.md` の pre-existing 死リンク 1 件（byteplus、対象ページは元々存在せず））。最終 grep で残存 0 件（`.i18n/zh-Hans-navigation.json` は zh-CN コンテンツ自体が存在しない pre-existing 状態のためスコープ外・未操作）
+3. **TTS ページを OpenAI-only に書き換え**: `docs/tts.md` / `docs/tools/tts.md` から elevenlabs / minimax / microsoft の設定・env key・base URL・voice 設定・model 既定値を全削除し、削除済みプロバイダーの legacy 注記を追加
+4. **web.md の web_search 能力テーブルをトリム**: Grok / Kimi / MiniMax Search / Ollama Web Search / Perplexity をカード・比較表・auto-detect 順序・onboarding 説明・Related から除去（kept 7: Brave / DuckDuckGo / Exa / Firecrawl / Gemini / SearXNG / Tavily）
+5. **capability docs のトリム**: image-generation.md / music-generation.md / video-generation.md を kept（google / openai）のみに整理（テーブル・provider notes・config 例・Related リンク）。music-generation.md の削除済み live-test ファイル参照節も除去
+6. **LOW 修正**: `configuration-reference.md` の JSON5 インデント 2 箇所（1117 / 1474 → 8 スペース）、`api-usage-costs.md` の video-generation 節に kept 例（`google/veo-3.1-fast-generate-preview` / `openai/sora-2`）を追加
+7. **web.md の x_search 節を全削除**: xai extension（HEAD で削除済み・executor は src/ に存在しない）の残骸ドキュメント `docs/tools/web.md` から x_search 全言及を除去（front-matter summary / read_when、導入段落、quick-start 例、`plugins.entries.xai.config.xSearch.*` + `XAI_API_KEY` の設定指示、`## x_search` セクション全体、Tool profiles の allowlist 例）。壊れリンク防止のため、削除節への唯一のアンカーリンク `docs/tools/code-execution.md` の `/tools/web#x_search` 行も併せて除去。他ファイルの残存 xai/x_search 言及（tool 一覧・secretref マトリクス・SDK 例・code-execution.md の使用例等）は第二段階トリアージ対象として据え置き
+8. **azure.md の推奨プロバイダー文言を修正**: `docs/install/azure.md` の「GitHub Copilot provider を選択」推奨（削除済みプロバイダー）を「OpenAI or Google API key を設定」推奨に言い換え
+9. **slash-commands.md の `/fast` 説明をトリム**: 削除済み Anthropic プロバイダーの OAuth / `service_tier=auto|standard_only` 記述を除去し、OpenAI/Codex の `service_tier=priority` 説明のみに
+

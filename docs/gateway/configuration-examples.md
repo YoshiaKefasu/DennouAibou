@@ -35,7 +35,7 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
   },
   agent: {
     workspace: "~/.openclaw/workspace",
-    model: { primary: "anthropic/claude-sonnet-4-6" },
+    model: { primary: "openai/gpt-5.4" },
   },
   channels: {
     whatsapp: {
@@ -54,9 +54,9 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
 {
   // Environment + shell
   env: {
-    OPENROUTER_API_KEY: "sk-or-...",
+    OPENAI_API_KEY: "sk-...",
     vars: {
-      GROQ_API_KEY: "gsk-...",
+      GEMINI_API_KEY: "...",
     },
     shellEnv: {
       enabled: true,
@@ -67,13 +67,10 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
   // Auth profile metadata (secrets live in auth-profiles.json)
   auth: {
     profiles: {
-      "anthropic:default": { provider: "anthropic", mode: "api_key" },
-      "anthropic:work": { provider: "anthropic", mode: "api_key" },
       "openai:default": { provider: "openai", mode: "api_key" },
       "openai-codex:personal": { provider: "openai-codex", mode: "oauth" },
     },
     order: {
-      anthropic: ["anthropic:default", "anthropic:work"],
       openai: ["openai:default"],
       "openai-codex": ["openai-codex:personal"],
     },
@@ -235,16 +232,15 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
       workspace: "~/.openclaw/workspace",
       userTimezone: "America/Chicago",
       model: {
-        primary: "anthropic/claude-sonnet-4-6",
-        fallbacks: ["anthropic/claude-opus-4-6", "openai/gpt-5.4"],
+        primary: "openai/gpt-5.4",
+        fallbacks: ["google/gemini-3.1-pro-preview"],
       },
       imageModel: {
-        primary: "openrouter/anthropic/claude-sonnet-4-6",
+        primary: "openai/gpt-image-1",
       },
       models: {
-        "anthropic/claude-opus-4-6": { alias: "opus" },
-        "anthropic/claude-sonnet-4-6": { alias: "sonnet" },
         "openai/gpt-5.4": { alias: "gpt" },
+        "google/gemini-3.1-pro-preview": { alias: "gemini" },
       },
       skills: ["github", "weather"], // inherited by agents that omit list[].skills
       thinkingDefault: "low",
@@ -269,7 +265,7 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
       maxConcurrent: 3,
       heartbeat: {
         every: "30m",
-        model: "anthropic/claude-sonnet-4-6",
+        model: "openai/gpt-5.4",
         target: "last",
         directPolicy: "allow", // allow (default) | block
         to: "+15555550123",
@@ -347,7 +343,7 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
     providers: {
       "custom-proxy": {
         baseUrl: "http://localhost:4000/v1",
-        apiKey: "LITELLM_KEY",
+        apiKey: "PROXY_API_KEY",
         api: "openai-responses",
         authHeader: true,
         headers: { "X-Proxy-Region": "us-west" },
@@ -531,40 +527,6 @@ If more than one person can DM your bot (multiple entries in `allowFrom`, pairin
 
 For Discord/Slack/Google Chat/Microsoft Teams/Mattermost/IRC, sender authorization is ID-first by default.
 Only enable direct mutable name/email/nick matching with each channel's `dangerouslyAllowNameMatching: true` if you explicitly accept that risk.
-
-### Anthropic API key + MiniMax fallback
-
-```json5
-{
-  auth: {
-    profiles: {
-      "anthropic:api": {
-        provider: "anthropic",
-        mode: "api_key",
-      },
-    },
-    order: {
-      anthropic: ["anthropic:api"],
-    },
-  },
-  models: {
-    providers: {
-      minimax: {
-        baseUrl: "https://api.minimax.io/anthropic",
-        api: "anthropic-messages",
-        apiKey: "${MINIMAX_API_KEY}",
-      },
-    },
-  },
-  agent: {
-    workspace: "~/.openclaw/workspace",
-    model: {
-      primary: "anthropic/claude-opus-4-6",
-      fallbacks: ["minimax/MiniMax-M2.7"],
-    },
-  },
-}
-```
 
 ### Work bot (restricted access)
 

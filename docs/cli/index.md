@@ -248,7 +248,7 @@ openclaw [--dev] [--profile <name>] <command>
     fallbacks list|add|remove|clear
     image-fallbacks list|add|remove|clear
     scan
-    auth add|login|login-github-copilot|setup-token|paste-token
+    auth add|login|setup-token|paste-token
     auth order get|set|clear
   sandbox
     list
@@ -497,33 +497,10 @@ Options:
 - `--mode <local|remote>`
 - `--flow <quickstart|advanced|manual>` (manual is an alias for advanced)
 - `--auth-choice <choice>` where `<choice>` is one of:
-  `chutes`, `deepseek-api-key`, `openai-codex`, `openai-api-key`,
-  `openrouter-api-key`, `kilocode-api-key`, `litellm-api-key`, `ai-gateway-api-key`,
-  `cloudflare-ai-gateway-api-key`, `moonshot-api-key`, `moonshot-api-key-cn`,
-  `kimi-code-api-key`, `synthetic-api-key`, `venice-api-key`, `together-api-key`,
-  `huggingface-api-key`, `apiKey`, `gemini-api-key`, `zai-api-key`,
-  `zai-coding-global`, `zai-coding-cn`, `zai-global`, `zai-cn`, `xiaomi-api-key`,
-  `minimax-global-oauth`, `minimax-global-api`, `minimax-cn-oauth`, `minimax-cn-api`,
-  `opencode-zen`, `opencode-go`, `github-copilot`, `copilot-proxy`, `xai-api-key`,
-  `mistral-api-key`, `volcengine-api-key`, `byteplus-api-key`, `qianfan-api-key`,
-  `qwen-standard-api-key-cn`, `qwen-standard-api-key`, `qwen-api-key-cn`, `qwen-api-key`,
-  `modelstudio-standard-api-key-cn`, `modelstudio-standard-api-key`,
-  `modelstudio-api-key-cn`, `modelstudio-api-key`, `custom-api-key`, `skip`
-- Qwen note: `qwen-*` is the canonical auth-choice family. `modelstudio-*`
-  ids remain accepted as legacy compatibility aliases only.
+  `openai-codex`, `openai-api-key`, `gemini-api-key`, `custom-api-key`, `skip`
 - `--secret-input-mode <plaintext|ref>` (default `plaintext`; use `ref` to store provider default env refs instead of plaintext keys)
-- `--anthropic-api-key <key>`
 - `--openai-api-key <key>`
-- `--mistral-api-key <key>`
-- `--openrouter-api-key <key>`
-- `--ai-gateway-api-key <key>`
-- `--moonshot-api-key <key>`
-- `--kimi-code-api-key <key>`
 - `--gemini-api-key <key>`
-- `--zai-api-key <key>`
-- `--minimax-api-key <key>`
-- `--opencode-zen-api-key <key>`
-- `--opencode-go-api-key <key>`
 - `--custom-base-url <url>` (non-interactive; used with `--auth-choice custom-api-key`)
 - `--custom-model-id <id>` (non-interactive; used with `--auth-choice custom-api-key`)
 - `--custom-api-key <key>` (non-interactive; optional; used with `--auth-choice custom-api-key`; falls back to `CUSTOM_API_KEY` when omitted)
@@ -547,8 +524,6 @@ Options:
 - `--skip-search`
 - `--skip-health`
 - `--skip-ui`
-- `--cloudflare-ai-gateway-account-id <id>`
-- `--cloudflare-ai-gateway-gateway-id <id>`
 - `--node-manager <npm|pnpm|bun>` (setup/onboarding node manager for skills; pnpm recommended, bun also supported)
 - `--json`
 
@@ -1231,8 +1206,7 @@ Notes:
 
 - Data comes directly from provider usage endpoints (no estimates).
 - Human-readable output is normalized to `X% left` across providers.
-- Providers with current usage windows: Anthropic, GitHub Copilot, Gemini CLI, OpenAI Codex, MiniMax, Xiaomi, and z.ai.
-- MiniMax note: raw `usage_percent` / `usagePercent` means remaining quota, so OpenClaw inverts it before display; count-based fields still win when present. `model_remains` responses prefer the chat-model entry, derive the window label from timestamps when needed, and include the model name in the plan label.
+- Providers with current usage windows: Gemini CLI and OpenAI Codex.
 - Usage auth comes from provider-specific hooks when available; otherwise OpenClaw falls back to matching OAuth/API-key credentials from auth profiles, env, or config. If none resolve, usage is hidden.
 - Details: see [Usage tracking](/concepts/usage-tracking).
 
@@ -1477,21 +1451,6 @@ Tip: the owner-only `gateway` runtime tool still refuses to rewrite `tools.exec.
 
 See [/concepts/models](/concepts/models) for fallback behavior and scanning strategy.
 
-Billing note: for Anthropic in OpenClaw, the practical split is **API key** or
-**Claude subscription with Extra Usage**. Anthropic notified OpenClaw users on
-**April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that the **OpenClaw**
-Claude-login path counts as third-party harness usage and requires
-**Extra Usage** billed separately from the subscription. Our local repros also
-show the OpenClaw-identifying prompt string does not reproduce on the
-Anthropic SDK + API-key path. For production, prefer an Anthropic API key or
-another supported subscription-style provider such as OpenAI Codex, Alibaba
-Cloud Model Studio Coding Plan, MiniMax Coding Plan, or Z.AI / GLM Coding
-Plan.
-
-Anthropic setup-token is available again as a legacy/manual auth path.
-Use it only with the expectation that Anthropic told OpenClaw users the
-OpenClaw-managed Anthropic subscription path requires **Extra Usage**.
-
 ### `models` (root)
 
 `openclaw models` is an alias for `models status`.
@@ -1585,13 +1544,12 @@ Options:
 - `--set-image`
 - `--json`
 
-### `models auth add|login|login-github-copilot|setup-token|paste-token`
+### `models auth add|login|setup-token|paste-token`
 
 Options:
 
 - `add`: interactive auth helper (provider auth flow or token paste)
 - `login`: `--provider <name>`, `--method <method>`, `--set-default`
-- `login-github-copilot`: GitHub Copilot OAuth login flow (`--yes`)
 - `setup-token`: `--provider <name>`, `--yes`
 - `paste-token`: `--provider <name>`, `--profile-id <id>`, `--expires-in <duration>`
 
@@ -1600,7 +1558,6 @@ Notes:
 - `setup-token` and `paste-token` are generic token commands for providers that expose token auth methods.
 - `setup-token` requires an interactive TTY and runs the provider's token-auth method.
 - `paste-token` prompts for the token value and defaults to auth profile id `<provider>:manual` when `--profile-id` is omitted.
-- Anthropic `setup-token` / `paste-token` are available again as a legacy/manual OpenClaw path. Anthropic told OpenClaw users this path requires **Extra Usage** on the Claude account.
 
 ### `models auth order get|set|clear`
 

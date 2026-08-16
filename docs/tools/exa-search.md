@@ -124,4 +124,3 @@ await web_search({
 
 - [Web Search overview](/tools/web) -- all providers and auto-detection
 - [Brave Search](/tools/brave-search) -- structured results with country/language filters
-- [Perplexity Search](/tools/perplexity-search) -- structured results with domain filtering

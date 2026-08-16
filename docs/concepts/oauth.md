@@ -85,9 +85,7 @@ and [Using Claude Code with your Team or Enterprise
 plan](https://support.anthropic.com/en/articles/11845131-using-claude-code-with-your-team-or-enterprise-plan/).
 
 If you want other subscription-style options in OpenClaw, see [OpenAI
-Codex](/providers/openai), [Qwen Cloud Coding
-Plan](/providers/qwen), [MiniMax Coding Plan](/providers/minimax),
-and [Z.AI / GLM Coding Plan](/providers/glm).
+Codex](/providers/openai).
 </Warning>
 
 OpenClaw now exposes Anthropic setup-token again as a legacy/manual path.

@@ -16,7 +16,7 @@ For the short guide, see [Onboarding (CLI)](/start/wizard).
 
 Local mode (default) walks you through:
 
-- Model and auth setup (OpenAI Code subscription OAuth, Anthropic Claude CLI or API key, plus MiniMax, GLM, Ollama, Moonshot, StepFun, and AI Gateway options)
+- Model and auth setup (OpenAI Code subscription OAuth, OpenAI API key, Google/Gemini, plus custom provider options)
 - Workspace location and bootstrap files
 - Gateway settings (port, bind, auth, tailscale)
 - Channels and providers (Telegram, WhatsApp, Discord, Google Chat, Mattermost, Signal, BlueBubbles, and other bundled channel plugins)
@@ -126,9 +126,6 @@ What you set:
 ## Auth and model options
 
 <AccordionGroup>
-  <Accordion title="Anthropic API key">
-    Uses `ANTHROPIC_API_KEY` if present or prompts for a key, then saves it for daemon use.
-  </Accordion>
   <Accordion title="OpenAI Code subscription (Codex CLI reuse)">
     If `~/.codex/auth.json` exists, the wizard can reuse it.
     Reused Codex CLI credentials stay managed by Codex CLI; on expiry OpenClaw
@@ -147,47 +144,6 @@ What you set:
 
     Sets `agents.defaults.model` to `openai/gpt-5.4` when model is unset, `openai/*`, or `openai-codex/*`.
 
-  </Accordion>
-  <Accordion title="xAI (Grok) API key">
-    Prompts for `XAI_API_KEY` and configures xAI as a model provider.
-  </Accordion>
-  <Accordion title="OpenCode">
-    Prompts for `OPENCODE_API_KEY` (or `OPENCODE_ZEN_API_KEY`) and lets you choose the Zen or Go catalog.
-    Setup URL: [opencode.ai/auth](https://opencode.ai/auth).
-  </Accordion>
-  <Accordion title="API key (generic)">
-    Stores the key for you.
-  </Accordion>
-  <Accordion title="Vercel AI Gateway">
-    Prompts for `AI_GATEWAY_API_KEY`.
-    More detail: [Vercel AI Gateway](/providers/vercel-ai-gateway).
-  </Accordion>
-  <Accordion title="Cloudflare AI Gateway">
-    Prompts for account ID, gateway ID, and `CLOUDFLARE_AI_GATEWAY_API_KEY`.
-    More detail: [Cloudflare AI Gateway](/providers/cloudflare-ai-gateway).
-  </Accordion>
-  <Accordion title="MiniMax">
-    Config is auto-written. Hosted default is `MiniMax-M2.7`; API-key setup uses
-    `minimax/...`, and OAuth setup uses `minimax-portal/...`.
-    More detail: [MiniMax](/providers/minimax).
-  </Accordion>
-  <Accordion title="StepFun">
-    Config is auto-written for StepFun standard or Step Plan on China or global endpoints.
-    Standard currently includes `step-3.5-flash`, and Step Plan also includes `step-3.5-flash-2603`.
-    More detail: [StepFun](/providers/stepfun).
-  </Accordion>
-  <Accordion title="Synthetic (Anthropic-compatible)">
-    Prompts for `SYNTHETIC_API_KEY`.
-    More detail: [Synthetic](/providers/synthetic).
-  </Accordion>
-  <Accordion title="Ollama (Cloud and local open models)">
-    Prompts for base URL (default `http://127.0.0.1:11434`), then offers Cloud + Local or Local mode.
-    Discovers available models and suggests defaults.
-    More detail: [Ollama](/providers/ollama).
-  </Accordion>
-  <Accordion title="Moonshot and Kimi Coding">
-    Moonshot (Kimi K2) and Kimi Coding configs are auto-written.
-    More detail: [Moonshot AI (Kimi + Kimi Coding)](/providers/moonshot).
   </Accordion>
   <Accordion title="Custom provider">
     Works with OpenAI-compatible and Anthropic-compatible endpoints.
@@ -214,9 +170,7 @@ Model behavior:
 
 - Pick default model from detected options, or enter provider and model manually.
 - When onboarding starts from a provider auth choice, the model picker prefers
-  that provider automatically. For Volcengine and BytePlus, the same preference
-  also matches their coding-plan variants (`volcengine-plan/*`,
-  `byteplus-plan/*`).
+  that provider automatically.
 - If that preferred-provider filter would be empty, the picker falls back to
   the full catalog instead of showing no models.
 - Wizard runs a model check and warns if the configured model is unknown or missing auth.
@@ -261,7 +215,7 @@ is only a legacy import source.
 Typical fields in `~/.openclaw/openclaw.json`:
 
 - `agents.defaults.workspace`
-- `agents.defaults.model` / `models.providers` (if Minimax chosen)
+- `agents.defaults.model` / `models.providers` (if a custom provider is chosen)
 - `tools.profile` (local onboarding defaults to `"coding"` when unset; existing explicit values are preserved)
 - `gateway.*` (mode, bind, auth, tailscale)
 - `session.dmScope` (local onboarding defaults this to `per-channel-peer` when unset; existing explicit values are preserved)

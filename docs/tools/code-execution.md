@@ -81,10 +81,8 @@ the full analysis request and any inline data in one prompt.
 - This is remote xAI execution, not local process execution.
 - It should be treated as ephemeral analysis, not a persistent notebook.
 - Do not assume access to local files or your workspace.
-- For fresh X data, use [`x_search`](/tools/web#x_search) first.
 
 ## See Also
 
 - [Web tools](/tools/web)
 - [Exec](/tools/exec)
-- [xAI](/providers/xai)

@@ -55,9 +55,7 @@ Fix options:
 
 Related:
 
-- [/providers/anthropic](/providers/anthropic)
 - [/reference/token-use](/reference/token-use)
-- [/help/faq#why-am-i-seeing-http-429-ratelimiterror-from-anthropic](/help/faq#why-am-i-seeing-http-429-ratelimiterror-from-anthropic)
 
 ## No replies
 

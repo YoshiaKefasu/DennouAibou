@@ -50,14 +50,14 @@ Use `channels.modelByChannel` to pin specific channel IDs to a model. Values acc
   channels: {
     modelByChannel: {
       discord: {
-        "123456789012345678": "anthropic/claude-opus-4-6",
+        "123456789012345678": "google/gemini-3-flash-preview",
       },
       slack: {
         C1234567890: "openai/gpt-4.1",
       },
       telegram: {
         "-1001234567890": "openai/gpt-4.1-mini",
-        "-1001234567890:topic:99": "anthropic/claude-sonnet-4-6",
+        "-1001234567890:topic:99": "google/gemini-3.1-pro-preview",
       },
     },
   },
@@ -977,28 +977,28 @@ Time format in system prompt. Default: `auto` (OS preference).
   agents: {
     defaults: {
       models: {
-        "anthropic/claude-opus-4-6": { alias: "opus" },
-        "minimax/MiniMax-M2.7": { alias: "minimax" },
+        "openai/gpt-5.4": { alias: "gpt" },
+        "google/gemini-3.1-pro-preview": { alias: "gemini" },
       },
       model: {
-        primary: "anthropic/claude-opus-4-6",
-        fallbacks: ["minimax/MiniMax-M2.7"],
+        primary: "openai/gpt-5.4",
+        fallbacks: ["google/gemini-3.1-pro-preview"],
       },
       imageModel: {
-        primary: "openrouter/qwen/qwen-2.5-vl-72b-instruct:free",
-        fallbacks: ["openrouter/google/gemini-2.0-flash-vision:free"],
+        primary: "google/gemini-3.1-flash-image-preview",
+        fallbacks: ["openai/gpt-5.4-mini"],
       },
       imageGenerationModel: {
         primary: "openai/gpt-image-1",
         fallbacks: ["google/gemini-3.1-flash-image-preview"],
       },
       videoGenerationModel: {
-        primary: "qwen/wan2.6-t2v",
-        fallbacks: ["qwen/wan2.6-i2v"],
+        primary: "openai/sora-2",
+        fallbacks: ["google/veo-3.1-fast-generate-preview"],
       },
       pdfModel: {
-        primary: "anthropic/claude-opus-4-6",
-        fallbacks: ["openai/gpt-5.4-mini"],
+        primary: "openai/gpt-5.4-mini",
+        fallbacks: ["google/gemini-3-flash-preview"],
       },
       params: { cacheRetention: "long" }, // global default provider params
       pdfMaxBytesMb: 10,
@@ -1023,20 +1023,19 @@ Time format in system prompt. Default: `auto` (OS preference).
   - Also used as fallback routing when the selected/default model cannot accept image input.
 - `imageGenerationModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the shared image-generation capability and any future tool/plugin surface that generates images.
-  - Typical values: `google/gemini-3.1-flash-image-preview` for native Gemini image generation, `fal/fal-ai/flux/dev` for fal, or `openai/gpt-image-1` for OpenAI Images.
-  - If you select a provider/model directly, configure the matching provider auth/API key too (for example `GEMINI_API_KEY` or `GOOGLE_API_KEY` for `google/*`, `OPENAI_API_KEY` for `openai/*`, `FAL_KEY` for `fal/*`).
+  - Typical values: `google/gemini-3.1-flash-image-preview` for native Gemini image generation, or `openai/gpt-image-1` for OpenAI Images.
+  - If you select a provider/model directly, configure the matching provider auth/API key too (for example `GEMINI_API_KEY` or `GOOGLE_API_KEY` for `google/*`, `OPENAI_API_KEY` for `openai/*`).
   - If omitted, `image_generate` can still infer an auth-backed provider default. It tries the current default provider first, then the remaining registered image-generation providers in provider-id order.
 - `musicGenerationModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the shared music-generation capability and the built-in `music_generate` tool.
-  - Typical values: `google/lyria-3-clip-preview`, `google/lyria-3-pro-preview`, or `minimax/music-2.5+`.
+  - Typical values: `google/lyria-3-clip-preview` or `google/lyria-3-pro-preview`.
   - If omitted, `music_generate` can still infer an auth-backed provider default. It tries the current default provider first, then the remaining registered music-generation providers in provider-id order.
   - If you select a provider/model directly, configure the matching provider auth/API key too.
 - `videoGenerationModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the shared video-generation capability and the built-in `video_generate` tool.
-  - Typical values: `qwen/wan2.6-t2v`, `qwen/wan2.6-i2v`, `qwen/wan2.6-r2v`, `qwen/wan2.6-r2v-flash`, or `qwen/wan2.7-r2v`.
+  - Typical values: `openai/sora-2` or `google/veo-3.1-fast-generate-preview`.
   - If omitted, `video_generate` can still infer an auth-backed provider default. It tries the current default provider first, then the remaining registered video-generation providers in provider-id order.
   - If you select a provider/model directly, configure the matching provider auth/API key too.
-  - The bundled Qwen video-generation provider currently supports up to 1 output video, 1 input image, 4 input videos, 10 seconds duration, and provider-level `size`, `aspectRatio`, `resolution`, `audio`, and `watermark` options.
 - `pdfModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the `pdf` tool for model routing.
   - If omitted, the PDF tool falls back to `imageModel`, then to the resolved session/default model.
@@ -1055,8 +1054,6 @@ Time format in system prompt. Default: `auto` (OS preference).
 
 | Alias               | Model                                  |
 | ------------------- | -------------------------------------- |
-| `opus`              | `anthropic/claude-opus-4-6`            |
-| `sonnet`            | `anthropic/claude-sonnet-4-6`          |
 | `gpt`               | `openai/gpt-5.4`                       |
 | `gpt-mini`          | `openai/gpt-5.4-mini`                  |
 | `gpt-nano`          | `openai/gpt-5.4-nano`                  |
@@ -1065,10 +1062,6 @@ Time format in system prompt. Default: `auto` (OS preference).
 | `gemini-flash-lite` | `google/gemini-3.1-flash-lite-preview` |
 
 Your configured aliases always win over defaults.
-
-Z.AI GLM-4.x models automatically enable thinking mode unless you set `--thinking off` or define `agents.defaults.models["zai/<model>"].params.thinking` yourself.
-Z.AI models enable `tool_stream` by default for tool call streaming. Set `agents.defaults.models["zai/<model>"].params.tool_stream` to `false` to disable it.
-Anthropic Claude 4.6 models default to `adaptive` thinking when no explicit thinking level is set.
 
 - Sessions supported when `sessionArg` is set.
 - Image pass-through supported when `imageArg` accepts file paths.
@@ -1121,7 +1114,7 @@ Periodic heartbeat runs.
         identifierPolicy: "strict", // strict | off | custom
         identifierInstructions: "Preserve deployment IDs, ticket IDs, and host:port pairs exactly.", // used when identifierPolicy=custom
         postCompactionSections: ["Session Startup", "Red Lines"], // [] disables reinjection
-        model: "openrouter/anthropic/claude-sonnet-4-6", // optional compaction-only model override
+        model: "openai/gpt-5.4", // optional compaction-only model override
         notifyUser: true, // send a brief notice when compaction starts (default: false)
         memoryFlush: {
           enabled: true,
@@ -1478,7 +1471,7 @@ scripts/sandbox-browser-setup.sh   # optional browser image
         name: "Main Agent",
         workspace: "~/.openclaw/workspace",
         agentDir: "~/.openclaw/agents/main/agent",
-        model: "anthropic/claude-opus-4-6", // or { primary, fallbacks }
+        model: "openai/gpt-5.4", // or { primary, fallbacks }
         thinkingDefault: "high", // per-agent thinking level override
         reasoningDefault: "on", // per-agent reasoning visibility override
         fastModeDefault: false, // per-agent fast mode override
@@ -1795,8 +1788,8 @@ Resolution (most specific wins): account → channel → global. `""` disables a
 | Variable          | Description            | Example                     |
 | ----------------- | ---------------------- | --------------------------- |
 | `{model}`         | Short model name       | `claude-opus-4-6`           |
-| `{modelFull}`     | Full model identifier  | `anthropic/claude-opus-4-6` |
-| `{provider}`      | Provider name          | `anthropic`                 |
+| `{modelFull}`     | Full model identifier  | `openai/gpt-5.4`            |
+| `{provider}`      | Provider name          | `openai`                    |
 | `{thinkingLevel}` | Current thinking level | `high`, `low`, `off`        |
 | `{identity.name}` | Agent identity name    | (same as `"auto"`)          |
 
@@ -1825,28 +1818,12 @@ Batches rapid text-only messages from the same sender into a single agent turn. 
     tts: {
       auto: "always", // off | always | inbound | tagged
       mode: "final", // final | all
-      provider: "elevenlabs",
+      provider: "openai",
       summaryModel: "openai/gpt-4.1-mini",
       modelOverrides: { enabled: true },
       maxTextLength: 4000,
       timeoutMs: 30000,
       prefsPath: "~/.openclaw/settings/tts.json",
-      elevenlabs: {
-        apiKey: "elevenlabs_api_key",
-        baseUrl: "https://api.elevenlabs.io",
-        voiceId: "voice_id",
-        modelId: "eleven_multilingual_v2",
-        seed: 42,
-        applyTextNormalization: "auto",
-        languageCode: "en",
-        voiceSettings: {
-          stability: 0.5,
-          similarityBoost: 0.75,
-          style: 0.0,
-          useSpeakerBoost: true,
-          speed: 1.0,
-        },
-      },
       openai: {
         apiKey: "openai_api_key",
         baseUrl: "https://api.openai.com/v1",
@@ -1861,7 +1838,7 @@ Batches rapid text-only messages from the same sender into a single agent turn. 
 - `auto` controls auto-TTS. `/tts off|always|inbound|tagged` overrides per session.
 - `summaryModel` overrides `agents.defaults.model.primary` for auto-summary.
 - `modelOverrides` is enabled by default; `modelOverrides.allowProvider` defaults to `false` (opt-in).
-- API keys fall back to `ELEVENLABS_API_KEY`/`XI_API_KEY` and `OPENAI_API_KEY`.
+- API keys fall back to `OPENAI_API_KEY`.
 - `openai.baseUrl` overrides the OpenAI TTS endpoint. Resolution order is config, then `OPENAI_TTS_BASE_URL`, then `https://api.openai.com/v1`.
 - When `openai.baseUrl` points to a non-OpenAI endpoint, OpenClaw treats it as an OpenAI-compatible TTS server and relaxes model/voice validation.
 
@@ -1871,33 +1848,9 @@ Batches rapid text-only messages from the same sender into a single agent turn. 
 
 Defaults for Talk mode (macOS/iOS/Android).
 
-```json5
-{
-  talk: {
-    provider: "elevenlabs",
-    providers: {
-      elevenlabs: {
-        voiceId: "elevenlabs_voice_id",
-        voiceAliases: {
-          Clawd: "EXAVITQu4vr4xnSDxMaL",
-          Roger: "CwhRBWXzGAHq8TQ4Fs17",
-        },
-        modelId: "eleven_v3",
-        outputFormat: "mp3_44100_128",
-        apiKey: "elevenlabs_api_key",
-      },
-    },
-    silenceTimeoutMs: 1500,
-    interruptOnSpeech: true,
-  },
-}
-```
-
 - `talk.provider` must match a key in `talk.providers` when multiple Talk providers are configured.
 - Legacy flat Talk keys (`talk.voiceId`, `talk.voiceAliases`, `talk.modelId`, `talk.outputFormat`, `talk.apiKey`) are compatibility-only and are auto-migrated into `talk.providers.<provider>`.
-- Voice IDs fall back to `ELEVENLABS_VOICE_ID` or `SAG_VOICE_ID`.
 - `providers.*.apiKey` accepts plaintext strings or SecretRef objects.
-- `ELEVENLABS_API_KEY` fallback applies only when no Talk API key is configured.
 - `providers.*.voiceAliases` lets Talk directives use friendly names.
 - `silenceTimeoutMs` controls how long Talk mode waits after user silence before it sends the transcript. Unset keeps the platform default pause window (`700 ms on macOS and Android, 900 ms on iOS`).
 
@@ -2104,7 +2057,7 @@ Configures inbound media understanding (image/audio/video):
 
 **Provider entry** (`type: "provider"` or omitted):
 
-- `provider`: API provider id (`openai`, `anthropic`, `google`/`gemini`, `groq`, etc.)
+- `provider`: API provider id (`openai`, `google`/`gemini`, etc.)
 - `model`: model id override
 - `profile` / `preferredProfile`: `auth-profiles.json` profile selection
 
@@ -2115,7 +2068,7 @@ Configures inbound media understanding (image/audio/video):
 
 **Common fields:**
 
-- `capabilities`: optional list (`image`, `audio`, `video`). Defaults: `openai`/`anthropic`/`minimax` → image, `google` → image+audio+video, `groq` → audio.
+- `capabilities`: optional list (`image`, `audio`, `video`). Defaults: `openai` → image, `google` → image+audio+video.
 - `prompt`, `maxChars`, `maxBytes`, `timeoutSeconds`, `language`: per-entry overrides.
 - Failures fall back to the next entry.
 
@@ -2224,7 +2177,7 @@ Notes:
     defaults: {
       subagents: {
         allowAgents: ["research"],
-        model: "minimax/MiniMax-M2.7",
+        model: "openai/gpt-5.4-mini",
         maxConcurrent: 8,
         runTimeoutSeconds: 900,
         archiveAfterMinutes: 60,
@@ -2252,7 +2205,7 @@ OpenClaw uses the built-in model catalog. Add custom providers via `models.provi
     providers: {
       "custom-proxy": {
         baseUrl: "http://localhost:4000/v1",
-        apiKey: "LITELLM_KEY",
+        apiKey: "PROXY_API_KEY",
         api: "openai-completions", // openai-completions | openai-responses | anthropic-messages | google-generative-ai
         models: [
           {
@@ -2292,7 +2245,7 @@ OpenClaw uses the built-in model catalog. Add custom providers via `models.provi
 - `models.providers.*.api`: request adapter (`openai-completions`, `openai-responses`, `anthropic-messages`, `google-generative-ai`, etc).
 - `models.providers.*.apiKey`: provider credential (prefer SecretRef/env substitution).
 - `models.providers.*.auth`: auth strategy (`api-key`, `token`, `oauth`, `aws-sdk`).
-- `models.providers.*.injectNumCtxForOpenAICompat`: for Ollama + `openai-completions`, inject `options.num_ctx` into requests (default: `true`).
+- `models.providers.*.injectNumCtxForOpenAICompat`: inject `options.num_ctx` into requests for `openai-completions` (default: `true`).
 - `models.providers.*.authHeader`: force credential transport in the `Authorization` header when required.
 - `models.providers.*.baseUrl`: upstream API base URL.
 - `models.providers.*.headers`: extra static headers for proxy/tenant routing.
@@ -2349,192 +2302,7 @@ OpenClaw uses the built-in model catalog. Add custom providers via `models.provi
 }
 ```
 
-Use `cerebras/zai-glm-4.7` for Cerebras; `zai/glm-4.7` for Z.AI direct.
-
-</Accordion>
-
-<Accordion title="OpenCode">
-
-```json5
-{
-  agents: {
-    defaults: {
-      model: { primary: "opencode/claude-opus-4-6" },
-      models: { "opencode/claude-opus-4-6": { alias: "Opus" } },
-    },
-  },
-}
-```
-
-Set `OPENCODE_API_KEY` (or `OPENCODE_ZEN_API_KEY`). Use `opencode/...` refs for the Zen catalog or `opencode-go/...` refs for the Go catalog. Shortcut: `openclaw onboard --auth-choice opencode-zen` or `openclaw onboard --auth-choice opencode-go`.
-
-</Accordion>
-
-<Accordion title="Z.AI (GLM-4.7)">
-
-```json5
-{
-  agents: {
-    defaults: {
-      model: { primary: "zai/glm-4.7" },
-      models: { "zai/glm-4.7": {} },
-    },
-  },
-}
-```
-
-Set `ZAI_API_KEY`. `z.ai/*` and `z-ai/*` are accepted aliases. Shortcut: `openclaw onboard --auth-choice zai-api-key`.
-
-- General endpoint: `https://api.z.ai/api/paas/v4`
-- Coding endpoint (default): `https://api.z.ai/api/coding/paas/v4`
-- For the general endpoint, define a custom provider with the base URL override.
-
-</Accordion>
-
-<Accordion title="Moonshot AI (Kimi)">
-
-```json5
-{
-  env: { MOONSHOT_API_KEY: "sk-..." },
-  agents: {
-    defaults: {
-      model: { primary: "moonshot/kimi-k2.5" },
-      models: { "moonshot/kimi-k2.5": { alias: "Kimi K2.5" } },
-    },
-  },
-  models: {
-    mode: "merge",
-    providers: {
-      moonshot: {
-        baseUrl: "https://api.moonshot.ai/v1",
-        apiKey: "${MOONSHOT_API_KEY}",
-        api: "openai-completions",
-        models: [
-          {
-            id: "kimi-k2.5",
-            name: "Kimi K2.5",
-            reasoning: false,
-            input: ["text", "image"],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: 262144,
-            maxTokens: 262144,
-          },
-        ],
-      },
-    },
-  },
-}
-```
-
-For the China endpoint: `baseUrl: "https://api.moonshot.cn/v1"` or `openclaw onboard --auth-choice moonshot-api-key-cn`.
-
-Native Moonshot endpoints advertise streaming usage compatibility on the shared
-`openai-completions` transport, and OpenClaw now keys that off endpoint
-capabilities rather than the built-in provider id alone.
-
-</Accordion>
-
-<Accordion title="Kimi Coding">
-
-```json5
-{
-  env: { KIMI_API_KEY: "sk-..." },
-  agents: {
-    defaults: {
-      model: { primary: "kimi/kimi-code" },
-      models: { "kimi/kimi-code": { alias: "Kimi Code" } },
-    },
-  },
-}
-```
-
-Anthropic-compatible, built-in provider. Shortcut: `openclaw onboard --auth-choice kimi-code-api-key`.
-
-</Accordion>
-
-<Accordion title="Synthetic (Anthropic-compatible)">
-
-```json5
-{
-  env: { SYNTHETIC_API_KEY: "sk-..." },
-  agents: {
-    defaults: {
-      model: { primary: "synthetic/hf:MiniMaxAI/MiniMax-M2.5" },
-      models: { "synthetic/hf:MiniMaxAI/MiniMax-M2.5": { alias: "MiniMax M2.5" } },
-    },
-  },
-  models: {
-    mode: "merge",
-    providers: {
-      synthetic: {
-        baseUrl: "https://api.synthetic.new/anthropic",
-        apiKey: "${SYNTHETIC_API_KEY}",
-        api: "anthropic-messages",
-        models: [
-          {
-            id: "hf:MiniMaxAI/MiniMax-M2.5",
-            name: "MiniMax M2.5",
-            reasoning: true,
-            input: ["text"],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: 192000,
-            maxTokens: 65536,
-          },
-        ],
-      },
-    },
-  },
-}
-```
-
-Base URL should omit `/v1` (Anthropic client appends it). Shortcut: `openclaw onboard --auth-choice synthetic-api-key`.
-
-</Accordion>
-
-<Accordion title="MiniMax M2.7 (direct)">
-
-```json5
-{
-  agents: {
-    defaults: {
-      model: { primary: "minimax/MiniMax-M2.7" },
-      models: {
-        "minimax/MiniMax-M2.7": { alias: "Minimax" },
-      },
-    },
-  },
-  models: {
-    mode: "merge",
-    providers: {
-      minimax: {
-        baseUrl: "https://api.minimax.io/anthropic",
-        apiKey: "${MINIMAX_API_KEY}",
-        api: "anthropic-messages",
-        models: [
-          {
-            id: "MiniMax-M2.7",
-            name: "MiniMax M2.7",
-            reasoning: true,
-            input: ["text", "image"],
-            cost: { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
-            contextWindow: 204800,
-            maxTokens: 131072,
-          },
-        ],
-      },
-    },
-  },
-}
-```
-
-Set `MINIMAX_API_KEY`. Shortcuts:
-`openclaw onboard --auth-choice minimax-global-api` or
-`openclaw onboard --auth-choice minimax-cn-api`.
-The model catalog now defaults to M2.7 only.
-On the Anthropic-compatible streaming path, OpenClaw disables MiniMax thinking
-by default unless you explicitly set `thinking` yourself. `/fast on` or
-`params.fastMode: true` rewrites `MiniMax-M2.7` to
-`MiniMax-M2.7-highspeed`.
+Use `cerebras/zai-glm-4.7` for Cerebras.
 
 </Accordion>
 
@@ -2622,9 +2390,6 @@ See [Local Models](/gateway/local-models). TL;DR: run a large local model via LM
   - `onlyMainContent`: extract only the main content from pages (default: `true`).
   - `maxAgeMs`: maximum cache age in milliseconds (default: `172800000` / 2 days).
   - `timeoutSeconds`: scrape request timeout in seconds (default: `60`).
-- `plugins.entries.xai.config.xSearch`: xAI X Search (Grok web search) settings.
-  - `enabled`: enable the X Search provider.
-  - `model`: Grok model to use for search (e.g. `"grok-4-1-fast"`).
 - `plugins.entries.memory-core.config.dreaming`: memory dreaming (experimental) settings. See [Dreaming](/concepts/dreaming) for phases and thresholds.
   - `enabled`: master dreaming switch (default `false`).
   - `frequency`: cron cadence for each full dreaming sweep (`"0 3 * * *"` by default).
@@ -2982,7 +2747,7 @@ Validation and safety notes:
       renewEveryMinutes: 720,
       serve: { bind: "127.0.0.1", port: 8788, path: "/" },
       tailscale: { mode: "funnel", path: "/gmail-pubsub" },
-      model: "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+      model: "openai/gpt-5.4-mini",
       thinking: "off",
     },
   },
@@ -3062,9 +2827,9 @@ Setup: `openclaw dns setup --apply`.
 ```json5
 {
   env: {
-    OPENROUTER_API_KEY: "sk-or-...",
+    OPENAI_API_KEY: "sk-...",
     vars: {
-      GROQ_API_KEY: "gsk-...",
+      GEMINI_API_KEY: "...",
     },
     shellEnv: {
       enabled: true,
@@ -3170,12 +2935,9 @@ Notes:
 {
   auth: {
     profiles: {
-      "anthropic:default": { provider: "anthropic", mode: "api_key" },
-      "anthropic:work": { provider: "anthropic", mode: "api_key" },
       "openai-codex:personal": { provider: "openai-codex", mode: "oauth" },
     },
     order: {
-      anthropic: ["anthropic:default", "anthropic:work"],
       "openai-codex": ["openai-codex:personal"],
     },
   },
@@ -3197,7 +2959,7 @@ Notes:
   auth: {
     cooldowns: {
       billingBackoffHours: 5,
-      billingBackoffHoursByProvider: { anthropic: 3, openai: 8 },
+      billingBackoffHoursByProvider: { openai: 8 },
       billingMaxHours: 24,
       authPermanentBackoffMinutes: 10,
       authPermanentMaxMinutes: 60,
@@ -3213,8 +2975,7 @@ Notes:
 - `billingBackoffHours`: base backoff in hours when a profile fails due to true
   billing/insufficient-credit errors (default: `5`). Explicit billing text can
   still land here even on `401`/`403` responses, but provider-specific text
-  matchers stay scoped to the provider that owns them (for example OpenRouter
-  `Key limit exceeded`). Retryable HTTP `402` usage-window or
+  matchers stay scoped to the provider that owns them. Retryable HTTP `402` usage-window or
   organization/workspace spend-limit messages stay in the `rate_limit` path
   instead.
 - `billingBackoffHoursByProvider`: optional per-provider overrides for billing backoff hours.

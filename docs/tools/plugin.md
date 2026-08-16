@@ -94,11 +94,7 @@ and the [Plugin SDK Overview](/plugins/sdk-overview).
 
 <AccordionGroup>
   <Accordion title="Model providers (enabled by default)">
-    `anthropic`, `byteplus`, `cloudflare-ai-gateway`, `github-copilot`, `google`,
-    `huggingface`, `kilocode`, `kimi-coding`, `minimax`, `mistral`, `qwen`,
-    `moonshot`, `nvidia`, `openai`, `opencode`, `opencode-go`, `openrouter`,
-    `qianfan`, `synthetic`, `together`, `venice`,
-    `vercel-ai-gateway`, `volcengine`, `xiaomi`, `zai`
+    `google`, `openai`
   </Accordion>
 
   <Accordion title="Memory plugins">
@@ -106,13 +102,8 @@ and the [Plugin SDK Overview](/plugins/sdk-overview).
     - `memory-lancedb` — install-on-demand long-term memory with auto-recall/capture (set `plugins.slots.memory = "memory-lancedb"`)
   </Accordion>
 
-  <Accordion title="Speech providers (enabled by default)">
-    `elevenlabs`, `microsoft`
-  </Accordion>
-
   <Accordion title="Other">
     - `browser` — bundled browser plugin for the browser tool, `openclaw browser` CLI, `browser.request` gateway method, browser runtime, and default browser control service (enabled by default; disable before replacing it)
-    - `copilot-proxy` — VS Code Copilot Proxy bridge (disabled by default)
   </Accordion>
 </AccordionGroup>
 

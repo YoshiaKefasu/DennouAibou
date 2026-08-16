@@ -11,7 +11,7 @@ title: "Local Models"
 
 Local is doable, but OpenClaw expects large context + strong defenses against prompt injection. Small cards truncate context and leak safety. Aim high: **≥2 maxed-out Mac Studios or equivalent GPU rig (~$30k+)**. A single **24 GB** GPU works only for lighter prompts with higher latency. Use the **largest / full-size model variant you can run**; aggressively quantized or “small” checkpoints raise prompt-injection risk (see [Security](/gateway/security)).
 
-If you want the lowest-friction local setup, start with [Ollama](/providers/ollama) and `openclaw onboard`. This page is the opinionated guide for higher-end local stacks and custom OpenAI-compatible local servers.
+If you want the lowest-friction local setup, skip straight to [Other OpenAI-compatible local proxies](#other-openai-compatible-local-proxies). This page is the opinionated guide for higher-end local stacks and custom OpenAI-compatible local servers.
 
 ## Recommended: LM Studio + large local model (Responses API)
 
@@ -110,7 +110,6 @@ Swap the primary and fallback order; keep the same providers block and `models.m
 
 ### Regional hosting / data routing
 
-- Hosted MiniMax/Kimi/GLM variants also exist on OpenRouter with region-pinned endpoints (e.g., US-hosted). Pick the regional variant there to keep traffic in your chosen jurisdiction while still using `models.mode: "merge"` for Anthropic/OpenAI fallbacks.
 - Local-only remains the strongest privacy path; hosted regional routing is the middle ground when you need provider features but want control over data flow.
 
 ## Other OpenAI-compatible local proxies

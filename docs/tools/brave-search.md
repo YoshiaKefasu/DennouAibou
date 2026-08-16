@@ -103,5 +103,4 @@ await web_search({
 ## Related
 
 - [Web Search overview](/tools/web) -- all providers and auto-detection
-- [Perplexity Search](/tools/perplexity-search) -- structured results with domain filtering
 - [Exa Search](/tools/exa-search) -- neural search with content extraction

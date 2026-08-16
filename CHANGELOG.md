@@ -5,6 +5,12 @@ For upstream history see https://github.com/openclaw/openclaw.
 
 ## Unreleased
 
+### Provider Debloat [DEBLOAT]
+
+- Removed 41 unused provider extensions (35 model providers + 6 sub-providers: TTS, web search, media generation, and LLM proxy). Only Google and OpenAI remain as model providers, with Deepgram/Brave/Exa kept for audio and web search.
+- Removed the Ollama local-embedding path; memory search now uses the remaining built-in embedding backends.
+- Cleaned up dead provider contract tests and updated the docs to match the kept provider set.
+
 ### Google Gemini Provider Sync
 
 - Synced the bounded Google model-provider core from upstream commit `8a2da4b1bf1555fe0bfaf705eb57300c673c81be` without importing newer host, OAuth, or Plugin SDK architecture.

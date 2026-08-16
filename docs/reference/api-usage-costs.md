@@ -31,26 +31,12 @@ OpenClaw features that can generate provider usage or paid API calls.
   `stats`, normalizes `stats.cached` into `cacheRead`, and derives input tokens
   from `stats.input_tokens - stats.cached` when needed.
 
-Anthropic note: Anthropic's public Claude Code docs still include direct Claude
-Code terminal usage in Claude plan limits. Separately, Anthropic told OpenClaw
-users that starting **April 4, 2026 at 12:00 PM PT / 8:00 PM BST**, the
-**OpenClaw** Claude-login path counts as third-party harness usage and
-requires **Extra Usage** billed separately from the subscription. Anthropic
-does not expose a per-message dollar estimate that OpenClaw can show in
-`/usage full`.
-
 **CLI usage windows (provider quotas)**
 
 - `openclaw status --usage` and `openclaw channels list` show provider **usage windows**
   (quota snapshots, not per-message costs).
 - Human output is normalized to `X% left` across providers.
-- Current usage-window providers: Anthropic, GitHub Copilot, Gemini CLI,
-  OpenAI Codex, MiniMax, Xiaomi, and z.ai.
-- MiniMax note: its raw `usage_percent` / `usagePercent` fields mean remaining
-  quota, so OpenClaw inverts them before display. Count-based fields still win
-  when present. If the provider returns `model_remains`, OpenClaw prefers the
-  chat-model entry, derives the window label from timestamps when needed, and
-  includes the model name in the plan label.
+- Current usage-window providers: Gemini CLI and OpenAI Codex.
 - Usage auth for those quota windows comes from provider-specific hooks when
   available; otherwise OpenClaw falls back to matching OAuth/API-key
   credentials from auth profiles, env, or config.
@@ -72,13 +58,11 @@ OpenClaw can pick up credentials from:
 
 ### 1) Core model responses (chat + tools)
 
-Every reply or tool call uses the **current model provider** (OpenAI, Anthropic, etc). This is the
+Every reply or tool call uses the **current model provider** (OpenAI, Google, etc). This is the
 primary source of usage and cost.
 
 This also includes subscription-style hosted providers that still bill outside
-OpenClaw's local UI, such as **OpenAI Codex**, **Alibaba Cloud Model Studio
-Coding Plan**, **MiniMax Coding Plan**, **Z.AI / GLM Coding Plan**, and
-Anthropic's OpenClaw Claude-login path with **Extra Usage** enabled.
+OpenClaw's local UI, such as **OpenAI Codex**.
 
 See [Models](/providers/models) for pricing config and [Token use & costs](/reference/token-use) for display.
 
@@ -86,9 +70,9 @@ See [Models](/providers/models) for pricing config and [Token use & costs](/refe
 
 Inbound media can be summarized/transcribed before the reply runs. This uses model/provider APIs.
 
-- Audio: OpenAI / Groq / Deepgram / Google / Mistral.
-- Image: OpenAI / OpenRouter / Anthropic / Google / MiniMax / Moonshot / Qwen / Z.AI.
-- Video: Google / Qwen / Moonshot.
+- Audio: OpenAI / Deepgram / Google.
+- Image: OpenAI / Google.
+- Video: Google.
 
 See [Media understanding](/nodes/media-understanding).
 
@@ -96,16 +80,14 @@ See [Media understanding](/nodes/media-understanding).
 
 Shared generation capabilities can also spend provider keys:
 
-- Image generation: OpenAI / Google / fal / MiniMax
-- Video generation: Qwen
+- Image generation: OpenAI / Google
 
 Image generation can infer an auth-backed provider default when
 `agents.defaults.imageGenerationModel` is unset. Video generation currently
 requires an explicit `agents.defaults.videoGenerationModel` such as
-`qwen/wan2.6-t2v`.
+`google/veo-3.1-fast-generate-preview` (or `openai/sora-2`).
 
-See [Image generation](/tools/image-generation), [Qwen Cloud](/providers/qwen),
-and [Models](/concepts/models).
+See [Image generation](/tools/image-generation) and [Models](/concepts/models).
 
 ### 4) Memory embeddings + semantic search
 
@@ -114,8 +96,6 @@ Semantic memory search uses **embedding APIs** when configured for remote provid
 - `memorySearch.provider = "openai"` → OpenAI embeddings
 - `memorySearch.provider = "gemini"` → Gemini embeddings
 - `memorySearch.provider = "voyage"` → Voyage embeddings
-- `memorySearch.provider = "mistral"` → Mistral embeddings
-- `memorySearch.provider = "ollama"` → Ollama embeddings (local/self-hosted; typically no hosted API billing)
 - Optional fallback to a remote provider if local embeddings fail
 
 You can keep it local with `memorySearch.provider = "local"` (no API usage).
@@ -130,11 +110,6 @@ See [Memory](/concepts/memory).
 - **Exa**: `EXA_API_KEY` or `plugins.entries.exa.config.webSearch.apiKey`
 - **Firecrawl**: `FIRECRAWL_API_KEY` or `plugins.entries.firecrawl.config.webSearch.apiKey`
 - **Gemini (Google Search)**: `GEMINI_API_KEY` or `plugins.entries.google.config.webSearch.apiKey`
-- **Grok (xAI)**: `XAI_API_KEY` or `plugins.entries.xai.config.webSearch.apiKey`
-- **Kimi (Moonshot)**: `KIMI_API_KEY`, `MOONSHOT_API_KEY`, or `plugins.entries.moonshot.config.webSearch.apiKey`
-- **MiniMax Search**: `MINIMAX_CODE_PLAN_KEY`, `MINIMAX_CODING_API_KEY`, `MINIMAX_API_KEY`, or `plugins.entries.minimax.config.webSearch.apiKey`
-- **Ollama Web Search**: key-free by default, but requires a reachable Ollama host plus `ollama signin`; can also reuse normal Ollama provider bearer auth when the host requires it
-- **Perplexity Search API**: `PERPLEXITY_API_KEY`, `OPENROUTER_API_KEY`, or `plugins.entries.perplexity.config.webSearch.apiKey`
 - **Tavily**: `TAVILY_API_KEY` or `plugins.entries.tavily.config.webSearch.apiKey`
 - **DuckDuckGo**: key-free fallback (no API billing, but unofficial and HTML-based)
 - **SearXNG**: `SEARXNG_BASE_URL` or `plugins.entries.searxng.config.webSearch.baseUrl` (key-free/self-hosted; no hosted API billing)
@@ -177,16 +152,12 @@ See [Session management + compaction](/reference/session-management-compaction).
 
 ### 8) Model scan / probe
 
-`openclaw models scan` can probe OpenRouter models and uses `OPENROUTER_API_KEY` when
+`openclaw models scan` can probe models using the configured provider keys when
 probing is enabled.
 
 See [Models CLI](/cli/models).
 
 ### 9) Talk (speech)
-
-Talk mode can invoke **ElevenLabs** when configured:
-
-- `ELEVENLABS_API_KEY` or `talk.providers.elevenlabs.apiKey`
 
 See [Talk mode](/nodes/talk).
 

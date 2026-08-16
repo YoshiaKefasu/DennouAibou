@@ -27,10 +27,9 @@ openclaw models scan
 `openclaw models status` shows the resolved default/fallbacks plus an auth overview.
 When provider usage snapshots are available, the OAuth/API-key status section includes
 provider usage windows and quota snapshots.
-Current usage-window providers: Anthropic, GitHub Copilot, Gemini CLI, OpenAI
-Codex, MiniMax, Xiaomi, and z.ai. Usage auth comes from provider-specific hooks
-when available; otherwise OpenClaw falls back to matching OAuth/API-key
-credentials from auth profiles, env, or config.
+Current usage-window providers: Gemini CLI and OpenAI Codex. Usage auth comes
+from provider-specific hooks when available; otherwise OpenClaw falls back to
+matching OAuth/API-key credentials from auth profiles, env, or config.
 In `--json` output, `auth.providers` is the env/config/store-aware provider
 overview, while `auth.oauth` is auth-store profile health only.
 Add `--probe` to run live auth probes against each configured provider profile.
@@ -43,14 +42,18 @@ Probe rows can come from auth profiles, env credentials, or `models.json`.
 Notes:
 
 - `models set <model-or-alias>` accepts `provider/model` or an alias.
-- Model refs are parsed by splitting on the **first** `/`. If the model ID includes `/` (OpenRouter-style), include the provider prefix (example: `openrouter/moonshotai/kimi-k2`).
+- Model refs are parsed by splitting on the **first** `/`. If the model ID
+  includes additional `/` separators, include the provider prefix (example:
+  `lmstudio/namespace/model`).
 - If you omit the provider, OpenClaw resolves the input as an alias first, then
   as a unique configured-provider match for that exact model id, and only then
   falls back to the configured default provider with a deprecation warning.
   If that provider no longer exposes the configured default model, OpenClaw
   falls back to the first configured provider/model instead of surfacing a
   stale removed-provider default.
-- `models status` may show `marker(<value>)` in auth output for non-secret placeholders (for example `OPENAI_API_KEY`, `secretref-managed`, `minimax-oauth`, `oauth:chutes`, `ollama-local`) instead of masking them as secrets.
+- `models status` may show `marker(<value>)` in auth output for non-secret
+  placeholders (for example `OPENAI_API_KEY`, `secretref-managed`, or OAuth/local
+  markers) instead of masking them as secrets.
 
 ### `models status`
 
@@ -130,5 +133,3 @@ Notes:
   `--profile-id`.
 - `paste-token --expires-in <duration>` stores an absolute token expiry from a
   relative duration such as `365d` or `12h`.
-- Anthropic billing note: for Anthropic in OpenClaw, the practical split is **API key** or **Claude subscription with Extra Usage**. Anthropic notified OpenClaw users on **April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that the **OpenClaw** Claude-login path counts as third-party harness usage and requires **Extra Usage** billed separately from the subscription. Our local repros also show the OpenClaw-identifying prompt string does not reproduce on the Anthropic SDK + API-key path.
-- Anthropic `setup-token` / `paste-token` are available again as a legacy/manual OpenClaw path. Use them with the expectation that Anthropic told OpenClaw users this path requires **Extra Usage**.

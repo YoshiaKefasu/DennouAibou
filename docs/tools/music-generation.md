@@ -1,5 +1,5 @@
 ---
-summary: "Generate music with shared providers, including workflow-backed plugins"
+summary: "Generate music with the shared music-generation provider"
 read_when:
   - Generating music or audio via the agent
   - Configuring music generation providers and models
@@ -10,8 +10,7 @@ title: "Music Generation"
 # Music Generation
 
 The `music_generate` tool lets the agent create music or audio through the
-shared music-generation capability with configured providers such as Google,
-MiniMax, and workflow-configured ComfyUI.
+shared music-generation capability with the bundled Google provider.
 
 For shared provider-backed agent sessions, OpenClaw starts music generation as a
 background task, tracks it in the task ledger, then wakes the agent again when
@@ -26,8 +25,7 @@ The built-in shared tool only appears when at least one music-generation provide
 
 ### Shared provider-backed generation
 
-1. Set an API key for at least one provider, for example `GEMINI_API_KEY` or
-   `MINIMAX_API_KEY`.
+1. Set an API key for at least one provider, for example `GEMINI_API_KEY`.
 2. Optionally set your preferred model:
 
 ```json5
@@ -61,29 +59,11 @@ Generate a cinematic piano track with soft strings and no vocals.
 Generate an energetic chiptune loop about launching a rocket at sunrise.
 ```
 
-### Workflow-driven Comfy generation
-
-The bundled `comfy` plugin plugs into the shared `music_generate` tool through
-the music-generation provider registry.
-
-1. Configure `models.providers.comfy.music` with a workflow JSON and
-   prompt/output nodes.
-2. If you use Comfy Cloud, set `COMFY_API_KEY` or `COMFY_CLOUD_API_KEY`.
-3. Ask the agent for music or call the tool directly.
-
-Example:
-
-```text
-/tool music_generate prompt="Warm ambient synth loop with soft tape texture"
-```
-
 ## Shared bundled provider support
 
 | Provider | Default model          | Reference inputs | Supported controls                                        | API key                                |
 | -------- | ---------------------- | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-| ComfyUI  | `workflow`             | Up to 1 image    | Workflow-defined music or audio                           | `COMFY_API_KEY`, `COMFY_CLOUD_API_KEY` |
 | Google   | `lyria-3-clip-preview` | Up to 10 images  | `lyrics`, `instrumental`, `format`                        | `GEMINI_API_KEY`, `GOOGLE_API_KEY`     |
-| MiniMax  | `music-2.5+`           | None             | `lyrics`, `instrumental`, `durationSeconds`, `format=mp3` | `MINIMAX_API_KEY`                      |
 
 ### Declared capability matrix
 
@@ -92,9 +72,7 @@ and the shared live sweep.
 
 | Provider | `generate` | `edit` | Edit limit | Shared live lanes                                                         |
 | -------- | ---------- | ------ | ---------- | ------------------------------------------------------------------------- |
-| ComfyUI  | Yes        | Yes    | 1 image    | Not in the shared sweep; covered by `extensions/comfy/comfy.live.test.ts` |
 | Google   | Yes        | Yes    | 10 images  | `generate`, `edit`                                                        |
-| MiniMax  | Yes        | No     | None       | `generate`                                                                |
 
 Use `action: "list"` to inspect available shared providers and models at
 runtime:
@@ -121,7 +99,7 @@ Direct generation example:
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `prompt`          | string   | Music generation prompt (required for `action: "generate"`)                                       |
 | `action`          | string   | `"generate"` (default), `"status"` for the current session task, or `"list"` to inspect providers |
-| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview` or `comfy/workflow`                    |
+| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview`                                         |
 | `lyrics`          | string   | Optional lyrics when the provider supports explicit lyric input                                   |
 | `instrumental`    | boolean  | Request instrumental-only output when the provider supports it                                    |
 | `image`           | string   | Single reference image path or URL                                                                |
@@ -154,7 +132,6 @@ ignored with a warning when the selected provider or model cannot honor them.
     defaults: {
       musicGenerationModel: {
         primary: "google/lyria-3-clip-preview",
-        fallbacks: ["minimax/music-2.5+"],
       },
     },
   },
@@ -179,11 +156,6 @@ error includes details from each attempt.
 
 - Google uses Lyria 3 batch generation. The current bundled flow supports
   prompt, optional lyrics text, and optional reference images.
-- MiniMax uses the batch `music_generation` endpoint. The current bundled flow
-  supports prompt, optional lyrics, instrumental mode, duration steering, and
-  mp3 output.
-- ComfyUI support is workflow-driven and depends on the configured graph plus
-  node mapping for prompt/output fields.
 
 ## Provider capability modes
 
@@ -218,42 +190,13 @@ the shared `music_generate` tool can validate mode support deterministically.
 ## Choosing the right path
 
 - Use the shared provider-backed path when you want model selection, provider failover, and the built-in async task/status flow.
-- Use a plugin path such as ComfyUI when you need a custom workflow graph or a provider that is not part of the shared bundled music capability.
-- If you are debugging ComfyUI-specific behavior, see [ComfyUI](/providers/comfy). If you are debugging shared provider behavior, start with [Google (Gemini)](/providers/google) or [MiniMax](/providers/minimax).
-
-## Live tests
-
-Opt-in live coverage for the shared bundled providers:
-
-```bash
-OPENCLAW_LIVE_TEST=1 pnpm test:live -- extensions/music-generation-providers.live.test.ts
-```
-
-This live file loads missing provider env vars from `~/.profile`, prefers
-live/env API keys ahead of stored auth profiles by default, and runs both
-`generate` and declared `edit` coverage when the provider enables edit mode.
-
-Today that means:
-
-- `google`: `generate` plus `edit`
-- `minimax`: `generate` only
-- `comfy`: separate Comfy live coverage, not the shared provider sweep
-
-Opt-in live coverage for the bundled ComfyUI music path:
-
-```bash
-OPENCLAW_LIVE_TEST=1 COMFY_LIVE_TEST=1 pnpm test:live -- extensions/comfy/comfy.live.test.ts
-```
-
-The Comfy live file also covers comfy image and video workflows when those
-sections are configured.
+- Use a plugin path when you need a custom workflow graph or a provider that is not part of the shared bundled music capability.
+- If you are debugging shared provider behavior, start with [Google (Gemini)](/providers/google).
 
 ## Related
 
 - [Background Tasks](/automation/tasks) - task tracking for detached `music_generate` runs
 - [Configuration Reference](/gateway/configuration-reference#agent-defaults) - `musicGenerationModel` config
-- [ComfyUI](/providers/comfy)
 - [Google (Gemini)](/providers/google)
-- [MiniMax](/providers/minimax)
 - [Models](/concepts/models) - model configuration and failover
 - [Tools Overview](/tools)

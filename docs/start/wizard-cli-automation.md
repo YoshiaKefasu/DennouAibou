@@ -20,8 +20,8 @@ Use `--non-interactive` to automate `openclaw onboard`.
 ```bash
 openclaw onboard --non-interactive \
   --mode local \
-  --auth-choice apiKey \
-  --anthropic-api-key "$ANTHROPIC_API_KEY" \
+  --auth-choice openai-api-key \
+  --openai-api-key "$OPENAI_API_KEY" \
   --secret-input-mode plaintext \
   --gateway-port 18789 \
   --gateway-bind loopback \
@@ -51,106 +51,12 @@ openclaw onboard --non-interactive \
 ## Provider-specific examples
 
 <AccordionGroup>
-  <Accordion title="Anthropic API key example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice apiKey \
-      --anthropic-api-key "$ANTHROPIC_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
   <Accordion title="Gemini example">
     ```bash
     openclaw onboard --non-interactive \
       --mode local \
       --auth-choice gemini-api-key \
       --gemini-api-key "$GEMINI_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Z.AI example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice zai-api-key \
-      --zai-api-key "$ZAI_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Vercel AI Gateway example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice ai-gateway-api-key \
-      --ai-gateway-api-key "$AI_GATEWAY_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Cloudflare AI Gateway example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice cloudflare-ai-gateway-api-key \
-      --cloudflare-ai-gateway-account-id "your-account-id" \
-      --cloudflare-ai-gateway-gateway-id "your-gateway-id" \
-      --cloudflare-ai-gateway-api-key "$CLOUDFLARE_AI_GATEWAY_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Moonshot example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice moonshot-api-key \
-      --moonshot-api-key "$MOONSHOT_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Mistral example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice mistral-api-key \
-      --mistral-api-key "$MISTRAL_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="Synthetic example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice synthetic-api-key \
-      --synthetic-api-key "$SYNTHETIC_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-  </Accordion>
-  <Accordion title="OpenCode example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice opencode-zen \
-      --opencode-zen-api-key "$OPENCODE_API_KEY" \
-      --gateway-port 18789 \
-      --gateway-bind loopback
-    ```
-    Swap to `--auth-choice opencode-go --opencode-go-api-key "$OPENCODE_API_KEY"` for the Go catalog.
-  </Accordion>
-  <Accordion title="Ollama example">
-    ```bash
-    openclaw onboard --non-interactive \
-      --mode local \
-      --auth-choice ollama \
-      --custom-model-id "qwen3.5:27b" \
-      --accept-risk \
       --gateway-port 18789 \
       --gateway-bind loopback
     ```
@@ -191,11 +97,6 @@ openclaw onboard --non-interactive \
 
   </Accordion>
 </AccordionGroup>
-
-Anthropic setup-token is available again as a legacy/manual onboarding path.
-Use it with the expectation that Anthropic told OpenClaw users the OpenClaw
-Claude-login path requires **Extra Usage**. For production, prefer an
-Anthropic API key.
 
 ## Add another agent
 

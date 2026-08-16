@@ -54,7 +54,7 @@
   "redirects": [
     {
       "source": "/providers/modelstudio",
-      "destination": "/providers/qwen"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/platforms/oracle",
@@ -86,7 +86,7 @@
     },
     {
       "source": "/perplexity",
-      "destination": "/tools/perplexity-search"
+      "destination": "/tools/web"
     },
     {
       "source": "/web-fetch",
@@ -106,11 +106,11 @@
     },
     {
       "source": "/grok-search",
-      "destination": "/tools/grok-search"
+      "destination": "/tools/web"
     },
     {
       "source": "/kimi-search",
-      "destination": "/tools/kimi-search"
+      "destination": "/tools/web"
     },
     {
       "source": "/tts",
@@ -146,11 +146,11 @@
     },
     {
       "source": "/minimax",
-      "destination": "/providers/minimax"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/xiaomi",
-      "destination": "/providers/xiaomi"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/openai",
@@ -162,35 +162,35 @@
     },
     {
       "source": "/anthropic",
-      "destination": "/providers/anthropic"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/anthropic/",
-      "destination": "/providers/anthropic"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/moonshot",
-      "destination": "/providers/moonshot"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/mistral",
-      "destination": "/providers/mistral"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/openrouter",
-      "destination": "/providers/openrouter"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/opencode",
-      "destination": "/providers/opencode"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/opencode-go",
-      "destination": "/providers/opencode-go"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/qianfan",
-      "destination": "/providers/qianfan"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/mattermost",
@@ -202,11 +202,11 @@
     },
     {
       "source": "/glm",
-      "destination": "/providers/glm"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/zai",
-      "destination": "/providers/zai"
+      "destination": "/concepts/model-providers"
     },
     {
       "source": "/message",
@@ -1185,10 +1185,6 @@
                       "tools/exa-search",
                       "tools/firecrawl",
                       "tools/gemini-search",
-                      "tools/grok-search",
-                      "tools/kimi-search",
-                      "tools/ollama-search",
-                      "tools/perplexity-search",
                       "tools/searxng-search",
                       "tools/tavily"
                     ]
@@ -1235,49 +1231,14 @@
               {
                 "group": "Providers",
                 "pages": [
-                  "providers/alibaba",
-                  "providers/anthropic",
                   "providers/bedrock",
                   "providers/bedrock-mantle",
-                  "providers/chutes",
-                  "providers/comfy",
                   "providers/claude-max-api-proxy",
-                  "providers/cloudflare-ai-gateway",
                   "providers/deepgram",
-                  "providers/deepseek",
-                  "providers/fal",
-                  "providers/github-copilot",
-                  "providers/glm",
                   "providers/google",
-                  "providers/groq",
-                  "providers/huggingface",
-                  "providers/kilocode",
-                  "providers/litellm",
-                  "providers/minimax",
-                  "providers/mistral",
-                  "providers/moonshot",
-                  "providers/nvidia",
-                  "providers/ollama",
-                  "providers/openai",
-                  "providers/opencode",
-                  "providers/opencode-go",
-                  "providers/openrouter",
-                  "providers/perplexity-provider",
-                  "providers/qianfan",
-                  "providers/qwen",
-                  "providers/runway",
-                  "providers/sglang",
-                  "providers/stepfun",
-                  "providers/synthetic",
-                  "providers/together",
-                  "providers/venice",
-                  "providers/vercel-ai-gateway",
-                  "providers/vydra",
-                  "providers/vllm",
-                  "providers/volcengine",
-                  "providers/xai",
-                  "providers/xiaomi",
-                  "providers/zai"
+                  "providers/index",
+                  "providers/models",
+                  "providers/openai"
                 ]
               }
             ]

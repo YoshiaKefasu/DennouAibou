@@ -565,7 +565,7 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   <Accordion title="What does onboarding actually do?">
     `openclaw onboard` is the recommended setup path. In **local mode** it walks you through:
 
-    - **Model/auth setup** (provider OAuth, API keys, Anthropic legacy setup-token, plus local model options such as LM Studio)
+    - **Model/auth setup** (provider OAuth, API keys, plus local model options such as LM Studio)
     - **Workspace** location + bootstrap files
     - **Gateway settings** (bind/port/auth/tailscale)
     - **Channels** (WhatsApp, Telegram, Discord, Mattermost, Signal, iMessage, plus bundled channel plugins like QQ Bot)
@@ -573,85 +573,6 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
     - **Health checks** and **skills** selection
 
     It also warns if your configured model is unknown or missing auth.
-
-  </Accordion>
-
-  <Accordion title="Do I need a Claude or OpenAI subscription to run this?">
-    No. You can run OpenClaw with **API keys** (Anthropic/OpenAI/others) or with
-    **local-only models** so your data stays on your device. Subscriptions (Claude
-    Pro/Max or OpenAI Codex) are optional ways to authenticate those providers.
-
-    For Anthropic in OpenClaw, the practical split is:
-
-    - **Anthropic API key**: normal Anthropic API billing
-    - **Claude subscription auth in OpenClaw**: Anthropic told OpenClaw users on
-      **April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that this requires
-      **Extra Usage** billed separately from the subscription
-
-    Our local repros also show that `claude -p --append-system-prompt ...` can
-    hit the same Extra Usage guard when the appended prompt identifies
-    OpenClaw, while the same prompt string does **not** reproduce that block on
-    the Anthropic SDK + API-key path. OpenAI Codex OAuth is explicitly
-    supported for external tools like OpenClaw.
-
-    OpenClaw also supports other hosted subscription-style options including
-    **Qwen Cloud Coding Plan**, **MiniMax Coding Plan**, and
-    **Z.AI / GLM Coding Plan**.
-
-    Docs: [Anthropic](/providers/anthropic), [OpenAI](/providers/openai),
-    [Qwen Cloud](/providers/qwen),
-    [MiniMax](/providers/minimax), [GLM Models](/providers/glm),
-    [Local models](/gateway/local-models), [Models](/concepts/models).
-
-  </Accordion>
-
-  <Accordion title="Can I use Claude Max subscription without an API key?">
-    Yes, but treat it as **Claude subscription auth with Extra Usage**.
-
-    Claude Pro/Max subscriptions do not include an API key. In OpenClaw, that
-    means Anthropic's OpenClaw-specific billing notice applies: subscription
-    traffic requires **Extra Usage**. If you want Anthropic traffic without
-    that Extra Usage path, use an Anthropic API key instead.
-
-  </Accordion>
-
-  <Accordion title="Do you support Claude subscription auth (Claude Pro or Max)?">
-    Yes, but the supported interpretation is now:
-
-    - Anthropic in OpenClaw with a subscription means **Extra Usage**
-    - Anthropic in OpenClaw without that path means **API key**
-
-    Anthropic setup-token is still available as a legacy/manual OpenClaw path,
-    and Anthropic's OpenClaw-specific billing notice still applies there. We
-    also reproduced the same billing guard locally with direct
-    `claude -p --append-system-prompt ...` usage when the appended prompt
-    identifies OpenClaw, while the same prompt string did **not** reproduce on
-    the Anthropic SDK + API-key path.
-
-    For production or multi-user workloads, Anthropic API key auth is the
-    safer, recommended choice. If you want other subscription-style hosted
-    options in OpenClaw, see [OpenAI](/providers/openai), [Qwen / Model
-    Cloud](/providers/qwen), [MiniMax](/providers/minimax), and
-    [GLM Models](/providers/glm).
-
-  </Accordion>
-
-<a id="why-am-i-seeing-http-429-ratelimiterror-from-anthropic"></a>
-<Accordion title="Why am I seeing HTTP 429 rate_limit_error from Anthropic?">
-That means your **Anthropic quota/rate limit** is exhausted for the current window. If you
-use **Claude CLI**, wait for the window to reset or upgrade your plan. If you
-use an **Anthropic API key**, check the Anthropic Console
-for usage/billing and raise limits as needed.
-
-    If the message is specifically:
-    `Extra usage is required for long context requests`, the request is trying to use
-    Anthropic's 1M context beta (`context1m: true`). That only works when your
-    credential is eligible for long-context billing (API key billing or the
-    OpenClaw Claude-login path with Extra Usage enabled).
-
-    Tip: set a **fallback model** so OpenClaw can keep replying while a provider is rate-limited.
-    See [Models](/cli/models), [OAuth](/concepts/oauth), and
-    [/gateway/troubleshooting#anthropic-429-extra-usage-required-for-long-context](/gateway/troubleshooting#anthropic-429-extra-usage-required-for-long-context).
 
   </Accordion>
 
@@ -685,10 +606,6 @@ for usage/billing and raise limits as needed.
 
   <Accordion title="Is a local model OK for casual chats?">
     Usually no. OpenClaw needs large context + strong safety; small cards truncate and leak. If you must, run the **largest** model build you can locally (LM Studio) and see [/gateway/local-models](/gateway/local-models). Smaller/quantized models increase prompt-injection risk - see [Security](/gateway/security).
-  </Accordion>
-
-  <Accordion title="How do I keep hosted model traffic in a specific region?">
-    Pick region-pinned endpoints. OpenRouter exposes US-hosted options for MiniMax, Kimi, and GLM; choose the US-hosted variant to keep data in-region. You can still list Anthropic/OpenAI alongside these by using `models.mode: "merge"` so fallbacks stay available while respecting the regioned provider you select.
   </Accordion>
 
   <Accordion title="Do I have to buy a Mac Mini to install this?">
@@ -902,8 +819,8 @@ for usage/billing and raise limits as needed.
       workspace + session history local.
     - **Real channels, not a web sandbox:** WhatsApp/Telegram/Slack/Discord/Signal/iMessage/etc,
       plus mobile voice and Canvas on supported platforms.
-    - **Model-agnostic:** use Anthropic, OpenAI, MiniMax, OpenRouter, etc., with per-agent routing
-      and failover.
+    - **Model-agnostic:** use OpenAI, Google, and other OpenAI/Anthropic-compatible providers, with
+      per-agent routing and failover.
     - **Local-only option:** run local models so **all data can stay on your device** if you want.
     - **Multi-agent routing:** separate agents per channel, account, or task, each with its own
       workspace and defaults.
@@ -1328,16 +1245,15 @@ for usage/billing and raise limits as needed.
     If you don't set a provider explicitly, OpenClaw auto-selects a provider when it
     can resolve an API key (auth profiles, `models.providers.*.apiKey`, or env vars).
     It prefers OpenAI if an OpenAI key resolves, otherwise Gemini if a Gemini key
-    resolves, then Voyage, then Mistral. If no remote key is available, memory
+    resolves, then Voyage. If no remote key is available, memory
     search stays disabled until you configure it. If you have a local model path
     configured and present, OpenClaw
-    prefers `local`. Ollama is supported when you explicitly set
-    `memorySearch.provider = "ollama"`.
+    prefers `local`.
 
     If you'd rather stay local, set `memorySearch.provider = "local"` (and optionally
     `memorySearch.fallback = "none"`). If you want Gemini embeddings, set
     `memorySearch.provider = "gemini"` and provide `GEMINI_API_KEY` (or
-    `memorySearch.remote.apiKey`). We support **OpenAI, Gemini, Voyage, Mistral, Ollama, or local** embedding
+    `memorySearch.remote.apiKey`). We support **OpenAI, Gemini, Voyage, or local** embedding
     models - see [Memory](/concepts/memory) for the setup details.
 
   </Accordion>
@@ -1351,7 +1267,7 @@ for usage/billing and raise limits as needed.
 
     - **Local by default:** sessions, memory files, config, and workspace live on the Gateway host
       (`~/.openclaw` + your workspace directory).
-    - **Remote by necessity:** messages you send to model providers (Anthropic/OpenAI/etc.) go to
+    - **Remote by necessity:** messages you send to model providers (OpenAI/Google/etc.) go to
       their APIs, and chat platforms (WhatsApp/Telegram/Slack/etc.) store message data on their
       servers.
     - **You control the footprint:** using local models keeps prompts on your machine, but channel
@@ -1537,8 +1453,7 @@ for usage/billing and raise limits as needed.
     `web_fetch` works without an API key. `web_search` depends on your selected
     provider:
 
-    - API-backed providers such as Brave, Exa, Firecrawl, Gemini, Grok, Kimi, MiniMax Search, Perplexity, and Tavily require their normal API key setup.
-    - Ollama Web Search is key-free, but it uses your configured Ollama host and requires `ollama signin`.
+    - API-backed providers such as Brave, Exa, Firecrawl, Gemini, and Tavily require their normal API key setup.
     - DuckDuckGo is key-free, but it is an unofficial HTML-based integration.
     - SearXNG is key-free/self-hosted; configure `SEARXNG_BASE_URL` or `plugins.entries.searxng.config.webSearch.baseUrl`.
 
@@ -1549,10 +1464,6 @@ for usage/billing and raise limits as needed.
     - Exa: `EXA_API_KEY`
     - Firecrawl: `FIRECRAWL_API_KEY`
     - Gemini: `GEMINI_API_KEY`
-    - Grok: `XAI_API_KEY`
-    - Kimi: `KIMI_API_KEY` or `MOONSHOT_API_KEY`
-    - MiniMax Search: `MINIMAX_CODE_PLAN_KEY`, `MINIMAX_CODING_API_KEY`, or `MINIMAX_API_KEY`
-    - Perplexity: `PERPLEXITY_API_KEY` or `OPENROUTER_API_KEY`
     - SearXNG: `SEARXNG_BASE_URL`
     - Tavily: `TAVILY_API_KEY`
 
@@ -2189,8 +2100,7 @@ for usage/billing and raise limits as needed.
     **For tool-enabled or untrusted-input agents:** prioritize model strength over cost.
     **For routine/low-stakes chat:** use cheaper fallback models and route by agent role.
 
-    MiniMax has its own docs: [MiniMax](/providers/minimax) and
-    [Local models](/gateway/local-models).
+    See [Local models](/gateway/local-models) for local/self-hosted options.
 
     Rule of thumb: use the **best model you can afford** for high-stakes work, and a cheaper
     model for routine chat or summaries. You can route models per agent and use sub-agents to
@@ -2223,28 +2133,16 @@ for usage/billing and raise limits as needed.
 
   </Accordion>
 
-  <Accordion title="Can I use self-hosted models (llama.cpp, vLLM, Ollama)?">
-    Yes. Ollama is the easiest path for local models.
-
-    Quickest setup:
-
-    1. Install Ollama from `https://ollama.com/download`
-    2. Pull a local model such as `ollama pull glm-4.7-flash`
-    3. If you want cloud models too, run `ollama signin`
-    4. Run `openclaw onboard` and choose `Ollama`
-    5. Pick `Local` or `Cloud + Local`
-
-    Notes:
-
-    - `Cloud + Local` gives you cloud models plus your local Ollama models
-    - cloud models such as `kimi-k2.5:cloud` do not need a local pull
-    - for manual switching, use `openclaw models list` and `openclaw models set ollama/<model>`
+  <Accordion title="Can I use self-hosted models (llama.cpp, vLLM, LM Studio)?">
+    Yes. Run an OpenAI-compatible local server (LM Studio, vLLM, LiteLLM, or any
+    custom `/v1` endpoint) and register it via `models.providers`. See
+    [Local models](/gateway/local-models).
 
     Security note: smaller or heavily quantized models are more vulnerable to prompt
     injection. We strongly recommend **large models** for any bot that can use tools.
     If you still want small models, enable sandboxing and strict tool allowlists.
 
-    Docs: [Ollama](/providers/ollama), [Local models](/gateway/local-models),
+    Docs: [Local models](/gateway/local-models),
     [Model providers](/concepts/model-providers), [Security](/gateway/security),
     [Sandboxing](/gateway/sandboxing).
 
@@ -2282,8 +2180,8 @@ for usage/billing and raise limits as needed.
     You can also force a specific auth profile for the provider (per session):
 
     ```
-    /model opus@anthropic:default
-    /model opus@anthropic:work
+    /model gpt@openai:default
+    /model gpt@openai:work
     ```
 
     Tip: `/model status` shows which agent is active, which `auth-profiles.json` file is being used, and which auth profile will be tried next.
@@ -2294,7 +2192,7 @@ for usage/billing and raise limits as needed.
     Re-run `/model` **without** the `@profile` suffix:
 
     ```
-    /model anthropic/claude-opus-4-6
+    /model openai/gpt-5.4
     ```
 
     If you want to return to the default, pick it from `/model` (or send `/model <default provider/model>`).
@@ -2362,75 +2260,9 @@ for usage/billing and raise limits as needed.
 
   </Accordion>
 
-  <Accordion title='Why do I see "Unknown model: minimax/MiniMax-M2.7"?'>
-    This means the **provider isn't configured** (no MiniMax provider config or auth
-    profile was found), so the model can't be resolved.
-
-    Fix checklist:
-
-    1. Upgrade to a current OpenClaw release (or run from source `main`), then restart the gateway.
-    2. Make sure MiniMax is configured (wizard or JSON), or that MiniMax auth
-       exists in env/auth profiles so the matching provider can be injected
-       (`MINIMAX_API_KEY` for `minimax`, `MINIMAX_OAUTH_TOKEN` or stored MiniMax
-       OAuth for `minimax-portal`).
-    3. Use the exact model id (case-sensitive) for your auth path:
-       `minimax/MiniMax-M2.7` or `minimax/MiniMax-M2.7-highspeed` for API-key
-       setup, or `minimax-portal/MiniMax-M2.7` /
-       `minimax-portal/MiniMax-M2.7-highspeed` for OAuth setup.
-    4. Run:
-
-       ```bash
-       openclaw models list
-       ```
-
-       and pick from the list (or `/model list` in chat).
-
-    See [MiniMax](/providers/minimax) and [Models](/concepts/models).
-
-  </Accordion>
-
-  <Accordion title="Can I use MiniMax as my default and OpenAI for complex tasks?">
-    Yes. Use **MiniMax as the default** and switch models **per session** when needed.
-    Fallbacks are for **errors**, not "hard tasks," so use `/model` or a separate agent.
-
-    **Option A: switch per session**
-
-    ```json5
-    {
-      env: { MINIMAX_API_KEY: "sk-...", OPENAI_API_KEY: "sk-..." },
-      agents: {
-        defaults: {
-          model: { primary: "minimax/MiniMax-M2.7" },
-          models: {
-            "minimax/MiniMax-M2.7": { alias: "minimax" },
-            "openai/gpt-5.4": { alias: "gpt" },
-          },
-        },
-      },
-    }
-    ```
-
-    Then:
-
-    ```
-    /model gpt
-    ```
-
-    **Option B: separate agents**
-
-    - Agent A default: MiniMax
-    - Agent B default: OpenAI
-    - Route by agent or use `/agent` to switch
-
-    Docs: [Models](/concepts/models), [Multi-Agent Routing](/concepts/multi-agent), [MiniMax](/providers/minimax), [OpenAI](/providers/openai).
-
-  </Accordion>
-
-  <Accordion title="Are opus / sonnet / gpt built-in shortcuts?">
+  <Accordion title="Are gpt / gemini built-in shortcuts?">
     Yes. OpenClaw ships a few default shorthands (only applied when the model exists in `agents.defaults.models`):
 
-    - `opus` → `anthropic/claude-opus-4-6`
-    - `sonnet` → `anthropic/claude-sonnet-4-6`
     - `gpt` → `openai/gpt-5.4`
     - `gpt-mini` → `openai/gpt-5.4-mini`
     - `gpt-nano` → `openai/gpt-5.4-nano`
@@ -2449,51 +2281,19 @@ for usage/billing and raise limits as needed.
     {
       agents: {
         defaults: {
-          model: { primary: "anthropic/claude-opus-4-6" },
+          model: { primary: "openai/gpt-5.4" },
           models: {
-            "anthropic/claude-opus-4-6": { alias: "opus" },
-            "anthropic/claude-sonnet-4-6": { alias: "sonnet" },
-            "anthropic/claude-haiku-4-5": { alias: "haiku" },
+            "openai/gpt-5.4": { alias: "gpt" },
+            "google/gemini-3.1-pro-preview": { alias: "gemini" },
           },
         },
       },
     }
     ```
 
-    Then `/model sonnet` (or `/<alias>` when supported) resolves to that model ID.
+    Then `/model gemini` (or `/<alias>` when supported) resolves to that model ID.
 
   </Accordion>
-
-  <Accordion title="How do I add models from other providers like OpenRouter or Z.AI?">
-    OpenRouter (pay-per-token; many models):
-
-    ```json5
-    {
-      agents: {
-        defaults: {
-          model: { primary: "openrouter/anthropic/claude-sonnet-4-6" },
-          models: { "openrouter/anthropic/claude-sonnet-4-6": {} },
-        },
-      },
-      env: { OPENROUTER_API_KEY: "sk-or-..." },
-    }
-    ```
-
-    Z.AI (GLM models):
-
-    ```json5
-    {
-      agents: {
-        defaults: {
-          model: { primary: "zai/glm-5" },
-          models: { "zai/glm-5": {} },
-        },
-      },
-      env: { ZAI_API_KEY: "..." },
-    }
-    ```
-
-    If you reference a provider/model but the required provider key is missing, you'll get a runtime auth error (e.g. `No API key found for provider "zai"`).
 
     **No API key found for provider after adding a new agent**
 
@@ -2536,7 +2336,7 @@ for usage/billing and raise limits as needed.
     responses also stay in that transient bucket. If a provider returns
     explicit billing text on `401` or `403`, OpenClaw can still keep that in
     the billing lane, but provider-specific text matchers stay scoped to the
-    provider that owns them (for example OpenRouter `Key limit exceeded`). If a `402`
+    provider that owns them. If a `402`
     message instead looks like a retryable usage-window or
     organization/workspace spend limit (`daily limit reached, resets tomorrow`,
     `organization spending limit exceeded`), OpenClaw treats it as
@@ -2545,14 +2345,14 @@ for usage/billing and raise limits as needed.
     Context-overflow errors are different: signatures such as
     `request_too_large`, `input exceeds the maximum number of tokens`,
     `input token count exceeds the maximum number of input tokens`,
-    `input is too long for the model`, or `ollama error: context length
-    exceeded` stay on the compaction/retry path instead of advancing model
+    or `input is too long for the model` stay on the compaction/retry path
+    instead of advancing model
     fallback.
 
     Generic server-error text is intentionally narrower than "anything with
     unknown/error in it". OpenClaw does treat provider-scoped transient shapes
-    such as Anthropic bare `An unknown error occurred`, OpenRouter bare
-    `Provider returned error`, stop-reason errors like `Unhandled stop reason:
+    such as bare `An unknown error occurred`, `Provider returned error`,
+    stop-reason errors like `Unhandled stop reason:
     error`, JSON `api_error` payloads with transient server text
     (`internal server error`, `unknown error, 520`, `upstream error`, `backend
     error`), and provider-busy errors such as `ModelNotReadyException` as
@@ -2560,41 +2360,6 @@ for usage/billing and raise limits as needed.
     matches.
     Generic internal fallback text like `LLM request failed with an unknown
     error.` stays conservative and does not trigger model fallback by itself.
-
-  </Accordion>
-
-  <Accordion title='What does "No credentials found for profile anthropic:default" mean?'>
-    It means the system attempted to use the auth profile ID `anthropic:default`, but could not find credentials for it in the expected auth store.
-
-    **Fix checklist:**
-
-    - **Confirm where auth profiles live** (new vs legacy paths)
-      - Current: `~/.openclaw/agents/<agentId>/agent/auth-profiles.json`
-      - Legacy: `~/.openclaw/agent/*` (migrated by `openclaw doctor`)
-    - **Confirm your env var is loaded by the Gateway**
-      - If you set `ANTHROPIC_API_KEY` in your shell but run the Gateway via systemd/launchd, it may not inherit it. Put it in `~/.openclaw/.env` or enable `env.shellEnv`.
-    - **Make sure you're editing the correct agent**
-      - Multi-agent setups mean there can be multiple `auth-profiles.json` files.
-    - **Sanity-check model/auth status**
-      - Use `openclaw models status` to see configured models and whether providers are authenticated.
-
-    **Fix checklist for "No credentials found for profile anthropic"**
-
-    This means the run is pinned to an Anthropic auth profile, but the Gateway
-    can't find it in its auth store.
-
-    - **Use Claude CLI**
-      - Run `openclaw models auth login --provider anthropic --method cli --set-default` on the gateway host.
-    - **If you want to use an API key instead**
-      - Put `ANTHROPIC_API_KEY` in `~/.openclaw/.env` on the **gateway host**.
-      - Clear any pinned order that forces a missing profile:
-
-        ```bash
-        openclaw models auth order clear --provider anthropic
-        ```
-
-    - **Confirm you're running commands on the gateway host**
-      - In remote mode, auth profiles live on the gateway machine, not your laptop.
 
   </Accordion>
 
@@ -2630,9 +2395,9 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
   <Accordion title="What are typical profile IDs?">
     OpenClaw uses provider-prefixed IDs like:
 
-    - `anthropic:default` (common when no email identity exists)
-    - `anthropic:<email>` for OAuth identities
-    - custom IDs you choose (e.g. `anthropic:work`)
+    - `openai:default` (common when no email identity exists)
+    - `openai:<email>` for OAuth identities
+    - custom IDs you choose (e.g. `openai:work`)
 
   </Accordion>
 
@@ -2649,22 +2414,22 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
 
     ```bash
     # Defaults to the configured default agent (omit --agent)
-    openclaw models auth order get --provider anthropic
+    openclaw models auth order get --provider openai
 
     # Lock rotation to a single profile (only try this one)
-    openclaw models auth order set --provider anthropic anthropic:default
+    openclaw models auth order set --provider openai openai:default
 
     # Or set an explicit order (fallback within provider)
-    openclaw models auth order set --provider anthropic anthropic:work anthropic:default
+    openclaw models auth order set --provider openai openai:work openai:default
 
     # Clear override (fall back to config auth.order / round-robin)
-    openclaw models auth order clear --provider anthropic
+    openclaw models auth order clear --provider openai
     ```
 
     To target a specific agent:
 
     ```bash
-    openclaw models auth order set --provider anthropic --agent main anthropic:default
+    openclaw models auth order set --provider openai --agent main openai:default
     ```
 
     To verify what will actually be tried, use:
@@ -2684,7 +2449,7 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
     - **OAuth** often leverages subscription access (where applicable).
     - **API keys** use pay-per-token billing.
 
-    The wizard explicitly supports Anthropic Claude CLI, OpenAI Codex OAuth, and API keys.
+    The wizard explicitly supports OpenAI Codex OAuth and API keys.
 
   </Accordion>
 </AccordionGroup>
@@ -3264,9 +3029,6 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
 ## Miscellaneous
 
 <AccordionGroup>
-  <Accordion title='What is the default model for Anthropic with an API key?'>
-    In OpenClaw, credentials and model selection are separate. Setting `ANTHROPIC_API_KEY` (or storing an Anthropic API key in auth profiles) enables authentication, but the actual default model is whatever you configure in `agents.defaults.model.primary` (for example, `anthropic/claude-sonnet-4-6` or `anthropic/claude-opus-4-6`). If you see `No credentials found for profile "anthropic:default"`, it means the Gateway couldn't find Anthropic credentials in the expected `auth-profiles.json` for the agent that's running.
-  </Accordion>
 </AccordionGroup>
 
 ---

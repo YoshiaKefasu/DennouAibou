@@ -13,23 +13,15 @@ Note: The **Model** section now includes a multi-select for the
 `agents.defaults.models` allowlist (what shows up in `/model` and the model picker).
 
 When configure starts from a provider auth choice, the default-model and
-allowlist pickers prefer that provider automatically. For paired providers such
-as Volcengine/BytePlus, the same preference also matches their coding-plan
-variants (`volcengine-plan/*`, `byteplus-plan/*`). If the preferred-provider
-filter would produce an empty list, configure falls back to the unfiltered
-catalog instead of showing a blank picker.
+allowlist pickers prefer that provider automatically. If the
+preferred-provider filter would produce an empty list, configure falls back to
+the unfiltered catalog instead of showing a blank picker.
 
 Tip: `openclaw config` without a subcommand opens the same wizard. Use
 `openclaw config get|set|unset` for non-interactive edits.
 
 For web search, `openclaw configure --section web` lets you choose a provider
-and configure its credentials. Some providers also show provider-specific
-follow-up prompts:
-
-- **Grok** can offer optional `x_search` setup with the same `XAI_API_KEY` and
-  let you pick an `x_search` model.
-- **Kimi** can ask for the Moonshot API region (`api.moonshot.ai` vs
-  `api.moonshot.cn`) and the default Kimi web-search model.
+and configure its credentials.
 
 Related:
 

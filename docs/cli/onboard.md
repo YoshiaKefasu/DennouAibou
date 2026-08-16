@@ -43,18 +43,6 @@ openclaw onboard --non-interactive \
 
 `--custom-api-key` is optional in non-interactive mode. If omitted, onboarding checks `CUSTOM_API_KEY`.
 
-Non-interactive Ollama:
-
-```bash
-openclaw onboard --non-interactive \
-  --auth-choice ollama \
-  --custom-base-url "http://ollama-host:11434" \
-  --custom-model-id "qwen3.5:27b" \
-  --accept-risk
-```
-
-`--custom-base-url` defaults to `http://127.0.0.1:11434`. `--custom-model-id` is optional; if omitted, onboarding uses Ollama's suggested defaults. Cloud model IDs such as `kimi-k2.5:cloud` also work here.
-
 Store provider keys as refs instead of plaintext:
 
 ```bash
@@ -113,47 +101,14 @@ Interactive onboarding behavior with reference mode:
 - Onboarding performs a fast preflight validation before saving the ref.
   - If validation fails, onboarding shows the error and lets you retry.
 
-Non-interactive Z.AI endpoint choices:
-
-Note: `--auth-choice zai-api-key` now auto-detects the best Z.AI endpoint for your key (prefers the general API with `zai/glm-5`).
-If you specifically want the GLM Coding Plan endpoints, pick `zai-coding-global` or `zai-coding-cn`.
-
-```bash
-# Promptless endpoint selection
-openclaw onboard --non-interactive \
-  --auth-choice zai-coding-global \
-  --zai-api-key "$ZAI_API_KEY"
-
-# Other Z.AI endpoint choices:
-# --auth-choice zai-coding-cn
-# --auth-choice zai-global
-# --auth-choice zai-cn
-```
-
-Non-interactive Mistral example:
-
-```bash
-openclaw onboard --non-interactive \
-  --auth-choice mistral-api-key \
-  --mistral-api-key "$MISTRAL_API_KEY"
-```
-
 Flow notes:
 
 - `quickstart`: minimal prompts, auto-generates a gateway token.
 - `manual`: full prompts for port/bind/auth (alias of `advanced`).
 - When an auth choice implies a preferred provider, onboarding prefilters the
-  default-model and allowlist pickers to that provider. For Volcengine and
-  BytePlus, this also matches the coding-plan variants
-  (`volcengine-plan/*`, `byteplus-plan/*`).
+  default-model and allowlist pickers to that provider.
 - If the preferred-provider filter yields no loaded models yet, onboarding
   falls back to the unfiltered catalog instead of leaving the picker empty.
-- In the web-search step, some providers can trigger provider-specific
-  follow-up prompts:
-  - **Grok** can offer optional `x_search` setup with the same `XAI_API_KEY`
-    and an `x_search` model choice.
-  - **Kimi** can ask for the Moonshot API region (`api.moonshot.ai` vs
-    `api.moonshot.cn`) and the default Kimi web-search model.
 - Local onboarding DM scope behavior: [CLI Setup Reference](/start/wizard-cli-reference#outputs-and-internals).
 - Fastest first chat: `openclaw dashboard` (Control UI, no channel setup).
 - Custom Provider: connect any OpenAI or Anthropic compatible endpoint,

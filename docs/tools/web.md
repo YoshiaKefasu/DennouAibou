@@ -1,10 +1,9 @@
 ---
 title: "Web Search"
 sidebarTitle: "Web Search"
-summary: "web_search, x_search, and web_fetch -- search the web, search X posts, or fetch page content"
+summary: "web_search and web_fetch -- search the web or fetch page content"
 read_when:
   - You want to enable or configure web_search
-  - You want to enable or configure x_search
   - You need to choose a search provider
   - You want to understand auto-detection and provider fallback
 ---
@@ -14,9 +13,9 @@ read_when:
 The `web_search` tool searches the web using your configured provider and
 returns results. Results are cached by query for 15 minutes (configurable).
 
-OpenClaw also includes `x_search` for X (formerly Twitter) posts and
-`web_fetch` for lightweight URL fetching. In this phase, `web_fetch` stays
-local while `web_search` and `x_search` can use xAI Responses under the hood.
+OpenClaw also includes `web_fetch` for lightweight URL fetching. In this
+phase, `web_fetch` stays local while `web_search` queries your configured
+provider.
 
 <Info>
   `web_search` is a lightweight HTTP tool, not browser automation. For
@@ -47,12 +46,6 @@ local while `web_search` and `x_search` can use xAI Responses under the hood.
     await web_search({ query: "OpenClaw plugin SDK" });
     ```
 
-    For X posts, use:
-
-    ```javascript
-    await x_search({ query: "dinner recipes" });
-    ```
-
   </Step>
 </Steps>
 
@@ -74,21 +67,6 @@ local while `web_search` and `x_search` can use xAI Responses under the hood.
   <Card title="Gemini" icon="sparkles" href="/tools/gemini-search">
     AI-synthesized answers with citations via Google Search grounding.
   </Card>
-  <Card title="Grok" icon="zap" href="/tools/grok-search">
-    AI-synthesized answers with citations via xAI web grounding.
-  </Card>
-  <Card title="Kimi" icon="moon" href="/tools/kimi-search">
-    AI-synthesized answers with citations via Moonshot web search.
-  </Card>
-  <Card title="MiniMax Search" icon="globe" href="/tools/minimax-search">
-    Structured results via the MiniMax Coding Plan search API.
-  </Card>
-  <Card title="Ollama Web Search" icon="globe" href="/tools/ollama-search">
-    Key-free search via your configured Ollama host. Requires `ollama signin`.
-  </Card>
-  <Card title="Perplexity" icon="search" href="/tools/perplexity-search">
-    Structured results with content extraction controls and domain filtering.
-  </Card>
   <Card title="SearXNG" icon="server" href="/tools/searxng-search">
     Self-hosted meta-search. No API key needed. Aggregates Google, Bing, DuckDuckGo, and more.
   </Card>
@@ -106,11 +84,6 @@ local while `web_search` and `x_search` can use xAI Responses under the hood.
 | [Exa](/tools/exa-search)                  | Structured + extracted     | Neural/keyword mode, date, content extraction    | `EXA_API_KEY`                                                                    |
 | [Firecrawl](/tools/firecrawl)             | Structured snippets        | Via `firecrawl_search` tool                      | `FIRECRAWL_API_KEY`                                                              |
 | [Gemini](/tools/gemini-search)            | AI-synthesized + citations | --                                               | `GEMINI_API_KEY`                                                                 |
-| [Grok](/tools/grok-search)                | AI-synthesized + citations | --                                               | `XAI_API_KEY`                                                                    |
-| [Kimi](/tools/kimi-search)                | AI-synthesized + citations | --                                               | `KIMI_API_KEY` / `MOONSHOT_API_KEY`                                              |
-| [MiniMax Search](/tools/minimax-search)   | Structured snippets        | Region (`global` / `cn`)                         | `MINIMAX_CODE_PLAN_KEY` / `MINIMAX_CODING_API_KEY`                               |
-| [Ollama Web Search](/tools/ollama-search) | Structured snippets        | --                                               | None by default; `ollama signin` required, can reuse Ollama provider bearer auth |
-| [Perplexity](/tools/perplexity-search)    | Structured snippets        | Country, language, time, domains, content limits | `PERPLEXITY_API_KEY` / `OPENROUTER_API_KEY`                                      |
 | [SearXNG](/tools/searxng-search)          | Structured snippets        | Categories, language                             | None (self-hosted)                                                               |
 | [Tavily](/tools/tavily)                   | Structured snippets        | Via `tavily_search` tool                         | `TAVILY_API_KEY`                                                                 |
 
@@ -162,20 +135,15 @@ first one that is ready:
 API-backed providers first:
 
 1. **Brave** -- `BRAVE_API_KEY` or `plugins.entries.brave.config.webSearch.apiKey` (order 10)
-2. **MiniMax Search** -- `MINIMAX_CODE_PLAN_KEY` / `MINIMAX_CODING_API_KEY` or `plugins.entries.minimax.config.webSearch.apiKey` (order 15)
-3. **Gemini** -- `GEMINI_API_KEY` or `plugins.entries.google.config.webSearch.apiKey` (order 20)
-4. **Grok** -- `XAI_API_KEY` or `plugins.entries.xai.config.webSearch.apiKey` (order 30)
-5. **Kimi** -- `KIMI_API_KEY` / `MOONSHOT_API_KEY` or `plugins.entries.moonshot.config.webSearch.apiKey` (order 40)
-6. **Perplexity** -- `PERPLEXITY_API_KEY` / `OPENROUTER_API_KEY` or `plugins.entries.perplexity.config.webSearch.apiKey` (order 50)
-7. **Firecrawl** -- `FIRECRAWL_API_KEY` or `plugins.entries.firecrawl.config.webSearch.apiKey` (order 60)
-8. **Exa** -- `EXA_API_KEY` or `plugins.entries.exa.config.webSearch.apiKey` (order 65)
-9. **Tavily** -- `TAVILY_API_KEY` or `plugins.entries.tavily.config.webSearch.apiKey` (order 70)
+2. **Gemini** -- `GEMINI_API_KEY` or `plugins.entries.google.config.webSearch.apiKey` (order 20)
+3. **Firecrawl** -- `FIRECRAWL_API_KEY` or `plugins.entries.firecrawl.config.webSearch.apiKey` (order 60)
+4. **Exa** -- `EXA_API_KEY` or `plugins.entries.exa.config.webSearch.apiKey` (order 65)
+5. **Tavily** -- `TAVILY_API_KEY` or `plugins.entries.tavily.config.webSearch.apiKey` (order 70)
 
 Key-free fallbacks after that:
 
-10. **DuckDuckGo** -- key-free HTML fallback with no account or API key (order 100)
-11. **Ollama Web Search** -- key-free fallback via your configured Ollama host; requires Ollama to be reachable and signed in with `ollama signin` and can reuse Ollama provider bearer auth if the host needs it (order 110)
-12. **SearXNG** -- `SEARXNG_BASE_URL` or `plugins.entries.searxng.config.webSearch.baseUrl` (order 200)
+6. **DuckDuckGo** -- key-free HTML fallback with no account or API key (order 100)
+7. **SearXNG** -- `SEARXNG_BASE_URL` or `plugins.entries.searxng.config.webSearch.baseUrl` (order 200)
 
 If no provider is detected, it falls back to Brave (you will get a missing-key
 error prompting you to configure one).
@@ -215,21 +183,6 @@ examples.
   provider from available credentials
 - today the bundled web-fetch provider is Firecrawl, configured under
   `plugins.entries.firecrawl.config.webFetch.*`
-
-When you choose **Kimi** during `openclaw onboard` or
-`openclaw configure --section web`, OpenClaw can also ask for:
-
-- the Moonshot API region (`https://api.moonshot.ai/v1` or `https://api.moonshot.cn/v1`)
-- the default Kimi web-search model (defaults to `kimi-k2.5`)
-
-For `x_search`, configure `plugins.entries.xai.config.xSearch.*`. It uses the
-same `XAI_API_KEY` fallback as Grok web search.
-Legacy `tools.web.x_search.*` config is auto-migrated by `openclaw doctor --fix`.
-When you choose Grok during `openclaw onboard` or `openclaw configure --section web`,
-OpenClaw can also offer optional `x_search` setup with the same key.
-This is a separate follow-up step inside the Grok path, not a separate top-level
-web-search provider choice. If you pick another provider, OpenClaw does not
-show the `x_search` prompt.
 
 ### Storing API keys
 
@@ -280,95 +233,18 @@ show the `x_search` prompt.
 | `date_after`          | Results after this date (YYYY-MM-DD)                  |
 | `date_before`         | Results before this date (YYYY-MM-DD)                 |
 | `ui_lang`             | UI language code (Brave only)                         |
-| `domain_filter`       | Domain allowlist/denylist array (Perplexity only)     |
-| `max_tokens`          | Total content budget, default 25000 (Perplexity only) |
-| `max_tokens_per_page` | Per-page token limit, default 2048 (Perplexity only)  |
 
 <Warning>
   Not all parameters work with all providers. Brave `llm-context` mode
   rejects `ui_lang`, `freshness`, `date_after`, and `date_before`.
-  Gemini, Grok, and Kimi return one synthesized answer with citations. They
-  accept `count` for shared-tool compatibility, but it does not change the
+  Gemini returns one synthesized answer with citations. It
+  accepts `count` for shared-tool compatibility, but it does not change the
   grounded answer shape.
-  Perplexity behaves the same way when you use the Sonar/OpenRouter
-  compatibility path (`plugins.entries.perplexity.config.webSearch.baseUrl` /
-  `model` or `OPENROUTER_API_KEY`).
   SearXNG accepts `http://` only for trusted private-network or loopback hosts;
   public SearXNG endpoints must use `https://`.
   Firecrawl and Tavily only support `query` and `count` through `web_search`
   -- use their dedicated tools for advanced options.
 </Warning>
-
-## x_search
-
-`x_search` queries X (formerly Twitter) posts using xAI and returns
-AI-synthesized answers with citations. It accepts natural-language queries and
-optional structured filters. OpenClaw only enables the built-in xAI `x_search`
-tool on the request that serves this tool call.
-
-<Note>
-  xAI documents `x_search` as supporting keyword search, semantic search, user
-  search, and thread fetch. For per-post engagement stats such as reposts,
-  replies, bookmarks, or views, prefer a targeted lookup for the exact post URL
-  or status ID. Broad keyword searches may find the right post but return less
-  complete per-post metadata. A good pattern is: locate the post first, then
-  run a second `x_search` query focused on that exact post.
-</Note>
-
-### x_search config
-
-```json5
-{
-  plugins: {
-    entries: {
-      xai: {
-        config: {
-          xSearch: {
-            enabled: true,
-            model: "grok-4-1-fast-non-reasoning",
-            inlineCitations: false,
-            maxTurns: 2,
-            timeoutSeconds: 30,
-            cacheTtlMinutes: 15,
-          },
-          webSearch: {
-            apiKey: "xai-...", // optional if XAI_API_KEY is set
-          },
-        },
-      },
-    },
-  },
-}
-```
-
-### x_search parameters
-
-| Parameter                    | Description                                            |
-| ---------------------------- | ------------------------------------------------------ |
-| `query`                      | Search query (required)                                |
-| `allowed_x_handles`          | Restrict results to specific X handles                 |
-| `excluded_x_handles`         | Exclude specific X handles                             |
-| `from_date`                  | Only include posts on or after this date (YYYY-MM-DD)  |
-| `to_date`                    | Only include posts on or before this date (YYYY-MM-DD) |
-| `enable_image_understanding` | Let xAI inspect images attached to matching posts      |
-| `enable_video_understanding` | Let xAI inspect videos attached to matching posts      |
-
-### x_search example
-
-```javascript
-await x_search({
-  query: "dinner recipes",
-  allowed_x_handles: ["nytfood"],
-  from_date: "2026-03-01",
-});
-```
-
-```javascript
-// Per-post stats: use the exact status URL or status ID when possible
-await x_search({
-  query: "https://x.com/huntharo/status/1905678901234567890",
-});
-```
 
 ## Examples
 
@@ -388,23 +264,17 @@ await web_search({
   date_after: "2024-01-01",
   date_before: "2024-06-30",
 });
-
-// Domain filtering (Perplexity only)
-await web_search({
-  query: "product reviews",
-  domain_filter: ["-reddit.com", "-pinterest.com"],
-});
 ```
 
 ## Tool profiles
 
-If you use tool profiles or allowlists, add `web_search`, `x_search`, or `group:web`:
+If you use tool profiles or allowlists, add `web_search` or `group:web`:
 
 ```json5
 {
   tools: {
-    allow: ["web_search", "x_search"],
-    // or: allow: ["group:web"]  (includes web_search, x_search, and web_fetch)
+    allow: ["web_search"],
+    // or: allow: ["group:web"]  (includes web_search and web_fetch)
   },
 }
 ```
@@ -413,5 +283,3 @@ If you use tool profiles or allowlists, add `web_search`, `x_search`, or `group:
 
 - [Web Fetch](/tools/web-fetch) -- fetch a URL and extract readable content
 - [Web Browser](/tools/browser) -- full browser automation for JS-heavy sites
-- [Grok Search](/tools/grok-search) -- Grok as the `web_search` provider
-- [Ollama Web Search](/tools/ollama-search) -- key-free web search through your Ollama host
