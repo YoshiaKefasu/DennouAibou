@@ -546,6 +546,40 @@ foreach ($t in $targets) { Remove-Item "extensions\$t" -Recurse -Force }
 
 ---
 
+## 12. Phase 5 実施記録（2026-08-16）
+
+docs クリーンアップを実施した。
+
+- 削除ページ 45 件: `docs/providers/` 34 + `docs/perplexity.md` + `docs/providers/qwen_modelstudio.md` + 検索ツール 5 ページ（minimax/kimi/grok/ollama/perplexity-search）+ stale 4 ページ（zai/glm/vydra/github-copilot）
+- 編集 22 docs + CHANGELOG + DEBLOAT.md: カタログ行・プロバイダー選択肢・accordion・音声（elevenlabs/microsoft）・web-search リストを kept セット（google/openai/deepgram/brave/exa/bedrock）に整理
+- 残存言及は 3 分類: generic-prose-keep（`anthropic-messages` 共有 API、モデル名文字列、英語語 false positive）/ row-removed / 第二段階フォローアップ候補（tts.md・oauth.md・troubleshooting 等）
+
+### Phase 5 フォローアップ（code-reviewer 指摘対応）
+
+- `docs/docs.json`（Mintlify）: Providers sidebar を実存 8 ファイルに再構築、Web Tools から削除検索 4 ページ除去、redirects 16 件を kept 先へ repoint（削除先 0）
+- 壊れたリンク 43 件を除去/repoint（最終 grep 0）
+- `docs/tts.md` + `docs/tools/tts.md`: elevenlabs/minimax/microsoft 設定手順を除去し OpenAI-only に
+- `docs/tools/web.md`: 削除検索プロバイダー 5 件の行・カード・比較表を除去（kept 7 件）、`x_search` セクション完全削除
+- image/music/video-generation.md: google/openai のみに整理、具体例追加
+- `docs/install/azure.md`（Copilot provider 推奨削除）、`docs/tools/slash-commands.md`（/fast の Anthropic 記述トリム）
+- 残存 xai/x_search 言及は第二段階トリアージ対象（code-execution.md は死んだツールのページ、secretref 系は静的レジストリ）
+
+---
+
+## 13. Phase 6 実施記録（2026-08-16）
+
+KASOU へのデプロイを実施した。
+
+- DEBLOAT 版 dist を `scripts/deploy-kasou.ps1 -SkipBuild` でデプロイ
+- KASOU 設定クリーンアップ（`~/.openclaw/openclaw.json`、バックアップ: `openclaw.json.bak-debloat-20260816`）:
+  - `auth.profiles` の `openrouter:default` / `kilocode:default` を削除
+  - `messages.tts.providers.elevenlabs` を削除（tts.provider は openai のまま維持）
+  - 全 41 削除プロバイダー名でスキャンし残留 0 を確認
+- gateway 再起動後: `/` と `/logs` が HTTP 200、agent model `google-gemini-cli/gemini-3.1-pro-preview` 正常
+- raw-chat の Go binary は 7/13 ビルドの ELF がそのまま稼働（Go 側変更なしのため問題なし）
+
+---
+
 ## 11. Phase 4 実施記録（2026-08-16）
 
 Phase 3 の extension 削除（commit `80f662c0c3c`）後に `pnpm test:contracts:plugins` を実行した結果の記録。

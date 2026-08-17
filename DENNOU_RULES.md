@@ -83,5 +83,31 @@ TypeScript must NOT own:
 
 This separation ensures long-running DB work and memory pressure stay outside the interactive Node.js gateway process. The Go sidecar can be independently tested, profiled, and replaced without touching the TypeScript boundary.
 
+## Rule 7: Test Execution (Speed)
+**Use `bunx vitest run <path>` for targeted tests; avoid the `pnpm test <path>` wrapper for daily loops.**
+
+The repo's `pnpm test` wrapper (`scripts/test-projects.mjs`) expands the given path to the whole matching project group, which makes even a single-file test take minutes and time out in agent runs. Measured on this fork:
+
+- `bunx vitest run <file>` — single file in ~3-4s, full vitest API compatibility (vi.hoisted/vi.doMock work)
+- `bun test src/dennou-soul/` — fast (~13s for 53 tests) but **NOT compatible** with `vi.hoisted`/`vi.doMock` (these crash under bun:test)
+- `pnpm test <path>` — correct but slow (whole-project expansion); use only for full-suite/landing gates
+
+Standard usage:
+
+```bash
+# targeted file or directory (daily loop, executor instructions)
+bunx vitest run src/dennou-soul/prune-engine.test.ts
+bunx vitest run src/dennou-soul/
+
+# full suite / landing gate (slow, use when needed)
+pnpm test
+
+# contracts / channels (repo-native config runners, already scoped)
+pnpm test:contracts:plugins
+pnpm test:contracts:channels
+```
+
+Do NOT use `bun test` directly for vitest-based suites (vi.hoisted crashes). Do NOT use `bunx vitest run --project <config>` without confirming the exact project name (it errors on this fork's config names). When instructing the executor, always pass explicit `bunx vitest run <path>` commands instead of relying on the wrapper's path expansion.
+
 ---
 *Follow these rules, and DennouAibou will outlive the tools it was born from.*
