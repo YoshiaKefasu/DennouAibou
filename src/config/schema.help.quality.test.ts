@@ -152,6 +152,7 @@ const TARGET_KEYS = [
   "session.typingIntervalSeconds",
   "session.typingMode",
   "session.mainKey",
+  "session.protectedKeys",
   "session.sendPolicy",
   "session.sendPolicy.default",
   "session.sendPolicy.rules",
@@ -417,7 +418,11 @@ const ENUM_EXPECTATIONS: Record<string, string[]> = {
   ],
   "messages.queue.drop": ['"old"', '"new"', '"summarize"'],
   "channels.defaults.groupPolicy": ['"open"', '"disabled"', '"allowlist"'],
-  "channels.defaults.contextVisibility": ['"all"', '"allowlist"', '"allowlist_quote"'],
+  "channels.defaults.contextVisibility": [
+    '"all"',
+    '"allowlist"',
+    '"allowlist_quote"',
+  ],
   "gateway.mode": ['"local"', '"remote"'],
   "gateway.bind": ['"auto"', '"lan"', '"loopback"', '"custom"', '"tailnet"'],
   "gateway.auth.mode": ['"none"', '"token"', '"password"', '"trusted-proxy"'],
@@ -426,7 +431,15 @@ const ENUM_EXPECTATIONS: Record<string, string[]> = {
   "discovery.mdns.mode": ['"off"', '"minimal"', '"full"'],
   "wizard.lastRunMode": ['"local"', '"remote"'],
   "diagnostics.otel.protocol": ['"http/protobuf"', '"grpc"'],
-  "logging.level": ['"silent"', '"fatal"', '"error"', '"warn"', '"info"', '"debug"', '"trace"'],
+  "logging.level": [
+    '"silent"',
+    '"fatal"',
+    '"error"',
+    '"warn"',
+    '"info"',
+    '"debug"',
+    '"trace"',
+  ],
   "logging.consoleLevel": [
     '"silent"',
     '"fatal"',
@@ -441,7 +454,11 @@ const ENUM_EXPECTATIONS: Record<string, string[]> = {
   "cli.banner.taglineMode": ['"random"', '"default"', '"off"'],
   "update.channel": ['"stable"', '"beta"', '"dev"'],
   "agents.defaults.compaction.mode": ['"default"', '"safeguard"'],
-  "agents.defaults.compaction.identifierPolicy": ['"strict"', '"off"', '"custom"'],
+  "agents.defaults.compaction.identifierPolicy": [
+    '"strict"',
+    '"off"',
+    '"custom"',
+  ],
 };
 
 const TOOLS_HOOKS_TARGET_KEYS = [
@@ -553,7 +570,9 @@ describe("config help copy quality", () => {
     for (const key of keys) {
       const help = FIELD_HELP[key];
       expect(help, `missing help for ${key}`).toBeDefined();
-      expect(help.length, `help too short for ${key}`).toBeGreaterThanOrEqual(minLength);
+      expect(help.length, `help too short for ${key}`).toBeGreaterThanOrEqual(
+        minLength,
+      );
       expect(
         guidancePattern.test(help),
         `help should include operational guidance for ${key}`,
@@ -570,7 +589,10 @@ describe("config help copy quality", () => {
 
   it("keeps labels in parity for all help keys", () => {
     for (const key of Object.keys(FIELD_HELP)) {
-      expect(FIELD_LABELS[key], `missing label for help key ${key}`).toBeDefined();
+      expect(
+        FIELD_LABELS[key],
+        `missing label for help key ${key}`,
+      ).toBeDefined();
     }
   });
 
@@ -607,7 +629,9 @@ describe("config help copy quality", () => {
       const help = FIELD_HELP[key];
       expect(help, `missing help for enum key ${key}`).toBeDefined();
       for (const token of options) {
-        expect(help.includes(token), `missing option ${token} in ${key}`).toBe(true);
+        expect(help.includes(token), `missing option ${token} in ${key}`).toBe(
+          true,
+        );
       }
     }
   });
@@ -622,9 +646,13 @@ describe("config help copy quality", () => {
   });
 
   it("includes concrete examples on path and interval fields", () => {
-    expect(FIELD_HELP["memory.qmd.paths.pattern"].includes("**/*.md")).toBe(true);
+    expect(FIELD_HELP["memory.qmd.paths.pattern"].includes("**/*.md")).toBe(
+      true,
+    );
     expect(FIELD_HELP["memory.qmd.update.interval"].includes("5m")).toBe(true);
-    expect(FIELD_HELP["memory.qmd.update.embedInterval"].includes("60m")).toBe(true);
+    expect(FIELD_HELP["memory.qmd.update.embedInterval"].includes("60m")).toBe(
+      true,
+    );
     expect(FIELD_HELP["agents.defaults.memorySearch.store.path"]).toContain(
       "~/.openclaw/memory/{agentId}.sqlite",
     );
@@ -656,7 +684,8 @@ describe("config help copy quality", () => {
     const keyPrefix = FIELD_HELP["session.sendPolicy.rules[].match.keyPrefix"];
     expect(/normalized/i.test(keyPrefix)).toBe(true);
 
-    const rawKeyPrefix = FIELD_HELP["session.sendPolicy.rules[].match.rawKeyPrefix"];
+    const rawKeyPrefix =
+      FIELD_HELP["session.sendPolicy.rules[].match.rawKeyPrefix"];
     expect(/raw|unnormalized/i.test(rawKeyPrefix)).toBe(true);
   });
 
@@ -673,7 +702,8 @@ describe("config help copy quality", () => {
     expect(/deprecated/i.test(deprecated)).toBe(true);
     expect(deprecated.includes("session.maintenance.pruneAfter")).toBe(true);
 
-    const resetRetention = FIELD_HELP["session.maintenance.resetArchiveRetention"];
+    const resetRetention =
+      FIELD_HELP["session.maintenance.resetArchiveRetention"];
     expect(resetRetention.includes(".reset.")).toBe(true);
     expect(/false/i.test(resetRetention)).toBe(true);
 
@@ -723,7 +753,9 @@ describe("config help copy quality", () => {
   it("documents hook transform safety and queue behavior options", () => {
     const transformModule = FIELD_HELP["hooks.mappings[].transform.module"];
     expect(/relative/i.test(transformModule)).toBe(true);
-    expect(/path traversal|reviewed|controlled/i.test(transformModule)).toBe(true);
+    expect(/path traversal|reviewed|controlled/i.test(transformModule)).toBe(
+      true,
+    );
 
     const queueMode = FIELD_HELP["messages.queue.mode"];
     expect(queueMode.includes('"interrupt"')).toBe(true);
@@ -756,7 +788,8 @@ describe("config help copy quality", () => {
     const pluginEnv = FIELD_HELP["plugins.entries.*.env"];
     expect(/scope|plugin|environment/i.test(pluginEnv)).toBe(true);
 
-    const pluginPromptPolicy = FIELD_HELP["plugins.entries.*.hooks.allowPromptInjection"];
+    const pluginPromptPolicy =
+      FIELD_HELP["plugins.entries.*.hooks.allowPromptInjection"];
     expect(pluginPromptPolicy.includes("before_prompt_build")).toBe(true);
     expect(pluginPromptPolicy.includes("before_agent_start")).toBe(true);
     expect(pluginPromptPolicy.includes("modelOverride")).toBe(true);
@@ -778,25 +811,35 @@ describe("config help copy quality", () => {
     expect(mode.includes('"default"')).toBe(true);
     expect(mode.includes('"safeguard"')).toBe(true);
 
-    const historyShare = FIELD_HELP["agents.defaults.compaction.maxHistoryShare"];
+    const historyShare =
+      FIELD_HELP["agents.defaults.compaction.maxHistoryShare"];
     expect(/0\\.1-0\\.9|fraction|share/i.test(historyShare)).toBe(true);
 
-    const identifierPolicy = FIELD_HELP["agents.defaults.compaction.identifierPolicy"];
+    const identifierPolicy =
+      FIELD_HELP["agents.defaults.compaction.identifierPolicy"];
     expect(identifierPolicy.includes('"strict"')).toBe(true);
     expect(identifierPolicy.includes('"off"')).toBe(true);
     expect(identifierPolicy.includes('"custom"')).toBe(true);
 
-    const recentTurnsPreserve = FIELD_HELP["agents.defaults.compaction.recentTurnsPreserve"];
+    const recentTurnsPreserve =
+      FIELD_HELP["agents.defaults.compaction.recentTurnsPreserve"];
     expect(/recent.*turn|verbatim/i.test(recentTurnsPreserve)).toBe(true);
     expect(/default:\s*3/i.test(recentTurnsPreserve)).toBe(true);
 
-    const postCompactionSections = FIELD_HELP["agents.defaults.compaction.postCompactionSections"];
-    expect(/Session Startup|Red Lines/i.test(postCompactionSections)).toBe(true);
+    const postCompactionSections =
+      FIELD_HELP["agents.defaults.compaction.postCompactionSections"];
+    expect(/Session Startup|Red Lines/i.test(postCompactionSections)).toBe(
+      true,
+    );
     expect(/Every Session|Safety/i.test(postCompactionSections)).toBe(true);
     expect(/\[\]|disable/i.test(postCompactionSections)).toBe(true);
 
     const compactionModel = FIELD_HELP["agents.defaults.compaction.model"];
-    expect(/provider\/model|different model|primary agent model/i.test(compactionModel)).toBe(true);
+    expect(
+      /provider\/model|different model|primary agent model/i.test(
+        compactionModel,
+      ),
+    ).toBe(true);
 
     const flush = FIELD_HELP["agents.defaults.compaction.memoryFlush.enabled"];
     expect(/pre-compaction|memory flush|token/i.test(flush)).toBe(true);

@@ -4,8 +4,15 @@ import { parseByteSize } from "../../cli/parse-bytes.js";
 import { parseDurationMs } from "../../cli/parse-duration.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { loadConfig } from "../config.js";
-import type { SessionMaintenanceConfig, SessionMaintenanceMode } from "../types.base.js";
+import type {
+  SessionMaintenanceConfig,
+  SessionMaintenanceMode,
+} from "../types.base.js";
 import type { SessionEntry } from "./types.js";
+import {
+  isProtectedSessionKey,
+  type ProtectedSessionConfig,
+} from "./protected-session.js";
 
 const log = createSubsystemLogger("sessions/store");
 
@@ -77,7 +84,9 @@ function resolveResetArchiveRetentionMs(
   }
 }
 
-function resolveMaxDiskBytes(maintenance?: SessionMaintenanceConfig): number | null {
+function resolveMaxDiskBytes(
+  maintenance?: SessionMaintenanceConfig,
+): number | null {
   const raw = maintenance?.maxDiskBytes;
   if (raw === undefined || raw === null || raw === "") {
     return null;
@@ -141,7 +150,10 @@ export function resolveMaintenanceConfig(): ResolvedSessionMaintenanceConfig {
     pruneAfterMs,
     maxEntries: maintenance?.maxEntries ?? DEFAULT_SESSION_MAX_ENTRIES,
     rotateBytes: resolveRotateBytes(maintenance),
-    resetArchiveRetentionMs: resolveResetArchiveRetentionMs(maintenance, pruneAfterMs),
+    resetArchiveRetentionMs: resolveResetArchiveRetentionMs(
+      maintenance,
+      pruneAfterMs,
+    ),
     maxDiskBytes,
     highWaterBytes: resolveHighWaterBytes(maintenance, maxDiskBytes),
   };
@@ -155,13 +167,22 @@ export function resolveMaintenanceConfig(): ResolvedSessionMaintenanceConfig {
 export function pruneStaleEntries(
   store: Record<string, SessionEntry>,
   overrideMaxAgeMs?: number,
-  opts: { log?: boolean; onPruned?: (params: { key: string; entry: SessionEntry }) => void } = {},
+  opts: {
+    log?: boolean;
+    onPruned?: (params: { key: string; entry: SessionEntry }) => void;
+    /** Pre-resolved OpenClaw config for protected-session checks. */
+    protectedSessionCfg?: ProtectedSessionConfig;
+  } = {},
 ): number {
   const maxAgeMs = overrideMaxAgeMs ?? resolveMaintenanceConfig().pruneAfterMs;
   const cutoffMs = Date.now() - maxAgeMs;
   let pruned = 0;
   for (const [key, entry] of Object.entries(store)) {
-    if (entry?.updatedAt != null && entry.updatedAt < cutoffMs) {
+    if (
+      entry?.updatedAt != null &&
+      entry.updatedAt < cutoffMs &&
+      !isProtectedSessionKey(key, opts.protectedSessionCfg)
+    ) {
       opts.onPruned?.({ key, entry });
       delete store[key];
       pruned++;
@@ -194,12 +215,17 @@ export function getActiveSessionMaintenanceWarning(params: {
   }
   const now = params.nowMs ?? Date.now();
   const cutoffMs = now - params.pruneAfterMs;
-  const wouldPrune = activeEntry.updatedAt != null ? activeEntry.updatedAt < cutoffMs : false;
+  const wouldPrune =
+    activeEntry.updatedAt != null ? activeEntry.updatedAt < cutoffMs : false;
   const keys = Object.keys(params.store);
   const wouldCap =
     keys.length > params.maxEntries &&
     keys
-      .toSorted((a, b) => getEntryUpdatedAt(params.store[b]) - getEntryUpdatedAt(params.store[a]))
+      .toSorted(
+        (a, b) =>
+          getEntryUpdatedAt(params.store[b]) -
+          getEntryUpdatedAt(params.store[a]),
+      )
       .slice(params.maxEntries)
       .includes(activeSessionKey);
 
@@ -229,6 +255,8 @@ export function capEntryCount(
   opts: {
     log?: boolean;
     onCapped?: (params: { key: string; entry: SessionEntry }) => void;
+    /** Pre-resolved OpenClaw config for protected-session checks. */
+    protectedSessionCfg?: ProtectedSessionConfig;
   } = {},
 ): number {
   const maxEntries = overrideMax ?? resolveMaintenanceConfig().maxEntries;
@@ -244,7 +272,10 @@ export function capEntryCount(
     return bTime - aTime;
   });
 
-  const toRemove = sorted.slice(maxEntries);
+  // Protect session keys that must never be evicted by the cap.
+  const toRemove = sorted
+    .filter((key) => !isProtectedSessionKey(key, opts.protectedSessionCfg))
+    .slice(maxEntries);
   for (const key of toRemove) {
     const entry = store[key];
     if (entry) {
@@ -253,7 +284,10 @@ export function capEntryCount(
     delete store[key];
   }
   if (opts.log !== false) {
-    log.info("capped session entry count", { removed: toRemove.length, maxEntries });
+    log.info("capped session entry count", {
+      removed: toRemove.length,
+      maxEntries,
+    });
   }
   return toRemove.length;
 }
@@ -317,7 +351,9 @@ export async function rotateSessionFile(
       for (const old of toDelete) {
         await fs.promises.unlink(path.join(dir, old)).catch(() => undefined);
       }
-      log.info("cleaned up old session store backups", { deleted: toDelete.length });
+      log.info("cleaned up old session store backups", {
+        deleted: toDelete.length,
+      });
     }
   } catch {
     // Best-effort cleanup; don't fail the write.

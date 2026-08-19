@@ -18906,6 +18906,15 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
             description:
               'Overrides the canonical main session key used for continuity when dmScope or routing logic points to "main". Use a stable value only if you intentionally need custom session anchoring.',
           },
+          protectedKeys: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            title: "Protected Session Keys",
+            description:
+              "Lists session keys that must never be reset or deleted, for example via /new, /reset, sessions.reset, or sessions.delete. The main session is always protected even when omitted; keep additional session keys here (raw or canonical form) so manual and automatic resets skip them. Default: main session only.",
+          },
           sendPolicy: {
             type: "object",
             properties: {
@@ -25511,6 +25520,11 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
     "session.mainKey": {
       label: "Session Main Key",
       help: 'Overrides the canonical main session key used for continuity when dmScope or routing logic points to "main". Use a stable value only if you intentionally need custom session anchoring.',
+      tags: ["storage"],
+    },
+    "session.protectedKeys": {
+      label: "Protected Session Keys",
+      help: "Lists session keys that must never be reset or deleted, for example via /new, /reset, sessions.reset, or sessions.delete. The main session is always protected even when omitted; keep additional session keys here (raw or canonical form) so manual and automatic resets skip them. Default: main session only.",
       tags: ["storage"],
     },
     "session.sendPolicy": {

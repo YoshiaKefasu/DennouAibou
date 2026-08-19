@@ -11,16 +11,21 @@ vi.mock("../../config/sessions/paths.js", () => ({
 
 vi.mock("../../config/sessions/reset.js", () => ({
   evaluateSessionFreshness: vi.fn().mockReturnValue({ fresh: true }),
-  resolveSessionResetPolicy: vi.fn().mockReturnValue({ mode: "idle", idleMinutes: 60 }),
+  resolveProtectedSessionResetPolicy: vi.fn(({ policy }) => policy),
+  resolveSessionResetPolicy: vi
+    .fn()
+    .mockReturnValue({ mode: "idle", idleMinutes: 60 }),
 }));
 
 vi.mock("../../agents/bootstrap-cache.js", () => ({
   clearBootstrapSnapshot: vi.fn(),
-  clearBootstrapSnapshotOnSessionRollover: vi.fn(({ sessionKey, previousSessionId }) => {
-    if (sessionKey && previousSessionId) {
-      clearBootstrapSnapshot(sessionKey);
-    }
-  }),
+  clearBootstrapSnapshotOnSessionRollover: vi.fn(
+    ({ sessionKey, previousSessionId }) => {
+      if (sessionKey && previousSessionId) {
+        clearBootstrapSnapshot(sessionKey);
+      }
+    },
+  ),
 }));
 
 import { clearBootstrapSnapshot } from "../../agents/bootstrap-cache.js";
@@ -45,7 +50,9 @@ function resolveWithStoredEntry(params?: {
     ? ({ [sessionKey]: params.entry as SessionStoreEntry } as SessionStore)
     : {};
   vi.mocked(loadSessionStore).mockReturnValue(store);
-  vi.mocked(evaluateSessionFreshness).mockReturnValue({ fresh: params?.fresh ?? true });
+  vi.mocked(evaluateSessionFreshness).mockReturnValue({
+    fresh: params?.fresh ?? true,
+  });
 
   return resolveCronSession({
     cfg: {} as OpenClawConfig,

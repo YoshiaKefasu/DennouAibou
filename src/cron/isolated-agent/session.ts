@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { resolveStorePath } from "../../config/sessions/paths.js";
 import {
   evaluateSessionFreshness,
+  resolveProtectedSessionResetPolicy,
   resolveSessionResetPolicy,
 } from "../../config/sessions/reset.js";
 import { loadSessionStore } from "../../config/sessions/store.js";
@@ -31,9 +32,13 @@ export function resolveCronSession(params: {
   if (!params.forceNew && entry?.sessionId) {
     // Evaluate freshness using the configured reset policy
     // Cron/webhook sessions use "direct" reset type (1:1 conversation style)
-    const resetPolicy = resolveSessionResetPolicy({
-      sessionCfg,
-      resetType: "direct",
+    const resetPolicy = resolveProtectedSessionResetPolicy({
+      policy: resolveSessionResetPolicy({
+        sessionCfg,
+        resetType: "direct",
+      }),
+      sessionKey: params.sessionKey,
+      cfg: params.cfg,
     });
     const freshness = evaluateSessionFreshness({
       updatedAt: entry.updatedAt,

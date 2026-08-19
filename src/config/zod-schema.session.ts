@@ -15,7 +15,9 @@ import { sensitive } from "./zod-schema.sensitive.js";
 
 const SessionResetConfigSchema = z
   .object({
-    mode: z.union([z.literal("daily"), z.literal("idle"), z.literal("off")]).optional(),
+    mode: z
+      .union([z.literal("daily"), z.literal("idle"), z.literal("off")])
+      .optional(),
     atHour: z.number().int().min(0).max(23).optional(),
     idleMinutes: z.number().int().positive().optional(),
   })
@@ -54,6 +56,7 @@ export const SessionSchema = z
     typingMode: TypingModeSchema.optional(),
     parentForkMaxTokens: z.number().int().nonnegative().optional(),
     mainKey: z.string().optional(),
+    protectedKeys: z.array(z.string()).optional(),
     sendPolicy: SessionSendPolicySchema.optional(),
     agentToAgent: z
       .object({
@@ -77,7 +80,9 @@ export const SessionSchema = z
         pruneDays: z.number().int().positive().optional(),
         maxEntries: z.number().int().positive().optional(),
         rotateBytes: z.union([z.string(), z.number()]).optional(),
-        resetArchiveRetention: z.union([z.string(), z.number(), z.literal(false)]).optional(),
+        resetArchiveRetention: z
+          .union([z.string(), z.number(), z.literal(false)])
+          .optional(),
         maxDiskBytes: z.union([z.string(), z.number()]).optional(),
         highWaterBytes: z.union([z.string(), z.number()]).optional(),
       })
@@ -85,7 +90,9 @@ export const SessionSchema = z
       .superRefine((val, ctx) => {
         if (val.pruneAfter !== undefined) {
           try {
-            parseDurationMs(String(val.pruneAfter).trim(), { defaultUnit: "d" });
+            parseDurationMs(String(val.pruneAfter).trim(), {
+              defaultUnit: "d",
+            });
           } catch {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -105,9 +112,14 @@ export const SessionSchema = z
             });
           }
         }
-        if (val.resetArchiveRetention !== undefined && val.resetArchiveRetention !== false) {
+        if (
+          val.resetArchiveRetention !== undefined &&
+          val.resetArchiveRetention !== false
+        ) {
           try {
-            parseDurationMs(String(val.resetArchiveRetention).trim(), { defaultUnit: "d" });
+            parseDurationMs(String(val.resetArchiveRetention).trim(), {
+              defaultUnit: "d",
+            });
           } catch {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -118,7 +130,9 @@ export const SessionSchema = z
         }
         if (val.maxDiskBytes !== undefined) {
           try {
-            parseByteSize(String(val.maxDiskBytes).trim(), { defaultUnit: "b" });
+            parseByteSize(String(val.maxDiskBytes).trim(), {
+              defaultUnit: "b",
+            });
           } catch {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -129,7 +143,9 @@ export const SessionSchema = z
         }
         if (val.highWaterBytes !== undefined) {
           try {
-            parseByteSize(String(val.highWaterBytes).trim(), { defaultUnit: "b" });
+            parseByteSize(String(val.highWaterBytes).trim(), {
+              defaultUnit: "b",
+            });
           } catch {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -213,5 +229,11 @@ export const CommandsSchema = z
   .strict()
   .optional()
   .default(
-    () => ({ native: "auto", nativeSkills: "auto", restart: true, ownerDisplay: "raw" }) as const,
+    () =>
+      ({
+        native: "auto",
+        nativeSkills: "auto",
+        restart: true,
+        ownerDisplay: "raw",
+      }) as const,
   );

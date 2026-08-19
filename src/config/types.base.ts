@@ -3,7 +3,8 @@ import type { ChatType } from "../channels/chat-type.js";
 export type ReplyMode = "text" | "command";
 export type TypingMode = "never" | "instant" | "thinking" | "message";
 export type SessionScope = "per-sender" | "global";
-export type DmScope = "main" | "per-peer" | "per-channel-peer" | "per-account-channel-peer";
+export type DmScope =
+  "main" | "per-peer" | "per-channel-peer" | "per-account-channel-peer";
 export type ReplyToMode = "off" | "first" | "all" | "batched";
 export type GroupPolicy = "open" | "disabled" | "allowlist";
 export type DmPolicy = "pairing" | "allowlist" | "open" | "disabled";
@@ -125,6 +126,14 @@ export type SessionConfig = {
    */
   parentForkMaxTokens?: number;
   mainKey?: string;
+  /**
+   * Session keys that must never be reset or deleted (the main session is
+   * always protected regardless of this list). Entries are matched after
+   * canonical main-alias normalization, so "main", "agent:main:main", and
+   * legacy aliases compare equal. Default: [] (the main session is still
+   * protected implicitly).
+   */
+  protectedKeys?: string[];
   sendPolicy?: SessionSendPolicyConfig;
   agentToAgent?: {
     /** Max ping-pong turns between requester/target (0–5). Default: 5. */
@@ -171,7 +180,8 @@ export type LoggingConfig = {
   file?: string;
   /** Maximum size of a single log file in bytes before writes are suppressed. Default: 500 MB. */
   maxFileBytes?: number;
-  consoleLevel?: "silent" | "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  consoleLevel?:
+    "silent" | "fatal" | "error" | "warn" | "info" | "debug" | "trace";
   consoleStyle?: "pretty" | "compact" | "json";
   /** Redact sensitive tokens in tool summaries. Default: "tools". */
   redactSensitive?: "off" | "tools";
@@ -228,7 +238,9 @@ export type WebConfig = {
 };
 
 // Provider docking: allowlists keyed by provider id (and internal "webchat").
-export type AgentElevatedAllowFromConfig = Partial<Record<string, Array<string | number>>>;
+export type AgentElevatedAllowFromConfig = Partial<
+  Record<string, Array<string | number>>
+>;
 
 export type IdentityConfig = {
   name?: string;

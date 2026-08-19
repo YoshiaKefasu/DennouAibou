@@ -22,6 +22,8 @@ import type { DennouPruneProtectionConfig } from "./types.js";
 import { getDennouConfig } from "./config.js";
 import { pruneActiveSessionFile } from "./prune-active-session.js";
 import { logDebug } from "../logger.js";
+import { loadConfig } from "../config/config.js";
+import { isProtectedSessionKey } from "../config/sessions/protected-session.js";
 
 /**
  * セッションキー（`agent:{agentId}:{wsHash}`）→ タイマーID のマップ
@@ -56,7 +58,14 @@ function extractAgentId(sessionKey: string): string | undefined {
  * エージェントIDとセッションIDからJSONLファイルの絶対パスを構築する。
  */
 function buildSessionFilePath(agentId: string, sessionId: string): string {
-  return path.join(os.homedir(), ".openclaw", "agents", agentId, "sessions", `${sessionId}.jsonl`);
+  return path.join(
+    os.homedir(),
+    ".openclaw",
+    "agents",
+    agentId,
+    "sessions",
+    `${sessionId}.jsonl`,
+  );
 }
 
 /**
@@ -71,6 +80,15 @@ function handleIdleEvent(
 ): void {
   const sessionKey = evt.sessionKey;
   if (!sessionKey) return;
+
+  // Skip idle prune for protected sessions (Phase 3).
+  const openclawCfg = loadConfig();
+  if (isProtectedSessionKey(sessionKey, openclawCfg)) {
+    logDebug(
+      `[DennouAibou] SKIP idle prune for protected session: sessionKey=${sessionKey}`,
+    );
+    return;
+  }
 
   // idle以外は無視
   if (evt.state !== "idle") return;
@@ -111,12 +129,19 @@ function handleIdleEvent(
       return;
     }
 
-    const result = pruneActiveSessionFile(filePath, config, (msg) => {
-      logDebug(msg);
-    }, protection);
+    const result = pruneActiveSessionFile(
+      filePath,
+      config,
+      (msg) => {
+        logDebug(msg);
+      },
+      protection,
+    );
 
     if (result === -1) {
-      console.warn(`[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`);
+      console.warn(
+        `[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`,
+      );
     } else if (result > 0) {
       logDebug(
         `[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`,
@@ -162,11 +187,16 @@ export function startIdlePruneWatcher(
   const removeListener = onDiagnosticEvent((evt: DiagnosticEventPayload) => {
     try {
       if (evt.type !== "session.state") return;
-      const stateEvt = evt as DiagnosticEventPayload & { type: "session.state" };
+      const stateEvt = evt as DiagnosticEventPayload & {
+        type: "session.state";
+      };
 
       if (stateEvt.state === "idle") {
         handleIdleEvent(stateEvt, protection);
-      } else if (stateEvt.state === "processing" || stateEvt.state === "waiting") {
+      } else if (
+        stateEvt.state === "processing" ||
+        stateEvt.state === "waiting"
+      ) {
         // セッションがアクティブに戻った → タイマーキャンセル
         const sessionKey = stateEvt.sessionKey;
         if (sessionKey && idleTimers.has(sessionKey)) {

@@ -46,7 +46,11 @@ export {
 } from "./telegram-command-config.js";
 export { resolveActiveTalkProviderConfig } from "../config/talk.js";
 export { resolveAgentMaxConcurrent } from "../config/agent-limits.js";
-export { loadCronStore, resolveCronStorePath, saveCronStore } from "../cron/store.js";
+export {
+  loadCronStore,
+  resolveCronStorePath,
+  saveCronStore,
+} from "../cron/store.js";
 export { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js";
 export { coerceSecretRef } from "../config/types.secrets.js";
 export {
@@ -112,6 +116,7 @@ export { canonicalizeMainSessionAlias } from "../config/sessions/main-session.js
 export {
   evaluateSessionFreshness,
   resolveChannelResetConfig,
+  resolveProtectedSessionResetPolicy,
   resolveSessionResetPolicy,
   resolveSessionResetType,
   resolveThreadFlag,

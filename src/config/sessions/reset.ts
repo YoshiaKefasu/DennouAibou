@@ -1,6 +1,14 @@
 import { resolveSessionThreadInfo } from "../../channels/plugins/session-conversation.js";
 import { normalizeMessageChannel } from "../../utils/message-channel.js";
-import type { SessionConfig, SessionResetConfig, SessionResetMode } from "../types.base.js";
+import type {
+  SessionConfig,
+  SessionResetConfig,
+  SessionResetMode,
+} from "../types.base.js";
+import {
+  isProtectedSessionKey,
+  type ProtectedSessionConfig,
+} from "./protected-session.js";
 import { DEFAULT_IDLE_MINUTES } from "./types.js";
 
 export type { SessionResetMode } from "../types.base.js";
@@ -90,20 +98,26 @@ export function resolveSessionResetPolicy(params: {
     ? undefined
     : (sessionCfg?.resetByType?.[params.resetType] ??
       (params.resetType === "direct"
-        ? (sessionCfg?.resetByType as { dm?: SessionResetConfig } | undefined)?.dm
+        ? (sessionCfg?.resetByType as { dm?: SessionResetConfig } | undefined)
+            ?.dm
         : undefined));
   const hasExplicitReset = Boolean(baseReset || sessionCfg?.resetByType);
-  const legacyIdleMinutes = params.resetOverride ? undefined : sessionCfg?.idleMinutes;
+  const legacyIdleMinutes = params.resetOverride
+    ? undefined
+    : sessionCfg?.idleMinutes;
   const mode =
     typeReset?.mode ??
     baseReset?.mode ??
-    (!hasExplicitReset && legacyIdleMinutes != null ? "idle" : DEFAULT_RESET_MODE);
+    (!hasExplicitReset && legacyIdleMinutes != null
+      ? "idle"
+      : DEFAULT_RESET_MODE);
   // Keep the normalized hour in the policy shape for stable logging/consumers;
   // daily mode uses it, other modes ignore it.
   const atHour = normalizeResetAtHour(
     typeReset?.atHour ?? baseReset?.atHour ?? DEFAULT_RESET_AT_HOUR,
   );
-  const idleMinutesRaw = typeReset?.idleMinutes ?? baseReset?.idleMinutes ?? legacyIdleMinutes;
+  const idleMinutesRaw =
+    typeReset?.idleMinutes ?? baseReset?.idleMinutes ?? legacyIdleMinutes;
 
   let idleMinutes: number | undefined;
   if (mode === "off") {
@@ -118,6 +132,28 @@ export function resolveSessionResetPolicy(params: {
   }
 
   return { mode, atHour, idleMinutes };
+}
+
+/**
+ * Force a resolved reset policy to "off" when the session key is protected.
+ *
+ * Protected sessions (see isProtectedSessionKey) must never rotate via the
+ * automatic daily/idle reset path. idleMinutes is cleared alongside mode so
+ * evaluateSessionFreshness does not derive an idle expiry from a stale
+ * configured window while mode is "off".
+ */
+export function resolveProtectedSessionResetPolicy(params: {
+  policy: SessionResetPolicy;
+  sessionKey?: string | null;
+  cfg?: ProtectedSessionConfig;
+}): SessionResetPolicy {
+  if (
+    !params.sessionKey ||
+    !isProtectedSessionKey(params.sessionKey, params.cfg)
+  ) {
+    return params.policy;
+  }
+  return { ...params.policy, mode: "off", idleMinutes: undefined };
 }
 
 export function resolveChannelResetConfig(params: {

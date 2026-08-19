@@ -11,8 +11,8 @@ import {
 import { clearSessionQueues } from "../../auto-reply/reply/queue/cleanup.js";
 import { loadConfig } from "../../config/config.js";
 import {
+  isProtectedSessionKey,
   loadSessionStore,
-  resolveMainSessionKey,
   resolveSessionFilePath,
   resolveSessionFilePathOptions,
   type SessionEntry,
@@ -88,7 +88,11 @@ function requireSessionKey(key: unknown, respond: RespondFn): string | null {
           : "";
   const normalized = raw.trim();
   if (!normalized) {
-    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "key required"));
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "key required"),
+    );
     return null;
   }
   return normalized;
@@ -113,7 +117,10 @@ function resolveOptionalInitialSessionMessage(params: {
   return undefined;
 }
 
-function shouldAttachPendingMessageSeq(params: { payload: unknown; cached?: boolean }): boolean {
+function shouldAttachPendingMessageSeq(params: {
+  payload: unknown;
+  cached?: boolean;
+}): boolean {
   if (params.cached) {
     return false;
   }
@@ -125,14 +132,19 @@ function shouldAttachPendingMessageSeq(params: { payload: unknown; cached?: bool
 }
 
 function emitSessionsChanged(
-  context: Pick<GatewayRequestContext, "broadcastToConnIds" | "getSessionEventSubscriberConnIds">,
+  context: Pick<
+    GatewayRequestContext,
+    "broadcastToConnIds" | "getSessionEventSubscriberConnIds"
+  >,
   payload: { sessionKey?: string; reason: string; compacted?: boolean },
 ) {
   const connIds = context.getSessionEventSubscriberConnIds();
   if (connIds.size === 0) {
     return;
   }
-  const sessionRow = payload.sessionKey ? loadGatewaySessionRow(payload.sessionKey) : null;
+  const sessionRow = payload.sessionKey
+    ? loadGatewaySessionRow(payload.sessionKey)
+    : null;
   context.broadcastToConnIds(
     "sessions.changed",
     {
@@ -196,10 +208,15 @@ function emitSessionsChanged(
 function rejectWebchatSessionMutation(params: {
   action: "patch" | "delete";
   client: GatewayClient | null;
-  isWebchatConnect: (params: GatewayClient["connect"] | null | undefined) => boolean;
+  isWebchatConnect: (
+    params: GatewayClient["connect"] | null | undefined,
+  ) => boolean;
   respond: RespondFn;
 }): boolean {
-  if (!params.client?.connect || !params.isWebchatConnect(params.client.connect)) {
+  if (
+    !params.client?.connect ||
+    !params.isWebchatConnect(params.client.connect)
+  ) {
     return false;
   }
   if (params.client.connect.client.id === GATEWAY_CLIENT_IDS.CONTROL_UI) {
@@ -288,7 +305,10 @@ function hasTrackedActiveSessionRun(params: {
   canonicalKey: string;
 }): boolean {
   for (const active of params.context.chatAbortControllers.values()) {
-    if (active.sessionKey === params.canonicalKey || active.sessionKey === params.requestedKey) {
+    if (
+      active.sessionKey === params.canonicalKey ||
+      active.sessionKey === params.requestedKey
+    ) {
       return true;
     }
   }
@@ -345,7 +365,11 @@ async function interruptSessionRunIfActive(params: {
       return {
         interrupted: true,
         error:
-          abortError ?? errorShape(ErrorCodes.UNAVAILABLE, "failed to interrupt active session"),
+          abortError ??
+          errorShape(
+            ErrorCodes.UNAVAILABLE,
+            "failed to interrupt active session",
+          ),
       };
     }
   }
@@ -354,7 +378,11 @@ async function interruptSessionRunIfActive(params: {
     abortEmbeddedPiRun(params.sessionId);
   }
 
-  clearSessionQueues([params.requestedKey, params.canonicalKey, params.sessionId]);
+  clearSessionQueues([
+    params.requestedKey,
+    params.canonicalKey,
+    params.sessionId,
+  ]);
 
   if (hasEmbeddedRun && params.sessionId) {
     const ended = await waitForEmbeddedPiRunEnd(params.sessionId, 15_000);
@@ -383,7 +411,12 @@ async function handleSessionSend(params: {
   interruptIfActive: boolean;
 }) {
   if (
-    !assertValidParams(params.params, validateSessionsSendParams, params.method, params.respond)
+    !assertValidParams(
+      params.params,
+      validateSessionsSendParams,
+      params.method,
+      params.respond,
+    )
   ) {
     return;
   }
@@ -420,7 +453,9 @@ async function handleSessionSend(params: {
     interruptedActiveRun = interruptResult.interrupted;
   }
 
-  const messageSeq = readSessionMessages(entry.sessionId, storePath, entry.sessionFile).length + 1;
+  const messageSeq =
+    readSessionMessages(entry.sessionId, storePath, entry.sessionFile).length +
+    1;
   let sendAcked = false;
   let sendPayload: unknown;
   let sendCached = false;
@@ -450,7 +485,13 @@ async function handleSessionSend(params: {
         typeof (payload as { runId?: unknown }).runId === "string"
           ? (payload as { runId: string }).runId
           : undefined;
-      if (ok && shouldAttachPendingMessageSeq({ payload, cached: meta?.cached === true })) {
+      if (
+        ok &&
+        shouldAttachPendingMessageSeq({
+          payload,
+          cached: meta?.cached === true,
+        })
+      ) {
         params.respond(
           true,
           {
@@ -480,7 +521,12 @@ async function handleSessionSend(params: {
     isWebchatConnect: params.isWebchatConnect,
   });
   if (sendAcked) {
-    if (shouldAttachPendingMessageSeq({ payload: sendPayload, cached: sendCached })) {
+    if (
+      shouldAttachPendingMessageSeq({
+        payload: sendPayload,
+        cached: sendCached,
+      })
+    ) {
       await reactivateCompletedSubagentSession({
         sessionKey: canonicalKey,
         runId: startedRunId,
@@ -494,7 +540,14 @@ async function handleSessionSend(params: {
 }
 export const sessionsHandlers: GatewayRequestHandlers = {
   "sessions.list": ({ params, respond }) => {
-    if (!assertValidParams(params, validateSessionsListParams, "sessions.list", respond)) {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsListParams,
+        "sessions.list",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -569,7 +622,14 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     respond(true, { subscribed: false, key: canonicalKey }, undefined);
   },
   "sessions.preview": ({ params, respond }) => {
-    if (!assertValidParams(params, validateSessionsPreviewParams, "sessions.preview", respond)) {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsPreviewParams,
+        "sessions.preview",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -579,14 +639,20 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       .filter(Boolean)
       .slice(0, 64);
     const limit =
-      typeof p.limit === "number" && Number.isFinite(p.limit) ? Math.max(1, p.limit) : 12;
+      typeof p.limit === "number" && Number.isFinite(p.limit)
+        ? Math.max(1, p.limit)
+        : 12;
     const maxChars =
       typeof p.maxChars === "number" && Number.isFinite(p.maxChars)
         ? Math.max(20, p.maxChars)
         : 240;
 
     if (keys.length === 0) {
-      respond(true, { ts: Date.now(), previews: [] } satisfies SessionsPreviewResult, undefined);
+      respond(
+        true,
+        { ts: Date.now(), previews: [] } satisfies SessionsPreviewResult,
+        undefined,
+      );
       return;
     }
 
@@ -596,16 +662,24 @@ export const sessionsHandlers: GatewayRequestHandlers = {
 
     for (const key of keys) {
       try {
-        const storeTarget = resolveGatewaySessionStoreTarget({ cfg, key, scanLegacyKeys: false });
+        const storeTarget = resolveGatewaySessionStoreTarget({
+          cfg,
+          key,
+          scanLegacyKeys: false,
+        });
         const store =
-          storeCache.get(storeTarget.storePath) ?? loadSessionStore(storeTarget.storePath);
+          storeCache.get(storeTarget.storePath) ??
+          loadSessionStore(storeTarget.storePath);
         storeCache.set(storeTarget.storePath, store);
         const target = resolveGatewaySessionStoreTarget({
           cfg,
           key,
           store,
         });
-        const entry = resolveFreshestSessionEntryFromStoreKeys(store, target.storeKeys);
+        const entry = resolveFreshestSessionEntryFromStoreKeys(
+          store,
+          target.storeKeys,
+        );
         if (!entry?.sessionId) {
           previews.push({ key, status: "missing", items: [] });
           continue;
@@ -628,10 +702,21 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       }
     }
 
-    respond(true, { ts: Date.now(), previews } satisfies SessionsPreviewResult, undefined);
+    respond(
+      true,
+      { ts: Date.now(), previews } satisfies SessionsPreviewResult,
+      undefined,
+    );
   },
   "sessions.resolve": async ({ params, respond }) => {
-    if (!assertValidParams(params, validateSessionsResolveParams, "sessions.resolve", respond)) {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsResolveParams,
+        "sessions.resolve",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -644,15 +729,32 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
     respond(true, { ok: true, key: resolved.key }, undefined);
   },
-  "sessions.create": async ({ req, params, respond, context, client, isWebchatConnect }) => {
-    if (!assertValidParams(params, validateSessionsCreateParams, "sessions.create", respond)) {
+  "sessions.create": async ({
+    req,
+    params,
+    respond,
+    context,
+    client,
+    isWebchatConnect,
+  }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsCreateParams,
+        "sessions.create",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
     const cfg = loadConfig();
-    const requestedKey = typeof p.key === "string" && p.key.trim() ? p.key.trim() : undefined;
+    const requestedKey =
+      typeof p.key === "string" && p.key.trim() ? p.key.trim() : undefined;
     const agentId = normalizeAgentId(
-      typeof p.agentId === "string" && p.agentId.trim() ? p.agentId : resolveDefaultAgentId(cfg),
+      typeof p.agentId === "string" && p.agentId.trim()
+        ? p.agentId
+        : resolveDefaultAgentId(cfg),
     );
     if (requestedKey) {
       const requestedAgentId = parseAgentSessionKey(requestedKey)?.agentId;
@@ -684,7 +786,10 @@ export const sessionsHandlers: GatewayRequestHandlers = {
         respond(
           false,
           undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, `unknown parent session: ${parentSessionKey}`),
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `unknown parent session: ${parentSessionKey}`,
+          ),
         );
         return;
       }
@@ -702,31 +807,34 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       : buildDashboardSessionKey(agentId);
     const target = resolveGatewaySessionStoreTarget({ cfg, key });
     const targetAgentId = resolveAgentIdFromSessionKey(target.canonicalKey);
-    const created = await updateSessionStore(target.storePath, async (store) => {
-      const patched = await applySessionsPatchToStore({
-        cfg,
-        store,
-        storeKey: target.canonicalKey,
-        patch: {
-          key: target.canonicalKey,
-          label: typeof p.label === "string" ? p.label.trim() : undefined,
-          model: typeof p.model === "string" ? p.model.trim() : undefined,
-        },
-        loadGatewayModelCatalog: context.loadGatewayModelCatalog,
-      });
-      if (!patched.ok || !canonicalParentSessionKey) {
-        return patched;
-      }
-      const nextEntry: SessionEntry = {
-        ...patched.entry,
-        parentSessionKey: canonicalParentSessionKey,
-      };
-      store[target.canonicalKey] = nextEntry;
-      return {
-        ...patched,
-        entry: nextEntry,
-      };
-    });
+    const created = await updateSessionStore(
+      target.storePath,
+      async (store) => {
+        const patched = await applySessionsPatchToStore({
+          cfg,
+          store,
+          storeKey: target.canonicalKey,
+          patch: {
+            key: target.canonicalKey,
+            label: typeof p.label === "string" ? p.label.trim() : undefined,
+            model: typeof p.model === "string" ? p.model.trim() : undefined,
+          },
+          loadGatewayModelCatalog: context.loadGatewayModelCatalog,
+        });
+        if (!patched.ok || !canonicalParentSessionKey) {
+          return patched;
+        }
+        const nextEntry: SessionEntry = {
+          ...patched.entry,
+          parentSessionKey: canonicalParentSessionKey,
+        };
+        store[target.canonicalKey] = nextEntry;
+        return {
+          ...patched,
+          entry: nextEntry,
+        };
+      },
+    );
     if (!created.ok) {
       respond(false, undefined, created.error);
       return;
@@ -744,7 +852,10 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.UNAVAILABLE, `failed to create session transcript: ${ensured.error}`),
+        errorShape(
+          ErrorCodes.UNAVAILABLE,
+          `failed to create session transcript: ${ensured.error}`,
+        ),
       );
       return;
     }
@@ -773,8 +884,11 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     let runError: unknown;
     let runMeta: Record<string, unknown> | undefined;
     const messageSeq = initialMessage
-      ? readSessionMessages(createdEntry.sessionId, target.storePath, createdEntry.sessionFile)
-          .length + 1
+      ? readSessionMessages(
+          createdEntry.sessionId,
+          target.storePath,
+          createdEntry.sessionFile,
+        ).length + 1
       : undefined;
 
     if (initialMessage) {
@@ -831,7 +945,14 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       });
     }
   },
-  "sessions.send": async ({ req, params, respond, context, client, isWebchatConnect }) => {
+  "sessions.send": async ({
+    req,
+    params,
+    respond,
+    context,
+    client,
+    isWebchatConnect,
+  }) => {
     await handleSessionSend({
       method: "sessions.send",
       req,
@@ -843,7 +964,14 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       interruptIfActive: false,
     });
   },
-  "sessions.steer": async ({ req, params, respond, context, client, isWebchatConnect }) => {
+  "sessions.steer": async ({
+    req,
+    params,
+    respond,
+    context,
+    client,
+    isWebchatConnect,
+  }) => {
     await handleSessionSend({
       method: "sessions.steer",
       req,
@@ -855,8 +983,22 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       interruptIfActive: true,
     });
   },
-  "sessions.abort": async ({ req, params, respond, context, client, isWebchatConnect }) => {
-    if (!assertValidParams(params, validateSessionsAbortParams, "sessions.abort", respond)) {
+  "sessions.abort": async ({
+    req,
+    params,
+    respond,
+    context,
+    client,
+    isWebchatConnect,
+  }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsAbortParams,
+        "sessions.abort",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -888,7 +1030,8 @@ export const sessionsHandlers: GatewayRequestHandlers = {
           typeof payload === "object" &&
           Array.isArray((payload as { runIds?: unknown[] }).runIds)
             ? (payload as { runIds: unknown[] }).runIds.filter(
-                (value): value is string => typeof value === "string" && value.trim().length > 0,
+                (value): value is string =>
+                  typeof value === "string" && value.trim().length > 0,
               )
             : [];
         abortedRunId = runIds[0] ?? null;
@@ -914,8 +1057,21 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       });
     }
   },
-  "sessions.patch": async ({ params, respond, context, client, isWebchatConnect }) => {
-    if (!assertValidParams(params, validateSessionsPatchParams, "sessions.patch", respond)) {
+  "sessions.patch": async ({
+    params,
+    respond,
+    context,
+    client,
+    isWebchatConnect,
+  }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsPatchParams,
+        "sessions.patch",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -923,13 +1079,24 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     if (!key) {
       return;
     }
-    if (rejectWebchatSessionMutation({ action: "patch", client, isWebchatConnect, respond })) {
+    if (
+      rejectWebchatSessionMutation({
+        action: "patch",
+        client,
+        isWebchatConnect,
+        respond,
+      })
+    ) {
       return;
     }
 
     const { cfg, target, storePath } = resolveGatewaySessionTargetFromKey(key);
     const applied = await updateSessionStore(storePath, async (store) => {
-      const { primaryKey } = migrateAndPruneGatewaySessionStoreKey({ cfg, key, store });
+      const { primaryKey } = migrateAndPruneGatewaySessionStoreKey({
+        cfg,
+        key,
+        store,
+      });
       return await applySessionsPatchToStore({
         cfg,
         store,
@@ -961,7 +1128,9 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
 
     const parsed = parseAgentSessionKey(target.canonicalKey ?? key);
-    const agentId = normalizeAgentId(parsed?.agentId ?? resolveDefaultAgentId(cfg));
+    const agentId = normalizeAgentId(
+      parsed?.agentId ?? resolveDefaultAgentId(cfg),
+    );
     const resolved = resolveSessionModelRef(cfg, applied.entry, agentId);
     const result: SessionsPatchResult = {
       ok: true,
@@ -980,7 +1149,14 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     });
   },
   "sessions.reset": async ({ params, respond, context }) => {
-    if (!assertValidParams(params, validateSessionsResetParams, "sessions.reset", respond)) {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsResetParams,
+        "sessions.reset",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -989,8 +1165,24 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       return;
     }
 
+    // Belt-and-suspenders for direct ACP/TUI calls: performGatewaySessionReset
+    // enforces the same check, but rejecting here keeps parity with delete and
+    // avoids spinning up runtime cleanup work for a protected session.
+    if (isProtectedSessionKey(key, loadConfig())) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `Cannot reset protected session (${key}).`,
+        ),
+      );
+      return;
+    }
+
     const reason = p.reason === "new" ? "new" : "reset";
-    const { performGatewaySessionReset } = await import("./sessions.runtime.js");
+    const { performGatewaySessionReset } =
+      await import("./sessions.runtime.js");
     const result = await performGatewaySessionReset({
       key,
       reason,
@@ -1000,14 +1192,31 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       respond(false, undefined, result.error);
       return;
     }
-    respond(true, { ok: true, key: result.key, entry: result.entry }, undefined);
+    respond(
+      true,
+      { ok: true, key: result.key, entry: result.entry },
+      undefined,
+    );
     emitSessionsChanged(context, {
       sessionKey: result.key,
       reason,
     });
   },
-  "sessions.delete": async ({ params, respond, client, isWebchatConnect, context }) => {
-    if (!assertValidParams(params, validateSessionsDeleteParams, "sessions.delete", respond)) {
+  "sessions.delete": async ({
+    params,
+    respond,
+    client,
+    isWebchatConnect,
+    context,
+  }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsDeleteParams,
+        "sessions.delete",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -1015,22 +1224,32 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     if (!key) {
       return;
     }
-    if (rejectWebchatSessionMutation({ action: "delete", client, isWebchatConnect, respond })) {
+    if (
+      rejectWebchatSessionMutation({
+        action: "delete",
+        client,
+        isWebchatConnect,
+        respond,
+      })
+    ) {
       return;
     }
 
     const { cfg, target, storePath } = resolveGatewaySessionTargetFromKey(key);
-    const mainKey = resolveMainSessionKey(cfg);
-    if (target.canonicalKey === mainKey) {
+    if (isProtectedSessionKey(key, cfg)) {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, `Cannot delete the main session (${mainKey}).`),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `Cannot delete protected session (${key}).`,
+        ),
       );
       return;
     }
 
-    const deleteTranscript = typeof p.deleteTranscript === "boolean" ? p.deleteTranscript : true;
+    const deleteTranscript =
+      typeof p.deleteTranscript === "boolean" ? p.deleteTranscript : true;
     const {
       archiveSessionTranscriptsForSessionDetailed,
       cleanupSessionBeforeMutation,
@@ -1054,7 +1273,11 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
     const sessionId = entry?.sessionId;
     const deleted = await updateSessionStore(storePath, (store) => {
-      const { primaryKey } = migrateAndPruneGatewaySessionStoreKey({ cfg, key, store });
+      const { primaryKey } = migrateAndPruneGatewaySessionStoreKey({
+        cfg,
+        key,
+        store,
+      });
       const hadEntry = Boolean(store[primaryKey]);
       if (hadEntry) {
         delete store[primaryKey];
@@ -1092,7 +1315,11 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       });
     }
 
-    respond(true, { ok: true, key: target.canonicalKey, deleted, archived }, undefined);
+    respond(
+      true,
+      { ok: true, key: target.canonicalKey, deleted, archived },
+      undefined,
+    );
     if (deleted) {
       emitSessionsChanged(context, {
         sessionKey: target.canonicalKey,
@@ -1113,17 +1340,32 @@ export const sessionsHandlers: GatewayRequestHandlers = {
 
     const { target, storePath } = resolveGatewaySessionTargetFromKey(key);
     const store = loadSessionStore(storePath);
-    const entry = resolveFreshestSessionEntryFromStoreKeys(store, target.storeKeys);
+    const entry = resolveFreshestSessionEntryFromStoreKeys(
+      store,
+      target.storeKeys,
+    );
     if (!entry?.sessionId) {
       respond(true, { messages: [] }, undefined);
       return;
     }
-    const allMessages = readSessionMessages(entry.sessionId, storePath, entry.sessionFile);
-    const messages = limit < allMessages.length ? allMessages.slice(-limit) : allMessages;
+    const allMessages = readSessionMessages(
+      entry.sessionId,
+      storePath,
+      entry.sessionFile,
+    );
+    const messages =
+      limit < allMessages.length ? allMessages.slice(-limit) : allMessages;
     respond(true, { messages }, undefined);
   },
   "sessions.compact": async ({ params, respond, context }) => {
-    if (!assertValidParams(params, validateSessionsCompactParams, "sessions.compact", respond)) {
+    if (
+      !assertValidParams(
+        params,
+        validateSessionsCompactParams,
+        "sessions.compact",
+        respond,
+      )
+    ) {
       return;
     }
     const p = params;
@@ -1140,7 +1382,11 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     const { cfg, target, storePath } = resolveGatewaySessionTargetFromKey(key);
     // Lock + read in a short critical section; transcript work happens outside.
     const compactTarget = await updateSessionStore(storePath, (store) => {
-      const { entry, primaryKey } = migrateAndPruneGatewaySessionStoreKey({ cfg, key, store });
+      const { entry, primaryKey } = migrateAndPruneGatewaySessionStoreKey({
+        cfg,
+        key,
+        store,
+      });
       return { entry, primaryKey };
     });
     const entry = compactTarget.entry;

@@ -11,6 +11,16 @@ function buildMainSessionKey(agentId: string, mainKey?: string): string {
   return `agent:${normalizeAgentId(agentId)}:${normalizeMainKey(mainKey)}`;
 }
 
+/** Resolve the configured default agent id (marked default, else first entry). */
+export function resolveDefaultAgentId(cfg?: {
+  agents?: { list?: Array<{ id?: string; default?: boolean }> };
+}): string {
+  const agents = cfg?.agents?.list ?? [];
+  const rawId =
+    agents.find((agent) => agent?.default)?.id ?? agents[0]?.id ?? FALLBACK_DEFAULT_AGENT_ID;
+  return normalizeAgentId(rawId);
+}
+
 export function resolveMainSessionKey(cfg?: {
   session?: { scope?: SessionScope; mainKey?: string };
   agents?: { list?: Array<{ id?: string; default?: boolean }> };
@@ -18,10 +28,7 @@ export function resolveMainSessionKey(cfg?: {
   if (cfg?.session?.scope === "global") {
     return "global";
   }
-  const agents = cfg?.agents?.list ?? [];
-  const defaultAgentId =
-    agents.find((agent) => agent?.default)?.id ?? agents[0]?.id ?? FALLBACK_DEFAULT_AGENT_ID;
-  return buildMainSessionKey(defaultAgentId, cfg?.session?.mainKey);
+  return buildMainSessionKey(resolveDefaultAgentId(cfg), cfg?.session?.mainKey);
 }
 
 export { resolveAgentIdFromSessionKey };
