@@ -88,6 +88,10 @@ function isProtectedSessionKey(key: string, cfg?: OpenClawConfig): boolean {
 ```
 
 判定は**正規化後のキー**で行う（エイリアス・レガシーキーを同一視）。
+なお正規化は**大文字小文字を無視**する（`normalizeProtectedSessionKey` が
+`toLowerCase()` してから `canonicalizeMainSessionAlias` に渡す。store キーは
+小文字で構築されるため、実キーの同一性には影響しない）。"MAIN" や
+"AGENT:MAIN:MAIN" のような表記ゆれでも保護をすり抜けないようにする。
 
 ---
 
@@ -128,6 +132,13 @@ if (isProtectedSessionKey(guardKey, cfg)) {
   isNewSession = false;
 }
 ```
+
+`SessionKey` と `targetSessionKey` の両方が無い場合は `guardKey` が空になり上記の
+ガードが走らない。その場合は canonicalize 後の `sessionKey` が main/global
+バケットに潰れることがある（例: `From` の無い匿名 per-sender メッセージ）ため、
+canonicalize 直後に `isProtectedSessionKey(sessionKey, cfg)` を再チェックして
+rotation フラグ（`resetTriggered` / `isNewSession` / `bodyStripped` /
+`matchedResetTriggerLower`）を同様にクリアする。
 
 `sessions.reset` RPC ハンドラ（sessions.ts:982-1008）にも念のためチェックを追加（ACP / TUI 経由の直接呼び出しを防ぐ）。参考（既存の delete 保護パターン）:
 
