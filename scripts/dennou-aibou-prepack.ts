@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const skipPrepackPreparedEnv = "OPENCLAW_PREPACK_PREPARED";
+const skipPrepackPreparedEnv = "DENNOU_PREPACK_PREPARED";
 const requiredPreparedPathGroups = [
   ["dist/index.js", "dist/index.mjs"],
   ["dist/control-ui/index.html"],

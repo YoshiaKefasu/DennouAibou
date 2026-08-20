@@ -58,7 +58,7 @@ const REQUIRED_PACKED_PATHS = ["dist/control-ui/index.html"];
 const CONTROL_UI_ASSET_PREFIX = "dist/control-ui/assets/";
 const FORBIDDEN_PACKED_PATH_PREFIXES = ["docs/.generated/"] as const;
 const NPM_PACK_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
-const skipPackValidationEnv = "OPENCLAW_NPM_RELEASE_SKIP_PACK_CHECK";
+const skipPackValidationEnv = "DENNOU_NPM_RELEASE_SKIP_PACK_CHECK";
 
 function normalizeRepoUrl(value: unknown): string {
   if (typeof value !== "string") {

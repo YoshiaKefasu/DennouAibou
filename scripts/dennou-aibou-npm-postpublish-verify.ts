@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { BUNDLED_RUNTIME_SIDECAR_PATHS } from "../src/plugins/runtime-sidecar-paths.ts";
-import { parseReleaseVersion, resolveNpmCommandInvocation } from "./openclaw-npm-release-check.ts";
+import { parseReleaseVersion, resolveNpmCommandInvocation } from "./dennou-aibou-npm-release-check.ts";
 
 type InstalledPackageJson = {
   version?: string;
