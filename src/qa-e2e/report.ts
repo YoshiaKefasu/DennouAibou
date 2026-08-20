@@ -1,1 +1,1 @@
-export * from "../../extensions/qa-lab/api.js";
+// Stub: qa-lab extension was removed in DennouAibou debloat.

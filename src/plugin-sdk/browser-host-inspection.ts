@@ -1,6 +1,11 @@
-export type { BrowserExecutable } from "../../extensions/browser/browser-host-inspection.js";
-export {
-  parseBrowserMajorVersion,
-  readBrowserVersion,
-  resolveGoogleChromeExecutableForPlatform,
-} from "../../extensions/browser/browser-host-inspection.js";
+// Stub: browser extension was removed in DennouAibou debloat.
+
+export type BrowserExecutable = Record<string, unknown>;
+
+export function parseBrowserMajorVersion(..._args: unknown[]): number {
+  throw new Error("browser extension removed");
+}
+
+export async function readBrowserVersion(..._args: unknown[]): Promise<string> {
+  throw new Error("browser extension removed");
+}
