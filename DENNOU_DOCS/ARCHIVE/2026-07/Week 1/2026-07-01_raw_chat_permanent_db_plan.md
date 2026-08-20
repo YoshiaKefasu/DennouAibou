@@ -352,10 +352,10 @@ Do not replace or heavily modify `memory_search`.
 
 Recommended split:
 
-| System | Responsibility |
-|---|---|
+| System          | Responsibility                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
 | `memory_search` | durable notes, decisions, preferences, summaries, `MEMORY.md`, `memory/*.md`, optional chunked session recall |
-| `chat_search` | exact raw chat ledger search by keyword/date/time/message context |
+| `chat_search`   | exact raw chat ledger search by keyword/date/time/message context                                             |
 
 This avoids mixing two very different meanings of “memory”.
 
@@ -460,11 +460,13 @@ If a migration becomes risky, rebuild the DB from session JSONL instead of mutat
 - Verify context expansion.
 
 **KASOU検証結果 (2026-07-02):**
+
 - 1 session JSONL (1346行) → **880 メッセージ indexed**, 0 errors
 - Go sidecar起動、SQLite DB作成、backfill自動実行まで確認
 - Go tests 14/14, TS tests 9/9 PASS
 
 **デプロイまでに発見・修正したバグ:**
+
 1. `__filename` not defined in ESM scope → `import.meta.url` に修正
 2. `__dirname` not defined in ESM scope → `fileURLToPath` で生成
 3. JSONL timestamp型不一致 (`int64` vs RFC3339 string) → 全行パース失敗していた。`string` + `time.Parse` に修正

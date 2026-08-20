@@ -1213,8 +1213,8 @@ export function attachGatewayWsMessageHandler(params: {
         // For device-token connections, only node clients receive a scoped canvas URL.
         const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
-        const deviceCanvasCapabilityExpiresAtMs = deviceCanvasCapability &&
-          (Date.now() + CANVAS_CAPABILITY_TTL_MS);
+        const deviceCanvasCapabilityExpiresAtMs =
+          deviceCanvasCapability && Date.now() + CANVAS_CAPABILITY_TTL_MS;
         const deviceScopedCanvasHostUrl =
           canvasHostUrl && deviceCanvasCapability
             ? (buildCanvasScopedHostUrl(canvasHostUrl, deviceCanvasCapability) ?? canvasHostUrl)

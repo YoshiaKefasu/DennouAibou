@@ -1,6 +1,14 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { TalkProviderConfig } from "../config/types.gateway.js";
 
+// NOTE: ResolvedTtsConfig was previously imported from @openclaw/speech-core/runtime-api.js
+// which was removed in debloat. Defined locally based on actual usage.
+export type ResolvedTtsConfig = {
+  timeoutMs: number;
+  summaryModel?: string;
+  [key: string]: unknown;
+};
+
 export type SpeechProviderId = string;
 
 export type SpeechSynthesisTarget = "audio-file" | "voice-note";

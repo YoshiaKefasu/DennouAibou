@@ -48,11 +48,11 @@ Upstream `openclaw/openclaw#42904` で `resolveActiveLogFile()` が導入され�
 
 ### ファイル一覧
 
-| ファイル | 変更内容 |
-|---|---|
-| `src/logging/logger.ts` | `resolveActiveLogFile()` 追加 + transport 内で毎回再解決 |
-| `src/logging/log-tail.ts` | `resolveLogFile()` の冗長フォールバックを整理 |
-| `src/logging/log-file-size-cap.test.ts` | 日付跨ぎテスト追加 |
+| ファイル                                | 変更内容                                                 |
+| --------------------------------------- | -------------------------------------------------------- |
+| `src/logging/logger.ts`                 | `resolveActiveLogFile()` 追加 + transport 内で毎回再解決 |
+| `src/logging/log-tail.ts`               | `resolveLogFile()` の冗長フォールバックを整理            |
+| `src/logging/log-file-size-cap.test.ts` | 日付跨ぎテスト追加                                       |
 
 ## Fix B: Discord stale-socket false positive
 
@@ -142,17 +142,17 @@ legitimately go idle for long periods while the transport is still healthy.
 
 ### ファイル一覧
 
-| ファイル | 変更内容 |
-|---|---|
-| `src/channels/plugins/types.core.ts` | `ChannelAccountSnapshot` に `lastTransportActivityAt` 追加 |
-| `src/gateway/channel-status-patches.ts` | `createTransportActivityStatusPatch()` 追加 |
-| `src/gateway/channel-health-policy.ts` | stale-socket 判定を `lastTransportActivityAt` 基準に変更 |
-| `extensions/discord/src/monitor/gateway-handle.ts` | `DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT` 定数追加 |
-| `extensions/discord/src/monitor/provider.lifecycle.ts` | transport activity イベント購読 + ステータス反映 |
-| `extensions/discord/src/monitor/status.ts` | `DiscordMonitorStatusSink` 型に `lastTransportActivityAt` 追加 |
-| `extensions/discord/src/channel.ts` | snapshots 生成時に `lastTransportActivityAt` を転送 |
-| `src/gateway/channel-health-policy.test.ts` | 新テスト + 既存テスト修正 |
-| `src/gateway/channel-status-patches.test.ts` | 新テスト追加 |
+| ファイル                                               | 変更内容                                                       |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| `src/channels/plugins/types.core.ts`                   | `ChannelAccountSnapshot` に `lastTransportActivityAt` 追加     |
+| `src/gateway/channel-status-patches.ts`                | `createTransportActivityStatusPatch()` 追加                    |
+| `src/gateway/channel-health-policy.ts`                 | stale-socket 判定を `lastTransportActivityAt` 基準に変更       |
+| `extensions/discord/src/monitor/gateway-handle.ts`     | `DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT` 定数追加            |
+| `extensions/discord/src/monitor/provider.lifecycle.ts` | transport activity イベント購読 + ステータス反映               |
+| `extensions/discord/src/monitor/status.ts`             | `DiscordMonitorStatusSink` 型に `lastTransportActivityAt` 追加 |
+| `extensions/discord/src/channel.ts`                    | snapshots 生成時に `lastTransportActivityAt` を転送            |
+| `src/gateway/channel-health-policy.test.ts`            | 新テスト + 既存テスト修正                                      |
+| `src/gateway/channel-status-patches.test.ts`           | 新テスト追加                                                   |
 
 ## コミット
 
@@ -173,58 +173,65 @@ legitimately go idle for long periods while the transport is still healthy.
 ---
 
 ## 🔧 Pro Engineer Review — Phase 2: Blind Spot Fixes
+
 > Reviewed: 2026-04-30
 > Perspective: Google / IBM Production Engineering  
 > Principles applied: YAGNI · KISS · DRY · SOLID  
-> Source code verified: ✅ (as of 2026-04-30)  
+> Source code verified: ✅ (as of 2026-04-30)
 
 ### 🎯 発見された死角（3件）
 
 初回コミット後に agent-thinking-skill フレームワークで死角分析を実施。Fix A（ログ）は完全クリーンだったが、Fix B（stale-socket）に3件の死角があった。
 
-| # | 深刻度 | ファイル | 内容 |
-|---|--------|---------|------|
-| B-1 | CRITICAL | `channel-health-monitor.test.ts` | Slack stale-socket テスト4ケースが FAIL。`lastTransportActivityAt` 未設定により全テストが healthy を返す |
-| B-2 | CRITICAL | `provider.lifecycle.ts` | Carbon gateway が `DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT` を発火しない。`lastTransportActivityAt` が常に null |
-| B-3 | MEDIUM | `readiness.test.ts` | stale-socket → ready のコードパスを silent に喪失。テスト自体はパスするがカバレッジが不正確に |
+| #   | 深刻度   | ファイル                         | 内容                                                                                                             |
+| --- | -------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| B-1 | CRITICAL | `channel-health-monitor.test.ts` | Slack stale-socket テスト4ケースが FAIL。`lastTransportActivityAt` 未設定により全テストが healthy を返す         |
+| B-2 | CRITICAL | `provider.lifecycle.ts`          | Carbon gateway が `DISCORD_GATEWAY_TRANSPORT_ACTIVITY_EVENT` を発火しない。`lastTransportActivityAt` が常に null |
+| B-3 | MEDIUM   | `readiness.test.ts`              | stale-socket → ready のコードパスを silent に喪失。テスト自体はパスするがカバレッジが不正確に                    |
 
 ### 🎯 Principle Filter
 
-| Check | Result | Note |
-|-------|--------|------|
-| YAGNI | ✅ 必需 | Carbon を直接改変するよりポーリングの方がシンプル |
-| KISS | ✅ 採用 | 60秒間隔の `isConnected` 定期ポーリングで代替。Carbon 改変は不要 |
-| DRY | ✅ 問題なし | ポーリングは1箇所に閉じている |
-| SOLID | ✅ 問題なし | イベント購読とポーリングは独立した責務として共存可能 |
+| Check | Result      | Note                                                             |
+| ----- | ----------- | ---------------------------------------------------------------- |
+| YAGNI | ✅ 必需     | Carbon を直接改変するよりポーリングの方がシンプル                |
+| KISS  | ✅ 採用     | 60秒間隔の `isConnected` 定期ポーリングで代替。Carbon 改変は不要 |
+| DRY   | ✅ 問題なし | ポーリングは1箇所に閉じている                                    |
+| SOLID | ✅ 問題なし | イベント購読とポーリングは独立した責務として共存可能             |
 
 ### 🛤️ Solution Options
 
-#### Option A — Fallback poller in lifecycle *(推奨)*
+#### Option A — Fallback poller in lifecycle _(推奨)_
+
 **Approach**: Carbon の emit を待たず、lifecycle 内で `gateway.isConnected` を60秒ごとにポーリングして transport activity を発火する  
 **Implementation cost**: 低（+11行）  
 **Risk**: 低（60秒のポーリング間隔 × 30秒のスロットルで毎回確実に通過）  
-**Why recommended**:  
+**Why recommended**:
+
 - Carbon の内部構造を触らない（YAGNI）
 - `unref()` でプロセス終了をブロックしない（production-safe）
 - Carbon が将来 emit を実装しても競合しない（イベントはそのまま購読継続）
 
 **Concrete steps**:
+
 1. `provider.lifecycle.ts` に `TRANSPORT_POLLER_INTERVAL_MS = 60_000` の定数を追加
 2. `setInterval` で `gateway.isConnected` を確認、閾値を越えていれば `pushStatus(createTransportActivityStatusPatch(now))` を発火
 3. `finally` ブロックで `clearInterval(transportPollerId)` を追加
 
 #### Option B — Carbon gateway 改変
+
 **Approach**: Carbon の heartbeat/debug ハンドラに emit を直接追加  
 **Implementation cost**: 高（Carbon の内部構造調査 + アップストリーム追従コスト）  
 **Risk**: 中（Carbon バージョン更新時に patch conflict）  
-**When to choose this instead**: Carbon が自前で emit を実装したらポーラーは削除可能だが、現時点では不要  
+**When to choose this instead**: Carbon が自前で emit を実装したらポーラーは削除可能だが、現時点では不要
 
 ### ✅ Pro Recommendation
+
 > **Choose Option A because**: YAGNI + KISS の観点から、Carbon を直接改変するより60秒ポーリングで十分。59/59テスト通過を確認。Carbon が将来 emit を実装したらポーラーは削除してよい。  
 > Estimated implementation: 15分（テスト含む）  
 > Rollback plan: `provider.lifecycle.ts` の poller ブロックを削除するのみ
 
 ### ⚡ Quick Wins
+
 - B-1: テストスナップショットに `lastTransportActivityAt` を追加（4行×4テスト = 16行の修正）
 - B-3: `readiness.test.ts` の stale-socket テストを `createStaleSocketDiscordManager()` で分離
 - 全修正後に59/59テスト通過を確認
@@ -237,13 +244,13 @@ Slack の stale-socket テストで使われていた `runningConnectedSlackAcco
 
 **修正**: 以下の5テストに `lastTransportActivityAt` を追加
 
-| テスト | lastTransportActivityAt 値 | 期待結果 |
-|--------|---------------------------|---------|
-| restarts a channel with no events past the stale threshold | `now - STALE_THRESHOLD - 30_000` | restart |
-| skips channels with recent events | `now - 5_000` | skip |
-| skips channels within startup grace | `null` | skip |
-| restarts: no events since connect past threshold | `now - STALE_THRESHOLD - 60_000` | restart |
-| respects custom staleEventThresholdMs | `now - customThreshold - 30_000` | restart |
+| テスト                                                     | lastTransportActivityAt 値       | 期待結果 |
+| ---------------------------------------------------------- | -------------------------------- | -------- |
+| restarts a channel with no events past the stale threshold | `now - STALE_THRESHOLD - 30_000` | restart  |
+| skips channels with recent events                          | `now - 5_000`                    | skip     |
+| skips channels within startup grace                        | `null`                           | skip     |
+| restarts: no events since connect past threshold           | `now - STALE_THRESHOLD - 60_000` | restart  |
+| respects custom staleEventThresholdMs                      | `now - customThreshold - 30_000` | restart  |
 
 #### B-2: provider.lifecycle.ts fallback poller
 

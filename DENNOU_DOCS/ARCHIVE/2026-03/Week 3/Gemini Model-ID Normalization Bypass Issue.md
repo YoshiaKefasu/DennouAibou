@@ -25,9 +25,9 @@ The bug is in the CLI-facing template ID constants. They reference **outdated pr
 
 ```typescript
 // BEFORE (BROKEN) — Lines 17-19
-const GEMINI_3_1_PRO_TEMPLATE_IDS   = ["gemini-3-pro-preview"] as const;   // ❌古い (3.0 preview)
+const GEMINI_3_1_PRO_TEMPLATE_IDS = ["gemini-3-pro-preview"] as const; // ❌古い (3.0 preview)
 const GEMINI_3_1_FLASH_LITE_TEMPLATE_IDS = ["gemini-3.1-flash-lite-preview"] as const; // ✅ OK
-const GEMINI_3_1_FLASH_TEMPLATE_IDS = ["gemini-3-flash-preview"] as const;  // ❌古い (3.0 preview)
+const GEMINI_3_1_FLASH_TEMPLATE_IDS = ["gemini-3-flash-preview"] as const; // ❌古い (3.0 preview)
 ```
 
 **Why this kills CLI:**  
@@ -74,67 +74,76 @@ git commit -m "[FIX-UPSTREAM] Restore Gemini 3.1 CLI template IDs (fix #65363, c
 
 ## 4. What We Are NOT Touching (Avoiding Bloat)
 
-| What PR #65433 included | DennouAibou verdict |
-|---|---|
-| Gemini 3.1 template ID fix | ✅ **Take this** |
+| What PR #65433 included                           | DennouAibou verdict                             |
+| ------------------------------------------------- | ----------------------------------------------- |
+| Gemini 3.1 template ID fix                        | ✅ **Take this**                                |
 | Inbound NUL safety checks (`src/core/inbound.ts`) | ❌ Reject — out of scope, separate PR territory |
-| Sonnet 4.6 default 1M context constant | ❌ Reject — Anthropic concern, not Gemini |
+| Sonnet 4.6 default 1M context constant            | ❌ Reject — Anthropic concern, not Gemini       |
 
 ---
 
 ## 5. Expected Result After Fix
 
-| Provider | Model selected by user | Template resolved | CLI receives |
-|---|---|---|---|
-| `google-gemini-cli` | `gemini-3.1-pro` | `gemini-3.1-pro-preview` | ✅ Valid ID |
-| `google-gemini-cli` | `gemini-3.1-flash` | `gemini-3.1-flash-preview` | ✅ Valid ID |
-| `google` (REST API) | `gemini-3.1-pro` | `gemini-3-pro-preview` (fallback) | ✅ Unchanged behavior |
+| Provider            | Model selected by user | Template resolved                 | CLI receives          |
+| ------------------- | ---------------------- | --------------------------------- | --------------------- |
+| `google-gemini-cli` | `gemini-3.1-pro`       | `gemini-3.1-pro-preview`          | ✅ Valid ID           |
+| `google-gemini-cli` | `gemini-3.1-flash`     | `gemini-3.1-flash-preview`        | ✅ Valid ID           |
+| `google` (REST API) | `gemini-3.1-pro`       | `gemini-3-pro-preview` (fallback) | ✅ Unchanged behavior |
 
 ---
 
 ## 🔧 Pro Engineer Review — 2026-04-14
+
 > Perspective: Google / IBM Production Engineering
 > Principles applied: YAGNI · KISS · DRY · SOLID
 > Source code verified: ✅ (as of 2026-04-14)
 
 ### 📍 Current Reality (Source Code vs. Document)
+
 - ✅ **Document matches code:** Verified `extensions/google/provider-models.ts` lines 17-19 exactly match the described legacy preview strings.
 - ✅ **DennouAibou Rules alignment:** The decision to outright reject the upstream bloat (NUL safety / Sonnet parameters) strictly follows the "Smart Debloat" and "Defend the Hooks" directives in `DENNOU_RULES.md`.
 
 ### 🎯 Core Problem (1 sentence)
+
 > The legacy `3.0-preview` fallback array breaks the modern `@google/gemini-cli` execution path which strictly requires a valid `3.1` model ID schema.
 
 ### 🔍 Principle Filter
-| Check | Result | Note |
-|-------|--------|------|
-| **YAGNI** — Is this actually needed now? | ✅ **Yes** | Passing the correct 3.1 ID is essential to unblock the CLI runner. The externally bloated upstream features were rightfully discarded. |
-| **KISS** — Is there a simpler solution? | ✅ **Simple enough** | Prepended the correct ID to the existing array. `cloneFirstTemplateModel` natively handles fallbacks. Elegant and minimal. |
-| **DRY** — Any duplication to eliminate? | ✅ **None** | Reuses the existing `cloneFirstTemplateModel` logic path efficiently. |
-| **SOLID** — Any violation causing real problems? | ✅ **None** | Expanding the literal array respects the Open-Closed Principle. |
+
+| Check                                            | Result               | Note                                                                                                                                   |
+| ------------------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **YAGNI** — Is this actually needed now?         | ✅ **Yes**           | Passing the correct 3.1 ID is essential to unblock the CLI runner. The externally bloated upstream features were rightfully discarded. |
+| **KISS** — Is there a simpler solution?          | ✅ **Simple enough** | Prepended the correct ID to the existing array. `cloneFirstTemplateModel` natively handles fallbacks. Elegant and minimal.             |
+| **DRY** — Any duplication to eliminate?          | ✅ **None**          | Reuses the existing `cloneFirstTemplateModel` logic path efficiently.                                                                  |
+| **SOLID** — Any violation causing real problems? | ✅ **None**          | Expanding the literal array respects the Open-Closed Principle.                                                                        |
 
 ### 🛤️ Solution Options
 
-#### Option A — The "Surgical Array Prepend" *(推奨)*
+#### Option A — The "Surgical Array Prepend" _(推奨)_
+
 **Approach**: Insert `gemini-3.1-pro-preview` as the first element of `GEMINI_3_1_PRO_TEMPLATE_IDS`, leaving the old string as a fallback.  
 **Implementation cost**: Minimal (2 lines).  
 **Risk**: Near Zero. `cloneFirstTemplateModel` protects against catastrophic missing references.  
 **Why recommended**: Provides exactly what the CLI binary expects right now, maintaining stable backwards compatibility logic for the REST API if the template map varies. Matches exactly with your proposed document.  
 **Concrete steps**:
+
 1. Prepend `"gemini-3.1-pro-preview", ` to `GEMINI_3_1_PRO_TEMPLATE_IDS`.
 2. Prepend `"gemini-3.1-flash-preview", ` to `GEMINI_3_1_FLASH_TEMPLATE_IDS`.
 
 #### Option B — The "Full Hardcode Rewrite"
+
 **Approach**: Completely replace the ID logic to skip `cliTemplateIds` iteration entirely for 3.1, passing strings directly.
 **Implementation cost**: Medium. Let `isModernGoogleModel()` handle early return and bypass the family mapper entirely.
 **Risk**: High. Could break the gateway's expected internal model ID resolution flow for edge cases.
 **When to choose this instead**: Only if downstream dependencies suddenly strip array-based fallback logic. Not recommended now.
 
 ### ✅ Pro Recommendation
+
 > **Choose Option A because**: It solves the bug strictly within the parameters of the current architecture's template fallback system, avoiding breaking changes while upholding the team's commitment to zero unneeded bloat.
 > Estimated implementation: 1 minute (Ready to go).
 > Rollback plan: Revert the two prepended string literals.
 
 ### ⚡ Quick Wins (implement regardless of option chosen)
+
 - [x] Option A was preserved and expanded during the bounded provider sync described below.
 
 ---

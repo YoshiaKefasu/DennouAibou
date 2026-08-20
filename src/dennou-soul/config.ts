@@ -10,11 +10,7 @@
  * 都度 `getDennouConfig()` を呼ぶ設計。config-reloadによるhot-reloadが自動で効く。
  */
 import { getRuntimeConfig } from "../config/config.js";
-import {
-  type DennouConfig,
-  type DennouToolsPruneConfig,
-  DENNOU_CONFIG_DEFAULTS,
-} from "./types.js";
+import { type DennouConfig, type DennouToolsPruneConfig, DENNOU_CONFIG_DEFAULTS } from "./types.js";
 
 /** 型ガード: raw値が部分的なDennouConfigかどうかを判定 */
 function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {

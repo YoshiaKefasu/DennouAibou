@@ -1,7 +1,7 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import { getProviderEnvVars } from "../../secrets/provider-env-vars.js";
-import { listRuntimeVideoGenerationProviders } from "../../video-generation/runtime.js";
 import { listSupportedVideoGenerationModes } from "../../video-generation/capabilities.js";
+import { listRuntimeVideoGenerationProviders } from "../../video-generation/runtime.js";
 import {
   buildVideoGenerationTaskStatusDetails,
   buildVideoGenerationTaskStatusText,

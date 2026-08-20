@@ -19,5 +19,10 @@ export {
   type BackfillResult,
 } from "./sidecar-client.js";
 export { createChatSearchTool, ChatSearchSchema } from "./tool.js";
-export { startRawChatIndexer, stopRawChatIndexer, isRawChatIndexingEnabled, backfillSessionFiles } from "./hook.js";
+export {
+  startRawChatIndexer,
+  stopRawChatIndexer,
+  isRawChatIndexingEnabled,
+  backfillSessionFiles,
+} from "./hook.js";
 export { setRawChatClient, getRawChatClient } from "./client-ref.js";

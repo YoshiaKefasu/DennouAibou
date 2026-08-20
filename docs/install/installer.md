@@ -11,8 +11,8 @@ title: "Installer Internals"
 
 DennouAibou ships three installer scripts, served from `openclaw.ai`.
 
-| Script                             | Platform             | What it does                                                                                                   |
-| ---------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Script                             | Platform             | What it does                                                                                                      |
+| ---------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | [`install.sh`](#installsh)         | macOS / Linux / WSL  | Installs Node if needed, installs DennouAibou via npm (default) or git, and can run onboarding.                   |
 | [`install-cli.sh`](#install-clish) | macOS / Linux / WSL  | Installs Node + DennouAibou into a local prefix (`~/.openclaw`) with npm or git checkout modes. No root required. |
 | [`install.ps1`](#installps1)       | Windows (PowerShell) | Installs Node if needed, installs DennouAibou via npm (default) or git, and can run onboarding.                   |
@@ -243,7 +243,7 @@ by default, plus git-checkout installs under the same prefix flow.
 | `--npm`                     | Shortcut for npm method                                                         |
 | `--git`, `--github`         | Shortcut for git method                                                         |
 | `--git-dir <path>`          | Git checkout directory (default: `~/openclaw`). Alias: `--dir`                  |
-| `--version <ver>`           | DennouAibou version or dist-tag (default: `latest`)                                |
+| `--version <ver>`           | DennouAibou version or dist-tag (default: `latest`)                             |
 | `--node-version <ver>`      | Node version (default: `22.22.0`)                                               |
 | `--json`                    | Emit NDJSON events                                                              |
 | `--onboard`                 | Run `openclaw onboard` after install                                            |
@@ -259,7 +259,7 @@ by default, plus git-checkout installs under the same prefix flow.
 | ------------------------------------------- | --------------------------------------------- |
 | `OPENCLAW_PREFIX=<path>`                    | Install prefix                                |
 | `OPENCLAW_INSTALL_METHOD=git\|npm`          | Install method                                |
-| `OPENCLAW_VERSION=<ver>`                    | DennouAibou version or dist-tag                  |
+| `OPENCLAW_VERSION=<ver>`                    | DennouAibou version or dist-tag               |
 | `OPENCLAW_NODE_VERSION=<ver>`               | Node version                                  |
 | `OPENCLAW_GIT_DIR=<path>`                   | Git checkout directory for git installs       |
 | `OPENCLAW_GIT_UPDATE=0\|1`                  | Toggle git updates for existing checkouts     |

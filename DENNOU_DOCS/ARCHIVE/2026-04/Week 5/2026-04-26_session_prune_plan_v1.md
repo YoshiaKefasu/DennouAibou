@@ -37,13 +37,13 @@
 
 ### 2.2 安全機構（5層防御）
 
-| # | 機構 | 説明 | 危険度低減効果 |
-|---|---|---|---|
-| 1 | **Idle Time Guard** | ファイルの最終更新時刻から `idleThresholdMinutes` 経過していないセッションは絶対に触らない | 書き込み中のファイル破損を防止 |
-| 2 | **Copy-on-Rotate** | 直接編集せず、リネーム → 読み取り → 新ファイル書き出し → 旧ファイル削除の順で処理 | 書き込み中プロセスに影響しない |
-| 3 | **Keep Last Entries** | セッション末尾の最新Nエントリは絶対にPruneしない | 直近の重要な文脈を保護 |
-| 4 | **Lock / 排他制御** | `state.db` もしくは専用 `.prune.lock` で二重起動防止 | 同時実行による競合を防止 |
-| 5 | **Dry-Run 段階的導入** | 初期は `dryRun: true` でログ出力のみ、実際の削除は行わない | 誤動作を事前に検出できる |
+| #   | 機構                   | 説明                                                                                       | 危険度低減効果                 |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------ | ------------------------------ |
+| 1   | **Idle Time Guard**    | ファイルの最終更新時刻から `idleThresholdMinutes` 経過していないセッションは絶対に触らない | 書き込み中のファイル破損を防止 |
+| 2   | **Copy-on-Rotate**     | 直接編集せず、リネーム → 読み取り → 新ファイル書き出し → 旧ファイル削除の順で処理          | 書き込み中プロセスに影響しない |
+| 3   | **Keep Last Entries**  | セッション末尾の最新Nエントリは絶対にPruneしない                                           | 直近の重要な文脈を保護         |
+| 4   | **Lock / 排他制御**    | `state.db` もしくは専用 `.prune.lock` で二重起動防止                                       | 同時実行による競合を防止       |
+| 5   | **Dry-Run 段階的導入** | 初期は `dryRun: true` でログ出力のみ、実際の削除は行わない                                 | 誤動作を事前に検出できる       |
 
 ---
 
@@ -190,6 +190,7 @@ export interface DennouSessionPruneConfig {
 ---
 
 ## 🔧 Pro Engineer Review — 2026-04-28
+
 > Perspective: Google / IBM Production Engineering
 > Principles applied: YAGNI · KISS · DRY · SOLID
 > Source code verified: ✅ (as of 2026-04-28)
@@ -197,6 +198,7 @@ export interface DennouSessionPruneConfig {
 ### 📍 Current Reality (Source Code vs. Document)
 
 **読み込んだファイル：**
+
 - `src/agents/pi-hooks/context-pruning/pruner.ts` (382行) — ランタイムContextPruning実装
 - `src/infra/heartbeat-runner.ts` L303-353 — `pruneHeartbeatTranscript()` / `captureTranscriptState()`
 - `src/infra/heartbeat-runner.transcript-prune.test.ts` (114行)
@@ -228,30 +230,35 @@ export interface DennouSessionPruneConfig {
 - ✅ Document matches code: Rule 1 Encapsulation方針はDENNOU_RULES.mdと整合
 
 ### 🎯 Core Problem (1 sentence)
+
 > セッションJSONLの**行レベルのツール出力肥大化**を安全にpruneしたいが、上流が既に持つ4つのセッション管理機構との競合を考慮せずに独自Copy-on-Rotateを導入すると、設計の重複と実行時の競合リスクを生む。
 
 ### 🔍 Principle Filter
-| Check | Result | Note |
-|-------|--------|------|
-| YAGNI — Is this actually needed now? | ⚠️ 部分的にYes | 行レベルpruneは上流にない。ただし `targetFiles: "all"` モードや独自スケジューラは過剰 |
-| KISS — Is there a simpler solution? | ⚠️ Simpler exists | 閉じたセッション限定なら上流との競合ゼロ。スケジューラも不要にできる |
-| DRY — Any duplication to eliminate? | ⚠️ Found | `minPrunableToolChars`, `placeholder` は上流 `EffectiveContextPruningSettings` の `minPrunableToolChars`, `hardClear.placeholder` と概念重複。設定の二重管理が発生する |
-| SOLID — Any violation causing real problems? | ✅ None | `pruneSessionFile()` と `pruneAllSessions()` の責務分離は適切 |
+
+| Check                                        | Result            | Note                                                                                                                                                                   |
+| -------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| YAGNI — Is this actually needed now?         | ⚠️ 部分的にYes    | 行レベルpruneは上流にない。ただし `targetFiles: "all"` モードや独自スケジューラは過剰                                                                                  |
+| KISS — Is there a simpler solution?          | ⚠️ Simpler exists | 閉じたセッション限定なら上流との競合ゼロ。スケジューラも不要にできる                                                                                                   |
+| DRY — Any duplication to eliminate?          | ⚠️ Found          | `minPrunableToolChars`, `placeholder` は上流 `EffectiveContextPruningSettings` の `minPrunableToolChars`, `hardClear.placeholder` と概念重複。設定の二重管理が発生する |
+| SOLID — Any violation causing real problems? | ✅ None           | `pruneSessionFile()` と `pruneAllSessions()` の責務分離は適切                                                                                                          |
 
 ### 🛤️ Solution Options
 
-#### Option A — Closed-Only Minimal *(推奨)*
+#### Option A — Closed-Only Minimal _(推奨)_
+
 **Approach**: pruneを `*.deleted.*` と `*.reset.*`（閉じたセッション）に限定する。アクティブ `.jsonl` には一切触れない。スケジューラを廃止し、上流の `saveSessionStore()` 実行後のpost-hookとして便乗実行する。
 
 **Implementation cost**: Low (1日以内)
 **Risk**: Low (閉じたファイルしか触らないため上流と100%競合しない)
 **Why recommended**:
+
 1. **アクティブセッション破損リスクが完全にゼロ** — Idle Time Guard、Lock、Copy-on-Rotateの5層防御のうち3層が不要になる（設計が5→2層に単純化）
 2. **上流との競合がゼロ** — `store-maintenance.ts` のarchiving後のファイルだけが対象なので、同時実行問題が発生しない
 3. **`setInterval` スケジューラが不要** — 上流の `saveSessionStore()` が既に定期的にmaintenance走査を行うので、そのタイミングに便乗すれば独自タイマーを持つ必要がない（KISS）
 4. **設定フィールドが5つ以下に削減** — `enabled`, `minPrunableToolChars`, `keepLastEntries`, `placeholder`, `dryRun` だけで十分
 
 **Concrete steps**:
+
 1. `src/dennou-soul/` ディレクトリを新規作成
 2. `src/dennou-soul/prune-closed-sessions.ts` — `pruneClosedSessionFile(filePath)` を実装（JSONLの行レベルpruning、ツール出力をplaceholderに置換）
 3. 上流 `store-maintenance.ts` の archive 完了後に呼び出すフックを `src/dennou-soul/session-maintenance-hook.ts` に配置
@@ -259,6 +266,7 @@ export interface DennouSessionPruneConfig {
 5. `dryRun: true` で1週間観察 → `false` に切り替え
 
 #### Option B — Full Plan（プラン通り + 競合対策追加）
+
 **Approach**: プランの設計をベースに、上流競合対策としてファイルロックの統合と `store-maintenance.ts` の実行タイミング検知を追加。
 
 **Implementation cost**: Medium〜High (3-5日)
@@ -266,6 +274,7 @@ export interface DennouSessionPruneConfig {
 **When to choose this instead**: セッションが数時間〜数日の長期稼働で、ツール出力がGB級に膨張する環境が現実に発生している場合のみ。
 
 **Concrete steps**:
+
 1. プランのPhase 1-4をそのまま実装
 2. **追加**: `store-maintenance.ts` の `saveSessionStore()` 実行中フラグを検知し、同時実行を回避するmutex層を追加
 3. **追加**: `ttlMinutes` のデフォルトを `5` → `30` に変更（5分は攻撃的すぎる — 会話中の5分休憩は日常的）
@@ -273,12 +282,14 @@ export interface DennouSessionPruneConfig {
 5. テストで上流archiving → 独自prune → 上流cleanup の3段パイプラインを検証
 
 ### ✅ Pro Recommendation
+
 > **Choose Option A because**: 223KBの閉じたセッション（`.deleted.*`）こそが「ディスクを占有する」主犯であり、アクティブセッションのpruneは現時点で実証された必要性がない（YAGNI）。閉じたファイル限定ならIdle Guard/Lock/Copy-on-Rotateの重装備が不要で、上流との競合もゼロ。最小限のコードで最大の効果が得られる。
 >
 > Estimated implementation: 0.5〜1日
 > Rollback plan: `enabled: false` で即停止。閉じたファイルのpruneなので復元不要（元々削除予定のデータ）。
 
 ### ⚡ Quick Wins (implement regardless of option chosen)
+
 - [ ] `ttlMinutes` デフォルトを `5` → `30` に変更（5分は日常的な休憩で誤prune発生）
 - [ ] `targetFiles: "all"` オプションを設計から削除（YAGNI — 非推奨なものを実装しない）
 - [ ] WAL rotate参照パスを `episodic-claw/src/segmenter.ts` L168-210 に修正

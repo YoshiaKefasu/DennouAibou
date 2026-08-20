@@ -154,7 +154,9 @@ describe("isProtectedByWorkspacePath", () => {
   });
 
   it("handles Windows backslash paths correctly", () => {
-    const line = makeWorkspaceFileResult(`File content from D:\\GitHub\\OpenClaw Related Repos\\DennouAibou\\SOUL.md`);
+    const line = makeWorkspaceFileResult(
+      `File content from D:\\GitHub\\OpenClaw Related Repos\\DennouAibou\\SOUL.md`,
+    );
     const parsed = parseLine(line)!;
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: [],
@@ -220,11 +222,11 @@ describe("pruneToolOutputLines with protection", () => {
     // keepLastTools=2, totalLines=5
     // index 2 should be pruned unless protected by keyword
     const lines = [
-      makeSessionHeader(),                     // 0
-      makeUserMessage("hello"),                // 1
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
       makeLargeToolResult("AGENTS.md: some rules"), // 2, protected by keyword!
-      makeSmallToolResult(),                   // 3, posFromEnd=2 → keepLastTools保護
-      makeSmallToolResult(),                   // 4, posFromEnd=1 → 保護
+      makeSmallToolResult(), // 3, posFromEnd=2 → keepLastTools保護
+      makeSmallToolResult(), // 4, posFromEnd=1 → 保護
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md"],
@@ -232,7 +234,10 @@ describe("pruneToolOutputLines with protection", () => {
     };
 
     const { resultLines, prunedCount } = pruneToolOutputLines(
-      lines, defaultConfig, testLogger, protection,
+      lines,
+      defaultConfig,
+      testLogger,
+      protection,
     );
 
     expect(prunedCount).toBe(0); // keyword保護でpruneされない
@@ -241,11 +246,11 @@ describe("pruneToolOutputLines with protection", () => {
 
   it("protects toolResult containing workspace path from pruning", () => {
     const lines = [
-      makeSessionHeader(),                     // 0
-      makeUserMessage("hello"),                // 1
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
       makeWorkspaceFileResult("Reading from /home/user/project/SOUL.md"), // 2, protected!
-      makeSmallToolResult(),                   // 3, posFromEnd=2
-      makeSmallToolResult(),                   // 4, posFromEnd=1
+      makeSmallToolResult(), // 3, posFromEnd=2
+      makeSmallToolResult(), // 4, posFromEnd=1
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: [],
@@ -253,7 +258,10 @@ describe("pruneToolOutputLines with protection", () => {
     };
 
     const { resultLines, prunedCount } = pruneToolOutputLines(
-      lines, defaultConfig, testLogger, protection,
+      lines,
+      defaultConfig,
+      testLogger,
+      protection,
     );
 
     expect(prunedCount).toBe(0);
@@ -262,11 +270,11 @@ describe("pruneToolOutputLines with protection", () => {
 
   it("prunes toolResult without protected content normally", () => {
     const lines = [
-      makeSessionHeader(),                     // 0
-      makeUserMessage("hello"),                // 1
-      makeLargeToolResult("x".repeat(100)),    // 2, no keyword → prune!
-      makeSmallToolResult(),                   // 3, posFromEnd=2
-      makeSmallToolResult(),                   // 4, posFromEnd=1
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
+      makeLargeToolResult("x".repeat(100)), // 2, no keyword → prune!
+      makeSmallToolResult(), // 3, posFromEnd=2
+      makeSmallToolResult(), // 4, posFromEnd=1
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md", "SOUL.md"],
@@ -274,7 +282,10 @@ describe("pruneToolOutputLines with protection", () => {
     };
 
     const { resultLines, prunedCount } = pruneToolOutputLines(
-      lines, defaultConfig, testLogger, protection,
+      lines,
+      defaultConfig,
+      testLogger,
+      protection,
     );
 
     expect(prunedCount).toBe(1);
@@ -293,11 +304,11 @@ describe("pruneToolOutputLines with protection", () => {
     // index 3: keyword match → protect
     // index 4: path match → protect
     const lines = [
-      makeSessionHeader(),                                // 0
-      makeUserMessage("hello"),                           // 1
-      makeLargeToolResult("plain output"),                // 2, neither → prune
-      makeWorkspaceFileResult("AGENTS.md updated"),        // 3, keyword match
-      makeWorkspaceFileResult("/home/user/project/README"),// 4, path match
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
+      makeLargeToolResult("plain output"), // 2, neither → prune
+      makeWorkspaceFileResult("AGENTS.md updated"), // 3, keyword match
+      makeWorkspaceFileResult("/home/user/project/README"), // 4, path match
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md"],
@@ -305,7 +316,10 @@ describe("pruneToolOutputLines with protection", () => {
     };
 
     const { resultLines, prunedCount } = pruneToolOutputLines(
-      lines, defaultConfig, testLogger, protection,
+      lines,
+      defaultConfig,
+      testLogger,
+      protection,
     );
 
     expect(prunedCount).toBe(1);
@@ -386,12 +400,12 @@ describe("pruneToolOutputLines with protection", () => {
 
   it("works without protection config (backward compatibility)", () => {
     const lines = [
-      makeSessionHeader(),                     // 0
-      makeUserMessage("hello"),                // 1
-      makeUserMessage("msg 2"),                // 2
-      makeUserMessage("msg 3"),                // 3
-      makeLargeToolResult("x".repeat(100)),    // 4, posFromEnd=2, keepLastTools=2 で保護範囲内 → 保護
-      makeSmallToolResult(),                   // 5, posFromEnd=1 → 保護
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
+      makeUserMessage("msg 2"), // 2
+      makeUserMessage("msg 3"), // 3
+      makeLargeToolResult("x".repeat(100)), // 4, posFromEnd=2, keepLastTools=2 で保護範囲内 → 保護
+      makeSmallToolResult(), // 5, posFromEnd=1 → 保護
     ];
 
     // minPrunableToolCharsを50にすることでlarge toolが対象になるが、

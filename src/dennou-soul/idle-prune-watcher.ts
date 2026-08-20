@@ -13,17 +13,14 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  onDiagnosticEvent,
-  type DiagnosticEventPayload,
-} from "../infra/diagnostic-events.js";
-import type { DennouPruneProtectionConfig } from "./types.js";
+import { loadConfig } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
+import { isProtectedSessionKey } from "../config/sessions/protected-session.js";
+import { onDiagnosticEvent, type DiagnosticEventPayload } from "../infra/diagnostic-events.js";
+import { logDebug } from "../logger.js";
 import { getDennouConfig } from "./config.js";
 import { pruneActiveSessionFile } from "./prune-active-session.js";
-import { logDebug } from "../logger.js";
-import { loadConfig } from "../config/config.js";
-import { isProtectedSessionKey } from "../config/sessions/protected-session.js";
-import { resolveStateDir } from "../config/paths.js";
+import type { DennouPruneProtectionConfig } from "./types.js";
 
 /**
  * セッションキー（`agent:{agentId}:{wsHash}`）→ タイマーID のマップ
@@ -82,9 +79,7 @@ function handleIdleEvent(
   // Skip idle prune for protected sessions (Phase 3).
   const openclawCfg = loadConfig();
   if (isProtectedSessionKey(sessionKey, openclawCfg)) {
-    logDebug(
-      `[DennouAibou] SKIP idle prune for protected session: sessionKey=${sessionKey}`,
-    );
+    logDebug(`[DennouAibou] SKIP idle prune for protected session: sessionKey=${sessionKey}`);
     return;
   }
 
@@ -137,13 +132,9 @@ function handleIdleEvent(
     );
 
     if (result === -1) {
-      console.warn(
-        `[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`,
-      );
+      console.warn(`[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`);
     } else if (result > 0) {
-      logDebug(
-        `[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`,
-      );
+      logDebug(`[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`);
     }
   }, delayMs);
 
@@ -168,9 +159,7 @@ function handleIdleEvent(
  * @param protection - 保護設定（ワークスペースパス自動解決済み）
  * @returns クリーンアップ関数（テストやシャットダウン時に呼び出す）
  */
-export function startIdlePruneWatcher(
-  protection?: DennouPruneProtectionConfig,
-): () => void {
+export function startIdlePruneWatcher(protection?: DennouPruneProtectionConfig): () => void {
   const dennocfg = getDennouConfig();
   const config = dennocfg.activeSessionToolsPrune;
   if (!config.enabled) {
@@ -191,10 +180,7 @@ export function startIdlePruneWatcher(
 
       if (stateEvt.state === "idle") {
         handleIdleEvent(stateEvt, protection);
-      } else if (
-        stateEvt.state === "processing" ||
-        stateEvt.state === "waiting"
-      ) {
+      } else if (stateEvt.state === "processing" || stateEvt.state === "waiting") {
         // セッションがアクティブに戻った → タイマーキャンセル
         const sessionKey = stateEvt.sessionKey;
         if (sessionKey && idleTimers.has(sessionKey)) {

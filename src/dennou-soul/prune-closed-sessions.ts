@@ -15,10 +15,10 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
-import { pruneToolOutputLines } from "./prune-engine.js";
-import { logDebug } from "../logger.js";
 import { resolveStateDir } from "../config/paths.js";
+import { logDebug } from "../logger.js";
+import { pruneToolOutputLines } from "./prune-engine.js";
+import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 
 /**
  * 単一の閉じたセッションファイルに対してPruneを実行する。
@@ -56,9 +56,14 @@ export function pruneClosedSessionFile(
   }
 
   // 共通エンジンでPrune判定
-  const { resultLines, prunedCount } = pruneToolOutputLines(lines, config, (msg) => {
-    logger(`[DennouAibou] ${filePath} ${msg}`);
-  }, protection);
+  const { resultLines, prunedCount } = pruneToolOutputLines(
+    lines,
+    config,
+    (msg) => {
+      logger(`[DennouAibou] ${filePath} ${msg}`);
+    },
+    protection,
+  );
 
   // dry-runの場合は書き込まない
   if (!config.dryRun && prunedCount > 0) {

@@ -424,7 +424,8 @@ export async function runDiscordGatewayLifecycle(params: {
     const now = Date.now();
     if (
       lastTransportActivityStatusAt !== undefined &&
-      now - lastTransportActivityStatusAt < DISCORD_GATEWAY_TRANSPORT_ACTIVITY_STATUS_MIN_INTERVAL_MS
+      now - lastTransportActivityStatusAt <
+        DISCORD_GATEWAY_TRANSPORT_ACTIVITY_STATUS_MIN_INTERVAL_MS
     ) {
       return;
     }

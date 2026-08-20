@@ -6,11 +6,11 @@
 
 ## 0. 解決する問題
 
-| 問題 | 解決策 |
-|---|---|
-| `dennou-config.json` はユーザーが手動作成必須 | **廃止**。`openclaw.json` の `dennou` セクションに統合 |
-| WebUIから操作不可 | `openclaw.json` は WebUI で編集可能。さらに専用セクションをUIに追加 |
-| DENNOU_RULES Rule 1 との兼ね合い | `OpenClawConfig` 型は変更しない。DennouAibou側のtype assertionで読む |
+| 問題                                          | 解決策                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `dennou-config.json` はユーザーが手動作成必須 | **廃止**。`openclaw.json` の `dennou` セクションに統合               |
+| WebUIから操作不可                             | `openclaw.json` は WebUI で編集可能。さらに専用セクションをUIに追加  |
+| DENNOU_RULES Rule 1 との兼ね合い              | `OpenClawConfig` 型は変更しない。DennouAibou側のtype assertionで読む |
 
 ---
 
@@ -37,12 +37,12 @@
 
 ### メリット
 
-| 観点 | 内容 |
-|---|---|
-| **ユーザー体験** | WebUIの設定画面でJSON編集 → 保存だけ。ファイル作成不要 |
-| **既存インフラ再利用** | `config-reload.ts` の hot-reload が自動で機能。設定変更が即時反映 |
-| **Encapsulation維持** | `OpenClawConfig` 型は変更しない。`dennou-soul/` 内で型アサーションして読む |
-| **後方互換** | `dennou-config.json` が残っていてもフォールバックとして機能させられる（移行期間） |
+| 観点                   | 内容                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| **ユーザー体験**       | WebUIの設定画面でJSON編集 → 保存だけ。ファイル作成不要                            |
+| **既存インフラ再利用** | `config-reload.ts` の hot-reload が自動で機能。設定変更が即時反映                 |
+| **Encapsulation維持**  | `OpenClawConfig` 型は変更しない。`dennou-soul/` 内で型アサーションして読む        |
+| **後方互換**           | `dennou-config.json` が残っていてもフォールバックとして機能させられる（移行期間） |
 
 ---
 
@@ -102,6 +102,7 @@ export function getDennouConfig(): DennouConfig {
 ```
 
 **削除する関数・変数**（`config.ts` から完全除去）:
+
 - `getConfigPath()` — ファイルパス解決不要になる
 - `loadDennouConfig()` — `getDennouConfig()` に統合
 - `cachedConfig` / `clearDennouConfigCache()` — キャッシュ不要（`getRuntimeConfig()` が管理）
@@ -111,6 +112,7 @@ export function getDennouConfig(): DennouConfig {
 `src/gateway/config-reload.ts` が `openclaw.json` の変更を検知するたびに `getRuntimeConfig()` が更新される。DennouAibouの各コンポーネントが `getDennouConfig()` を都度呼ぶ設計（キャッシュなし）であれば、**WebUIで設定を保存した瞬間に反映**される。
 
 対象コンポーネント：
+
 - `idle-prune-watcher.ts` — idleDelayMinutes の変更 → タイマー再起動
 - `prune-engine.ts` — minPrunableToolChars, keepLastTools の変更 → 次回prune時に反映
 - `prune-closed-sessions.ts` — enabled の変更 → 次回 afterSaveHook 呼び出し時に反映
@@ -224,41 +226,45 @@ function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {
 
 ## 6. 削除するもの（実装時に即座に除去）
 
-| 対象 | アクション |
-|---|---|
-| `src/dennou-soul/config.ts` 全体 | Phase 1 で完全書き換え |
-| `getConfigPath()` 関数 | 削除 |
-| `loadDennouConfig()` 関数 | 削除（`getDennouConfig()` に置き換え） |
-| `cachedConfig` / `clearDennouConfigCache()` | 削除 |
+| 対象                                         | アクション                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `src/dennou-soul/config.ts` 全体             | Phase 1 で完全書き換え                                                   |
+| `getConfigPath()` 関数                       | 削除                                                                     |
+| `loadDennouConfig()` 関数                    | 削除（`getDennouConfig()` に置き換え）                                   |
+| `cachedConfig` / `clearDennouConfigCache()`  | 削除                                                                     |
 | `~/.openclaw/dennou-config.json`（ファイル） | コードから参照がなくなるため自然消滅。既存ファイルはユーザーが手動削除可 |
 
 ---
 
 ## 7. 実装フェーズ一覧
 
-| Phase | 内容 | 変更ファイル | 見積 |
-|---|---|---|---|
-| **1** | `config.ts` 完全書き換え | `src/dennou-soul/config.ts` | 1-2h |
-| **2** | hot-reload 対応 | `idle-prune-watcher.ts` | 1h |
-| **3** | WebUI セクション追加 | `ui/src/ui/views/config.ts`（patch管理） | 1h |
-| **4** | ドキュメント更新 | DENNOU_DOCS 各プラン | 0.5h |
+| Phase | 内容                     | 変更ファイル                             | 見積 |
+| ----- | ------------------------ | ---------------------------------------- | ---- |
+| **1** | `config.ts` 完全書き換え | `src/dennou-soul/config.ts`              | 1-2h |
+| **2** | hot-reload 対応          | `idle-prune-watcher.ts`                  | 1h   |
+| **3** | WebUI セクション追加     | `ui/src/ui/views/config.ts`（patch管理） | 1h   |
+| **4** | ドキュメント更新         | DENNOU_DOCS 各プラン                     | 0.5h |
 
 ### Phase 1: バックエンド — `config.ts` 完全書き換え
+
 - `getRuntimeConfig()` から `dennou` セクションを読む形に書き換え
 - `getConfigPath()` / `loadDennouConfig()` / `cachedConfig` / `clearDennouConfigCache()` を全削除
 - 型ガード `isDennouConfigObject()` を追加
 - `dennou-config.json` への参照をコードベースから完全除去
 
 ### Phase 2: バックエンド — hot-reload 対応
+
 - `idle-prune-watcher.ts` でタイマーを config 変更時に再起動するロジック追加
 - `prune-engine.ts` は都度 `getDennouConfig()` を呼ぶ形なら変更不要
 
 ### Phase 3: フロントエンド — WebUI セクション追加
+
 - `ui/src/ui/views/config.ts` の `SECTION_CATEGORIES` に `dennouAibou` カテゴリ追加
 - `sidebarIcons` に `dennou` アイコン（scissorsSVG）追加
 - 変更を `patches/dennou-webui-config-section.patch` として保存
 
 ### Phase 4: ドキュメント更新
+
 - DENNOU_DOCS の各プランに openclaw.json 統合の注記追加
 - `DENNOU_RULES.md` にユーザー向け設定方法を追記
 
@@ -266,13 +272,13 @@ function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {
 
 ## 8. リスク
 
-| リスク | 対策 |
-|---|---|
-| `getRuntimeConfig()` が未初期化状態で呼ばれる | `getDennouConfig()` を try/catch で包み、エラー時は DEFAULTS を返す |
-| 上流が将来 `dennou` キーを使い始める | `dennouAibou` に改名する。現状リスクは低い |
-| WebUIで誤った値を設定してpruneが暴走 | `dryRun: true` がデフォルトのため、誤設定でもファイルは変更されない |
+| リスク                                                        | 対策                                                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `getRuntimeConfig()` が未初期化状態で呼ばれる                 | `getDennouConfig()` を try/catch で包み、エラー時は DEFAULTS を返す                                |
+| 上流が将来 `dennou` キーを使い始める                          | `dennouAibou` に改名する。現状リスクは低い                                                         |
+| WebUIで誤った値を設定してpruneが暴走                          | `dryRun: true` がデフォルトのため、誤設定でもファイルは変更されない                                |
 | `config.ts`（上流）へのパッチが upstream merge でコンフリクト | `patches/` で管理し、merge後に `git apply` で再適用。影響箇所は `SECTION_CATEGORIES` 1エントリのみ |
-| 既存の `dennou-config.json` が残留している | コードから参照がなくなるため無害。ユーザーには手動削除を促す（強制不要） |
+| 既存の `dennou-config.json` が残留している                    | コードから参照がなくなるため無害。ユーザーには手動削除を促す（強制不要）                           |
 
 ---
 
@@ -293,18 +299,18 @@ function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {
 
 ### 全フェーズ完了
 
-| Phase | 変更内容 | 状態 | 備考 |
-|---|---|---|---|
-| **Phase 1** | `src/dennou-soul/config.ts` 完全書き換え | ✅ | `dennou-config.json` 読み込み廃止。`getRuntimeConfig()` から `dennou` セクションを読む |
-| Phase 1 | `getConfigPath()` / `loadDennouConfig()` / `cachedConfig` / `clearDennouConfigCache()` 削除 | ✅ | 不要コードを完全除去 |
-| Phase 1 | `types.ts` コメント更新 | ✅ | `dennou-config.json → openclaw.json dennou セクション` |
-| Phase 1追加 | `toolsPrune` 共通設定追加 | ✅ | `minPrunableToolChars` / `keepLastTools` / `placeholder` / `dryRun` の重複を整理。各モード側で必要なキーだけ上書き可能 |
-| Phase 1追加 | `src/config/zod-schema.ts` に `dennou` schema登録 | ✅ | `openclaw.json` の strict schema とWebUI表示に必要。ユーザーが全キーを設定可能 |
-| **Phase 2** | `idle-prune-watcher.ts` hot-reload対応 | ✅ | `handleIdleEvent` 内で都度 `getDennouConfig()` を呼ぶ。`startIdlePruneWatcher` の `config` 引数削除 |
-| Phase 2 | `run-main.ts` 呼び出し簡略化 | ✅ | `startIdlePruneWatcher(protection)` — configは内部で読む |
-| **Phase 3** | `ui/src/ui/views/config.ts` にDennouAibouカテゴリ追加 | ✅ | `sidebarIcons.dennou` (scissorsアイコン) + `SECTION_CATEGORIES` に `dennouAibou` セクション |
-| Phase 3 | パッチ管理 | ✅ | `patches/dennou-webui-config-section.patch` 保存 |
-| **Phase 4** | 本プラン更新 | ✅ | このセクション |
+| Phase       | 変更内容                                                                                    | 状態 | 備考                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Phase 1** | `src/dennou-soul/config.ts` 完全書き換え                                                    | ✅   | `dennou-config.json` 読み込み廃止。`getRuntimeConfig()` から `dennou` セクションを読む                                 |
+| Phase 1     | `getConfigPath()` / `loadDennouConfig()` / `cachedConfig` / `clearDennouConfigCache()` 削除 | ✅   | 不要コードを完全除去                                                                                                   |
+| Phase 1     | `types.ts` コメント更新                                                                     | ✅   | `dennou-config.json → openclaw.json dennou セクション`                                                                 |
+| Phase 1追加 | `toolsPrune` 共通設定追加                                                                   | ✅   | `minPrunableToolChars` / `keepLastTools` / `placeholder` / `dryRun` の重複を整理。各モード側で必要なキーだけ上書き可能 |
+| Phase 1追加 | `src/config/zod-schema.ts` に `dennou` schema登録                                           | ✅   | `openclaw.json` の strict schema とWebUI表示に必要。ユーザーが全キーを設定可能                                         |
+| **Phase 2** | `idle-prune-watcher.ts` hot-reload対応                                                      | ✅   | `handleIdleEvent` 内で都度 `getDennouConfig()` を呼ぶ。`startIdlePruneWatcher` の `config` 引数削除                    |
+| Phase 2     | `run-main.ts` 呼び出し簡略化                                                                | ✅   | `startIdlePruneWatcher(protection)` — configは内部で読む                                                               |
+| **Phase 3** | `ui/src/ui/views/config.ts` にDennouAibouカテゴリ追加                                       | ✅   | `sidebarIcons.dennou` (scissorsアイコン) + `SECTION_CATEGORIES` に `dennouAibou` セクション                            |
+| Phase 3     | パッチ管理                                                                                  | ✅   | `patches/dennou-webui-config-section.patch` 保存                                                                       |
+| **Phase 4** | 本プラン更新                                                                                | ✅   | このセクション                                                                                                         |
 
 ### 設計との整合性
 
@@ -317,9 +323,9 @@ function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {
 
 ### 削除したコード
 
-| 対象 | 行数 |
-|---|---|
-| `src/dennou-soul/config.ts` 旧実装（ファイルI/O + キャッシュ） | 80行 |
+| 対象                                                               | 行数  |
+| ------------------------------------------------------------------ | ----- |
+| `src/dennou-soul/config.ts` 旧実装（ファイルI/O + キャッシュ）     | 80行  |
 | `ui/src/ui/views/config.ts` パッチ（追記のみ、既存コード削除なし） | +13行 |
 
 ### dennou-config.json からの移行方法（ユーザー向け）

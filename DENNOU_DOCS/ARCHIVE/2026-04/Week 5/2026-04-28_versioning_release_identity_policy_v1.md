@@ -88,14 +88,17 @@ Base: OpenClaw 2026.4.5
 Upstream base: OpenClaw 2026.4.5
 
 ## Highlights
+
 - ...
 
 ## DennouAibou changes
+
 - [SOUL] ...
 - [DEBLOAT] ...
 - [FIX-UPSTREAM] ...
 
 ## Upstream sync
+
 - Base remains OpenClaw 2026.4.5
 ```
 

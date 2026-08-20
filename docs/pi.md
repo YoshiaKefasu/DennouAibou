@@ -37,7 +37,7 @@ DennouAibou uses the pi SDK to embed an AI coding agent into its messaging gatew
 | `pi-ai`           | Core LLM abstractions: `Model`, `streamSimple`, message types, provider APIs                           |
 | `pi-agent-core`   | Agent loop, tool execution, `AgentMessage` types                                                       |
 | `pi-coding-agent` | High-level SDK: `createAgentSession`, `SessionManager`, `AuthStorage`, `ModelRegistry`, built-in tools |
-| `pi-tui`          | Terminal UI components (used in DennouAibou's local TUI mode)                                             |
+| `pi-tui`          | Terminal UI components (used in DennouAibou's local TUI mode)                                          |
 
 ## File Structure
 
@@ -521,10 +521,10 @@ This provides the interactive terminal experience similar to pi's native mode.
 
 ## Key Differences from Pi CLI
 
-| Aspect          | Pi CLI                  | DennouAibou Embedded                                                                              |
+| Aspect          | Pi CLI                  | DennouAibou Embedded                                                                           |
 | --------------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
 | Invocation      | `pi` command / RPC      | SDK via `createAgentSession()`                                                                 |
-| Tools           | Default coding tools    | Custom DennouAibou tool suite                                                                     |
+| Tools           | Default coding tools    | Custom DennouAibou tool suite                                                                  |
 | System prompt   | AGENTS.md + prompts     | Dynamic per-channel/context                                                                    |
 | Session storage | `~/.pi/agent/sessions/` | `~/.openclaw/agents/<agentId>/sessions/` (or `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/`) |
 | Auth            | Single credential       | Multi-profile with rotation                                                                    |

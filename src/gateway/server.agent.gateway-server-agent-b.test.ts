@@ -1,22 +1,10 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  test,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
-import {
-  emitAgentEvent,
-  registerAgentRunContext,
-} from "../infra/agent-events.js";
+import { emitAgentEvent, registerAgentRunContext } from "../infra/agent-events.js";
 import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
 import { setRegistry } from "./server.agent.gateway-server-agent.mocks.js";
 import { createRegistry } from "./server.e2e-registry-helpers.js";
@@ -53,9 +41,7 @@ afterAll(async () => {
   await server.close();
 });
 
-const createMSTeamsPlugin = (params?: {
-  aliases?: string[];
-}): ChannelPlugin => ({
+const createMSTeamsPlugin = (params?: { aliases?: string[] }): ChannelPlugin => ({
   id: "msteams",
   meta: {
     id: "msteams",
@@ -194,10 +180,7 @@ async function sendAgentWsRequestAndWaitFinal(
 ) {
   const finalP = onceMessage(
     socket,
-    (o) =>
-      o.type === "res" &&
-      o.id === params.reqId &&
-      o.payload?.status !== "accepted",
+    (o) => o.type === "res" && o.id === params.reqId && o.payload?.status !== "accepted",
     params.timeoutMs,
   );
   sendAgentWsRequest(socket, params);
@@ -329,9 +312,7 @@ describe("gateway server agent", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.error?.code).toBe("INVALID_REQUEST");
-    expect(res.error?.message).toMatch(
-      /Channel is required|runtime not initialized/,
-    );
+    expect(res.error?.message).toMatch(/Channel is required|runtime not initialized/);
     expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
   });
 
@@ -447,9 +428,7 @@ describe("gateway server agent", () => {
         key: "main",
       });
       expect(directReset.ok).toBe(false);
-      expect(directReset.error?.message).toContain(
-        "missing scope: operator.admin",
-      );
+      expect(directReset.error?.message).toContain("missing scope: operator.admin");
 
       vi.mocked(agentCommand).mockClear();
       const viaAgent = await rpcReq(writeWs, "agent", {
@@ -458,60 +437,46 @@ describe("gateway server agent", () => {
         idempotencyKey: "idem-agent-write-reset",
       });
       expect(viaAgent.ok).toBe(false);
-      expect(viaAgent.error?.message).toContain(
-        "missing scope: operator.admin",
-      );
+      expect(viaAgent.error?.message).toContain("missing scope: operator.admin");
 
       const store = JSON.parse(await fs.readFile(storePath, "utf-8")) as Record<
         string,
         { sessionId?: string }
       >;
       expect(store["agent:main:main"]?.sessionId).toBeDefined();
-      expect(store["agent:main:main"]?.sessionId).toBe(
-        "sess-main-before-write-reset",
-      );
+      expect(store["agent:main:main"]?.sessionId).toBe("sess-main-before-write-reset");
       expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
 
       writeWs.close();
     });
   });
 
-  test(
-    "agent ack response then final response",
-    { timeout: 8000 },
-    async () => {
-      const ackP = onceMessage(
-        ws,
-        (o) =>
-          o.type === "res" &&
-          o.id === "ag1" &&
-          o.payload?.status === "accepted",
-      );
-      const finalP = onceMessage(
-        ws,
-        (o) =>
-          o.type === "res" &&
-          o.id === "ag1" &&
-          o.payload?.status !== "accepted",
-      );
-      sendAgentWsRequest(ws, {
-        reqId: "ag1",
-        message: "hi",
-        idempotencyKey: "idem-ag",
-      });
+  test("agent ack response then final response", { timeout: 8000 }, async () => {
+    const ackP = onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "ag1" && o.payload?.status === "accepted",
+    );
+    const finalP = onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "ag1" && o.payload?.status !== "accepted",
+    );
+    sendAgentWsRequest(ws, {
+      reqId: "ag1",
+      message: "hi",
+      idempotencyKey: "idem-ag",
+    });
 
-      const ack = await ackP;
-      const final = await finalP;
-      const ackPayload = ack.payload;
-      const finalPayload = final.payload;
-      if (!ackPayload || !finalPayload) {
-        throw new Error("missing websocket payload");
-      }
-      expect(ackPayload.runId).toBeDefined();
-      expect(finalPayload.runId).toBe(ackPayload.runId);
-      expect(finalPayload.status).toBe("ok");
-    },
-  );
+    const ack = await ackP;
+    const final = await finalP;
+    const ackPayload = ack.payload;
+    const finalPayload = final.payload;
+    if (!ackPayload || !finalPayload) {
+      throw new Error("missing websocket payload");
+    }
+    expect(ackPayload.runId).toBeDefined();
+    expect(finalPayload.runId).toBe(ackPayload.runId);
+    expect(finalPayload.status).toBe("ok");
+  });
 
   test("agent dedupes by idempotencyKey after completion", async () => {
     const firstFinal = await sendAgentWsRequestAndWaitFinal(ws, {
@@ -575,8 +540,7 @@ describe("gateway server agent", () => {
         if (o.type !== "event" || o.event !== "chat") {
           return false;
         }
-        const payload = o.payload as
-          { state?: unknown; runId?: unknown } | undefined;
+        const payload = o.payload as { state?: unknown; runId?: unknown } | undefined;
         return payload?.state === "final" && payload.runId === "run-auto-1";
       },
       8000,
@@ -594,8 +558,7 @@ describe("gateway server agent", () => {
     });
 
     const evt = await finalChatP;
-    const payload =
-      evt.payload && typeof evt.payload === "object" ? evt.payload : {};
+    const payload = evt.payload && typeof evt.payload === "object" ? evt.payload : {};
     expect(payload.sessionKey).toBe("main");
     expect(payload.runId).toBe("run-auto-1");
 

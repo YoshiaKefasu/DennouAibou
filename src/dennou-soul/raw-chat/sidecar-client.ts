@@ -9,13 +9,13 @@
  * ponytail: Phase 1 — thin RPC boundary only. No DB/index/search logic in TS.
  */
 
-import * as path from "path";
-import * as net from "net";
-import * as os from "os";
 import * as fs from "fs";
+import * as net from "net";
+import { createRequire } from "node:module";
+import * as os from "os";
+import * as path from "path";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
-import { createRequire } from "node:module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

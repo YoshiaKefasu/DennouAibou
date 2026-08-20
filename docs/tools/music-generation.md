@@ -61,18 +61,18 @@ Generate an energetic chiptune loop about launching a rocket at sunrise.
 
 ## Shared bundled provider support
 
-| Provider | Default model          | Reference inputs | Supported controls                                        | API key                                |
-| -------- | ---------------------- | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-| Google   | `lyria-3-clip-preview` | Up to 10 images  | `lyrics`, `instrumental`, `format`                        | `GEMINI_API_KEY`, `GOOGLE_API_KEY`     |
+| Provider | Default model          | Reference inputs | Supported controls                 | API key                            |
+| -------- | ---------------------- | ---------------- | ---------------------------------- | ---------------------------------- |
+| Google   | `lyria-3-clip-preview` | Up to 10 images  | `lyrics`, `instrumental`, `format` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 
 ### Declared capability matrix
 
 This is the explicit mode contract used by `music_generate`, contract tests,
 and the shared live sweep.
 
-| Provider | `generate` | `edit` | Edit limit | Shared live lanes                                                         |
-| -------- | ---------- | ------ | ---------- | ------------------------------------------------------------------------- |
-| Google   | Yes        | Yes    | 10 images  | `generate`, `edit`                                                        |
+| Provider | `generate` | `edit` | Edit limit | Shared live lanes  |
+| -------- | ---------- | ------ | ---------- | ------------------ |
+| Google   | Yes        | Yes    | 10 images  | `generate`, `edit` |
 
 Use `action: "list"` to inspect available shared providers and models at
 runtime:
@@ -99,7 +99,7 @@ Direct generation example:
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `prompt`          | string   | Music generation prompt (required for `action: "generate"`)                                       |
 | `action`          | string   | `"generate"` (default), `"status"` for the current session task, or `"list"` to inspect providers |
-| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview`                                         |
+| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview`                                        |
 | `lyrics`          | string   | Optional lyrics when the provider supports explicit lyric input                                   |
 | `instrumental`    | boolean  | Request instrumental-only output when the provider supports it                                    |
 | `image`           | string   | Single reference image path or URL                                                                |

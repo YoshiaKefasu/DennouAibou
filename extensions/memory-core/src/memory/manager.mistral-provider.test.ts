@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/memory-core-host-engine-foundation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { registerMemoryEmbeddingProvider } from "../../../../src/plugins/memory-embedding-providers.js";
 import type {
   EmbeddingProvider,
   EmbeddingProviderRuntime,
@@ -10,7 +11,6 @@ import type {
 } from "./embeddings.js";
 import type { MemoryIndexManager } from "./index.js";
 import { registerBuiltInMemoryEmbeddingProviders } from "./provider-adapters.js";
-import { registerMemoryEmbeddingProvider } from "../../../../src/plugins/memory-embedding-providers.js";
 type MemoryIndexModule = typeof import("./index.js");
 
 const { createEmbeddingProviderMock } = vi.hoisted(() => ({

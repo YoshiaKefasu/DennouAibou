@@ -10,40 +10,41 @@
 
 ### 1.1 パッケージレベル (package.json)
 
-| 項目 | 現在 | 変更後 |
-|---|---|---|
-| `name` | `"openclaw"` | `"dennou-aibou"` |
-| `homepage` | `https://github.com/openclaw/openclaw#readme` | `https://github.com/YoshiaKefasu/DennouAibou#readme` |
-| `bugs.url` | `https://github.com/openclaw/openclaw/issues` | `https://github.com/YoshiaKefasu/DennouAibou/issues` |
+| 項目             | 現在                                           | 変更後                                                |
+| ---------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| `name`           | `"openclaw"`                                   | `"dennou-aibou"`                                      |
+| `homepage`       | `https://github.com/openclaw/openclaw#readme`  | `https://github.com/YoshiaKefasu/DennouAibou#readme`  |
+| `bugs.url`       | `https://github.com/openclaw/openclaw/issues`  | `https://github.com/YoshiaKefasu/DennouAibou/issues`  |
 | `repository.url` | `git+https://github.com/openclaw/openclaw.git` | `git+https://github.com/YoshiaKefasu/DennouAibou.git` |
-| `bin.openclaw` | `"openclaw": "openclaw.mjs"` | `"dennou-aibou": "openclaw.mjs"` |
+| `bin.openclaw`   | `"openclaw": "openclaw.mjs"`                   | `"dennou-aibou": "openclaw.mjs"`                      |
 
 **注意**: `name` 変更は `require("openclaw")` / import パスに波及する可能性がある。`src/plugin-sdk/` の import は `@openclaw/*` を維持するが、パッケージ名変更後にモジュール解決が壊れないことをビルドで確認する。
 
 ### 1.2 環境変数プレフィックス
 
-| 現在 | 変更後 | 影響範囲 |
-|---|---|---|
+| 現在         | 変更後     | 影響範囲                 |
+| ------------ | ---------- | ------------------------ |
 | `OPENCLAW_*` | `DENNOU_*` | スクリプト、設定、テスト |
 
 **変更対象の主要環境変数（網羅リスト）**:
 
-| 環境変数 | 使用箇所 |
-|---|---|
-| `OPENCLAW_SKIP_CHANNELS` | テスト・開発 |
-| `OPENCLAW_LIVE_TEST` | ライブテスト |
-| `OPENCLAW_LIVE_ANDROID_NODE` | Android テスト |
-| `OPENCLAW_E2E_*` | E2E テスト |
-| `OPENCLAW_VITEST_*` | テスト設定 |
-| `OPENCLAW_PROFILE` | TUI プロファイル |
-| `OPENCLAW_SKIP_DOCKER_BUILD` | Docker テスト |
-| `OPENCLAW_HOME` | ホームディレクトリ |
-| `OPENCLAW_CONFIG_PATH` | 設定ファイルパス |
-| `OPENCLAW_GATEWAY_TOKEN` | 認証トークン |
-| `OPENCLAW_GATEWAY_PORT` | ゲートウェイポート |
-| `OPENCLAW_HOME_VOLUME` | Docker ボリューム |
+| 環境変数                     | 使用箇所           |
+| ---------------------------- | ------------------ |
+| `OPENCLAW_SKIP_CHANNELS`     | テスト・開発       |
+| `OPENCLAW_LIVE_TEST`         | ライブテスト       |
+| `OPENCLAW_LIVE_ANDROID_NODE` | Android テスト     |
+| `OPENCLAW_E2E_*`             | E2E テスト         |
+| `OPENCLAW_VITEST_*`          | テスト設定         |
+| `OPENCLAW_PROFILE`           | TUI プロファイル   |
+| `OPENCLAW_SKIP_DOCKER_BUILD` | Docker テスト      |
+| `OPENCLAW_HOME`              | ホームディレクトリ |
+| `OPENCLAW_CONFIG_PATH`       | 設定ファイルパス   |
+| `OPENCLAW_GATEWAY_TOKEN`     | 認証トークン       |
+| `OPENCLAW_GATEWAY_PORT`      | ゲートウェイポート |
+| `OPENCLAW_HOME_VOLUME`       | Docker ボリューム  |
 
 **判断ポイント**: 環境変数は外部依存（CI、デプロイスクリプト、ユーザー設定）にも影響。変更する場合は：
+
 1. 旧 `OPENCLAW_*` との互換性を maintain する（新しい方を優先、旧方を fallback）
 2. または完全に置換し、全ファイルを grep して残りゼロにする
 
@@ -51,35 +52,36 @@
 
 package.json のスクリプト名に `openclaw` が含まれるもの：
 
-| スクリプト | 内容 |
-|---|---|
-| `"openclaw"` | `node scripts/run-node.mjs` |
-| `"openclaw:rpc"` | `node scripts/run-node.mjs agent --mode rpc --json` |
-| `"gateway:dev"` | `OPENCLAW_SKIP_CHANNELS=1 node scripts/run-node.mjs --dev gateway` |
-| `"release:openclaw:npm:*"` | npm リリース関連 |
-| `"qa:lab:ui"` | `pnpm openclaw qa ui` |
+| スクリプト                 | 内容                                                               |
+| -------------------------- | ------------------------------------------------------------------ |
+| `"openclaw"`               | `node scripts/run-node.mjs`                                        |
+| `"openclaw:rpc"`           | `node scripts/run-node.mjs agent --mode rpc --json`                |
+| `"gateway:dev"`            | `OPENCLAW_SKIP_CHANNELS=1 node scripts/run-node.mjs --dev gateway` |
+| `"release:openclaw:npm:*"` | npm リリース関連                                                   |
+| `"qa:lab:ui"`              | `pnpm openclaw qa ui`                                              |
 
 ### 1.4 ワークスペース内スクリプトファイル名
 
-| ファイル | 内容 |
-|---|---|
-| `openclaw.mjs` | CLI エントリポイント |
-| `scripts/openclaw-prepack.ts` | prepack スクリプト |
-| `scripts/openclaw-npm-release-check.ts` | リリースチェック |
-| `scripts/openclaw-npm-postpublish-verify.ts` | リリース後検証 |
+| ファイル                                     | 内容                 |
+| -------------------------------------------- | -------------------- |
+| `openclaw.mjs`                               | CLI エントリポイント |
+| `scripts/openclaw-prepack.ts`                | prepack スクリプト   |
+| `scripts/openclaw-npm-release-check.ts`      | リリースチェック     |
+| `scripts/openclaw-npm-postpublish-verify.ts` | リリース後検証       |
 
 **推奨**: ファイル名は変更せず、中身の文字列のみ置換（ファイル名変更は import path に波及）。
 
 ### 1.5 ソースコード内の文字列
 
-| 場所 | 種類 | 数 |
-|---|---|---|
-| `src/config/*.ts` | 設定キー、フォルダパス | 多数 |
-| `src/gateway/*.ts` | ヘッダー名、ログメッセージ | 多数 |
-| `src/agents/*.ts` | アシスタント名、ツール名 | 中程度 |
-| `docs/**/*.md` | ドキュメント文字列 | 大量 |
+| 場所               | 種類                       | 数     |
+| ------------------ | -------------------------- | ------ |
+| `src/config/*.ts`  | 設定キー、フォルダパス     | 多数   |
+| `src/gateway/*.ts` | ヘッダー名、ログメッセージ | 多数   |
+| `src/agents/*.ts`  | アシスタント名、ツール名   | 中程度 |
+| `docs/**/*.md`     | ドキュメント文字列         | 大量   |
 
 **主要な wire-protocol 識別子**:
+
 - `x-openclaw-*` ヘッダー（HTTP/WS通信）
 - `~/.openclaw/` ファイルシステムパス
 - `Symbol.for("openclaw.*")` グローバルシンボル
@@ -100,10 +102,10 @@ package.json のスクリプト名に `openclaw` が含まれるもの：
 
 ### 1.8 GitHub リポジトリ参照
 
-| 参照先 | 現在 | 変更後 |
-|---|---|---|
-| リポジトリ | `openclaw/openclaw` | `YoshiaKefasu/DennouAibou` |
-| upstream追跡 | `origin/main` | `upstream/main` (OpenClaw本家) に分離 |
+| 参照先       | 現在                | 変更後                                |
+| ------------ | ------------------- | ------------------------------------- |
+| リポジトリ   | `openclaw/openclaw` | `YoshiaKefasu/DennouAibou`            |
+| upstream追跡 | `origin/main`       | `upstream/main` (OpenClaw本家) に分離 |
 
 ---
 
@@ -133,37 +135,37 @@ package.json のスクリプト名に `openclaw` が含まれるもの：
 
 ### 2.2 置換しないもの（互換性維持）
 
-| 項目 | 理由 |
-|---|---|
+| 項目                                    | 理由                                                           |
+| --------------------------------------- | -------------------------------------------------------------- |
 | `@openclaw/plugin-sdk/*` インポートパス | プラグインエコシステム互換。ClawHub プラグインがこのパスを参照 |
-| upstream git リファレンス | マージ・cherry-pick 時に上游を追跡するため |
-| テスト内のモックデータ | モックは文字列なので実機能に影響なし（必要に応じて後回し） |
+| upstream git リファレンス               | マージ・cherry-pick 時に上游を追跡するため                     |
+| テスト内のモックデータ                  | モックは文字列なので実機能に影響なし（必要に応じて後回し）     |
 
 ### 2.3 KASOU 固有の変更点チェックリスト
 
 置換時に個別対応が必要な KASOU 固有パス:
 
-| パス | 内容 | 対応 |
-|---|---|---|
-| `~/.openclaw/openclaw.json` | gateway 設定 | パス変更 or symlink |
-| `~/.openclaw/.env` | API キー | パス変更 or symlink |
-| `~/.openclaw/extensions/` | プラグイン配置 | パス変更 or symlink |
-| `~/.config/systemd/user/openclaw-gateway.service` | systemd unit | unit 名変更 |
-| `/tmp/openclaw/` | ログディレクトリ | パス変更 |
+| パス                                              | 内容             | 対応                |
+| ------------------------------------------------- | ---------------- | ------------------- |
+| `~/.openclaw/openclaw.json`                       | gateway 設定     | パス変更 or symlink |
+| `~/.openclaw/.env`                                | API キー         | パス変更 or symlink |
+| `~/.openclaw/extensions/`                         | プラグイン配置   | パス変更 or symlink |
+| `~/.config/systemd/user/openclaw-gateway.service` | systemd unit     | unit 名変更         |
+| `/tmp/openclaw/`                                  | ログディレクトリ | パス変更            |
 
 ---
 
 ## 3. リスクと対策
 
-| リスク | 対策 |
-|---|---|
-| KASOU の `~/.openclaw/` パスが変わると gateway 起動不可 | Phase 2 で旧パスからの symlink か fallback を設ける |
-| プラグインが `@openclaw/plugin-sdk/*` を参照 | インポートパスは維持（`src/plugin-sdk/` はそのまま） |
-| 環境変数が CI/CD で使われている | 旧→新 fallback を実装し、移行期間を設ける |
-| bin 名が変わると `openclaw gateway start` 等が動かなくなる | `openclaw` をエイリアスとして維持 |
-| `openclaw.json` 設定ファイル名が変わると設定が読めなくなる | 設定ファイル名は `dennou-aibou.json` に変更 or 両対応 |
-| Canvas host URL 変更で UI アクセスが壊れる | URL パスも同時に置換 |
-| episodic-claw の config path が変わるとプラグインが動かなくなる | Phase 4 前に episodic-claw のパス設定を更新 |
+| リスク                                                          | 対策                                                  |
+| --------------------------------------------------------------- | ----------------------------------------------------- |
+| KASOU の `~/.openclaw/` パスが変わると gateway 起動不可         | Phase 2 で旧パスからの symlink か fallback を設ける   |
+| プラグインが `@openclaw/plugin-sdk/*` を参照                    | インポートパスは維持（`src/plugin-sdk/` はそのまま）  |
+| 環境変数が CI/CD で使われている                                 | 旧→新 fallback を実装し、移行期間を設ける             |
+| bin 名が変わると `openclaw gateway start` 等が動かなくなる      | `openclaw` をエイリアスとして維持                     |
+| `openclaw.json` 設定ファイル名が変わると設定が読めなくなる      | 設定ファイル名は `dennou-aibou.json` に変更 or 両対応 |
+| Canvas host URL 変更で UI アクセスが壊れる                      | URL パスも同時に置換                                  |
+| episodic-claw の config path が変わるとプラグインが動かなくなる | Phase 4 前に episodic-claw のパス設定を更新           |
 
 ---
 
@@ -191,22 +193,22 @@ package.json のスクリプト名に `openclaw` が含まれるもの：
 
 DENNOU_RULES.md の既存タグ taxonomy に追加:
 
-| タグ | 用途 |
-|---|---|
-| `[SOUL]` | DennouAibou オリジナル機能 |
-| `[FIX-SOUL]` | DennouAibou オリジナル修正 |
-| `[DEBLOAT]` | 未使用 upstream 削除 |
-| `[FIX-UPSTREAM]` | 上流へのパッチ |
-| `[SYNC]` | 上流からの直接 import |
-| **`[BRAND]`** | **ブランディング変更** |
+| タグ             | 用途                       |
+| ---------------- | -------------------------- |
+| `[SOUL]`         | DennouAibou オリジナル機能 |
+| `[FIX-SOUL]`     | DennouAibou オリジナル修正 |
+| `[DEBLOAT]`      | 未使用 upstream 削除       |
+| `[FIX-UPSTREAM]` | 上流へのパッチ             |
+| `[SYNC]`         | 上流からの直接 import      |
+| **`[BRAND]`**    | **ブランディング変更**     |
 
 ---
 
 ## 6. 実施記録
 
 | 日付 | 内容 | 状態 |
-|---|---|---|
-| | | |
+| ---- | ---- | ---- |
+|      |      |      |
 
 ---
 

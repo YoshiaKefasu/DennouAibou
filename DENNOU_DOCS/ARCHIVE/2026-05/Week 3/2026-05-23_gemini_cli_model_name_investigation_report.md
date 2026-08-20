@@ -30,12 +30,12 @@ OpenClawの `google-gemini-cli` プロバイダは `gemini` バイナリをAPI�
 
 ## 2. KASOUの環境
 
-| 項目 | 値 |
-|---|---|
-| Gemini CLI バージョン | v0.37.1 (Homebrew) — **API呼び出しには未使用** |
-| OpenClaw primary model | `google-gemini-cli/gemini-3.1-pro-preview` |
-| Fallback候補 | `openai-codex/gpt-5.4`, `google-gemini-cli/gemini-3-flash-preview`, 他 |
-| Node.js | v25.9.0 (Linuxbrew) |
+| 項目                   | 値                                                                     |
+| ---------------------- | ---------------------------------------------------------------------- |
+| Gemini CLI バージョン  | v0.37.1 (Homebrew) — **API呼び出しには未使用**                         |
+| OpenClaw primary model | `google-gemini-cli/gemini-3.1-pro-preview`                             |
+| Fallback候補           | `openai-codex/gpt-5.4`, `google-gemini-cli/gemini-3-flash-preview`, 他 |
+| Node.js                | v25.9.0 (Linuxbrew)                                                    |
 
 ---
 
@@ -60,11 +60,11 @@ OpenClawの `google-gemini-cli` プロバイダは `gemini` バイナリをAPI�
 
 **コードで確認**：
 
-| # | ファイル | 行 | 動作 |
-|---|---------|----|------|
-| 1 | `src/agents/google-transport-stream.ts` | 161-169 | `mapStopReasonString()` — デフォルトケースで全ての非`STOP` finishReasonを `"error"` に丸める |
-| 2 | `src/agents/transport-stream-shared.ts` | 89-90 | `stopReason === "error"` → `throw new Error("An unknown error occurred")` |
-| 3 | `src/agents/pi-embedded-helpers.ts` | `classifyFailoverReason` | `"An unknown error occurred"` → `null` を返す（テスト `pi-embedded-helpers.test.ts:663` で確認） |
+| #   | ファイル                                | 行                       | 動作                                                                                             |
+| --- | --------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| 1   | `src/agents/google-transport-stream.ts` | 161-169                  | `mapStopReasonString()` — デフォルトケースで全ての非`STOP` finishReasonを `"error"` に丸める     |
+| 2   | `src/agents/transport-stream-shared.ts` | 89-90                    | `stopReason === "error"` → `throw new Error("An unknown error occurred")`                        |
+| 3   | `src/agents/pi-embedded-helpers.ts`     | `classifyFailoverReason` | `"An unknown error occurred"` → `null` を返す（テスト `pi-embedded-helpers.test.ts:663` で確認） |
 
 **結果**: Google APIからの具体的なfinishReason（`SAFETY`, `RECITATION`, `OTHER`, 等）が失われる。
 
@@ -75,11 +75,11 @@ OpenClawの `google-gemini-cli` プロバイダは `gemini` バイナリをAPI�
 
 ### 4.3 考えられるシナリオ（KASOUのAPI応答が不明なため推定）
 
-| シナリオ | 発生確率 | 根拠 |
-|----------|---------|------|
-| **A**: APIがHTTP 200 + finishReason=`OTHER`/`SAFETY`を返した | **高い** | ログの `failoverReason: null` はこの経路と一致 |
-| **B**: APIがHTTP 400/500を返したが、`classifyFailoverReason` が分類に失敗 | 低い（400は"format"に分類されるはず） | コード上400系エラーは `"format"` になる |
-| **C**: Gemini CLI v0.37.1 の `defaultModelConfigs.ts` バグ | **関連なし** | OpenClawはgemini binaryを経由しない |
+| シナリオ                                                                  | 発生確率                              | 根拠                                           |
+| ------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------- |
+| **A**: APIがHTTP 200 + finishReason=`OTHER`/`SAFETY`を返した              | **高い**                              | ログの `failoverReason: null` はこの経路と一致 |
+| **B**: APIがHTTP 400/500を返したが、`classifyFailoverReason` が分類に失敗 | 低い（400は"format"に分類されるはず） | コード上400系エラーは `"format"` になる        |
+| **C**: Gemini CLI v0.37.1 の `defaultModelConfigs.ts` バグ                | **関連なし**                          | OpenClawはgemini binaryを経由しない            |
 
 シナリオAが最も可能性が高い。つまり**Google API自体が正常応答(200)を返したが、中身のfinishReasonが想定外だった**ケース。
 
@@ -96,6 +96,7 @@ OpenClawの `google-gemini-cli` プロバイダは `gemini` バイナリをAPI�
 ### 5.1 ログからの証拠
 
 KASOUログ `openclaw-2026-05-23.log:482`:
+
 ```
 error: "An unknown error occurred"
 failoverReason: null
@@ -131,14 +132,14 @@ finishReason が非STOP/非MAX_TOKENSの場合、`output.errorMessage` に元の
 
 ```typescript
 if (typeof candidate?.finishReason === "string") {
-    output.stopReason = mapStopReasonString(candidate.finishReason);
-    if (output.content.some((block) => block.type === "toolCall")) {
-      output.stopReason = "toolUse";
-    }
-    // DennouAibou: preserve non-STOP finishReasons for diagnostics
-    if (output.stopReason === "error" && candidate.finishReason !== "STOP") {
-      output.errorMessage = `Google API finishReason: ${candidate.finishReason}`;
-    }
+  output.stopReason = mapStopReasonString(candidate.finishReason);
+  if (output.content.some((block) => block.type === "toolCall")) {
+    output.stopReason = "toolUse";
+  }
+  // DennouAibou: preserve non-STOP finishReasons for diagnostics
+  if (output.stopReason === "error" && candidate.finishReason !== "STOP") {
+    output.errorMessage = `Google API finishReason: ${candidate.finishReason}`;
+  }
 }
 ```
 
@@ -149,12 +150,13 @@ if (typeof candidate?.finishReason === "string") {
 // Before: throw new Error("An unknown error occurred");
 // After:
 if (output.stopReason === "aborted" || output.stopReason === "error") {
-    const detail = output.errorMessage ? ` (${output.errorMessage})` : "";
-    throw new Error(`An unknown error occurred${detail}`);
+  const detail = output.errorMessage ? ` (${output.errorMessage})` : "";
+  throw new Error(`An unknown error occurred${detail}`);
 }
 ```
 
 **効果**:
+
 - `"An unknown error occurred"` → `"An unknown error occurred (Google API finishReason: SAFETY)"` に変化
 - `classifyFailoverReason` の戻り値は変わらない（SAFETY/RECITATIONはfallback対象外のため）
 - `lastAssistant.errorMessage` に詳細が残るようになる
@@ -168,10 +170,10 @@ KASOUのconfigで `google-gemini-cli/gemini-3.1-pro-preview` → 代わりのモ
 
 候補:
 
-| モデル | メリット | デメリット |
-|--------|---------|-----------|
-| `gemini-2.5-pro` | 安定、確実に動く | 3.1より能力が低い |
-| `gemini-3.5-flash` | I/Oで発表された最新 | まだ正式にOpenClawに未対応かも |
+| モデル                               | メリット                       | デメリット                                          |
+| ------------------------------------ | ------------------------------ | --------------------------------------------------- |
+| `gemini-2.5-pro`                     | 安定、確実に動く               | 3.1より能力が低い                                   |
+| `gemini-3.5-flash`                   | I/Oで発表された最新            | まだ正式にOpenClawに未対応かも                      |
 | `gemini-3.1-pro-preview-customtools` | 同じ3.1系、customtools最適化版 | APIキーユーザー専用、同じfinishReason問題が起きうる |
 
 ### 6C — `transport-stream-shared.ts` でエラー詳細を維持する
@@ -189,13 +191,13 @@ throw new Error("An unknown error occurred");
 
 ## 7. Google I/O 2026 関連発表まとめ
 
-| 発表 | 日付 | 影響 |
-|------|------|------|
-| Gemini 3.5 Flash 公開 | 2026-05-19 | 新しい最速モデル |
-| Antigravity CLI 発表 | 2026-05-19 | Gemini CLIからの移行先 |
-| Gemini CLI 無料提供終了予告 | 2026-05-19 | 2026-06-18で無料ユーザー終了。有料ユーザーは継続 |
-| Gemini CLI は終了しない | 同上 | 組織ライセンス/API有料ユーザーは引き続きサポート |
-| Gemini 3.5 Pro | 2026年6月予定 | 内部テスト中 |
+| 発表                        | 日付          | 影響                                             |
+| --------------------------- | ------------- | ------------------------------------------------ |
+| Gemini 3.5 Flash 公開       | 2026-05-19    | 新しい最速モデル                                 |
+| Antigravity CLI 発表        | 2026-05-19    | Gemini CLIからの移行先                           |
+| Gemini CLI 無料提供終了予告 | 2026-05-19    | 2026-06-18で無料ユーザー終了。有料ユーザーは継続 |
+| Gemini CLI は終了しない     | 同上          | 組織ライセンス/API有料ユーザーは引き続きサポート |
+| Gemini 3.5 Pro              | 2026年6月予定 | 内部テスト中                                     |
 
 ---
 
@@ -203,12 +205,12 @@ throw new Error("An unknown error occurred");
 
 `git diff v2026.4.5..origin/main — src/agents/transport-stream-shared.ts` を確認した結果：
 
-| 項目 | 上流 main | DennouAibou (v0.6.0) |
-|------|-----------|----------------------|
-| `finalizeTransportStream` の `"An unknown error occurred"` | **未修正**（同コード） | **未修正**（同コード） |
-| `TransportOutputShape` | `errorCode`, `errorType`, `errorBody` 追加あり | 無し |
-| `assignTransportErrorDetails` | `failTransportStream` で使用 | 無し（`failTransportStream` も古い形式） |
-| `extractTransportErrorDetails` | 追加済み | 無し |
+| 項目                                                       | 上流 main                                      | DennouAibou (v0.6.0)                     |
+| ---------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------- |
+| `finalizeTransportStream` の `"An unknown error occurred"` | **未修正**（同コード）                         | **未修正**（同コード）                   |
+| `TransportOutputShape`                                     | `errorCode`, `errorType`, `errorBody` 追加あり | 無し                                     |
+| `assignTransportErrorDetails`                              | `failTransportStream` で使用                   | 無し（`failTransportStream` も古い形式） |
+| `extractTransportErrorDetails`                             | 追加済み                                       | 無し                                     |
 
 上流でも `finalizeTransportStream` の `"An unknown error occurred"` 問題は**同じまま** → DennouAibouで独自に修正する判断。
 
@@ -225,7 +227,7 @@ throw new Error("An unknown error occurred");
 
 ## 9. 訂正履歴
 
-| 版 | 日付 | 内容 |
-|----|------|------|
-| 初版 | 2026-05-23 | 「Gemini CLI v0.37.1のバグが原因」と誤認 |
+| 版           | 日付       | 内容                                                                            |
+| ------------ | ---------- | ------------------------------------------------------------------------------- |
+| 初版         | 2026-05-23 | 「Gemini CLI v0.37.1のバグが原因」と誤認                                        |
 | 訂正版(本版) | 2026-05-23 | コードレビューで誤りを指摘され修正。真因はOpenClawのAPI応答処理にあることを追記 |

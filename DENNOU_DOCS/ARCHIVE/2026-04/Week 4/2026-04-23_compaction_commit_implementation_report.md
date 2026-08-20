@@ -159,7 +159,7 @@
 - その後、user systemd の unit が旧 `.npm-global` パスを保持していたため、
   - `openclaw node install --force`
   - `openclaw gateway install --force`
-  で unit を再生成して整合。
+    で unit を再生成して整合。
 - 最終的に `openclaw-node.service` / `openclaw-gateway.service` は `active` を確認。
 
 ---

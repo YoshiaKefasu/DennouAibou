@@ -154,7 +154,7 @@ Example:
 | `npmSpec`                    | `string`             | Canonical npm spec for install/update flows.                                     |
 | `localPath`                  | `string`             | Local development or bundled install path.                                       |
 | `defaultChoice`              | `"npm"` \| `"local"` | Preferred install source when both are available.                                |
-| `minHostVersion`             | `string`             | Minimum supported DennouAibou version in the form `>=x.y.z`.                        |
+| `minHostVersion`             | `string`             | Minimum supported DennouAibou version in the form `>=x.y.z`.                     |
 | `allowInvalidConfigRecovery` | `boolean`            | Lets bundled-plugin reinstall flows recover from specific stale-config failures. |
 
 If `minHostVersion` is set, install and manifest-registry loading both enforce

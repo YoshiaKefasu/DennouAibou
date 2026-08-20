@@ -147,9 +147,7 @@ describe("createMcpLoopbackServerConfig", () => {
       mcpServers?: Record<string, { url?: string; headers?: Record<string, string> }>;
     };
     expect(config.mcpServers?.openclaw?.url).toBe("http://127.0.0.1:23119/mcp");
-    expect(config.mcpServers?.openclaw?.headers?.Authorization).toBe(
-      "Bearer ${DENNOU_MCP_TOKEN}",
-    );
+    expect(config.mcpServers?.openclaw?.headers?.Authorization).toBe("Bearer ${DENNOU_MCP_TOKEN}");
     expect(config.mcpServers?.openclaw?.headers?.["x-dennou-message-channel"]).toBe(
       "${DENNOU_MCP_MESSAGE_CHANNEL}",
     );

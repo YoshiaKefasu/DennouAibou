@@ -84,10 +84,7 @@ function resolveSessionBindingContractRuntimeConfig(id: string) {
 }
 
 function setSessionBindingPluginRegistryForTests(): void {
-  const channels = [
-    getDiscordPlugin(),
-    getTelegramPlugin(),
-  ].map((plugin) => ({
+  const channels = [getDiscordPlugin(), getTelegramPlugin()].map((plugin) => ({
     pluginId: plugin.id,
     plugin,
     source: "test" as const,

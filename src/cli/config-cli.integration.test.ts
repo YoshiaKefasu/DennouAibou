@@ -114,11 +114,7 @@ describe("config cli integration", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-config-cli-int-"));
     const configPath = path.join(tempDir, "dennou-aibou.json");
     const batchPath = path.join(tempDir, "batch.json");
-    const envSnapshot = captureEnv([
-      "DENNOU_CONFIG_PATH",
-      "DENNOU_TEST_FAST",
-      "DISCORD_BOT_TOKEN",
-    ]);
+    const envSnapshot = captureEnv(["DENNOU_CONFIG_PATH", "DENNOU_TEST_FAST", "DISCORD_BOT_TOKEN"]);
     try {
       fs.writeFileSync(
         configPath,

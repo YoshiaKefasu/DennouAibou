@@ -304,9 +304,7 @@ export function installSessionToolResultGuard(
       pendingState.trackToolCalls(toolCalls);
     }
     if (finalRole === "user") {
-      void opts?.onUserMessagePersisted?.(
-        finalMessage as Extract<AgentMessage, { role: "user" }>,
-      );
+      void opts?.onUserMessagePersisted?.(finalMessage as Extract<AgentMessage, { role: "user" }>);
     }
     if (
       (finalMessage as { role?: unknown }).role === "assistant" &&

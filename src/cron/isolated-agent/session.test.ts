@@ -12,20 +12,16 @@ vi.mock("../../config/sessions/paths.js", () => ({
 vi.mock("../../config/sessions/reset.js", () => ({
   evaluateSessionFreshness: vi.fn().mockReturnValue({ fresh: true }),
   resolveProtectedSessionResetPolicy: vi.fn(({ policy }) => policy),
-  resolveSessionResetPolicy: vi
-    .fn()
-    .mockReturnValue({ mode: "idle", idleMinutes: 60 }),
+  resolveSessionResetPolicy: vi.fn().mockReturnValue({ mode: "idle", idleMinutes: 60 }),
 }));
 
 vi.mock("../../agents/bootstrap-cache.js", () => ({
   clearBootstrapSnapshot: vi.fn(),
-  clearBootstrapSnapshotOnSessionRollover: vi.fn(
-    ({ sessionKey, previousSessionId }) => {
-      if (sessionKey && previousSessionId) {
-        clearBootstrapSnapshot(sessionKey);
-      }
-    },
-  ),
+  clearBootstrapSnapshotOnSessionRollover: vi.fn(({ sessionKey, previousSessionId }) => {
+    if (sessionKey && previousSessionId) {
+      clearBootstrapSnapshot(sessionKey);
+    }
+  }),
 }));
 
 import { clearBootstrapSnapshot } from "../../agents/bootstrap-cache.js";

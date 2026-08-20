@@ -202,9 +202,7 @@ describe("plugin contract registry scoped retries", () => {
             webFetchProviderIds: [],
             webSearchProviderIds: [],
           },
-          diagnostics: [
-            { pluginId: "fetch-a", message: "transient fetch-a fetch load failure" },
-          ],
+          diagnostics: [{ pluginId: "fetch-a", message: "transient fetch-a fetch load failure" }],
         }),
       )
       .mockReturnValueOnce(

@@ -34,8 +34,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "update.auto.enabled": "Auto Update Enabled",
   "update.auto.stableDelayHours": "Auto Update Stable Delay (hours)",
   "update.auto.stableJitterHours": "Auto Update Stable Jitter (hours)",
-  "update.auto.betaCheckIntervalHours":
-    "Auto Update Beta Check Interval (hours)",
+  "update.auto.betaCheckIntervalHours": "Auto Update Beta Check Interval (hours)",
   dennou: "DennouAibou",
   "dennou.toolsPrune": "Shared Prune Defaults",
   "dennou.toolsPrune.minPrunableToolChars": "Shared: Min Prunable Tool Chars",
@@ -44,23 +43,19 @@ export const FIELD_LABELS: Record<string, string> = {
   "dennou.toolsPrune.dryRun": "Shared: Dry Run",
   "dennou.sessionToolsPrune": "Session Tools Prune (Closed Sessions)",
   "dennou.sessionToolsPrune.enabled": "Session Prune Enabled",
-  "dennou.sessionToolsPrune.minPrunableToolChars":
-    "Session: Min Prunable Tool Chars",
+  "dennou.sessionToolsPrune.minPrunableToolChars": "Session: Min Prunable Tool Chars",
   "dennou.sessionToolsPrune.keepLastTools": "Session: Keep Last Tools",
   "dennou.sessionToolsPrune.placeholder": "Session: Placeholder",
   "dennou.sessionToolsPrune.dryRun": "Session: Dry Run",
   "dennou.activeSessionToolsPrune": "Active Session Tools Prune",
   "dennou.activeSessionToolsPrune.enabled": "Active Prune Enabled",
-  "dennou.activeSessionToolsPrune.idleDelayMinutes":
-    "Active: Idle Delay Minutes",
-  "dennou.activeSessionToolsPrune.minPrunableToolChars":
-    "Active: Min Prunable Tool Chars",
+  "dennou.activeSessionToolsPrune.idleDelayMinutes": "Active: Idle Delay Minutes",
+  "dennou.activeSessionToolsPrune.minPrunableToolChars": "Active: Min Prunable Tool Chars",
   "dennou.activeSessionToolsPrune.keepLastTools": "Active: Keep Last Tools",
   "dennou.activeSessionToolsPrune.placeholder": "Active: Placeholder",
   "dennou.activeSessionToolsPrune.dryRun": "Active: Dry Run",
   "dennou.pruneProtection": "Prune Protection",
-  "dennou.pruneProtection.protectedContentKeywords":
-    "Protected Content Keywords",
+  "dennou.pruneProtection.protectedContentKeywords": "Protected Content Keywords",
   "dennou.rawChat": "Raw Chat DB",
   "dennou.rawChat.indexing": "Raw Chat Indexing",
   "dennou.rawChat.indexing.enabled": "Indexing Enabled",
@@ -114,10 +109,8 @@ export const FIELD_LABELS: Record<string, string> = {
   "gateway.tools": "Gateway Tool Exposure Policy",
   "gateway.tools.allow": "Gateway Tool Allowlist",
   "gateway.tools.deny": "Gateway Tool Denylist",
-  "gateway.channelHealthCheckMinutes":
-    "Gateway Channel Health Check Interval (min)",
-  "gateway.channelStaleEventThresholdMinutes":
-    "Gateway Channel Stale Event Threshold (min)",
+  "gateway.channelHealthCheckMinutes": "Gateway Channel Health Check Interval (min)",
+  "gateway.channelStaleEventThresholdMinutes": "Gateway Channel Stale Event Threshold (min)",
   "gateway.channelMaxRestartsPerHour": "Gateway Channel Max Restarts Per Hour",
   "gateway.tailscale": "Gateway Tailscale",
   "gateway.tailscale.mode": "Gateway Tailscale Mode",
@@ -134,8 +127,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "gateway.http": "Gateway HTTP API",
   "gateway.http.endpoints": "Gateway HTTP Endpoints",
   "gateway.http.securityHeaders": "Gateway HTTP Security Headers",
-  "gateway.http.securityHeaders.strictTransportSecurity":
-    "Strict Transport Security Header",
+  "gateway.http.securityHeaders.strictTransportSecurity": "Strict Transport Security Header",
   "gateway.remote.url": "Remote Gateway URL",
   "gateway.remote.sshTarget": "Remote Gateway SSH Target",
   "gateway.remote.sshIdentity": "Remote Gateway SSH Identity",
@@ -176,8 +168,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "tools.media.image.scope": "Image Understanding Scope",
   "tools.media.models": "Media Understanding Shared Models",
   "tools.media.concurrency": "Media Understanding Concurrency",
-  "tools.media.asyncCompletion.directSend":
-    "Async Media Completion Direct Send",
+  "tools.media.asyncCompletion.directSend": "Async Media Completion Direct Send",
   ...MEDIA_AUDIO_FIELD_LABELS,
   "tools.media.video.enabled": "Enable Video Understanding",
   "tools.media.video.maxBytes": "Video Understanding Max Bytes",
@@ -205,12 +196,9 @@ export const FIELD_LABELS: Record<string, string> = {
   "tools.loopDetection.historySize": "Tool-loop History Size",
   "tools.loopDetection.warningThreshold": "Tool-loop Warning Threshold",
   "tools.loopDetection.criticalThreshold": "Tool-loop Critical Threshold",
-  "tools.loopDetection.globalCircuitBreakerThreshold":
-    "Tool-loop Global Circuit Breaker Threshold",
-  "tools.loopDetection.detectors.genericRepeat":
-    "Tool-loop Generic Repeat Detection",
-  "tools.loopDetection.detectors.knownPollNoProgress":
-    "Tool-loop Poll No-Progress Detection",
+  "tools.loopDetection.globalCircuitBreakerThreshold": "Tool-loop Global Circuit Breaker Threshold",
+  "tools.loopDetection.detectors.genericRepeat": "Tool-loop Generic Repeat Detection",
+  "tools.loopDetection.detectors.knownPollNoProgress": "Tool-loop Poll No-Progress Detection",
   "tools.loopDetection.detectors.pingPong": "Tool-loop Ping-Pong Detection",
   "tools.fs.workspaceOnly": "Workspace-only FS tools",
   "tools.sessions.visibility": "Session Tools Visibility",
@@ -260,10 +248,8 @@ export const FIELD_LABELS: Record<string, string> = {
   "approvals.plugin.targets[].accountId": "Plugin Approval Target Account ID",
   "approvals.plugin.targets[].threadId": "Plugin Approval Target Thread ID",
   "tools.message.allowCrossContextSend": "Allow Cross-Context Messaging",
-  "tools.message.crossContext.allowWithinProvider":
-    "Allow Cross-Context (Same Provider)",
-  "tools.message.crossContext.allowAcrossProviders":
-    "Allow Cross-Context (Across Providers)",
+  "tools.message.crossContext.allowWithinProvider": "Allow Cross-Context (Same Provider)",
+  "tools.message.crossContext.allowAcrossProviders": "Allow Cross-Context (Across Providers)",
   "tools.message.crossContext.marker.enabled": "Cross-Context Marker",
   "tools.message.crossContext.marker.prefix": "Cross-Context Marker Prefix",
   "tools.message.crossContext.marker.suffix": "Cross-Context Marker Suffix",
@@ -298,23 +284,18 @@ export const FIELD_LABELS: Record<string, string> = {
   "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback":
     "Dangerously Allow Host-Header Origin Fallback",
   "gateway.controlUi.allowInsecureAuth": "Insecure Control UI Auth Toggle",
-  "gateway.controlUi.dangerouslyDisableDeviceAuth":
-    "Dangerously Disable Control UI Device Auth",
+  "gateway.controlUi.dangerouslyDisableDeviceAuth": "Dangerously Disable Control UI Device Auth",
   "gateway.push": "Gateway Push Delivery",
   "gateway.push.apns": "Gateway APNs Delivery",
   "gateway.push.apns.relay": "Gateway APNs Relay",
   "gateway.push.apns.relay.baseUrl": "Gateway APNs Relay Base URL",
   "gateway.push.apns.relay.timeoutMs": "Gateway APNs Relay Timeout (ms)",
-  "gateway.http.endpoints.chatCompletions.enabled":
-    "OpenAI Chat Completions Endpoint",
-  "gateway.http.endpoints.chatCompletions.maxBodyBytes":
-    "OpenAI Chat Completions Max Body Bytes",
-  "gateway.http.endpoints.chatCompletions.maxImageParts":
-    "OpenAI Chat Completions Max Image Parts",
+  "gateway.http.endpoints.chatCompletions.enabled": "OpenAI Chat Completions Endpoint",
+  "gateway.http.endpoints.chatCompletions.maxBodyBytes": "OpenAI Chat Completions Max Body Bytes",
+  "gateway.http.endpoints.chatCompletions.maxImageParts": "OpenAI Chat Completions Max Image Parts",
   "gateway.http.endpoints.chatCompletions.maxTotalImageBytes":
     "OpenAI Chat Completions Max Total Image Bytes",
-  "gateway.http.endpoints.chatCompletions.images":
-    "OpenAI Chat Completions Image Limits",
+  "gateway.http.endpoints.chatCompletions.images": "OpenAI Chat Completions Image Limits",
   "gateway.http.endpoints.chatCompletions.images.allowUrl":
     "OpenAI Chat Completions Allow Image URLs",
   "gateway.http.endpoints.chatCompletions.images.urlAllowlist":
@@ -373,8 +354,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.repoRoot": "Repo Root",
   "agents.defaults.bootstrapMaxChars": "Bootstrap Max Chars",
   "agents.defaults.bootstrapTotalMaxChars": "Bootstrap Total Max Chars",
-  "agents.defaults.bootstrapPromptTruncationWarning":
-    "Bootstrap Prompt Truncation Warning",
+  "agents.defaults.bootstrapPromptTruncationWarning": "Bootstrap Prompt Truncation Warning",
   "agents.defaults.envelopeTimezone": "Envelope Timezone",
   "agents.defaults.envelopeTimestamp": "Envelope Timestamp",
   "agents.defaults.envelopeElapsed": "Envelope Elapsed",
@@ -384,79 +364,55 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.memorySearch.extraPaths": "Extra Memory Paths",
   "agents.defaults.memorySearch.qmd": "Memory Search QMD Collections",
   "agents.defaults.memorySearch.qmd.extraCollections": "QMD Extra Collections",
-  "agents.defaults.memorySearch.qmd.extraCollections.path":
-    "QMD Extra Collection Path",
-  "agents.defaults.memorySearch.qmd.extraCollections.name":
-    "QMD Extra Collection Name",
-  "agents.defaults.memorySearch.qmd.extraCollections.pattern":
-    "QMD Extra Collection Pattern",
+  "agents.defaults.memorySearch.qmd.extraCollections.path": "QMD Extra Collection Path",
+  "agents.defaults.memorySearch.qmd.extraCollections.name": "QMD Extra Collection Name",
+  "agents.defaults.memorySearch.qmd.extraCollections.pattern": "QMD Extra Collection Pattern",
   "agents.defaults.memorySearch.multimodal": "Memory Search Multimodal",
-  "agents.defaults.memorySearch.multimodal.enabled":
-    "Enable Memory Search Multimodal",
-  "agents.defaults.memorySearch.multimodal.modalities":
-    "Memory Search Multimodal Modalities",
-  "agents.defaults.memorySearch.multimodal.maxFileBytes":
-    "Memory Search Multimodal Max File Bytes",
+  "agents.defaults.memorySearch.multimodal.enabled": "Enable Memory Search Multimodal",
+  "agents.defaults.memorySearch.multimodal.modalities": "Memory Search Multimodal Modalities",
+  "agents.defaults.memorySearch.multimodal.maxFileBytes": "Memory Search Multimodal Max File Bytes",
   "agents.defaults.memorySearch.experimental.sessionMemory":
     "Memory Search Session Index (Experimental)",
   "agents.defaults.memorySearch.provider": "Memory Search Provider",
   "agents.defaults.memorySearch.remote.baseUrl": "Remote Embedding Base URL",
   "agents.defaults.memorySearch.remote.apiKey": "Remote Embedding API Key",
   "agents.defaults.memorySearch.remote.headers": "Remote Embedding Headers",
-  "agents.defaults.memorySearch.remote.batch.enabled":
-    "Remote Batch Embedding Enabled",
-  "agents.defaults.memorySearch.remote.batch.wait":
-    "Remote Batch Wait for Completion",
-  "agents.defaults.memorySearch.remote.batch.concurrency":
-    "Remote Batch Concurrency",
-  "agents.defaults.memorySearch.remote.batch.pollIntervalMs":
-    "Remote Batch Poll Interval (ms)",
-  "agents.defaults.memorySearch.remote.batch.timeoutMinutes":
-    "Remote Batch Timeout (min)",
+  "agents.defaults.memorySearch.remote.batch.enabled": "Remote Batch Embedding Enabled",
+  "agents.defaults.memorySearch.remote.batch.wait": "Remote Batch Wait for Completion",
+  "agents.defaults.memorySearch.remote.batch.concurrency": "Remote Batch Concurrency",
+  "agents.defaults.memorySearch.remote.batch.pollIntervalMs": "Remote Batch Poll Interval (ms)",
+  "agents.defaults.memorySearch.remote.batch.timeoutMinutes": "Remote Batch Timeout (min)",
   "agents.defaults.memorySearch.model": "Memory Search Model",
-  "agents.defaults.memorySearch.outputDimensionality":
-    "Memory Search Output Dimensionality",
+  "agents.defaults.memorySearch.outputDimensionality": "Memory Search Output Dimensionality",
   "agents.defaults.memorySearch.fallback": "Memory Search Fallback",
   "agents.defaults.memorySearch.local.modelPath": "Local Embedding Model Path",
   "agents.defaults.memorySearch.store.path": "Memory Search Index Path",
-  "agents.defaults.memorySearch.store.vector.enabled":
-    "Memory Search Vector Index",
-  "agents.defaults.memorySearch.store.vector.extensionPath":
-    "Memory Search Vector Extension Path",
+  "agents.defaults.memorySearch.store.vector.enabled": "Memory Search Vector Index",
+  "agents.defaults.memorySearch.store.vector.extensionPath": "Memory Search Vector Extension Path",
   "agents.defaults.memorySearch.chunking.tokens": "Memory Chunk Tokens",
-  "agents.defaults.memorySearch.chunking.overlap":
-    "Memory Chunk Overlap Tokens",
+  "agents.defaults.memorySearch.chunking.overlap": "Memory Chunk Overlap Tokens",
   "agents.defaults.memorySearch.sync.onSessionStart": "Index on Session Start",
   "agents.defaults.memorySearch.sync.onSearch": "Index on Search (Lazy)",
   "agents.defaults.memorySearch.sync.watch": "Watch Memory Files",
-  "agents.defaults.memorySearch.sync.watchDebounceMs":
-    "Memory Watch Debounce (ms)",
-  "agents.defaults.memorySearch.sync.sessions.deltaBytes":
-    "Session Delta Bytes",
-  "agents.defaults.memorySearch.sync.sessions.deltaMessages":
-    "Session Delta Messages",
+  "agents.defaults.memorySearch.sync.watchDebounceMs": "Memory Watch Debounce (ms)",
+  "agents.defaults.memorySearch.sync.sessions.deltaBytes": "Session Delta Bytes",
+  "agents.defaults.memorySearch.sync.sessions.deltaMessages": "Session Delta Messages",
   "agents.defaults.memorySearch.sync.sessions.postCompactionForce":
     "Force Reindex After Compaction",
   "agents.defaults.memorySearch.query.maxResults": "Memory Search Max Results",
   "agents.defaults.memorySearch.query.minScore": "Memory Search Min Score",
   "agents.defaults.memorySearch.query.hybrid.enabled": "Memory Search Hybrid",
-  "agents.defaults.memorySearch.query.hybrid.vectorWeight":
-    "Memory Search Vector Weight",
-  "agents.defaults.memorySearch.query.hybrid.textWeight":
-    "Memory Search Text Weight",
+  "agents.defaults.memorySearch.query.hybrid.vectorWeight": "Memory Search Vector Weight",
+  "agents.defaults.memorySearch.query.hybrid.textWeight": "Memory Search Text Weight",
   "agents.defaults.memorySearch.query.hybrid.candidateMultiplier":
     "Memory Search Hybrid Candidate Multiplier",
-  "agents.defaults.memorySearch.query.hybrid.mmr.enabled":
-    "Memory Search MMR Re-ranking",
-  "agents.defaults.memorySearch.query.hybrid.mmr.lambda":
-    "Memory Search MMR Lambda",
-  "agents.defaults.memorySearch.query.hybrid.temporalDecay.enabled":
-    "Memory Search Temporal Decay",
+  "agents.defaults.memorySearch.query.hybrid.mmr.enabled": "Memory Search MMR Re-ranking",
+  "agents.defaults.memorySearch.query.hybrid.mmr.lambda": "Memory Search MMR Lambda",
+  "agents.defaults.memorySearch.query.hybrid.temporalDecay.enabled": "Memory Search Temporal Decay",
   "agents.defaults.memorySearch.query.hybrid.temporalDecay.halfLifeDays":
     "Memory Search Temporal Decay Half-life (Days)",
   "agents.defaults.memorySearch.cache.enabled": "Memory Search Embedding Cache",
-  "agents.defaults.memorySearch.cache.maxEntries":
-    "Memory Search Embedding Cache Max Entries",
+  "agents.defaults.memorySearch.cache.maxEntries": "Memory Search Embedding Cache Max Entries",
   memory: "Memory",
   "memory.backend": "Memory Backend",
   "memory.citations": "Memory Citations Mode",
@@ -517,75 +473,56 @@ export const FIELD_LABELS: Record<string, string> = {
   "models.providers.*.apiKey": "Model Provider API Key", // pragma: allowlist secret
   "models.providers.*.auth": "Model Provider Auth Mode",
   "models.providers.*.api": "Model Provider API Adapter",
-  "models.providers.*.injectNumCtxForOpenAICompat":
-    "Model Provider Inject num_ctx (OpenAI Compat)",
+  "models.providers.*.injectNumCtxForOpenAICompat": "Model Provider Inject num_ctx (OpenAI Compat)",
   "models.providers.*.headers": "Model Provider Headers",
   "models.providers.*.authHeader": "Model Provider Authorization Header",
   "models.providers.*.request": "Model Provider Request Overrides",
   "models.providers.*.request.headers": "Model Provider Request Headers",
   "models.providers.*.request.auth": "Model Provider Request Auth Override",
   "models.providers.*.request.auth.mode": "Model Provider Request Auth Mode",
-  "models.providers.*.request.auth.token":
-    "Model Provider Request Bearer Token",
-  "models.providers.*.request.auth.headerName":
-    "Model Provider Request Auth Header Name",
-  "models.providers.*.request.auth.value":
-    "Model Provider Request Auth Header Value",
-  "models.providers.*.request.auth.prefix":
-    "Model Provider Request Auth Header Prefix",
+  "models.providers.*.request.auth.token": "Model Provider Request Bearer Token",
+  "models.providers.*.request.auth.headerName": "Model Provider Request Auth Header Name",
+  "models.providers.*.request.auth.value": "Model Provider Request Auth Header Value",
+  "models.providers.*.request.auth.prefix": "Model Provider Request Auth Header Prefix",
   "models.providers.*.request.proxy": "Model Provider Request Proxy",
   "models.providers.*.request.proxy.mode": "Model Provider Request Proxy Mode",
   "models.providers.*.request.proxy.url": "Model Provider Request Proxy URL",
   "models.providers.*.request.proxy.tls": "Model Provider Request Proxy TLS",
-  "models.providers.*.request.proxy.tls.ca":
-    "Model Provider Request Proxy TLS CA",
-  "models.providers.*.request.proxy.tls.cert":
-    "Model Provider Request Proxy TLS Cert",
-  "models.providers.*.request.proxy.tls.key":
-    "Model Provider Request Proxy TLS Key",
-  "models.providers.*.request.proxy.tls.passphrase":
-    "Model Provider Request Proxy TLS Passphrase",
-  "models.providers.*.request.proxy.tls.serverName":
-    "Model Provider Request Proxy TLS Server Name",
+  "models.providers.*.request.proxy.tls.ca": "Model Provider Request Proxy TLS CA",
+  "models.providers.*.request.proxy.tls.cert": "Model Provider Request Proxy TLS Cert",
+  "models.providers.*.request.proxy.tls.key": "Model Provider Request Proxy TLS Key",
+  "models.providers.*.request.proxy.tls.passphrase": "Model Provider Request Proxy TLS Passphrase",
+  "models.providers.*.request.proxy.tls.serverName": "Model Provider Request Proxy TLS Server Name",
   "models.providers.*.request.proxy.tls.insecureSkipVerify":
     "Model Provider Request Proxy TLS Skip Verify",
   "models.providers.*.request.tls": "Model Provider Request TLS",
   "models.providers.*.request.tls.ca": "Model Provider Request TLS CA",
   "models.providers.*.request.tls.cert": "Model Provider Request TLS Cert",
   "models.providers.*.request.tls.key": "Model Provider Request TLS Key",
-  "models.providers.*.request.tls.passphrase":
-    "Model Provider Request TLS Passphrase",
-  "models.providers.*.request.tls.serverName":
-    "Model Provider Request TLS Server Name",
-  "models.providers.*.request.tls.insecureSkipVerify":
-    "Model Provider Request TLS Skip Verify",
+  "models.providers.*.request.tls.passphrase": "Model Provider Request TLS Passphrase",
+  "models.providers.*.request.tls.serverName": "Model Provider Request TLS Server Name",
+  "models.providers.*.request.tls.insecureSkipVerify": "Model Provider Request TLS Skip Verify",
   "models.providers.*.models": "Model Provider Model List",
   "auth.cooldowns.billingBackoffHours": "Billing Backoff (hours)",
   "auth.cooldowns.billingBackoffHoursByProvider": "Billing Backoff Overrides",
   "auth.cooldowns.billingMaxHours": "Billing Backoff Cap (hours)",
-  "auth.cooldowns.authPermanentBackoffMinutes":
-    "Auth-Permanent Backoff (minutes)",
-  "auth.cooldowns.authPermanentMaxMinutes":
-    "Auth-Permanent Backoff Cap (minutes)",
+  "auth.cooldowns.authPermanentBackoffMinutes": "Auth-Permanent Backoff (minutes)",
+  "auth.cooldowns.authPermanentMaxMinutes": "Auth-Permanent Backoff Cap (minutes)",
   "auth.cooldowns.failureWindowHours": "Failover Window (hours)",
   "auth.cooldowns.overloadedProfileRotations": "Overloaded Profile Rotations",
   "auth.cooldowns.overloadedBackoffMs": "Overloaded Backoff (ms)",
-  "auth.cooldowns.rateLimitedProfileRotations":
-    "Rate-Limited Profile Rotations",
+  "auth.cooldowns.rateLimitedProfileRotations": "Rate-Limited Profile Rotations",
   "agents.defaults.models": "Models",
   "agents.defaults.model.primary": "Primary Model",
   "agents.defaults.model.fallbacks": "Model Fallbacks",
   "agents.defaults.imageModel.primary": "Image Model",
   "agents.defaults.imageModel.fallbacks": "Image Model Fallbacks",
   "agents.defaults.imageGenerationModel.primary": "Image Generation Model",
-  "agents.defaults.imageGenerationModel.fallbacks":
-    "Image Generation Model Fallbacks",
+  "agents.defaults.imageGenerationModel.fallbacks": "Image Generation Model Fallbacks",
   "agents.defaults.videoGenerationModel.primary": "Video Generation Model",
-  "agents.defaults.videoGenerationModel.fallbacks":
-    "Video Generation Model Fallbacks",
+  "agents.defaults.videoGenerationModel.fallbacks": "Video Generation Model Fallbacks",
   "agents.defaults.musicGenerationModel.primary": "Music Generation Model",
-  "agents.defaults.musicGenerationModel.fallbacks":
-    "Music Generation Model Fallbacks",
+  "agents.defaults.musicGenerationModel.fallbacks": "Music Generation Model Fallbacks",
   "agents.defaults.pdfModel.primary": "PDF Model",
   "agents.defaults.pdfModel.fallbacks": "PDF Model Fallbacks",
   "agents.defaults.pdfMaxBytesMb": "PDF Max Size (MB)",
@@ -597,54 +534,38 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.compaction": "Compaction",
   "agents.defaults.compaction.mode": "Compaction Mode",
   "agents.defaults.compaction.reserveTokens": "Compaction Reserve Tokens",
-  "agents.defaults.compaction.keepRecentTokens":
-    "Compaction Keep Recent Tokens",
-  "agents.defaults.compaction.reserveTokensFloor":
-    "Compaction Reserve Token Floor",
+  "agents.defaults.compaction.keepRecentTokens": "Compaction Keep Recent Tokens",
+  "agents.defaults.compaction.reserveTokensFloor": "Compaction Reserve Token Floor",
   "agents.defaults.compaction.maxHistoryShare": "Compaction Max History Share",
   "agents.defaults.compaction.identifierPolicy": "Compaction Identifier Policy",
-  "agents.defaults.compaction.identifierInstructions":
-    "Compaction Identifier Instructions",
-  "agents.defaults.compaction.recentTurnsPreserve":
-    "Compaction Preserve Recent Turns",
+  "agents.defaults.compaction.identifierInstructions": "Compaction Identifier Instructions",
+  "agents.defaults.compaction.recentTurnsPreserve": "Compaction Preserve Recent Turns",
   "agents.defaults.compaction.qualityGuard": "Compaction Quality Guard",
-  "agents.defaults.compaction.qualityGuard.enabled":
-    "Compaction Quality Guard Enabled",
-  "agents.defaults.compaction.qualityGuard.maxRetries":
-    "Compaction Quality Guard Max Retries",
+  "agents.defaults.compaction.qualityGuard.enabled": "Compaction Quality Guard Enabled",
+  "agents.defaults.compaction.qualityGuard.maxRetries": "Compaction Quality Guard Max Retries",
   "agents.defaults.compaction.postIndexSync": "Compaction Post-Index Sync",
-  "agents.defaults.compaction.postCompactionSections":
-    "Post-Compaction Context Sections",
+  "agents.defaults.compaction.postCompactionSections": "Post-Compaction Context Sections",
   "agents.defaults.compaction.timeoutSeconds": "Compaction Timeout (Seconds)",
   "agents.defaults.compaction.model": "Compaction Model Override",
-  "agents.defaults.compaction.truncateAfterCompaction":
-    "Truncate After Compaction",
+  "agents.defaults.compaction.truncateAfterCompaction": "Truncate After Compaction",
   "agents.defaults.compaction.notifyUser": "Compaction Notify User",
   "agents.defaults.compaction.memoryFlush": "Compaction Memory Flush",
-  "agents.defaults.compaction.memoryFlush.enabled":
-    "Compaction Memory Flush Enabled",
+  "agents.defaults.compaction.memoryFlush.enabled": "Compaction Memory Flush Enabled",
   "agents.defaults.compaction.memoryFlush.softThresholdTokens":
     "Compaction Memory Flush Soft Threshold",
   "agents.defaults.compaction.memoryFlush.forceFlushTranscriptBytes":
     "Compaction Memory Flush Transcript Size Threshold",
-  "agents.defaults.compaction.memoryFlush.prompt":
-    "Compaction Memory Flush Prompt",
-  "agents.defaults.compaction.memoryFlush.systemPrompt":
-    "Compaction Memory Flush System Prompt",
+  "agents.defaults.compaction.memoryFlush.prompt": "Compaction Memory Flush Prompt",
+  "agents.defaults.compaction.memoryFlush.systemPrompt": "Compaction Memory Flush System Prompt",
   "agents.defaults.embeddedPi": "Embedded Pi",
-  "agents.defaults.embeddedPi.projectSettingsPolicy":
-    "Embedded Pi Project Settings Policy",
-  "agents.defaults.heartbeat.includeSystemPromptSection":
-    "Heartbeat Include System Prompt Section",
-  "agents.list.*.heartbeat.includeSystemPromptSection":
-    "Heartbeat Include System Prompt Section",
+  "agents.defaults.embeddedPi.projectSettingsPolicy": "Embedded Pi Project Settings Policy",
+  "agents.defaults.heartbeat.includeSystemPromptSection": "Heartbeat Include System Prompt Section",
+  "agents.list.*.heartbeat.includeSystemPromptSection": "Heartbeat Include System Prompt Section",
   "agents.defaults.heartbeat.directPolicy": "Heartbeat Direct Policy",
   "agents.list.*.heartbeat.directPolicy": "Heartbeat Direct Policy",
-  "agents.defaults.heartbeat.suppressToolErrorWarnings":
-    "Heartbeat Suppress Tool Error Warnings",
+  "agents.defaults.heartbeat.suppressToolErrorWarnings": "Heartbeat Suppress Tool Error Warnings",
   "agents.defaults.sandbox.browser.network": "Sandbox Browser Network",
-  "agents.defaults.sandbox.browser.cdpSourceRange":
-    "Sandbox Browser CDP Source Port Range",
+  "agents.defaults.sandbox.browser.cdpSourceRange": "Sandbox Browser CDP Source Port Range",
   "agents.defaults.sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
     "Sandbox Docker Allow Container Namespace Join",
   commands: "Commands",
@@ -674,8 +595,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "browser.snapshotDefaults": "Browser Snapshot Defaults",
   "browser.snapshotDefaults.mode": "Browser Snapshot Mode",
   "browser.ssrfPolicy": "Browser SSRF Policy",
-  "browser.ssrfPolicy.dangerouslyAllowPrivateNetwork":
-    "Browser Dangerously Allow Private Network",
+  "browser.ssrfPolicy.dangerouslyAllowPrivateNetwork": "Browser Dangerously Allow Private Network",
   "browser.ssrfPolicy.allowedHostnames": "Browser Allowed Hostnames",
   "browser.ssrfPolicy.hostnameAllowlist": "Browser Hostname Allowlist",
   "browser.remoteCdpTimeoutMs": "Remote CDP Timeout (ms)",
@@ -710,8 +630,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "session.sendPolicy.rules[].match.channel": "Session Send Rule Channel",
   "session.sendPolicy.rules[].match.chatType": "Session Send Rule Chat Type",
   "session.sendPolicy.rules[].match.keyPrefix": "Session Send Rule Key Prefix",
-  "session.sendPolicy.rules[].match.rawKeyPrefix":
-    "Session Send Rule Raw Key Prefix",
+  "session.sendPolicy.rules[].match.rawKeyPrefix": "Session Send Rule Raw Key Prefix",
   "session.agentToAgent": "Session Agent-to-Agent",
   "session.agentToAgent.maxPingPongTurns": "Agent-to-Agent Ping-Pong Turns",
   "session.threadBindings": "Session Thread Bindings",
@@ -724,8 +643,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "session.maintenance.pruneDays": "Session Prune Days (Deprecated)",
   "session.maintenance.maxEntries": "Session Max Entries",
   "session.maintenance.rotateBytes": "Session Rotate Size",
-  "session.maintenance.resetArchiveRetention":
-    "Session Reset Archive Retention",
+  "session.maintenance.resetArchiveRetention": "Session Reset Archive Retention",
   "session.maintenance.maxDiskBytes": "Session Max Disk Budget",
   "session.maintenance.highWaterBytes": "Session Disk High-water Target",
   cron: "Cron",
@@ -766,8 +684,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "hooks.mappings[].messageTemplate": "Hook Mapping Message Template",
   "hooks.mappings[].textTemplate": "Hook Mapping Text Template",
   "hooks.mappings[].deliver": "Hook Mapping Deliver Reply",
-  "hooks.mappings[].allowUnsafeExternalContent":
-    "Hook Mapping Allow Unsafe External Content",
+  "hooks.mappings[].allowUnsafeExternalContent": "Hook Mapping Allow Unsafe External Content",
   "hooks.mappings[].channel": "Hook Mapping Delivery Channel",
   "hooks.mappings[].to": "Hook Mapping Delivery Destination",
   "hooks.mappings[].model": "Hook Mapping Model Override",
@@ -786,8 +703,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "hooks.gmail.includeBody": "Gmail Hook Include Body",
   "hooks.gmail.maxBytes": "Gmail Hook Max Body Bytes",
   "hooks.gmail.renewEveryMinutes": "Gmail Hook Renew Interval (min)",
-  "hooks.gmail.allowUnsafeExternalContent":
-    "Gmail Hook Allow Unsafe External Content",
+  "hooks.gmail.allowUnsafeExternalContent": "Gmail Hook Allow Unsafe External Content",
   "hooks.gmail.serve": "Gmail Hook Local Server",
   "hooks.gmail.serve.bind": "Gmail Hook Server Bind Address",
   "hooks.gmail.serve.port": "Gmail Hook Server Port",
@@ -880,8 +796,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.list[].heartbeat.suppressToolErrorWarnings":
     "Agent Heartbeat Suppress Tool Error Warnings",
   "agents.list[].sandbox.browser.network": "Agent Sandbox Browser Network",
-  "agents.list[].sandbox.browser.cdpSourceRange":
-    "Agent Sandbox Browser CDP Source Port Range",
+  "agents.list[].sandbox.browser.cdpSourceRange": "Agent Sandbox Browser CDP Source Port Range",
   "agents.list[].sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
     "Agent Sandbox Docker Allow Container Namespace Join",
   "discovery.mdns.mode": "mDNS Discovery Mode",
@@ -897,11 +812,9 @@ export const FIELD_LABELS: Record<string, string> = {
   "plugins.entries": "Plugin Entries",
   "plugins.entries.*.enabled": "Plugin Enabled",
   "plugins.entries.*.hooks": "Plugin Hook Policy",
-  "plugins.entries.*.hooks.allowPromptInjection":
-    "Allow Prompt Injection Hooks",
+  "plugins.entries.*.hooks.allowPromptInjection": "Allow Prompt Injection Hooks",
   "plugins.entries.*.subagent": "Plugin Subagent Policy",
-  "plugins.entries.*.subagent.allowModelOverride":
-    "Allow Plugin Subagent Model Override",
+  "plugins.entries.*.subagent.allowModelOverride": "Allow Plugin Subagent Model Override",
   "plugins.entries.*.subagent.allowedModels": "Plugin Subagent Allowed Models",
   "plugins.entries.*.apiKey": "Plugin API Key", // pragma: allowlist secret
   "plugins.entries.*.env": "Plugin Environment Variables",

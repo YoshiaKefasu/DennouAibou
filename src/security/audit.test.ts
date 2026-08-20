@@ -57,10 +57,10 @@ function stubChannelPlugin(params: {
           ChannelPlugin["security"]
         >["collectAuditFindings"])
       : params.id === "telegram"
-            ? (collectTelegramSecurityAuditFindings as NonNullable<
-                ChannelPlugin["security"]
-              >["collectAuditFindings"])
-            : undefined);
+        ? (collectTelegramSecurityAuditFindings as NonNullable<
+            ChannelPlugin["security"]
+          >["collectAuditFindings"])
+        : undefined);
   const defaultCommands =
     params.commands ??
     (params.id === "discord" || params.id === "telegram"

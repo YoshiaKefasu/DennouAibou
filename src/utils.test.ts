@@ -83,9 +83,9 @@ describe("shortenHomePath", () => {
     vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
     vi.stubEnv("HOME", "/home/other");
 
-    expect(shortenHomePath(`${path.resolve("/srv/openclaw-home")}/.openclaw/dennou-aibou.json`)).toBe(
-      "$DENNOU_HOME/.openclaw/dennou-aibou.json",
-    );
+    expect(
+      shortenHomePath(`${path.resolve("/srv/openclaw-home")}/.openclaw/dennou-aibou.json`),
+    ).toBe("$DENNOU_HOME/.openclaw/dennou-aibou.json");
 
     vi.unstubAllEnvs();
   });
@@ -97,7 +97,9 @@ describe("shortenHomeInString", () => {
     vi.stubEnv("HOME", "/home/other");
 
     expect(
-      shortenHomeInString(`config: ${path.resolve("/srv/openclaw-home")}/.openclaw/dennou-aibou.json`),
+      shortenHomeInString(
+        `config: ${path.resolve("/srv/openclaw-home")}/.openclaw/dennou-aibou.json`,
+      ),
     ).toBe("config: $DENNOU_HOME/.openclaw/dennou-aibou.json");
 
     vi.unstubAllEnvs();

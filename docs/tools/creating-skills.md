@@ -102,14 +102,14 @@ The YAML frontmatter supports these fields:
 
 ## Where skills live
 
-| Location                        | Precedence | Scope                 |
-| ------------------------------- | ---------- | --------------------- |
-| `\<workspace\>/skills/`         | Highest    | Per-agent             |
-| `\<workspace\>/.agents/skills/` | High       | Per-workspace agent   |
-| `~/.agents/skills/`             | Medium     | Shared agent profile  |
-| `~/.openclaw/skills/`           | Medium     | Shared (all agents)   |
+| Location                           | Precedence | Scope                 |
+| ---------------------------------- | ---------- | --------------------- |
+| `\<workspace\>/skills/`            | Highest    | Per-agent             |
+| `\<workspace\>/.agents/skills/`    | High       | Per-workspace agent   |
+| `~/.agents/skills/`                | Medium     | Shared agent profile  |
+| `~/.openclaw/skills/`              | Medium     | Shared (all agents)   |
 | Bundled (shipped with DennouAibou) | Low        | Global                |
-| `skills.load.extraDirs`         | Lowest     | Custom shared folders |
+| `skills.load.extraDirs`            | Lowest     | Custom shared folders |
 
 ## Related
 

@@ -31,12 +31,12 @@
 
 上流OpenClawは以下の4つのディスクレベル管理機構を持つ（v1では見落としていた）：
 
-| 機構 | ファイル | 何をするか |
-|---|---|---|
-| Session Maintenance | `src/config/sessions/store-maintenance.ts` | `pruneAfter` (時間), `maxEntries` (数) でstaleセッションを `.deleted.*` にアーカイブ |
-| Disk Budget | `src/config/sessions/disk-budget.ts` | `maxDiskBytes` / `highWaterBytes` によるoldest-first eviction |
-| Session Reaper | `src/cron/session-reaper.ts` | cron run sessionの自動sweep |
-| Heartbeat Truncation | `src/infra/heartbeat-runner.ts` L308-325 | HEARTBEAT_OK時に `fs.truncate()` でtranscriptを元サイズに復元 |
+| 機構                 | ファイル                                   | 何をするか                                                                           |
+| -------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Session Maintenance  | `src/config/sessions/store-maintenance.ts` | `pruneAfter` (時間), `maxEntries` (数) でstaleセッションを `.deleted.*` にアーカイブ |
+| Disk Budget          | `src/config/sessions/disk-budget.ts`       | `maxDiskBytes` / `highWaterBytes` によるoldest-first eviction                        |
+| Session Reaper       | `src/cron/session-reaper.ts`               | cron run sessionの自動sweep                                                          |
+| Heartbeat Truncation | `src/infra/heartbeat-runner.ts` L308-325   | HEARTBEAT_OK時に `fs.truncate()` でtranscriptを元サイズに復元                        |
 
 **これらはセッション「全体」の管理であり、セッション内の「行レベルのツール出力」のpruningは行わない。** → 本プランのスコープはここ。
 
@@ -58,10 +58,10 @@
 
 ### 2.2 安全機構（2層防御）
 
-| # | 機構 | 説明 | 危険度低減効果 |
-|---|---|---|---|
-| 1 | **Closed-Only Guard** | `*.deleted.*` と `*.reset.*` のみを対象。アクティブ `.jsonl` は絶対に触らない | アクティブセッション破損リスクが**完全にゼロ** |
-| 2 | **Dry-Run 段階的導入** | 初期は `dryRun: true` でログ出力のみ、実際の削除は行わない | 誤動作を事前に検出できる |
+| #   | 機構                   | 説明                                                                          | 危険度低減効果                                 |
+| --- | ---------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1   | **Closed-Only Guard**  | `*.deleted.*` と `*.reset.*` のみを対象。アクティブ `.jsonl` は絶対に触らない | アクティブセッション破損リスクが**完全にゼロ** |
+| 2   | **Dry-Run 段階的導入** | 初期は `dryRun: true` でログ出力のみ、実際の削除は行わない                    | 誤動作を事前に検出できる                       |
 
 > **v1 との差分**: Idle Time Guard, Copy-on-Rotate, Lock/排他制御の3層を削除。閉じたファイル限定にすることで、これらが構造的に不要になった。
 
@@ -101,6 +101,7 @@ export interface DennouSessionToolsPruneConfig {
 ```
 
 > **v1 との差分**:
+>
 > - `targetFiles` 削除 — Closed-Onlyで固定。設定で変えられる必要がない
 > - `idleThresholdMinutes` 削除 — 閉じたファイル限定なのでアイドル判定が不要
 > - `intervalMinutes` 削除 — スケジューラ廃止（上流便乗）
@@ -185,11 +186,11 @@ export interface DennouSessionToolsPruneConfig {
 
 ## 7. 決定済み事項（v1の未確定を解消）
 
-| 項目 | v1での状態 | v2での決定 | 根拠 |
-|---|---|---|---|
-| バックアップ戦略 | 未確定 | **不要** | 閉じたセッションは元々削除予定のデータ。バックアップの追加コストが利益を上回る |
-| 設定の保存場所 | 未確定 | **`dennou-config.json`（独自ファイル）** | Rule 2: Smart Debloating。`openclaw.json` を汚さず、上流syncの衝突を防ぐ |
-| OpenClawアップストリーム同期 | 独自のまま | **独自のまま** | Rule 1: Encapsulation。コアファイルには触れない |
+| 項目                         | v1での状態 | v2での決定                               | 根拠                                                                           |
+| ---------------------------- | ---------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
+| バックアップ戦略             | 未確定     | **不要**                                 | 閉じたセッションは元々削除予定のデータ。バックアップの追加コストが利益を上回る |
+| 設定の保存場所               | 未確定     | **`dennou-config.json`（独自ファイル）** | Rule 2: Smart Debloating。`openclaw.json` を汚さず、上流syncの衝突を防ぐ       |
+| OpenClawアップストリーム同期 | 独自のまま | **独自のまま**                           | Rule 1: Encapsulation。コアファイルには触れない                                |
 
 ---
 
@@ -199,16 +200,16 @@ export interface DennouSessionToolsPruneConfig {
 
 ### 全フェーズ完了
 
-| Phase | ファイル | 状態 | 備考 |
-|---|---|---|---|
-| Phase 1 | `src/dennou-soul/types.ts` | ✅ 完了 | `DennouSessionToolsPruneConfig` 定義 |
-| Phase 1 | `src/dennou-soul/config.ts` | ✅ 完了 | `dennou-config.json` 読み込み + デフォルトマージ |
-| Phase 2 | `src/dennou-soul/prune-closed-sessions.ts` | ✅ 完了 | エンジン本体（228行） |
-| Phase 2 | `src/dennou-soul/prune-closed-sessions.test.ts` | ✅ 完了 | 11テスト 全通過 |
-| Phase 3 | `src/dennou-soul/session-maintenance-hook.ts` | ✅ 完了 | フック定義 + `setAfterSaveHook` 登録 |
-| Phase 3 | `src/config/sessions/store.ts` | ✅ 完了 | `setAfterSaveHook()` / `_afterSaveHook` / 成功パス3箇所で呼び出し |
-| Phase 3 | `src/cli/run-main.ts` | ✅ 完了 | `runCli()` 初期化時に `initSessionMaintenanceHook()` 呼び出し |
-| Phase 4 | デフォルト設定 | ✅ 完了 | `dryRun: true`（安全側）でリリース済み |
+| Phase   | ファイル                                        | 状態    | 備考                                                              |
+| ------- | ----------------------------------------------- | ------- | ----------------------------------------------------------------- |
+| Phase 1 | `src/dennou-soul/types.ts`                      | ✅ 完了 | `DennouSessionToolsPruneConfig` 定義                              |
+| Phase 1 | `src/dennou-soul/config.ts`                     | ✅ 完了 | `dennou-config.json` 読み込み + デフォルトマージ                  |
+| Phase 2 | `src/dennou-soul/prune-closed-sessions.ts`      | ✅ 完了 | エンジン本体（228行）                                             |
+| Phase 2 | `src/dennou-soul/prune-closed-sessions.test.ts` | ✅ 完了 | 11テスト 全通過                                                   |
+| Phase 3 | `src/dennou-soul/session-maintenance-hook.ts`   | ✅ 完了 | フック定義 + `setAfterSaveHook` 登録                              |
+| Phase 3 | `src/config/sessions/store.ts`                  | ✅ 完了 | `setAfterSaveHook()` / `_afterSaveHook` / 成功パス3箇所で呼び出し |
+| Phase 3 | `src/cli/run-main.ts`                           | ✅ 完了 | `runCli()` 初期化時に `initSessionMaintenanceHook()` 呼び出し     |
+| Phase 4 | デフォルト設定                                  | ✅ 完了 | `dryRun: true`（安全側）でリリース済み                            |
 
 ### 設計からの逸脱（意図的）
 

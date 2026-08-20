@@ -23,10 +23,10 @@ instead of ACP.
 
 There are three nearby surfaces that are easy to confuse:
 
-| You want to...                                                                     | Use this                   | Notes                                                                                                       |
-| ---------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| You want to...                                                                        | Use this                   | Notes                                                                                                       |
+| ------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Run Codex, Claude Code, Gemini CLI, or another external harness _through_ DennouAibou | This page: ACP agents      | Chat-bound sessions, `/acp spawn`, `sessions_spawn({ runtime: "acp" })`, background tasks, runtime controls |
-| Expose an DennouAibou Gateway session _as_ an ACP server for an editor or client      | [`openclaw acp`](/cli/acp) | Bridge mode. IDE/client talks ACP to DennouAibou over stdio/WebSocket                                          |
+| Expose an DennouAibou Gateway session _as_ an ACP server for an editor or client      | [`openclaw acp`](/cli/acp) | Bridge mode. IDE/client talks ACP to DennouAibou over stdio/WebSocket                                       |
 
 ## Does this work out of the box?
 
@@ -90,12 +90,12 @@ What DennouAibou should do:
 
 Use ACP when you want an external harness runtime. Use sub-agents when you want DennouAibou-native delegated runs.
 
-| Area          | ACP session                           | Sub-agent run                      |
-| ------------- | ------------------------------------- | ---------------------------------- |
-| Runtime       | ACP backend plugin (for example acpx) | DennouAibou native sub-agent runtime  |
-| Session key   | `agent:<agentId>:acp:<uuid>`          | `agent:<agentId>:subagent:<uuid>`  |
-| Main commands | `/acp ...`                            | `/subagents ...`                   |
-| Spawn tool    | `sessions_spawn` with `runtime:"acp"` | `sessions_spawn` (default runtime) |
+| Area          | ACP session                           | Sub-agent run                        |
+| ------------- | ------------------------------------- | ------------------------------------ |
+| Runtime       | ACP backend plugin (for example acpx) | DennouAibou native sub-agent runtime |
+| Session key   | `agent:<agentId>:acp:<uuid>`          | `agent:<agentId>:subagent:<uuid>`    |
+| Main commands | `/acp ...`                            | `/subagents ...`                     |
+| Spawn tool    | `sessions_spawn` with `runtime:"acp"` | `sessions_spawn` (default runtime)   |
 
 See also [Sub-agents](/tools/subagents).
 

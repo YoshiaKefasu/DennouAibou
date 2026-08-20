@@ -693,7 +693,7 @@ describe("splitThinkingTaggedText", () => {
 
   it("handles Gemini CLI thought prefix pattern", () => {
     const text =
-      '...94>thought\nCRITICAL INSTRUCTION 1: Do not use generic bash commands.\nCRITICAL INSTRUCTION 2: List related tools.\n\n<final>This is the actual response.</final>';
+      "...94>thought\nCRITICAL INSTRUCTION 1: Do not use generic bash commands.\nCRITICAL INSTRUCTION 2: List related tools.\n\n<final>This is the actual response.</final>";
     const result = splitThinkingTaggedText(text);
     expect(result).not.toBeNull();
     expect(result).toHaveLength(2);
@@ -701,14 +701,17 @@ describe("splitThinkingTaggedText", () => {
     expect(result![0]).toEqual({
       type: "thinking",
       thinking:
-        '...94>thought\nCRITICAL INSTRUCTION 1: Do not use generic bash commands.\nCRITICAL INSTRUCTION 2: List related tools.',
+        "...94>thought\nCRITICAL INSTRUCTION 1: Do not use generic bash commands.\nCRITICAL INSTRUCTION 2: List related tools.",
     });
-    expect(result![1]).toEqual({ type: "text", text: "<final>This is the actual response.</final>" });
+    expect(result![1]).toEqual({
+      type: "text",
+      text: "<final>This is the actual response.</final>",
+    });
   });
 
   it("handles Gemini CLI pattern with multiple lines before final", () => {
     const text =
-      '...94>thought\n[E]\n[META-CHECK-START]\nCheck context.\n[META-CHECK-END]\n\n<final>Hello world</final>';
+      "...94>thought\n[E]\n[META-CHECK-START]\nCheck context.\n[META-CHECK-END]\n\n<final>Hello world</final>";
     const result = splitThinkingTaggedText(text);
     expect(result).not.toBeNull();
     expect(result![0].type).toBe("thinking");
@@ -716,7 +719,7 @@ describe("splitThinkingTaggedText", () => {
   });
 
   it("returns thinking-only block for Gemini CLI pattern without final tag (incomplete stream)", () => {
-    const text = '...94>thought\nSome reasoning without final tag.';
+    const text = "...94>thought\nSome reasoning without final tag.";
     const result = splitThinkingTaggedText(text);
     // Without <final>, the entire text becomes thinking - not null
     // This is intentional: it IS Gemini CLI thought text, just incomplete
@@ -727,7 +730,7 @@ describe("splitThinkingTaggedText", () => {
 
   it("does not false-positive on ...94>thought appearing mid-text", () => {
     const text =
-      'Normal prose that mentions\n...94>thought somewhere mid-sentence but this is not Gemini CLI output.';
+      "Normal prose that mentions\n...94>thought somewhere mid-sentence but this is not Gemini CLI output.";
     const result = splitThinkingTaggedText(text);
     expect(result).toBeNull();
   });

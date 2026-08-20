@@ -81,9 +81,7 @@ function isProtectedSessionKey(key: string, cfg?: OpenClawConfig): boolean {
   if (normalized === resolveMainSessionKey(cfg)) {
     return true; // main は常に保護
   }
-  return (cfg?.session?.protectedKeys ?? []).some(
-    (k) => normalizeSessionKey(k) === normalized,
-  );
+  return (cfg?.session?.protectedKeys ?? []).some((k) => normalizeSessionKey(k) === normalized);
 }
 ```
 
@@ -112,10 +110,7 @@ function isProtectedSessionKey(key: string, cfg?: OpenClawConfig): boolean {
 if (isProtectedSessionKey(key, cfg)) {
   return {
     ok: false,
-    error: errorShape(
-      ErrorCodes.INVALID_REQUEST,
-      `Cannot reset protected session (${key}).`,
-    ),
+    error: errorShape(ErrorCodes.INVALID_REQUEST, `Cannot reset protected session (${key}).`),
   };
 }
 ```
@@ -149,10 +144,7 @@ if (target.canonicalKey === mainKey) {
   respond(
     false,
     undefined,
-    errorShape(
-      ErrorCodes.INVALID_REQUEST,
-      `Cannot delete the main session (${mainKey}).`,
-    ),
+    errorShape(ErrorCodes.INVALID_REQUEST, `Cannot delete the main session (${mainKey}).`),
   );
   return;
 }
@@ -167,10 +159,7 @@ if (isProtectedSessionKey(key, cfg)) {
   respond(
     false,
     undefined,
-    errorShape(
-      ErrorCodes.INVALID_REQUEST,
-      `Cannot delete protected session (${key}).`,
-    ),
+    errorShape(ErrorCodes.INVALID_REQUEST, `Cannot delete protected session (${key}).`),
   );
   return;
 }
@@ -282,10 +271,7 @@ if (isProtectedSessionKey(key, cfg)) {
 ```json
 {
   "session": {
-    "protectedKeys": [
-      "agent:main:main",
-      "agent:main:telegram:g-agent-main-main"
-    ]
+    "protectedKeys": ["agent:main:main", "agent:main:telegram:g-agent-main-main"]
   }
 }
 ```

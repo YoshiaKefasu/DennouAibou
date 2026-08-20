@@ -677,9 +677,11 @@ export async function runAgentTurnWithFallback(params: {
         ...resolveModelFallbackOptions(params.followupRun.run),
         runId,
         run: async (provider, model, runOptions) => {
-const suppressQueuedUserPersistenceForCandidate =
-  ((params.followupRun.run as { suppressNextUserMessagePersistence?: boolean }).suppressNextUserMessagePersistence ?? false) ||
-  queuedUserMessagePersistedAcrossFallback;
+          const suppressQueuedUserPersistenceForCandidate =
+            ((params.followupRun.run as { suppressNextUserMessagePersistence?: boolean })
+              .suppressNextUserMessagePersistence ??
+              false) ||
+            queuedUserMessagePersistedAcrossFallback;
           const suppressAssistantErrorPersistenceForCandidate =
             assistantErrorPersistedAcrossFallback;
           // Notify that model selection is complete (including after fallback).

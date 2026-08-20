@@ -128,8 +128,8 @@ Create a helper that mirrors the magic-context formatting rules:
 Expected helper behavior:
 
 ```typescript
-formatTemporalGapMarker(seconds) // returns "+2w 4d" or null
-formatTemporalMarkerPrefix(seconds) // returns "<!-- +2w 4d -->\n" or null
+formatTemporalGapMarker(seconds); // returns "+2w 4d" or null
+formatTemporalMarkerPrefix(seconds); // returns "<!-- +2w 4d -->\n" or null
 ```
 
 Keep it independent and unit-tested. Do not couple it to Telegram, Discord, or any one channel.

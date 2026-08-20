@@ -4,13 +4,7 @@ import path from "node:path";
 import { captureEnv } from "./env.js";
 import { cleanupSessionStateForTest } from "./session-state-cleanup.js";
 
-const HOME_ENV_KEYS = [
-  "HOME",
-  "USERPROFILE",
-  "HOMEDRIVE",
-  "HOMEPATH",
-  "DENNOU_STATE_DIR",
-] as const;
+const HOME_ENV_KEYS = ["HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "DENNOU_STATE_DIR"] as const;
 
 export type TempHomeEnv = {
   home: string;

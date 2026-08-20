@@ -68,10 +68,7 @@ export async function completeSimpleWithLiveTimeout<TApi extends Api>(
   context: Parameters<typeof completeSimple<TApi>>[1],
   options: Parameters<typeof completeSimple<TApi>>[2],
   progressContext: string,
-  timeoutMs = Math.max(
-    1_000,
-    toInt(process.env.DENNOU_LIVE_MODEL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
-  ),
+  timeoutMs = Math.max(1_000, toInt(process.env.DENNOU_LIVE_MODEL_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)),
 ): Promise<AssistantMessage> {
   const controller = new AbortController();
   const abortTimer = setTimeout(() => controller.abort(), timeoutMs);

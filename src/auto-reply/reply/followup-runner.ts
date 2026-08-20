@@ -196,7 +196,9 @@ export function createFollowupRunner(params: {
           }),
           run: async (provider, model, runOptions) => {
             const suppressQueuedUserPersistenceForCandidate =
-              ((queued.run as { suppressNextUserMessagePersistence?: boolean }).suppressNextUserMessagePersistence ?? false) ||
+              ((queued.run as { suppressNextUserMessagePersistence?: boolean })
+                .suppressNextUserMessagePersistence ??
+                false) ||
               queuedUserMessagePersistedAcrossFallback;
             const suppressAssistantErrorPersistenceForCandidate =
               assistantErrorPersistedAcrossFallback;

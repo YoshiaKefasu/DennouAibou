@@ -97,8 +97,8 @@ export function isProtectedByKeyword(
 ): boolean {
   if (!protection?.protectedContentKeywords?.length) return false;
   const text = getToolResultTextContent(entry).toLowerCase();
-  return protection.protectedContentKeywords.some(
-    (keyword) => text.includes(keyword.toLowerCase()),
+  return protection.protectedContentKeywords.some((keyword) =>
+    text.includes(keyword.toLowerCase()),
   );
 }
 

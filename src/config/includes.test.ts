@@ -660,7 +660,10 @@ describe("security: path traversal protection (CWE-22)", () => {
         await fs.writeFile(includePath, `{"blob":"${payload}"}`, "utf-8");
 
         expect(() =>
-          resolveConfigIncludes({ $include: "./big.json5" }, path.join(configDir, "dennou-aibou.json")),
+          resolveConfigIncludes(
+            { $include: "./big.json5" },
+            path.join(configDir, "dennou-aibou.json"),
+          ),
         ).toThrow(/security checks|max/i);
       } finally {
         await fs.rm(tempRoot, { recursive: true, force: true });

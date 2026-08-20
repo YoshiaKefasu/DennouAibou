@@ -79,12 +79,12 @@ Meaning: even the real runtime is still stored under an npm/OpenClaw-shaped path
 
 ## 3. Risk summary
 
-| Risk | Why it matters |
-|------|----------------|
-| `npm audit fix --force` can install upstream `openclaw@2026.5.27` | This can erase DennouAibou runtime code in the npm-managed folder. |
-| Home `package.json` makes KASOU look like an upstream OpenClaw app | Future maintenance commands may touch the wrong package. |
-| Runtime path is still `.local/lib/node_modules/openclaw` | The service works, but the path name is misleading after hard fork. |
-| Secrets are still embedded in the user systemd unit | Not caused by this issue, but path migration is a good chance to move them to `.env`-only loading. |
+| Risk                                                               | Why it matters                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `npm audit fix --force` can install upstream `openclaw@2026.5.27`  | This can erase DennouAibou runtime code in the npm-managed folder.                                 |
+| Home `package.json` makes KASOU look like an upstream OpenClaw app | Future maintenance commands may touch the wrong package.                                           |
+| Runtime path is still `.local/lib/node_modules/openclaw`           | The service works, but the path name is misleading after hard fork.                                |
+| Secrets are still embedded in the user systemd unit                | Not caused by this issue, but path migration is a good chance to move them to `.env`-only loading. |
 
 ## 4. Recommended migration strategy
 
@@ -265,12 +265,12 @@ This is optional and should be done after Phase 2 is stable.
 
 Possible changes:
 
-| Current | Candidate |
-|---------|-----------|
-| `Description=OpenClaw Gateway (v2026.4.5)` | `Description=DennouAibou Gateway` |
-| `OPENCLAW_SERVICE_MARKER=openclaw` | keep unless code expects it |
-| `OPENCLAW_SERVICE_KIND=gateway` | keep |
-| `OPENCLAW_SERVICE_VERSION=2026.4.5` | replace with DennouAibou release version after confirming consumers |
+| Current                                    | Candidate                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `Description=OpenClaw Gateway (v2026.4.5)` | `Description=DennouAibou Gateway`                                   |
+| `OPENCLAW_SERVICE_MARKER=openclaw`         | keep unless code expects it                                         |
+| `OPENCLAW_SERVICE_KIND=gateway`            | keep                                                                |
+| `OPENCLAW_SERVICE_VERSION=2026.4.5`        | replace with DennouAibou release version after confirming consumers |
 
 Do not rename every `OPENCLAW_*` environment variable blindly. Some are product-internal contracts.
 
@@ -342,56 +342,56 @@ After work:
 
 ### Phase 1 — npm home dep removal
 
-| Step | Action | Result |
-|------|--------|--------|
-| 1 | Backed up `package.json` | `package.json.bak-before-dennou-detach-20260529-161314` (105 bytes) |
-| 2 | Backed up `package-lock.json` | `package-lock.json.bak-before-dennou-detach-20260529-161314` (195,434 bytes) |
-| 3 | Removed `openclaw` dep from `package.json` | dependencies block deleted; only `devDependencies.typescript` remains |
-| 4 | `npm install --package-lock-only` | "up to date, audited 2 packages in 2s, found 0 vulnerabilities" |
-| 5 | `npm prune` (clean extraneous) | "removed 662 packages" — node_modules/openclaw and its transitive deps purged |
-| 6 | `npm ls openclaw --depth=0` | `(empty)` — no longer shows openclaw |
-| 7 | `npm audit --omit=dev` | `found 0 vulnerabilities` — no more openclaw upgrade proposal |
+| Step | Action                                     | Result                                                                        |
+| ---- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| 1    | Backed up `package.json`                   | `package.json.bak-before-dennou-detach-20260529-161314` (105 bytes)           |
+| 2    | Backed up `package-lock.json`              | `package-lock.json.bak-before-dennou-detach-20260529-161314` (195,434 bytes)  |
+| 3    | Removed `openclaw` dep from `package.json` | dependencies block deleted; only `devDependencies.typescript` remains         |
+| 4    | `npm install --package-lock-only`          | "up to date, audited 2 packages in 2s, found 0 vulnerabilities"               |
+| 5    | `npm prune` (clean extraneous)             | "removed 662 packages" — node_modules/openclaw and its transitive deps purged |
+| 6    | `npm ls openclaw --depth=0`                | `(empty)` — no longer shows openclaw                                          |
+| 7    | `npm audit --omit=dev`                     | `found 0 vulnerabilities` — no more openclaw upgrade proposal                 |
 
 ### Phase 2 — runtime path separation
 
-| Step | Action | Result |
-|------|--------|--------|
-| 1 | Updated `scripts/deploy-kasou.ps1` | Changed all `~/.local/lib/node_modules/openclaw/dist` → `~/.local/lib/dennou-aibou/dist` (2 edits: deploy block + rollback message) |
-| 2 | Built backend + frontend | `pnpm build` + `pnpm ui:build` succeeded |
-| 3 | Deployed to new path | SCP tar to KASOU → extracted to `~/.local/lib/dennou-aibou/dist/` |
-| 4 | Updated systemd ExecStart | Old: `/home/linuxbrew/.linuxbrew/bin/node /home/kasou_yoshia/.local/lib/node_modules/openclaw/dist/index.js` |
-| | | New: `/home/linuxbrew/.linuxbrew/bin/node /home/kasou_yoshia/.local/lib/dennou-aibou/dist/index.js` |
-| 5 | `systemctl --user daemon-reload` | OK |
-| 6 | `systemctl --user restart` | ActiveState=active, SubState=running (1s startup) |
-| 7 | Verify HTTP `/` | HTTP 200 ✅ |
-| 8 | Verify HTTP `/logs` | HTTP 200 ✅ |
-| 9 | Verify `Restart=on-failure` | Preserved ✅ |
-| 10 | `openclaw --version` | `OpenClaw 2026.4.5 (cfda3d8)` ✅ |
-| 11 | `openclaw gateway status --help` | Shows help text ✅ |
-| 12 | `openclaw plugins --help` | Times out (resource constrained; KASOU MiniPC behavior — not regression) |
+| Step | Action                             | Result                                                                                                                              |
+| ---- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Updated `scripts/deploy-kasou.ps1` | Changed all `~/.local/lib/node_modules/openclaw/dist` → `~/.local/lib/dennou-aibou/dist` (2 edits: deploy block + rollback message) |
+| 2    | Built backend + frontend           | `pnpm build` + `pnpm ui:build` succeeded                                                                                            |
+| 3    | Deployed to new path               | SCP tar to KASOU → extracted to `~/.local/lib/dennou-aibou/dist/`                                                                   |
+| 4    | Updated systemd ExecStart          | Old: `/home/linuxbrew/.linuxbrew/bin/node /home/kasou_yoshia/.local/lib/node_modules/openclaw/dist/index.js`                        |
+|      |                                    | New: `/home/linuxbrew/.linuxbrew/bin/node /home/kasou_yoshia/.local/lib/dennou-aibou/dist/index.js`                                 |
+| 5    | `systemctl --user daemon-reload`   | OK                                                                                                                                  |
+| 6    | `systemctl --user restart`         | ActiveState=active, SubState=running (1s startup)                                                                                   |
+| 7    | Verify HTTP `/`                    | HTTP 200 ✅                                                                                                                         |
+| 8    | Verify HTTP `/logs`                | HTTP 200 ✅                                                                                                                         |
+| 9    | Verify `Restart=on-failure`        | Preserved ✅                                                                                                                        |
+| 10   | `openclaw --version`               | `OpenClaw 2026.4.5 (cfda3d8)` ✅                                                                                                    |
+| 11   | `openclaw gateway status --help`   | Shows help text ✅                                                                                                                  |
+| 12   | `openclaw plugins --help`          | Times out (resource constrained; KASOU MiniPC behavior — not regression)                                                            |
 
 ### Backup files created
 
-| File | Size |
-|------|------|
-| `/home/kasou_yoshia/package.json.bak-before-dennou-detach-20260529-161314` | 105 bytes |
+| File                                                                            | Size          |
+| ------------------------------------------------------------------------------- | ------------- |
+| `/home/kasou_yoshia/package.json.bak-before-dennou-detach-20260529-161314`      | 105 bytes     |
 | `/home/kasou_yoshia/package-lock.json.bak-before-dennou-detach-20260529-161314` | 195,434 bytes |
 
 ### Files changed locally
 
-| File | Change |
-|------|--------|
-| `scripts/deploy-kasou.ps1` | Target path updated from `~/.local/lib/node_modules/openclaw/dist` to `~/.local/lib/dennou-aibou/dist` (2 edits) |
-| `DENNOU_DOCS/2026-05/Week 4/2026-05-29_kasou_openclaw_package_detach_plan.md` | Added implementation log (this section) |
+| File                                                                          | Change                                                                                                           |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `scripts/deploy-kasou.ps1`                                                    | Target path updated from `~/.local/lib/node_modules/openclaw/dist` to `~/.local/lib/dennou-aibou/dist` (2 edits) |
+| `DENNOU_DOCS/2026-05/Week 4/2026-05-29_kasou_openclaw_package_detach_plan.md` | Added implementation log (this section)                                                                          |
 
 ### KASOU files changed
 
-| File | Change |
-|------|--------|
-| `/home/kasou_yoshia/package.json` | `dependencies.openclaw` removed |
-| `/home/kasou_yoshia/package-lock.json` | Regenerated (568 bytes, no openclaw refs) |
+| File                                                               | Change                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `/home/kasou_yoshia/package.json`                                  | `dependencies.openclaw` removed                        |
+| `/home/kasou_yoshia/package-lock.json`                             | Regenerated (568 bytes, no openclaw refs)              |
 | `/home/kasou_yoshia/.config/systemd/user/openclaw-gateway.service` | ExecStart path updated to `dennou-aibou/dist/index.js` |
-| `/home/kasou_yoshia/.local/lib/dennou-aibou/dist/` | Created — fresh built dist (2026-05-29) |
+| `/home/kasou_yoshia/.local/lib/dennou-aibou/dist/`                 | Created — fresh built dist (2026-05-29)                |
 
 ### Not deleted (rollback available)
 

@@ -150,10 +150,12 @@ Repair algorithm:
 7. Use a timestamp between the previous and next row, or the backup row's original line position context if a timestamp can be inferred safely.
 
 > Timestamp inference note for repair implementation: the backup contains plain-text placeholder lines with no embedded timestamp. The repair script should pick a timestamp that does not break chronological order:
+>
 > - Default: middle point between the previous assistant toolCall row and the next assistant final reply row.
 > - Fallback: previous row's timestamp + 1 second if the gap exceeds a configurable threshold (e.g. 1 hour). This avoids producing out-of-order timestamps when the placeholder sat across a long quiet period.
-8. Insert the synthetic valid JSON `toolResult` placeholder row at the matching position in the current JSONL.
-9. Do not rewrite later `parentId` values unless the restored row is not enough to reconnect the chain.
+>
+> 8. Insert the synthetic valid JSON `toolResult` placeholder row at the matching position in the current JSONL.
+> 9. Do not rewrite later `parentId` values unless the restored row is not enough to reconnect the chain.
 
 Why this is safe: the broken assistant already points to the missing toolResult id. Restoring that id as a valid JSON entry lets the existing chain reconnect naturally.
 
@@ -214,7 +216,7 @@ Update `src/dennou-soul/prune-engine.ts` so `pruneToolOutputLines()` serializes 
 Expected helper shape:
 
 ```ts
-function pruneToolResultEntry(entry: JsonlEntry, placeholder: string): string
+function pruneToolResultEntry(entry: JsonlEntry, placeholder: string): string;
 ```
 
 The helper should deep-clone the parsed entry, replace only `message.content`, and return `JSON.stringify(clonedEntry)`. Deep cloning is required so the original parsed object, if referenced elsewhere in the same run, is not mutated.

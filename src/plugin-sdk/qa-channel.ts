@@ -1,21 +1,49 @@
 // Stub: qa-channel extension was removed in DennouAibou debloat.
 // qa-lab still references this surface; it will be removed in Step 3.
 
-export const buildQaTarget: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const createQaBusThread: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const deleteQaBusMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const editQaBusMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const getQaBusState: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const injectQaBusInboundMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const normalizeQaTarget: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const parseQaTarget: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const pollQaBus: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
+export const buildQaTarget: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const createQaBusThread: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const deleteQaBusMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const editQaBusMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const getQaBusState: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const injectQaBusInboundMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const normalizeQaTarget: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const parseQaTarget: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const pollQaBus: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
 export const qaChannelPlugin: unknown = {};
-export const reactToQaBusMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const readQaBusMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const searchQaBusMessages: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const sendQaBusMessage: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
-export const setQaChannelRuntime: (...args: unknown[]) => unknown = () => { throw new Error("qa-channel removed"); };
+export const reactToQaBusMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const readQaBusMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const searchQaBusMessages: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const sendQaBusMessage: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
+export const setQaChannelRuntime: (...args: unknown[]) => unknown = () => {
+  throw new Error("qa-channel removed");
+};
 
 // Types preserved for downstream consumers until full removal.
 export type QaBusConversation = Record<string, unknown>;

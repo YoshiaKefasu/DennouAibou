@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { formatGap, temporalMarkerPrefix, TEMPORAL_MARKER_THRESHOLD_SECONDS } from "./temporal-marker.js";
+import {
+  formatGap,
+  temporalMarkerPrefix,
+  TEMPORAL_MARKER_THRESHOLD_SECONDS,
+} from "./temporal-marker.js";
 
 describe("formatGap", () => {
   it("returns null for gaps below the 5-minute threshold", () => {
     expect(formatGap(0)).toBeNull();
-    expect(formatGap(60)).toBeNull();     // 1 minute
-    expect(formatGap(299)).toBeNull();    // just under 5 min
+    expect(formatGap(60)).toBeNull(); // 1 minute
+    expect(formatGap(299)).toBeNull(); // just under 5 min
     expect(formatGap(TEMPORAL_MARKER_THRESHOLD_SECONDS - 1)).toBeNull();
   });
 

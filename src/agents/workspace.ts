@@ -369,7 +369,15 @@ export async function ensureAgentWorkspace(params?: {
   const statePath = resolveWorkspaceStatePath(dir);
 
   const isBrandNewWorkspace = await (async () => {
-    const templatePaths = [agentsPath, habitsPath, soulPath, toolsPath, identityPath, userPath, heartbeatPath];
+    const templatePaths = [
+      agentsPath,
+      habitsPath,
+      soulPath,
+      toolsPath,
+      identityPath,
+      userPath,
+      heartbeatPath,
+    ];
     const userContentPaths = [
       path.join(dir, "memory"),
       path.join(dir, DEFAULT_MEMORY_FILENAME),

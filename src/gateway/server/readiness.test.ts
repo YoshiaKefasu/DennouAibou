@@ -32,7 +32,10 @@ function createManager(snapshot: ChannelRuntimeSnapshot): ChannelManager {
   };
 }
 
-function createHealthyDiscordManager(startedAt: number, lastTransportActivityAt: number): ChannelManager {
+function createHealthyDiscordManager(
+  startedAt: number,
+  lastTransportActivityAt: number,
+): ChannelManager {
   return createManager(
     snapshotWith({
       discord: {

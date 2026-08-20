@@ -44,7 +44,7 @@ import { resolveAgentWorkspaceDir, listAgentIds } from "../agents/agent-scope.js
 import { getRuntimeConfig } from "../config/config.js";
 
 const cfg = getRuntimeConfig();
-const workspacePaths = listAgentIds(cfg).map(id => resolveAgentWorkspaceDir(cfg, id));
+const workspacePaths = listAgentIds(cfg).map((id) => resolveAgentWorkspaceDir(cfg, id));
 // → ["d:\\GitHub\\OpenClaw Related Repos\\DennouAibou", ...]
 ```
 
@@ -54,10 +54,10 @@ const workspacePaths = listAgentIds(cfg).map(id => resolveAgentWorkspaceDir(cfg,
 
 ### 2層の保護ルール
 
-| # | ルール | 判定方法 | 保護対象 |
-|---|---|---|---|
-| 1 | **キーワード保護** | `content[].text` に `protectedContentKeywords` のいずれかが含まれる | AGENTS.md, SOUL.md, DENNOU_RULES 等の内容を含むツール出力 |
-| 2 | **ワークスペースパス保護** | `content[].text` に `resolveAgentWorkspaceDir()` で自動取得したパスが含まれる | エージェントのワークスペース内の全ファイル読み取り結果 |
+| #   | ルール                     | 判定方法                                                                      | 保護対象                                                  |
+| --- | -------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | **キーワード保護**         | `content[].text` に `protectedContentKeywords` のいずれかが含まれる           | AGENTS.md, SOUL.md, DENNOU_RULES 等の内容を含むツール出力 |
+| 2   | **ワークスペースパス保護** | `content[].text` に `resolveAgentWorkspaceDir()` で自動取得したパスが含まれる | エージェントのワークスペース内の全ファイル読み取り結果    |
 
 **判定順序**: キーワード → ワークスペースパス → 通常のprune判定（minPrunableToolChars, keepLastTools）
 
@@ -87,11 +87,7 @@ export interface DennouPruneProtectionConfig {
 // dennou-config.json に追加
 {
   "pruneProtection": {
-    "protectedContentKeywords": [
-      "AGENTS.md",
-      "SOUL.md",
-      "DENNOU_RULES"
-    ]
+    "protectedContentKeywords": ["AGENTS.md", "SOUL.md", "DENNOU_RULES"]
   }
 }
 ```
@@ -99,6 +95,7 @@ export interface DennouPruneProtectionConfig {
 > **設計判断**: `resolvedWorkspacePaths` は設定ファイルに書かない。`idle-prune-watcher.ts` の初期化時に `resolveAgentWorkspaceDir()` で自動取得し、pruneエンジンに渡す。ユーザーがワークスペースを変更しても自動追従する。
 
 > **設計判断**:
+>
 > - `protectedContentKeywords` は大文字小文字を区別しない（case-insensitive）
 > - `resolvedWorkspacePaths` はパス区切りを正規化して比較（`\\` と `/` を統一）
 > - キーワードは設定ファイルで管理、ワークスペースパスはランタイム自動解決
@@ -138,8 +135,8 @@ function isProtectedByKeyword(
 ): boolean {
   if (!protection?.protectedContentKeywords?.length) return false;
   const text = getToolResultTextContent(entry).toLowerCase();
-  return protection.protectedContentKeywords.some(
-    (keyword) => text.includes(keyword.toLowerCase()),
+  return protection.protectedContentKeywords.some((keyword) =>
+    text.includes(keyword.toLowerCase()),
   );
 }
 
@@ -150,8 +147,8 @@ function isProtectedByWorkspacePath(
 ): boolean {
   if (!protection?.resolvedWorkspacePaths?.length) return false;
   const text = normalizePathSeparators(getToolResultTextContent(entry));
-  return protection.resolvedWorkspacePaths.some(
-    (wsPath) => text.includes(normalizePathSeparators(wsPath)),
+  return protection.resolvedWorkspacePaths.some((wsPath) =>
+    text.includes(normalizePathSeparators(wsPath)),
   );
 }
 
@@ -202,7 +199,7 @@ function normalizePathSeparators(s: string): string {
 - ワークスペース自動解決: `src/agents/agent-scope.ts` L271 `resolveAgentWorkspaceDir()`
 - エージェントID列挙: `src/agents/agent-scope.ts` L65 `listAgentIds()`
 - Active Session Prune Plan: `2026-04-28_active_session_tools_prune_plan_v1.md`
- - Closed-Only Prune Plan (v2): `2026-04-26_session_prune_plan_v2.md`
+- Closed-Only Prune Plan (v2): `2026-04-26_session_prune_plan_v2.md`
 
 ---
 
@@ -210,17 +207,17 @@ function normalizePathSeparators(s: string): string {
 
 ### 全フェーズ完了
 
-| Phase | ファイル | 状態 | 備考 |
-|---|---|---|---|
-| Phase 1 | `src/dennou-soul/types.ts` | ✅ 完了 | `DennouPruneProtectionConfig` 追加（`protectedContentKeywords` + `resolvedWorkspacePaths`） |
-| Phase 1 | `src/dennou-soul/config.ts` | ✅ 完了 | `pruneProtection` デフォルト値 + マージロジック。`resolvedWorkspacePaths` は設定ファイルから上書き禁止 |
-| Phase 2 | `src/dennou-soul/prune-engine.ts` | ✅ 完了 | `isProtectedByKeyword()`, `isProtectedByWorkspacePath()`, `getToolResultTextContent()` 追加。`pruneToolOutputLines()` に protection 引数追加 |
-| Phase 3 | `src/dennou-soul/prune-closed-sessions.ts` | ✅ 完了 | 全関数に protection 引数を伝搬 |
-| Phase 3 | `src/dennou-soul/prune-active-session.ts` | ✅ 完了 | 全関数に protection 引数を伝搬 |
-| Phase 3 | `src/dennou-soul/session-maintenance-hook.ts` | ✅ 完了 | `resolveProtectionWithWorkspacePaths()` 追加。閉じたセッションでもパス保護が有効に |
-| Phase 3 | `src/dennou-soul/idle-prune-watcher.ts` | ✅ 完了 | `handleIdleEvent()` と `startIdlePruneWatcher()` に protection 引数追加 |
-| Phase 3 | `src/cli/run-main.ts` | ✅ 完了 | 起動時に `resolveAgentWorkspaceDir()` + `listAgentIds()` でワークスペースパスを自動解決し保護設定に注入 |
-| Phase 4 | `src/dennou-soul/prune-engine.test.ts` | ✅ 完了 | 14テスト（キーワード保護、パス保護、同時適用、後方互換性） |
+| Phase   | ファイル                                      | 状態    | 備考                                                                                                                                         |
+| ------- | --------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1 | `src/dennou-soul/types.ts`                    | ✅ 完了 | `DennouPruneProtectionConfig` 追加（`protectedContentKeywords` + `resolvedWorkspacePaths`）                                                  |
+| Phase 1 | `src/dennou-soul/config.ts`                   | ✅ 完了 | `pruneProtection` デフォルト値 + マージロジック。`resolvedWorkspacePaths` は設定ファイルから上書き禁止                                       |
+| Phase 2 | `src/dennou-soul/prune-engine.ts`             | ✅ 完了 | `isProtectedByKeyword()`, `isProtectedByWorkspacePath()`, `getToolResultTextContent()` 追加。`pruneToolOutputLines()` に protection 引数追加 |
+| Phase 3 | `src/dennou-soul/prune-closed-sessions.ts`    | ✅ 完了 | 全関数に protection 引数を伝搬                                                                                                               |
+| Phase 3 | `src/dennou-soul/prune-active-session.ts`     | ✅ 完了 | 全関数に protection 引数を伝搬                                                                                                               |
+| Phase 3 | `src/dennou-soul/session-maintenance-hook.ts` | ✅ 完了 | `resolveProtectionWithWorkspacePaths()` 追加。閉じたセッションでもパス保護が有効に                                                           |
+| Phase 3 | `src/dennou-soul/idle-prune-watcher.ts`       | ✅ 完了 | `handleIdleEvent()` と `startIdlePruneWatcher()` に protection 引数追加                                                                      |
+| Phase 3 | `src/cli/run-main.ts`                         | ✅ 完了 | 起動時に `resolveAgentWorkspaceDir()` + `listAgentIds()` でワークスペースパスを自動解決し保護設定に注入                                      |
+| Phase 4 | `src/dennou-soul/prune-engine.test.ts`        | ✅ 完了 | 14テスト（キーワード保護、パス保護、同時適用、後方互換性）                                                                                   |
 
 ### 設計との整合性
 
@@ -239,13 +236,13 @@ function normalizePathSeparators(s: string): string {
 
 ### レビュー結果（2026-04-28）
 
-| # | 判定 | 備考 |
-|---|---|---|
-| ✅ | `prune-engine.ts` | 保護関数のロジック正しい。case-insensitive + パス正規化 + 判定順序も正しい |
-| ✅ | 呼び出し元伝搬 | `prune-closed-sessions`, `prune-active-session`, `idle-prune-watcher` すべて正しく protection を伝搬 |
-| ✅ | `session-maintenance-hook.ts` | ✅ 修正済み。`resolveProtectionWithWorkspacePaths()` で閉じたセッションでも自動解決 |
-| ✅ | 後方互換性 | protection 未指定でも既存動作を維持 |
-| ✅ | テスト | 14/14 全通過 |
+| #   | 判定                          | 備考                                                                                                 |
+| --- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| ✅  | `prune-engine.ts`             | 保護関数のロジック正しい。case-insensitive + パス正規化 + 判定順序も正しい                           |
+| ✅  | 呼び出し元伝搬                | `prune-closed-sessions`, `prune-active-session`, `idle-prune-watcher` すべて正しく protection を伝搬 |
+| ✅  | `session-maintenance-hook.ts` | ✅ 修正済み。`resolveProtectionWithWorkspacePaths()` で閉じたセッションでも自動解決                  |
+| ✅  | 後方互換性                    | protection 未指定でも既存動作を維持                                                                  |
+| ✅  | テスト                        | 14/14 全通過                                                                                         |
 
 **批判的バグ: なし**
 
@@ -316,13 +313,13 @@ Kasou のログに以下の警告が常に出る：
 
 ### 修正
 
-| 項目 | 内容 |
-|---|---|
-| 変更ファイル | `src/dennou-soul/session-maintenance-hook.ts` |
-| 変更行 | 54行目（1行のみ） |
-| Before | `const sessionsDir = path.join(path.dirname(storePath), "sessions");` |
-| After | `const sessionsDir = path.dirname(storePath);` |
-| 理由 | `storePath` は既に `.../sessions/sessions.json` なので、`dirname` が正しい |
+| 項目         | 内容                                                                       |
+| ------------ | -------------------------------------------------------------------------- |
+| 変更ファイル | `src/dennou-soul/session-maintenance-hook.ts`                              |
+| 変更行       | 54行目（1行のみ）                                                          |
+| Before       | `const sessionsDir = path.join(path.dirname(storePath), "sessions");`      |
+| After        | `const sessionsDir = path.dirname(storePath);`                             |
+| 理由         | `storePath` は既に `.../sessions/sessions.json` なので、`dirname` が正しい |
 
 ### テスト結果
 
@@ -357,10 +354,10 @@ Kasou のログに以下の警告が常に出る：
 
 ### 修正
 
-| 項目 | 内容 |
-|---|---|
-| 変更ファイル | `src/dennou-soul/prune-engine.ts` |
-| 変更点 | dry-run 分岐の行単位ログを停止 |
+| 項目         | 内容                                                                     |
+| ------------ | ------------------------------------------------------------------------ |
+| 変更ファイル | `src/dennou-soul/prune-engine.ts`                                        |
+| 変更点       | dry-run 分岐の行単位ログを停止                                           |
 | 維持した仕様 | `prunedCount` の計上、非dry-run時の `PRUNE: line ...` ログ、置換ロジック |
 
 ### 設計意図（安全側）

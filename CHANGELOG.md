@@ -110,7 +110,7 @@ For upstream history see https://github.com/openclaw/openclaw.
 
 - **Config UI: DennouAibou settings tab**
   - Category tab under /config page
-  - Settings: dennou.toolsPrune.*, dennou.sessionToolsPrune.*, dennou.activeSessionToolsPrune.*, dennou.pruneProtection.*
+  - Settings: dennou.toolsPrune._, dennou.sessionToolsPrune._, dennou.activeSessionToolsPrune._, dennou.pruneProtection._
   - WebSocket runtime schema delivery
 
 ### Build & Deploy

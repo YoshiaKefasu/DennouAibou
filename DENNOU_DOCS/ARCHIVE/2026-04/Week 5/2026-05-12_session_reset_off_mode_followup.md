@@ -18,12 +18,14 @@ OpenClaw upstream now treats `off` as a first-class mode for long-running sessio
 `src/config/sessions/reset.ts` now imports that type and re-exports it instead of declaring a second copy.
 
 Why:
+
 - avoids drift between the config model and reset logic
 - keeps the public `config-runtime` export stable through `src/config/sessions.ts`
 
 ### 2) Runtime behavior for `mode: "off"`
 
 `resolveSessionResetPolicy()` now returns:
+
 - `mode: "off"`
 - `idleMinutes: undefined`
 
@@ -43,6 +45,7 @@ This proves type-specific config wins over the base reset policy.
 The code review pointed out that `atHour` is still present in `SessionResetPolicy` even when `mode !== "daily"`.
 
 Current decision:
+
 - keep the field for shape stability
 - document that `atHour` only matters in daily mode
 

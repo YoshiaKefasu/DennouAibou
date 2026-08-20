@@ -13,11 +13,11 @@
 
 ### 層の定義
 
-| 層 | 対象 | ランナー | 時間 | 状況 | 使い方 |
-|---|---|---|---|---|---|
-| **fast** | `src/dennou-soul/**`（prune/watchdog/guard） | **Bun** | 〜15秒 | ✅ 実証済み（40/42 pass） | 日常の edit → test サイクル |
-| **core** | vi.doMock / vi.resetModules 以外のvitest専用APIを使わないテスト | **Bun** | 未検証 | ⚪ 未実装 | push前の安全確認（任意） |
-| **full** | 全テスト（159ファイルはvitest専用API使用） | vitest | 14分 | ❌ 149既存FAILあり | ship前の最終確認、週一メンテ |
+| 層       | 対象                                                            | ランナー | 時間   | 状況                      | 使い方                       |
+| -------- | --------------------------------------------------------------- | -------- | ------ | ------------------------- | ---------------------------- |
+| **fast** | `src/dennou-soul/**`（prune/watchdog/guard）                    | **Bun**  | 〜15秒 | ✅ 実証済み（40/42 pass） | 日常の edit → test サイクル  |
+| **core** | vi.doMock / vi.resetModules 以外のvitest専用APIを使わないテスト | **Bun**  | 未検証 | ⚪ 未実装                 | push前の安全確認（任意）     |
+| **full** | 全テスト（159ファイルはvitest専用API使用）                      | vitest   | 14分   | ❌ 149既存FAILあり        | ship前の最終確認、週一メンテ |
 
 ### なぜ全部Bunにしないのか
 
@@ -36,12 +36,12 @@ pnpm test              # → vitest run                 — 既存full suite（1
 
 全量を毎回確認する必要はない。fast層がパスしていれば、DennouAibou固有機能は正常。full層のFAILは以下のカテゴリに分類：
 
-| カテゴリ | 件数（概算） | 対応 |
-|---|---|---|
-| ReplyRunAlreadyActiveError（テスト分離問題） | 50+ | 既知。`test.skip` で黙らせる候補 |
-| session.test.ts（session.reset.mode=off の影響） | 5 | DennouAibou の変更が原因。本数が少ないので直す |
-| Windowsパスセパレーター差分 | 10 | ローカル環境のみ。CIでは出ない |
-| チャネル固有の設定テスト | 30+ | upstream由来。DennouAibouでは使わないチャネル |
+| カテゴリ                                         | 件数（概算） | 対応                                           |
+| ------------------------------------------------ | ------------ | ---------------------------------------------- |
+| ReplyRunAlreadyActiveError（テスト分離問題）     | 50+          | 既知。`test.skip` で黙らせる候補               |
+| session.test.ts（session.reset.mode=off の影響） | 5            | DennouAibou の変更が原因。本数が少ないので直す |
+| Windowsパスセパレーター差分                      | 10           | ローカル環境のみ。CIでは出ない                 |
+| チャネル固有の設定テスト                         | 30+          | upstream由来。DennouAibouでは使わないチャネル  |
 
 ### ステータス
 

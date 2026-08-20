@@ -222,10 +222,9 @@ async function persistRunSessionUsageForFollowupTest(
 
 async function loadFreshFollowupRunnerModuleForTest() {
   vi.resetModules();
-  vi.doMock(
-    "../../agents/model-fallback.js",
-    () => ({ runWithModelFallback: runWithModelFallbackMock }),
-  );
+  vi.doMock("../../agents/model-fallback.js", () => ({
+    runWithModelFallback: runWithModelFallbackMock,
+  }));
   vi.doMock("../../agents/session-write-lock.js", () => ({
     acquireSessionWriteLock: vi.fn(async () => ({
       release: async () => {},

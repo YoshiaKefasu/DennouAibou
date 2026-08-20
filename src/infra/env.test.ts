@@ -99,9 +99,7 @@ describe("logAcceptedEnvOption", () => {
     );
 
     expect(loggerMocks.info).toHaveBeenCalledTimes(1);
-    expect(loggerMocks.info).toHaveBeenCalledWith(
-      "env: DENNOU_TEST_ENV=<redacted> (test option)",
-    );
+    expect(loggerMocks.info).toHaveBeenCalledWith("env: DENNOU_TEST_ENV=<redacted> (test option)");
   });
 
   it("skips blank values and test-mode logging", () => {

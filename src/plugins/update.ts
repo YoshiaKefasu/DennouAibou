@@ -94,7 +94,10 @@ function formatClawHubInstallFailure(params: {
   return `Failed to ${params.phase} ${params.pluginId}: ${params.error} (ClawHub ${params.spec}).`;
 }
 
-type ClawHubUpdateMode = "legacy-exact-to-latest" | "explicit-clawhub-selector" | "unversioned-clawhub";
+type ClawHubUpdateMode =
+  | "legacy-exact-to-latest"
+  | "explicit-clawhub-selector"
+  | "unversioned-clawhub";
 
 type ClawHubUpdateSpecResult = {
   installSpec: string;
@@ -139,7 +142,11 @@ function resolveClawHubUpdateSpec(params: {
 
   // Rule 2: already-unversioned record stays unversioned.
   if (!hasVersionPart) {
-    return { installSpec: recordSpec || fallbackSpec, recordSpec, modeLabel: "unversioned-clawhub" };
+    return {
+      installSpec: recordSpec || fallbackSpec,
+      recordSpec,
+      modeLabel: "unversioned-clawhub",
+    };
   }
 
   // Rule 3: legacy exact record with id-only update → latest-line intent.
@@ -488,7 +495,8 @@ export async function updateNpmInstalledPlugins(params: {
               : record.source === "clawhub"
                 ? formatClawHubInstallFailure({
                     pluginId,
-                    spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
+                    spec:
+                      clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
                     phase: "check",
                     error: probe.error,
                   })
@@ -665,7 +673,8 @@ export async function updateNpmInstalledPlugins(params: {
       // Phase 4: Normalize legacy exact record after successful id-only update.
       // If old record was exact clawhub:<pkg>@<version> and update succeeded via
       // id-only latest-line path, save record spec as unversioned clawhub:<pkg>.
-      let savedSpec = clawhubInstallSpec ?? effectiveSpec ?? record.spec ?? `clawhub:${record.clawhubPackage!}`;
+      let savedSpec =
+        clawhubInstallSpec ?? effectiveSpec ?? record.spec ?? `clawhub:${record.clawhubPackage!}`;
       if (
         resolvedClawHubSpec?.modeLabel === "legacy-exact-to-latest" &&
         record.spec !== savedSpec

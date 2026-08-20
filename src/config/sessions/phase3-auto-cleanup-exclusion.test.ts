@@ -4,10 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { formatSessionArchiveTimestamp } from "./artifacts.js";
 import { enforceSessionDiskBudget } from "./disk-budget.js";
-import {
-  isProtectedSessionKey,
-  type ProtectedSessionConfig,
-} from "./protected-session.js";
+import { isProtectedSessionKey, type ProtectedSessionConfig } from "./protected-session.js";
 import { capEntryCount, pruneStaleEntries } from "./store.js";
 import type { SessionEntry } from "./types.js";
 
@@ -22,9 +19,7 @@ async function createCaseDir(prefix: string): Promise<string> {
 }
 
 afterEach(async () => {
-  await Promise.all(
-    createdDirs.map((dir) => fs.rm(dir, { recursive: true, force: true })),
-  );
+  await Promise.all(createdDirs.map((dir) => fs.rm(dir, { recursive: true, force: true })));
   createdDirs.length = 0;
 });
 
@@ -32,9 +27,7 @@ function makeEntry(updatedAt: number): SessionEntry {
   return { sessionId: crypto.randomUUID(), updatedAt };
 }
 
-function makeStore(
-  entries: Array<[string, SessionEntry]>,
-): Record<string, SessionEntry> {
+function makeStore(entries: Array<[string, SessionEntry]>): Record<string, SessionEntry> {
   return Object.fromEntries(entries);
 }
 
@@ -224,9 +217,7 @@ describe("isProtectedSessionKey — sanity for Phase 3", () => {
   });
 
   it("recognizes unprotected session keys", () => {
-    expect(
-      isProtectedSessionKey("agent:main:telegram:direct:999", PROTECTED_CFG),
-    ).toBe(false);
+    expect(isProtectedSessionKey("agent:main:telegram:direct:999", PROTECTED_CFG)).toBe(false);
   });
 
   it("recognizes main alias as protected", () => {

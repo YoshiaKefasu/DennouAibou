@@ -63,7 +63,9 @@ describe("detectChangedScope", () => {
   });
 
   it("keeps node lane off for Android native-only changes", () => {
-    expect(detectChangedScope(["apps/android/app/src/main/java/ai/openclaw/app/MainActivity.kt"])).toEqual({
+    expect(
+      detectChangedScope(["apps/android/app/src/main/java/ai/openclaw/app/MainActivity.kt"]),
+    ).toEqual({
       runNode: false,
       runMacos: false,
       runAndroid: true,

@@ -74,9 +74,9 @@ is detected but not yet wired.
 
 | Feature       | How it maps                                                                                 | Applies to     |
 | ------------- | ------------------------------------------------------------------------------------------- | -------------- |
-| Skill content | Bundle skill roots load as normal DennouAibou skills                                           | All formats    |
+| Skill content | Bundle skill roots load as normal DennouAibou skills                                        | All formats    |
 | Commands      | `commands/` and `.cursor/commands/` treated as skill roots                                  | Claude, Cursor |
-| Hook packs    | DennouAibou-style `HOOK.md` + `handler.ts` layouts                                             | Codex          |
+| Hook packs    | DennouAibou-style `HOOK.md` + `handler.ts` layouts                                          | Codex          |
 | MCP tools     | Bundle MCP config merged into embedded Pi settings; supported stdio and HTTP servers loaded | All formats    |
 | LSP servers   | Claude `.lsp.json` and manifest-declared `lspServers` merged into embedded Pi LSP defaults  | Claude         |
 | Settings      | Claude `settings.json` imported as embedded Pi defaults                                     | Claude         |

@@ -842,7 +842,8 @@ describe("updateNpmInstalledPlugins", () => {
       {
         pluginId: "missing-pkg",
         status: "error",
-        message: "Failed to check missing-pkg: Package not found on ClawHub. (ClawHub clawhub:missing-pkg).",
+        message:
+          "Failed to check missing-pkg: Package not found on ClawHub. (ClawHub clawhub:missing-pkg).",
       },
     ]);
     // Should NOT have called the real installer.
@@ -976,7 +977,9 @@ describe("updateNpmInstalledPlugins", () => {
     });
 
     // First update should normalize the spec.
-    expect(firstResult.config.plugins?.installs?.["episodic-claw"]?.spec).toBe("clawhub:episodic-claw");
+    expect(firstResult.config.plugins?.installs?.["episodic-claw"]?.spec).toBe(
+      "clawhub:episodic-claw",
+    );
 
     // Update mock to return 0.7.0 for the second call.
     readInstalledPackageVersionMock.mockResolvedValue("0.6.0");

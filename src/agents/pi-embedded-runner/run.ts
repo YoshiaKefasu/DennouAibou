@@ -279,12 +279,11 @@ export async function runEmbeddedPiAgent(
       });
       const ctxInfo = resolvedRuntimeModel.ctxInfo;
       let effectiveModel = resolvedRuntimeModel.effectiveModel;
-      const timeoutCompactionPromptUsageThreshold =
-        resolveTimeoutCompactionPromptUsageThreshold({
-          cfg: params.config,
-          contextTokenBudget: ctxInfo.tokens,
-          fallbackRatio: 0.65,
-        });
+      const timeoutCompactionPromptUsageThreshold = resolveTimeoutCompactionPromptUsageThreshold({
+        cfg: params.config,
+        contextTokenBudget: ctxInfo.tokens,
+        fallbackRatio: 0.65,
+      });
 
       const authStore = ensureAuthProfileStore(agentDir, {
         allowKeychainPrompt: false,

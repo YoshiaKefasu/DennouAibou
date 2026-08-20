@@ -173,9 +173,7 @@ export function describeOpenAICodexProviderDiscoveryContract() {
     installDiscoveryHooks(state, ["openai-codex"]);
 
     it("keeps catalog disabled without stored profiles", async () => {
-      await expect(
-        runCatalog(state, { provider: state.openAICodexProvider! }),
-      ).resolves.toBeNull();
+      await expect(runCatalog(state, { provider: state.openAICodexProvider! })).resolves.toBeNull();
     });
 
     it("keeps profile-gated catalog provider-owned", async () => {

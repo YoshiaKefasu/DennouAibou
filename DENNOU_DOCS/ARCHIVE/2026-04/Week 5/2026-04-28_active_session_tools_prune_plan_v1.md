@@ -19,11 +19,11 @@
 
 OpenClawは以下の3つのIdle関連機構を持つ：
 
-| 機構 | ファイル | 何をするか |
-|---|---|---|
-| **DiagnosticSessionState** | `src/infra/diagnostic-events.ts` L3 | セッション状態を `"idle" \| "processing" \| "waiting"` で管理 |
-| **logSessionStateChange → "idle"** | `src/logging/diagnostic.ts` L194-227 | エージェントの処理完了時に `state: "idle"` イベントを `emitDiagnosticEvent()` で発火。**`onDiagnosticEvent()` でlistenできる** |
-| **session.reset.idleMinutes** | `src/config/sessions/reset.ts` L80-115 | N分のIdle後にセッションを**リセット**（新セッション作成）する既存設定。ただしpruneではなくリセット |
+| 機構                               | ファイル                               | 何をするか                                                                                                                     |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **DiagnosticSessionState**         | `src/infra/diagnostic-events.ts` L3    | セッション状態を `"idle" \| "processing" \| "waiting"` で管理                                                                  |
+| **logSessionStateChange → "idle"** | `src/logging/diagnostic.ts` L194-227   | エージェントの処理完了時に `state: "idle"` イベントを `emitDiagnosticEvent()` で発火。**`onDiagnosticEvent()` でlistenできる** |
+| **session.reset.idleMinutes**      | `src/config/sessions/reset.ts` L80-115 | N分のIdle後にセッションを**リセット**（新セッション作成）する既存設定。ただしpruneではなくリセット                             |
 
 ### 証拠2: Idle検知の既存フロー
 
@@ -57,11 +57,11 @@ OpenClawは以下の3つのIdle関連機構を持つ：
 
 ### 2.2 安全機構（3層防御）
 
-| # | 機構 | 説明 | 危険度低減効果 |
-|---|---|---|---|
-| 1 | **Idle Timer Guard** | `session.state: "idle"` 検出後 `idleDelayMinutes` 経過するまで待機。途中で `processing` に戻ったらタイマーキャンセル | 会話中のpruneを100%防止 |
-| 2 | **Copy-on-Write** | アクティブセッションは直接上書きせず、一時ファイルに書き出し → atomic rename | 書き込み中のプロセスとの競合を防止 |
-| 3 | **Dry-Run** | 初期は `dryRun: true` でログ出力のみ | 誤動作を事前に検出 |
+| #   | 機構                 | 説明                                                                                                                 | 危険度低減効果                     |
+| --- | -------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | **Idle Timer Guard** | `session.state: "idle"` 検出後 `idleDelayMinutes` 経過するまで待機。途中で `processing` に戻ったらタイマーキャンセル | 会話中のpruneを100%防止            |
+| 2   | **Copy-on-Write**    | アクティブセッションは直接上書きせず、一時ファイルに書き出し → atomic rename                                         | 書き込み中のプロセスとの競合を防止 |
+| 3   | **Dry-Run**          | 初期は `dryRun: true` でログ出力のみ                                                                                 | 誤動作を事前に検出                 |
 
 ### 2.3 上流変更がゼロである理由
 
@@ -109,6 +109,7 @@ export interface DennouActiveSessionPruneConfig {
 ```
 
 > **設計判断**:
+>
 > - `idleDelayMinutes: 30` — Idle後30分の沈黙で発火。ユーザーが30分以内に返事すればpruneはキャンセルされる
 > - `keepLastTools: 10` — アクティブセッションでは直近の文脈がより重要なため、v2の `5` より多く保護
 > - `minPrunableToolChars: 1200` — v2と同じ閾値を再利用（DRY）
@@ -164,9 +165,12 @@ onDiagnosticEvent((evt) => {
     // 既存のタイマーがあればクリア（再起動）
     clearExistingTimer(sessionKey);
     // 新しいIdleタイマーを設定
-    idleTimers.set(sessionKey, setTimeout(() => {
-      pruneActiveSession(sessionKey);
-    }, config.idleDelayMinutes * 60_000));
+    idleTimers.set(
+      sessionKey,
+      setTimeout(() => {
+        pruneActiveSession(sessionKey);
+      }, config.idleDelayMinutes * 60_000),
+    );
   } else {
     // processing/waiting に遷移 → タイマーキャンセル
     clearExistingTimer(sessionKey);
@@ -298,7 +302,7 @@ src/dennou-soul/
 - `DiagnosticSessionState`: `src/infra/diagnostic-events.ts` L3
 - `session.reset.idleMinutes`: `src/config/sessions/reset.ts` L80-115
 - v2 Closed-Only実装: `src/dennou-soul/prune-closed-sessions.ts`
- - v2 プラン: `2026-04-26_session_prune_plan_v2.md`
+- v2 プラン: `2026-04-26_session_prune_plan_v2.md`
 
 ---
 
@@ -306,17 +310,17 @@ src/dennou-soul/
 
 ### 全フェーズ完了
 
-| Phase | ファイル | 状態 | 備考 |
-|---|---|---|---|
-| Phase 1 | `src/dennou-soul/prune-engine.ts` | ✅ 完了 | 共通Pruneエンジン。`parseLine`, `isToolResultEntry`, `getToolResultContentLength`, `pruneToolOutputLines` を抽出 |
-| Phase 1 | `src/dennou-soul/prune-closed-sessions.ts` | ✅ 完了 | リファクタ: 共通エンジンを呼び出す形に変更 |
-| Phase 2 | `src/dennou-soul/prune-active-session.ts` | ✅ 完了 | アクティブセッションPrune + mtime double-check + atomic write |
-| Phase 2 | `src/dennou-soul/prune-active-session.test.ts` | ✅ 完了 | 13テスト 全通過 |
-| Phase 3 | `src/dennou-soul/types.ts` | ✅ 完了 | `DennouActiveSessionPruneConfig` 追加 |
-| Phase 3 | `src/dennou-soul/config.ts` | ✅ 完了 | `activeSessionToolsPrune` 設定読み込み |
-| Phase 3 | `src/dennou-soul/idle-prune-watcher.ts` | ✅ 完了 | `onDiagnosticEvent` listener + タイマー管理 |
-| Phase 3 | `src/cli/run-main.ts` | ✅ 完了 | `startIdlePruneWatcher()` 呼び出し |
-| Phase 4 | デフォルト設定 | ✅ 完了 | `dryRun: true`（安全側）でリリース済み |
+| Phase   | ファイル                                       | 状態    | 備考                                                                                                             |
+| ------- | ---------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| Phase 1 | `src/dennou-soul/prune-engine.ts`              | ✅ 完了 | 共通Pruneエンジン。`parseLine`, `isToolResultEntry`, `getToolResultContentLength`, `pruneToolOutputLines` を抽出 |
+| Phase 1 | `src/dennou-soul/prune-closed-sessions.ts`     | ✅ 完了 | リファクタ: 共通エンジンを呼び出す形に変更                                                                       |
+| Phase 2 | `src/dennou-soul/prune-active-session.ts`      | ✅ 完了 | アクティブセッションPrune + mtime double-check + atomic write                                                    |
+| Phase 2 | `src/dennou-soul/prune-active-session.test.ts` | ✅ 完了 | 13テスト 全通過                                                                                                  |
+| Phase 3 | `src/dennou-soul/types.ts`                     | ✅ 完了 | `DennouActiveSessionPruneConfig` 追加                                                                            |
+| Phase 3 | `src/dennou-soul/config.ts`                    | ✅ 完了 | `activeSessionToolsPrune` 設定読み込み                                                                           |
+| Phase 3 | `src/dennou-soul/idle-prune-watcher.ts`        | ✅ 完了 | `onDiagnosticEvent` listener + タイマー管理                                                                      |
+| Phase 3 | `src/cli/run-main.ts`                          | ✅ 完了 | `startIdlePruneWatcher()` 呼び出し                                                                               |
+| Phase 4 | デフォルト設定                                 | ✅ 完了 | `dryRun: true`（安全側）でリリース済み                                                                           |
 
 ### 設計からの逸脱（意図的）
 
@@ -349,12 +353,12 @@ src/cli/run-main.ts        (+2行) startIdlePruneWatcher() 呼び出し
 
 ### レビュー結果（2026-04-28）
 
-| # | 判定 | 備考 |
-|---|---|---|
-| ✅ | `prune-active-session.ts` | mtime double-check + atomic write + protection伝搬、すべて正しい |
-| ✅ | `idle-prune-watcher.ts` | idle timer → cancel → cleanup、全経路で protection 正しく伝搬 |
-| ✅ | `run-main.ts` → watcher | ワークスペースパス解決済み protection が渡されている |
-| ✅ | テスト | 13/13 全通過、影響なし |
+| #   | 判定                      | 備考                                                             |
+| --- | ------------------------- | ---------------------------------------------------------------- |
+| ✅  | `prune-active-session.ts` | mtime double-check + atomic write + protection伝搬、すべて正しい |
+| ✅  | `idle-prune-watcher.ts`   | idle timer → cancel → cleanup、全経路で protection 正しく伝搬    |
+| ✅  | `run-main.ts` → watcher   | ワークスペースパス解決済み protection が渡されている             |
+| ✅  | テスト                    | 13/13 全通過、影響なし                                           |
 
 **批判的バグ: なし**
 

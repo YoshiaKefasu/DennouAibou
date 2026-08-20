@@ -87,14 +87,14 @@ code-reviewer は修正方針を承認した。
 
 ## 期待する挙動
 
-| コマンド | runtime hooks |
-|---|---|
-| `openclaw plugins install ...` | 起動しない |
-| `openclaw plugins --help` | 起動しない |
-| `openclaw gateway stop` | 起動しない |
-| `openclaw gateway status` | 起動しない |
-| `openclaw gateway` | Gateway 起動成功後に起動 |
-| `openclaw gateway run` | Gateway 起動成功後に起動 |
+| コマンド                       | runtime hooks            |
+| ------------------------------ | ------------------------ |
+| `openclaw plugins install ...` | 起動しない               |
+| `openclaw plugins --help`      | 起動しない               |
+| `openclaw gateway stop`        | 起動しない               |
+| `openclaw gateway status`      | 起動しない               |
+| `openclaw gateway`             | Gateway 起動成功後に起動 |
+| `openclaw gateway run`         | Gateway 起動成功後に起動 |
 
 ## ユーザー向けの一言
 

@@ -28,16 +28,16 @@
 
 #### 未使用ファイル（実在確認済み）
 
-| ファイル | 状態 | 対策 |
-|---|---|---|
-| `src/agents/byteplus-models.ts` | **実在**（import元なし） | 削除 |
-| `src/agents/chutes-oauth.ts` | **実在**（chutes extension 削除後） | 削除 |
-| `src/agents/chutes-oauth.test.ts` | **実在**（孤児テスト） | 削除 |
-| `src/agents/chutes-oauth.flow.test.ts` | **実在**（孤児テスト） | 削除 |
-| `tmp-generated-schema.ts` | ビルド一時ファイル | 削除 |
-| `tmp-rendered-schema.ts` | ビルド一時ファイル | 削除 |
-| `InstallationLog.txt` | インストールログ | 削除 |
-| `filter-*.jq` | デバッグ用スクリプト | 削除 |
+| ファイル                               | 状態                                | 対策 |
+| -------------------------------------- | ----------------------------------- | ---- |
+| `src/agents/byteplus-models.ts`        | **実在**（import元なし）            | 削除 |
+| `src/agents/chutes-oauth.ts`           | **実在**（chutes extension 削除後） | 削除 |
+| `src/agents/chutes-oauth.test.ts`      | **実在**（孤児テスト）              | 削除 |
+| `src/agents/chutes-oauth.flow.test.ts` | **実在**（孤児テスト）              | 削除 |
+| `tmp-generated-schema.ts`              | ビルド一時ファイル                  | 削除 |
+| `tmp-rendered-schema.ts`               | ビルド一時ファイル                  | 削除 |
+| `InstallationLog.txt`                  | インストールログ                    | 削除 |
+| `filter-*.jq`                          | デバッグ用スクリプト                | 削除 |
 
 #### Dead Code 検出手順
 
@@ -56,9 +56,9 @@ rg "from.*extensions/(chutes|byteplus|kilocode|opencode-zen)" src/ --type ts
 
 #### 孤児テスト（実在確認済み）
 
-| テストファイル | 参照先 | 状態 | 対策 |
-|---|---|---|---|
-| `src/agents/chutes-oauth.test.ts` | `chutes-oauth.ts` | **実在** | 削除 |
+| テストファイル                         | 参照先            | 状態     | 対策 |
+| -------------------------------------- | ----------------- | -------- | ---- |
+| `src/agents/chutes-oauth.test.ts`      | `chutes-oauth.ts` | **実在** | 削除 |
 | `src/agents/chutes-oauth.flow.test.ts` | `chutes-oauth.ts` | **実在** | 削除 |
 
 **注意**: Phase B で `byteplus-models.ts` を削除した場合、関連テストも削除対象になる可能性あり。
@@ -130,19 +130,19 @@ pnpm build && pnpm test
 
 ## 4. リスク
 
-| リスク | 対策 |
-|---|---|
-| dead code 削除で依存コードが壊れる | grep で使用箇所を確認してから削除 |
-| テスト削除でカバレッジが下がる | 削除対象は孤児テストのみ（本番コードを参照しないことを確認済み） |
-| 型修正で既存機能に影響 | 修正後に全テストを実行 |
+| リスク                             | 対策                                                             |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| dead code 削除で依存コードが壊れる | grep で使用箇所を確認してから削除                                |
+| テスト削除でカバレッジが下がる     | 削除対象は孤児テストのみ（本番コードを参照しないことを確認済み） |
+| 型修正で既存機能に影響             | 修正後に全テストを実行                                           |
 
 ---
 
 ## 5. 実施記録
 
 | 日付 | 内容 | 状態 |
-|---|---|---|
-| | | |
+| ---- | ---- | ---- |
+|      |      |      |
 
 ---
 

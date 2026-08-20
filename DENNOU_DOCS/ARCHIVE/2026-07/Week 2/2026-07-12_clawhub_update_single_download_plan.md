@@ -95,12 +95,12 @@ For an already-current plugin, output reports `up to date` with no archive downl
 
 ## 8. Risks and Guards
 
-| Risk | Guard |
-| --- | --- |
+| Risk                                                                          | Guard                                                                                                                                      |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Metadata says a version is compatible but archive validation later rejects it | Keep the existing full validation and security scan in the one real installer call. Metadata preflight is only an early-skip optimization. |
-| Metadata request fails transiently | Surface the metadata error; do not silently download/install a version that was not resolved. The operator can retry. |
-| The helper accidentally grows archive side effects later | Test that the metadata resolver never calls archive download/install functions. |
-| Exact selectors accidentally float to latest | Reuse `resolveClawHubUpdateSpec()` output without changing its selector rules. |
+| Metadata request fails transiently                                            | Surface the metadata error; do not silently download/install a version that was not resolved. The operator can retry.                      |
+| The helper accidentally grows archive side effects later                      | Test that the metadata resolver never calls archive download/install functions.                                                            |
+| Exact selectors accidentally float to latest                                  | Reuse `resolveClawHubUpdateSpec()` output without changing its selector rules.                                                             |
 
 ## 9. Decision
 

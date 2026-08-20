@@ -1,7 +1,7 @@
-import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
-import { resolveSessionAgentIdFromKey } from "./resolve-agent.js";
-import { getRawChatClient } from "./client-ref.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
+import { getRawChatClient } from "./client-ref.js";
+import { resolveSessionAgentIdFromKey } from "./resolve-agent.js";
 
 /**
  * Hook into session transcript updates to incrementally index raw chat messages.
@@ -74,13 +74,15 @@ export function startRawChatIndexer(config?: OpenClawConfig): () => void {
         const agentId = resolveSessionAgentIdFromKey(update.sessionKey);
 
         // Non-blocking: fire and forget. Indexing failure never affects chat delivery.
-        client.indexSession({
-          session_file: sessionFile,
-          agent_id: agentId,
-          session_key: update.sessionKey ?? "",
-        }).catch(() => {
-          // Best-effort: ignore errors.
-        });
+        client
+          .indexSession({
+            session_file: sessionFile,
+            agent_id: agentId,
+            session_key: update.sessionKey ?? "",
+          })
+          .catch(() => {
+            // Best-effort: ignore errors.
+          });
       }, DEBOUNCE_MS),
     );
   });

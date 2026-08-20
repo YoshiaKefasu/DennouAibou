@@ -44,13 +44,15 @@ export type SessionsCleanupOptions = {
 };
 
 type SessionCleanupAction =
-  "keep" | "prune-missing" | "prune-stale" | "cap-overflow" | "evict-budget";
+  | "keep"
+  | "prune-missing"
+  | "prune-stale"
+  | "cap-overflow"
+  | "evict-budget";
 
 const ACTION_PAD = 12;
 
-type SessionCleanupActionRow = ReturnType<
-  typeof toSessionDisplayRows
->[number] & {
+type SessionCleanupActionRow = ReturnType<typeof toSessionDisplayRows>[number] & {
   action: SessionCleanupAction;
 };
 
@@ -92,10 +94,7 @@ function resolveSessionCleanupAction(params: {
   return "keep";
 }
 
-function formatCleanupActionCell(
-  action: SessionCleanupAction,
-  rich: boolean,
-): string {
+function formatCleanupActionCell(action: SessionCleanupAction, rich: boolean): string {
   const label = action.padEnd(ACTION_PAD);
   if (!rich) {
     return label;
@@ -147,11 +146,7 @@ function pruneMissingTranscriptEntries(params: {
     if (!entry?.sessionId) {
       continue;
     }
-    const transcriptPath = resolveSessionFilePath(
-      entry.sessionId,
-      entry,
-      sessionPathOpts,
-    );
+    const transcriptPath = resolveSessionFilePath(entry.sessionId, entry, sessionPathOpts);
     if (!fs.existsSync(transcriptPath)) {
       delete params.store[key];
       removed += 1;
@@ -223,10 +218,7 @@ async function previewStoreCleanup(params: {
     missing > 0 ||
     pruned > 0 ||
     capped > 0 ||
-    Boolean(
-      (diskBudget?.removedEntries ?? 0) > 0 ||
-      (diskBudget?.removedFiles ?? 0) > 0,
-    );
+    Boolean((diskBudget?.removedEntries ?? 0) > 0 || (diskBudget?.removedFiles ?? 0) > 0);
 
   const summary: SessionCleanupSummary = {
     agentId: params.target.agentId,
@@ -271,9 +263,7 @@ function renderStoreDryRunPlan(params: {
   params.runtime.log(
     `Entries: ${params.summary.beforeCount} -> ${params.summary.afterCount} (remove ${params.summary.beforeCount - params.summary.afterCount})`,
   );
-  params.runtime.log(
-    `Would prune missing transcripts: ${params.summary.missing}`,
-  );
+  params.runtime.log(`Would prune missing transcripts: ${params.summary.missing}`);
   params.runtime.log(`Would prune stale: ${params.summary.pruned}`);
   params.runtime.log(`Would cap overflow: ${params.summary.capped}`);
   if (params.summary.diskBudget) {
@@ -295,11 +285,7 @@ function renderStoreDryRunPlan(params: {
   ].join(" ");
   params.runtime.log(rich ? theme.heading(header) : header);
   for (const actionRow of params.actionRows) {
-    const model = resolveSessionDisplayModel(
-      params.cfg,
-      actionRow,
-      params.displayDefaults,
-    );
+    const model = resolveSessionDisplayModel(params.cfg, actionRow, params.displayDefaults);
     const line = [
       formatCleanupActionCell(actionRow.action, rich),
       formatSessionKeyCell(actionRow.key, rich),
@@ -311,10 +297,7 @@ function renderStoreDryRunPlan(params: {
   }
 }
 
-export async function sessionsCleanupCommand(
-  opts: SessionsCleanupOptions,
-  runtime: RuntimeEnv,
-) {
+export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runtime: RuntimeEnv) {
   const cfg = loadConfig();
   const displayDefaults = resolveSessionDisplayDefaults(cfg);
   const mode = opts.enforce ? "enforce" : resolveMaintenanceConfig().mode;
@@ -381,10 +364,9 @@ export async function sessionsCleanupCommand(
 
   const appliedSummaries: SessionCleanupSummary[] = [];
   for (const target of targets) {
-    const appliedReportRef: { current: SessionMaintenanceApplyReport | null } =
-      {
-        current: null,
-      };
+    const appliedReportRef: { current: SessionMaintenanceApplyReport | null } = {
+      current: null,
+    };
     const missingApplied = await updateSessionStore(
       target.storePath,
       async (store) => {
@@ -408,9 +390,7 @@ export async function sessionsCleanupCommand(
       },
     );
     const afterStore = loadSessionStore(target.storePath, { skipCache: true });
-    const preview = previewResults.find(
-      (result) => result.summary.storePath === target.storePath,
-    );
+    const preview = previewResults.find((result) => result.summary.storePath === target.storePath);
     const appliedReport = appliedReportRef.current;
     const summary: SessionCleanupSummary =
       appliedReport === null
@@ -480,8 +460,6 @@ export async function sessionsCleanupCommand(
       runtime.log(`Agent: ${summary.agentId}`);
     }
     runtime.log(`Session store: ${summary.storePath}`);
-    runtime.log(
-      `Applied maintenance. Current entries: ${summary.appliedCount ?? 0}`,
-    );
+    runtime.log(`Applied maintenance. Current entries: ${summary.appliedCount ?? 0}`);
   }
 }

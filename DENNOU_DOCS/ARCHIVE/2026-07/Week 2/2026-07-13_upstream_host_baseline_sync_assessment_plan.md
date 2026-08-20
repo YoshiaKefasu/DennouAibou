@@ -57,12 +57,12 @@ The assessment should produce one primary Markdown report containing:
 ### Commit dependency matrix
 
 | Upstream commit / PR | Subsystem | Needed for Codex? | Parent dependencies | Local overlap | Conflict type | Tests | Decision |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| -------------------- | --------- | ----------------- | ------------------- | ------------- | ------------- | ----- | -------- |
 
 ### Local patch ledger
 
 | Local commit | Tag | Upstream-owned files touched | Still needed upstream? | Conflict risk | Action |
-| --- | --- | --- | --- | --- | --- |
+| ------------ | --- | ---------------------------- | ---------------------- | ------------- | ------ |
 
 Actions are limited to: keep, port after sync, replace with upstream, or retire after verified equivalence. Retirement remains a later implementation action: code-reviewer must approve the equivalence evidence first, and every deletion requires explicit user approval.
 

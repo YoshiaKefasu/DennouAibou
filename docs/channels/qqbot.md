@@ -171,13 +171,13 @@ Outbound audio upload/transcode behavior can also be tuned with
 
 Built-in commands intercepted before the AI queue:
 
-| Command        | Description                          |
-| -------------- | ------------------------------------ |
-| `/bot-ping`    | Latency test                         |
-| `/bot-version` | Show the DennouAibou framework version  |
-| `/bot-help`    | List all commands                    |
-| `/bot-upgrade` | Show the QQBot upgrade guide link    |
-| `/bot-logs`    | Export recent gateway logs as a file |
+| Command        | Description                            |
+| -------------- | -------------------------------------- |
+| `/bot-ping`    | Latency test                           |
+| `/bot-version` | Show the DennouAibou framework version |
+| `/bot-help`    | List all commands                      |
+| `/bot-upgrade` | Show the QQBot upgrade guide link      |
+| `/bot-logs`    | Export recent gateway logs as a file   |
 
 Append `?` to any command for usage help (for example `/bot-upgrade ?`).
 

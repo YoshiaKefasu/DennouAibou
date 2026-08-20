@@ -2,16 +2,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { upsertAcpSessionMeta } from "../../acp/runtime/session-meta.js";
 import * as jsonFiles from "../../infra/json-files.js";
 import type { OpenClawConfig } from "../config.js";
@@ -28,11 +19,7 @@ import {
   resolveSessionResetPolicy,
 } from "./reset.js";
 import { resolveAndPersistSessionFile } from "./session-file.js";
-import {
-  clearSessionStoreCacheForTest,
-  loadSessionStore,
-  updateSessionStore,
-} from "./store.js";
+import { clearSessionStoreCacheForTest, loadSessionStore, updateSessionStore } from "./store.js";
 import { mergeSessionEntry, type SessionEntry } from "./types.js";
 
 function useTempSessionsFixture(prefix: string) {
@@ -61,23 +48,15 @@ describe("session path safety", () => {
   it("rejects unsafe session IDs", () => {
     const unsafeSessionIds = ["../etc/passwd", "a/b", "a\\b", "/abs"];
     for (const sessionId of unsafeSessionIds) {
-      expect(() => validateSessionId(sessionId), sessionId).toThrow(
-        /Invalid session ID/,
-      );
+      expect(() => validateSessionId(sessionId), sessionId).toThrow(/Invalid session ID/);
     }
   });
 
   it("resolves transcript path inside an explicit sessions dir", () => {
     const sessionsDir = "/tmp/openclaw/agents/main/sessions";
-    const resolved = resolveSessionTranscriptPathInDir(
-      "sess-1",
-      sessionsDir,
-      "topic/a+b",
-    );
+    const resolved = resolveSessionTranscriptPathInDir("sess-1", sessionsDir, "topic/a+b");
 
-    expect(resolved).toBe(
-      path.resolve(sessionsDir, "sess-1-topic-topic%2Fa%2Bb.jsonl"),
-    );
+    expect(resolved).toBe(path.resolve(sessionsDir, "sess-1-topic-topic%2Fa%2Bb.jsonl"));
   });
 
   it("falls back to derived path when sessionFile is outside known agent sessions dirs", () => {
@@ -100,37 +79,23 @@ describe("session path safety", () => {
     ).toEqual({
       agentId: "worker",
     });
-    expect(
-      resolveSessionFilePathOptions({ storePath: "(multiple)" }),
-    ).toBeUndefined();
+    expect(resolveSessionFilePathOptions({ storePath: "(multiple)" })).toBeUndefined();
   });
 
   it("accepts symlink-alias session paths that resolve under the sessions dir", () => {
     if (process.platform === "win32") {
       return;
     }
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "openclaw-symlink-session-"),
-    );
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-symlink-session-"));
     const realRoot = path.join(tmpDir, "real-state");
     const aliasRoot = path.join(tmpDir, "alias-state");
     try {
       const sessionsDir = path.join(realRoot, "agents", "main", "sessions");
       fs.mkdirSync(sessionsDir, { recursive: true });
       fs.symlinkSync(realRoot, aliasRoot, "dir");
-      const viaAlias = path.join(
-        aliasRoot,
-        "agents",
-        "main",
-        "sessions",
-        "sess-1.jsonl",
-      );
+      const viaAlias = path.join(aliasRoot, "agents", "main", "sessions", "sess-1.jsonl");
       fs.writeFileSync(path.join(sessionsDir, "sess-1.jsonl"), "");
-      const resolved = resolveSessionFilePath(
-        "sess-1",
-        { sessionFile: viaAlias },
-        { sessionsDir },
-      );
+      const resolved = resolveSessionFilePath("sess-1", { sessionFile: viaAlias }, { sessionsDir });
       expect(fs.realpathSync(resolved)).toBe(
         fs.realpathSync(path.join(sessionsDir, "sess-1.jsonl")),
       );
@@ -143,9 +108,7 @@ describe("session path safety", () => {
     if (process.platform === "win32") {
       return;
     }
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "openclaw-symlink-escape-"),
-    );
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-symlink-escape-"));
     const sessionsDir = path.join(tmpDir, "agents", "main", "sessions");
     const outsideDir = path.join(tmpDir, "outside");
     try {
@@ -161,9 +124,7 @@ describe("session path safety", () => {
         { sessionFile: symlinkPath },
         { sessionsDir },
       );
-      expect(fs.realpathSync(path.dirname(resolved))).toBe(
-        fs.realpathSync(sessionsDir),
-      );
+      expect(fs.realpathSync(path.dirname(resolved))).toBe(fs.realpathSync(sessionsDir));
       expect(path.basename(resolved)).toBe("sess-1.jsonl");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -375,26 +336,18 @@ describe("session store lock (Promise chain mutex)", () => {
     lockTmpDirs.push(dir);
     const storePath = path.join(dir, "sessions.json");
     if (Object.keys(initial).length > 0) {
-      await fsPromises.writeFile(
-        storePath,
-        JSON.stringify(initial, null, 2),
-        "utf-8",
-      );
+      await fsPromises.writeFile(storePath, JSON.stringify(initial, null, 2), "utf-8");
     }
     return { dir, storePath };
   }
 
   beforeAll(async () => {
-    lockFixtureRoot = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), "openclaw-lock-test-"),
-    );
+    lockFixtureRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), "openclaw-lock-test-"));
   });
 
   afterAll(async () => {
     if (lockFixtureRoot) {
-      await fsPromises
-        .rm(lockFixtureRoot, { recursive: true, force: true })
-        .catch(() => undefined);
+      await fsPromises.rm(lockFixtureRoot, { recursive: true, force: true }).catch(() => undefined);
     }
   });
 
@@ -618,10 +571,7 @@ describe("resolveAndPersistSessionFile", () => {
     const sessionStore = loadSessionStore(fixture.storePath(), {
       skipCache: true,
     });
-    const fallbackSessionFile = resolveSessionTranscriptPathInDir(
-      sessionId,
-      fixture.sessionsDir(),
-    );
+    const fallbackSessionFile = resolveSessionTranscriptPathInDir(sessionId, fixture.sessionsDir());
 
     const result = await resolveAndPersistSessionFile({
       sessionId,

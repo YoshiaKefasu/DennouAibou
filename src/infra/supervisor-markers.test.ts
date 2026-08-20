@@ -27,9 +27,9 @@ describe("detectRespawnSupervisor", () => {
   });
 
   it("detects scheduled-task supervision on Windows from either hint family", () => {
-    expect(
-      detectRespawnSupervisor({ DENNOU_WINDOWS_TASK_NAME: "OpenClaw Gateway" }, "win32"),
-    ).toBe("schtasks");
+    expect(detectRespawnSupervisor({ DENNOU_WINDOWS_TASK_NAME: "OpenClaw Gateway" }, "win32")).toBe(
+      "schtasks",
+    );
     expect(
       detectRespawnSupervisor(
         {

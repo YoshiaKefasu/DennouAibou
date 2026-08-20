@@ -441,9 +441,7 @@ const SECTION_CATEGORIES: SectionCategory[] = [
   {
     id: "dennouAibou",
     label: "DennouAibou",
-    sections: [
-      { key: "dennou", label: "DennouAibou" },
-    ],
+    sections: [{ key: "dennou", label: "DennouAibou" }],
   },
 ];
 

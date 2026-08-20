@@ -190,9 +190,7 @@ export function resolveOpenAiCompatibleHttpSenderIsOwner(
 
 export function resolveAgentIdFromHeader(req: IncomingMessage): string | undefined {
   const raw =
-    getHeader(req, "x-dennou-agent-id")?.trim() ||
-    getHeader(req, "x-dennou-agent")?.trim() ||
-    "";
+    getHeader(req, "x-dennou-agent-id")?.trim() || getHeader(req, "x-dennou-agent")?.trim() || "";
   if (!raw) {
     return undefined;
   }

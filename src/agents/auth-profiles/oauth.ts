@@ -12,7 +12,6 @@ import {
   refreshProviderOAuthCredentialWithPlugin,
 } from "../../plugins/provider-runtime.runtime.js";
 import { resolveSecretRefString, type SecretRefResolveCache } from "../../secrets/resolve.js";
-
 import { AUTH_STORE_LOCK_OPTIONS, log } from "./constants.js";
 import { resolveTokenExpiryState } from "./credential-state.js";
 import { formatAuthDoctorHint } from "./doctor.js";
@@ -199,14 +198,14 @@ async function refreshOAuthTokenWithLock(params: {
     }
 
     const oauthCreds: Record<string, OAuthCredentials> = { [cred.provider]: cred };
-        const oauthProvider = resolveOAuthProvider(cred.provider);
-        if (!oauthProvider) {
-          return null;
-        }
-        if (typeof getOAuthApiKey !== "function") {
-          return null;
-        }
-        const result = await getOAuthApiKey(oauthProvider, oauthCreds);
+    const oauthProvider = resolveOAuthProvider(cred.provider);
+    if (!oauthProvider) {
+      return null;
+    }
+    if (typeof getOAuthApiKey !== "function") {
+      return null;
+    }
+    const result = await getOAuthApiKey(oauthProvider, oauthCreds);
     if (!result) {
       return null;
     }

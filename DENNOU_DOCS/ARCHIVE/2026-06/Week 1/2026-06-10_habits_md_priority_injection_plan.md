@@ -17,18 +17,18 @@ AGENTS.md is currently the highest-priority file (order 10), but there are use c
 
 ## Target Injection Order (After Implementation)
 
-| Order | File | Notes |
-|-------|------|-------|
-| **5** | **HABITS.md** | **NEW — Highest priority** |
-| 10 | AGENTS.md | Existing |
-| 20 | SOUL.md | Existing |
-| 30 | IDENTITY.md | Existing |
-| 40 | USER.md | Existing |
-| 50 | TOOLS.md | Existing |
-| 60 | BOOTSTRAP.md | Existing |
-| 70 | MEMORY.md | Existing |
-| --- | CACHE BOUNDARY | --- |
-| dynamic | HEARTBEAT.md | Existing |
+| Order   | File           | Notes                      |
+| ------- | -------------- | -------------------------- |
+| **5**   | **HABITS.md**  | **NEW — Highest priority** |
+| 10      | AGENTS.md      | Existing                   |
+| 20      | SOUL.md        | Existing                   |
+| 30      | IDENTITY.md    | Existing                   |
+| 40      | USER.md        | Existing                   |
+| 50      | TOOLS.md       | Existing                   |
+| 60      | BOOTSTRAP.md   | Existing                   |
+| 70      | MEMORY.md      | Existing                   |
+| ---     | CACHE BOUNDARY | ---                        |
+| dynamic | HEARTBEAT.md   | Existing                   |
 
 ## Files to Modify
 
@@ -44,17 +44,17 @@ export const DEFAULT_HABITS_FILENAME = "HABITS.md";
 
 ```typescript
 export type WorkspaceBootstrapFileName =
-  | typeof DEFAULT_HABITS_FILENAME    // NEW
+  | typeof DEFAULT_HABITS_FILENAME // NEW
   | typeof DEFAULT_AGENTS_FILENAME
-  | typeof DEFAULT_SOUL_FILENAME
-  // ... rest unchanged
+  | typeof DEFAULT_SOUL_FILENAME;
+// ... rest unchanged
 ```
 
 **Add to `VALID_BOOTSTRAP_NAMES` Set** (line 169-179) — **BLOCKER from code-reviewer**:
 
 ```typescript
 const VALID_BOOTSTRAP_NAMES = new Set<WorkspaceBootstrapFileName>([
-  DEFAULT_HABITS_FILENAME,    // NEW
+  DEFAULT_HABITS_FILENAME, // NEW
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_SOUL_FILENAME,
   DEFAULT_TOOLS_FILENAME,
@@ -89,7 +89,7 @@ const entries: Array<{
 
 ```typescript
 const MINIMAL_BOOTSTRAP_ALLOWLIST: WorkspaceBootstrapFileName[] = [
-  DEFAULT_HABITS_FILENAME,    // NEW
+  DEFAULT_HABITS_FILENAME, // NEW
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_SOUL_FILENAME,
   DEFAULT_IDENTITY_FILENAME,
@@ -111,7 +111,7 @@ await writeFileIfMissing(habitsPath, habitsTemplate);
 ```typescript
 return {
   agentsPath,
-  habitsPath,    // NEW
+  habitsPath, // NEW
   soulPath,
   // ... rest unchanged
 };
@@ -122,7 +122,7 @@ return {
 ```typescript
 const templatePaths = [
   agentsPath,
-  habitsPath,    // NEW
+  habitsPath, // NEW
   soulPath,
   // ... rest unchanged
 ];
@@ -134,7 +134,7 @@ const templatePaths = [
 
 ```typescript
 const CONTEXT_FILE_ORDER = new Map<string, number>([
-  ["habits.md", 5],     // NEW — highest priority
+  ["habits.md", 5], // NEW — highest priority
   ["agents.md", 10],
   ["soul.md", 20],
   ["identity.md", 30],
@@ -171,7 +171,7 @@ Create template file with example content:
 ```markdown
 # HABITS
 
-<!-- 
+<!--
   This file defines hard behavioral rules for the agent.
   Rules here take precedence over AGENTS.md and all other context files.
   Use this for non-negotiable habits, constraints, or behavioral patterns.
@@ -229,6 +229,7 @@ Create template file with example content:
 ## Implementation Phases
 
 ### Phase 1: Template & Core (estimated ~40 min)
+
 1. Create `docs/reference/templates/HABITS.md` template file
 2. Add constant + type + `VALID_BOOTSTRAP_NAMES` in `workspace.ts`
 3. Add entries array + `MINIMAL_BOOTSTRAP_ALLOWLIST` in `workspace.ts`
@@ -238,6 +239,7 @@ Create template file with example content:
 7. Run existing tests to verify no regressions
 
 ### Phase 2: Tests (estimated ~25 min)
+
 1. Add HABITS.md loading test
 2. Add sort order test
 3. Update `expectSubagentAllowedBootstrapNames` helper
@@ -246,6 +248,7 @@ Create template file with example content:
 6. Add subagent session test
 
 ### Phase 3: Deploy (estimated ~10 min)
+
 1. Build
 2. Deploy to KASOU
 3. Verify `/` and `/logs` return 200
@@ -263,30 +266,36 @@ Create template file with example content:
 **Commit**: `f4dbf2c8198 [FIX-SOUL] Address code-review findings for HABITS.md implementation`
 
 ### 1. ✅ Remove export from DEFAULT_HABITS_FILENAME
+
 - **Before**: `export const DEFAULT_HABITS_FILENAME = "HABITS.md";`
 - **After**: `const DEFAULT_HABITS_FILENAME = "HABITS.md";`
 - **Reason**: Only used internally in `workspace.ts`. No external consumer needs this.
 
 ### 2. ✅ Add lowercase key requirement comment to CONTEXT_FILE_ORDER
+
 - **Added**: `// Keys MUST be lowercase — getContextFileBasename() lowercases before lookup.`
 - **Reason**: Prevents future contributors from adding mixed-case keys that would silently fall to `Number.MAX_SAFE_INTEGER` sort order.
 
 ### 3. ✅ Extract HABITS.md guidance string to constant
+
 - **Added**: `const HABITS_GUIDANCE = "If HABITS.md is present, treat its entries as hard behavioral rules. They take precedence over AGENTS.md and all other stable context files.";`
 - **Reason**: Improves discoverability and makes the text easier to maintain.
 
 ### 4. ✅ Clarify HABITS.md guidance text
+
 - **Before**: "...all other context files."
 - **After**: "...all other stable context files."
 - **Reason**: HABITS.md guidance is only injected for stable (non-dynamic) context. The original text implied universal precedence, which was misleading.
 
 ### 5. ✅ Add JSDoc for habitsPath in return type
+
 - **Added**: JSDoc comment for `ensureAgentWorkspace` return type and `habitsPath` property.
 - **Reason**: Documents when path properties are present vs undefined.
 
 ## Open Items (Deferred)
 
 ### Potential Future Improvements
+
 1. **Shared priority ordering**: The load order in `WORKSPACE_BOOTSTRAP_ENTRIES` and prompt order in `CONTEXT_FILE_ORDER` are separate. Could be unified into a single source of truth.
 2. **`memory.md` in VALID_BOOTSTRAP_NAMES**: Included for case-insensitive FS handling but not in main entries array. Documented inconsistency.
 3. **HABITS.md lint rule**: Template says "under 50 rules" but no enforcement. Could add CI check if needed.

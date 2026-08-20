@@ -25,21 +25,13 @@ function createTempDir(): string {
 }
 
 /** テスト用の閉じたセッションファイルを作成する（*.jsonl.deleted.*） */
-function writeClosedSessionFile(
-  dir: string,
-  name: string,
-  lines: string[],
-): string {
+function writeClosedSessionFile(dir: string, name: string, lines: string[]): string {
   const filePath = path.join(dir, name);
   fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
   return filePath;
 }
 
-function writeActiveSessionFile(
-  dir: string,
-  name: string,
-  lines: string[],
-): string {
+function writeActiveSessionFile(dir: string, name: string, lines: string[]): string {
   const filePath = path.join(dir, name);
   fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
   return filePath;
@@ -171,10 +163,10 @@ describe("pruneClosedSessionFile", () => {
       makeSessionHeader(),
       makeUserMessage("msg 1"),
       makeAssistantMessage("msg 2"),
-      makeUserMessage("msg 3"),           // index 3, posFromEnd=4 → 保護外
+      makeUserMessage("msg 3"), // index 3, posFromEnd=4 → 保護外
       makeLargeToolResult("x".repeat(150)), // index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(),               // index 5, posFromEnd=2 → 保護
-      makeSmallToolResult(),               // index 6, posFromEnd=1 → 保護
+      makeSmallToolResult(), // index 5, posFromEnd=2 → 保護
+      makeSmallToolResult(), // index 6, posFromEnd=1 → 保護
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -224,10 +216,7 @@ describe("pruneClosedSessionFile", () => {
   });
 
   it("skips active .jsonl files", () => {
-    const lines = [
-      makeSessionHeader(),
-      makeLargeToolResult("x".repeat(200)),
-    ];
+    const lines = [makeSessionHeader(), makeLargeToolResult("x".repeat(200))];
     const filePath = writeActiveSessionFile(tempDir, "active-session.jsonl", lines);
 
     const pruned = pruneClosedSessionFile(filePath, defaultConfig, testLogger);
@@ -278,19 +267,19 @@ describe("pruneClosedSessionFile", () => {
     // totalLines=5, keepLastTools=2 → index 2が保護範囲外
     const lines = [
       makeSessionHeader(),
-      "this is not json at all",          // index 1, malformed
-      makeUserMessage("padding"),          // index 2, posFromEnd=3 → 保護外
+      "this is not json at all", // index 1, malformed
+      makeUserMessage("padding"), // index 2, posFromEnd=3 → 保護外
       makeLargeToolResult("x".repeat(150)), // index 3, posFromEnd=2 → …微妙。index 2にしよう
     ];
     // ※総行数が少ないので書き直し: 7行で構築
     const lines2 = [
-      makeSessionHeader(),                  // 0
-      makeUserMessage("filler"),            // 1, posFromEnd=6
-      "this is not json at all",            // 2, posFromEnd=5, malformed
-      makeUserMessage("padding"),           // 3, posFromEnd=4
+      makeSessionHeader(), // 0
+      makeUserMessage("filler"), // 1, posFromEnd=6
+      "this is not json at all", // 2, posFromEnd=5, malformed
+      makeUserMessage("padding"), // 3, posFromEnd=4
       makeLargeToolResult("x".repeat(150)), // 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(),               // 5, posFromEnd=2 → 保護
-      makeAssistantMessage("end"),          // 6, posFromEnd=1 → 保護
+      makeSmallToolResult(), // 5, posFromEnd=2 → 保護
+      makeAssistantMessage("end"), // 6, posFromEnd=1 → 保護
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -315,13 +304,13 @@ describe("pruneClosedSessionFile", () => {
   it("counts multi-content text length correctly", () => {
     // totalLines=7, keepLastTools=2 → index 4が保護範囲外
     const lines = [
-      makeSessionHeader(),                    // 0
-      makeUserMessage("one"),                 // 1
-      makeAssistantMessage("two"),            // 2
-      makeUserMessage("three"),               // 3
+      makeSessionHeader(), // 0
+      makeUserMessage("one"), // 1
+      makeAssistantMessage("two"), // 2
+      makeUserMessage("three"), // 3
       makeMultiContentToolResult(["x".repeat(60), "y".repeat(60)]), // 120 chars, index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(),                 // 5, posFromEnd=2 → 保護
-      makeAssistantMessage("end"),            // 6, posFromEnd=1 → 保護
+      makeSmallToolResult(), // 5, posFromEnd=2 → 保護
+      makeAssistantMessage("end"), // 6, posFromEnd=1 → 保護
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -357,21 +346,24 @@ describe("pruneAllClosedSessions", () => {
     // 各ファイルに4行以上配置し、toolResultを保護範囲外に置く
     // keepLastTools=2 なので、index 3以降は保護範囲
     const lines1 = [
-      makeSessionHeader(),                                  // index 0
-      makeLargeToolResult("x".repeat(150)),                   // index 1, posFromEnd=4 → 保護外 → prune!
-      makeAssistantMessage("filler"),                         // index 2, posFromEnd=3 → 保護外
-      makeSmallToolResult(),                                  // index 3, posFromEnd=2 → 保護
+      makeSessionHeader(), // index 0
+      makeLargeToolResult("x".repeat(150)), // index 1, posFromEnd=4 → 保護外 → prune!
+      makeAssistantMessage("filler"), // index 2, posFromEnd=3 → 保護外
+      makeSmallToolResult(), // index 3, posFromEnd=2 → 保護
     ];
     const lines2 = [
-      makeSessionHeader(),                                  // index 0
-      makeLargeToolResult("y".repeat(200)),                   // index 1, posFromEnd=4 → 保護外 → prune!
-      makeSmallToolResult(),                                  // index 2, posFromEnd=3 → 保護外
-      makeSmallToolResult(),                                  // index 3, posFromEnd=2 → 保護
+      makeSessionHeader(), // index 0
+      makeLargeToolResult("y".repeat(200)), // index 1, posFromEnd=4 → 保護外 → prune!
+      makeSmallToolResult(), // index 2, posFromEnd=3 → 保護外
+      makeSmallToolResult(), // index 3, posFromEnd=2 → 保護
     ];
 
     writeClosedSessionFile(tempDir, "s1.jsonl.deleted.2026-01-01T00-00-00.000Z", lines1);
     writeClosedSessionFile(tempDir, "s2.jsonl.reset.2026-01-01T00-00-00.000Z", lines2);
-    writeActiveSessionFile(tempDir, "active.jsonl", [makeSessionHeader(), makeUserMessage("hello")]);
+    writeActiveSessionFile(tempDir, "active.jsonl", [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+    ]);
 
     const total = pruneAllClosedSessions(tempDir, defaultConfig, testLogger);
     expect(total).toBe(2); // 2ファイルでそれぞれ1行ずつprune

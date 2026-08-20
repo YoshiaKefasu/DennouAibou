@@ -1,6 +1,7 @@
 # Gemini CLI Provider 思考漏れ（Reasoning Leak）分析
 
 ## 日時
+
 - 作成: 2026-05-20
 - 報告者: Kuraudo
 
@@ -41,6 +42,7 @@ CRITICAL INSTRUCTION 2: Explicitly list out related tools before making tool cal
 JSONL保存前のフィルタリングは `pi-embedded-subscribe.ts` と `pi-embedded-utils.ts` にある。
 
 **`THINKING_TAG_SCAN_RE`**（pi-embedded-subscribe.ts:29）:
+
 ```ts
 const THINKING_TAG_SCAN_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\s*>/gi;
 ```
@@ -49,6 +51,7 @@ const THINKING_TAG_SCAN_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\
 **`...94>thought` はマッチしない。** 単なる「文中の `thought` という文字列」として無視される。
 
 **`FINAL_TAG_SCAN_RE`**（pi-embedded-subscribe.ts:30）:
+
 ```ts
 const FINAL_TAG_SCAN_RE = /<\s*(\/?)\s*final\s*>/gi;
 ```
@@ -61,9 +64,9 @@ const FINAL_TAG_SCAN_RE = /<\s*(\/?)\s*final\s*>/gi;
 `google-gemini-cli` は `isReasoningTagProvider()` に `true` を返す（provider-utils.ts）。
 
 テストでも確認：
+
 ```ts
-["google-gemini-cli", true]  // isReasoningTagProvider → true
-["google-gemini-cli", "tagged"]  // resolveReasoningOutputMode → "tagged"
+["google-gemini-cli", true][("google-gemini-cli", "tagged")]; // isReasoningTagProvider → true // resolveReasoningOutputMode → "tagged"
 ```
 
 なので `enforceFinalTag: true` は**有効になっているはず**。
@@ -73,6 +76,7 @@ const FINAL_TAG_SCAN_RE = /<\s*(\/?)\s*final\s*>/gi;
 JSONLを実際に読むと、漏れたメッセージにはすでに `<final>...</final>` が含まれている。
 
 つまり：
+
 1. Geminiが `...94>thought\nCRITICAL...<final>正しい文章</final>` という1つのtextチャンクを返す
 2. OpenClawは `enforceFinalTag` により `<final>` 内部だけを抽出しようとする
 3. しかし、**`...94>thought` が `<final>` の外にある** ため、`stripBlockTags` がこれを除去できない
@@ -105,12 +109,14 @@ JSONL上の漏れを確認した限りでは、**Telegram送信前にもある�
 **アプローチ：** `pi-embedded-utils.ts` に新しいサニタイザー関数を追加し、`stripBlockTags()` の後処理として適用する。
 
 検出パターン：
+
 1. `...94>thought` で始まるセクションを `<final>` 開始まで除去
 2. `CRITICAL INSTRUCTION \d+: ` で始まる指示文の除去
 3. `[META-CHECK-START]`〜`[META-CHECK-END]` ブロック（タグ無し）の除去
 4. 思考メタ認知テキスト（`[E]`、分子思考の説明など）の除去
 
 **適用範囲：**
+
 - `emitBlockChunk()` 内の `stripBlockTags()` 通過後
 - `pushAssistantText()` に渡す前のテキスト
 - これにより、送信だけでなくJSONL保存前にも思考漏れが除去される
@@ -130,10 +136,10 @@ JSONL上の漏れを確認した限りでは、**Telegram送信前にもある�
 
 ### 変更したファイル
 
-| ファイル | 変更内容 |
-|---|---|
-| `src/agents/pi-embedded-utils.ts` | `splitThinkingTaggedText()` に Gemini CLI thought接頭辞パターン対応を追加 |
-| `src/agents/pi-embedded-utils.test.ts` | 5件のテストケース追加 |
+| ファイル                               | 変更内容                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| `src/agents/pi-embedded-utils.ts`      | `splitThinkingTaggedText()` に Gemini CLI thought接頭辞パターン対応を追加 |
+| `src/agents/pi-embedded-utils.test.ts` | 5件のテストケース追加                                                     |
 
 ### 修正の仕組み
 
@@ -165,19 +171,19 @@ JSONL上の漏れを確認した限りでは、**Telegram送信前にもある�
 
 ## 参考ファイル
 
-| ファイル | 役割 |
-|---|---|
-| `src/agents/pi-embedded-subscribe.ts` | タグ解析・フィルター本体 |
-| `src/agents/pi-embedded-utils.ts` | タグ変換ユーティリティ |
-| `src/utils/provider-utils.ts` | プロバイダー判定（tagged/native） |
-| `src/auto-reply/reply/get-reply-run.ts` | enforceFinalTag 設定 |
-| `src/auto-reply/reply/agent-runner-utils.ts` | enforceFinalTag 解決 |
-| `src/agents/pi-embedded-subscribe.handlers.messages.ts` | メッセージ送信制御 |
+| ファイル                                                | 役割                              |
+| ------------------------------------------------------- | --------------------------------- |
+| `src/agents/pi-embedded-subscribe.ts`                   | タグ解析・フィルター本体          |
+| `src/agents/pi-embedded-utils.ts`                       | タグ変換ユーティリティ            |
+| `src/utils/provider-utils.ts`                           | プロバイダー判定（tagged/native） |
+| `src/auto-reply/reply/get-reply-run.ts`                 | enforceFinalTag 設定              |
+| `src/auto-reply/reply/agent-runner-utils.ts`            | enforceFinalTag 解決              |
+| `src/agents/pi-embedded-subscribe.handlers.messages.ts` | メッセージ送信制御                |
 
 ## 変更履歴
 
-| 日付 | 変更内容 |
-|---|---|
-| 2026-05-20 | 初版作成 |
+| 日付       | 変更内容                                                                 |
+| ---------- | ------------------------------------------------------------------------ |
+| 2026-05-20 | 初版作成                                                                 |
 | 2026-05-20 | 実装完了：`pi-embedded-utils.ts` 修正、テスト6件追加、コードレビュー対処 |
-| 2026-05-20 | デプロイ完了：KASOU gateway HTTP 200確認 |
+| 2026-05-20 | デプロイ完了：KASOU gateway HTTP 200確認                                 |

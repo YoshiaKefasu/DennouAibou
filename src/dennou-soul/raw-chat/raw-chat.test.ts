@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createChatSearchTool, ChatSearchSchema } from "./tool.js";
 import { setRawChatClient, getRawChatClient } from "./client-ref.js";
 import type { RawChatClient } from "./sidecar-client.js";
+import { createChatSearchTool, ChatSearchSchema } from "./tool.js";
 
 /**
  * Tests for the raw chat TS boundary: tool registration, RPC call formatting,

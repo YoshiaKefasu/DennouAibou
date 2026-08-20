@@ -368,7 +368,7 @@ Beyond `api.runtime`, the API object also provides:
 | ------------------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
 | `api.id`                 | `string`                  | Plugin id                                                                                   |
 | `api.name`               | `string`                  | Plugin display name                                                                         |
-| `api.config`             | `DennouAibouConfig`          | Current config snapshot (active in-memory runtime snapshot when available)                  |
+| `api.config`             | `DennouAibouConfig`       | Current config snapshot (active in-memory runtime snapshot when available)                  |
 | `api.pluginConfig`       | `Record<string, unknown>` | Plugin-specific config from `plugins.entries.<id>.config`                                   |
 | `api.logger`             | `PluginLogger`            | Scoped logger (`debug`, `info`, `warn`, `error`)                                            |
 | `api.registrationMode`   | `PluginRegistrationMode`  | Current load mode; `"setup-runtime"` is the lightweight pre-full-entry startup/setup window |

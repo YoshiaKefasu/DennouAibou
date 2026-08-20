@@ -808,7 +808,9 @@ export async function runSecretsConfigureInteractive(
         value: configureCandidateKey(candidate),
         label: candidate.label,
         hint: [
-          candidate.configFile === "auth-profiles.json" ? "auth-profiles.json" : "dennou-aibou.json",
+          candidate.configFile === "auth-profiles.json"
+            ? "auth-profiles.json"
+            : "dennou-aibou.json",
           candidate.isDerived === true ? "derived" : undefined,
         ]
           .filter(Boolean)

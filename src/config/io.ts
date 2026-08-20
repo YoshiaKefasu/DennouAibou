@@ -1522,12 +1522,7 @@ function warnOnConfigMiskeys(raw: unknown, logger: Pick<typeof console, "warn">)
   }
 }
 
-const REMOVED_THINKING_FORMATS = new Set([
-  "openrouter",
-  "zai",
-  "qwen",
-  "qwen-chat-template",
-]);
+const REMOVED_THINKING_FORMATS = new Set(["openrouter", "zai", "qwen", "qwen-chat-template"]);
 
 /**
  * Warns before config validation rejects persisted compat.thinkingFormat values
@@ -1535,10 +1530,7 @@ const REMOVED_THINKING_FORMATS = new Set([
  * (INVALID_CONFIG); this diagnostic is the only place an upgrading operator
  * learns WHY their legacy config no longer validates.
  */
-function warnOnRemovedThinkingFormats(
-  raw: unknown,
-  logger: Pick<typeof console, "warn">,
-): void {
+function warnOnRemovedThinkingFormats(raw: unknown, logger: Pick<typeof console, "warn">): void {
   if (!raw || typeof raw !== "object") {
     return;
   }
@@ -1550,9 +1542,7 @@ function warnOnRemovedThinkingFormats(
   if (!providers || typeof providers !== "object") {
     return;
   }
-  for (const [providerId, providerConfig] of Object.entries(
-    providers as Record<string, unknown>,
-  )) {
+  for (const [providerId, providerConfig] of Object.entries(providers as Record<string, unknown>)) {
     if (!providerConfig || typeof providerConfig !== "object") {
       continue;
     }
@@ -1572,7 +1562,7 @@ function warnOnRemovedThinkingFormats(
       if (typeof thinkingFormat === "string" && REMOVED_THINKING_FORMATS.has(thinkingFormat)) {
         logger.warn(
           `Config (models.providers.${providerId}): model compat.thinkingFormat "${thinkingFormat}" ` +
-            "is no longer supported and will be rejected. Remove or change it to \"openai\".",
+            'is no longer supported and will be rejected. Remove or change it to "openai".',
         );
       }
     }

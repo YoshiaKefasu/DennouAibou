@@ -23,11 +23,7 @@ export {
   synthesizeSpeech,
   textToSpeech,
   textToSpeechTelephony,
-  type ResolvedTtsConfig,
-  type ResolvedTtsModelOverrides,
-  type TtsDirectiveOverrides,
-  type TtsDirectiveParseResult,
-  type TtsResult,
-  type TtsSynthesisResult,
-  type TtsTelephonyResult,
 } from "../plugin-sdk/tts-runtime.js";
+
+// NOTE: Type exports moved to provider-types.ts (speech-core was removed in debloat).
+export type { ResolvedTtsConfig } from "./provider-types.js";

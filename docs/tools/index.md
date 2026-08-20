@@ -155,7 +155,7 @@ Use `group:*` shorthands in allow/deny lists:
 | `group:nodes`      | nodes                                                                                                     |
 | `group:agents`     | agents_list                                                                                               |
 | `group:media`      | image, image_generate, music_generate, video_generate, tts                                                |
-| `group:openclaw`   | All built-in DennouAibou tools (excludes plugin tools)                                                       |
+| `group:openclaw`   | All built-in DennouAibou tools (excludes plugin tools)                                                    |
 
 `sessions_history` returns a bounded, safety-filtered recall view. It strips
 thinking tags, `<relevant-memories>` scaffolding, plain-text tool-call XML

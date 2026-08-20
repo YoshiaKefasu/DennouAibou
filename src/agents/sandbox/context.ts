@@ -5,6 +5,7 @@ import { getRemoteSkillEligibility } from "../../infra/skills-remote.js";
 import {
   ensureBrowserControlAuth,
   resolveBrowserControlAuth,
+  type BrowserControlAuth,
 } from "../../plugin-sdk/browser-control-auth.js";
 import { DEFAULT_BROWSER_EVALUATE_ENABLED } from "../../plugin-sdk/browser-profiles.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -176,10 +177,11 @@ export async function resolveSandboxContext(params: {
         // Sandbox browser bridge server runs on a loopback TCP port; always wire up
         // the same auth that loopback browser clients will send (token/password).
         const cfgForAuth = params.config ?? loadConfig();
-        let browserAuth = resolveBrowserControlAuth(cfgForAuth);
+        let browserAuth: BrowserControlAuth | undefined =
+          await resolveBrowserControlAuth(cfgForAuth);
         try {
           const ensured = await ensureBrowserControlAuth({ cfg: cfgForAuth });
-          browserAuth = ensured.auth;
+          browserAuth = ensured.auth as BrowserControlAuth;
         } catch (error) {
           const message = error instanceof Error ? error.message : JSON.stringify(error);
           defaultRuntime.error?.(`Sandbox browser auth ensure failed: ${message}`);

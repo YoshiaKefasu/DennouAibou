@@ -93,9 +93,8 @@ async function startDennouRuntimeHooksOnce(): Promise<void> {
   try {
     // DennouAibou runtime hooks keep timers/listeners alive, so they belong only to
     // the long-lived gateway process after the server has actually started.
-    const { initSessionMaintenanceHook } = await import(
-      "../../dennou-soul/session-maintenance-hook.js"
-    );
+    const { initSessionMaintenanceHook } =
+      await import("../../dennou-soul/session-maintenance-hook.js");
     initSessionMaintenanceHook();
 
     const { startIdlePruneWatcher } = await import("../../dennou-soul/idle-prune-watcher.js");
@@ -103,9 +102,8 @@ async function startDennouRuntimeHooksOnce(): Promise<void> {
     try {
       const { getDennouConfig } = await import("../../dennou-soul/config.js");
       protection = getDennouConfig().pruneProtection;
-      const { resolveAgentWorkspaceDir, listAgentIds } = await import(
-        "../../agents/agent-scope.js"
-      );
+      const { resolveAgentWorkspaceDir, listAgentIds } =
+        await import("../../agents/agent-scope.js");
       const { getRuntimeConfig } = await import("../../config/config.js");
       const cfg = getRuntimeConfig();
       const wsPaths = listAgentIds(cfg).map((id) => resolveAgentWorkspaceDir(cfg, id));

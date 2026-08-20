@@ -137,10 +137,10 @@ describe("pruneActiveSessionFile", () => {
       makeSessionHeader(),
       makeUserMessage("msg 1"),
       makeAssistantMessage("msg 2"),
-      makeUserMessage("msg 3"),           // index 3, posFromEnd=4 → 保護外
+      makeUserMessage("msg 3"), // index 3, posFromEnd=4 → 保護外
       makeLargeToolResult("x".repeat(150)), // index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(),               // index 5, posFromEnd=2 → 保護
-      makeSmallToolResult(),               // index 6, posFromEnd=1 → 保護
+      makeSmallToolResult(), // index 5, posFromEnd=2 → 保護
+      makeSmallToolResult(), // index 6, posFromEnd=1 → 保護
     ];
     const filePath = writeSessionFile(tempDir, "active-session.jsonl", lines);
 
@@ -187,8 +187,8 @@ describe("pruneActiveSessionFile", () => {
       makeUserMessage("msg 1"),
       makeAssistantMessage("msg 2"),
       makeLargeToolResult("x".repeat(150)), // 保護外 → prune対象
-      makeSmallToolResult(),               // 保護
-      makeAssistantMessage("end"),          // 保護
+      makeSmallToolResult(), // 保護
+      makeAssistantMessage("end"), // 保護
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -208,8 +208,8 @@ describe("pruneActiveSessionFile", () => {
       "this is not json",
       makeUserMessage("padding"),
       makeLargeToolResult("x".repeat(150)), // index 3, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(),               // 保護
-      makeAssistantMessage("end"),          // 保護
+      makeSmallToolResult(), // 保護
+      makeAssistantMessage("end"), // 保護
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -242,17 +242,18 @@ describe("pruneActiveSessionFile", () => {
   });
 
   it("handles file disappearance before write", () => {
-    const lines = [
-      makeSessionHeader(),
-      makeLargeToolResult("x".repeat(150)),
-    ];
+    const lines = [makeSessionHeader(), makeLargeToolResult("x".repeat(150))];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
     const cfg = { ...defaultConfig, minPrunableToolChars: 1 };
     const pruned = pruneActiveSessionFile(filePath, cfg, (msg) => {
       // 1回目のlogger呼び出し（読み取り後）でファイルを削除
       if (logs.length === 0) {
-        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(filePath);
+        } catch {
+          /* ignore */
+        }
       }
       logs.push(msg);
     });
@@ -270,8 +271,8 @@ describe("pruneActiveSessionFile", () => {
       makeAssistantMessage("pad"),
       makeUserMessage("pad2"),
       makeLargeToolResult("x".repeat(150)), // 保護外（totalLines=5, keepLastTools=2）
-      makeSmallToolResult(),               // 保護
-      makeAssistantMessage("end"),          // 保護
+      makeSmallToolResult(), // 保護
+      makeAssistantMessage("end"), // 保護
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 

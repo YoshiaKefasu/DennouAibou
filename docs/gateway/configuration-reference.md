@@ -1785,13 +1785,13 @@ Resolution (most specific wins): account → channel → global. `""` disables a
 
 **Template variables:**
 
-| Variable          | Description            | Example                     |
-| ----------------- | ---------------------- | --------------------------- |
-| `{model}`         | Short model name       | `claude-opus-4-6`           |
-| `{modelFull}`     | Full model identifier  | `openai/gpt-5.4`            |
-| `{provider}`      | Provider name          | `openai`                    |
-| `{thinkingLevel}` | Current thinking level | `high`, `low`, `off`        |
-| `{identity.name}` | Agent identity name    | (same as `"auto"`)          |
+| Variable          | Description            | Example              |
+| ----------------- | ---------------------- | -------------------- |
+| `{model}`         | Short model name       | `claude-opus-4-6`    |
+| `{modelFull}`     | Full model identifier  | `openai/gpt-5.4`     |
+| `{provider}`      | Provider name          | `openai`             |
+| `{thinkingLevel}` | Current thinking level | `high`, `low`, `off` |
+| `{identity.name}` | Agent identity name    | (same as `"auto"`)   |
 
 Variables are case-insensitive. `{think}` is an alias for `{thinkingLevel}`.
 

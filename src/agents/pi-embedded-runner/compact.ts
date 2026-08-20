@@ -65,8 +65,8 @@ import {
   consumeCompactionSafeguardCancelReason,
   setCompactionSafeguardCancelReason,
 } from "../pi-hooks/compaction-safeguard-runtime.js";
-import { applyPiCompactionSettingsFromConfig } from "../pi-settings.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
+import { applyPiCompactionSettingsFromConfig } from "../pi-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import { registerProviderStreamForModel } from "../provider-stream.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";

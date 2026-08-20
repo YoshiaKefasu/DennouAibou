@@ -1,8 +1,8 @@
 import { codingTools, createReadTool, readTool } from "@mariozechner/pi-coding-agent";
 import type { OpenClawConfig } from "../config/config.js";
-import { createChatSearchTool } from "../dennou-soul/raw-chat/tool.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
+import { createChatSearchTool } from "../dennou-soul/raw-chat/tool.js";
 import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runtime-policy.js";
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
@@ -600,10 +600,12 @@ export function createOpenClawCodingTools(options?: {
       config: options?.config,
       agentSessionKey: options?.sessionKey,
     })
-      ? [createChatSearchTool({
-          config: options?.config,
-          agentSessionKey: options?.sessionKey,
-        })!]
+      ? [
+          createChatSearchTool({
+            config: options?.config,
+            agentSessionKey: options?.sessionKey,
+          })!,
+        ]
       : []),
   ];
   const toolsForMemoryFlush =

@@ -145,9 +145,7 @@ export function extractHookToken(req: IncomingMessage): string | undefined {
     }
   }
   const headerToken =
-    typeof req.headers["x-dennou-token"] === "string"
-      ? req.headers["x-dennou-token"].trim()
-      : "";
+    typeof req.headers["x-dennou-token"] === "string" ? req.headers["x-dennou-token"].trim() : "";
   if (headerToken) {
     return headerToken;
   }

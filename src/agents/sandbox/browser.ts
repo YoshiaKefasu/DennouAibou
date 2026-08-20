@@ -309,7 +309,9 @@ export async function ensureSandboxBrowser(params: {
   }
 
   const shouldReuse =
-    existing && existing.containerName === containerName && existingProfile?.cdpPort === mappedCdp;
+    existing &&
+    existing.containerName === containerName &&
+    (existingProfile as Record<string, unknown> | null)?.cdpPort === mappedCdp;
   const authMatches =
     !existing ||
     (existing.authToken === desiredAuthToken && existing.authPassword === desiredAuthPassword);

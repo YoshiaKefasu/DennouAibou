@@ -462,12 +462,12 @@ status output.
 
 `streamable-http` is an additional transport option alongside `sse` and `stdio`. It uses HTTP streaming for bidirectional communication with remote MCP servers.
 
-| Field                 | Description                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------- |
-| `url`                 | HTTP or HTTPS URL of the remote server (required)                                      |
+| Field                 | Description                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `url`                 | HTTP or HTTPS URL of the remote server (required)                                         |
 | `transport`           | Set to `"streamable-http"` to select this transport; when omitted, DennouAibou uses `sse` |
-| `headers`             | Optional key-value map of HTTP headers (for example auth tokens)                       |
-| `connectionTimeoutMs` | Per-server connection timeout in ms (optional)                                         |
+| `headers`             | Optional key-value map of HTTP headers (for example auth tokens)                          |
+| `connectionTimeoutMs` | Per-server connection timeout in ms (optional)                                            |
 
 Example:
 

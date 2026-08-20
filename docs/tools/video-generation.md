@@ -50,10 +50,10 @@ Outside of session-backed agent runs (for example, direct tool invocations), the
 
 ## Supported providers
 
-| Provider | Default model                   | Text | Image ref        | Video ref        | API key                                  |
-| -------- | ------------------------------- | ---- | ---------------- | ---------------- | ---------------------------------------- |
-| Google   | `veo-3.1-fast-generate-preview` | Yes  | 1 image          | 1 video          | `GEMINI_API_KEY`                         |
-| OpenAI   | `sora-2`                        | Yes  | 1 image          | 1 video          | `OPENAI_API_KEY`                         |
+| Provider | Default model                   | Text | Image ref | Video ref | API key          |
+| -------- | ------------------------------- | ---- | --------- | --------- | ---------------- |
+| Google   | `veo-3.1-fast-generate-preview` | Yes  | 1 image   | 1 video   | `GEMINI_API_KEY` |
+| OpenAI   | `sora-2`                        | Yes  | 1 image   | 1 video   | `OPENAI_API_KEY` |
 
 Some providers accept additional or alternate API key env vars. See individual [provider pages](#related) for details.
 
@@ -89,11 +89,11 @@ Run `video_generate action=list` to inspect available providers and models at ru
 
 ### Advanced
 
-| Parameter  | Type   | Description                                     |
-| ---------- | ------ | ----------------------------------------------- |
-| `action`   | string | `"generate"` (default), `"status"`, or `"list"` |
+| Parameter  | Type   | Description                                                           |
+| ---------- | ------ | --------------------------------------------------------------------- |
+| `action`   | string | `"generate"` (default), `"status"`, or `"list"`                       |
 | `model`    | string | Provider/model override (e.g. `google/veo-3.1-fast-generate-preview`) |
-| `filename` | string | Output filename hint                            |
+| `filename` | string | Output filename hint                                                  |
 
 Not all providers support all parameters. Unsupported overrides are ignored on a best-effort basis and reported as warnings in the tool result. Hard capability limits (such as too many reference inputs) fail before submission.
 

@@ -20,10 +20,7 @@ import {
   resolveStorePath,
   type SessionEntry,
 } from "../../config/sessions.js";
-import {
-  normalizeAgentId,
-  normalizeMainKey,
-} from "../../routing/session-key.js";
+import { normalizeAgentId, normalizeMainKey } from "../../routing/session-key.js";
 import { resolveSessionIdMatchSelection } from "../../sessions/session-id-resolution.js";
 import { listAgentIds } from "../agent-scope.js";
 import { clearBootstrapSnapshotOnSessionRollover } from "../bootstrap-cache.js";
@@ -51,10 +48,7 @@ type SessionIdMatchSet = {
   storeByKey: Map<string, SessionKeyResolution>;
 };
 
-function buildExplicitSessionIdSessionKey(params: {
-  sessionId: string;
-  agentId?: string;
-}): string {
+function buildExplicitSessionIdSessionKey(params: { sessionId: string; agentId?: string }): string {
   return `agent:${normalizeAgentId(params.agentId)}:explicit:${params.sessionId.trim()}`;
 }
 
@@ -74,9 +68,7 @@ function collectSessionIdMatchesForRequest(opts: {
     candidateStorePath: string,
     options?: { primary?: boolean },
   ): void => {
-    for (const [candidateKey, candidateEntry] of Object.entries(
-      candidateStore,
-    )) {
+    for (const [candidateKey, candidateEntry] of Object.entries(candidateStore)) {
       if (candidateEntry?.sessionId !== opts.sessionId) {
         continue;
       }
@@ -117,9 +109,7 @@ export function resolveStoredSessionKeyForSessionId(opts: {
   agentId?: string;
 }): SessionKeyResolution {
   const sessionId = opts.sessionId.trim();
-  const storeAgentId = opts.agentId?.trim()
-    ? normalizeAgentId(opts.agentId)
-    : undefined;
+  const storeAgentId = opts.agentId?.trim() ? normalizeAgentId(opts.agentId) : undefined;
   const storePath = resolveStorePath(opts.cfg.session?.store, {
     agentId: storeAgentId,
   });
@@ -129,14 +119,11 @@ export function resolveStoredSessionKeyForSessionId(opts: {
   }
 
   const selection = resolveSessionIdMatchSelection(
-    Object.entries(sessionStore).filter(
-      ([, entry]) => entry?.sessionId === sessionId,
-    ),
+    Object.entries(sessionStore).filter(([, entry]) => entry?.sessionId === sessionId),
     sessionId,
   );
   return {
-    sessionKey:
-      selection.kind === "selected" ? selection.sessionKey : undefined,
+    sessionKey: selection.kind === "selected" ? selection.sessionKey : undefined,
     sessionStore,
     storePath,
   };
@@ -164,12 +151,9 @@ export function resolveSessionKeyForRequest(opts: {
   });
   const sessionStore = loadSessionStore(storePath);
 
-  const ctx: MsgContext | undefined = opts.to?.trim()
-    ? { From: opts.to }
-    : undefined;
+  const ctx: MsgContext | undefined = opts.to?.trim() ? { From: opts.to } : undefined;
   let sessionKey: string | undefined =
-    explicitSessionKey ??
-    (ctx ? resolveSessionKey(scope, ctx, mainKey) : undefined);
+    explicitSessionKey ?? (ctx ? resolveSessionKey(scope, ctx, mainKey) : undefined);
 
   // If a session id was provided, prefer to re-use its existing entry (by id) even when no key was
   // derived. When duplicates exist across agent stores, pick the same deterministic best match used
@@ -180,18 +164,14 @@ export function resolveSessionKeyForRequest(opts: {
     !explicitSessionKey &&
     (!sessionKey || sessionStore[sessionKey]?.sessionId !== opts.sessionId)
   ) {
-    const { matches, primaryStoreMatches, storeByKey } =
-      collectSessionIdMatchesForRequest({
-        cfg: opts.cfg,
-        sessionStore,
-        storePath,
-        storeAgentId,
-        sessionId: opts.sessionId,
-      });
-    const preferredSelection = resolveSessionIdMatchSelection(
-      matches,
-      opts.sessionId,
-    );
+    const { matches, primaryStoreMatches, storeByKey } = collectSessionIdMatchesForRequest({
+      cfg: opts.cfg,
+      sessionStore,
+      storePath,
+      storeAgentId,
+      sessionId: opts.sessionId,
+    });
+    const preferredSelection = resolveSessionIdMatchSelection(matches, opts.sessionId);
     const currentStoreSelection =
       preferredSelection.kind === "selected"
         ? preferredSelection
@@ -237,10 +217,7 @@ export function resolveSession(opts: {
   const resetType = resolveSessionResetType({ sessionKey });
   const channelReset = resolveChannelResetConfig({
     sessionCfg,
-    channel:
-      sessionEntry?.lastChannel ??
-      sessionEntry?.channel ??
-      sessionEntry?.origin?.provider,
+    channel: sessionEntry?.lastChannel ?? sessionEntry?.channel ?? sessionEntry?.origin?.provider,
   });
   const resetPolicy = resolveProtectedSessionResetPolicy({
     policy: resolveSessionResetPolicy({
@@ -259,9 +236,7 @@ export function resolveSession(opts: {
       }).fresh
     : false;
   const sessionId =
-    opts.sessionId?.trim() ||
-    (fresh ? sessionEntry?.sessionId : undefined) ||
-    crypto.randomUUID();
+    opts.sessionId?.trim() || (fresh ? sessionEntry?.sessionId : undefined) || crypto.randomUUID();
   const isNewSession = !fresh && !opts.sessionId;
 
   clearBootstrapSnapshotOnSessionRollover({

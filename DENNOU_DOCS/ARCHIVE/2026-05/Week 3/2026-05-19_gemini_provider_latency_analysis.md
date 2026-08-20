@@ -59,6 +59,7 @@ hostname + resolved IPs のMapを保持する。
 ### #3: ツールスキーマの二重クリーニング
 
 **ファイル:**
+
 - `src/agents/pi-tools.ts:662` — `normalizeToolParameters()` → `cleanSchemaForGemini()`
 - `src/agents/pi-embedded-runner/run/attempt.ts:552` — `normalizeProviderToolSchemas()` → 再度 `cleanSchemaForGemini()`
 - `src/plugin-sdk/provider-tools.ts:141` — `normalizeGeminiToolSchemas()` → さらに `cleanSchemaForGemini()`
@@ -83,6 +84,7 @@ hostname + resolved IPs のMapを保持する。
 **タグ:** `[SYNC]`
 
 毎APIリクエストでセッション履歴の全メッセージを走査し、各コンテンツブロックに対して:
+
 - `sanitizeTransportPayloadText()` の正規表現実行
 - プロバイダ/モデル同一性のチェック
 - toolResult → functionResponse 変換
@@ -114,6 +116,7 @@ hostname + resolved IPs のMapを保持する。
 ### #6: メッセージ変換の二重走査
 
 **ファイル:**
+
 - `src/agents/transport-message-transform.ts:3-131`（`transformTransportMessages()`）
 - `src/agents/google-transport-stream.ts:276-409`（`convertGoogleMessages()`）
 
@@ -136,6 +139,7 @@ hostname + resolved IPs のMapを保持する。
 **ファイル:** `src/agents/pi-embedded-runner/run/attempt.ts:1190-1251`
 
 Gemini でも5層のラッパーを通過:
+
 1. yield チェック
 2. `wrapStreamFnSanitizeMalformedToolCalls`
 3. `wrapStreamFnTrimToolCallNames`
@@ -189,14 +193,14 @@ Google Prompt Cache のキー生成に使用。小さなオブジェクトなの
 
 ## まとめ
 
-| 順位 | ボトルネック | 効果 | タグ |
-|------|-------------|------|------|
-| 1 | 毎回DNS解決（SSRFガード） | 🔴 高 | [SYNC] |
-| 2 | コネクション使い捨て（keep-alive無効） | 🔴 高 | [SYNC] |
-| 3 | ツールスキーマ二重クリーニング | 🟡 中 | [SYNC] |
-| 4 | 全メッセージ履歴逐次変換 | 🟡 中 | [SYNC] |
-| 5 | Prompt Cache 事前API呼び出し | 🟡 中 | [SYNC] |
-| 6 | メッセージ変換二重走査 | 🟢 低〜中 | [SYNC] |
+| 順位 | ボトルネック                           | 効果      | タグ   |
+| ---- | -------------------------------------- | --------- | ------ |
+| 1    | 毎回DNS解決（SSRFガード）              | 🔴 高     | [SYNC] |
+| 2    | コネクション使い捨て（keep-alive無効） | 🔴 高     | [SYNC] |
+| 3    | ツールスキーマ二重クリーニング         | 🟡 中     | [SYNC] |
+| 4    | 全メッセージ履歴逐次変換               | 🟡 中     | [SYNC] |
+| 5    | Prompt Cache 事前API呼び出し           | 🟡 中     | [SYNC] |
+| 6    | メッセージ変換二重走査                 | 🟢 低〜中 | [SYNC] |
 
 **体感レイテンシの8割は #1 と #2（トランスポート層）で説明できる。**
 どちらもSSRFガードが原因。信頼できるAPIホスト（Gemini等）へのリクエストで

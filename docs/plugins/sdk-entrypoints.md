@@ -43,14 +43,14 @@ export default definePluginEntry({
 });
 ```
 
-| Field          | Type                                                             | Required | Default             |
-| -------------- | ---------------------------------------------------------------- | -------- | ------------------- |
-| `id`           | `string`                                                         | Yes      | —                   |
-| `name`         | `string`                                                         | Yes      | —                   |
-| `description`  | `string`                                                         | Yes      | —                   |
-| `kind`         | `string`                                                         | No       | —                   |
+| Field          | Type                                                                   | Required | Default             |
+| -------------- | ---------------------------------------------------------------------- | -------- | ------------------- |
+| `id`           | `string`                                                               | Yes      | —                   |
+| `name`         | `string`                                                               | Yes      | —                   |
+| `description`  | `string`                                                               | Yes      | —                   |
+| `kind`         | `string`                                                               | No       | —                   |
 | `configSchema` | `DennouAibouPluginConfigSchema \| () => DennouAibouPluginConfigSchema` | No       | Empty object schema |
-| `register`     | `(api: DennouAibouPluginApi) => void`                               | Yes      | —                   |
+| `register`     | `(api: DennouAibouPluginApi) => void`                                  | Yes      | —                   |
 
 - `id` must match your `openclaw.plugin.json` manifest.
 - `kind` is for exclusive slots: `"memory"` or `"context-engine"`.
@@ -84,16 +84,16 @@ export default defineChannelPluginEntry({
 });
 ```
 
-| Field                 | Type                                                             | Required | Default             |
-| --------------------- | ---------------------------------------------------------------- | -------- | ------------------- |
-| `id`                  | `string`                                                         | Yes      | —                   |
-| `name`                | `string`                                                         | Yes      | —                   |
-| `description`         | `string`                                                         | Yes      | —                   |
-| `plugin`              | `ChannelPlugin`                                                  | Yes      | —                   |
+| Field                 | Type                                                                   | Required | Default             |
+| --------------------- | ---------------------------------------------------------------------- | -------- | ------------------- |
+| `id`                  | `string`                                                               | Yes      | —                   |
+| `name`                | `string`                                                               | Yes      | —                   |
+| `description`         | `string`                                                               | Yes      | —                   |
+| `plugin`              | `ChannelPlugin`                                                        | Yes      | —                   |
 | `configSchema`        | `DennouAibouPluginConfigSchema \| () => DennouAibouPluginConfigSchema` | No       | Empty object schema |
-| `setRuntime`          | `(runtime: PluginRuntime) => void`                               | No       | —                   |
-| `registerCliMetadata` | `(api: DennouAibouPluginApi) => void`                               | No       | —                   |
-| `registerFull`        | `(api: DennouAibouPluginApi) => void`                               | No       | —                   |
+| `setRuntime`          | `(runtime: PluginRuntime) => void`                                     | No       | —                   |
+| `registerCliMetadata` | `(api: DennouAibouPluginApi) => void`                                  | No       | —                   |
+| `registerFull`        | `(api: DennouAibouPluginApi) => void`                                  | No       | —                   |
 
 - `setRuntime` is called during registration so you can store the runtime reference
   (typically via `createPluginRuntimeStore`). It is skipped during CLI metadata

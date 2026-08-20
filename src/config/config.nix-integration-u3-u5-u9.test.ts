@@ -211,19 +211,13 @@ describe("Nix integration (U3, U5, U9)", () => {
 
     it("prefers DENNOU_GATEWAY_PORT over config", () => {
       expect(
-        resolveGatewayPort(
-          { gateway: { port: 19002 } },
-          envWith({ DENNOU_GATEWAY_PORT: "19001" }),
-        ),
+        resolveGatewayPort({ gateway: { port: 19002 } }, envWith({ DENNOU_GATEWAY_PORT: "19001" })),
       ).toBe(19001);
     });
 
     it("falls back to config when env is invalid", () => {
       expect(
-        resolveGatewayPort(
-          { gateway: { port: 19003 } },
-          envWith({ DENNOU_GATEWAY_PORT: "nope" }),
-        ),
+        resolveGatewayPort({ gateway: { port: 19003 } }, envWith({ DENNOU_GATEWAY_PORT: "nope" })),
       ).toBe(19003);
     });
   });

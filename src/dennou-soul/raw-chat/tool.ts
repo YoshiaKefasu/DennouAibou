@@ -6,10 +6,10 @@ import {
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
 import { resolveSessionAgentId } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
-import type { RawChatClient, SearchParams } from "./sidecar-client.js";
-import { getRawChatClient } from "./client-ref.js";
 import { textResult } from "../../agents/tools/common.js";
+import { getRawChatClient } from "./client-ref.js";
 import { isRawChatIndexingEnabled } from "./hook.js";
+import type { RawChatClient, SearchParams } from "./sidecar-client.js";
 
 /**
  * chat_search tool — searches the raw chat permanent DB via Go sidecar RPC.
@@ -23,7 +23,9 @@ export const ChatSearchSchema = Type.Object({
   from: Type.Optional(Type.String({ description: "Start time (ISO 8601)" })),
   to: Type.Optional(Type.String({ description: "End time (ISO 8601)" })),
   date: Type.Optional(Type.String({ description: "Date filter (YYYY-MM-DD)" })),
-  messageId: Type.Optional(Type.String({ description: "Show surrounding context for this message ID" })),
+  messageId: Type.Optional(
+    Type.String({ description: "Show surrounding context for this message ID" }),
+  ),
   role: Type.Optional(Type.String({ description: "Filter by role: user or assistant" })),
   channel: Type.Optional(Type.String({ description: "Filter by channel" })),
   limit: Type.Optional(Type.Number({ description: "Max results (default 20, max 100)" })),
@@ -59,14 +61,14 @@ export function createChatSearchTool(options: {
     execute: async (_toolCallId, params) => {
       const client = getRawChatClient();
       if (!client) {
-          return textResult(
-            JSON.stringify({
-              results: [],
-              error: "Raw chat sidecar is not available.",
-              hint: "The Go sidecar may not be running. Indexing is disabled until it starts.",
-            }),
-            undefined,
-          );
+        return textResult(
+          JSON.stringify({
+            results: [],
+            error: "Raw chat sidecar is not available.",
+            hint: "The Go sidecar may not be running. Indexing is disabled until it starts.",
+          }),
+          undefined,
+        );
       }
 
       const searchParams: SearchParams = {

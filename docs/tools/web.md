@@ -77,15 +77,15 @@ provider.
 
 ### Provider comparison
 
-| Provider                                  | Result style               | Filters                                          | API key                                                                          |
-| ----------------------------------------- | -------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [Brave](/tools/brave-search)              | Structured snippets        | Country, language, time, `llm-context` mode      | `BRAVE_API_KEY`                                                                  |
-| [DuckDuckGo](/tools/duckduckgo-search)    | Structured snippets        | --                                               | None (key-free)                                                                  |
-| [Exa](/tools/exa-search)                  | Structured + extracted     | Neural/keyword mode, date, content extraction    | `EXA_API_KEY`                                                                    |
-| [Firecrawl](/tools/firecrawl)             | Structured snippets        | Via `firecrawl_search` tool                      | `FIRECRAWL_API_KEY`                                                              |
-| [Gemini](/tools/gemini-search)            | AI-synthesized + citations | --                                               | `GEMINI_API_KEY`                                                                 |
-| [SearXNG](/tools/searxng-search)          | Structured snippets        | Categories, language                             | None (self-hosted)                                                               |
-| [Tavily](/tools/tavily)                   | Structured snippets        | Via `tavily_search` tool                         | `TAVILY_API_KEY`                                                                 |
+| Provider                               | Result style               | Filters                                       | API key             |
+| -------------------------------------- | -------------------------- | --------------------------------------------- | ------------------- |
+| [Brave](/tools/brave-search)           | Structured snippets        | Country, language, time, `llm-context` mode   | `BRAVE_API_KEY`     |
+| [DuckDuckGo](/tools/duckduckgo-search) | Structured snippets        | --                                            | None (key-free)     |
+| [Exa](/tools/exa-search)               | Structured + extracted     | Neural/keyword mode, date, content extraction | `EXA_API_KEY`       |
+| [Firecrawl](/tools/firecrawl)          | Structured snippets        | Via `firecrawl_search` tool                   | `FIRECRAWL_API_KEY` |
+| [Gemini](/tools/gemini-search)         | AI-synthesized + citations | --                                            | `GEMINI_API_KEY`    |
+| [SearXNG](/tools/searxng-search)       | Structured snippets        | Categories, language                          | None (self-hosted)  |
+| [Tavily](/tools/tavily)                | Structured snippets        | Via `tavily_search` tool                      | `TAVILY_API_KEY`    |
 
 ## Auto-detection
 
@@ -222,17 +222,17 @@ examples.
 
 ## Tool parameters
 
-| Parameter             | Description                                           |
-| --------------------- | ----------------------------------------------------- |
-| `query`               | Search query (required)                               |
-| `count`               | Results to return (1-10, default: 5)                  |
-| `country`             | 2-letter ISO country code (e.g. "US", "DE")           |
-| `language`            | ISO 639-1 language code (e.g. "en", "de")             |
-| `search_lang`         | Search-language code (Brave only)                     |
-| `freshness`           | Time filter: `day`, `week`, `month`, or `year`        |
-| `date_after`          | Results after this date (YYYY-MM-DD)                  |
-| `date_before`         | Results before this date (YYYY-MM-DD)                 |
-| `ui_lang`             | UI language code (Brave only)                         |
+| Parameter     | Description                                    |
+| ------------- | ---------------------------------------------- |
+| `query`       | Search query (required)                        |
+| `count`       | Results to return (1-10, default: 5)           |
+| `country`     | 2-letter ISO country code (e.g. "US", "DE")    |
+| `language`    | ISO 639-1 language code (e.g. "en", "de")      |
+| `search_lang` | Search-language code (Brave only)              |
+| `freshness`   | Time filter: `day`, `week`, `month`, or `year` |
+| `date_after`  | Results after this date (YYYY-MM-DD)           |
+| `date_before` | Results before this date (YYYY-MM-DD)          |
+| `ui_lang`     | UI language code (Brave only)                  |
 
 <Warning>
   Not all parameters work with all providers. Brave `llm-context` mode
