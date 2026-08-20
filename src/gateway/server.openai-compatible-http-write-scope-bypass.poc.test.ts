@@ -35,7 +35,7 @@ describe("gateway OpenAI-compatible HTTP shared-secret auth", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.approvals",
+          "x-dennou-scopes": "operator.approvals",
         },
         body: JSON.stringify({
           model: "openclaw",
@@ -92,7 +92,7 @@ describe("gateway OpenAI-compatible HTTP shared-secret auth", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.write",
+          "x-dennou-scopes": "operator.write",
         },
         body: JSON.stringify({
           model: "openclaw",
@@ -134,7 +134,7 @@ describe("gateway OpenAI-compatible HTTP shared-secret auth", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.approvals",
+          "x-dennou-scopes": "operator.approvals",
         },
         body: JSON.stringify({
           stream: false,
@@ -174,7 +174,7 @@ describe("gateway OpenAI-compatible HTTP shared-secret auth", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.write",
+          "x-dennou-scopes": "operator.write",
         },
         body: JSON.stringify({
           stream: false,

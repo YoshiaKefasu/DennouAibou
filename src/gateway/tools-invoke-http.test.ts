@@ -266,8 +266,8 @@ beforeEach(() => {
   vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({ ok: true });
 });
 
-const gatewayAuthHeaders = () => ({ "x-openclaw-scopes": "operator.write" });
-const gatewayAdminHeaders = () => ({ "x-openclaw-scopes": "operator.admin" });
+const gatewayAuthHeaders = () => ({ "x-dennou-scopes": "operator.write" });
+const gatewayAdminHeaders = () => ({ "x-dennou-scopes": "operator.admin" });
 
 const allowAgentsListForMain = () => {
   cfg = {
@@ -599,8 +599,8 @@ describe("POST /tools/invoke", () => {
       port: sharedPort,
       headers: {
         ...gatewayAuthHeaders(),
-        "x-openclaw-message-to": "channel:24514",
-        "x-openclaw-thread-id": "thread-24514",
+        "x-dennou-message-to": "channel:24514",
+        "x-dennou-thread-id": "thread-24514",
       },
       tool: "sessions_spawn",
       sessionKey: "main",
@@ -762,7 +762,7 @@ describe("POST /tools/invoke", () => {
     const res = await invokeTool({
       port: sharedPort,
       headers: {
-        "x-openclaw-scopes": "",
+        "x-dennou-scopes": "",
       },
       tool: "agents_list",
       sessionKey: "main",
@@ -833,7 +833,7 @@ describe("POST /tools/invoke", () => {
       port: sharedPort,
       headers: {
         authorization: "Bearer secret",
-        "x-openclaw-scopes": "operator.approvals",
+        "x-dennou-scopes": "operator.approvals",
       },
       tool: "owner_only_test",
       sessionKey: "main",

@@ -87,9 +87,9 @@ export function createMcpLoopbackServerConfig(port: number) {
         headers: {
           Authorization: "Bearer ${DENNOU_MCP_TOKEN}",
           "x-session-key": "${DENNOU_MCP_SESSION_KEY}",
-          "x-openclaw-agent-id": "${DENNOU_MCP_AGENT_ID}",
-          "x-openclaw-account-id": "${DENNOU_MCP_ACCOUNT_ID}",
-          "x-openclaw-message-channel": "${DENNOU_MCP_MESSAGE_CHANNEL}",
+          "x-dennou-agent-id": "${DENNOU_MCP_AGENT_ID}",
+          "x-dennou-account-id": "${DENNOU_MCP_ACCOUNT_ID}",
+          "x-dennou-message-channel": "${DENNOU_MCP_MESSAGE_CHANNEL}",
         },
       },
     },

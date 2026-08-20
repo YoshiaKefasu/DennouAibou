@@ -62,8 +62,8 @@ const QMD_EMBED_LOCK_RETRY_TEMPLATE = {
   maxTimeout: 10_000,
   randomize: true,
 } as const;
-const MCPORTER_STATE_KEY = Symbol.for("openclaw.mcporterState");
-const QMD_EMBED_QUEUE_KEY = Symbol.for("openclaw.qmdEmbedQueueTail");
+const MCPORTER_STATE_KEY = Symbol.for("dennou.mcporterState");
+const QMD_EMBED_QUEUE_KEY = Symbol.for("dennou.qmdEmbedQueueTail");
 const IGNORED_MEMORY_WATCH_DIR_NAMES = new Set([
   ".git",
   "node_modules",

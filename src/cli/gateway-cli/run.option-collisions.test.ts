@@ -26,7 +26,7 @@ const configState = vi.hoisted(() => ({
   snapshot: { exists: false } as Record<string, unknown>,
 }));
 const controlUiState = vi.hoisted(() => ({
-  root: "/tmp/openclaw-control-ui" as string | null,
+  root: "/tmp/dennou-control-ui" as string | null,
 }));
 
 const { runtimeErrors, defaultRuntime, resetRuntimeCapture } = createCliRuntimeCapture();
@@ -142,7 +142,7 @@ describe("gateway run option collisions", () => {
     resetRuntimeCapture();
     configState.cfg = {};
     configState.snapshot = { exists: false };
-    controlUiState.root = "/tmp/openclaw-control-ui";
+    controlUiState.root = "/tmp/dennou-control-ui";
     gatewayLogMessages.length = 0;
     startGatewayServer.mockClear();
     setGatewayWsLogStyle.mockClear();

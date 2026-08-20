@@ -411,7 +411,7 @@ function resolveNativeOpenAISessionHeaders(params: {
   }
   return {
     "x-client-request-id": sessionId,
-    "x-openclaw-session-id": sessionId,
+    "x-dennou-session-id": sessionId,
   };
 }
 
@@ -436,11 +436,11 @@ function resolveNativeOpenAITransportTurnState(params: {
   return {
     headers: {
       ...sessionHeaders,
-      "x-openclaw-turn-id": turnId,
-      "x-openclaw-turn-attempt": attempt,
+      "x-dennou-turn-id": turnId,
+      "x-dennou-turn-attempt": attempt,
     },
     metadata: {
-      DENNOU_session_id: sessionHeaders["x-openclaw-session-id"] ?? "",
+      DENNOU_session_id: sessionHeaders["x-dennou-session-id"] ?? "",
       DENNOU_turn_id: turnId,
       DENNOU_turn_attempt: attempt,
       DENNOU_transport: params.transport,

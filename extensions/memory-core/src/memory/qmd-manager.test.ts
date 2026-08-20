@@ -25,8 +25,8 @@ const { withFileLockMock } = vi.hoisted(() => ({
     async <T>(_filePath: string, _options: unknown, fn: () => Promise<T>) => await fn(),
   ),
 }));
-const MCPORTER_STATE_KEY = Symbol.for("openclaw.mcporterState");
-const QMD_EMBED_QUEUE_KEY = Symbol.for("openclaw.qmdEmbedQueueTail");
+const MCPORTER_STATE_KEY = Symbol.for("dennou.mcporterState");
+const QMD_EMBED_QUEUE_KEY = Symbol.for("dennou.qmdEmbedQueueTail");
 
 type MockChild = EventEmitter & {
   stdout: EventEmitter;

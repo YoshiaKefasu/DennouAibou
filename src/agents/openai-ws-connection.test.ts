@@ -256,7 +256,7 @@ describe("OpenAIWebSocketManager", () => {
       const manager = buildManager({
         headers: {
           "x-client-request-id": "session-123",
-          "x-openclaw-session-id": "session-123",
+          "x-dennou-session-id": "session-123",
         },
       });
       const connectPromise = manager.connect("sk-test-key");
@@ -265,7 +265,7 @@ describe("OpenAIWebSocketManager", () => {
       expect(sock.options).toMatchObject({
         headers: expect.objectContaining({
           "x-client-request-id": "session-123",
-          "x-openclaw-session-id": "session-123",
+          "x-dennou-session-id": "session-123",
         }),
       });
 

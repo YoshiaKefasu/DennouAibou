@@ -36,7 +36,7 @@ const FTS_TABLE = "chunks_fts";
 const EMBEDDING_CACHE_TABLE = "embedding_cache";
 const BATCH_FAILURE_LIMIT = 2;
 
-const MEMORY_INDEX_MANAGER_CACHE_KEY = Symbol.for("openclaw.memoryIndexManagerCache");
+const MEMORY_INDEX_MANAGER_CACHE_KEY = Symbol.for("dennou.memoryIndexManagerCache");
 type MemoryIndexManagerCacheStore = {
   indexCache: Map<string, MemoryIndexManager>;
   indexCachePending: Map<string, Promise<MemoryIndexManager>>;

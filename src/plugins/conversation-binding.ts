@@ -106,7 +106,7 @@ type PluginBindingResolveResult =
       status: "expired";
     };
 
-const PLUGIN_BINDING_PENDING_REQUESTS_KEY = Symbol.for("openclaw.pluginBindingPendingRequests");
+const PLUGIN_BINDING_PENDING_REQUESTS_KEY = Symbol.for("dennou.pluginBindingPendingRequests");
 
 const pendingRequests = resolveGlobalMap<string, PendingPluginBindingRequest>(
   PLUGIN_BINDING_PENDING_REQUESTS_KEY,
@@ -118,7 +118,7 @@ type PluginBindingGlobalState = {
   approvalsLoaded: boolean;
 };
 
-const pluginBindingGlobalStateKey = Symbol.for("openclaw.plugins.binding.global-state");
+const pluginBindingGlobalStateKey = Symbol.for("dennou.plugins.binding.global-state");
 const pluginBindingGlobalState = resolveGlobalSingleton<PluginBindingGlobalState>(
   pluginBindingGlobalStateKey,
   () => ({

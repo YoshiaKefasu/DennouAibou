@@ -135,7 +135,7 @@ export function resolveTrustedHttpOperatorScopes(
     return [];
   }
 
-  const headerValue = getHeader(req, "x-openclaw-scopes");
+  const headerValue = getHeader(req, "x-dennou-scopes");
   if (headerValue === undefined) {
     // No scope header present — trusted clients without an explicit header
     // get the default operator scopes (matching pre-#57783 behavior).
@@ -190,8 +190,8 @@ export function resolveOpenAiCompatibleHttpSenderIsOwner(
 
 export function resolveAgentIdFromHeader(req: IncomingMessage): string | undefined {
   const raw =
-    getHeader(req, "x-openclaw-agent-id")?.trim() ||
-    getHeader(req, "x-openclaw-agent")?.trim() ||
+    getHeader(req, "x-dennou-agent-id")?.trim() ||
+    getHeader(req, "x-dennou-agent")?.trim() ||
     "";
   if (!raw) {
     return undefined;
@@ -234,7 +234,7 @@ export async function resolveOpenAiCompatModelOverride(params: {
     };
   }
 
-  const raw = getHeader(params.req, "x-openclaw-model")?.trim();
+  const raw = getHeader(params.req, "x-dennou-model")?.trim();
   if (!raw) {
     return {};
   }
@@ -244,7 +244,7 @@ export async function resolveOpenAiCompatModelOverride(params: {
   const defaultProvider = defaultModelRef.provider;
   const parsed = parseModelRef(raw, defaultProvider);
   if (!parsed) {
-    return { errorMessage: "Invalid `x-openclaw-model`." };
+    return { errorMessage: "Invalid `x-dennou-model`." };
   }
 
   const catalog = await loadGatewayModelCatalog();
@@ -284,7 +284,7 @@ export function resolveSessionKey(params: {
   user?: string | undefined;
   prefix: string;
 }): string {
-  const explicit = getHeader(params.req, "x-openclaw-session-key")?.trim();
+  const explicit = getHeader(params.req, "x-dennou-session-key")?.trim();
   if (explicit) {
     return explicit;
   }
@@ -311,7 +311,7 @@ export function resolveGatewayRequestContext(params: {
   });
 
   const messageChannel = params.useMessageChannelHeader
-    ? (normalizeMessageChannel(getHeader(params.req, "x-openclaw-message-channel")) ??
+    ? (normalizeMessageChannel(getHeader(params.req, "x-dennou-message-channel")) ??
       params.defaultMessageChannel)
     : params.defaultMessageChannel;
 

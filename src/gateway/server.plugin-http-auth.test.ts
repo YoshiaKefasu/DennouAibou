@@ -307,7 +307,7 @@ describe("gateway plugin HTTP auth boundary", () => {
             headers: {
               "x-forwarded-user": "operator",
               "x-forwarded-for": "198.51.100.20",
-              "x-openclaw-scopes": "operator.read",
+              "x-dennou-scopes": "operator.read",
             },
           }),
           response.res,
@@ -367,7 +367,7 @@ describe("gateway plugin HTTP auth boundary", () => {
             path: "/secure-hook",
             authorization: "Bearer test-token",
             headers: {
-              "x-openclaw-scopes": "operator.read",
+              "x-dennou-scopes": "operator.read",
             },
           }),
           response.res,

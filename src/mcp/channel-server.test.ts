@@ -68,7 +68,7 @@ describe("openclaw channel mcp server", () => {
                   content: [{ type: "text", text: "hello from transcript" }],
                 },
                 {
-                  __openclaw: {
+                  __dennou: {
                     id: "msg-attachment",
                   },
                   role: "assistant",
@@ -146,7 +146,7 @@ describe("openclaw channel mcp server", () => {
             content: [{ type: "text", text: "hello from transcript" }],
           });
           expect(read.structuredContent?.messages?.[1]).toMatchObject({
-            __openclaw: {
+            __dennou: {
               id: "msg-attachment",
             },
           });

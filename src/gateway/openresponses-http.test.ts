@@ -85,7 +85,7 @@ async function postResponses(port: number, body: unknown, headers?: Record<strin
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-openclaw-scopes": "operator.write",
+      "x-dennou-scopes": "operator.write",
       ...headers,
     },
     body: JSON.stringify(body),
@@ -266,7 +266,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
       const resHeader = await postResponses(
         port,
         { model: "openclaw", input: "hi" },
-        { "x-openclaw-agent-id": "beta" },
+        { "x-dennou-agent-id": "beta" },
       );
       expect(resHeader.status).toBe(200);
       const optsHeader = (agentCommand.mock.calls[0] as unknown[] | undefined)?.[0];
@@ -300,7 +300,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
       const resChannelHeader = await postResponses(
         port,
         { model: "openclaw", input: "hi" },
-        { "x-openclaw-message-channel": "custom-client-channel" },
+        { "x-dennou-message-channel": "custom-client-channel" },
       );
       expect(resChannelHeader.status).toBe(200);
       const optsChannelHeader = (agentCommand.mock.calls[0] as unknown[] | undefined)?.[0];
@@ -316,7 +316,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
           model: "openclaw",
           input: "hi",
         },
-        { "x-openclaw-model": "openai/gpt-5.4" },
+        { "x-dennou-model": "openai/gpt-5.4" },
       );
       expect(resModelOverride.status).toBe(200);
       const optsModelOverride = (agentCommand.mock.calls[0] as unknown[] | undefined)?.[0];
@@ -327,14 +327,14 @@ describe("OpenResponses HTTP API (e2e)", () => {
       const resInvalidOverride = await postResponses(
         port,
         { model: "openclaw", input: "hi" },
-        { "x-openclaw-model": "openai/" },
+        { "x-dennou-model": "openai/" },
       );
       expect(resInvalidOverride.status).toBe(400);
       const invalidOverrideJson = (await resInvalidOverride.json()) as {
         error?: { type?: string; message?: string };
       };
       expect(invalidOverrideJson.error?.type).toBe("invalid_request_error");
-      expect(invalidOverrideJson.error?.message).toBe("Invalid `x-openclaw-model`.");
+      expect(invalidOverrideJson.error?.message).toBe("Invalid `x-dennou-model`.");
       expect(agentCommand).toHaveBeenCalledTimes(0);
       await ensureResponseConsumed(resInvalidOverride);
 
@@ -780,7 +780,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
     const adminScopeResponse = await postResponses(
       port,
       { model: "openclaw", input: "hi" },
-      { "x-openclaw-scopes": "operator.admin, operator.write" },
+      { "x-dennou-scopes": "operator.admin, operator.write" },
     );
     expect(adminScopeResponse.status).toBe(200);
     const adminScopeOpts = (agentCommand.mock.calls[0] as unknown[] | undefined)?.[0] as
@@ -801,7 +801,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
     const streamingResponse = await postResponses(
       port,
       { stream: true, model: "openclaw", input: "hi" },
-      { "x-openclaw-scopes": "operator.admin, operator.write" },
+      { "x-dennou-scopes": "operator.admin, operator.write" },
     );
     expect(streamingResponse.status).toBe(200);
     const streamingOpts = (agentCommand.mock.calls[0] as unknown[] | undefined)?.[0] as
@@ -824,7 +824,7 @@ describe("OpenResponses HTTP API (e2e)", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.approvals",
+          "x-dennou-scopes": "operator.approvals",
         },
         body: JSON.stringify({
           model: "openclaw",

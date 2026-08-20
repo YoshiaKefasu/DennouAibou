@@ -255,9 +255,9 @@ describe("session.message websocket events", () => {
         expect(
           (
             event.payload as {
-              message?: { __openclaw?: { id?: string; seq?: number } };
+              message?: { __dennou?: { id?: string; seq?: number } };
             }
-          ).message?.__openclaw,
+          ).message?.__dennou,
         ).toMatchObject({
           id: appended.ok ? appended.messageId : undefined,
           seq: 1,

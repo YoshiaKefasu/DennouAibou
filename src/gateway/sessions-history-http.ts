@@ -87,7 +87,7 @@ function resolveMessageSeq(message: unknown): number | undefined {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
     return undefined;
   }
-  const meta = (message as { __openclaw?: unknown }).__openclaw;
+  const meta = (message as { __dennou?: unknown }).__dennou;
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
     return undefined;
   }

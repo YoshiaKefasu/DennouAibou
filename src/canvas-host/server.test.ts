@@ -123,8 +123,8 @@ describe("canvas host", () => {
     const out = injectCanvasLiveReload("<html><body>Hello</body></html>");
     expect(out).toContain(CANVAS_WS_PATH);
     expect(out).toContain("location.reload");
-    expect(out).toContain("openclawCanvasA2UIAction");
-    expect(out).toContain("openclawSendUserAction");
+    expect(out).toContain("dennouCanvasA2UIAction");
+    expect(out).toContain("dennouSendUserAction");
   });
 
   it("creates a default index.html when missing", async () => {
@@ -143,7 +143,7 @@ describe("canvas host", () => {
       const { res, html } = await fetchCanvasHtml(server.port);
       expect(res.status).toBe(200);
       expect(html).toContain("Interactive test page");
-      expect(html).toContain("openclawSendUserAction");
+      expect(html).toContain("dennouSendUserAction");
       expect(html).toContain(CANVAS_WS_PATH);
       expect(html).toContain('document.createElement("span")');
       expect(html).not.toContain("statusEl.innerHTML");
@@ -419,7 +419,7 @@ describe("canvas host", () => {
       const html = await res.text();
       expect(res.status).toBe(200);
       expect(html).toContain("openclaw-a2ui-host");
-      expect(html).toContain("openclawCanvasA2UIAction");
+      expect(html).toContain("dennouCanvasA2UIAction");
 
       const bundleRes = await realFetch(
         `http://127.0.0.1:${server.port}/__DENNOU__/a2ui/a2ui.bundle.js`,

@@ -39,7 +39,7 @@ describe("resolveOpenAiCompatModelOverride", () => {
   it("rejects CLI model overrides outside the configured allowlist", async () => {
     await expect(
       resolveOpenAiCompatModelOverride({
-        req: createReq({ "x-openclaw-model": "codex-cli/gpt-5.4" }),
+        req: createReq({ "x-dennou-model": "codex-cli/gpt-5.4" }),
         agentId: "main",
         model: "openclaw",
       }),

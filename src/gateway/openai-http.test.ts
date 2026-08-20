@@ -70,7 +70,7 @@ async function postChatCompletions(port: number, body: unknown, headers?: Record
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-openclaw-scopes": "operator.write",
+      "x-dennou-scopes": "operator.write",
       ...headers,
     },
     body: JSON.stringify(body),
@@ -209,7 +209,7 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
       {
         await expectAgentSessionKeyMatch({
           body: { model: "openclaw", messages: [{ role: "user", content: "hi" }] },
-          headers: { "x-openclaw-agent-id": "beta" },
+          headers: { "x-dennou-agent-id": "beta" },
           matcher: /^agent:beta:/,
         });
       }
@@ -240,8 +240,8 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
           port,
           { model: "openclaw", messages: [{ role: "user", content: "hi" }] },
           {
-            "x-openclaw-agent-id": "beta",
-            "x-openclaw-session-key": "agent:beta:openai:custom",
+            "x-dennou-agent-id": "beta",
+            "x-dennou-session-key": "agent:beta:openai:custom",
           },
         );
         expect(res.status).toBe(200);
@@ -278,7 +278,7 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
             messages: [{ role: "user", content: "hi" }],
           },
           {
-            "x-openclaw-model": "openai/gpt-5.4",
+            "x-dennou-model": "openai/gpt-5.4",
           },
         );
         expect(res.status).toBe(200);
@@ -306,7 +306,7 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
             messages: [{ role: "user", content: "hi" }],
           },
           {
-            "x-openclaw-model": "gpt-5.4",
+            "x-dennou-model": "gpt-5.4",
           },
         );
         expect(res.status).toBe(200);
@@ -339,12 +339,12 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
             model: "openclaw",
             messages: [{ role: "user", content: "hi" }],
           },
-          { "x-openclaw-model": "openai/" },
+          { "x-dennou-model": "openai/" },
         );
         expect(res.status).toBe(400);
         const json = (await res.json()) as { error?: { type?: string; message?: string } };
         expect(json.error?.type).toBe("invalid_request_error");
-        expect(json.error?.message).toBe("Invalid `x-openclaw-model`.");
+        expect(json.error?.message).toBe("Invalid `x-dennou-model`.");
         expect(agentCommand).toHaveBeenCalledTimes(0);
       }
 
@@ -864,7 +864,7 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
         headers: {
           authorization: "Bearer secret",
           "content-type": "application/json",
-          "x-openclaw-scopes": "operator.approvals",
+          "x-dennou-scopes": "operator.approvals",
         },
         body: JSON.stringify({
           model: "openclaw",

@@ -5,7 +5,7 @@ import { getFreePort, installGatewayTestHooks } from "./test-helpers.js";
 
 installGatewayTestHooks({ scope: "suite" });
 
-const WRITE_SCOPE_HEADER = { "x-openclaw-scopes": "operator.write" };
+const WRITE_SCOPE_HEADER = { "x-dennou-scopes": "operator.write" };
 
 let startGatewayServer: typeof import("./server.js").startGatewayServer;
 let createEmbeddingProviderMock: ReturnType<
@@ -122,7 +122,7 @@ describe("OpenAI-compatible embeddings HTTP API (e2e)", () => {
         model: "openclaw/default",
         input: "hello again",
       },
-      { "x-openclaw-model": "openai/text-embedding-3-small" },
+      { "x-dennou-model": "openai/text-embedding-3-small" },
     );
     expect(qualified.status).toBe(200);
     const qualifiedJson = (await qualified.json()) as { model?: string };
@@ -143,7 +143,7 @@ describe("OpenAI-compatible embeddings HTTP API (e2e)", () => {
         input: "hello",
         encoding_format: "base64",
       },
-      { "x-openclaw-agent-id": "beta" },
+      { "x-dennou-agent-id": "beta" },
     );
     expect(res.status).toBe(200);
     const json = (await res.json()) as { data?: Array<{ embedding?: string }> };
@@ -172,7 +172,7 @@ describe("OpenAI-compatible embeddings HTTP API (e2e)", () => {
         model: "openclaw/default",
         input: "hello",
       },
-      { "x-openclaw-scopes": "operator.read" },
+      { "x-dennou-scopes": "operator.read" },
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
@@ -187,7 +187,7 @@ describe("OpenAI-compatible embeddings HTTP API (e2e)", () => {
         model: "openclaw/default",
         input: "hello",
       },
-      { "x-openclaw-scopes": "" },
+      { "x-dennou-scopes": "" },
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
@@ -228,13 +228,13 @@ describe("OpenAI-compatible embeddings HTTP API (e2e)", () => {
     });
   });
 
-  it("rejects disallowed x-openclaw-model provider overrides", async () => {
+  it("rejects disallowed x-dennou-model provider overrides", async () => {
     const res = await postEmbeddings(
       {
         model: "openclaw/default",
         input: "hello",
       },
-      { "x-openclaw-model": "ollama/nomic-embed-text" },
+      { "x-dennou-model": "ollama/nomic-embed-text" },
     );
     expect(res.status).toBe(400);
     const json = (await res.json()) as { error?: { type?: string; message?: string } };

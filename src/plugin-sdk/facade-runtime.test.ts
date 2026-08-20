@@ -17,7 +17,7 @@ import {
 const tempDirs: string[] = [];
 const originalBundledPluginsDir = process.env.DENNOU_BUNDLED_PLUGINS_DIR;
 const originalStateDir = process.env.DENNOU_STATE_DIR;
-const FACADE_RUNTIME_GLOBAL = "__openclawTestLoadBundledPluginPublicSurfaceModuleSync";
+const FACADE_RUNTIME_GLOBAL = "__dennouTestLoadBundledPluginPublicSurfaceModuleSync";
 
 function createBundledPluginDir(prefix: string, marker: string): string {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

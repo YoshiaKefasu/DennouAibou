@@ -30,7 +30,7 @@ type BundleMcpSession = {
 type LoadedMcpConfig = ReturnType<typeof loadEmbeddedPiMcpConfig>;
 type ListedTool = Awaited<ReturnType<Client["listTools"]>>["tools"][number];
 
-const SESSION_MCP_RUNTIME_MANAGER_KEY = Symbol.for("openclaw.sessionMcpRuntimeManager");
+const SESSION_MCP_RUNTIME_MANAGER_KEY = Symbol.for("dennou.sessionMcpRuntimeManager");
 
 function connectWithTimeout(
   client: Client,

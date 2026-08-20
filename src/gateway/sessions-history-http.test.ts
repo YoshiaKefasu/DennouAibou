@@ -15,7 +15,7 @@ import {
 installGatewayTestHooks();
 
 const AUTH_HEADER = { Authorization: "Bearer test-gateway-token-1234567890" };
-const READ_SCOPE_HEADER = { "x-openclaw-scopes": "operator.read" };
+const READ_SCOPE_HEADER = { "x-dennou-scopes": "operator.read" };
 const cleanupDirs: string[] = [];
 
 afterEach(async () => {
@@ -154,9 +154,9 @@ describe("session history HTTP endpoints", () => {
       expect(
         (
           body.messages?.[0] as {
-            __openclaw?: { id?: string; seq?: number };
+            __dennou?: { id?: string; seq?: number };
           }
-        )?.__openclaw,
+        )?.__dennou,
       ).toMatchObject({
         seq: 1,
       });
@@ -318,8 +318,8 @@ describe("session history HTTP endpoints", () => {
       expect(firstPage.status).toBe(200);
       const firstBody = (await firstPage.json()) as {
         sessionKey?: string;
-        items?: Array<{ content?: Array<{ text?: string }>; __openclaw?: { seq?: number } }>;
-        messages?: Array<{ content?: Array<{ text?: string }>; __openclaw?: { seq?: number } }>;
+        items?: Array<{ content?: Array<{ text?: string }>; __dennou?: { seq?: number } }>;
+        messages?: Array<{ content?: Array<{ text?: string }>; __dennou?: { seq?: number } }>;
         nextCursor?: string;
         hasMore?: boolean;
       };
@@ -328,7 +328,7 @@ describe("session history HTTP endpoints", () => {
         "second message",
         "third message",
       ]);
-      expect(firstBody.messages?.map((message) => message.__openclaw?.seq)).toEqual([2, 3]);
+      expect(firstBody.messages?.map((message) => message.__dennou?.seq)).toEqual([2, 3]);
       expect(firstBody.hasMore).toBe(true);
       expect(firstBody.nextCursor).toBe("2");
 
@@ -337,15 +337,15 @@ describe("session history HTTP endpoints", () => {
       });
       expect(secondPage.status).toBe(200);
       const secondBody = (await secondPage.json()) as {
-        items?: Array<{ content?: Array<{ text?: string }>; __openclaw?: { seq?: number } }>;
-        messages?: Array<{ __openclaw?: { seq?: number } }>;
+        items?: Array<{ content?: Array<{ text?: string }>; __dennou?: { seq?: number } }>;
+        messages?: Array<{ __dennou?: { seq?: number } }>;
         nextCursor?: string;
         hasMore?: boolean;
       };
       expect(secondBody.items?.map((message) => message.content?.[0]?.text)).toEqual([
         "first message",
       ]);
-      expect(secondBody.messages?.map((message) => message.__openclaw?.seq)).toEqual([1]);
+      expect(secondBody.messages?.map((message) => message.__dennou?.seq)).toEqual([1]);
       expect(secondBody.hasMore).toBe(false);
       expect(secondBody.nextCursor).toBeUndefined();
     });
@@ -394,18 +394,18 @@ describe("session history HTTP endpoints", () => {
       const suppressedEvent = await readSseEvent(reader!, streamState);
       expect(suppressedEvent.event).toBe("history");
       const suppressedData = suppressedEvent.data as {
-        messages?: Array<{ content?: Array<{ text?: string }>; __openclaw?: { seq?: number } }>;
+        messages?: Array<{ content?: Array<{ text?: string }>; __dennou?: { seq?: number } }>;
       };
       expect(suppressedData.messages?.[0]?.content?.[0]?.text).toBe("NO_REPLY");
-      expect(suppressedData.messages?.[0]?.__openclaw?.seq).toBe(3);
+      expect(suppressedData.messages?.[0]?.__dennou?.seq).toBe(3);
 
       const nextEvent = await readSseEvent(reader!, streamState);
       expect(nextEvent.event).toBe("history");
       const nextData = nextEvent.data as {
-        messages?: Array<{ content?: Array<{ text?: string }>; __openclaw?: { seq?: number } }>;
+        messages?: Array<{ content?: Array<{ text?: string }>; __dennou?: { seq?: number } }>;
       };
       expect(nextData.messages?.[0]?.content?.[0]?.text).toBe("third message");
-      expect(nextData.messages?.[0]?.__openclaw?.seq).toBe(4);
+      expect(nextData.messages?.[0]?.__dennou?.seq).toBe(4);
 
       await reader?.cancel();
     });
@@ -459,9 +459,9 @@ describe("session history HTTP endpoints", () => {
       expect(
         (
           messageEvent.data as {
-            message?: { __openclaw?: { id?: string; seq?: number } };
+            message?: { __dennou?: { id?: string; seq?: number } };
           }
-        ).message?.__openclaw,
+        ).message?.__dennou,
       ).toMatchObject({
         id: appended.ok ? appended.messageId : undefined,
         seq: 2,
@@ -495,7 +495,7 @@ describe("session history HTTP endpoints", () => {
         {
           headers: {
             ...AUTH_HEADER,
-            "x-openclaw-scopes": "operator.approvals",
+            "x-dennou-scopes": "operator.approvals",
           },
         },
       );
