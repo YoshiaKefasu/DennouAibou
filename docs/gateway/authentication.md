@@ -12,7 +12,7 @@ title: "Authentication"
 This page covers **model provider** authentication (API keys, OAuth, and legacy Anthropic setup-token). For **gateway connection** authentication (token, password, trusted-proxy), see [Configuration](/gateway/configuration) and [Trusted Proxy Auth](/gateway/trusted-proxy-auth).
 </Note>
 
-OpenClaw supports OAuth and API keys for model providers. For always-on gateway
+DennouAibou supports OAuth and API keys for model providers. For always-on gateway
 hosts, API keys are usually the most predictable option. Subscription/OAuth
 flows are also supported when they match your provider account model.
 
@@ -27,7 +27,7 @@ For credential eligibility/reason-code rules used by `models status --probe`, se
 If you’re running a long-lived gateway, start with an API key for your chosen
 provider.
 For Anthropic specifically, API key auth is the safe path. Anthropic
-subscription-style auth inside OpenClaw is the legacy setup-token path and
+subscription-style auth inside DennouAibou is the legacy setup-token path and
 should be treated as an **Extra Usage** path, not a plan-limits path.
 
 1. Create an API key in your provider console.
@@ -62,15 +62,15 @@ See [Help](/help) for details on env inheritance (`env.shellEnv`,
 
 ## Anthropic: legacy token compatibility
 
-Anthropic setup-token auth is still available in OpenClaw as a
+Anthropic setup-token auth is still available in DennouAibou as a
 legacy/manual path. Anthropic's public Claude Code docs still cover direct
 Claude Code terminal use under Claude plans, but Anthropic separately told
-OpenClaw users that the **OpenClaw** Claude-login path counts as third-party
+DennouAibou users that the **DennouAibou** Claude-login path counts as third-party
 harness usage and requires **Extra Usage** billed separately from the
 subscription.
 
 For the clearest setup path, use an Anthropic API key. If you must keep a
-subscription-style Anthropic path in OpenClaw, use the legacy setup-token path
+subscription-style Anthropic path in DennouAibou, use the legacy setup-token path
 with the expectation that Anthropic treats it as **Extra Usage**.
 
 Manual token entry (any provider; writes `auth-profiles.json` + updates config):
@@ -102,7 +102,7 @@ Notes:
 - Probe rows can come from auth profiles, env credentials, or `models.json`.
 - If explicit `auth.order.<provider>` omits a stored profile, probe reports
   `excluded_by_auth_order` for that profile instead of trying it.
-- If auth exists but OpenClaw cannot resolve a probeable model candidate for
+- If auth exists but DennouAibou cannot resolve a probeable model candidate for
   that provider, probe reports `status: no_model`.
 - Rate-limit cooldowns can be model-scoped. A profile cooling down for one
   model can still be usable for a sibling model on the same provider.
@@ -114,9 +114,9 @@ Optional ops scripts (systemd/Termux) are documented here:
 
 The Anthropic `claude-cli` backend was removed.
 
-- Use Anthropic API keys for Anthropic traffic in OpenClaw.
+- Use Anthropic API keys for Anthropic traffic in DennouAibou.
 - Anthropic setup-token remains a legacy/manual path and should be used with
-  the Extra Usage billing expectation Anthropic communicated to OpenClaw users.
+  the Extra Usage billing expectation Anthropic communicated to DennouAibou users.
 - `openclaw doctor` now detects stale removed Anthropic Claude CLI state. If
   stored credential bytes still exist, doctor converts them back into
   Anthropic token/OAuth profiles. If not, doctor removes the stale Claude CLI
@@ -141,7 +141,7 @@ hits a provider rate limit.
   - `<PROVIDER>_API_KEY_*`
 - Google providers also include `GOOGLE_API_KEY` as an additional fallback.
 - The same key list is deduplicated before use.
-- OpenClaw retries with the next key only for rate-limit errors (for example
+- DennouAibou retries with the next key only for rate-limit errors (for example
   `429`, `rate_limit`, `quota`, `resource exhausted`, `Too many concurrent
 requests`, `ThrottlingException`, `concurrency limit reached`, or
   `workers_ai ... quota limit exceeded`).

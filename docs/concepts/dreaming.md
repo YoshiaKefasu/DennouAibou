@@ -10,7 +10,7 @@ read_when:
 # Dreaming (experimental)
 
 Dreaming is the background memory consolidation system in `memory-core`.
-It helps OpenClaw move strong short-term signals into durable memory while
+It helps DennouAibou move strong short-term signals into durable memory while
 keeping the process explainable and reviewable.
 
 Dreaming is **opt-in** and disabled by default.

@@ -1,14 +1,14 @@
 ---
-summary: "Use Amazon Bedrock (Converse API) models with OpenClaw"
+summary: "Use Amazon Bedrock (Converse API) models with DennouAibou"
 read_when:
-  - You want to use Amazon Bedrock models with OpenClaw
+  - You want to use Amazon Bedrock models with DennouAibou
   - You need AWS credential/region setup for model calls
 title: "Amazon Bedrock"
 ---
 
 # Amazon Bedrock
 
-OpenClaw can use **Amazon Bedrock** models via pi‑ai’s **Bedrock Converse**
+DennouAibou can use **Amazon Bedrock** models via pi‑ai’s **Bedrock Converse**
 streaming provider. Bedrock auth uses the **AWS SDK default credential chain**,
 not an API key.
 
@@ -21,16 +21,16 @@ not an API key.
 
 ## Automatic model discovery
 
-OpenClaw can automatically discover Bedrock models that support **streaming**
+DennouAibou can automatically discover Bedrock models that support **streaming**
 and **text output**. Discovery uses `bedrock:ListFoundationModels` and
 `bedrock:ListInferenceProfiles`, and results are cached (default: 1 hour).
 
 How the implicit provider is enabled:
 
 - If `plugins.entries.amazon-bedrock.config.discovery.enabled` is `true`,
-  OpenClaw will try discovery even when no AWS env marker is present.
+  DennouAibou will try discovery even when no AWS env marker is present.
 - If `plugins.entries.amazon-bedrock.config.discovery.enabled` is unset,
-  OpenClaw only auto-adds the
+  DennouAibou only auto-adds the
   implicit Bedrock provider when it sees one of these AWS auth markers:
   `AWS_BEARER_TOKEN_BEDROCK`, `AWS_ACCESS_KEY_ID` +
   `AWS_SECRET_ACCESS_KEY`, or `AWS_PROFILE`.
@@ -63,14 +63,14 @@ Config options live under `plugins.entries.amazon-bedrock.config.discovery`:
 
 Notes:
 
-- `enabled` defaults to auto mode. In auto mode, OpenClaw only enables the
+- `enabled` defaults to auto mode. In auto mode, DennouAibou only enables the
   implicit Bedrock provider when it sees a supported AWS env marker.
 - `region` defaults to `AWS_REGION` or `AWS_DEFAULT_REGION`, then `us-east-1`.
 - `providerFilter` matches Bedrock provider names (for example `anthropic`).
 - `refreshInterval` is seconds; set to `0` to disable caching.
 - `defaultContextWindow` (default: `32000`) and `defaultMaxTokens` (default: `4096`)
   are used for discovered models (override if you know your model limits).
-- For explicit `models.providers["amazon-bedrock"]` entries, OpenClaw can still
+- For explicit `models.providers["amazon-bedrock"]` entries, DennouAibou can still
   resolve Bedrock env-marker auth early from AWS env markers such as
   `AWS_BEARER_TOKEN_BEDROCK` without forcing full runtime auth loading. The
   actual model-call auth path still uses the AWS SDK default chain.
@@ -124,9 +124,9 @@ export AWS_BEARER_TOKEN_BEDROCK="..."
 
 ## EC2 Instance Roles
 
-When running OpenClaw on an EC2 instance with an IAM role attached, the AWS SDK
+When running DennouAibou on an EC2 instance with an IAM role attached, the AWS SDK
 can use the instance metadata service (IMDS) for authentication. For Bedrock
-model discovery, OpenClaw only auto-enables the implicit provider from AWS env
+model discovery, DennouAibou only auto-enables the implicit provider from AWS env
 markers unless you explicitly set
 `plugins.entries.amazon-bedrock.config.discovery.enabled: true`.
 
@@ -199,7 +199,7 @@ openclaw models list
 
 ## Inference profiles
 
-OpenClaw discovers **regional and global inference profiles** alongside
+DennouAibou discovers **regional and global inference profiles** alongside
 foundation models. When a profile maps to a known foundation model, the
 profile inherits that model's capabilities (context window, max tokens,
 reasoning, vision) and the correct Bedrock request region is injected
@@ -223,7 +223,7 @@ foundation models in `openclaw models list`.
 - If you rely on auto mode, set one of the supported AWS auth env markers on the
   gateway host. If you prefer IMDS/shared-config auth without env markers, set
   `plugins.entries.amazon-bedrock.config.discovery.enabled: true`.
-- OpenClaw surfaces the credential source in this order: `AWS_BEARER_TOKEN_BEDROCK`,
+- DennouAibou surfaces the credential source in this order: `AWS_BEARER_TOKEN_BEDROCK`,
   then `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`, then `AWS_PROFILE`, then the
   default AWS SDK chain.
 - Reasoning support depends on the model; check the Bedrock model card for

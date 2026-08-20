@@ -415,14 +415,14 @@ describe("canvas host", () => {
         throw error;
       }
 
-      const res = await realFetch(`http://127.0.0.1:${server.port}/__openclaw__/a2ui/`);
+      const res = await realFetch(`http://127.0.0.1:${server.port}/__DENNOU__/a2ui/`);
       const html = await res.text();
       expect(res.status).toBe(200);
       expect(html).toContain("openclaw-a2ui-host");
       expect(html).toContain("openclawCanvasA2UIAction");
 
       const bundleRes = await realFetch(
-        `http://127.0.0.1:${server.port}/__openclaw__/a2ui/a2ui.bundle.js`,
+        `http://127.0.0.1:${server.port}/__DENNOU__/a2ui/a2ui.bundle.js`,
       );
       const js = await bundleRes.text();
       expect(bundleRes.status).toBe(200);

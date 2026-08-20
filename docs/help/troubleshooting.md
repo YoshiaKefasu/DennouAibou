@@ -1,7 +1,7 @@
 ---
-summary: "Symptom first troubleshooting hub for OpenClaw"
+summary: "Symptom first troubleshooting hub for DennouAibou"
 read_when:
-  - OpenClaw is not working and you need the fastest path to a fix
+  - DennouAibou is not working and you need the fastest path to a fix
   - You want a triage flow before diving into deep runbooks
 title: "General Troubleshooting"
 ---
@@ -45,7 +45,7 @@ go to [/gateway/troubleshooting#anthropic-429-extra-usage-required-for-long-cont
 ## Plugin install fails with missing openclaw extensions
 
 If install fails with `package.json missing openclaw.extensions`, the plugin package
-is using an old shape that OpenClaw no longer accepts.
+is using an old shape that DennouAibou no longer accepts.
 
 Fix in the plugin package:
 
@@ -71,7 +71,7 @@ Reference: [Plugin architecture](/plugins/architecture)
 
 ```mermaid
 flowchart TD
-  A[OpenClaw is not working] --> B{What breaks first}
+  A[DennouAibou is not working] --> B{What breaks first}
   B --> C[No replies]
   B --> D[Dashboard or Control UI will not connect]
   B --> E[Gateway will not start or service not running]

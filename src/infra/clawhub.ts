@@ -199,7 +199,7 @@ export class ClawHubRequestError extends Error {
 
 function normalizeBaseUrl(baseUrl?: string): string {
   const envValue =
-    process.env.OPENCLAW_CLAWHUB_URL?.trim() ||
+    process.env.DENNOU_CLAWHUB_URL?.trim() ||
     process.env.CLAWHUB_URL?.trim() ||
     DEFAULT_CLAWHUB_URL;
   const value = (baseUrl?.trim() || envValue).replace(/\/+$/, "");
@@ -229,7 +229,7 @@ function extractTokenFromClawHubConfig(value: unknown): string | undefined {
 
 function resolveClawHubConfigPaths(): string[] {
   const explicit =
-    process.env.OPENCLAW_CLAWHUB_CONFIG_PATH?.trim() ||
+    process.env.DENNOU_CLAWHUB_CONFIG_PATH?.trim() ||
     process.env.CLAWHUB_CONFIG_PATH?.trim() ||
     process.env.CLAWDHUB_CONFIG_PATH?.trim(); // legacy misspelling from older clawhub CLI builds; keep for back-compat
   if (explicit) {
@@ -253,7 +253,7 @@ function resolveClawHubConfigPaths(): string[] {
 
 export async function resolveClawHubAuthToken(): Promise<string | undefined> {
   const envToken =
-    process.env.OPENCLAW_CLAWHUB_TOKEN?.trim() ||
+    process.env.DENNOU_CLAWHUB_TOKEN?.trim() ||
     process.env.CLAWHUB_TOKEN?.trim() ||
     process.env.CLAWHUB_AUTH_TOKEN?.trim();
   if (envToken) {

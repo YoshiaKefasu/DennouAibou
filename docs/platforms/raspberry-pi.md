@@ -1,17 +1,17 @@
 ---
-summary: "OpenClaw on Raspberry Pi (budget self-hosted setup)"
+summary: "DennouAibou on Raspberry Pi (budget self-hosted setup)"
 read_when:
-  - Setting up OpenClaw on a Raspberry Pi
-  - Running OpenClaw on ARM devices
+  - Setting up DennouAibou on a Raspberry Pi
+  - Running DennouAibou on ARM devices
   - Building a cheap always-on personal AI
 title: "Raspberry Pi (Platform)"
 ---
 
-# OpenClaw on Raspberry Pi
+# DennouAibou on Raspberry Pi
 
 ## Goal
 
-Run a persistent, always-on OpenClaw Gateway on a Raspberry Pi for **~$35-80** one-time cost (no monthly fees).
+Run a persistent, always-on DennouAibou Gateway on a Raspberry Pi for **~$35-80** one-time cost (no monthly fees).
 
 Perfect for:
 
@@ -107,7 +107,7 @@ echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 
-## 6) Install OpenClaw
+## 6) Install DennouAibou
 
 ### Option A: Standard Install (Recommended)
 
@@ -153,7 +153,7 @@ systemctl --user status openclaw-gateway.service
 journalctl --user -u openclaw-gateway.service -f
 ```
 
-## 9) Access the OpenClaw Dashboard
+## 9) Access the DennouAibou Dashboard
 
 Replace `user@gateway-host` with your Pi username and hostname or IP address.
 
@@ -218,7 +218,7 @@ Notes:
 
 ### systemd startup tuning (optional)
 
-If this Pi is mostly running OpenClaw, add a service drop-in to reduce restart
+If this Pi is mostly running DennouAibou, add a service drop-in to reduce restart
 jitter and keep startup env stable:
 
 ```bash
@@ -241,7 +241,7 @@ systemctl --user daemon-reload
 systemctl --user restart openclaw-gateway.service
 ```
 
-If possible, keep OpenClaw state/cache on SSD-backed storage to avoid SD-card
+If possible, keep DennouAibou state/cache on SSD-backed storage to avoid SD-card
 random-I/O bottlenecks during cold starts.
 
 If this is a headless Pi, enable lingering once so the user service survives
@@ -283,7 +283,7 @@ htop
 
 ### Binary Compatibility
 
-Most OpenClaw features work on ARM64, but some external binaries may need ARM builds:
+Most DennouAibou features work on ARM64, but some external binaries may need ARM builds:
 
 | Tool               | ARM64 Status | Notes                               |
 | ------------------ | ------------ | ----------------------------------- |

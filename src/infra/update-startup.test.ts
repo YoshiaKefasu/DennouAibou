@@ -68,8 +68,8 @@ describe("update-startup", () => {
     vi.setSystemTime(new Date("2026-01-17T10:00:00Z"));
     tempDir = path.join(suiteRoot, `case-${++suiteCase}`);
     await fs.mkdir(tempDir);
-    envSnapshot = captureEnv(["OPENCLAW_STATE_DIR", "NODE_ENV", "VITEST"]);
-    process.env.OPENCLAW_STATE_DIR = tempDir;
+    envSnapshot = captureEnv(["DENNOU_STATE_DIR", "NODE_ENV", "VITEST"]);
+    process.env.DENNOU_STATE_DIR = tempDir;
 
     process.env.NODE_ENV = "test";
 
@@ -407,7 +407,7 @@ describe("update-startup", () => {
       expect.objectContaining({
         timeoutMs: 45 * 60 * 1000,
         env: expect.objectContaining({
-          OPENCLAW_AUTO_UPDATE: "1",
+          DENNOU_AUTO_UPDATE: "1",
         }),
       }),
     );

@@ -28,8 +28,8 @@ const buildGatewayInstallPlan = vi.fn(
     programArguments: ["/bin/node", "cli", "gateway", "--port", String(params.port)],
     workingDirectory: process.cwd(),
     environment: {
-      OPENCLAW_GATEWAY_PORT: String(params.port),
-      ...(params.token ? { OPENCLAW_GATEWAY_TOKEN: params.token } : {}),
+      DENNOU_GATEWAY_PORT: String(params.port),
+      ...(params.token ? { DENNOU_GATEWAY_TOKEN: params.token } : {}),
     },
   }),
 );
@@ -147,15 +147,15 @@ describe("daemon-cli coverage", () => {
   beforeEach(() => {
     daemonProgram = createDaemonProgram();
     envSnapshot = captureEnv([
-      "OPENCLAW_STATE_DIR",
-      "OPENCLAW_CONFIG_PATH",
-      "OPENCLAW_GATEWAY_PORT",
-      "OPENCLAW_PROFILE",
+      "DENNOU_STATE_DIR",
+      "DENNOU_CONFIG_PATH",
+      "DENNOU_GATEWAY_PORT",
+      "DENNOU_PROFILE",
     ]);
-    process.env.OPENCLAW_STATE_DIR = "/tmp/openclaw-cli-state";
-    process.env.OPENCLAW_CONFIG_PATH = "/tmp/openclaw-cli-state/openclaw.json";
-    delete process.env.OPENCLAW_GATEWAY_PORT;
-    delete process.env.OPENCLAW_PROFILE;
+    process.env.DENNOU_STATE_DIR = "/tmp/openclaw-cli-state";
+    process.env.DENNOU_CONFIG_PATH = "/tmp/openclaw-cli-state/dennou-aibou.json";
+    delete process.env.DENNOU_GATEWAY_PORT;
+    delete process.env.DENNOU_PROFILE;
     serviceReadCommand.mockResolvedValue(null);
     resolveGatewayProbeAuthWithSecretInputs.mockClear();
     buildGatewayInstallPlan.mockClear();
@@ -187,10 +187,10 @@ describe("daemon-cli coverage", () => {
     serviceReadCommand.mockResolvedValueOnce({
       programArguments: ["/bin/node", "cli", "gateway", "--port", "19001"],
       environment: {
-        OPENCLAW_PROFILE: "dev",
-        OPENCLAW_STATE_DIR: "/tmp/openclaw-daemon-state",
-        OPENCLAW_CONFIG_PATH: "/tmp/openclaw-daemon-state/openclaw.json",
-        OPENCLAW_GATEWAY_PORT: "19001",
+        DENNOU_PROFILE: "dev",
+        DENNOU_STATE_DIR: "/tmp/openclaw-daemon-state",
+        DENNOU_CONFIG_PATH: "/tmp/openclaw-daemon-state/dennou-aibou.json",
+        DENNOU_GATEWAY_PORT: "19001",
       },
       sourcePath: "/tmp/ai.openclaw.gateway.plist",
     });

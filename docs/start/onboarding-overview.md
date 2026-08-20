@@ -1,5 +1,5 @@
 ---
-summary: "Overview of OpenClaw onboarding options and flows"
+summary: "Overview of DennouAibou onboarding options and flows"
 read_when:
   - Choosing an onboarding path
   - Setting up a new environment
@@ -9,7 +9,7 @@ sidebarTitle: "Onboarding Overview"
 
 # Onboarding Overview
 
-OpenClaw has two onboarding paths. Both configure auth, the Gateway, and
+DennouAibou has two onboarding paths. Both configure auth, the Gateway, and
 optional chat channels — they just differ in how you interact with the setup.
 
 ## Which path should I use?
@@ -52,7 +52,7 @@ CLI command docs: [`openclaw onboard`](/cli/onboard)
 
 ## macOS app onboarding
 
-Open the OpenClaw app. The first-run wizard walks you through the same steps
+Open the DennouAibou app. The first-run wizard walks you through the same steps
 with a visual interface.
 
 Full reference: [Onboarding (macOS App)](/start/onboarding)

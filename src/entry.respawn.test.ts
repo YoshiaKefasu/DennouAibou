@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCliRespawnPlan,
   EXPERIMENTAL_WARNING_FLAG,
-  OPENCLAW_NODE_EXTRA_CA_CERTS_READY,
-  OPENCLAW_NODE_OPTIONS_READY,
+  DENNOU_NODE_EXTRA_CA_CERTS_READY,
+  DENNOU_NODE_OPTIONS_READY,
 } from "./entry.respawn.js";
 
 const shouldSkipRespawnForArgvMock = vi.hoisted(() => vi.fn(() => false));
@@ -44,8 +44,8 @@ describe("buildCliRespawnPlan", () => {
     expect(plan).not.toBeNull();
     expect(plan?.argv[0]).toBe(EXPERIMENTAL_WARNING_FLAG);
     expect(plan?.env.NODE_EXTRA_CA_CERTS).toBe("/etc/ssl/certs/ca-certificates.crt");
-    expect(plan?.env[OPENCLAW_NODE_EXTRA_CA_CERTS_READY]).toBe("1");
-    expect(plan?.env[OPENCLAW_NODE_OPTIONS_READY]).toBe("1");
+    expect(plan?.env[DENNOU_NODE_EXTRA_CA_CERTS_READY]).toBe("1");
+    expect(plan?.env[DENNOU_NODE_OPTIONS_READY]).toBe("1");
   });
 
   it("does not overwrite an existing NODE_EXTRA_CA_CERTS value", () => {
@@ -64,8 +64,8 @@ describe("buildCliRespawnPlan", () => {
       buildCliRespawnPlan({
         argv: ["node", "openclaw", "gateway", "run"],
         env: {
-          [OPENCLAW_NODE_EXTRA_CA_CERTS_READY]: "1",
-          [OPENCLAW_NODE_OPTIONS_READY]: "1",
+          [DENNOU_NODE_EXTRA_CA_CERTS_READY]: "1",
+          [DENNOU_NODE_OPTIONS_READY]: "1",
         },
         execArgv: [EXPERIMENTAL_WARNING_FLAG],
         autoNodeExtraCaCerts: "/etc/ssl/certs/ca-certificates.crt",

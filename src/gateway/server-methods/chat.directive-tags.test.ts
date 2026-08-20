@@ -1335,7 +1335,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "acp-session-spoof",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-spoof\n[/Source Receipt]",
@@ -1371,7 +1371,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "admin-session-1",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=admin-session-1\n[/Source Receipt]",
@@ -1383,7 +1383,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       kind: "external_user",
       originSessionId: "admin-session-1",
       sourceChannel: "acp",
-      sourceTool: "openclaw_acp",
+      sourceTool: "DENNOU_acp",
     });
     expect(mockState.lastDispatchCtx?.Body).toBe(
       "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=admin-session-1\n[/Source Receipt]\n\nops update",
@@ -1435,7 +1435,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "acp-session-1",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-1\n[/Source Receipt]",
@@ -1447,7 +1447,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       kind: "external_user",
       originSessionId: "acp-session-1",
       sourceChannel: "acp",
-      sourceTool: "openclaw_acp",
+      sourceTool: "DENNOU_acp",
     });
     expect(mockState.lastDispatchCtx?.Body).toBe(
       "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-1\n[/Source Receipt]\n\nbench update",

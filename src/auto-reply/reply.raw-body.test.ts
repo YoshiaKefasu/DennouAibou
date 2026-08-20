@@ -18,7 +18,7 @@ installReplyRuntimeMocks(agentMocks);
 describe("RawBody directive parsing", () => {
   beforeEach(async () => {
     vi.resetModules();
-    vi.stubEnv("OPENCLAW_TEST_FAST", "1");
+    vi.stubEnv("DENNOU_TEST_FAST", "1");
     resetReplyRuntimeMocks(agentMocks);
     ({ getReplyFromConfig } = await import("./reply.js"));
   });

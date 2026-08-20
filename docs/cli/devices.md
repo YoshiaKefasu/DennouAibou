@@ -49,11 +49,11 @@ openclaw devices clear --yes --pending --json
 
 ### `openclaw devices approve [requestId] [--latest]`
 
-Approve a pending device pairing request. If `requestId` is omitted, OpenClaw
+Approve a pending device pairing request. If `requestId` is omitted, DennouAibou
 automatically approves the most recent pending request.
 
 Note: if a device retries pairing with changed auth details (role/scopes/public
-key), OpenClaw supersedes the previous pending entry and issues a new
+key), DennouAibou supersedes the previous pending entry and issues a new
 `requestId`. Run `openclaw devices list` right before approval to use the
 current ID.
 

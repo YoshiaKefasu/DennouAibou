@@ -1,21 +1,21 @@
 ---
 title: "Building Provider Plugins"
 sidebarTitle: "Provider Plugins"
-summary: "Step-by-step guide to building a model provider plugin for OpenClaw"
+summary: "Step-by-step guide to building a model provider plugin for DennouAibou"
 read_when:
   - You are building a new model provider plugin
-  - You want to add an OpenAI-compatible proxy or custom LLM to OpenClaw
+  - You want to add an OpenAI-compatible proxy or custom LLM to DennouAibou
   - You need to understand provider auth, catalogs, and runtime hooks
 ---
 
 # Building Provider Plugins
 
 This guide walks through building a provider plugin that adds a model provider
-(LLM) to OpenClaw. By the end you will have a provider with a model catalog,
+(LLM) to DennouAibou. By the end you will have a provider with a model catalog,
 API key auth, and dynamic model resolution.
 
 <Info>
-  If you have not built any OpenClaw plugin before, read
+  If you have not built any DennouAibou plugin before, read
   [Getting Started](/plugins/building-plugins) first for the basic package
   structure and manifest setup.
 </Info>
@@ -79,9 +79,9 @@ API key auth, and dynamic model resolution.
     ```
     </CodeGroup>
 
-    The manifest declares `providerAuthEnvVars` so OpenClaw can detect
+    The manifest declares `providerAuthEnvVars` so DennouAibou can detect
     credentials without loading your plugin runtime. `modelSupport` is optional
-    and lets OpenClaw auto-load your provider plugin from shorthand model ids
+    and lets DennouAibou auto-load your provider plugin from shorthand model ids
     like `acme-large` before runtime hooks exist. If you publish the
     provider on ClawHub, those `openclaw.compat` and `openclaw.build` fields
     are required in `package.json`.
@@ -454,7 +454,7 @@ API key auth, and dynamic model resolution.
     </Tabs>
 
     <Accordion title="All available provider hooks">
-      OpenClaw calls hooks in this order. Most providers only use 2-3:
+      DennouAibou calls hooks in this order. Most providers only use 2-3:
 
       | # | Hook | When to use |
       | --- | --- | --- |
@@ -627,7 +627,7 @@ API key auth, and dynamic model resolution.
     }
     ```
 
-    OpenClaw classifies this as a **hybrid-capability** plugin. This is the
+    DennouAibou classifies this as a **hybrid-capability** plugin. This is the
     recommended pattern for company plugins (one plugin per vendor). See
     [Internals: Capability Ownership](/plugins/architecture#capability-ownership-model).
 

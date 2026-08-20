@@ -8,7 +8,7 @@ read_when:
 
 # Honcho Memory
 
-[Honcho](https://honcho.dev) adds AI-native memory to OpenClaw. It persists
+[Honcho](https://honcho.dev) adds AI-native memory to DennouAibou. It persists
 conversations to a dedicated service and builds user and agent models over time,
 giving your agent cross-session context that goes beyond workspace Markdown
 files.
@@ -135,6 +135,6 @@ openclaw honcho search <query> [-k N] [-d D] # Semantic search over memory
 
 - [Plugin source code](https://github.com/plastic-labs/openclaw-honcho)
 - [Honcho documentation](https://docs.honcho.dev)
-- [Honcho OpenClaw integration guide](https://docs.honcho.dev/v3/guides/integrations/openclaw)
-- [Memory](/concepts/memory) -- OpenClaw memory overview
+- [Honcho DennouAibou integration guide](https://docs.honcho.dev/v3/guides/integrations/openclaw)
+- [Memory](/concepts/memory) -- DennouAibou memory overview
 - [Context Engines](/concepts/context-engine) -- how plugin context engines work

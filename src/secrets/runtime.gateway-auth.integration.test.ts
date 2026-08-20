@@ -36,9 +36,9 @@ describe("secrets runtime snapshot gateway-auth integration", () => {
   it("fails fast at startup when gateway auth SecretRef is active and unresolved", async () => {
     await withEnvAsync(
       {
-        OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
-        OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
-        OPENCLAW_VERSION: undefined,
+        DENNOU_BUNDLED_PLUGINS_DIR: undefined,
+        DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
+        DENNOU_VERSION: undefined,
       },
       async () => {
         await expect(
@@ -118,7 +118,7 @@ describe("secrets runtime snapshot gateway-auth integration", () => {
         expect(activeAfterFailure?.sourceConfig.gateway?.auth?.token).toEqual(initialTokenRef);
 
         const persistedConfig = JSON.parse(
-          await fs.readFile(path.join(home, ".openclaw", "openclaw.json"), "utf8"),
+          await fs.readFile(path.join(home, ".openclaw", "dennou-aibou.json"), "utf8"),
         ) as OpenClawConfig;
         expect(persistedConfig.gateway?.auth?.token).toEqual(missingTokenRef);
       });

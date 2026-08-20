@@ -115,7 +115,7 @@ describe("resolveGatewayProbeAuthSafeWithSecretInputs", () => {
         gateway: {
           auth: {
             mode: "token",
-            token: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_TOKEN" },
+            token: { source: "env", provider: "default", id: "DENNOU_GATEWAY_TOKEN" },
           },
         },
         secrets: {
@@ -126,7 +126,7 @@ describe("resolveGatewayProbeAuthSafeWithSecretInputs", () => {
       } as OpenClawConfig,
       mode: "local",
       env: {
-        OPENCLAW_GATEWAY_TOKEN: "test-token-from-env",
+        DENNOU_GATEWAY_TOKEN: "test-token-from-env",
       } as NodeJS.ProcessEnv,
     });
 

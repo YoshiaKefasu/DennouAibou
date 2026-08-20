@@ -1,0 +1,7 @@
+************************************* Invoked: Thu Jul 2 14:08:17 2026
+[0] Arguments: A:\Temp\WinGet\MSYS2.MSYS2.20260611\msys2-x86_64-20260611.exe, install, --confirm-command, --root, C:\msys64
+[9] Operations sanity check succeeded.
+[21] Using metadata cache from "C:/Users/yosia/AppData/Local/cache\\qt-installer-framework\\d75f1c19-3379-3717-ae8d-1404b51494a9"
+[21] Found 0 cached items.
+[35] Loaded control script ":/metadata/installer-config/control_js"
+[36] TargetDirectoryInUse : Error : The directory you selected already exists and contains an installation. Choose a different target for installation.

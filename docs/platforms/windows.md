@@ -1,7 +1,7 @@
 ---
 summary: "Windows support: native and WSL2 install paths, daemon, and current caveats"
 read_when:
-  - Installing OpenClaw on Windows
+  - Installing DennouAibou on Windows
   - Choosing between native Windows and WSL2
   - Looking for Windows companion app status
 title: "Windows"
@@ -9,7 +9,7 @@ title: "Windows"
 
 # Windows
 
-OpenClaw supports both **native Windows** and **WSL2**. WSL2 is the more
+DennouAibou supports both **native Windows** and **WSL2**. WSL2 is the more
 stable path and recommended for the full experience — the CLI, Gateway, and
 tooling run inside Linux with full compatibility. Native Windows works for
 core CLI and Gateway use, with some caveats noted below.
@@ -40,8 +40,8 @@ Current caveats:
 
 - `openclaw onboard --non-interactive` still expects a reachable local gateway unless you pass `--skip-health`
 - `openclaw onboard --non-interactive --install-daemon` and `openclaw gateway install` try Windows Scheduled Tasks first
-- if Scheduled Task creation is denied, OpenClaw falls back to a per-user Startup-folder login item and starts the gateway immediately
-- if `schtasks` itself wedges or stops responding, OpenClaw now aborts that path quickly and falls back instead of hanging forever
+- if Scheduled Task creation is denied, DennouAibou falls back to a per-user Startup-folder login item and starts the gateway immediately
+- if `schtasks` itself wedges or stops responding, DennouAibou now aborts that path quickly and falls back instead of hanging forever
 - Scheduled Tasks are still preferred when available because they provide better supervisor status
 
 If you want the native CLI only, without gateway service install, use one of these:
@@ -106,7 +106,7 @@ Inside WSL:
 sudo loginctl enable-linger "$(whoami)"
 ```
 
-### 2) Install the OpenClaw gateway user service
+### 2) Install the DennouAibou gateway user service
 
 Inside WSL:
 
@@ -220,7 +220,7 @@ Re-open Ubuntu, then verify:
 systemctl --user status
 ```
 
-### 3) Install OpenClaw (inside WSL)
+### 3) Install DennouAibou (inside WSL)
 
 Follow the Linux Getting Started flow inside WSL:
 

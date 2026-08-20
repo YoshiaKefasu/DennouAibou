@@ -1,10 +1,22 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  vi,
+} from "vitest";
 import { WebSocket } from "ws";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
-import { emitAgentEvent, registerAgentRunContext } from "../infra/agent-events.js";
+import {
+  emitAgentEvent,
+  registerAgentRunContext,
+} from "../infra/agent-events.js";
 import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
 import { setRegistry } from "./server.agent.gateway-server-agent.mocks.js";
 import { createRegistry } from "./server.e2e-registry-helpers.js";
@@ -41,7 +53,9 @@ afterAll(async () => {
   await server.close();
 });
 
-const createMSTeamsPlugin = (params?: { aliases?: string[] }): ChannelPlugin => ({
+const createMSTeamsPlugin = (params?: {
+  aliases?: string[];
+}): ChannelPlugin => ({
   id: "msteams",
   meta: {
     id: "msteams",
@@ -161,18 +175,29 @@ function sendAgentWsRequest(
       type: "req",
       id: params.reqId,
       method: "agent",
-      params: { message: params.message, idempotencyKey: params.idempotencyKey },
+      params: {
+        message: params.message,
+        idempotencyKey: params.idempotencyKey,
+      },
     }),
   );
 }
 
 async function sendAgentWsRequestAndWaitFinal(
   socket: WebSocket,
-  params: { reqId: string; message: string; idempotencyKey: string; timeoutMs?: number },
+  params: {
+    reqId: string;
+    message: string;
+    idempotencyKey: string;
+    timeoutMs?: number;
+  },
 ) {
   const finalP = onceMessage(
     socket,
-    (o) => o.type === "res" && o.id === params.reqId && o.payload?.status !== "accepted",
+    (o) =>
+      o.type === "res" &&
+      o.id === params.reqId &&
+      o.payload?.status !== "accepted",
     params.timeoutMs,
   );
   sendAgentWsRequest(socket, params);
@@ -304,7 +329,9 @@ describe("gateway server agent", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.error?.code).toBe("INVALID_REQUEST");
-    expect(res.error?.message).toMatch(/Channel is required|runtime not initialized/);
+    expect(res.error?.message).toMatch(
+      /Channel is required|runtime not initialized/,
+    );
     expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
   });
 
@@ -332,12 +359,18 @@ describe("gateway server agent", () => {
       {
         pluginId: "discord",
         source: "test",
-        plugin: createConfiguredChannelPlugin({ id: "discord", label: "Discord" }),
+        plugin: createConfiguredChannelPlugin({
+          id: "discord",
+          label: "Discord",
+        }),
       },
       {
         pluginId: "telegram",
         source: "test",
-        plugin: createConfiguredChannelPlugin({ id: "telegram", label: "Telegram" }),
+        plugin: createConfiguredChannelPlugin({
+          id: "telegram",
+          label: "Telegram",
+        }),
       },
     ]);
     setRegistry(registry);
@@ -373,25 +406,19 @@ describe("gateway server agent", () => {
     expectAgentRoutingCall({ channel: "webchat", deliver: false });
   });
 
-  test("agent routes bare /new through session reset before running greeting prompt", async () => {
+  test("agent /new on the main session is rejected as a protected session", async () => {
     await writeMainSessionEntry({ sessionId: "sess-main-before-reset" });
     const spy = vi.mocked(agentCommand);
-    const calls = spy.mock.calls;
-    const callsBefore = calls.length;
+    const callsBefore = spy.mock.calls.length;
     const res = await rpcReq(ws, "agent", {
       message: "/new",
       sessionKey: "main",
       idempotencyKey: "idem-agent-new",
     });
-    expect(res.ok).toBe(true);
-
-    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(callsBefore));
-    const call = (calls.at(-1)?.[0] ?? {}) as Record<string, unknown>;
-    expect(call.message).toBeTypeOf("string");
-    expect(call.message).toContain("Run your Session Startup sequence");
-    expect(call.message).toContain("Current time:");
-    expect(typeof call.sessionId).toBe("string");
-    expect(call.sessionId).not.toBe("sess-main-before-reset");
+    expect(res.ok).toBe(false);
+    expect(res.error?.message ?? "").toMatch(/Cannot reset protected session/);
+    // No greeting run is started because the reset is rejected up front.
+    expect(spy.mock.calls.length).toBe(callsBefore);
   });
 
   test("write-scoped callers cannot reset conversations via agent", async () => {
@@ -416,9 +443,13 @@ describe("gateway server agent", () => {
       await new Promise<void>((resolve) => writeWs.once("open", resolve));
       await connectOk(writeWs, { scopes: ["operator.write"] });
 
-      const directReset = await rpcReq(writeWs, "sessions.reset", { key: "main" });
+      const directReset = await rpcReq(writeWs, "sessions.reset", {
+        key: "main",
+      });
       expect(directReset.ok).toBe(false);
-      expect(directReset.error?.message).toContain("missing scope: operator.admin");
+      expect(directReset.error?.message).toContain(
+        "missing scope: operator.admin",
+      );
 
       vi.mocked(agentCommand).mockClear();
       const viaAgent = await rpcReq(writeWs, "agent", {
@@ -427,46 +458,60 @@ describe("gateway server agent", () => {
         idempotencyKey: "idem-agent-write-reset",
       });
       expect(viaAgent.ok).toBe(false);
-      expect(viaAgent.error?.message).toContain("missing scope: operator.admin");
+      expect(viaAgent.error?.message).toContain(
+        "missing scope: operator.admin",
+      );
 
       const store = JSON.parse(await fs.readFile(storePath, "utf-8")) as Record<
         string,
         { sessionId?: string }
       >;
       expect(store["agent:main:main"]?.sessionId).toBeDefined();
-      expect(store["agent:main:main"]?.sessionId).toBe("sess-main-before-write-reset");
+      expect(store["agent:main:main"]?.sessionId).toBe(
+        "sess-main-before-write-reset",
+      );
       expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
 
       writeWs.close();
     });
   });
 
-  test("agent ack response then final response", { timeout: 8000 }, async () => {
-    const ackP = onceMessage(
-      ws,
-      (o) => o.type === "res" && o.id === "ag1" && o.payload?.status === "accepted",
-    );
-    const finalP = onceMessage(
-      ws,
-      (o) => o.type === "res" && o.id === "ag1" && o.payload?.status !== "accepted",
-    );
-    sendAgentWsRequest(ws, {
-      reqId: "ag1",
-      message: "hi",
-      idempotencyKey: "idem-ag",
-    });
+  test(
+    "agent ack response then final response",
+    { timeout: 8000 },
+    async () => {
+      const ackP = onceMessage(
+        ws,
+        (o) =>
+          o.type === "res" &&
+          o.id === "ag1" &&
+          o.payload?.status === "accepted",
+      );
+      const finalP = onceMessage(
+        ws,
+        (o) =>
+          o.type === "res" &&
+          o.id === "ag1" &&
+          o.payload?.status !== "accepted",
+      );
+      sendAgentWsRequest(ws, {
+        reqId: "ag1",
+        message: "hi",
+        idempotencyKey: "idem-ag",
+      });
 
-    const ack = await ackP;
-    const final = await finalP;
-    const ackPayload = ack.payload;
-    const finalPayload = final.payload;
-    if (!ackPayload || !finalPayload) {
-      throw new Error("missing websocket payload");
-    }
-    expect(ackPayload.runId).toBeDefined();
-    expect(finalPayload.runId).toBe(ackPayload.runId);
-    expect(finalPayload.status).toBe("ok");
-  });
+      const ack = await ackP;
+      const final = await finalP;
+      const ackPayload = ack.payload;
+      const finalPayload = final.payload;
+      if (!ackPayload || !finalPayload) {
+        throw new Error("missing websocket payload");
+      }
+      expect(ackPayload.runId).toBeDefined();
+      expect(finalPayload.runId).toBe(ackPayload.runId);
+      expect(finalPayload.status).toBe("ok");
+    },
+  );
 
   test("agent dedupes by idempotencyKey after completion", async () => {
     const firstFinal = await sendAgentWsRequestAndWaitFinal(ws, {
@@ -530,7 +575,8 @@ describe("gateway server agent", () => {
         if (o.type !== "event" || o.event !== "chat") {
           return false;
         }
-        const payload = o.payload as { state?: unknown; runId?: unknown } | undefined;
+        const payload = o.payload as
+          { state?: unknown; runId?: unknown } | undefined;
         return payload?.state === "final" && payload.runId === "run-auto-1";
       },
       8000,
@@ -548,7 +594,8 @@ describe("gateway server agent", () => {
     });
 
     const evt = await finalChatP;
-    const payload = evt.payload && typeof evt.payload === "object" ? evt.payload : {};
+    const payload =
+      evt.payload && typeof evt.payload === "object" ? evt.payload : {};
     expect(payload.sessionKey).toBe("main");
     expect(payload.runId).toBe("run-auto-1");
 

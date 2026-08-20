@@ -1,7 +1,7 @@
 ---
 summary: "Troubleshoot WSL2 Gateway + Windows Chrome remote CDP in layers"
 read_when:
-  - Running OpenClaw Gateway in WSL2 while Chrome lives on Windows
+  - Running DennouAibou Gateway in WSL2 while Chrome lives on Windows
   - Seeing overlapping browser/control-ui errors across WSL2 and Windows
   - Deciding between host-local Chrome MCP and raw remote CDP in split-host setups
 title: "WSL2 + Windows + remote Chrome CDP troubleshooting"
@@ -11,7 +11,7 @@ title: "WSL2 + Windows + remote Chrome CDP troubleshooting"
 
 This guide covers the common split-host setup where:
 
-- OpenClaw Gateway runs inside WSL2
+- DennouAibou Gateway runs inside WSL2
 - Chrome runs on Windows
 - browser control must cross the WSL2/Windows boundary
 
@@ -37,7 +37,7 @@ Use `existing-session` / `user` only when the Gateway itself runs on the same ho
 
 Choose this when:
 
-- OpenClaw and Chrome are on the same machine
+- DennouAibou and Chrome are on the same machine
 - you want the local signed-in browser state
 - you do not need cross-host browser transport
 - you do not need advanced managed/raw-CDP-only routes like `responsebody`, PDF
@@ -53,7 +53,7 @@ Reference shape:
 - Windows opens the Control UI in a normal browser at `http://127.0.0.1:18789/`
 - Windows Chrome exposes a CDP endpoint on port `9222`
 - WSL2 can reach that Windows CDP endpoint
-- OpenClaw points a browser profile at the address that is reachable from WSL2
+- DennouAibou points a browser profile at the address that is reachable from WSL2
 
 ## Why this setup is confusing
 
@@ -96,7 +96,7 @@ curl http://127.0.0.1:9222/json/version
 curl http://127.0.0.1:9222/json/list
 ```
 
-If this fails on Windows, OpenClaw is not the problem yet.
+If this fails on Windows, DennouAibou is not the problem yet.
 
 ### Layer 2: Verify WSL2 can reach that Windows endpoint
 
@@ -118,11 +118,11 @@ If this fails:
 - the address is wrong for the WSL2 side
 - firewall / port forwarding / local proxying is still missing
 
-Fix that before touching OpenClaw config.
+Fix that before touching DennouAibou config.
 
 ### Layer 3: Configure the correct browser profile
 
-For raw remote CDP, point OpenClaw at the address that is reachable from WSL2:
+For raw remote CDP, point DennouAibou at the address that is reachable from WSL2:
 
 ```json5
 {
@@ -145,9 +145,9 @@ Notes:
 - use the WSL2-reachable address, not whatever only works on Windows
 - keep `attachOnly: true` for externally managed browsers
 - `cdpUrl` can be `http://`, `https://`, `ws://`, or `wss://`
-- use HTTP(S) when you want OpenClaw to discover `/json/version`
+- use HTTP(S) when you want DennouAibou to discover `/json/version`
 - use WS(S) only when the browser provider gives you a direct DevTools socket URL
-- test the same URL with `curl` before expecting OpenClaw to succeed
+- test the same URL with `curl` before expecting DennouAibou to succeed
 
 ### Layer 4: Verify the Control UI layer separately
 
@@ -206,7 +206,7 @@ Treat each message as a layer-specific clue:
 
 1. Windows: does `curl http://127.0.0.1:9222/json/version` work?
 2. WSL2: does `curl http://WINDOWS_HOST_OR_IP:9222/json/version` work?
-3. OpenClaw config: does `browser.profiles.<name>.cdpUrl` use that exact WSL2-reachable address?
+3. DennouAibou config: does `browser.profiles.<name>.cdpUrl` use that exact WSL2-reachable address?
 4. Control UI: are you opening `http://127.0.0.1:18789/` instead of a LAN IP?
 5. Are you trying to use `existing-session` across WSL2 and Windows instead of raw remote CDP?
 
@@ -218,4 +218,4 @@ When in doubt:
 
 - verify the Windows Chrome endpoint locally first
 - verify the same endpoint from WSL2 second
-- only then debug OpenClaw config or Control UI auth
+- only then debug DennouAibou config or Control UI auth

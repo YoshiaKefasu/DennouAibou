@@ -248,7 +248,7 @@ const readUsageFromSessionLog = (
       model?: string;
     }
   | undefined => {
-  // Transcripts are stored at the session file path (fallback: ~/.openclaw/sessions/<SessionId>.jsonl)
+  // Transcripts are stored at the session file path (fallback: ~/.dennou-aibou/sessions/<SessionId>.jsonl)
   if (!sessionId) {
     return undefined;
   }

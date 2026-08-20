@@ -1,0 +1,1 @@
+.session.protectedKeys = ["agent:main:main"]

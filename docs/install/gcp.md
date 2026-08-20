@@ -1,19 +1,19 @@
 ---
-summary: "Run OpenClaw Gateway 24/7 on a GCP Compute Engine VM (Docker) with durable state"
+summary: "Run DennouAibou Gateway 24/7 on a GCP Compute Engine VM (Docker) with durable state"
 read_when:
-  - You want OpenClaw running 24/7 on GCP
+  - You want DennouAibou running 24/7 on GCP
   - You want a production-grade, always-on Gateway on your own VM
   - You want full control over persistence, binaries, and restart behavior
 title: "GCP"
 ---
 
-# OpenClaw on GCP Compute Engine (Docker, Production VPS Guide)
+# DennouAibou on GCP Compute Engine (Docker, Production VPS Guide)
 
 ## Goal
 
-Run a persistent OpenClaw Gateway on a GCP Compute Engine VM using Docker, with durable state, baked-in binaries, and safe restart behavior.
+Run a persistent DennouAibou Gateway on a GCP Compute Engine VM using Docker, with durable state, baked-in binaries, and safe restart behavior.
 
-If you want "OpenClaw 24/7 for ~$5-12/mo", this is a reliable setup on Google Cloud.
+If you want "DennouAibou 24/7 for ~$5-12/mo", this is a reliable setup on Google Cloud.
 Pricing varies by machine type and region; pick the smallest VM that fits your workload and scale up if you hit OOMs.
 
 ## What are we doing (simple terms)?
@@ -21,7 +21,7 @@ Pricing varies by machine type and region; pick the smallest VM that fits your w
 - Create a GCP project and enable billing
 - Create a Compute Engine VM
 - Install Docker (isolated app runtime)
-- Start the OpenClaw Gateway in Docker
+- Start the DennouAibou Gateway in Docker
 - Persist `~/.openclaw` + `~/.openclaw/workspace` on the host (survives restarts/rebuilds)
 - Access the Control UI from your laptop via an SSH tunnel
 
@@ -45,7 +45,7 @@ For the generic Docker flow, see [Docker](/install/docker).
 2. Create Compute Engine VM (e2-small, Debian 12, 20GB)
 3. SSH into the VM
 4. Install Docker
-5. Clone OpenClaw repository
+5. Clone DennouAibou repository
 6. Create persistent host directories
 7. Configure `.env` and `docker-compose.yml`
 8. Bake required binaries, build, and launch
@@ -91,7 +91,7 @@ For the generic Docker flow, see [Docker](/install/docker).
     **CLI:**
 
     ```bash
-    gcloud projects create my-openclaw-project --name="OpenClaw Gateway"
+    gcloud projects create my-openclaw-project --name="DennouAibou Gateway"
     gcloud config set project my-openclaw-project
     ```
 
@@ -187,7 +187,7 @@ For the generic Docker flow, see [Docker](/install/docker).
 
   </Step>
 
-  <Step title="Clone the OpenClaw repository">
+  <Step title="Clone the DennouAibou repository">
     ```bash
     git clone https://github.com/openclaw/openclaw.git
     cd openclaw
@@ -388,7 +388,7 @@ For automation or CI/CD pipelines, create a dedicated service account with minim
 
    ```bash
    gcloud iam service-accounts create openclaw-deploy \
-     --display-name="OpenClaw Deployment"
+     --display-name="DennouAibou Deployment"
    ```
 
 2. Grant Compute Instance Admin role (or narrower custom role):

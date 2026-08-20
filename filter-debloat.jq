@@ -1,0 +1,1 @@
+del(.auth.profiles["openrouter:default"]) | del(.auth.profiles["kilocode:default"]) | del(.messages.tts.providers.elevenlabs)

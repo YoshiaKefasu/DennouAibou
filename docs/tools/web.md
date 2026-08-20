@@ -13,7 +13,7 @@ read_when:
 The `web_search` tool searches the web using your configured provider and
 returns results. Results are cached by query for 15 minutes (configurable).
 
-OpenClaw also includes `web_fetch` for lightweight URL fetching. In this
+DennouAibou also includes `web_fetch` for lightweight URL fetching. In this
 phase, `web_fetch` stays local while `web_search` queries your configured
 provider.
 
@@ -43,7 +43,7 @@ provider.
     The agent can now call `web_search`:
 
     ```javascript
-    await web_search({ query: "OpenClaw plugin SDK" });
+    await web_search({ query: "DennouAibou plugin SDK" });
     ```
 
   </Step>
@@ -91,7 +91,7 @@ provider.
 
 ## Native Codex web search
 
-Codex-capable models can optionally use the provider-native Responses `web_search` tool instead of OpenClaw's managed `web_search` function.
+Codex-capable models can optionally use the provider-native Responses `web_search` tool instead of DennouAibou's managed `web_search` function.
 
 - Configure it under `tools.web.search.openaiCodex`
 - It only activates for Codex-capable models (`openai-codex/*` or providers using `api: "openai-codex-responses"`)
@@ -122,14 +122,14 @@ Codex-capable models can optionally use the provider-native Responses `web_searc
 }
 ```
 
-If native Codex search is enabled but the current model is not Codex-capable, OpenClaw keeps the normal managed `web_search` behavior.
+If native Codex search is enabled but the current model is not Codex-capable, DennouAibou keeps the normal managed `web_search` behavior.
 
 ## Setting up web search
 
 Provider lists in docs and setup flows are alphabetical. Auto-detection keeps a
 separate precedence order.
 
-If no `provider` is set, OpenClaw checks providers in this order and uses the
+If no `provider` is set, DennouAibou checks providers in this order and uses the
 first one that is ready:
 
 API-backed providers first:
@@ -150,7 +150,7 @@ error prompting you to configure one).
 
 <Note>
   All provider key fields support SecretRef objects. In auto-detect mode,
-  OpenClaw resolves only the selected provider key -- non-selected SecretRefs
+  DennouAibou resolves only the selected provider key -- non-selected SecretRefs
   stay inactive.
 </Note>
 
@@ -179,7 +179,7 @@ examples.
 `web_fetch` fallback provider selection is separate:
 
 - choose it with `tools.web.fetch.provider`
-- or omit that field and let OpenClaw auto-detect the first ready web-fetch
+- or omit that field and let DennouAibou auto-detect the first ready web-fetch
   provider from available credentials
 - today the bundled web-fetch provider is Firecrawl, configured under
   `plugins.entries.firecrawl.config.webFetch.*`
@@ -250,7 +250,7 @@ examples.
 
 ```javascript
 // Basic search
-await web_search({ query: "OpenClaw plugin SDK" });
+await web_search({ query: "DennouAibou plugin SDK" });
 
 // German-specific search
 await web_search({ query: "TV online schauen", country: "DE", language: "de" });

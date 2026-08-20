@@ -177,8 +177,8 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
       throw new Error("temp home not initialized");
     }
     const stateDir = await fs.mkdtemp(path.join(tempHome, prefix));
-    process.env.OPENCLAW_STATE_DIR = stateDir;
-    delete process.env.OPENCLAW_CONFIG_PATH;
+    process.env.DENNOU_STATE_DIR = stateDir;
+    delete process.env.DENNOU_CONFIG_PATH;
     return stateDir;
   };
   const withStateDir = async (
@@ -195,23 +195,23 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
   beforeAll(async () => {
     envSnapshot = captureEnv([
       "HOME",
-      "OPENCLAW_STATE_DIR",
-      "OPENCLAW_CONFIG_PATH",
-      "OPENCLAW_SKIP_CHANNELS",
-      "OPENCLAW_SKIP_GMAIL_WATCHER",
-      "OPENCLAW_SKIP_CRON",
-      "OPENCLAW_SKIP_CANVAS_HOST",
-      "OPENCLAW_SKIP_BROWSER_CONTROL_SERVER",
-      "OPENCLAW_GATEWAY_TOKEN",
-      "OPENCLAW_GATEWAY_PASSWORD",
+      "DENNOU_STATE_DIR",
+      "DENNOU_CONFIG_PATH",
+      "DENNOU_SKIP_CHANNELS",
+      "DENNOU_SKIP_GMAIL_WATCHER",
+      "DENNOU_SKIP_CRON",
+      "DENNOU_SKIP_CANVAS_HOST",
+      "DENNOU_SKIP_BROWSER_CONTROL_SERVER",
+      "DENNOU_GATEWAY_TOKEN",
+      "DENNOU_GATEWAY_PASSWORD",
     ]);
-    process.env.OPENCLAW_SKIP_CHANNELS = "1";
-    process.env.OPENCLAW_SKIP_GMAIL_WATCHER = "1";
-    process.env.OPENCLAW_SKIP_CRON = "1";
-    process.env.OPENCLAW_SKIP_CANVAS_HOST = "1";
-    process.env.OPENCLAW_SKIP_BROWSER_CONTROL_SERVER = "1";
-    delete process.env.OPENCLAW_GATEWAY_TOKEN;
-    delete process.env.OPENCLAW_GATEWAY_PASSWORD;
+    process.env.DENNOU_SKIP_CHANNELS = "1";
+    process.env.DENNOU_SKIP_GMAIL_WATCHER = "1";
+    process.env.DENNOU_SKIP_CRON = "1";
+    process.env.DENNOU_SKIP_CANVAS_HOST = "1";
+    process.env.DENNOU_SKIP_BROWSER_CONTROL_SERVER = "1";
+    delete process.env.DENNOU_GATEWAY_TOKEN;
+    delete process.env.DENNOU_GATEWAY_PASSWORD;
 
     tempHome = await makeTempWorkspace("openclaw-onboard-");
     process.env.HOME = tempHome;
@@ -304,12 +304,12 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
     });
   }, 60_000);
 
-  it("uses OPENCLAW_GATEWAY_TOKEN when --gateway-token is omitted", async () => {
+  it("uses DENNOU_GATEWAY_TOKEN when --gateway-token is omitted", async () => {
     await withStateDir("state-env-token-", async (stateDir) => {
       const envToken = "tok_env_fallback_123";
       const workspace = path.join(stateDir, "openclaw");
-      const prevToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-      process.env.OPENCLAW_GATEWAY_TOKEN = envToken;
+      const prevToken = process.env.DENNOU_GATEWAY_TOKEN;
+      process.env.DENNOU_GATEWAY_TOKEN = envToken;
 
       try {
         await runNonInteractiveSetup(
@@ -336,9 +336,9 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
         expect(cfg?.gateway?.auth?.token).toBe(envToken);
       } finally {
         if (prevToken === undefined) {
-          delete process.env.OPENCLAW_GATEWAY_TOKEN;
+          delete process.env.DENNOU_GATEWAY_TOKEN;
         } else {
-          process.env.OPENCLAW_GATEWAY_TOKEN = prevToken;
+          process.env.DENNOU_GATEWAY_TOKEN = prevToken;
         }
       }
     });
@@ -348,8 +348,8 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
     await withStateDir("state-env-token-ref-", async (stateDir) => {
       const envToken = "tok_env_ref_123";
       const workspace = path.join(stateDir, "openclaw");
-      const prevToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-      process.env.OPENCLAW_GATEWAY_TOKEN = envToken;
+      const prevToken = process.env.DENNOU_GATEWAY_TOKEN;
+      process.env.DENNOU_GATEWAY_TOKEN = envToken;
 
       try {
         await runNonInteractiveSetup(
@@ -363,7 +363,7 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
             installDaemon: false,
             gatewayBind: "loopback",
             gatewayAuth: "token",
-            gatewayTokenRefEnv: "OPENCLAW_GATEWAY_TOKEN",
+            gatewayTokenRefEnv: "DENNOU_GATEWAY_TOKEN",
           },
           runtime,
         );
@@ -377,13 +377,13 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
         expect(cfg?.gateway?.auth?.token).toEqual({
           source: "env",
           provider: "default",
-          id: "OPENCLAW_GATEWAY_TOKEN",
+          id: "DENNOU_GATEWAY_TOKEN",
         });
       } finally {
         if (prevToken === undefined) {
-          delete process.env.OPENCLAW_GATEWAY_TOKEN;
+          delete process.env.DENNOU_GATEWAY_TOKEN;
         } else {
-          process.env.OPENCLAW_GATEWAY_TOKEN = prevToken;
+          process.env.DENNOU_GATEWAY_TOKEN = prevToken;
         }
       }
     });
@@ -657,8 +657,8 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
       return;
     }
     await withStateDir("state-lan-", async (stateDir) => {
-      process.env.OPENCLAW_STATE_DIR = stateDir;
-      process.env.OPENCLAW_CONFIG_PATH = path.join(stateDir, "openclaw.json");
+      process.env.DENNOU_STATE_DIR = stateDir;
+      process.env.DENNOU_CONFIG_PATH = path.join(stateDir, "dennou-aibou.json");
 
       const port = getPseudoPort(40_000);
       const workspace = path.join(stateDir, "openclaw");

@@ -10,7 +10,7 @@ title: "API Usage and Costs"
 # API usage & costs
 
 This doc lists **features that can invoke API keys** and where their costs show up. It focuses on
-OpenClaw features that can generate provider usage or paid API calls.
+DennouAibou features that can generate provider usage or paid API calls.
 
 ## Where costs show up (chat + CLI)
 
@@ -27,7 +27,7 @@ OpenClaw features that can generate provider usage or paid API calls.
 
 - `/usage full` appends a usage footer to every reply, including **estimated cost** (API-key only).
 - `/usage tokens` shows tokens only; subscription-style OAuth/token and CLI flows hide dollar cost.
-- Gemini CLI note: when the CLI returns JSON output, OpenClaw reads usage from
+- Gemini CLI note: when the CLI returns JSON output, DennouAibou reads usage from
   `stats`, normalizes `stats.cached` into `cacheRead`, and derives input tokens
   from `stats.input_tokens - stats.cached` when needed.
 
@@ -38,14 +38,14 @@ OpenClaw features that can generate provider usage or paid API calls.
 - Human output is normalized to `X% left` across providers.
 - Current usage-window providers: Gemini CLI and OpenAI Codex.
 - Usage auth for those quota windows comes from provider-specific hooks when
-  available; otherwise OpenClaw falls back to matching OAuth/API-key
+  available; otherwise DennouAibou falls back to matching OAuth/API-key
   credentials from auth profiles, env, or config.
 
 See [Token use & costs](/reference/token-use) for details and examples.
 
 ## How keys are discovered
 
-OpenClaw can pick up credentials from:
+DennouAibou can pick up credentials from:
 
 - **Auth profiles** (per-agent, stored in `auth-profiles.json`).
 - **Environment variables** (e.g. `OPENAI_API_KEY`, `BRAVE_API_KEY`, `FIRECRAWL_API_KEY`).
@@ -62,7 +62,7 @@ Every reply or tool call uses the **current model provider** (OpenAI, Google, et
 primary source of usage and cost.
 
 This also includes subscription-style hosted providers that still bill outside
-OpenClaw's local UI, such as **OpenAI Codex**.
+DennouAibou's local UI, such as **OpenAI Codex**.
 
 See [Models](/providers/models) for pricing config and [Token use & costs](/reference/token-use) for display.
 

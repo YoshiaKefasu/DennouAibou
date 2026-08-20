@@ -69,7 +69,7 @@ export async function resetCommand(runtime: RuntimeEnv, opts: ResetOptions) {
         {
           value: "config",
           label: "Config only",
-          hint: "openclaw.json",
+          hint: "dennou-aibou.json",
         },
         {
           value: "config+creds+sessions",

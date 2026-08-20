@@ -1,14 +1,14 @@
 ---
-summary: "Move (migrate) an OpenClaw install from one machine to another"
+summary: "Move (migrate) an DennouAibou install from one machine to another"
 read_when:
-  - You are moving OpenClaw to a new laptop/server
+  - You are moving DennouAibou to a new laptop/server
   - You want to preserve sessions, auth, and channel logins (WhatsApp, etc.)
 title: "Migration Guide"
 ---
 
-# Migrating OpenClaw to a New Machine
+# Migrating DennouAibou to a New Machine
 
-This guide moves an OpenClaw gateway to a new machine without redoing onboarding.
+This guide moves an DennouAibou gateway to a new machine without redoing onboarding.
 
 ## What Gets Migrated
 
@@ -41,7 +41,7 @@ Custom profiles use `~/.openclaw-<profile>/` or a path set via `OPENCLAW_STATE_D
 
   </Step>
 
-  <Step title="Install OpenClaw on the new machine">
+  <Step title="Install DennouAibou on the new machine">
     [Install](/install) the CLI (and Node if needed) on the new machine.
     It is fine if onboarding creates a fresh `~/.openclaw/` -- you will overwrite it next.
   </Step>

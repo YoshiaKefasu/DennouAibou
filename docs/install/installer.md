@@ -9,13 +9,13 @@ title: "Installer Internals"
 
 # Installer internals
 
-OpenClaw ships three installer scripts, served from `openclaw.ai`.
+DennouAibou ships three installer scripts, served from `openclaw.ai`.
 
 | Script                             | Platform             | What it does                                                                                                   |
 | ---------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| [`install.sh`](#installsh)         | macOS / Linux / WSL  | Installs Node if needed, installs OpenClaw via npm (default) or git, and can run onboarding.                   |
-| [`install-cli.sh`](#install-clish) | macOS / Linux / WSL  | Installs Node + OpenClaw into a local prefix (`~/.openclaw`) with npm or git checkout modes. No root required. |
-| [`install.ps1`](#installps1)       | Windows (PowerShell) | Installs Node if needed, installs OpenClaw via npm (default) or git, and can run onboarding.                   |
+| [`install.sh`](#installsh)         | macOS / Linux / WSL  | Installs Node if needed, installs DennouAibou via npm (default) or git, and can run onboarding.                   |
+| [`install-cli.sh`](#install-clish) | macOS / Linux / WSL  | Installs Node + DennouAibou into a local prefix (`~/.openclaw`) with npm or git checkout modes. No root required. |
+| [`install.ps1`](#installps1)       | Windows (PowerShell) | Installs Node if needed, installs DennouAibou via npm (default) or git, and can run onboarding.                   |
 
 ## Quick commands
 
@@ -73,12 +73,12 @@ Recommended for most interactive installs on macOS/Linux/WSL.
     Supports macOS and Linux (including WSL). If macOS is detected, installs Homebrew if missing.
   </Step>
   <Step title="Ensure Node.js 24 by default">
-    Checks Node version and installs Node 24 if needed (Homebrew on macOS, NodeSource setup scripts on Linux apt/dnf/yum). OpenClaw still supports Node 22 LTS, currently `22.14+`, for compatibility.
+    Checks Node version and installs Node 24 if needed (Homebrew on macOS, NodeSource setup scripts on Linux apt/dnf/yum). DennouAibou still supports Node 22 LTS, currently `22.14+`, for compatibility.
   </Step>
   <Step title="Ensure Git">
     Installs Git if missing.
   </Step>
-  <Step title="Install OpenClaw">
+  <Step title="Install DennouAibou">
     - `npm` method (default): global npm install
     - `git` method: clone/update repo, install deps with pnpm, build, then install wrapper at `~/.local/bin/openclaw`
   </Step>
@@ -92,7 +92,7 @@ Recommended for most interactive installs on macOS/Linux/WSL.
 
 ### Source checkout detection
 
-If run inside an OpenClaw checkout (`package.json` + `pnpm-workspace.yaml`), the script offers:
+If run inside an DennouAibou checkout (`package.json` + `pnpm-workspace.yaml`), the script offers:
 
 - use checkout (`git`), or
 - use global install (`npm`)
@@ -192,7 +192,7 @@ by default, plus git-checkout installs under the same prefix flow.
   <Step title="Ensure Git">
     If Git is missing, attempts install via apt/dnf/yum on Linux or Homebrew on macOS.
   </Step>
-  <Step title="Install OpenClaw under prefix">
+  <Step title="Install DennouAibou under prefix">
     - `npm` method (default): installs under the prefix with npm, then writes wrapper to `<prefix>/bin/openclaw`
     - `git` method: clones/updates a checkout (default `~/openclaw`) and still writes the wrapper to `<prefix>/bin/openclaw`
   </Step>
@@ -243,7 +243,7 @@ by default, plus git-checkout installs under the same prefix flow.
 | `--npm`                     | Shortcut for npm method                                                         |
 | `--git`, `--github`         | Shortcut for git method                                                         |
 | `--git-dir <path>`          | Git checkout directory (default: `~/openclaw`). Alias: `--dir`                  |
-| `--version <ver>`           | OpenClaw version or dist-tag (default: `latest`)                                |
+| `--version <ver>`           | DennouAibou version or dist-tag (default: `latest`)                                |
 | `--node-version <ver>`      | Node version (default: `22.22.0`)                                               |
 | `--json`                    | Emit NDJSON events                                                              |
 | `--onboard`                 | Run `openclaw onboard` after install                                            |
@@ -259,7 +259,7 @@ by default, plus git-checkout installs under the same prefix flow.
 | ------------------------------------------- | --------------------------------------------- |
 | `OPENCLAW_PREFIX=<path>`                    | Install prefix                                |
 | `OPENCLAW_INSTALL_METHOD=git\|npm`          | Install method                                |
-| `OPENCLAW_VERSION=<ver>`                    | OpenClaw version or dist-tag                  |
+| `OPENCLAW_VERSION=<ver>`                    | DennouAibou version or dist-tag                  |
 | `OPENCLAW_NODE_VERSION=<ver>`               | Node version                                  |
 | `OPENCLAW_GIT_DIR=<path>`                   | Git checkout directory for git installs       |
 | `OPENCLAW_GIT_UPDATE=0\|1`                  | Toggle git updates for existing checkouts     |
@@ -285,7 +285,7 @@ by default, plus git-checkout installs under the same prefix flow.
   <Step title="Ensure Node.js 24 by default">
     If missing, attempts install via winget, then Chocolatey, then Scoop. Node 22 LTS, currently `22.14+`, remains supported for compatibility.
   </Step>
-  <Step title="Install OpenClaw">
+  <Step title="Install DennouAibou">
     - `npm` method (default): global npm install using selected `-Tag`
     - `git` method: clone/update repo, install/build with pnpm, and install wrapper at `%USERPROFILE%\.local\bin\openclaw.cmd`
   </Step>

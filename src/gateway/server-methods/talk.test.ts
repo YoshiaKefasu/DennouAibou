@@ -53,7 +53,7 @@ describe("talk.speak handler", () => {
 
     mocks.loadConfig.mockReturnValue(runtimeConfig);
     mocks.readConfigFileSnapshot.mockResolvedValue({
-      path: "/tmp/openclaw.json",
+      path: "/tmp/dennou-aibou.json",
       hash: "test-hash",
       valid: true,
       config: diskConfig,

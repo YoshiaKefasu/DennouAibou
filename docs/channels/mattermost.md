@@ -1,5 +1,5 @@
 ---
-summary: "Mattermost bot setup and OpenClaw config"
+summary: "Mattermost bot setup and DennouAibou config"
 read_when:
   - Setting up Mattermost
   - Debugging Mattermost routing
@@ -14,7 +14,7 @@ Mattermost is a self-hostable team messaging platform; see the official site at
 
 ## Bundled plugin
 
-Mattermost ships as a bundled plugin in current OpenClaw releases, so normal
+Mattermost ships as a bundled plugin in current DennouAibou releases, so normal
 packaged builds do not need a separate install.
 
 If you are on an older build or a custom install that excludes Mattermost,
@@ -37,11 +37,11 @@ Details: [Plugins](/tools/plugin)
 ## Quick setup
 
 1. Ensure the Mattermost plugin is available.
-   - Current packaged OpenClaw releases already bundle it.
+   - Current packaged DennouAibou releases already bundle it.
    - Older/custom installs can add it manually with the commands above.
 2. Create a Mattermost bot account and copy the **bot token**.
 3. Copy the Mattermost **base URL** (e.g., `https://chat.example.com`).
-4. Configure OpenClaw and start the gateway.
+4. Configure DennouAibou and start the gateway.
 
 Minimal config:
 
@@ -60,7 +60,7 @@ Minimal config:
 
 ## Native slash commands
 
-Native slash commands are opt-in. When enabled, OpenClaw registers `oc_*` slash commands via
+Native slash commands are opt-in. When enabled, DennouAibou registers `oc_*` slash commands via
 the Mattermost API and receives callback POSTs on the gateway HTTP server.
 
 ```json5
@@ -82,17 +82,17 @@ the Mattermost API and receives callback POSTs on the gateway HTTP server.
 Notes:
 
 - `native: "auto"` defaults to disabled for Mattermost. Set `native: true` to enable.
-- If `callbackUrl` is omitted, OpenClaw derives one from gateway host/port + `callbackPath`.
+- If `callbackUrl` is omitted, DennouAibou derives one from gateway host/port + `callbackPath`.
 - For multi-account setups, `commands` can be set at the top level or under
   `channels.mattermost.accounts.<id>.commands` (account values override top-level fields).
 - Command callbacks are validated with the per-command tokens returned by
-  Mattermost when OpenClaw registers `oc_*` commands.
+  Mattermost when DennouAibou registers `oc_*` commands.
 - Slash callbacks fail closed when registration failed, startup was partial, or
   the callback token does not match one of the registered commands.
 - Reachability requirement: the callback endpoint must be reachable from the Mattermost server.
-  - Do not set `callbackUrl` to `localhost` unless Mattermost runs on the same host/network namespace as OpenClaw.
-  - Do not set `callbackUrl` to your Mattermost base URL unless that URL reverse-proxies `/api/channels/mattermost/command` to OpenClaw.
-  - A quick check is `curl https://<gateway-host>/api/channels/mattermost/command`; a GET should return `405 Method Not Allowed` from OpenClaw, not `404`.
+  - Do not set `callbackUrl` to `localhost` unless Mattermost runs on the same host/network namespace as DennouAibou.
+  - Do not set `callbackUrl` to your Mattermost base URL unless that URL reverse-proxies `/api/channels/mattermost/command` to DennouAibou.
+  - A quick check is `curl https://<gateway-host>/api/channels/mattermost/command`; a GET should return `405 Method Not Allowed` from DennouAibou, not `404`.
 - Mattermost egress allowlist requirement:
   - If your callback targets private/tailnet/internal addresses, set Mattermost
     `ServiceSettings.AllowedUntrustedInternalConnections` to include the callback host/domain.
@@ -208,16 +208,16 @@ Use these target formats with `openclaw message send` or cron/webhooks:
 
 Bare opaque IDs (like `64ifufp...`) are **ambiguous** in Mattermost (user ID vs channel ID).
 
-OpenClaw resolves them **user-first**:
+DennouAibou resolves them **user-first**:
 
-- If the ID exists as a user (`GET /api/v4/users/<id>` succeeds), OpenClaw sends a **DM** by resolving the direct channel via `/api/v4/channels/direct`.
+- If the ID exists as a user (`GET /api/v4/users/<id>` succeeds), DennouAibou sends a **DM** by resolving the direct channel via `/api/v4/channels/direct`.
 - Otherwise the ID is treated as a **channel ID**.
 
 If you need deterministic behavior, always use the explicit prefixes (`user:<id>` / `channel:<id>`).
 
 ## DM channel retry
 
-When OpenClaw sends to a Mattermost DM target and needs to resolve the direct channel first, it
+When DennouAibou sends to a Mattermost DM target and needs to resolve the direct channel first, it
 retries transient direct-channel creation failures by default.
 
 Use `channels.mattermost.dmChannelRetry` to tune that behavior globally for the Mattermost plugin,
@@ -315,10 +315,10 @@ Config:
   reach the gateway at its bind host directly.
 - In multi-account setups, you can also set the same field under
   `channels.mattermost.accounts.<id>.interactions.callbackBaseUrl`.
-- If `interactions.callbackBaseUrl` is omitted, OpenClaw derives the callback URL from
+- If `interactions.callbackBaseUrl` is omitted, DennouAibou derives the callback URL from
   `gateway.customBindHost` + `gateway.port`, then falls back to `http://localhost:<port>`.
 - Reachability rule: the button callback URL must be reachable from the Mattermost server.
-  `localhost` only works when Mattermost and OpenClaw run on the same host/network namespace.
+  `localhost` only works when Mattermost and DennouAibou run on the same host/network namespace.
 - If your callback target is private/tailnet/internal, add its host/domain to Mattermost
   `ServiceSettings.AllowedUntrustedInternalConnections`.
 
@@ -442,7 +442,7 @@ Mattermost supports multiple accounts under `channels.mattermost.accounts`:
 - No replies in channels: ensure the bot is in the channel and mention it (oncall), use a trigger prefix (onchar), or set `chatmode: "onmessage"`.
 - Auth errors: check the bot token, base URL, and whether the account is enabled.
 - Multi-account issues: env vars only apply to the `default` account.
-- Native slash commands return `Unauthorized: invalid command token.`: OpenClaw
+- Native slash commands return `Unauthorized: invalid command token.`: DennouAibou
   did not accept the callback token. Typical causes:
   - slash command registration failed or only partially completed at startup
   - the callback is hitting the wrong gateway/account
@@ -453,7 +453,7 @@ Mattermost supports multiple accounts under `channels.mattermost.accounts`:
   `mattermost: native slash commands enabled but no commands could be registered`.
 - If `callbackUrl` is omitted and logs warn that the callback resolved to
   `http://127.0.0.1:18789/...`, that URL is probably only reachable when
-  Mattermost runs on the same host/network namespace as OpenClaw. Set an
+  Mattermost runs on the same host/network namespace as DennouAibou. Set an
   explicit externally reachable `commands.callbackUrl` instead.
 - Buttons appear as white boxes: the agent may be sending malformed button data. Check that each button has both `text` and `callback_data` fields.
 - Buttons render but clicks do nothing: verify `AllowedUntrustedInternalConnections` in Mattermost server config includes `127.0.0.1 localhost`, and that `EnablePostActionIntegration` is `true` in ServiceSettings.

@@ -339,7 +339,7 @@ describe("doctor config flow", () => {
         const stateDir = path.join(home, ".openclaw");
         await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -387,7 +387,7 @@ describe("doctor config flow", () => {
         });
         await fs.mkdir(path.join(accountRoot, "crypto"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -427,7 +427,7 @@ describe("doctor config flow", () => {
         const stateDir = path.join(home, ".openclaw");
         await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -487,7 +487,7 @@ describe("doctor config flow", () => {
       const stateDir = path.join(home, ".openclaw");
       await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
       await fs.writeFile(
-        path.join(stateDir, "openclaw.json"),
+        path.join(stateDir, "dennou-aibou.json"),
         JSON.stringify({
           channels: {
             matrix: {
@@ -995,7 +995,7 @@ describe("doctor config flow", () => {
       const configDir = path.join(home, ".openclaw");
       await fs.mkdir(configDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             channels: {
@@ -1240,7 +1240,7 @@ describe("doctor config flow", () => {
       const credentialsDir = path.join(configDir, "credentials");
       await fs.mkdir(credentialsDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             channels: {
@@ -2024,7 +2024,7 @@ describe("doctor config flow", () => {
       const configDir = path.join(home, ".openclaw");
       await fs.mkdir(configDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             talk: {

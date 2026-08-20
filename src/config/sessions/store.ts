@@ -15,6 +15,7 @@ import {
   type DeliveryContext,
 } from "../../utils/delivery-context.js";
 import { getFileStatSnapshot } from "../cache-utils.js";
+import { loadConfig } from "../io.js";
 import {
   enforceSessionDiskBudget,
   type SessionDiskBudgetSweepResult,

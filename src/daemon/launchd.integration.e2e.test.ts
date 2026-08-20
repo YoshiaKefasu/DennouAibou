@@ -95,8 +95,8 @@ describeLaunchdIntegration("launchd integration", () => {
     homeDir = await fs.mkdtemp(path.join(os.tmpdir(), `openclaw-launchd-int-${testId}-`));
     env = {
       HOME: homeDir,
-      OPENCLAW_LAUNCHD_LABEL: `ai.openclaw.launchd-int-${testId}`,
-      OPENCLAW_LOG_PREFIX: `gateway-launchd-int-${testId}`,
+      DENNOU_LAUNCHD_LABEL: `ai.openclaw.launchd-int-${testId}`,
+      DENNOU_LOG_PREFIX: `gateway-launchd-int-${testId}`,
     };
   });
 

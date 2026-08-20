@@ -26,16 +26,16 @@ function resolveVersionFromInstaller(cliPath: string): string {
     [
       "-lc",
       `source "${installerPath}" >/dev/null 2>&1
-OPENCLAW_BIN="$FAKE_OPENCLAW_BIN"
-resolve_openclaw_version`,
+DENNOU_BIN="$FAKE_DENNOU_BIN"
+resolve_DENNOU_version`,
     ],
     {
       cwd: process.cwd(),
       encoding: "utf-8",
       env: {
         ...process.env,
-        FAKE_OPENCLAW_BIN: cliPath,
-        OPENCLAW_INSTALL_SH_NO_RUN: "1",
+        FAKE_DENNOU_BIN: cliPath,
+        DENNOU_INSTALL_SH_NO_RUN: "1",
       },
     },
   );
@@ -49,13 +49,13 @@ function resolveVersionFromInstallerViaStdin(cliPath: string, cwd: string): stri
     cwd,
     encoding: "utf-8",
     input: `${installerSource}
-OPENCLAW_BIN="$FAKE_OPENCLAW_BIN"
-resolve_openclaw_version
+DENNOU_BIN="$FAKE_DENNOU_BIN"
+resolve_DENNOU_version
 `,
     env: {
       ...process.env,
-      FAKE_OPENCLAW_BIN: cliPath,
-      OPENCLAW_INSTALL_SH_NO_RUN: "1",
+      FAKE_DENNOU_BIN: cliPath,
+      DENNOU_INSTALL_SH_NO_RUN: "1",
     },
   });
   return output.trim();
@@ -108,7 +108,7 @@ describe("install.sh version resolution", () => {
       fs.writeFileSync(
         hostileHelper,
         `#!/usr/bin/env bash
-extract_openclaw_semver() {
+extract_DENNOU_semver() {
   printf '%s' 'poisoned'
 }
 `,

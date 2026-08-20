@@ -657,3 +657,244 @@ code-review で指摘された docs 残骸を修正（コミットなし・作�
 8. **azure.md の推奨プロバイダー文言を修正**: `docs/install/azure.md` の「GitHub Copilot provider を選択」推奨（削除済みプロバイダー）を「OpenAI or Google API key を設定」推奨に言い換え
 9. **slash-commands.md の `/fast` 説明をトリム**: 削除済み Anthropic プロバイダーの OAuth / `service_tier=auto|standard_only` 記述を除去し、OpenAI/Codex の `service_tier=priority` 説明のみに
 
+
+---
+
+
+## 14. Phase B: 追加 Debloat（未使用機能の削除）
+
+> **目標**: Provider 削除に加え、KASOU で未使用の機能・チャンネル・ツールを追加削除
+> **工数目安**: 2-3日
+> **前提**: Phase A (Branding) と並行可能
+
+### 14.1 削除候補のカテゴリ
+
+#### A. 未使用チャンネル
+
+KASOU で実際に使われているチャンネル: **Telegram**（メイン）+ **Discord**（`openclaw.json` に channel 設定あり）。
+
+**注意**: GRKD-Jisho は**独自の discord.js 接続**を使い、DennouAibou の Discord extension には依存しない。ただし KASOU の `openclaw.json` に Discord channel 設定が存在するため、**Discord が DennouAibou gateway 経由で使われている可能性がある**。Phase B-1 の前に KASOU 設定を確認し、Discord の使用有無を確定すること。
+
+| チャンネル | 用途 | 削除判定 |
+|---|---|---|
+| **telegram** | KASOU main | **維持** |
+| **discord** | KASOU に channel 設定あり → 要確認 | **要確認** |
+| **googlechat** | 未使用 | **削除候補** |
+| **imessage** | 未使用 | **削除候補** |
+| **mattermost** | 未使用 | **削除候補** |
+| **matrix** | 未使用 | **削除候補** |
+| **slack** | 未使用 | **削除候補** |
+| **whatsapp** | 未使用 | **削除候補** |
+| **irc** | 未使用 | **削除候補** |
+| **nostr** | 未使用 | **削除候補** |
+| **bluebubbles** | 未使用 | **削除候補** |
+| **feishu** | 未使用 | **削除候補** |
+| **tlon** | 未使用 | **削除候補** |
+| **nextcloud-talk** | 未使用 | **削除候補** |
+| **synology-chat** | 未使用 | **削除候補** |
+| **zalo** / **zalouser** | 未使用 | **削除候補** |
+| **line** | 未使用 | **削除候補** |
+| **twitch** | 未使用 | **削除候補** |
+| **msteams** | 未使用 | **削除候補** |
+
+#### B. 未使用ツール・チャネルプラグイン
+
+| プラグイン | 種類 | 用途 | 削除判定 |
+|---|---|---|---|
+| **qa-channel** | チャンネル | QA チャンネル | **削除候補** |
+| **talk-voice** | ツール | 音声選択（`enabledByDefault: true`） | **削除候補** |
+| **openshell** | ツール | リモートシェル | **削除候補** |
+| **phone-control** | ツール | スマホ操作 | **削除候補** |
+| **browser** | ツール | ブラウザ操作 | **削除候補** |
+| **voice-call** | ツール | 音声通話（elevenlabs TTS 依存 → Phase A で削除済み） | **削除候補** |
+
+#### C. 未使用サブプロバイダー（kept プロバイダー内）
+
+| プロバイダー | サブ機能 | 削除判定 |
+|---|---|---|
+| **deepgram** | STT/TTS | KASOU で使用中 → **維持** |
+| **brave** | Web Search | KASOU で使用中 → **維持** |
+| **exa** | Web Search | KASOU で使用中 → **維持** |
+
+#### D. コア内のデッドコード
+
+Provider 削除で生まれたデッドコードの追加掃除:
+
+1. **src/agents/byteplus-models.ts** — import 元なし（**削除**）
+2. **src/config/zod-schema.core.ts** — 削除済みプロバイダーの `thinkingFormat` literal（確認後削除）
+3. **src/plugins/discovery.test.ts** — 削除済みプロバイダーの package マッピング fixture（静的データなので生存確認のみ）
+
+#### E. 未使用モバイルアプリ（KASOU スコープ外）
+
+| アプリ | 状態 | 削除判定 |
+|---|---|---|
+| **apps/macos/** | 実在 | KASOU 不要 → **削除候補**（git ブランチで退避推奨） |
+
+**注意**: `apps/ios/` と `apps/android/` はリポジトリに**存在しない**。削除対象外。
+
+### 14.2 削除手順
+
+1. **Phase B-1: チャンネル削除**
+   - `extensions/{imessage,mattermost,matrix,slack,...}/` を削除
+   - `extensions/googlechat/` を削除
+   - `extensions/qa-channel/` を削除
+   - `extensions/talk-voice/` を削除（`enabledByDefault: true` なので auto-activate を停止）
+   - `extensions/voice-call/` を削除（elevenlabs 依存 → Phase A で削除済みと整合）
+   - **⚠️ コア参照のクリーンアップ（必須）**:
+     - `src/config/bundled-channel-config-metadata.generated.ts` から削除チャンネルのエントリを除去
+     - `src/plugin-sdk/qa-channel.ts` — `declare module` パターンで `dennou-removed-plugin-facades.d.ts` に追加
+     - `src/plugin-sdk/talk-voice.ts` — 同上
+     - `src/channels/plugins/contracts/channel-import-guardrails.test.ts` の allowlist から削除チャンネルを除去
+     - 削除後 `pnpm build:plugin-sdk:dts` を実行し、型エラーがないことを確認
+   - ビルド・テスト確認
+
+2. **Phase B-2: ツールプラグイン削除**
+   - `extensions/{openshell,phone-control,browser}/` を削除
+   - ツール参照のコアコードを確認
+   - ビルド・テスト確認
+
+3. **Phase B-3: デッドコード掃除**
+   - `src/agents/byteplus-models.ts` を削除
+   - テスト修正
+
+4. **Phase B-4: モバイルアプリ退避**（判断後）
+   - `git branch backup/mobile-apps` で退避
+   - `apps/macos/` を削除
+   - package.json のモバイル関連スクリプトを削除
+
+### 14.3 リスク
+
+| リスク | 対策 |
+|---|---|
+| チャンネル削除で `bundled-channel-config-metadata.generated.ts` の stale エントリが残る | 削除後に再生成 |
+| `plugin-sdk` facade の `declare module` が足りず `pnpm build:plugin-sdk:dts` が失敗 | `dennou-removed-plugin-facades.d.ts` に追加（Phase A 5.7 章のパターン） |
+| `channel-import-guardrails.test.ts` の allowlist が壊れる | 削除チャンネルを allowlist から除去 |
+| Discord 削除で KASOU の Discord 応答が止まる | Phase B-1 の前に KASOU 設定で Discord 使用有無を確認 |
+| ツール削除で他プラグインが依存 | 削除前に grep で依存確認 |
+| `voice-call` 削除で elevenlabs schema が孤立 | Phase A で elevenlabs 設定削除済みと整合確認 |
+
+### 14.4 検証基準
+
+- [ ] 削除後の `pnpm build` が通る
+- [ ] 削除後の `pnpm build:plugin-sdk:dts` が通る
+- [ ] 削除後の `pnpm test` が通る（既存失敗が増えない）
+- [ ] 削除後の `pnpm test:contracts` が通る（既存失敗が増えない）
+- [ ] KASOU デプロイ後、Telegram 応答が正常
+- [ ] KASOU デプロイ後、gateway が起動し `/` `/logs` で HTTP 200
+- [ ] Discord の使用有無を確認し、結果を記録
+
+### 14.5 実施記録
+
+| 日付 | 内容 | 状態 |
+|---|---|---|
+| | | |
+
+---
+
+## 15. Phase B-5: Google Gemini CLI 廃止（緊急対応）
+
+> **目標**: Google Gemini CLI のライセンス停止に伴い、KASOU のプロバイダー設定を Google REST API に移行
+> **工数目安**: 0.5日
+> **前提**: Phase B-1〜B-4 と並行可能
+
+### 15.1 背景
+
+- **2026-08-20**: Google Gemini CLI が403エラー（`Cloud Code Assist API error (403): You do not have a valid license of this product.`）
+- フォールバック先も全て失敗（Gemini CLI系403、openai-codex 401）
+- **結論**: Google Gemini CLI は使用不可。Google REST API（API Key ベース）に移行
+
+### 15.2 移行先の選択肢
+
+| プロバイダー | 認証方式 | 既存設定 | 備考 |
+|---|---|---|---|
+| **google** (REST API) | API Key | `.env` の `GEMINI_API_KEY` を再利用可能 | **推奨** |
+| **openai-codex** | OAuth | 要再認証 | フォールバック用 |
+| **openai** | API Key | 要設定 | フォールバック用 |
+
+### 15.3 KASOU設定変更
+
+`~/.openclaw/openclaw.json` の `agents.defaults.model` を変更：
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google/gemini-3.1-pro-preview",
+        "fallbacks": [
+          "google/gemini-2.5-pro",
+          "openai/gpt-5.4"
+        ]
+      }
+    }
+  }
+}
+```
+
+**注意**: `google-gemini-cli/` → `google/` にプレフィックスが変わる。
+
+### 15.4 Gemini CLI 関連の削除対象
+
+| 項目 | 削除/変更 |
+|---|---|
+| `~/.gemini/` ディレクトリ | 削除（不要） |
+| `extensions/google-gemini-cli/` | 削除候補（Phase B-1 で判定） |
+| `src/agents/gemini-cli-provider.ts` | 確認後削除 |
+| `auth.json` の `google-gemini-cli` エントリ | 削除 |
+
+### 15.5 実施手順
+
+1. **Phase B-5-1**: KASOU の `openclaw.json` で `google-gemini-cli` を `google` に変更
+2. **Phase B-5-2**: gateway 再起動
+3. **Phase B-5-3**: Telegram でテスト応答を確認
+4. **Phase B-5-4**: `~/.gemini/` ディレクトリを削除（確認後）
+
+### 15.6 検証基準
+
+- [ ] gateway が起動し `/` `/logs` で HTTP 200
+- [ ] Telegram でメッセージ送信 → 正常に応答
+- [ ] `google-gemini-cli` へのリクエストがゼロ
+- [ ] `google` REST API 経由で正常動作
+
+### 15.7 リスク
+
+| リスク | 対策 |
+|---|---|
+| `GEMINI_API_KEY` の有効期限切れ | .env のキーを確認し、必要なら再発行 |
+| モデル名の不一致（`google-gemini-cli/gemini-3.1-pro-preview` → `google/gemini-3.1-pro-preview`） | 設定変更時にモデル名を正確に指定 |
+| episodic-claw が Gemini CLI を使用 | NarrativeWorker のデフォルトモデルも `google` に変更 |
+
+### 15.8 実施記録
+
+| 日付 | 内容 | 状態 |
+|---|---|---|
+| 2026-08-20 | Gemini CLI 403エラー検出、移行計画作成 | 計画完了 |
+
+---
+
+## 16. 緊急対応: KASOU プロバイダー移行（実装済み）
+
+> **日付**: 2026-08-20
+> **状態**: 実装完了・検証済み
+
+### 実施内容
+
+1. **KASOU `openclaw.json` 変更**:
+   - `agents.defaults.model.primary`: `google-gemini-cli/gemini-3.1-pro-preview` → `google/gemini-3.1-pro-preview`
+   - `agents.defaults.model.fallbacks`: Gemini CLI系 → `google/gemini-2.5-pro`, `openai/gpt-5.4`
+
+2. **gateway 再起動**: `systemctl --user restart openclaw-gateway`
+
+3. **検証**: Telegram でテスト応答を確認
+
+### 検証結果
+
+- gateway 起動: ✅ HTTP 200
+- Telegram 応答: ✅ 正常
+- プロバイダー: ✅ `google` REST API 経由で動作
+
+### 残タスク
+
+- `~/.gemini/` ディレクトリの削除（確認後）
+- `extensions/google-gemini-cli/` の削除（Phase B-1 で判定）
+- `src/agents/gemini-cli-provider.ts` の削除確認

@@ -64,7 +64,7 @@ describe("Ollama provider", () => {
   }) {
     const env = {
       ...process.env,
-      OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
+      DENNOU_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
       VITEST: "1",
       NODE_ENV: "test",
       ...params.env,
@@ -81,7 +81,7 @@ describe("Ollama provider", () => {
 
   async function loadOllamaCatalogProvider(): Promise<ProviderPlugin | undefined> {
     ollamaCatalogProviderPromise ??= resolvePluginDiscoveryProviders({
-      env: { ...process.env, OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama", VITEST: "1" },
+      env: { ...process.env, DENNOU_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama", VITEST: "1" },
       onlyPluginIds: ["ollama"],
     }).then((providers) => providers.find((provider) => provider.id === "ollama"));
     return ollamaCatalogProviderPromise;

@@ -51,13 +51,13 @@ describe("legacy state dir auto-migration", () => {
     expect(fs.readFileSync(path.join(root, ".clawdbot", "marker.txt"), "utf-8")).toBe("ok");
   });
 
-  it("skips state-dir migration when OPENCLAW_STATE_DIR is explicitly set", async () => {
+  it("skips state-dir migration when DENNOU_STATE_DIR is explicitly set", async () => {
     const root = await makeTempRoot();
     const legacyDir = path.join(root, ".clawdbot");
     fs.mkdirSync(legacyDir, { recursive: true });
 
     const result = await autoMigrateLegacyStateDir({
-      env: { OPENCLAW_STATE_DIR: path.join(root, "custom-state") } as NodeJS.ProcessEnv,
+      env: { DENNOU_STATE_DIR: path.join(root, "custom-state") } as NodeJS.ProcessEnv,
       homedir: () => root,
     });
 

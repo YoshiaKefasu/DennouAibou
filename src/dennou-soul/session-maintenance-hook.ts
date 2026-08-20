@@ -42,7 +42,7 @@ async function resolveProtectionWithWorkspacePaths(): Promise<import("./types.js
  * saveSessionStore() 完了後のコールバック。
  *
  * @param storePath - 保存された session store のパス
- *   （例: ~/.openclaw/agents/{agentId}/store.json）
+ *   （例: ~/.dennou-aibou/agents/{agentId}/store.json）
  */
 async function afterSavePrune(storePath: string): Promise<void> {
   try {

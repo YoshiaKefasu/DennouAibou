@@ -65,7 +65,7 @@ async function expectSchemaLookupInvalid(path: unknown) {
 
 describe("gateway config methods", () => {
   it("rejects config.set when SecretRef resolution fails", async () => {
-    const missingEnvVar = `OPENCLAW_MISSING_SECRETREF_${Date.now()}`;
+    const missingEnvVar = `DENNOU_MISSING_SECRETREF_${Date.now()}`;
     delete process.env[missingEnvVar];
     const current = await rpcReq<{
       hash?: string;
@@ -123,7 +123,7 @@ describe("gateway config methods", () => {
   });
 
   it("does not reject config.set for unresolved auth-profile refs outside submitted config", async () => {
-    const missingEnvVar = `OPENCLAW_MISSING_AUTH_PROFILE_REF_${Date.now()}`;
+    const missingEnvVar = `DENNOU_MISSING_AUTH_PROFILE_REF_${Date.now()}`;
     delete process.env[missingEnvVar];
 
     const authStorePath = path.join(resolveOpenClawAgentDir(), AUTH_PROFILE_FILENAME);
@@ -286,7 +286,7 @@ describe("gateway config methods", () => {
   });
 
   it("rejects config.patch when merged SecretRefs cannot resolve", async () => {
-    const missingEnvVar = `OPENCLAW_MISSING_SECRETREF_PATCH_${Date.now()}`;
+    const missingEnvVar = `DENNOU_MISSING_SECRETREF_PATCH_${Date.now()}`;
     delete process.env[missingEnvVar];
     const beforeHash = await getConfigHash();
     const res = await rpcReq<{ ok?: boolean; error?: { message?: string } }>(

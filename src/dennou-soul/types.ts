@@ -42,7 +42,7 @@ export interface DennouPruneProtectionConfig {
   resolvedWorkspacePaths: string[];
 }
 
-/** openclaw.json `dennou` セクションのルート型 */
+/** dennou-aibou.json `dennou` セクションのルート型 */
 export interface DennouConfig {
   /** Closed/Active共通のPrune設定。各モード側で必要なキーだけ上書きできる。 */
   toolsPrune: DennouToolsPruneConfig;

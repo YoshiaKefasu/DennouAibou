@@ -139,7 +139,7 @@ function createOpenClawModelRegistry(
 }
 
 function scrubLegacyStaticAuthJsonEntries(pathname: string): void {
-  if (process.env.OPENCLAW_AUTH_STORE_READONLY === "1") {
+  if (process.env.DENNOU_AUTH_STORE_READONLY === "1") {
     return;
   }
   if (!fs.existsSync(pathname)) {

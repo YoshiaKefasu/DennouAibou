@@ -9,7 +9,7 @@ title: "Video Generation"
 
 # Video Generation
 
-OpenClaw agents can generate videos from text prompts, reference images, or existing videos. Google (Veo) and OpenAI (Sora) are the supported provider backends, each with different model options, input modes, and feature sets. The agent picks the right provider automatically based on your configuration and available API keys.
+DennouAibou agents can generate videos from text prompts, reference images, or existing videos. Google (Veo) and OpenAI (Sora) are the supported provider backends, each with different model options, input modes, and feature sets. The agent picks the right provider automatically based on your configuration and available API keys.
 
 <Note>
 The `video_generate` tool only appears when at least one video-generation provider is available. If you do not see it in your agent tools, set a provider API key or configure `agents.defaults.videoGenerationModel`.
@@ -39,9 +39,9 @@ The agent calls `video_generate` automatically. No tool allowlisting is needed.
 
 Video generation is asynchronous. When the agent calls `video_generate` in a session:
 
-1. OpenClaw submits the request to the provider and immediately returns a task ID.
+1. DennouAibou submits the request to the provider and immediately returns a task ID.
 2. The provider processes the job in the background (typically 30 seconds to 5 minutes depending on the provider and resolution).
-3. When the video is ready, OpenClaw wakes the same session with an internal completion event.
+3. When the video is ready, DennouAibou wakes the same session with an internal completion event.
 4. The agent posts the finished video back into the original conversation.
 
 While a job is in flight, duplicate `video_generate` calls in the same session return the current task status instead of starting another generation. Use `openclaw tasks list` or `openclaw tasks show <taskId>` to check progress from the CLI.
@@ -105,7 +105,7 @@ Not all providers support all parameters. Unsupported overrides are ignored on a
 
 ## Model selection
 
-When generating a video, OpenClaw resolves the model in this order:
+When generating a video, DennouAibou resolves the model in this order:
 
 1. **`model` tool parameter** -- if the agent specifies one in the call.
 2. **`videoGenerationModel.primary`** -- from config.
@@ -136,7 +136,7 @@ If a provider fails, the next candidate is tried automatically. If all candidate
 
 ## Configuration
 
-Set the default video generation model in your OpenClaw config:
+Set the default video generation model in your DennouAibou config:
 
 ```json5
 {

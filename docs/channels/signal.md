@@ -12,7 +12,7 @@ Status: external CLI integration. Gateway talks to `signal-cli` over HTTP JSON-R
 
 ## Prerequisites
 
-- OpenClaw installed on your server (Linux flow below tested on Ubuntu 24).
+- DennouAibou installed on your server (Linux flow below tested on Ubuntu 24).
 - `signal-cli` available on the host where the gateway runs.
 - A phone number that can receive one verification SMS (for SMS registration path).
 - Browser access for Signal captcha (`signalcaptchas.org`) during registration.
@@ -22,9 +22,9 @@ Status: external CLI integration. Gateway talks to `signal-cli` over HTTP JSON-R
 1. Use a **separate Signal number** for the bot (recommended).
 2. Install `signal-cli` (Java required if you use the JVM build).
 3. Choose one setup path:
-   - **Path A (QR link):** `signal-cli link -n "OpenClaw"` and scan with Signal.
+   - **Path A (QR link):** `signal-cli link -n "DennouAibou"` and scan with Signal.
    - **Path B (SMS register):** register a dedicated number with captcha + SMS verification.
-4. Configure OpenClaw and restart the gateway.
+4. Configure DennouAibou and restart the gateway.
 5. Send a first DM and approve pairing (`openclaw pairing approve signal <CODE>`).
 
 Minimal config:
@@ -80,7 +80,7 @@ Disable with:
 
 1. Install `signal-cli` (JVM or native build).
 2. Link a bot account:
-   - `signal-cli link -n "OpenClaw"` then scan the QR in Signal.
+   - `signal-cli link -n "DennouAibou"` then scan the QR in Signal.
 3. Configure Signal and start the gateway.
 
 Example:
@@ -138,7 +138,7 @@ signal-cli -a +<BOT_PHONE_NUMBER> register --captcha '<SIGNALCAPTCHA_URL>'
 signal-cli -a +<BOT_PHONE_NUMBER> verify <VERIFICATION_CODE>
 ```
 
-4. Configure OpenClaw, restart gateway, verify channel:
+4. Configure DennouAibou, restart gateway, verify channel:
 
 ```bash
 # If you run the gateway as a user systemd service:
@@ -164,7 +164,7 @@ Upstream references:
 
 ## External daemon mode (httpUrl)
 
-If you want to manage `signal-cli` yourself (slow JVM cold starts, container init, or shared CPUs), run the daemon separately and point OpenClaw at it:
+If you want to manage `signal-cli` yourself (slow JVM cold starts, container init, or shared CPUs), run the daemon separately and point DennouAibou at it:
 
 ```json5
 {
@@ -177,7 +177,7 @@ If you want to manage `signal-cli` yourself (slow JVM cold starts, container ini
 }
 ```
 
-This skips auto-spawn and the startup wait inside OpenClaw. For slow starts when auto-spawning, set `channels.signal.startupTimeoutMs`.
+This skips auto-spawn and the startup wait inside DennouAibou. For slow starts when auto-spawning, set `channels.signal.startupTimeoutMs`.
 
 ## Access control (DMs + groups)
 
@@ -216,8 +216,8 @@ Groups:
 
 ## Typing + read receipts
 
-- **Typing indicators**: OpenClaw sends typing signals via `signal-cli sendTyping` and refreshes them while a reply is running.
-- **Read receipts**: when `channels.signal.sendReadReceipts` is true, OpenClaw forwards read receipts for allowed DMs.
+- **Typing indicators**: DennouAibou sends typing signals via `signal-cli sendTyping` and refreshes them while a reply is running.
+- **Read receipts**: when `channels.signal.sendReadReceipts` is true, DennouAibou forwards read receipts for allowed DMs.
 - Signal-cli does not expose read receipts for groups.
 
 ## Reactions (message tool)

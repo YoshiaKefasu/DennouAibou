@@ -401,7 +401,7 @@ export async function installPluginFromClawHub(
         source: "clawhub",
         clawhubUrl:
           params.baseUrl?.trim() ||
-          process.env.OPENCLAW_CLAWHUB_URL?.trim() ||
+          process.env.DENNOU_CLAWHUB_URL?.trim() ||
           "https://clawhub.ai",
         clawhubPackage: parsed.name,
         clawhubFamily,

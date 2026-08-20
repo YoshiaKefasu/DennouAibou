@@ -118,14 +118,14 @@ describe("exec PATH login shell merge", () => {
     expect(shellPathMock).toHaveBeenCalledTimes(1);
   });
 
-  it("sets OPENCLAW_SHELL for host=gateway commands", async () => {
+  it("sets DENNOU_SHELL for host=gateway commands", async () => {
     if (isWin) {
       return;
     }
 
     const tool = createExecTool({ host: "gateway", security: "full", ask: "off" });
     const result = await tool.execute("call-openclaw-shell", {
-      command: 'printf "%s" "${OPENCLAW_SHELL:-}"',
+      command: 'printf "%s" "${DENNOU_SHELL:-}"',
     });
     const value = normalizeText(result.content.find((c) => c.type === "text")?.text);
 

@@ -1,6 +1,6 @@
 ---
 title: OpenShell
-summary: "Use OpenShell as a managed sandbox backend for OpenClaw agents"
+summary: "Use OpenShell as a managed sandbox backend for DennouAibou agents"
 read_when:
   - You want cloud-managed sandboxes instead of local Docker
   - You are setting up the OpenShell plugin
@@ -9,8 +9,8 @@ read_when:
 
 # OpenShell
 
-OpenShell is a managed sandbox backend for OpenClaw. Instead of running Docker
-containers locally, OpenClaw delegates sandbox lifecycle to the `openshell` CLI,
+OpenShell is a managed sandbox backend for DennouAibou. Instead of running Docker
+containers locally, DennouAibou delegates sandbox lifecycle to the `openshell` CLI,
 which provisions remote environments with SSH-based command execution.
 
 The OpenShell plugin reuses the same core SSH transport and remote filesystem
@@ -23,7 +23,7 @@ and an optional `mirror` workspace mode.
 - The `openshell` CLI installed and on `PATH` (or set a custom path via
   `plugins.entries.openshell.config.command`)
 - An OpenShell account with sandbox access
-- OpenClaw Gateway running on the host
+- DennouAibou Gateway running on the host
 
 ## Quick start
 
@@ -55,7 +55,7 @@ and an optional `mirror` workspace mode.
 }
 ```
 
-2. Restart the Gateway. On the next agent turn, OpenClaw creates an OpenShell
+2. Restart the Gateway. On the next agent turn, DennouAibou creates an OpenShell
    sandbox and routes tool execution through it.
 
 3. Verify:
@@ -76,14 +76,14 @@ workspace to stay canonical**.
 
 Behavior:
 
-- Before `exec`, OpenClaw syncs the local workspace into the OpenShell sandbox.
-- After `exec`, OpenClaw syncs the remote workspace back to the local workspace.
+- Before `exec`, DennouAibou syncs the local workspace into the OpenShell sandbox.
+- After `exec`, DennouAibou syncs the remote workspace back to the local workspace.
 - File tools still operate through the sandbox bridge, but the local workspace
   remains the source of truth between turns.
 
 Best for:
 
-- You edit files locally outside OpenClaw and want those changes visible in the
+- You edit files locally outside DennouAibou and want those changes visible in the
   sandbox automatically.
 - You want the OpenShell sandbox to behave as much like the Docker backend as
   possible.
@@ -98,11 +98,11 @@ Use `plugins.entries.openshell.config.mode: "remote"` when you want the
 
 Behavior:
 
-- When the sandbox is first created, OpenClaw seeds the remote workspace from
+- When the sandbox is first created, DennouAibou seeds the remote workspace from
   the local workspace once.
 - After that, `exec`, `read`, `write`, `edit`, and `apply_patch` operate
   directly against the remote OpenShell workspace.
-- OpenClaw does **not** sync remote changes back into the local workspace.
+- DennouAibou does **not** sync remote changes back into the local workspace.
 - Prompt-time media reads still work because file and media tools read through
   the sandbox bridge.
 
@@ -112,7 +112,7 @@ Best for:
 - You want lower per-turn sync overhead.
 - You do not want host-local edits to silently overwrite remote sandbox state.
 
-Important: if you edit files on the host outside OpenClaw after the initial seed,
+Important: if you edit files on the host outside DennouAibou after the initial seed,
 the remote sandbox does **not** see those changes. Use
 `openclaw sandbox recreate` to re-seed.
 
@@ -289,9 +289,9 @@ openclaw sandbox recreate --all
 
 ## How it works
 
-1. OpenClaw calls `openshell sandbox create` (with `--from`, `--gateway`,
+1. DennouAibou calls `openshell sandbox create` (with `--from`, `--gateway`,
    `--policy`, `--providers`, `--gpu` flags as configured).
-2. OpenClaw calls `openshell sandbox ssh-config <name>` to get SSH connection
+2. DennouAibou calls `openshell sandbox ssh-config <name>` to get SSH connection
    details for the sandbox.
 3. Core writes the SSH config to a temp file and opens an SSH session using the
    same remote filesystem bridge as the generic SSH backend.

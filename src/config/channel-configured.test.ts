@@ -73,6 +73,6 @@ describe("isChannelConfigured", () => {
       "utf8",
     );
 
-    expect(isChannelConfigured({}, "matrix", { OPENCLAW_STATE_DIR: stateDir })).toBe(true);
+    expect(isChannelConfigured({}, "matrix", { DENNOU_STATE_DIR: stateDir })).toBe(true);
   });
 });

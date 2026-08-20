@@ -25,7 +25,7 @@ describe("Ollama auto-discovery", () => {
     originalFetch = globalThis.fetch;
     return {
       ...process.env,
-      OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
+      DENNOU_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
       VITEST: "1",
       NODE_ENV: "test",
     };
@@ -34,7 +34,7 @@ describe("Ollama auto-discovery", () => {
   function createDiscoveryRunEnv(): NodeJS.ProcessEnv {
     return {
       ...process.env,
-      OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
+      DENNOU_TEST_ONLY_PROVIDER_PLUGIN_IDS: "ollama",
       VITEST: "",
       NODE_ENV: "development",
     };

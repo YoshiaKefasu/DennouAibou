@@ -117,14 +117,14 @@ export function expectResolvedOpenAIRuntime(agentDir: string) {
 
 export function beginSecretsRuntimeIsolationForTest(): SecretsRuntimeEnvSnapshot {
   const envSnapshot = captureEnv([
-    "OPENCLAW_BUNDLED_PLUGINS_DIR",
-    "OPENCLAW_DISABLE_BUNDLED_PLUGINS",
-    "OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE",
-    "OPENCLAW_VERSION",
+    "DENNOU_BUNDLED_PLUGINS_DIR",
+    "DENNOU_DISABLE_BUNDLED_PLUGINS",
+    "DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE",
+    "DENNOU_VERSION",
   ]);
-  delete process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
-  process.env.OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE = "1";
-  delete process.env.OPENCLAW_VERSION;
+  delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
+  process.env.DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE = "1";
+  delete process.env.DENNOU_VERSION;
   return envSnapshot;
 }
 

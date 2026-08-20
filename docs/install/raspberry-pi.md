@@ -1,15 +1,15 @@
 ---
-summary: "Host OpenClaw on a Raspberry Pi for always-on self-hosting"
+summary: "Host DennouAibou on a Raspberry Pi for always-on self-hosting"
 read_when:
-  - Setting up OpenClaw on a Raspberry Pi
-  - Running OpenClaw on ARM devices
+  - Setting up DennouAibou on a Raspberry Pi
+  - Running DennouAibou on ARM devices
   - Building a cheap always-on personal AI
 title: "Raspberry Pi"
 ---
 
 # Raspberry Pi
 
-Run a persistent, always-on OpenClaw Gateway on a Raspberry Pi. Since the Pi is just the gateway (models run in the cloud via API), even a modest Pi handles the workload well.
+Run a persistent, always-on DennouAibou Gateway on a Raspberry Pi. Since the Pi is just the gateway (models run in the cloud via API), even a modest Pi handles the workload well.
 
 ## Prerequisites
 
@@ -77,7 +77,7 @@ Run a persistent, always-on OpenClaw Gateway on a Raspberry Pi. Since the Pi is 
 
   </Step>
 
-  <Step title="Install OpenClaw">
+  <Step title="Install DennouAibou">
     ```bash
     curl -fsSL https://openclaw.ai/install.sh | bash
     ```
@@ -156,4 +156,4 @@ sudo systemctl disable bluetooth
 
 - [Channels](/channels) -- connect Telegram, WhatsApp, Discord, and more
 - [Gateway configuration](/gateway/configuration) -- all config options
-- [Updating](/install/updating) -- keep OpenClaw up to date
+- [Updating](/install/updating) -- keep DennouAibou up to date

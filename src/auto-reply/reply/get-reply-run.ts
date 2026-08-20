@@ -340,7 +340,7 @@ export async function runPreparedReply(
     return { prefixedCommandBody, queuedBody };
   };
   const skillResult =
-    process.env.OPENCLAW_TEST_FAST === "1"
+    process.env.DENNOU_TEST_FAST === "1"
       ? {
           sessionEntry,
           skillsSnapshot: sessionEntry?.skillsSnapshot,

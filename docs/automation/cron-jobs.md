@@ -2,7 +2,7 @@
 summary: "Scheduled jobs, webhooks, and Gmail PubSub triggers for the Gateway scheduler"
 read_when:
   - Scheduling background jobs or wakeups
-  - Wiring external triggers (webhooks, Gmail) into OpenClaw
+  - Wiring external triggers (webhooks, Gmail) into DennouAibou
   - Deciding between heartbeat and cron for scheduled tasks
 title: "Scheduled Tasks"
 ---
@@ -40,7 +40,7 @@ openclaw cron runs --id <job-id>
 - Isolated cron runs also guard against stale acknowledgement replies. If the
   first result is just an interim status update (`on it`, `pulling everything
 together`, and similar hints) and no descendant subagent run is still
-  responsible for the final answer, OpenClaw re-prompts once for the actual
+  responsible for the final answer, DennouAibou re-prompts once for the actual
   result before delivery.
 
 Task reconciliation for cron is runtime-owned: an active cron task stays live while the
@@ -75,7 +75,7 @@ For isolated jobs, runtime teardown now includes best-effort browser cleanup for
 
 When isolated cron runs orchestrate subagents, delivery also prefers the final
 descendant output over stale parent interim text. If descendants are still
-running, OpenClaw suppresses that partial parent update instead of announcing it.
+running, DennouAibou suppresses that partial parent update instead of announcing it.
 
 ### Payload options for isolated jobs
 
@@ -240,9 +240,9 @@ Custom hook names are resolved via `hooks.mappings` in config. Mappings can tran
 
 ## Gmail PubSub integration
 
-Wire Gmail inbox triggers to OpenClaw via Google PubSub.
+Wire Gmail inbox triggers to DennouAibou via Google PubSub.
 
-**Prerequisites**: `gcloud` CLI, `gog` (gogcli), OpenClaw hooks enabled, Tailscale for the public HTTPS endpoint.
+**Prerequisites**: `gcloud` CLI, `gog` (gogcli), DennouAibou hooks enabled, Tailscale for the public HTTPS endpoint.
 
 ### Wizard setup (recommended)
 
@@ -390,7 +390,7 @@ openclaw doctor
 - Delivery target missing/invalid (`channel`/`to`) means outbound was skipped.
 - Channel auth errors (`unauthorized`, `Forbidden`) mean delivery was blocked by credentials.
 - If the isolated run returns only the silent token (`NO_REPLY` / `no_reply`),
-  OpenClaw suppresses direct outbound delivery and also suppresses the fallback
+  DennouAibou suppresses direct outbound delivery and also suppresses the fallback
   queued summary path, so nothing is posted back to chat.
 - For cron-owned isolated jobs, do not expect the agent to use the message tool
   as a fallback. The runner owns final delivery; `--no-deliver` keeps it

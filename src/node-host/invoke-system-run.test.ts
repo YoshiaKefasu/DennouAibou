@@ -36,18 +36,18 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
   let previousOpenClawHome: string | undefined;
 
   beforeEach(() => {
-    previousOpenClawHome = process.env.OPENCLAW_HOME;
+    previousOpenClawHome = process.env.DENNOU_HOME;
     testOpenClawHome = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-node-host-home-"));
-    process.env.OPENCLAW_HOME = testOpenClawHome;
+    process.env.DENNOU_HOME = testOpenClawHome;
     clearRuntimeConfigSnapshot();
   });
 
   afterEach(() => {
     clearRuntimeConfigSnapshot();
     if (previousOpenClawHome === undefined) {
-      delete process.env.OPENCLAW_HOME;
+      delete process.env.DENNOU_HOME;
     } else {
-      process.env.OPENCLAW_HOME = previousOpenClawHome;
+      process.env.DENNOU_HOME = previousOpenClawHome;
     }
     if (testOpenClawHome) {
       fs.rmSync(testOpenClawHome, { recursive: true, force: true });
@@ -239,16 +239,16 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
     run: (ctx: { tempHome: string }) => Promise<T>;
   }): Promise<T> {
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-exec-approvals-"));
-    const previousOpenClawHome = process.env.OPENCLAW_HOME;
-    process.env.OPENCLAW_HOME = tempHome;
+    const previousOpenClawHome = process.env.DENNOU_HOME;
+    process.env.DENNOU_HOME = tempHome;
     saveExecApprovals(params.approvals);
     try {
       return await params.run({ tempHome });
     } finally {
       if (previousOpenClawHome === undefined) {
-        delete process.env.OPENCLAW_HOME;
+        delete process.env.DENNOU_HOME;
       } else {
-        process.env.OPENCLAW_HOME = previousOpenClawHome;
+        process.env.DENNOU_HOME = previousOpenClawHome;
       }
       fs.rmSync(tempHome, { recursive: true, force: true });
     }

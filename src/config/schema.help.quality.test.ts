@@ -654,7 +654,7 @@ describe("config help copy quality", () => {
       true,
     );
     expect(FIELD_HELP["agents.defaults.memorySearch.store.path"]).toContain(
-      "~/.openclaw/memory/{agentId}.sqlite",
+      "~/.dennou-aibou/memory/{agentId}.sqlite",
     );
   });
 

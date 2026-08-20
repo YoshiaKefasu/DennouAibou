@@ -68,7 +68,7 @@ describe("resolvePreferredProviderForAuthChoice", () => {
   });
 
   it("passes explicit env through legacy auth normalization", async () => {
-    const env = { OPENCLAW_AUTH_CHOICE_TEST: "1" } as NodeJS.ProcessEnv;
+    const env = { DENNOU_AUTH_CHOICE_TEST: "1" } as NodeJS.ProcessEnv;
     resolveManifestDeprecatedProviderAuthChoice.mockReturnValue({
       choiceId: "openai-codex",
       choiceLabel: "OpenAI Codex (ChatGPT OAuth)",

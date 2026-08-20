@@ -11,7 +11,7 @@ type ExternalCatalogChannelEntry = {
   preferOver: string[];
 };
 
-const ENV_CATALOG_PATHS = ["OPENCLAW_PLUGIN_CATALOG_PATHS", "OPENCLAW_MPM_CATALOG_PATHS"];
+const ENV_CATALOG_PATHS = ["DENNOU_PLUGIN_CATALOG_PATHS", "DENNOU_MPM_CATALOG_PATHS"];
 
 function splitEnvPaths(value: string): string[] {
   const trimmed = value.trim();

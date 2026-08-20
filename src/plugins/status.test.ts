@@ -526,7 +526,7 @@ describe("plugin status reports", () => {
     const report = buildPluginDiagnosticsReport({
       config: {},
       env: {
-        OPENCLAW_VERSION: "2026.3.23-1",
+        DENNOU_VERSION: "2026.3.23-1",
       } as NodeJS.ProcessEnv,
     });
 

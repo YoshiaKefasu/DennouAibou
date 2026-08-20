@@ -714,7 +714,7 @@ describe("test-projects args", () => {
       "extensions/discord/src/monitor/message-handler.preflight.test.ts",
     ]);
     expect(spec?.includeFilePath).toContain("openclaw-vitest-include-");
-    expect(spec?.env.OPENCLAW_VITEST_INCLUDE_FILE).toBe(spec?.includeFilePath);
+    expect(spec?.env.DENNOU_VITEST_INCLUDE_FILE).toBe(spec?.includeFilePath);
   });
 
   it("rejects watch mode when a command spans multiple suites", () => {

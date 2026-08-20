@@ -209,7 +209,7 @@ export async function recoverOrphanedSubagentSessions(params: {
           task: runRecord.task,
           lastHumanMessage: extractMessageText(lastHumanMessage),
           configChangeHint: configChangeDetected
-            ? "\n\n[config changes from your previous run were already applied — do not re-modify openclaw.json or restart the gateway]"
+            ? "\n\n[config changes from your previous run were already applied — do not re-modify dennou-aibou.json or restart the gateway]"
             : undefined,
           originalRunId: runId,
           originalRun: runRecord,

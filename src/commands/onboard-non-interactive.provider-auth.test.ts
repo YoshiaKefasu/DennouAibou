@@ -764,25 +764,25 @@ async function withOnboardEnv(
   run: (ctx: OnboardEnv) => Promise<void>,
 ): Promise<void> {
   const tempHome = await makeTempWorkspace(prefix);
-  const configPath = path.join(tempHome, "openclaw.json");
+  const configPath = path.join(tempHome, "dennou-aibou.json");
   const runtime = createThrowingRuntime();
 
   try {
     await withEnvAsync(
       {
         HOME: tempHome,
-        OPENCLAW_STATE_DIR: tempHome,
-        OPENCLAW_CONFIG_PATH: configPath,
-        OPENCLAW_SKIP_CHANNELS: "1",
-        OPENCLAW_SKIP_GMAIL_WATCHER: "1",
-        OPENCLAW_SKIP_CRON: "1",
-        OPENCLAW_SKIP_CANVAS_HOST: "1",
-        OPENCLAW_GATEWAY_TOKEN: undefined,
-        OPENCLAW_GATEWAY_PASSWORD: undefined,
+        DENNOU_STATE_DIR: tempHome,
+        DENNOU_CONFIG_PATH: configPath,
+        DENNOU_SKIP_CHANNELS: "1",
+        DENNOU_SKIP_GMAIL_WATCHER: "1",
+        DENNOU_SKIP_CRON: "1",
+        DENNOU_SKIP_CANVAS_HOST: "1",
+        DENNOU_GATEWAY_TOKEN: undefined,
+        DENNOU_GATEWAY_PASSWORD: undefined,
         CUSTOM_API_KEY: undefined,
-        OPENCLAW_DISABLE_CONFIG_CACHE: "1",
-        OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
-        OPENCLAW_DISABLE_PLUGIN_MANIFEST_CACHE: "1",
+        DENNOU_DISABLE_CONFIG_CACHE: "1",
+        DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
+        DENNOU_DISABLE_PLUGIN_MANIFEST_CACHE: "1",
       },
       async () => {
         await run({ configPath, runtime });

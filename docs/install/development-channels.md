@@ -10,7 +10,7 @@ sidebarTitle: "Release Channels"
 
 # Development channels
 
-OpenClaw ships three update channels:
+DennouAibou ships three update channels:
 
 - **stable**: npm dist-tag `latest`. Recommended for most users.
 - **beta**: npm dist-tag `beta` when it is current; if beta is missing or older than
@@ -74,7 +74,7 @@ Notes:
 - The tag is not persisted. Your next `openclaw update` uses your configured
   channel as usual.
 - Downgrade protection: if the target version is older than your current version,
-  OpenClaw prompts for confirmation (skip with `--yes`).
+  DennouAibou prompts for confirmation (skip with `--yes`).
 - `--channel beta` is different from `--tag beta`: the channel flow can fall back
   to stable/latest when beta is missing or older, while `--tag beta` targets the
   raw `beta` dist-tag for that one run.
@@ -95,7 +95,7 @@ whether a downgrade confirmation would be required.
 
 ## Plugins and channels
 
-When you switch channels with `openclaw update`, OpenClaw also syncs plugin
+When you switch channels with `openclaw update`, DennouAibou also syncs plugin
 sources:
 
 - `dev` prefers bundled plugins from the git checkout.

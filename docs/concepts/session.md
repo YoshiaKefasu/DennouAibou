@@ -1,5 +1,5 @@
 ---
-summary: "How OpenClaw manages conversation sessions"
+summary: "How DennouAibou manages conversation sessions"
 read_when:
   - You want to understand session routing and isolation
   - You want to configure DM scope for multi-user setups
@@ -8,7 +8,7 @@ title: "Session Management"
 
 # Session Management
 
-OpenClaw organizes conversations into **sessions**. Each message is routed to a
+DennouAibou organizes conversations into **sessions**. Each message is routed to a
 session based on where it came from -- DMs, group chats, cron jobs, etc.
 
 ## How messages are routed
@@ -79,7 +79,7 @@ session data.
 
 ## Session maintenance
 
-OpenClaw automatically bounds session storage over time. By default, it runs
+DennouAibou automatically bounds session storage over time. By default, it runs
 in `warn` mode (reports what would be cleaned). Set `session.maintenance.mode`
 to `"enforce"` for automatic cleanup:
 

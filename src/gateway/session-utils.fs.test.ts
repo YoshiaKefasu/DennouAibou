@@ -835,8 +835,8 @@ describe("resolveSessionTranscriptCandidates", () => {
     vi.unstubAllEnvs();
   });
 
-  test("fallback candidate uses OPENCLAW_HOME instead of os.homedir()", () => {
-    vi.stubEnv("OPENCLAW_HOME", "/srv/openclaw-home");
+  test("fallback candidate uses DENNOU_HOME instead of os.homedir()", () => {
+    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
     vi.stubEnv("HOME", "/home/other");
 
     const candidates = resolveSessionTranscriptCandidates("sess-1", undefined);
@@ -971,7 +971,7 @@ describe("archiveSessionTranscripts", () => {
   });
 
   beforeAll(() => {
-    vi.stubEnv("OPENCLAW_HOME", tmpDir);
+    vi.stubEnv("DENNOU_HOME", tmpDir);
   });
 
   afterAll(() => {

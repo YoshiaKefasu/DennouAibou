@@ -132,8 +132,8 @@ describe("discoverAuthStorage", () => {
 
   it("preserves legacy auth.json when auth store is forced read-only", async () => {
     await withAgentDir(async (agentDir) => {
-      const previous = process.env.OPENCLAW_AUTH_STORE_READONLY;
-      process.env.OPENCLAW_AUTH_STORE_READONLY = "1";
+      const previous = process.env.DENNOU_AUTH_STORE_READONLY;
+      process.env.DENNOU_AUTH_STORE_READONLY = "1";
       try {
         writeRuntimeOpenRouterProfile(agentDir);
         await writeLegacyAuthJson(agentDir, {
@@ -146,9 +146,9 @@ describe("discoverAuthStorage", () => {
         expect(parsed.openrouter).toMatchObject({ type: "api_key", key: "legacy-static-key" });
       } finally {
         if (previous === undefined) {
-          delete process.env.OPENCLAW_AUTH_STORE_READONLY;
+          delete process.env.DENNOU_AUTH_STORE_READONLY;
         } else {
-          process.env.OPENCLAW_AUTH_STORE_READONLY = previous;
+          process.env.DENNOU_AUTH_STORE_READONLY = previous;
         }
       }
     });

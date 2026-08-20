@@ -56,7 +56,7 @@ order shown. Set `memorySearch.provider` to override.
 
 ## How indexing works
 
-OpenClaw indexes `MEMORY.md` and `memory/*.md` into chunks (~400 tokens with
+DennouAibou indexes `MEMORY.md` and `memory/*.md` into chunks (~400 tokens with
 80-token overlap) and stores them in a per-agent SQLite database.
 
 - **Index location:** `~/.openclaw/memory/<agentId>.sqlite`
@@ -94,7 +94,7 @@ detected, set one explicitly or add an API key.
 **Stale results?** Run `openclaw memory index --force` to rebuild. The watcher
 may miss changes in rare edge cases.
 
-**sqlite-vec not loading?** OpenClaw falls back to in-process cosine similarity
+**sqlite-vec not loading?** DennouAibou falls back to in-process cosine similarity
 automatically. Check logs for the specific load error.
 
 ## Configuration

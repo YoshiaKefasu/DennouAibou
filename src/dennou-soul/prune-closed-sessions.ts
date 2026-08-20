@@ -15,10 +15,10 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 import { pruneToolOutputLines } from "./prune-engine.js";
 import { logDebug } from "../logger.js";
+import { resolveStateDir } from "../config/paths.js";
 
 /**
  * 単一の閉じたセッションファイルに対してPruneを実行する。
@@ -120,7 +120,7 @@ export function pruneAllAgentsClosedSessions(
   logger: (msg: string) => void = logDebug,
   protection?: DennouPruneProtectionConfig,
 ): number {
-  const agentsDir = path.join(os.homedir(), ".openclaw", "agents");
+  const agentsDir = path.join(resolveStateDir(), "agents");
   if (!fs.existsSync(agentsDir)) {
     logger(`[DennouAibou] SKIP (agents directory not found): ${agentsDir}`);
     return 0;

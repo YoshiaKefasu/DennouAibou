@@ -14,7 +14,7 @@ async function withTempConfig(
   run: (configPath: string) => Promise<void>,
 ): Promise<void> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-env-io-"));
-  const configPath = path.join(dir, "openclaw.json");
+  const configPath = path.join(dir, "dennou-aibou.json");
   await fs.writeFile(configPath, configContent);
   try {
     await run(configPath);
@@ -26,7 +26,7 @@ async function withTempConfig(
 async function withWrapperEnvContext(configPath: string, run: () => Promise<void>): Promise<void> {
   await withEnvAsync(
     {
-      OPENCLAW_CONFIG_PATH: configPath,
+      DENNOU_CONFIG_PATH: configPath,
       MY_API_KEY: "original-key-123",
     },
     run,

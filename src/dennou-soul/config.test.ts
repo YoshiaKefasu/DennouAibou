@@ -71,7 +71,7 @@ describe("getDennouConfig", () => {
     expect(config.activeSessionToolsPrune.dryRun).toBe(true);
   });
 
-  it("does not accept resolvedWorkspacePaths from openclaw.json", () => {
+  it("does not accept resolvedWorkspacePaths from dennou-aibou.json", () => {
     mocks.getRuntimeConfig.mockReturnValue({
       dennou: {
         pruneProtection: {

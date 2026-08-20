@@ -28,7 +28,7 @@ openclaw models scan
 When provider usage snapshots are available, the OAuth/API-key status section includes
 provider usage windows and quota snapshots.
 Current usage-window providers: Gemini CLI and OpenAI Codex. Usage auth comes
-from provider-specific hooks when available; otherwise OpenClaw falls back to
+from provider-specific hooks when available; otherwise DennouAibou falls back to
 matching OAuth/API-key credentials from auth profiles, env, or config.
 In `--json` output, `auth.providers` is the env/config/store-aware provider
 overview, while `auth.oauth` is auth-store profile health only.
@@ -45,10 +45,10 @@ Notes:
 - Model refs are parsed by splitting on the **first** `/`. If the model ID
   includes additional `/` separators, include the provider prefix (example:
   `lmstudio/namespace/model`).
-- If you omit the provider, OpenClaw resolves the input as an alias first, then
+- If you omit the provider, DennouAibou resolves the input as an alias first, then
   as a unique configured-provider match for that exact model id, and only then
   falls back to the configured default provider with a deprecation warning.
-  If that provider no longer exposes the configured default model, OpenClaw
+  If that provider no longer exposes the configured default model, DennouAibou
   falls back to the first configured provider/model instead of surfacing a
   stale removed-provider default.
 - `models status` may show `marker(<value>)` in auth output for non-secret
@@ -88,7 +88,7 @@ Probe detail/reason-code cases to expect:
   trying it.
 - `missing_credential`, `invalid_expires`, `expired`, `unresolved_ref`:
   profile is present but not eligible/resolvable.
-- `no_model`: provider auth exists, but OpenClaw could not resolve a probeable
+- `no_model`: provider auth exists, but DennouAibou could not resolve a probeable
   model candidate for that provider.
 
 ## Aliases + fallbacks

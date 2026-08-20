@@ -84,7 +84,7 @@ openclaw approvals set --node <id|name|ip> --stdin <<'EOF'
 EOF
 ```
 
-This changes the **host approvals file** only. To keep the requested OpenClaw policy aligned, also set:
+This changes the **host approvals file** only. To keep the requested DennouAibou policy aligned, also set:
 
 ```bash
 openclaw config set tools.exec.host gateway

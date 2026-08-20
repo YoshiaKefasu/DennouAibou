@@ -1020,7 +1020,7 @@ describe("initSessionState RawBody", () => {
       "sessions.json",
     );
 
-    vi.stubEnv("OPENCLAW_STATE_DIR", stateDir);
+    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
     try {
       await fs.mkdir(path.dirname(storePath), { recursive: true });
       await writeSessionStoreFast(storePath, {

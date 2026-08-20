@@ -18,25 +18,25 @@ const BLOCKED_WORKSPACE_DOTENV_KEYS = new Set([
   "HTTPS_PROXY",
   "NODE_TLS_REJECT_UNAUTHORIZED",
   "NO_PROXY",
-  "OPENCLAW_AGENT_DIR",
-  "OPENCLAW_BUNDLED_HOOKS_DIR",
-  "OPENCLAW_BUNDLED_PLUGINS_DIR",
-  "OPENCLAW_BUNDLED_SKILLS_DIR",
-  "OPENCLAW_CONFIG_PATH",
-  "OPENCLAW_GATEWAY_PASSWORD",
-  "OPENCLAW_GATEWAY_SECRET",
-  "OPENCLAW_GATEWAY_TOKEN",
-  "OPENCLAW_HOME",
-  "OPENCLAW_LIVE_ANTHROPIC_KEY",
-  "OPENCLAW_LIVE_ANTHROPIC_KEYS",
-  "OPENCLAW_LIVE_GEMINI_KEY",
-  "OPENCLAW_LIVE_OPENAI_KEY",
-  "OPENCLAW_OAUTH_DIR",
-  "OPENCLAW_PINNED_PYTHON",
-  "OPENCLAW_PINNED_WRITE_PYTHON",
-  "OPENCLAW_PROFILE",
-  "OPENCLAW_STATE_DIR",
-  "OPENCLAW_TEST_TAILSCALE_BINARY",
+  "DENNOU_AGENT_DIR",
+  "DENNOU_BUNDLED_HOOKS_DIR",
+  "DENNOU_BUNDLED_PLUGINS_DIR",
+  "DENNOU_BUNDLED_SKILLS_DIR",
+  "DENNOU_CONFIG_PATH",
+  "DENNOU_GATEWAY_PASSWORD",
+  "DENNOU_GATEWAY_SECRET",
+  "DENNOU_GATEWAY_TOKEN",
+  "DENNOU_HOME",
+  "DENNOU_LIVE_ANTHROPIC_KEY",
+  "DENNOU_LIVE_ANTHROPIC_KEYS",
+  "DENNOU_LIVE_GEMINI_KEY",
+  "DENNOU_LIVE_OPENAI_KEY",
+  "DENNOU_OAUTH_DIR",
+  "DENNOU_PINNED_PYTHON",
+  "DENNOU_PINNED_WRITE_PYTHON",
+  "DENNOU_PROFILE",
+  "DENNOU_STATE_DIR",
+  "DENNOU_TEST_TAILSCALE_BINARY",
   "OPENAI_API_KEY",
   "OPENAI_API_KEYS",
   "PI_CODING_AGENT_DIR",
@@ -51,7 +51,7 @@ function shouldBlockWorkspaceRuntimeDotEnvKey(key: string): boolean {
 }
 
 function shouldBlockRuntimeDotEnvKey(key: string): boolean {
-  // The global ~/.openclaw/.env (or OPENCLAW_STATE_DIR/.env) is a trusted
+  // The global ~/.dennou-aibou/.env (or DENNOU_STATE_DIR/.env) is a trusted
   // operator-controlled runtime surface. Workspace .env is untrusted and gets
   // the strict blocklist, but the trusted global fallback is allowed to set
   // runtime vars like proxy/base-url/auth values.
@@ -206,7 +206,7 @@ export function loadGlobalRuntimeDotEnvFiles(opts?: { quiet?: boolean; stateEnvP
     ".env",
   );
   const hasExplicitNonDefaultStateDir =
-    process.env.OPENCLAW_STATE_DIR?.trim() !== undefined &&
+    process.env.DENNOU_STATE_DIR?.trim() !== undefined &&
     path.resolve(stateEnvPath) !== path.resolve(defaultStateEnvPath);
   const parsedFiles = [
     readDotEnvFile({
@@ -238,7 +238,7 @@ export function loadDotEnv(opts?: { quiet?: boolean }) {
   const cwdEnvPath = path.join(process.cwd(), ".env");
   loadWorkspaceDotEnvFile(cwdEnvPath, { quiet });
 
-  // Then load global fallback: ~/.openclaw/.env (or OPENCLAW_STATE_DIR/.env),
+  // Then load global fallback: ~/.dennou-aibou/.env (or DENNOU_STATE_DIR/.env),
   // without overriding any env vars already present.
   loadGlobalRuntimeDotEnvFiles({ quiet });
 }

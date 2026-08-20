@@ -14,7 +14,7 @@ export function resolveDefaultAgentWorkspaceDir(
   homedir: () => string = os.homedir,
 ): string {
   const home = resolveRequiredHomeDir(env, homedir);
-  const profile = env.OPENCLAW_PROFILE?.trim();
+  const profile = env.DENNOU_PROFILE?.trim();
   if (profile && profile.toLowerCase() !== "default") {
     return path.join(home, ".openclaw", `workspace-${profile}`);
   }
@@ -330,7 +330,7 @@ async function ensureGitRepo(dir: string, isBrandNewWorkspace: boolean) {
 /**
  * Ensure the agent workspace exists and optionally populate bootstrap files.
  *
- * @param params.dir - Workspace directory path. Defaults to `~/.openclaw/workspace`.
+ * @param params.dir - Workspace directory path. Defaults to `~/.dennou-aibou/workspace`.
  * @param params.ensureBootstrapFiles - If true, create missing bootstrap files from templates.
  * @returns Workspace paths. Path properties are present only when `ensureBootstrapFiles` is true
  *   and the corresponding file was created or already existed.

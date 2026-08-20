@@ -8,7 +8,7 @@ title: "acp"
 
 # acp
 
-Run the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) bridge that talks to an OpenClaw Gateway.
+Run the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) bridge that talks to an DennouAibou Gateway.
 
 This command speaks ACP over stdio for IDEs and forwards prompts to the Gateway
 over WebSocket. It keeps ACP sessions mapped to Gateway session keys.
@@ -17,7 +17,7 @@ over WebSocket. It keeps ACP sessions mapped to Gateway session keys.
 runtime. It focuses on session routing, prompt delivery, and basic streaming
 updates.
 
-If you want an external MCP client to talk directly to OpenClaw channel
+If you want an external MCP client to talk directly to DennouAibou channel
 conversations instead of hosting an ACP harness session, use
 [`openclaw mcp serve`](/cli/mcp) instead.
 
@@ -27,17 +27,17 @@ This page is often confused with ACP harness sessions.
 
 `openclaw acp` means:
 
-- OpenClaw acts as an ACP server
-- an IDE or ACP client connects to OpenClaw
-- OpenClaw forwards that work into a Gateway session
+- DennouAibou acts as an ACP server
+- an IDE or ACP client connects to DennouAibou
+- DennouAibou forwards that work into a Gateway session
 
-This is different from [ACP Agents](/tools/acp-agents), where OpenClaw runs an
+This is different from [ACP Agents](/tools/acp-agents), where DennouAibou runs an
 external harness such as Codex or Claude Code through `acpx`.
 
 Quick rule:
 
-- editor/client wants to talk ACP to OpenClaw: use `openclaw acp`
-- OpenClaw should launch Codex/Claude/Gemini as an ACP harness: use `/acp spawn` and [ACP Agents](/tools/acp-agents)
+- editor/client wants to talk ACP to DennouAibou: use `openclaw acp`
+- DennouAibou should launch Codex/Claude/Gemini as an ACP harness: use `/acp spawn` and [ACP Agents](/tools/acp-agents)
 
 ## Compatibility Matrix
 
@@ -50,7 +50,7 @@ Quick rule:
 | Session modes                                                         | Partial     | `session/set_mode` is supported and the bridge exposes initial Gateway-backed session controls for thought level, tool verbosity, reasoning, usage detail, and elevated actions. Broader ACP-native mode/config surfaces are still out of scope. |
 | Session info and usage updates                                        | Partial     | The bridge emits `session_info_update` and best-effort `usage_update` notifications from cached Gateway session snapshots. Usage is approximate and only sent when Gateway token totals are marked fresh.                                        |
 | Tool streaming                                                        | Partial     | `tool_call` / `tool_call_update` events include raw I/O, text content, and best-effort file locations when Gateway tool args/results expose them. Embedded terminals and richer diff-native output are still not exposed.                        |
-| Per-session MCP servers (`mcpServers`)                                | Unsupported | Bridge mode rejects per-session MCP server requests. Configure MCP on the OpenClaw gateway or agent instead.                                                                                                                                     |
+| Per-session MCP servers (`mcpServers`)                                | Unsupported | Bridge mode rejects per-session MCP server requests. Configure MCP on the DennouAibou gateway or agent instead.                                                                                                                                     |
 | Client filesystem methods (`fs/read_text_file`, `fs/write_text_file`) | Unsupported | The bridge does not call ACP client filesystem methods.                                                                                                                                                                                          |
 | Client terminal methods (`terminal/*`)                                | Unsupported | The bridge does not create ACP client terminals or stream terminal ids through tool calls.                                                                                                                                                       |
 | Session plans / thought streaming                                     | Unsupported | The bridge currently emits output text and tool status, not ACP plan or thought updates.                                                                                                                                                         |
@@ -120,12 +120,12 @@ Permission model (client debug mode):
 - `read` auto-approval is scoped to the current working directory (`--cwd` when set).
 - ACP only auto-approves narrow readonly classes: scoped `read` calls under the active cwd plus readonly search tools (`search`, `web_search`, `memory_search`). Unknown/non-core tools, out-of-scope reads, exec-capable tools, control-plane tools, mutating tools, and interactive flows always require explicit prompt approval.
 - Server-provided `toolCall.kind` is treated as untrusted metadata (not an authorization source).
-- This ACP bridge policy is separate from ACPX harness permissions. If you run OpenClaw through the `acpx` backend, `plugins.entries.acpx.config.permissionMode=approve-all` is the break-glass “yolo” switch for that harness session.
+- This ACP bridge policy is separate from ACPX harness permissions. If you run DennouAibou through the `acpx` backend, `plugins.entries.acpx.config.permissionMode=approve-all` is the break-glass “yolo” switch for that harness session.
 
 ## How to use this
 
 Use ACP when an IDE (or other client) speaks Agent Client Protocol and you want
-it to drive an OpenClaw Gateway session.
+it to drive an DennouAibou Gateway session.
 
 1. Ensure the Gateway is running (local or remote).
 2. Configure the Gateway target (config or flags).
@@ -166,31 +166,31 @@ Per-session `mcpServers` are not supported in bridge mode. If an ACP client
 sends them during `newSession` or `loadSession`, the bridge returns a clear
 error instead of silently ignoring them.
 
-If you want ACPX-backed sessions to see OpenClaw plugin tools, enable the
+If you want ACPX-backed sessions to see DennouAibou plugin tools, enable the
 gateway-side ACPX plugin bridge instead of trying to pass per-session
 `mcpServers`. See [ACP Agents](/tools/acp-agents#plugin-tools-mcp-bridge).
 
 ## Use from `acpx` (Codex, Claude, other ACP clients)
 
 If you want a coding agent such as Codex or Claude Code to talk to your
-OpenClaw bot over ACP, use `acpx` with its built-in `openclaw` target.
+DennouAibou bot over ACP, use `acpx` with its built-in `openclaw` target.
 
 Typical flow:
 
 1. Run the Gateway and make sure the ACP bridge can reach it.
 2. Point `acpx openclaw` at `openclaw acp`.
-3. Target the OpenClaw session key you want the coding agent to use.
+3. Target the DennouAibou session key you want the coding agent to use.
 
 Examples:
 
 ```bash
-# One-shot request into your default OpenClaw ACP session
-acpx openclaw exec "Summarize the active OpenClaw session state."
+# One-shot request into your default DennouAibou ACP session
+acpx openclaw exec "Summarize the active DennouAibou session state."
 
 # Persistent named session for follow-up turns
 acpx openclaw sessions ensure --name codex-bridge
 acpx openclaw -s codex-bridge --cwd /path/to/repo \
-  "Ask my OpenClaw work agent for recent context relevant to this repo."
+  "Ask my DennouAibou work agent for recent context relevant to this repo."
 ```
 
 If you want `acpx openclaw` to target a specific Gateway and session key every
@@ -206,7 +206,7 @@ time, override the `openclaw` agent command in `~/.acpx/config.json`:
 }
 ```
 
-For a repo-local OpenClaw checkout, use the direct CLI entrypoint instead of the
+For a repo-local DennouAibou checkout, use the direct CLI entrypoint instead of the
 dev runner so the ACP stream stays clean. For example:
 
 ```bash
@@ -214,7 +214,7 @@ env OPENCLAW_HIDE_BANNER=1 OPENCLAW_SUPPRESS_NOTES=1 node openclaw.mjs acp ...
 ```
 
 This is the easiest way to let Codex, Claude Code, or another ACP-aware client
-pull contextual information from an OpenClaw agent without scraping a terminal.
+pull contextual information from an DennouAibou agent without scraping a terminal.
 
 ## Zed editor setup
 
@@ -223,7 +223,7 @@ Add a custom ACP agent in `~/.config/zed/settings.json` (or use Zed’s Settings
 ```json
 {
   "agent_servers": {
-    "OpenClaw ACP": {
+    "DennouAibou ACP": {
       "type": "custom",
       "command": "openclaw",
       "args": ["acp"],
@@ -238,7 +238,7 @@ To target a specific Gateway or agent:
 ```json
 {
   "agent_servers": {
-    "OpenClaw ACP": {
+    "DennouAibou ACP": {
       "type": "custom",
       "command": "openclaw",
       "args": [
@@ -256,7 +256,7 @@ To target a specific Gateway or agent:
 }
 ```
 
-In Zed, open the Agent panel and select “OpenClaw ACP” to start a thread.
+In Zed, open the Agent panel and select “DennouAibou ACP” to start a thread.
 
 ## Session mapping
 

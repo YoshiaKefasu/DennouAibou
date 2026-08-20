@@ -2,8 +2,8 @@
 title: "Trusted Proxy Auth"
 summary: "Delegate gateway authentication to a trusted reverse proxy (Pomerium, Caddy, nginx + OAuth)"
 read_when:
-  - Running OpenClaw behind an identity-aware proxy
-  - Setting up Pomerium, Caddy, or nginx with OAuth in front of OpenClaw
+  - Running DennouAibou behind an identity-aware proxy
+  - Setting up Pomerium, Caddy, or nginx with OAuth in front of DennouAibou
   - Fixing WebSocket 1008 unauthorized errors with reverse proxy setups
   - Deciding where to set HSTS and other HTTP hardening headers
 ---
@@ -16,7 +16,7 @@ read_when:
 
 Use `trusted-proxy` auth mode when:
 
-- You run OpenClaw behind an **identity-aware proxy** (Pomerium, Caddy + OAuth, nginx + oauth2-proxy, Traefik + forward auth)
+- You run DennouAibou behind an **identity-aware proxy** (Pomerium, Caddy + OAuth, nginx + oauth2-proxy, Traefik + forward auth)
 - Your proxy handles all authentication and passes user identity via headers
 - You're in a Kubernetes or container environment where the proxy is the only path to the Gateway
 - You're hitting WebSocket `1008 unauthorized` errors because browsers can't pass tokens in WS payloads
@@ -32,8 +32,8 @@ Use `trusted-proxy` auth mode when:
 
 1. Your reverse proxy authenticates users (OAuth, OIDC, SAML, etc.)
 2. Proxy adds a header with the authenticated user identity (e.g., `x-forwarded-user: nick@example.com`)
-3. OpenClaw checks that the request came from a **trusted proxy IP** (configured in `gateway.trustedProxies`)
-4. OpenClaw extracts the user identity from the configured header
+3. DennouAibou checks that the request came from a **trusted proxy IP** (configured in `gateway.trustedProxies`)
+4. DennouAibou extracts the user identity from the configured header
 5. If everything checks out, the request is authorized
 
 ## Control UI Pairing Behavior
@@ -80,7 +80,7 @@ Important runtime rule:
 
 - Trusted-proxy auth rejects loopback-source requests (`127.0.0.1`, `::1`, loopback CIDRs).
 - Same-host loopback reverse proxies do **not** satisfy trusted-proxy auth.
-- For same-host loopback proxy setups, use token/password auth instead, or route through a non-loopback trusted proxy address that OpenClaw can verify.
+- For same-host loopback proxy setups, use token/password auth instead, or route through a non-loopback trusted proxy address that DennouAibou can verify.
 - Non-loopback Control UI deployments still need explicit `gateway.controlUi.allowedOrigins`.
 
 ### Configuration Reference
@@ -104,7 +104,7 @@ When your reverse proxy handles HTTPS for `https://control.example.com`, set
 
 - Good fit for internet-facing deployments.
 - Keeps certificate + HTTP hardening policy in one place.
-- OpenClaw can stay on loopback HTTP behind the proxy.
+- DennouAibou can stay on loopback HTTP behind the proxy.
 
 Example header value:
 
@@ -114,7 +114,7 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains
 
 ### Gateway TLS termination
 
-If OpenClaw itself serves HTTPS directly (no TLS-terminating proxy), set:
+If DennouAibou itself serves HTTPS directly (no TLS-terminating proxy), set:
 
 ```json5
 {
@@ -260,7 +260,7 @@ location / {
 
 ## Mixed token configuration
 
-OpenClaw rejects ambiguous configurations where both a `gateway.auth.token` (or `OPENCLAW_GATEWAY_TOKEN`) and `trusted-proxy` mode are active at the same time. Mixed token configs can cause loopback requests to silently authenticate on the wrong auth path.
+DennouAibou rejects ambiguous configurations where both a `gateway.auth.token` (or `OPENCLAW_GATEWAY_TOKEN`) and `trusted-proxy` mode are active at the same time. Mixed token configs can cause loopback requests to silently authenticate on the wrong auth path.
 
 If you see a `mixed_trusted_proxy_token` error on startup:
 
@@ -282,7 +282,7 @@ Examples:
 
 Behavior:
 
-- When the header is present, OpenClaw honors the declared scope set.
+- When the header is present, DennouAibou honors the declared scope set.
 - When the header is present but empty, the request declares **no** operator scopes.
 - When the header is absent, normal identity-bearing HTTP APIs fall back to the standard operator default scope set.
 - Gateway-auth **plugin HTTP routes** are narrower by default: when `x-openclaw-scopes` is absent, their runtime scope falls back to `operator.write`.
@@ -331,7 +331,7 @@ The request didn't come from an IP in `gateway.trustedProxies`. Check:
 
 ### "trusted_proxy_loopback_source"
 
-OpenClaw rejected a loopback-source trusted-proxy request.
+DennouAibou rejected a loopback-source trusted-proxy request.
 
 Check:
 
@@ -386,7 +386,7 @@ If you're moving from token auth to trusted-proxy:
 
 1. Configure your proxy to authenticate users and pass headers
 2. Test the proxy setup independently (curl with headers)
-3. Update OpenClaw config with trusted-proxy auth
+3. Update DennouAibou config with trusted-proxy auth
 4. Restart the Gateway
 5. Test WebSocket connections from the Control UI
 6. Run `openclaw security audit` and review findings

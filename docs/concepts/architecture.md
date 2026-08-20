@@ -103,7 +103,7 @@ sequenceDiagram
   for subsequent connects.
 - Direct local loopback connects can be auto-approved to keep same-host UX
   smooth.
-- OpenClaw also has a narrow backend/container-local self-connect path for
+- DennouAibou also has a narrow backend/container-local self-connect path for
   trusted shared-secret helper flows.
 - Tailnet and LAN connects, including same-host tailnet binds, still require
   explicit pairing approval.

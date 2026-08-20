@@ -1,5 +1,5 @@
 ---
-summary: "Run OpenClaw in a rootless Podman container"
+summary: "Run DennouAibou in a rootless Podman container"
 read_when:
   - You want a containerized gateway with Podman instead of Docker
 title: "Podman"
@@ -7,7 +7,7 @@ title: "Podman"
 
 # Podman
 
-Run the OpenClaw Gateway in a rootless Podman container, managed by your current non-root user.
+Run the DennouAibou Gateway in a rootless Podman container, managed by your current non-root user.
 
 The intended model is:
 
@@ -19,7 +19,7 @@ The intended model is:
 ## Prerequisites
 
 - **Podman** in rootless mode
-- **OpenClaw CLI** installed on the host
+- **DennouAibou CLI** installed on the host
 - **Optional:** `systemd --user` if you want Quadlet-managed auto-start
 - **Optional:** `sudo` only if you want `loginctl enable-linger "$(whoami)"` for boot persistence on a headless host
 
@@ -72,7 +72,7 @@ Container start:
 ./scripts/run-openclaw-podman.sh launch
 ```
 
-The script starts the container as your current uid/gid with `--userns=keep-id` and bind-mounts your OpenClaw state into the container.
+The script starts the container as your current uid/gid with `--userns=keep-id` and bind-mounts your DennouAibou state into the container.
 
 Onboarding:
 

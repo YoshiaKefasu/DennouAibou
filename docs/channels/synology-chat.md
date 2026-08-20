@@ -1,7 +1,7 @@
 ---
-summary: "Synology Chat webhook setup and OpenClaw config"
+summary: "Synology Chat webhook setup and DennouAibou config"
 read_when:
-  - Setting up Synology Chat with OpenClaw
+  - Setting up Synology Chat with DennouAibou
   - Debugging Synology Chat webhook routing
 title: "Synology Chat"
 ---
@@ -14,7 +14,7 @@ through a Synology Chat incoming webhook.
 
 ## Bundled plugin
 
-Synology Chat ships as a bundled plugin in current OpenClaw releases, so normal
+Synology Chat ships as a bundled plugin in current DennouAibou releases, so normal
 packaged builds do not need a separate install.
 
 If you are on an older build or a custom install that excludes Synology Chat,
@@ -31,24 +31,24 @@ Details: [Plugins](/tools/plugin)
 ## Quick setup
 
 1. Ensure the Synology Chat plugin is available.
-   - Current packaged OpenClaw releases already bundle it.
+   - Current packaged DennouAibou releases already bundle it.
    - Older/custom installs can add it manually from a source checkout with the command above.
    - `openclaw onboard` now shows Synology Chat in the same channel setup list as `openclaw channels add`.
    - Non-interactive setup: `openclaw channels add --channel synology-chat --token <token> --url <incoming-webhook-url>`
 2. In Synology Chat integrations:
    - Create an incoming webhook and copy its URL.
    - Create an outgoing webhook with your secret token.
-3. Point the outgoing webhook URL to your OpenClaw gateway:
+3. Point the outgoing webhook URL to your DennouAibou gateway:
    - `https://gateway-host/webhook/synology` by default.
    - Or your custom `channels.synology-chat.webhookPath`.
-4. Finish setup in OpenClaw.
+4. Finish setup in DennouAibou.
    - Guided: `openclaw onboard`
    - Direct: `openclaw channels add --channel synology-chat --token <token> --url <incoming-webhook-url>`
 5. Restart gateway and send a DM to the Synology Chat bot.
 
 Webhook auth details:
 
-- OpenClaw accepts the outgoing webhook token from `body.token`, then
+- DennouAibou accepts the outgoing webhook token from `body.token`, then
   `?token=...`, then headers.
 - Accepted header forms:
   - `x-synology-token`
@@ -108,7 +108,7 @@ Use numeric Synology Chat user IDs as targets.
 Examples:
 
 ```bash
-openclaw message send --channel synology-chat --target 123456 --text "Hello from OpenClaw"
+openclaw message send --channel synology-chat --target 123456 --text "Hello from DennouAibou"
 openclaw message send --channel synology-chat --target synology-chat:123456 --text "Hello again"
 ```
 
@@ -120,7 +120,7 @@ Multiple Synology Chat accounts are supported under `channels.synology-chat.acco
 Each account can override token, incoming URL, webhook path, DM policy, and limits.
 Direct-message sessions are isolated per account and user, so the same numeric `user_id`
 on two different Synology accounts does not share transcript state.
-Give each enabled account a distinct `webhookPath`. OpenClaw now rejects duplicate exact paths
+Give each enabled account a distinct `webhookPath`. DennouAibou now rejects duplicate exact paths
 and refuses to start named accounts that only inherit a shared webhook path in multi-account setups.
 If you intentionally need legacy inheritance for a named account, set
 `dangerouslyAllowInheritedWebhookPath: true` on that account or at `channels.synology-chat`,
@@ -167,7 +167,7 @@ but duplicate exact paths are still rejected fail-closed. Prefer explicit per-ac
 - `Invalid token`:
   - the outgoing webhook secret does not match `channels.synology-chat.token`
   - the request is hitting the wrong account/webhook path
-  - a reverse proxy stripped the token header before the request reached OpenClaw
+  - a reverse proxy stripped the token header before the request reached DennouAibou
 - `Rate limit exceeded`:
   - too many invalid token attempts from the same source can temporarily lock that source out
   - authenticated senders also have a separate per-user message rate limit

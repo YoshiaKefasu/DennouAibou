@@ -8,7 +8,7 @@ title: "Doctor"
 
 # Doctor
 
-`openclaw doctor` is the repair + migration tool for OpenClaw. It fixes stale
+`openclaw doctor` is the repair + migration tool for DennouAibou. It fixes stale
 config/state, checks health, and provides actionable repair steps.
 
 ## Quick start
@@ -337,16 +337,16 @@ switch to legacy names if the current image is missing.
 ### 7b) Bundled plugin runtime deps
 
 Doctor verifies that bundled plugin runtime dependencies (for example the
-Discord plugin runtime packages) are present in the OpenClaw install root.
+Discord plugin runtime packages) are present in the DennouAibou install root.
 If any are missing, doctor reports the packages and installs them in
 `openclaw doctor --fix` / `openclaw doctor --repair` mode.
 
 ### 8) Gateway service migrations and cleanup hints
 
 Doctor detects legacy gateway services (launchd/systemd/schtasks) and
-offers to remove them and install the OpenClaw service using the current gateway
+offers to remove them and install the DennouAibou service using the current gateway
 port. It can also scan for extra gateway-like services and print cleanup hints.
-Profile-named OpenClaw gateway services are considered first-class and are not
+Profile-named DennouAibou gateway services are considered first-class and are not
 flagged as "extra."
 
 ### 8b) Startup Matrix migration
