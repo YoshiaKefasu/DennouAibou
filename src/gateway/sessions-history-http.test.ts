@@ -229,7 +229,6 @@ describe("session history HTTP endpoints", () => {
   });
 
   test("returns 404 for unknown sessions", async () => {
-  test("returns 404 for unknown sessions", async () => {
     await createSessionStoreFile();
     await withGatewayHarness(async (harness) => {
       const res = await fetchSessionHistory(harness.port, "agent:main:missing");
