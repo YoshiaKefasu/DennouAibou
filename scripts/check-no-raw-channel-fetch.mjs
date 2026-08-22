@@ -39,7 +39,6 @@ const allowedRawFetchCallsites = new Set([
   bundledPluginCallsite("thread-ownership", "index.ts", 105),
   bundledPluginCallsite("voice-call", "src/providers/plivo.ts", 95),
   bundledPluginCallsite("voice-call", "src/providers/telnyx.ts", 61),
-  bundledPluginCallsite("voice-call", "src/providers/tts-openai.ts", 111),
   bundledPluginCallsite("voice-call", "src/providers/twilio/api.ts", 23),
   bundledPluginCallsite("telegram", "src/api-fetch.ts", 8),
   bundledPluginCallsite("discord", "src/send.outbound.ts", 363),

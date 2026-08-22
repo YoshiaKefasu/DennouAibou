@@ -745,17 +745,6 @@ describe("plugin-sdk subpath exports", () => {
       "postTranscriptionRequest",
       "requireTranscriptionText",
     ]);
-    expectSourceOmits("speech", [
-      "buildElevenLabsSpeechProvider",
-      "buildMicrosoftSpeechProvider",
-      "buildOpenAISpeechProvider",
-      "edgeTTS",
-      "elevenLabsTTS",
-      "inferEdgeExtension",
-      "openaiTTS",
-      "OPENAI_TTS_MODELS",
-      "OPENAI_TTS_VOICES",
-    ]);
     expectSourceOmits("media-understanding", [
       "deepgramMediaUnderstandingProvider",
       "groqMediaUnderstandingProvider",

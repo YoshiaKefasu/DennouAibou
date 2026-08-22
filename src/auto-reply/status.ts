@@ -31,7 +31,6 @@ import { resolveCommitHash } from "../infra/git-commit.js";
 import type { MediaUnderstandingDecision } from "../media-understanding/types.js";
 import { listPluginCommands } from "../plugins/commands.js";
 import { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
-import { resolveStatusTtsSnapshot } from "../tts/status-config.js";
 import {
   estimateUsageCost,
   formatTokenCount as formatTokenCountShared,
@@ -420,20 +419,10 @@ const formatMediaUnderstandingLine = (decisions?: ReadonlyArray<MediaUnderstandi
 };
 
 const formatVoiceModeLine = (
-  config?: OpenClawConfig,
-  sessionEntry?: SessionEntry,
+  _config?: OpenClawConfig,
+  _sessionEntry?: SessionEntry,
 ): string | null => {
-  if (!config) {
-    return null;
-  }
-  const snapshot = resolveStatusTtsSnapshot({
-    cfg: config,
-    sessionAuto: sessionEntry?.ttsAuto,
-  });
-  if (!snapshot) {
-    return null;
-  }
-  return `🔊 Voice: ${snapshot.autoMode} · provider=${snapshot.provider} · limit=${snapshot.maxLength} · summary=${snapshot.summarize ? "on" : "off"}`;
+  return null;
 };
 
 export function buildStatusMessage(args: StatusArgs): string {

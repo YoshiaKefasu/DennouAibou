@@ -31,22 +31,12 @@ import { createRuntimeTaskFlow } from "./runtime-taskflow.js";
 import { createRuntimeTasks } from "./runtime-tasks.js";
 import type { PluginRuntime } from "./types.js";
 
-const loadTtsRuntime = createLazyRuntimeModule(() => import("../../tts/tts.js"));
 const loadMediaUnderstandingRuntime = createLazyRuntimeModule(
   () => import("../../media-understanding/runtime.js"),
 );
 const loadModelAuthRuntime = createLazyRuntimeModule(
   () => import("./runtime-model-auth.runtime.js"),
 );
-
-function createRuntimeTts(): PluginRuntime["tts"] {
-  const bindTtsRuntime = createLazyRuntimeMethodBinder(loadTtsRuntime);
-  return {
-    textToSpeech: bindTtsRuntime((runtime) => runtime.textToSpeech),
-    textToSpeechTelephony: bindTtsRuntime((runtime) => runtime.textToSpeechTelephony),
-    listVoices: bindTtsRuntime((runtime) => runtime.listSpeechVoices),
-  };
-}
 
 function createRuntimeMediaUnderstandingFacade(): PluginRuntime["mediaUnderstanding"] {
   const bindMediaUnderstandingRuntime = createLazyRuntimeMethodBinder(
@@ -222,7 +212,6 @@ export function createPluginRuntime(_options: CreatePluginRuntimeOptions = {}): 
     taskFlow,
   } satisfies Omit<
     PluginRuntime,
-    | "tts"
     | "mediaUnderstanding"
     | "stt"
     | "modelAuth"
@@ -233,7 +222,6 @@ export function createPluginRuntime(_options: CreatePluginRuntimeOptions = {}): 
     Partial<
       Pick<
         PluginRuntime,
-        | "tts"
         | "mediaUnderstanding"
         | "stt"
         | "modelAuth"
@@ -243,7 +231,6 @@ export function createPluginRuntime(_options: CreatePluginRuntimeOptions = {}): 
       >
     >;
 
-  defineCachedValue(runtime, "tts", createRuntimeTts);
   defineCachedValue(runtime, "mediaUnderstanding", () => mediaUnderstanding);
   defineCachedValue(runtime, "stt", () => ({
     transcribeAudioFile: mediaUnderstanding.transcribeAudioFile,

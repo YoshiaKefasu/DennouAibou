@@ -110,37 +110,6 @@ const agentEventMocks = vi.hoisted(() => ({
   emitAgentEvent: vi.fn(),
   onAgentEvent: vi.fn<(listener: unknown) => () => void>(() => () => {}),
 }));
-const ttsMocks = vi.hoisted(() => {
-  const state = {
-    synthesizeFinalAudio: false,
-  };
-  return {
-    state,
-    maybeApplyTtsToPayload: vi.fn(async (paramsUnknown: unknown) => {
-      const params = paramsUnknown as {
-        payload: ReplyPayload;
-        kind: "tool" | "block" | "final";
-      };
-      if (
-        state.synthesizeFinalAudio &&
-        params.kind === "final" &&
-        typeof params.payload?.text === "string" &&
-        params.payload.text.trim()
-      ) {
-        return {
-          ...params.payload,
-          mediaUrl: "https://example.com/tts-synth.opus",
-          audioAsVoice: true,
-        };
-      }
-      return params.payload;
-    }),
-    normalizeTtsAutoMode: vi.fn((value: unknown) =>
-      typeof value === "string" ? value : undefined,
-    ),
-    resolveTtsConfig: vi.fn((_cfg: OpenClawConfig) => ({ mode: "final" })),
-  };
-});
 const threadInfoMocks = vi.hoisted(() => ({
   parseSessionThreadInfo: vi.fn<
     (sessionKey: string | undefined) => {
@@ -314,32 +283,9 @@ vi.mock("./dispatch-acp-manager.runtime.js", () => ({
     unbind: vi.fn(async () => []),
   }),
 }));
-vi.mock("../../tts/tts.js", () => ({
-  maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
-  normalizeTtsAutoMode: (value: unknown) => ttsMocks.normalizeTtsAutoMode(value),
-  resolveTtsConfig: (cfg: OpenClawConfig) => ttsMocks.resolveTtsConfig(cfg),
-}));
-vi.mock("../../tts/tts.runtime.js", () => ({
-  maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
-}));
-vi.mock("../../tts/status-config.js", () => ({
-  resolveStatusTtsSnapshot: () => ({
-    autoMode: "always",
-    provider: "auto",
-    maxLength: 1500,
-    summarize: true,
-  }),
-}));
-vi.mock("./dispatch-acp-tts.runtime.js", () => ({
-  maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
-}));
 vi.mock("./dispatch-acp-session.runtime.js", () => ({
   readAcpSessionEntry: (params: { sessionKey: string; cfg?: OpenClawConfig }) =>
     acpMocks.readAcpSessionEntry(params),
-}));
-vi.mock("../../tts/tts-config.js", () => ({
-  normalizeTtsAutoMode: (value: unknown) => ttsMocks.normalizeTtsAutoMode(value),
-  resolveConfiguredTtsMode: (cfg: OpenClawConfig) => ttsMocks.resolveTtsConfig(cfg).mode,
 }));
 
 const noAbortResult = { handled: false, aborted: false } as const;
@@ -356,7 +302,6 @@ beforeAll(async () => {
   ({ dispatchReplyFromConfig } = await import("./dispatch-from-config.js"));
   await import("./dispatch-acp.js");
   await import("./dispatch-acp-command-bypass.js");
-  await import("./dispatch-acp-tts.runtime.js");
   await import("./dispatch-acp-session.runtime.js");
   ({ resetInboundDedupe } = await import("./inbound-dedupe.js"));
   ({ AcpRuntimeError: AcpRuntimeErrorClass } = await import("../../acp/runtime/errors.js"));
@@ -631,13 +576,6 @@ describe("dispatchReplyFromConfig", () => {
     sessionStoreMocks.resolveSessionStoreEntry.mockClear();
     threadInfoMocks.parseSessionThreadInfo.mockReset();
     threadInfoMocks.parseSessionThreadInfo.mockImplementation(parseGenericThreadSessionInfo);
-    ttsMocks.state.synthesizeFinalAudio = false;
-    ttsMocks.maybeApplyTtsToPayload.mockClear();
-    ttsMocks.normalizeTtsAutoMode.mockClear();
-    ttsMocks.resolveTtsConfig.mockClear();
-    ttsMocks.resolveTtsConfig.mockReturnValue({
-      mode: "final",
-    });
   });
   it("does not route when Provider matches OriginatingChannel (even if Surface is missing)", async () => {
     setNoAbort();
@@ -957,7 +895,7 @@ describe("dispatchReplyFromConfig", () => {
       expect(opts?.onToolResult).toBeDefined();
       await opts?.onToolResult?.({
         text: "NO_REPLY",
-        mediaUrls: ["https://example.com/tts-routed.opus"],
+        mediaUrls: ["https://example.com/audio-routed.opus"],
       });
       return undefined;
     };
@@ -968,7 +906,7 @@ describe("dispatchReplyFromConfig", () => {
     expect(dispatcher.sendFinalReply).not.toHaveBeenCalled();
     expect(mocks.routeReply).toHaveBeenCalledTimes(1);
     const routed = mocks.routeReply.mock.calls[0]?.[0] as { payload?: ReplyPayload } | undefined;
-    expect(routed?.payload?.mediaUrls).toEqual(["https://example.com/tts-routed.opus"]);
+    expect(routed?.payload?.mediaUrls).toEqual(["https://example.com/audio-routed.opus"]);
     expect(routed?.payload?.text).toBeUndefined();
   });
 
@@ -1014,7 +952,7 @@ describe("dispatchReplyFromConfig", () => {
       await opts?.onToolResult?.({ text: "🔧 exec: ls" });
       await opts?.onToolResult?.({
         text: "NO_REPLY",
-        mediaUrls: ["https://example.com/tts-group.opus"],
+        mediaUrls: ["https://example.com/audio-group.opus"],
       });
       return { text: "hi" } satisfies ReplyPayload;
     };
@@ -1023,7 +961,7 @@ describe("dispatchReplyFromConfig", () => {
 
     expect(dispatcher.sendToolResult).toHaveBeenCalledTimes(1);
     const sent = firstToolResultPayload(dispatcher);
-    expect(sent?.mediaUrls).toEqual(["https://example.com/tts-group.opus"]);
+    expect(sent?.mediaUrls).toEqual(["https://example.com/audio-group.opus"]);
     expect(sent?.text).toBeUndefined();
     expect(dispatcher.sendFinalReply).toHaveBeenCalledTimes(1);
   });
@@ -1145,7 +1083,7 @@ describe("dispatchReplyFromConfig", () => {
       expect(opts?.onToolResult).toBeDefined();
       await opts?.onToolResult?.({ text: "🔧 tools/sessions_send" });
       await opts?.onToolResult?.({
-        mediaUrl: "https://example.com/tts-native.opus",
+        mediaUrl: "https://example.com/audio-native.opus",
       });
       return { text: "hi" } satisfies ReplyPayload;
     };
@@ -1158,7 +1096,7 @@ describe("dispatchReplyFromConfig", () => {
       expect.objectContaining({ text: "🔧 tools/sessions_send" }),
     );
     const sent = (dispatcher.sendToolResult as Mock).mock.calls[1]?.[0] as ReplyPayload | undefined;
-    expect(sent?.mediaUrl).toBe("https://example.com/tts-native.opus");
+    expect(sent?.mediaUrl).toBe("https://example.com/audio-native.opus");
     expect(sent?.text).toBeUndefined();
     expect(dispatcher.sendFinalReply).toHaveBeenCalledTimes(1);
   });
@@ -1867,56 +1805,6 @@ describe("dispatchReplyFromConfig", () => {
     expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
       expect.objectContaining({ text: "What do you want to work on?" }),
     );
-  });
-
-  it("generates final-mode TTS audio after ACP block streaming completes", async () => {
-    setNoAbort();
-    ttsMocks.state.synthesizeFinalAudio = true;
-    const runtime = createAcpRuntime([
-      { type: "text_delta", text: "Hello from ACP streaming." },
-      { type: "done" },
-    ]);
-    acpMocks.readAcpSessionEntry.mockReturnValue({
-      sessionKey: "agent:codex-acp:session-1",
-      storeSessionKey: "agent:codex-acp:session-1",
-      cfg: {},
-      storePath: "/tmp/mock-sessions.json",
-      entry: {},
-      acp: {
-        backend: "acpx",
-        agent: "codex",
-        runtimeSessionName: "runtime:1",
-        mode: "persistent",
-        state: "idle",
-        lastActivityAt: Date.now(),
-      },
-    });
-    acpMocks.requireAcpRuntimeBackend.mockReturnValue({
-      id: "acpx",
-      runtime,
-    });
-
-    const cfg = {
-      acp: {
-        enabled: true,
-        dispatch: { enabled: true },
-        stream: { coalesceIdleMs: 0, maxChunkChars: 256 },
-      },
-    } as OpenClawConfig;
-    const dispatcher = createDispatcher();
-    const ctx = buildTestCtx({
-      Provider: "discord",
-      Surface: "discord",
-      SessionKey: "agent:codex-acp:session-1",
-      BodyForAgent: "stream this",
-    });
-
-    await dispatchReplyFromConfig({ ctx, cfg, dispatcher });
-
-    const finalPayload = (dispatcher.sendFinalReply as ReturnType<typeof vi.fn>).mock
-      .calls[0]?.[0] as ReplyPayload | undefined;
-    expect(finalPayload?.mediaUrl).toBe("https://example.com/tts-synth.opus");
-    expect(finalPayload?.text).toBeUndefined();
   });
 
   it("routes ACP block output to originating channel without parent dispatcher duplicates", async () => {
@@ -3071,8 +2959,6 @@ describe("before_dispatch hook", () => {
     mocks.routeReply.mockResolvedValue({ ok: true, messageId: "mock" });
     threadInfoMocks.parseSessionThreadInfo.mockReset();
     threadInfoMocks.parseSessionThreadInfo.mockImplementation(parseGenericThreadSessionInfo);
-    ttsMocks.state.synthesizeFinalAudio = false;
-    ttsMocks.maybeApplyTtsToPayload.mockClear();
     setNoAbort();
     hookMocks.runner.runBeforeDispatch.mockClear();
     hookMocks.runner.runBeforeDispatch.mockResolvedValue(undefined);
@@ -3108,7 +2994,6 @@ describe("before_dispatch hook", () => {
   });
 
   it("uses canonical hook metadata and shared routed final delivery", async () => {
-    ttsMocks.state.synthesizeFinalAudio = true;
     hookMocks.runner.runBeforeDispatch.mockResolvedValue({ handled: true, text: "Blocked" });
     const dispatcher = createDispatcher();
     const ctx = createHookCtx({
@@ -3149,8 +3034,6 @@ describe("before_dispatch hook", () => {
         to: "telegram:999",
         payload: expect.objectContaining({
           text: "Blocked",
-          mediaUrl: "https://example.com/tts-synth.opus",
-          audioAsVoice: true,
         }),
       }),
     );

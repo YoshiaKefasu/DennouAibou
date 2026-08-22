@@ -6,8 +6,6 @@ import {
   publicKeyRawBase64UrlFromPem,
   signDevicePayload,
 } from "../infra/device-identity.js";
-import { createEmptyPluginRegistry } from "../plugins/registry-empty.js";
-import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
 import { withEnvAsync } from "../test-utils/env.js";
 import { buildDeviceAuthPayload } from "./device-auth.js";
 import { validateTalkConfigResult } from "./protocol/index.js";
@@ -111,22 +109,6 @@ async function fetchTalkConfig(
   params?: { includeSecrets?: boolean } | Record<string, unknown>,
 ) {
   return rpcReq<TalkConfigPayload>(ws, "talk.config", params ?? {});
-}
-
-async function withSpeechProviders<T>(
-  speechProviders: NonNullable<ReturnType<typeof createEmptyPluginRegistry>["speechProviders"]>,
-  run: () => Promise<T>,
-): Promise<T> {
-  const previousRegistry = getActivePluginRegistry() ?? createEmptyPluginRegistry();
-  setActivePluginRegistry({
-    ...createEmptyPluginRegistry(),
-    speechProviders,
-  });
-  try {
-    return await run();
-  } finally {
-    setActivePluginRegistry(previousRegistry);
-  }
 }
 
 function expectTalkConfig(
@@ -253,54 +235,6 @@ describe("gateway talk.config", () => {
           apiKey: secretRef,
         });
       });
-    });
-  });
-
-  it("resolves plugin-owned Talk defaults before redaction", async () => {
-    await writeTalkConfig({
-      provider: GENERIC_TALK_PROVIDER_ID,
-      voiceId: "voice-from-config",
-    });
-
-    await withEnvAsync({ [GENERIC_TALK_API_ENV]: "env-acme-key" }, async () => {
-      await withSpeechProviders(
-        [
-          {
-            pluginId: "acme-talk-defaults-test",
-            source: "test",
-            provider: {
-              id: GENERIC_TALK_PROVIDER_ID,
-              label: "Acme Speech",
-              isConfigured: () => true,
-              resolveTalkConfig: ({ talkProviderConfig }) => ({
-                ...talkProviderConfig,
-                apiKey:
-                  typeof process.env[GENERIC_TALK_API_ENV] === "string"
-                    ? process.env[GENERIC_TALK_API_ENV]
-                    : undefined,
-              }),
-              synthesize: async () => ({
-                audioBuffer: Buffer.from([1]),
-                outputFormat: "mp3",
-                fileExtension: ".mp3",
-                voiceCompatible: false,
-              }),
-            },
-          },
-        ],
-        async () => {
-          await withServer(async (ws) => {
-            await connectOperator(ws, ["operator.read"]);
-            const res = await fetchTalkConfig(ws);
-            expect(res.ok, JSON.stringify(res.error)).toBe(true);
-            expectTalkConfig(res.payload?.config?.talk, {
-              provider: GENERIC_TALK_PROVIDER_ID,
-              voiceId: "voice-from-config",
-              apiKey: "__DENNOU_REDACTED__",
-            });
-          });
-        },
-      );
     });
   });
 

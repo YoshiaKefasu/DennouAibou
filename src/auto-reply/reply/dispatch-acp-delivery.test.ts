@@ -5,20 +5,9 @@ import type { ReplyDispatcher } from "./reply-dispatcher.js";
 import { buildTestCtx } from "./test-ctx.js";
 import { createAcpTestConfig } from "./test-fixtures/acp-runtime.js";
 
-const ttsMocks = vi.hoisted(() => ({
-  maybeApplyTtsToPayload: vi.fn(async (paramsUnknown: unknown) => {
-    const params = paramsUnknown as { payload: unknown };
-    return params.payload;
-  }),
-}));
-
 const deliveryMocks = vi.hoisted(() => ({
   routeReply: vi.fn(async (_params: unknown) => ({ ok: true, messageId: "mock-message" })),
   runMessageAction: vi.fn(async (_params: unknown) => ({ ok: true as const })),
-}));
-
-vi.mock("../../tts/tts.js", () => ({
-  maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
 }));
 
 vi.mock("./route-reply.js", () => ({
@@ -64,7 +53,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
     deliveryMocks.runMessageAction.mockResolvedValue({ ok: true as const });
   });
 
-  it("bypasses TTS when skipTts is requested", async () => {
+  it("delivers text payload correctly", async () => {
     const dispatcher = createDispatcher();
     const coordinator = createAcpDispatchDeliveryCoordinator({
       cfg: createAcpTestConfig(),
@@ -78,10 +67,9 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       shouldRouteToOriginating: false,
     });
 
-    await coordinator.deliver("final", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("final", { text: "hello" });
     await coordinator.settleVisibleText();
 
-    expect(ttsMocks.maybeApplyTtsToPayload).not.toHaveBeenCalled();
     expect(dispatcher.sendFinalReply).toHaveBeenCalledWith({ text: "hello" });
   });
 
@@ -92,7 +80,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
     expect(coordinator.hasDeliveredVisibleText()).toBe(false);
     expect(coordinator.hasFailedVisibleTextDelivery()).toBe(false);
 
-    await coordinator.deliver("final", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("final", { text: "hello" });
     await coordinator.settleVisibleText();
 
     expect(coordinator.hasDeliveredFinalReply()).toBe(true);
@@ -114,7 +102,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       shouldRouteToOriginating: false,
     });
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
     await coordinator.settleVisibleText();
 
     expect(coordinator.hasDeliveredFinalReply()).toBe(false);
@@ -136,7 +124,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       shouldRouteToOriginating: false,
     });
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
     await coordinator.settleVisibleText();
 
     expect(coordinator.hasDeliveredVisibleText()).toBe(true);
@@ -146,7 +134,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
   it("does not treat non-telegram direct block text as visible", async () => {
     const coordinator = createCoordinator();
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
     await coordinator.settleVisibleText();
 
     expect(coordinator.hasDeliveredFinalReply()).toBe(false);
@@ -177,7 +165,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       shouldRouteToOriginating: false,
     });
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
 
     expect(coordinator.hasDeliveredVisibleText()).toBe(false);
     expect(coordinator.hasFailedVisibleTextDelivery()).toBe(true);
@@ -264,7 +252,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       originatingTo: "channel:thread-1",
     });
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
 
     expect(deliveryMocks.routeReply).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -290,7 +278,7 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
       originatingTo: "channel:thread-1",
     });
 
-    await coordinator.deliver("block", { text: "hello" }, { skipTts: true });
+    await coordinator.deliver("block", { text: "hello" });
 
     expect(deliveryMocks.routeReply).toHaveBeenCalledWith(
       expect.objectContaining({

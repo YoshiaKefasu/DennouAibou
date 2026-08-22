@@ -56,7 +56,7 @@
   opacity: 0.7;
 }
 
-/* ── Group footer action buttons (TTS, delete) ── */
+/* ── Group footer action buttons (delete) ── */
 .chat-group-footer button {
   background: none;
   border: none;
@@ -95,12 +95,6 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.chat-tts-btn--active {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  color: var(--accent);
 }
 
 .chat-group-delete:hover {

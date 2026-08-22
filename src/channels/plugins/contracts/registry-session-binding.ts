@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { expect } from "vitest";
 import type { OpenClawConfig } from "../../../config/config.js";
 import {
@@ -8,12 +5,12 @@ import {
   type SessionBindingCapabilities,
   type SessionBindingRecord,
 } from "../../../infra/outbound/session-binding-service.js";
+import { loadBundledPluginPublicSurfaceSync } from "../../../test-utils/bundled-plugin-public-surface.js";
 import { createChannelConversationBindingManager } from "../conversation-bindings.js";
 import {
   sessionBindingContractChannelIds,
   type SessionBindingContractChannelId,
 } from "./manifest.js";
-import { importBundledChannelContractArtifact } from "./runtime-artifacts.js";
 import "./registry.js";
 
 type SessionBindingContractEntry = {
@@ -24,26 +21,11 @@ type SessionBindingContractEntry = {
   unbindAndVerify: (binding: SessionBindingRecord) => Promise<void>;
   cleanup: () => Promise<void> | void;
 };
-const contractApiPromises = new Map<string, Promise<Record<string, unknown>>>();
-
-const matrixSessionBindingStateDir = fs.mkdtempSync(
-  path.join(os.tmpdir(), "openclaw-matrix-session-binding-contract-"),
-);
-const matrixSessionBindingAuth = {
-  accountId: "ops",
-  homeserver: "https://matrix.example.org",
-  userId: "@bot:example.org",
-  accessToken: "token",
-} as const;
-
-async function getContractApi<T extends Record<string, unknown>>(pluginId: string): Promise<T> {
-  const existing = contractApiPromises.get(pluginId);
-  if (existing) {
-    return (await existing) as T;
-  }
-  const next = importBundledChannelContractArtifact<T>(pluginId, "contract-api");
-  contractApiPromises.set(pluginId, next);
-  return await next;
+function getContractApi<T extends Record<string, unknown>>(pluginId: string): T {
+  return loadBundledPluginPublicSurfaceSync<T>({
+    pluginId,
+    artifactBasename: "contract-api.js",
+  });
 }
 
 function expectResolvedSessionBinding(params: {
@@ -89,39 +71,6 @@ function expectClearedSessionBinding(params: {
   ).toBeNull();
 }
 
-function resetMatrixSessionBindingStateDir() {
-  fs.rmSync(matrixSessionBindingStateDir, { recursive: true, force: true });
-  fs.mkdirSync(matrixSessionBindingStateDir, { recursive: true });
-}
-
-async function createContractMatrixThreadBindingManager() {
-  resetMatrixSessionBindingStateDir();
-  const { setMatrixRuntime, createMatrixThreadBindingManager } = await getContractApi<{
-    setMatrixRuntime: (runtime: unknown) => void;
-    createMatrixThreadBindingManager: (params: {
-      accountId: string;
-      auth: typeof matrixSessionBindingAuth;
-      client: unknown;
-      idleTimeoutMs: number;
-      maxAgeMs: number;
-      enableSweeper: boolean;
-    }) => Promise<unknown>;
-  }>("matrix");
-  setMatrixRuntime({
-    state: {
-      resolveStateDir: () => matrixSessionBindingStateDir,
-    },
-  } as never);
-  return await createMatrixThreadBindingManager({
-    accountId: matrixSessionBindingAuth.accountId,
-    auth: matrixSessionBindingAuth,
-    client: {} as never,
-    idleTimeoutMs: 24 * 60 * 60 * 1000,
-    maxAgeMs: 0,
-    enableSweeper: false,
-  });
-}
-
 const baseSessionBindingCfg = {
   session: { mainKey: "main", scope: "per-sender" },
 } satisfies OpenClawConfig;
@@ -130,68 +79,6 @@ const sessionBindingContractEntries: Record<
   SessionBindingContractChannelId,
   Omit<SessionBindingContractEntry, "id">
 > = {
-  bluebubbles: {
-    expectedCapabilities: {
-      adapterAvailable: true,
-      bindSupported: true,
-      unbindSupported: true,
-      placements: ["current"],
-    },
-    getCapabilities: () => {
-      void createChannelConversationBindingManager({
-        channelId: "bluebubbles",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      return getSessionBindingService().getCapabilities({
-        channel: "bluebubbles",
-        accountId: "default",
-      });
-    },
-    bindAndResolve: async () => {
-      await createChannelConversationBindingManager({
-        channelId: "bluebubbles",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      const service = getSessionBindingService();
-      const binding = await service.bind({
-        targetSessionKey: "agent:codex:acp:binding:bluebubbles:default:abc123",
-        targetKind: "session",
-        conversation: {
-          channel: "bluebubbles",
-          accountId: "default",
-          conversationId: "+15555550123",
-        },
-        placement: "current",
-        metadata: {
-          agentId: "codex",
-          label: "codex-main",
-        },
-      });
-      expectResolvedSessionBinding({
-        channel: "bluebubbles",
-        accountId: "default",
-        conversationId: "+15555550123",
-        targetSessionKey: "agent:codex:acp:binding:bluebubbles:default:abc123",
-      });
-      return binding;
-    },
-    unbindAndVerify: unbindAndExpectClearedSessionBinding,
-    cleanup: async () => {
-      const manager = await createChannelConversationBindingManager({
-        channelId: "bluebubbles",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      await manager?.stop();
-      expectClearedSessionBinding({
-        channel: "bluebubbles",
-        accountId: "default",
-        conversationId: "+15555550123",
-      });
-    },
-  },
   discord: {
     expectedCapabilities: {
       adapterAvailable: true,
@@ -271,192 +158,6 @@ const sessionBindingContractEntries: Record<
         channel: "discord",
         accountId: "default",
         conversationId: "channel:123456789012345678",
-      });
-    },
-  },
-  feishu: {
-    expectedCapabilities: {
-      adapterAvailable: true,
-      bindSupported: true,
-      unbindSupported: true,
-      placements: ["current"],
-    },
-    getCapabilities: async () => {
-      const { createFeishuThreadBindingManager } = await getContractApi<{
-        createFeishuThreadBindingManager: (params: {
-          cfg: OpenClawConfig;
-          accountId: string;
-        }) => unknown;
-      }>("feishu");
-      createFeishuThreadBindingManager({ cfg: baseSessionBindingCfg, accountId: "default" });
-      return getSessionBindingService().getCapabilities({
-        channel: "feishu",
-        accountId: "default",
-      });
-    },
-    bindAndResolve: async () => {
-      const { createFeishuThreadBindingManager } = await getContractApi<{
-        createFeishuThreadBindingManager: (params: {
-          cfg: OpenClawConfig;
-          accountId: string;
-        }) => unknown;
-      }>("feishu");
-      createFeishuThreadBindingManager({ cfg: baseSessionBindingCfg, accountId: "default" });
-      const service = getSessionBindingService();
-      const binding = await service.bind({
-        targetSessionKey: "agent:codex:acp:binding:feishu:default:abc123",
-        targetKind: "session",
-        conversation: {
-          channel: "feishu",
-          accountId: "default",
-          conversationId: "oc_group_chat:topic:om_topic_root",
-          parentConversationId: "oc_group_chat",
-        },
-        placement: "current",
-        metadata: {
-          agentId: "codex",
-          label: "codex-main",
-        },
-      });
-      expectResolvedSessionBinding({
-        channel: "feishu",
-        accountId: "default",
-        conversationId: "oc_group_chat:topic:om_topic_root",
-        targetSessionKey: "agent:codex:acp:binding:feishu:default:abc123",
-      });
-      return binding;
-    },
-    unbindAndVerify: unbindAndExpectClearedSessionBinding,
-    cleanup: async () => {
-      const { createFeishuThreadBindingManager } = await getContractApi<{
-        createFeishuThreadBindingManager: (params: { cfg: OpenClawConfig; accountId: string }) => {
-          stop: () => void;
-        };
-      }>("feishu");
-      const manager = createFeishuThreadBindingManager({
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      manager.stop();
-      expectClearedSessionBinding({
-        channel: "feishu",
-        accountId: "default",
-        conversationId: "oc_group_chat:topic:om_topic_root",
-      });
-    },
-  },
-  imessage: {
-    expectedCapabilities: {
-      adapterAvailable: true,
-      bindSupported: true,
-      unbindSupported: true,
-      placements: ["current"],
-    },
-    getCapabilities: () => {
-      void createChannelConversationBindingManager({
-        channelId: "imessage",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      return getSessionBindingService().getCapabilities({
-        channel: "imessage",
-        accountId: "default",
-      });
-    },
-    bindAndResolve: async () => {
-      await createChannelConversationBindingManager({
-        channelId: "imessage",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      const service = getSessionBindingService();
-      const binding = await service.bind({
-        targetSessionKey: "agent:codex:acp:binding:imessage:default:abc123",
-        targetKind: "session",
-        conversation: {
-          channel: "imessage",
-          accountId: "default",
-          conversationId: "+15555550123",
-        },
-        placement: "current",
-        metadata: {
-          agentId: "codex",
-          label: "codex-main",
-        },
-      });
-      expectResolvedSessionBinding({
-        channel: "imessage",
-        accountId: "default",
-        conversationId: "+15555550123",
-        targetSessionKey: "agent:codex:acp:binding:imessage:default:abc123",
-      });
-      return binding;
-    },
-    unbindAndVerify: unbindAndExpectClearedSessionBinding,
-    cleanup: async () => {
-      const manager = await createChannelConversationBindingManager({
-        channelId: "imessage",
-        cfg: baseSessionBindingCfg,
-        accountId: "default",
-      });
-      await manager?.stop();
-      expectClearedSessionBinding({
-        channel: "imessage",
-        accountId: "default",
-        conversationId: "+15555550123",
-      });
-    },
-  },
-  matrix: {
-    expectedCapabilities: {
-      adapterAvailable: true,
-      bindSupported: true,
-      unbindSupported: true,
-      placements: ["current", "child"],
-    },
-    getCapabilities: async () => {
-      await createContractMatrixThreadBindingManager();
-      return getSessionBindingService().getCapabilities({
-        channel: "matrix",
-        accountId: matrixSessionBindingAuth.accountId,
-      });
-    },
-    bindAndResolve: async () => {
-      await createContractMatrixThreadBindingManager();
-      const service = getSessionBindingService();
-      const binding = await service.bind({
-        targetSessionKey: "agent:matrix:child:thread-1",
-        targetKind: "subagent",
-        conversation: {
-          channel: "matrix",
-          accountId: matrixSessionBindingAuth.accountId,
-          conversationId: "$thread",
-          parentConversationId: "!room:example",
-        },
-        placement: "current",
-        metadata: {
-          label: "codex-matrix",
-        },
-      });
-      expectResolvedSessionBinding({
-        channel: "matrix",
-        accountId: matrixSessionBindingAuth.accountId,
-        conversationId: "$thread",
-        targetSessionKey: "agent:matrix:child:thread-1",
-      });
-      return binding;
-    },
-    unbindAndVerify: unbindAndExpectClearedSessionBinding,
-    cleanup: async () => {
-      const { resetMatrixThreadBindingsForTests } = await getContractApi<{
-        resetMatrixThreadBindingsForTests: () => void;
-      }>("matrix");
-      resetMatrixThreadBindingsForTests();
-      resetMatrixSessionBindingStateDir();
-      expectClearedSessionBinding({
-        channel: "matrix",
-        accountId: matrixSessionBindingAuth.accountId,
-        conversationId: "$thread",
       });
     },
   },

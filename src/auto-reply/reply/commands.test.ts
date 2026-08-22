@@ -2,9 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildTelegramModelsProviderChannelData,
-} from "../../../test/helpers/channels/command-contract.js";
+import { getBuildTelegramModelsProviderChannelData } from "../../../test/helpers/channels/command-contract.js";
 import type { ChannelCommandAdapter } from "../../channels/plugins/types.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -522,7 +520,7 @@ const telegramCommandTestPlugin: ChannelPlugin = {
     idLabel: "telegramUserId",
   },
   commands: {
-    buildModelsProviderChannelData: buildTelegramModelsProviderChannelData,
+    buildModelsProviderChannelData: getBuildTelegramModelsProviderChannelData(),
   },
   allowlist: buildDmGroupAccountAllowlistAdapter({
     channelId: "telegram",
@@ -3347,19 +3345,5 @@ describe("handleCommands subagents", () => {
     expect(trackedRuns).toHaveLength(1);
     expect(trackedRuns[0].runId).toBe("run-1");
     expect(trackedRuns[0].suppressAnnounceReason).toBeUndefined();
-  });
-});
-
-describe("handleCommands /tts", () => {
-  it("returns status for bare /tts on text command surfaces", async () => {
-    const cfg = {
-      commands: { text: true },
-      channels: { whatsapp: { allowFrom: ["*"] } },
-      messages: { tts: { prefsPath: path.join(testWorkspaceDir, "tts.json") } },
-    } as OpenClawConfig;
-    const params = buildParams("/tts", cfg);
-    const result = await handleCommands(params);
-    expect(result.shouldContinue).toBe(false);
-    expect(result.reply?.text).toContain("TTS status");
   });
 });

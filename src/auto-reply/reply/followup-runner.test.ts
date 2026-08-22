@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "../../config/sessions/types.js";
-import type { OpenClawConfig } from "../../config/config.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
+import { __testing as replyRunRegistryTesting } from "./reply-run-registry.js";
 
 const runEmbeddedPiAgentMock = vi.fn();
 const runWithModelFallbackMock = vi.fn();
@@ -20,7 +20,6 @@ let enqueueFollowupRun: typeof import("./queue.js").enqueueFollowupRun;
 let sessionRunAccounting: typeof import("./session-run-accounting.js");
 let createMockFollowupRun: typeof import("./test-helpers.js").createMockFollowupRun;
 let createMockTypingController: typeof import("./test-helpers.js").createMockTypingController;
-import { __testing as replyRunRegistryTesting } from "./reply-run-registry.js";
 
 const FOLLOWUP_DEBUG = process.env.DENNOU_DEBUG_FOLLOWUP_RUNNER_TEST === "1";
 const FOLLOWUP_TEST_QUEUES = new Map<
@@ -337,15 +336,10 @@ function createQueuedRun(
   return createMockFollowupRun(overrides);
 }
 
-function requireLastMockCallArg(mock: ReturnType<typeof vi.fn>, label: string): Record<string, unknown> {
-  const lastCall = mock.mock.calls.at(-1);
-  expect(lastCall, `expected at least one call to ${label}`).toBeDefined();
-  const arg = lastCall![0] as Record<string, unknown>;
-  expect(arg, `expected arg at ${label}`).toBeDefined();
-  return arg;
-}
-
-function requireMockCallArg(mock: ReturnType<typeof vi.fn>, index: number): Record<string, unknown> {
+function requireMockCallArg(
+  mock: ReturnType<typeof vi.fn>,
+  index: number,
+): Record<string, unknown> {
   const call = mock.mock.calls.at(index);
   expect(call, `expected mock call at index ${index}`).toBeDefined();
   return call![0] as Record<string, unknown>;

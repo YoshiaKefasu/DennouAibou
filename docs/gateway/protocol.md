@@ -274,7 +274,6 @@ implemented in `src/gateway/server-methods/*.ts`.
   requires `operator.talk.secrets` (or `operator.admin`).
 - `talk.mode` sets/broadcasts the current Talk mode state for WebChat/Control UI
   clients.
-- `talk.speak` synthesizes speech through the active Talk speech provider.
 - `tts.status` returns TTS enabled state, active provider, fallback providers,
   and provider config state.
 - `tts.providers` returns the visible TTS provider inventory.

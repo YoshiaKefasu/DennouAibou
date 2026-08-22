@@ -13,7 +13,6 @@ import {
   realtimeVoiceProviderContractRegistry,
   resolveWebFetchProviderContractEntriesForPluginId,
   resolveWebSearchProviderContractEntriesForPluginId,
-  speechProviderContractRegistry,
   webFetchProviderContractRegistry,
 } from "./registry.js";
 import { uniqueSortedStrings } from "./testkit.js";
@@ -97,26 +96,10 @@ describe("plugin contract registry", () => {
     expectUniqueIds(ids());
   });
 
-  it(
-    "does not duplicate bundled speech provider ids",
-    { timeout: REGISTRY_CONTRACT_TIMEOUT_MS },
-    () => {
-      expectUniqueIds(speechProviderContractRegistry.map((entry) => entry.provider.id));
-    },
-  );
-
   it("covers every bundled provider plugin discovered from manifests", () => {
     expectRegistryPluginIds({
       actualPluginIds: providerContractPluginIds,
       predicate: (plugin) => plugin.origin === "bundled" && plugin.providers.length > 0,
-    });
-  });
-
-  it("covers every bundled speech plugin discovered from manifests", () => {
-    expectRegistryPluginIds({
-      actualPluginIds: speechProviderContractRegistry.map((entry) => entry.pluginId),
-      predicate: (plugin) =>
-        plugin.origin === "bundled" && (plugin.contracts?.speechProviders?.length ?? 0) > 0,
     });
   });
 

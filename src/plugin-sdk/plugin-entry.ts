@@ -66,7 +66,6 @@ import type {
   ProviderValidateReplayTurnsContext,
   ProviderWebSocketSessionPolicy,
   ProviderWrapStreamFnContext,
-  SpeechProviderPlugin,
   PluginCommandContext,
 } from "../plugins/types.js";
 import { createCachedLazyValueGetter } from "./lazy-value.js";
@@ -124,7 +123,6 @@ export type {
   ProviderRuntimeModel,
   RealtimeTranscriptionProviderPlugin,
   ProviderTransportTurnState,
-  SpeechProviderPlugin,
   ProviderThinkingPolicyContext,
   ProviderValidateReplayTurnsContext,
   ProviderWebSocketSessionPolicy,

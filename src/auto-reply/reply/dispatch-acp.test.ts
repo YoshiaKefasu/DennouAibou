@@ -37,14 +37,6 @@ const messageActionMocks = vi.hoisted(() => ({
   runMessageAction: vi.fn(async (_params: unknown) => ({ ok: true as const })),
 }));
 
-const ttsMocks = vi.hoisted(() => ({
-  maybeApplyTtsToPayload: vi.fn(async (paramsUnknown: unknown) => {
-    const params = paramsUnknown as { payload: unknown };
-    return params.payload;
-  }),
-  resolveTtsConfig: vi.fn((_cfg: OpenClawConfig) => ({ mode: "final" })),
-}));
-
 const mediaUnderstandingMocks = vi.hoisted(() => ({
   applyMediaUnderstanding: vi.fn(async (_params: unknown) => undefined),
 }));
@@ -62,7 +54,6 @@ const bindingServiceMocks = vi.hoisted(() => ({
 
 const sessionKey = "agent:codex-acp:session-1";
 const originalFetch = globalThis.fetch;
-type MockTtsReply = Awaited<ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>>;
 let tryDispatchAcpReply: typeof import("./dispatch-acp.js").tryDispatchAcpReply;
 
 function createDispatcher(): {
@@ -195,12 +186,6 @@ async function dispatchVisibleTurn(onReplyStart: () => void) {
   });
 }
 
-function queueTtsReplies(...replies: MockTtsReply[]) {
-  for (const reply of replies) {
-    ttsMocks.maybeApplyTtsToPayload.mockResolvedValueOnce(reply);
-  }
-}
-
 async function runRoutedAcpTextTurn(text: string) {
   mockRoutedTextTurn(text);
   const { dispatcher } = createDispatcher();
@@ -210,15 +195,6 @@ async function runRoutedAcpTextTurn(text: string) {
     shouldRouteToOriginating: true,
   });
   return { result };
-}
-
-function expectSecondRoutedPayload(payload: Partial<MockTtsReply>) {
-  expect(routeMocks.routeReply).toHaveBeenNthCalledWith(
-    2,
-    expect.objectContaining({
-      payload: expect.objectContaining(payload),
-    }),
-  );
 }
 
 describe("tryDispatchAcpReply", () => {
@@ -238,24 +214,6 @@ describe("tryDispatchAcpReply", () => {
     }));
     vi.doMock("../../infra/outbound/message-action-runner.js", () => ({
       runMessageAction: (params: unknown) => messageActionMocks.runMessageAction(params),
-    }));
-    vi.doMock("../../tts/tts.js", () => ({
-      maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
-      resolveTtsConfig: (cfg: OpenClawConfig) => ttsMocks.resolveTtsConfig(cfg),
-    }));
-    vi.doMock("../../tts/tts.runtime.js", () => ({
-      maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
-    }));
-    vi.doMock("../../tts/status-config.js", () => ({
-      resolveStatusTtsSnapshot: () => ({
-        autoMode: "always",
-        provider: "auto",
-        maxLength: 1500,
-        summarize: true,
-      }),
-    }));
-    vi.doMock("./dispatch-acp-tts.runtime.js", () => ({
-      maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
     }));
     vi.doMock("../../media-understanding/apply.js", () => ({
       applyMediaUnderstanding: (params: unknown) =>
@@ -297,9 +255,6 @@ describe("tryDispatchAcpReply", () => {
     routeMocks.routeReply.mockResolvedValue({ ok: true, messageId: "mock" });
     messageActionMocks.runMessageAction.mockReset();
     messageActionMocks.runMessageAction.mockResolvedValue({ ok: true as const });
-    ttsMocks.maybeApplyTtsToPayload.mockClear();
-    ttsMocks.resolveTtsConfig.mockReset();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
     mediaUnderstandingMocks.applyMediaUnderstanding.mockReset();
     mediaUnderstandingMocks.applyMediaUnderstanding.mockResolvedValue(undefined);
     sessionMetaMocks.readAcpSessionEntry.mockReset();
@@ -948,8 +903,6 @@ describe("tryDispatchAcpReply", () => {
 
   it("does not deliver final fallback text when routed block text was already visible", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies({ text: "CODEX_OK" }, {} as ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>);
     const { result } = await runRoutedAcpTextTurn("CODEX_OK");
 
     expect(result?.counts.block).toBe(1);
@@ -959,8 +912,6 @@ describe("tryDispatchAcpReply", () => {
 
   it("does not deliver final fallback text when direct block text was already visible", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies({ text: "CODEX_OK" }, {} as ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>);
     mockVisibleTextTurn("CODEX_OK");
 
     const { dispatcher, counts } = createDispatcher();
@@ -985,8 +936,6 @@ describe("tryDispatchAcpReply", () => {
 
   it("treats visible telegram ACP block delivery as a successful final response", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies({ text: "CODEX_OK" }, {} as ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>);
     mockVisibleTextTurn("CODEX_OK");
 
     const { dispatcher } = createDispatcher();
@@ -1008,8 +957,6 @@ describe("tryDispatchAcpReply", () => {
 
   it("preserves final fallback when direct block text is filtered by non-telegram channels", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies({ text: "CODEX_OK" }, {} as ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>);
     mockVisibleTextTurn("CODEX_OK");
 
     const { dispatcher, counts } = createDispatcher();
@@ -1032,12 +979,6 @@ describe("tryDispatchAcpReply", () => {
 
   it("falls back to final text when a later telegram ACP block delivery fails", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies(
-      { text: "First chunk. " },
-      { text: "Second chunk." },
-      {} as ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>,
-    );
     const cfg = createAcpTestConfig({
       acp: {
         enabled: true,
@@ -1126,37 +1067,8 @@ describe("tryDispatchAcpReply", () => {
     );
   });
 
-  it("does not add text fallback when final TTS already delivered audio", async () => {
+  it("skips text fallback when no block text was accumulated", async () => {
     setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
-    queueTtsReplies({ text: "Task completed" }, {
-      mediaUrl: "https://example.com/final.mp3",
-      audioAsVoice: true,
-    } as MockTtsReply);
-    const { result } = await runRoutedAcpTextTurn("Task completed");
-
-    expect(result?.counts.block).toBe(1);
-    expect(result?.counts.final).toBe(1);
-    expect(routeMocks.routeReply).toHaveBeenCalledTimes(2);
-    expectSecondRoutedPayload({
-      mediaUrl: "https://example.com/final.mp3",
-      audioAsVoice: true,
-    });
-  });
-
-  it("skips fallback when TTS mode is all (blocks already processed with TTS)", async () => {
-    setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "all" });
-    const { result } = await runRoutedAcpTextTurn("Response");
-
-    expect(result?.counts.block).toBe(1);
-    expect(result?.counts.final).toBe(0);
-    expect(routeMocks.routeReply).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips final TTS and fallback when no block text was accumulated", async () => {
-    setReadyAcpResolution();
-    ttsMocks.resolveTtsConfig.mockReturnValue({ mode: "final" });
 
     managerMocks.runTurn.mockImplementation(
       async ({ onEvent }: { onEvent: (event: unknown) => Promise<void> }) => {
@@ -1174,6 +1086,5 @@ describe("tryDispatchAcpReply", () => {
     expect(result?.counts.block).toBe(0);
     expect(result?.counts.final).toBe(0);
     expect(routeMocks.routeReply).not.toHaveBeenCalled();
-    expect(ttsMocks.maybeApplyTtsToPayload).not.toHaveBeenCalled();
   });
 });

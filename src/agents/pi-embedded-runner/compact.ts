@@ -25,7 +25,6 @@ import {
 import type { ProviderRuntimeModel } from "../../plugins/types.js";
 import { type enqueueCommand, enqueueCommandInLane } from "../../process/command-queue.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../../routing/session-key.js";
-import { buildTtsSystemPromptHint } from "../../tts/tts.js";
 import { resolveUserPath } from "../../utils.js";
 import { normalizeMessageChannel } from "../../utils/message-channel.js";
 import { isReasoningTagProvider } from "../../utils/provider-utils.js";
@@ -654,7 +653,6 @@ export async function compactEmbeddedPiSessionDirect(
       cwd: effectiveWorkspace,
       moduleUrl: import.meta.url,
     });
-    const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
     const ownerDisplay = resolveOwnerDisplaySetting(params.config);
     const promptContribution = resolveProviderSystemPromptContribution({
       provider,
@@ -694,7 +692,6 @@ export async function compactEmbeddedPiSessionDirect(
             }),
             skillsPrompt,
             docsPath: docsPath ?? undefined,
-            ttsHint,
             promptMode,
             acpEnabled: params.config?.acp?.enabled !== false,
             runtimeInfo,

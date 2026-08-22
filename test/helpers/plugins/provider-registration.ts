@@ -3,14 +3,12 @@ import type {
   MediaUnderstandingProviderPlugin,
   MusicGenerationProviderPlugin,
   ProviderPlugin,
-  SpeechProviderPlugin,
   VideoGenerationProviderPlugin,
 } from "../../../src/plugins/types.js";
 import { createTestPluginApi } from "./plugin-api.js";
 
 type RegisteredProviderCollections = {
   providers: ProviderPlugin[];
-  speechProviders: SpeechProviderPlugin[];
   mediaProviders: MediaUnderstandingProviderPlugin[];
   imageProviders: ImageGenerationProviderPlugin[];
   musicProviders: MusicGenerationProviderPlugin[];
@@ -27,7 +25,6 @@ export async function registerProviderPlugin(params: {
   name: string;
 }): Promise<RegisteredProviderCollections> {
   const providers: ProviderPlugin[] = [];
-  const speechProviders: SpeechProviderPlugin[] = [];
   const mediaProviders: MediaUnderstandingProviderPlugin[] = [];
   const imageProviders: ImageGenerationProviderPlugin[] = [];
   const musicProviders: MusicGenerationProviderPlugin[] = [];
@@ -42,9 +39,6 @@ export async function registerProviderPlugin(params: {
       runtime: {} as never,
       registerProvider: (provider) => {
         providers.push(provider);
-      },
-      registerSpeechProvider: (provider) => {
-        speechProviders.push(provider);
       },
       registerMediaUnderstandingProvider: (provider) => {
         mediaProviders.push(provider);
@@ -63,7 +57,6 @@ export async function registerProviderPlugin(params: {
 
   return {
     providers,
-    speechProviders,
     mediaProviders,
     imageProviders,
     musicProviders,

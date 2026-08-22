@@ -66,10 +66,6 @@ const SAME_CHANNEL_SDK_GUARDS: GuardedSource[] = [
     forbiddenPatterns: [/["']openclaw\/plugin-sdk\/discord["']/, /plugin-sdk-internal\/discord/],
   },
   {
-    path: bundledPluginFile("slack", "src/shared.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/slack["']/, /plugin-sdk-internal\/slack/],
-  },
-  {
     path: bundledPluginFile("telegram", "src/shared.ts"),
     forbiddenPatterns: [/["']openclaw\/plugin-sdk\/telegram["']/, /plugin-sdk-internal\/telegram/],
   },
@@ -121,73 +117,24 @@ const SAME_CHANNEL_SDK_GUARDS: GuardedSource[] = [
     path: bundledPluginFile("telegram", "src/token.ts"),
     forbiddenPatterns: [/["']\.\.\/runtime-api\.js["']/],
   },
-  {
-    path: bundledPluginFile("imessage", "src/shared.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/imessage["']/, /plugin-sdk-internal\/imessage/],
-  },
-  {
-    path: bundledPluginFile("whatsapp", "src/shared.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/whatsapp["']/, /plugin-sdk-internal\/whatsapp/],
-  },
-  {
-    path: bundledPluginFile("signal", "src/shared.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/signal["']/, /plugin-sdk-internal\/signal/],
-  },
-  {
-    path: bundledPluginFile("signal", "src/runtime-api.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/signal["']/, /plugin-sdk-internal\/signal/],
-  },
 ];
 
 const SETUP_BARREL_GUARDS: GuardedSource[] = [
   {
-    path: bundledPluginFile("signal", "src/setup-core.ts"),
-    forbiddenPatterns: [/\bformatCliCommand\b/, /\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("signal", "src/setup-surface.ts"),
-    forbiddenPatterns: [/\bdetectBinary\b/, /\bformatCliCommand\b/, /\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("slack", "src/setup-core.ts"),
-    forbiddenPatterns: [/\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("slack", "src/setup-surface.ts"),
-    forbiddenPatterns: [/\bformatDocsLink\b/],
-  },
-  {
     path: bundledPluginFile("discord", "src/setup-core.ts"),
-    forbiddenPatterns: [/\bformatDocsLink\b/],
+    forbiddenPatterns: [/formatDocsLink\b/],
   },
   {
     path: bundledPluginFile("discord", "src/setup-surface.ts"),
-    forbiddenPatterns: [/\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("imessage", "src/setup-core.ts"),
-    forbiddenPatterns: [/\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("imessage", "src/setup-surface.ts"),
-    forbiddenPatterns: [/\bdetectBinary\b/, /\bformatDocsLink\b/],
+    forbiddenPatterns: [/formatDocsLink\b/],
   },
   {
     path: bundledPluginFile("telegram", "src/setup-core.ts"),
-    forbiddenPatterns: [/\bformatCliCommand\b/, /\bformatDocsLink\b/],
-  },
-  {
-    path: bundledPluginFile("whatsapp", "src/setup-surface.ts"),
-    forbiddenPatterns: [/\bformatCliCommand\b/, /\bformatDocsLink\b/],
+    forbiddenPatterns: [/formatCliCommand\b/, /\bformatDocsLink\b/],
   },
 ];
 
-const CHANNEL_CONFIG_SCHEMA_GUARDS: GuardedSource[] = [
-  {
-    path: bundledPluginFile("tlon", "src/config-schema.ts"),
-    forbiddenPatterns: [/["']openclaw\/plugin-sdk\/core["']/],
-  },
-];
+const CHANNEL_CONFIG_SCHEMA_GUARDS: GuardedSource[] = [];
 
 const LOCAL_EXTENSION_API_BARREL_GUARDS = [
   "acpx",
@@ -230,13 +177,7 @@ const LOCAL_EXTENSION_API_BARREL_GUARDS = [
   "zalouser",
 ] as const;
 
-const LOCAL_EXTENSION_API_BARREL_EXCEPTIONS = [
-  // Direct import avoids a circular init path:
-  // accounts.ts -> runtime-api.ts -> src/plugin-sdk/matrix -> plugin api barrel -> accounts.ts
-  bundledPluginFile("matrix", "src/matrix/accounts.ts"),
-  // Config schema stays on the public SDK seam and is covered by dedicated config guardrails.
-  bundledPluginFile("msteams", "src/config-schema.ts"),
-] as const;
+const LOCAL_EXTENSION_API_BARREL_EXCEPTIONS = [] as const;
 
 const sourceTextCache = new Map<string, string>();
 type SourceAnalysis = {

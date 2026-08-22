@@ -146,7 +146,9 @@ describe("loadToolsCatalog", () => {
           id: "media",
           label: "Media",
           source: "core",
-          tools: [{ id: "tts", label: "tts", description: "Text-to-speech", source: "core" }],
+          tools: [
+            { id: "web-search", label: "web-search", description: "Web search", source: "core" },
+          ],
         },
       ],
     };

@@ -103,8 +103,6 @@ describe("resolveCommandsSystemPromptBundle", () => {
     vi.spyOn(piTools, "createOpenClawCodingTools").mockImplementation(
       createOpenClawCodingToolsMock,
     );
-    const ttsRuntime = await import("../../tts/tts.js");
-    vi.spyOn(ttsRuntime, "buildTtsSystemPromptHint").mockReturnValue(undefined);
   });
 
   it("opts command tool builds into gateway subagent binding", async () => {

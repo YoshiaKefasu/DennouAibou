@@ -1,6 +1,5 @@
 import {
   collectNestedChannelFieldAssignments,
-  collectNestedChannelTtsAssignments,
   collectSimpleChannelFieldAssignments,
   getChannelSurface,
   isBaseFieldActiveForChannelSurface,
@@ -35,18 +34,6 @@ export const secretTargetRegistryEntries = [
     includeInAudit: true,
   },
   {
-    id: "channels.discord.accounts.*.voice.tts.providers.*.apiKey",
-    targetType: "channels.discord.accounts.*.voice.tts.providers.*.apiKey",
-    configFile: "dennou-aibou.json",
-    pathPattern: "channels.discord.accounts.*.voice.tts.providers.*.apiKey",
-    secretShape: "secret_input",
-    expectedResolvedValue: "string",
-    includeInPlan: true,
-    includeInConfigure: true,
-    includeInAudit: true,
-    providerIdPathSegmentIndex: 6,
-  },
-  {
     id: "channels.discord.pluralkit.token",
     targetType: "channels.discord.pluralkit.token",
     configFile: "dennou-aibou.json",
@@ -67,18 +54,6 @@ export const secretTargetRegistryEntries = [
     includeInPlan: true,
     includeInConfigure: true,
     includeInAudit: true,
-  },
-  {
-    id: "channels.discord.voice.tts.providers.*.apiKey",
-    targetType: "channels.discord.voice.tts.providers.*.apiKey",
-    configFile: "dennou-aibou.json",
-    pathPattern: "channels.discord.voice.tts.providers.*.apiKey",
-    secretShape: "secret_input",
-    expectedResolvedValue: "string",
-    includeInPlan: true,
-    includeInConfigure: true,
-    includeInAudit: true,
-    providerIdPathSegmentIndex: 4,
   },
 ] satisfies SecretTargetRegistryEntry[];
 
@@ -119,22 +94,5 @@ export function collectRuntimeConfigAssignments(params: {
     accountActive: ({ account, enabled }) =>
       enabled && isRecord(account.pluralkit) && isEnabledFlag(account.pluralkit),
     accountInactiveReason: "Discord account is disabled or PluralKit is disabled for this account.",
-  });
-  collectNestedChannelTtsAssignments({
-    channelKey: "discord",
-    nestedKey: "voice",
-    channel: discord,
-    surface,
-    defaults: params.defaults,
-    context: params.context,
-    topLevelActive:
-      isBaseFieldActiveForChannelSurface(surface, "voice") &&
-      isRecord(discord.voice) &&
-      isEnabledFlag(discord.voice),
-    topInactiveReason:
-      "no enabled Discord surface inherits this top-level voice config or voice is disabled.",
-    accountActive: ({ account, enabled }) =>
-      enabled && isRecord(account.voice) && isEnabledFlag(account.voice),
-    accountInactiveReason: "Discord account is disabled or voice is disabled for this account.",
   });
 }

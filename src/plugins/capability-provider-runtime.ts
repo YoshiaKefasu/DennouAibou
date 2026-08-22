@@ -9,7 +9,6 @@ import type { PluginRegistry } from "./registry.js";
 
 type CapabilityProviderRegistryKey =
   | "memoryEmbeddingProviders"
-  | "speechProviders"
   | "realtimeTranscriptionProviders"
   | "realtimeVoiceProviders"
   | "mediaUnderstandingProviders"
@@ -19,7 +18,6 @@ type CapabilityProviderRegistryKey =
 
 type CapabilityContractKey =
   | "memoryEmbeddingProviders"
-  | "speechProviders"
   | "realtimeTranscriptionProviders"
   | "realtimeVoiceProviders"
   | "mediaUnderstandingProviders"
@@ -32,7 +30,6 @@ type CapabilityProviderForKey<K extends CapabilityProviderRegistryKey> =
 
 const CAPABILITY_CONTRACT_KEY: Record<CapabilityProviderRegistryKey, CapabilityContractKey> = {
   memoryEmbeddingProviders: "memoryEmbeddingProviders",
-  speechProviders: "speechProviders",
   realtimeTranscriptionProviders: "realtimeTranscriptionProviders",
   realtimeVoiceProviders: "realtimeVoiceProviders",
   mediaUnderstandingProviders: "mediaUnderstandingProviders",

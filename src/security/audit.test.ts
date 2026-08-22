@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  collectDiscordSecurityAuditFindings,
-  collectTelegramSecurityAuditFindings,
+  getCollectDiscordSecurityAuditFindings,
+  getCollectTelegramSecurityAuditFindings,
 } from "../../test/helpers/channels/security-audit-contract.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -53,11 +53,11 @@ function stubChannelPlugin(params: {
   const defaultCollectAuditFindings =
     params.collectAuditFindings ??
     (params.id === "discord"
-      ? (collectDiscordSecurityAuditFindings as NonNullable<
+      ? (getCollectDiscordSecurityAuditFindings() as NonNullable<
           ChannelPlugin["security"]
         >["collectAuditFindings"])
       : params.id === "telegram"
-        ? (collectTelegramSecurityAuditFindings as NonNullable<
+        ? (getCollectTelegramSecurityAuditFindings() as NonNullable<
             ChannelPlugin["security"]
           >["collectAuditFindings"])
         : undefined);

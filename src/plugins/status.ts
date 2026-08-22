@@ -241,7 +241,6 @@ export function buildPluginDiagnosticsReport(params?: PluginReportParams): Plugi
 function buildCapabilityEntries(plugin: PluginRegistry["plugins"][number]) {
   return [
     { kind: "text-inference" as const, ids: plugin.providerIds },
-    { kind: "speech" as const, ids: plugin.speechProviderIds },
     { kind: "realtime-transcription" as const, ids: plugin.realtimeTranscriptionProviderIds },
     { kind: "realtime-voice" as const, ids: plugin.realtimeVoiceProviderIds },
     { kind: "media-understanding" as const, ids: plugin.mediaUnderstandingProviderIds },

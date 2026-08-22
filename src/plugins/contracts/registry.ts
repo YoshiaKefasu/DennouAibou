@@ -10,7 +10,6 @@ import type {
   ProviderPlugin,
   RealtimeTranscriptionProviderPlugin,
   RealtimeVoiceProviderPlugin,
-  SpeechProviderPlugin,
   VideoGenerationProviderPlugin,
   WebFetchProviderPlugin,
   WebSearchProviderPlugin,
@@ -22,7 +21,6 @@ import {
   loadVitestMusicGenerationProviderContractRegistry,
   loadVitestRealtimeTranscriptionProviderContractRegistry,
   loadVitestRealtimeVoiceProviderContractRegistry,
-  loadVitestSpeechProviderContractRegistry,
   loadVitestVideoGenerationProviderContractRegistry,
 } from "./speech-vitest-registry.js";
 
@@ -39,7 +37,6 @@ type WebSearchProviderContractEntry = CapabilityContractEntry<WebSearchProviderP
 type WebFetchProviderContractEntry = CapabilityContractEntry<WebFetchProviderPlugin> & {
   credentialValue: unknown;
 };
-type SpeechProviderContractEntry = CapabilityContractEntry<SpeechProviderPlugin>;
 type RealtimeTranscriptionProviderContractEntry =
   CapabilityContractEntry<RealtimeTranscriptionProviderPlugin>;
 type RealtimeVoiceProviderContractEntry = CapabilityContractEntry<RealtimeVoiceProviderPlugin>;
@@ -52,7 +49,6 @@ type MusicGenerationProviderContractEntry = CapabilityContractEntry<MusicGenerat
 type PluginRegistrationContractEntry = {
   pluginId: string;
   providerIds: string[];
-  speechProviderIds: string[];
   realtimeTranscriptionProviderIds: string[];
   realtimeVoiceProviderIds: string[];
   mediaUnderstandingProviderIds: string[];
@@ -65,7 +61,6 @@ type PluginRegistrationContractEntry = {
 };
 
 type ManifestContractKey =
-  | "speechProviders"
   | "realtimeTranscriptionProviders"
   | "realtimeVoiceProviders"
   | "mediaUnderstandingProviders"
@@ -96,7 +91,6 @@ function resolveBundledManifestContracts(): PluginRegistrationContractEntry[] {
     return BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS.map((entry) => ({
       pluginId: entry.pluginId,
       providerIds: [...entry.providerIds],
-      speechProviderIds: [...entry.speechProviderIds],
       realtimeTranscriptionProviderIds: [...entry.realtimeTranscriptionProviderIds],
       realtimeVoiceProviderIds: [...entry.realtimeVoiceProviderIds],
       mediaUnderstandingProviderIds: [...entry.mediaUnderstandingProviderIds],
@@ -113,7 +107,6 @@ function resolveBundledManifestContracts(): PluginRegistrationContractEntry[] {
       (plugin) =>
         plugin.origin === "bundled" &&
         (plugin.providers.length > 0 ||
-          (plugin.contracts?.speechProviders?.length ?? 0) > 0 ||
           (plugin.contracts?.realtimeTranscriptionProviders?.length ?? 0) > 0 ||
           (plugin.contracts?.realtimeVoiceProviders?.length ?? 0) > 0 ||
           (plugin.contracts?.mediaUnderstandingProviders?.length ?? 0) > 0 ||
@@ -127,7 +120,6 @@ function resolveBundledManifestContracts(): PluginRegistrationContractEntry[] {
     .map((plugin) => ({
       pluginId: plugin.id,
       providerIds: uniqueStrings(plugin.providers),
-      speechProviderIds: uniqueStrings(plugin.contracts?.speechProviders ?? []),
       realtimeTranscriptionProviderIds: uniqueStrings(
         plugin.contracts?.realtimeTranscriptionProviders ?? [],
       ),
@@ -178,8 +170,6 @@ function resolveBundledManifestPluginIdsForContract(contract: ManifestContractKe
     resolveBundledManifestContracts()
       .filter((entry) => {
         switch (contract) {
-          case "speechProviders":
-            return entry.speechProviderIds.length > 0;
           case "realtimeTranscriptionProviders":
             return entry.realtimeTranscriptionProviderIds.length > 0;
           case "realtimeVoiceProviders":
@@ -216,7 +206,6 @@ let webSearchProviderContractRegistryByPluginIdCache: Map<
   string,
   WebSearchProviderContractEntry[]
 > | null = null;
-let speechProviderContractRegistryCache: SpeechProviderContractEntry[] | null = null;
 let realtimeTranscriptionProviderContractRegistryCache:
   | RealtimeTranscriptionProviderContractEntry[]
   | null = null;
@@ -502,21 +491,6 @@ export function resolveWebSearchProviderContractEntriesForPluginId(
   return entries;
 }
 
-function loadSpeechProviderContractRegistry(): SpeechProviderContractEntry[] {
-  if (!speechProviderContractRegistryCache) {
-    speechProviderContractRegistryCache = process.env.VITEST
-      ? loadVitestSpeechProviderContractRegistry()
-      : loadBundledCapabilityRuntimeRegistry({
-          pluginIds: resolveBundledManifestPluginIdsForContract("speechProviders"),
-          pluginSdkResolution: "dist",
-        }).speechProviders.map((entry) => ({
-          pluginId: entry.pluginId,
-          provider: entry.provider,
-        }));
-  }
-  return speechProviderContractRegistryCache;
-}
-
 function loadRealtimeVoiceProviderContractRegistry(): RealtimeVoiceProviderContractEntry[] {
   if (!realtimeVoiceProviderContractRegistryCache) {
     realtimeVoiceProviderContractRegistryCache = process.env.VITEST
@@ -697,9 +671,6 @@ export const webSearchProviderContractRegistry: WebSearchProviderContractEntry[]
   createLazyArrayView(loadWebSearchProviderContractRegistry);
 export const webFetchProviderContractRegistry: WebFetchProviderContractEntry[] =
   createLazyArrayView(loadWebFetchProviderContractRegistry);
-export const speechProviderContractRegistry: SpeechProviderContractEntry[] = createLazyArrayView(
-  loadSpeechProviderContractRegistry,
-);
 export const realtimeTranscriptionProviderContractRegistry: RealtimeTranscriptionProviderContractEntry[] =
   createLazyArrayView(loadRealtimeTranscriptionProviderContractRegistry);
 export const realtimeVoiceProviderContractRegistry: RealtimeVoiceProviderContractEntry[] =

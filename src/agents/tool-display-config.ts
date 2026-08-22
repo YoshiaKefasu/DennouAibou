@@ -691,11 +691,6 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
       title: "Yield",
       detailKeys: ["message"],
     },
-    tts: {
-      emoji: "🔊",
-      title: "TTS",
-      detailKeys: ["text", "channel"],
-    },
   },
 };
 

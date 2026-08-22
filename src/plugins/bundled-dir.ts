@@ -55,7 +55,8 @@ export function resolveBundledPluginsDir(env: NodeJS.ProcessEnv = process.env): 
     return resolveDisabledBundledPluginsDir();
   }
 
-  const override = env.DENNOU_BUNDLED_PLUGINS_DIR?.trim();
+  const override =
+    env.DENNOU_BUNDLED_PLUGINS_DIR?.trim() || env.OPENCLAW_BUNDLED_PLUGINS_DIR?.trim();
   if (override) {
     const resolvedOverride = resolveUserPath(override, env);
     if (fs.existsSync(resolvedOverride)) {

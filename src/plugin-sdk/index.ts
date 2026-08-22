@@ -51,7 +51,6 @@ export type {
   ProviderAuthResult,
   ProviderRuntimeModel,
   RealtimeTranscriptionProviderPlugin,
-  SpeechProviderPlugin,
 } from "../plugins/types.js";
 export type {
   PluginRuntime,

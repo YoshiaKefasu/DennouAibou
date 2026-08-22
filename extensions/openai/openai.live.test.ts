@@ -4,7 +4,6 @@ import path from "node:path";
 import { getModel } from "@mariozechner/pi-ai";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import OpenAI from "openai";
-import type { ResolvedTtsConfig } from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
 import { encodePngRgba, fillPixel } from "openclaw/plugin-sdk/media-runtime";
@@ -107,35 +106,6 @@ function createLiveConfig(): OpenClawConfig {
   } as OpenClawConfig;
 }
 
-function createLiveTtsConfig() {
-  return {
-    auto: "off",
-    mode: "final",
-    provider: "openai",
-    providerSource: "config",
-    modelOverrides: {
-      enabled: true,
-      allowText: true,
-      allowProvider: true,
-      allowVoice: true,
-      allowModelId: true,
-      allowVoiceSettings: true,
-      allowNormalization: true,
-      allowSeed: true,
-    },
-    providerConfigs: {
-      openai: {
-        apiKey: OPENAI_API_KEY,
-        baseUrl: "https://api.openai.com/v1",
-        model: "gpt-4o-mini-tts",
-        voice: "alloy",
-      },
-    },
-    maxTextLength: 4_000,
-    timeoutMs: 30_000,
-  };
-}
-
 async function createTempAgentDir(): Promise<string> {
   return await fs.mkdtemp(path.join(os.tmpdir(), "openai-plugin-live-"));
 }
@@ -180,71 +150,6 @@ describeLive("openai plugin live", () => {
 
     expect(response.output_text.trim()).toMatch(/^OK[.!]?$/);
   }, 30_000);
-
-  it("lists voices and synthesizes audio through the registered speech provider", async () => {
-    const { speechProviders } = await registerOpenAIPlugin();
-    const speechProvider = requireRegisteredProvider(speechProviders, "openai");
-
-    const voices = await speechProvider.listVoices?.({});
-    if (!voices) {
-      throw new Error("openai speech provider did not return voices");
-    }
-    expect(voices).toEqual(expect.arrayContaining([expect.objectContaining({ id: "alloy" })]));
-
-    const cfg = createLiveConfig();
-    const ttsConfig = createLiveTtsConfig();
-
-    const audioFile = await speechProvider.synthesize({
-      text: "OpenClaw integration test OK.",
-      cfg,
-      providerConfig: ttsConfig.providerConfigs.openai ?? {},
-      target: "audio-file",
-      timeoutMs: ttsConfig.timeoutMs,
-    });
-    expect(audioFile.outputFormat).toBe("mp3");
-    expect(audioFile.fileExtension).toBe(".mp3");
-    expect(audioFile.audioBuffer.byteLength).toBeGreaterThan(512);
-
-    const telephony = await speechProvider.synthesizeTelephony?.({
-      text: "Telephony check OK.",
-      cfg,
-      providerConfig: ttsConfig.providerConfigs.openai ?? {},
-      timeoutMs: ttsConfig.timeoutMs,
-    });
-    expect(telephony?.outputFormat).toBe("pcm");
-    expect(telephony?.sampleRate).toBe(24_000);
-    expect(telephony?.audioBuffer.byteLength).toBeGreaterThan(512);
-  }, 45_000);
-
-  it("transcribes synthesized speech through the registered media provider", async () => {
-    const { speechProviders, mediaProviders } = await registerOpenAIPlugin();
-    const speechProvider = requireRegisteredProvider(speechProviders, "openai");
-    const mediaProvider = requireRegisteredProvider(mediaProviders, "openai");
-
-    const cfg = createLiveConfig();
-    const ttsConfig = createLiveTtsConfig();
-
-    const synthesized = await speechProvider.synthesize({
-      text: "OpenClaw integration test OK.",
-      cfg,
-      providerConfig: ttsConfig.providerConfigs.openai ?? {},
-      target: "audio-file",
-      timeoutMs: ttsConfig.timeoutMs,
-    });
-
-    const transcription = await mediaProvider.transcribeAudio?.({
-      buffer: synthesized.audioBuffer,
-      fileName: "openai-plugin-live.mp3",
-      mime: "audio/mpeg",
-      apiKey: OPENAI_API_KEY,
-      timeoutMs: 30_000,
-    });
-
-    const text = String(transcription?.text ?? "").toLowerCase();
-    expect(text.length).toBeGreaterThan(0);
-    expect(text).toContain("openclaw");
-    expect(text).toMatch(/\bok\b/);
-  }, 45_000);
 
   it("generates an image through the registered image provider", async () => {
     const { imageProviders } = await registerOpenAIPlugin();

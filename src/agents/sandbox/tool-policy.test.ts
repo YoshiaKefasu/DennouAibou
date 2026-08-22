@@ -20,7 +20,7 @@ describe("sandbox/tool-policy", () => {
             tools: {
               sandbox: {
                 tools: {
-                  alsoAllow: ["message", "tts"],
+                  alsoAllow: ["message"],
                 },
               },
             },
@@ -31,7 +31,6 @@ describe("sandbox/tool-policy", () => {
 
     const resolved = resolveSandboxToolPolicyForAgent(cfg, "tavern");
     expect(resolved.allow).toContain("message");
-    expect(resolved.allow).toContain("tts");
     expect(resolved.sources.allow).toEqual({
       source: "agent",
       key: "agents.list[].tools.sandbox.tools.alsoAllow",
@@ -120,7 +119,7 @@ describe("sandbox/tool-policy", () => {
             tools: {
               sandbox: {
                 tools: {
-                  alsoAllow: ["message", "tts"],
+                  alsoAllow: ["message"],
                 },
               },
             },
@@ -137,14 +136,14 @@ describe("sandbox/tool-policy", () => {
     };
 
     const sandbox = resolveSandboxConfigForAgent(cfg, "tavern");
-    expect(sandbox.tools.allow).toEqual(expect.arrayContaining(["browser", "message", "tts"]));
+    expect(sandbox.tools.allow).toEqual(expect.arrayContaining(["browser", "message"]));
     expect(sandbox.tools.deny).not.toContain("browser");
 
     const runtime = resolveSandboxRuntimeStatus({
       cfg,
       sessionKey: "agent:tavern:main",
     });
-    expect(runtime.toolPolicy.allow).toEqual(expect.arrayContaining(["browser", "message", "tts"]));
+    expect(runtime.toolPolicy.allow).toEqual(expect.arrayContaining(["browser", "message"]));
     expect(runtime.toolPolicy.deny).not.toContain("browser");
   });
 

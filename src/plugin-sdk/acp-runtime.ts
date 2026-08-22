@@ -82,8 +82,6 @@ export async function tryDispatchAcpReplyHook(
     sessionKey: event.sessionKey,
     abortSignal: ctx.abortSignal,
     inboundAudio: event.inboundAudio,
-    sessionTtsAuto: event.sessionTtsAuto,
-    ttsChannel: event.ttsChannel,
     suppressUserDelivery: event.suppressUserDelivery,
     shouldRouteToOriginating: event.shouldRouteToOriginating,
     originatingChannel: event.originatingChannel,

@@ -5,15 +5,9 @@ import type {
   MusicGenerationProviderPlugin,
   RealtimeTranscriptionProviderPlugin,
   RealtimeVoiceProviderPlugin,
-  SpeechProviderPlugin,
   VideoGenerationProviderPlugin,
 } from "../types.js";
 import { BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS } from "./inventory/bundled-capability-metadata.js";
-
-export type SpeechProviderContractEntry = {
-  pluginId: string;
-  provider: SpeechProviderPlugin;
-};
 
 export type MediaUnderstandingProviderContractEntry = {
   pluginId: string;
@@ -47,7 +41,6 @@ export type MusicGenerationProviderContractEntry = {
 
 type ManifestContractKey =
   | "imageGenerationProviders"
-  | "speechProviders"
   | "mediaUnderstandingProviders"
   | "realtimeVoiceProviders"
   | "realtimeTranscriptionProviders"
@@ -57,9 +50,6 @@ type ManifestContractKey =
 const VITEST_CONTRACT_PLUGIN_IDS = {
   imageGenerationProviders: BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS.filter(
     (entry) => entry.imageGenerationProviderIds.length > 0,
-  ).map((entry) => entry.pluginId),
-  speechProviders: BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS.filter(
-    (entry) => entry.speechProviderIds.length > 0,
   ).map((entry) => entry.pluginId),
   mediaUnderstandingProviders: BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS.filter(
     (entry) => entry.mediaUnderstandingProviderIds.length > 0,
@@ -153,17 +143,6 @@ function loadVitestCapabilityContractEntries<T>(params: {
       )
       .filter((entry) => entry.pluginId === pluginId),
   );
-}
-
-export function loadVitestSpeechProviderContractRegistry(): SpeechProviderContractEntry[] {
-  return loadVitestCapabilityContractEntries({
-    contract: "speechProviders",
-    pickEntries: (registry) =>
-      registry.speechProviders.map((entry) => ({
-        pluginId: entry.pluginId,
-        provider: entry.provider,
-      })),
-  });
 }
 
 export function loadVitestMediaUnderstandingProviderContractRegistry(): MediaUnderstandingProviderContractEntry[] {

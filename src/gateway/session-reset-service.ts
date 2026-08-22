@@ -468,7 +468,6 @@ export async function performGatewaySessionReset(params: {
       verboseLevel: currentEntry?.verboseLevel,
       reasoningLevel: currentEntry?.reasoningLevel,
       elevatedLevel: currentEntry?.elevatedLevel,
-      ttsAuto: currentEntry?.ttsAuto,
       execHost: currentEntry?.execHost,
       execSecurity: currentEntry?.execSecurity,
       execAsk: currentEntry?.execAsk,

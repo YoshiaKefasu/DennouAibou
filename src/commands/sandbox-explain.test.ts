@@ -58,7 +58,7 @@ describe("sandbox explain command", () => {
             tools: {
               sandbox: {
                 tools: {
-                  alsoAllow: ["message", "tts"],
+                  alsoAllow: ["message"],
                 },
               },
             },
@@ -83,9 +83,7 @@ describe("sandbox explain command", () => {
     } as unknown as Parameters<typeof sandboxExplainCommand>[1]);
 
     const parsed = JSON.parse(logs.join(""));
-    expect(parsed.sandbox.tools.allow).toEqual(
-      expect.arrayContaining(["browser", "message", "tts"]),
-    );
+    expect(parsed.sandbox.tools.allow).toEqual(expect.arrayContaining(["browser", "message"]));
     expect(parsed.sandbox.tools.deny).not.toContain("browser");
     expect(parsed.sandbox.tools.sources.allow).toEqual({
       source: "agent",

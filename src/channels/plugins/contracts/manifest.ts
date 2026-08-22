@@ -11,13 +11,6 @@ export const channelPluginSurfaceKeys = [
 
 export type ChannelPluginSurface = (typeof channelPluginSurfaceKeys)[number];
 
-export const sessionBindingContractChannelIds = [
-  "bluebubbles",
-  "discord",
-  "feishu",
-  "imessage",
-  "matrix",
-  "telegram",
-] as const;
+export const sessionBindingContractChannelIds = ["discord", "telegram"] as const;
 
 export type SessionBindingContractChannelId = (typeof sessionBindingContractChannelIds)[number];

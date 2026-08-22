@@ -23,8 +23,6 @@ const event = {
   runId: "run-1",
   sessionKey: "agent:test:session",
   inboundAudio: false,
-  sessionTtsAuto: "off" as const,
-  ttsChannel: undefined,
   suppressUserDelivery: false,
   shouldRouteToOriginating: false,
   originatingChannel: undefined,

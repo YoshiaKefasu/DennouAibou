@@ -99,8 +99,7 @@ export function createDiscordPluginBase(params: {
     commands: {
       nativeCommandsAutoEnabled: true,
       nativeSkillsAutoEnabled: true,
-      resolveNativeCommandName: ({ commandKey, defaultName }) =>
-        commandKey === "tts" ? "voice" : defaultName,
+      resolveNativeCommandName: ({ commandKey, defaultName }) => defaultName,
     },
     doctor: discordDoctor,
     streaming: {

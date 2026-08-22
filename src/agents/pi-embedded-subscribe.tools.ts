@@ -157,7 +157,7 @@ const TRUSTED_TOOL_RESULT_MEDIA = new Set([
   "sessions_send",
   "sessions_spawn",
   "subagents",
-  "tts",
+
   "video_generate",
   "web_fetch",
   "web_search",

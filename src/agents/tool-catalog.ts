@@ -301,14 +301,6 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     profiles: ["coding"],
     includeInOpenClawGroup: true,
   },
-  {
-    id: "tts",
-    label: "tts",
-    description: "Text-to-speech conversion",
-    sectionId: "media",
-    profiles: [],
-    includeInOpenClawGroup: true,
-  },
 ];
 
 const CORE_TOOL_BY_ID = new Map<string, CoreToolDefinition>(

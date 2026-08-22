@@ -1317,7 +1317,6 @@ describe("gateway server sessions", () => {
           subagentRole: "orchestrator",
           subagentControlScope: "children",
           elevatedLevel: "on",
-          ttsAuto: "always",
           providerOverride: "anthropic",
           modelOverride: "claude-opus-4-1",
           authProfileOverride: "work",
@@ -1366,7 +1365,6 @@ describe("gateway server sessions", () => {
         subagentRole?: string;
         subagentControlScope?: string;
         elevatedLevel?: string;
-        ttsAuto?: string;
         providerOverride?: string;
         modelOverride?: string;
         authProfileOverride?: string;
@@ -1410,7 +1408,6 @@ describe("gateway server sessions", () => {
     expect(reset.payload?.entry.subagentRole).toBe("orchestrator");
     expect(reset.payload?.entry.subagentControlScope).toBe("children");
     expect(reset.payload?.entry.elevatedLevel).toBe("on");
-    expect(reset.payload?.entry.ttsAuto).toBe("always");
     expect(reset.payload?.entry.providerOverride).toBe("anthropic");
     expect(reset.payload?.entry.modelOverride).toBe("claude-opus-4-1");
     expect(reset.payload?.entry.authProfileOverride).toBe("work");
@@ -1454,7 +1451,6 @@ describe("gateway server sessions", () => {
         subagentRole?: string;
         subagentControlScope?: string;
         elevatedLevel?: string;
-        ttsAuto?: string;
         providerOverride?: string;
         modelOverride?: string;
         authProfileOverride?: string;
@@ -1496,7 +1492,6 @@ describe("gateway server sessions", () => {
     expect(store["agent:main:subagent:child"]?.subagentRole).toBe("orchestrator");
     expect(store["agent:main:subagent:child"]?.subagentControlScope).toBe("children");
     expect(store["agent:main:subagent:child"]?.elevatedLevel).toBe("on");
-    expect(store["agent:main:subagent:child"]?.ttsAuto).toBe("always");
     expect(store["agent:main:subagent:child"]?.providerOverride).toBe("anthropic");
     expect(store["agent:main:subagent:child"]?.modelOverride).toBe("claude-opus-4-1");
     expect(store["agent:main:subagent:child"]?.authProfileOverride).toBe("work");

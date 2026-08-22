@@ -60,11 +60,6 @@ describe("model-pricing-cache", () => {
           },
         },
       },
-      messages: {
-        tts: {
-          summaryModel: "openai/gpt-5.4",
-        },
-      },
     } as unknown as OpenClawConfig;
 
     const refs = collectConfiguredModelPricingRefs(config).map((ref) =>
@@ -73,7 +68,6 @@ describe("model-pricing-cache", () => {
 
     expect(refs).toEqual(
       expect.arrayContaining([
-        "openai/gpt-5.4",
         "anthropic/claude-sonnet-4-6",
         "google/gemini-3-pro-preview",
         "anthropic/claude-opus-4-6",

@@ -72,7 +72,7 @@ describe("pi-tools sandbox policy", () => {
               tools: {
                 sandbox: {
                   tools: {
-                    alsoAllow: ["message", "tts"],
+                    alsoAllow: ["message"],
                   },
                 },
               },
@@ -83,7 +83,6 @@ describe("pi-tools sandbox policy", () => {
     });
 
     expect(names).toContain("message");
-    expect(names).toContain("tts");
   });
 
   it("re-enables default-denied sandbox tools when explicitly allowed", () => {

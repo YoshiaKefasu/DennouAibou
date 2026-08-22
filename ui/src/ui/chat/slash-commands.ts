@@ -48,7 +48,6 @@ const COMMAND_ICON_OVERRIDES: Partial<Record<string, IconName>> = {
   subagents: "folder",
   kill: "x",
   steer: "send",
-  tts: "volume2",
 };
 
 const LOCAL_COMMANDS = new Set([
@@ -98,7 +97,7 @@ const CATEGORY_OVERRIDES: Partial<Record<string, SlashCommandCategory>> = {
   status: "tools",
   export_session: "tools",
   usage: "tools",
-  tts: "tools",
+
   agents: "agents",
   subagents: "agents",
   kill: "agents",

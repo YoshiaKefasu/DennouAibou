@@ -35,19 +35,6 @@ const CASES: GuidanceCase[] = [
     required: ["DENNOU_CONFIG_PATH"],
   },
   {
-    file: "skills/sherpa-onnx-tts/SKILL.md",
-    required: [
-      "DENNOU_STATE_DIR",
-      "DENNOU_CONFIG_PATH",
-      'STATE_DIR="${DENNOU_STATE_DIR:-$HOME/.openclaw}"',
-    ],
-    forbidden: [
-      'SHERPA_ONNX_RUNTIME_DIR: "~/.dennou-aibou/tools/sherpa-onnx-tts/runtime"',
-      'SHERPA_ONNX_MODEL_DIR: "~/.dennou-aibou/tools/sherpa-onnx-tts/models/vits-piper-en_US-lessac-high"',
-      "<state-dir>",
-    ],
-  },
-  {
     file: "skills/coding-agent/SKILL.md",
     required: ["DENNOU_STATE_DIR"],
     forbidden: ["NEVER start Codex in ~/.dennou-aibou/"],

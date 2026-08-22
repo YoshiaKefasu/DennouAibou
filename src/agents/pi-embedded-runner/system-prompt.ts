@@ -20,7 +20,6 @@ export function buildEmbeddedSystemPrompt(params: {
   heartbeatPrompt?: string;
   skillsPrompt?: string;
   docsPath?: string;
-  ttsHint?: string;
   reactionGuidance?: {
     level: "minimal" | "extensive";
     channel: string;
@@ -66,7 +65,6 @@ export function buildEmbeddedSystemPrompt(params: {
     heartbeatPrompt: params.heartbeatPrompt,
     skillsPrompt: params.skillsPrompt,
     docsPath: params.docsPath,
-    ttsHint: params.ttsHint,
     workspaceNotes: params.workspaceNotes,
     reactionGuidance: params.reactionGuidance,
     promptMode: params.promptMode,

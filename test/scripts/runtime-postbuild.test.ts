@@ -71,11 +71,6 @@ describe("runtime postbuild static assets", () => {
       "utf8",
     );
     await fs.writeFile(
-      path.join(distDir, "runtime-tts.runtime-AbCd1234.js"),
-      "export const tts = true;\n",
-      "utf8",
-    );
-    await fs.writeFile(
       path.join(distDir, "library-Other123.js"),
       "export const x = true;\n",
       "utf8",
@@ -85,9 +80,6 @@ describe("runtime postbuild static assets", () => {
 
     expect(await fs.readFile(path.join(distDir, "runtime-model-auth.runtime.js"), "utf8")).toBe(
       'export * from "./runtime-model-auth.runtime-XyZ987.js";\n',
-    );
-    expect(await fs.readFile(path.join(distDir, "runtime-tts.runtime.js"), "utf8")).toBe(
-      'export * from "./runtime-tts.runtime-AbCd1234.js";\n',
     );
     await expect(fs.stat(path.join(distDir, "library.js"))).rejects.toThrow();
   });

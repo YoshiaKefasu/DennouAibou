@@ -10,7 +10,7 @@
       "Agent respects mention-driven group routing semantics."
     ],
     "docsRefs": ["docs/channels/group-messages.md", "docs/channels/qa-channel.md"],
-    "codeRefs": ["extensions/qa-channel/src/inbound.ts", "extensions/qa-lab/src/bus-state.ts"]
+    "codeRefs": ["extensions/qa-channel/src/inbound.ts"]
   },
   {
     "id": "cron-one-minute-ping",
@@ -22,8 +22,7 @@
       "Reminder returns through qa-channel.",
       "Agent recognizes the reminder as part of the original task."
     ],
-    "docsRefs": ["docs/help/testing.md", "docs/channels/qa-channel.md"],
-    "codeRefs": ["extensions/qa-lab/src/bus-server.ts", "extensions/qa-lab/src/self-check.ts"]
+    "docsRefs": ["docs/help/testing.md", "docs/channels/qa-channel.md"]
   },
   {
     "id": "dm-chat-baseline",
@@ -36,7 +35,7 @@
       "Agent keeps the dev C-3PO personality."
     ],
     "docsRefs": ["docs/channels/qa-channel.md", "docs/help/testing.md"],
-    "codeRefs": ["extensions/qa-channel/src/gateway.ts", "extensions/qa-lab/src/lab-server.ts"]
+    "codeRefs": ["extensions/qa-channel/src/gateway.ts"]
   },
   {
     "id": "lobster-invaders-build",
@@ -48,8 +47,7 @@
       "Agent builds a tiny playable Lobster Invaders artifact.",
       "Agent explains how to run or view the artifact."
     ],
-    "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md"],
-    "codeRefs": ["extensions/qa-lab/src/report.ts", "extensions/qa-lab/web/src/app.ts"]
+    "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md"]
   },
   {
     "id": "memory-recall",
@@ -61,8 +59,7 @@
       "Agent later recalls the same fact correctly.",
       "Recall stays scoped to the active QA conversation."
     ],
-    "docsRefs": ["docs/help/testing.md"],
-    "codeRefs": ["extensions/qa-lab/src/scenario.ts"]
+    "docsRefs": ["docs/help/testing.md"]
   },
   {
     "id": "model-switch-follow-up",
@@ -74,8 +71,7 @@
       "Follow-up answer remains coherent with prior context.",
       "Final report notes whether the switch actually happened."
     ],
-    "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md"],
-    "codeRefs": ["extensions/qa-lab/src/report.ts"]
+    "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md"]
   },
   {
     "id": "reaction-edit-delete",
@@ -89,8 +85,7 @@
     ],
     "docsRefs": ["docs/channels/qa-channel.md"],
     "codeRefs": [
-      "extensions/qa-channel/src/channel-actions.ts",
-      "extensions/qa-lab/src/self-check-scenario.ts"
+      "extensions/qa-channel/src/channel-actions.ts"
     ]
   },
   {
@@ -105,8 +100,6 @@
     ],
     "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md", "docs/channels/qa-channel.md"],
     "codeRefs": [
-      "extensions/qa-lab/src/report.ts",
-      "extensions/qa-lab/src/self-check.ts",
       "src/agents/system-prompt.ts"
     ]
   },
@@ -121,7 +114,7 @@
       "Final answer attributes delegated work clearly."
     ],
     "docsRefs": ["docs/tools/subagents.md", "docs/help/testing.md"],
-    "codeRefs": ["src/agents/system-prompt.ts", "extensions/qa-lab/src/report.ts"]
+    "codeRefs": ["src/agents/system-prompt.ts"]
   },
   {
     "id": "thread-follow-up",
@@ -134,7 +127,7 @@
       "Thread report references the correct prior context."
     ],
     "docsRefs": ["docs/channels/qa-channel.md", "docs/channels/group-messages.md"],
-    "codeRefs": ["extensions/qa-channel/src/protocol.ts", "extensions/qa-lab/src/bus-state.ts"]
+    "codeRefs": ["extensions/qa-channel/src/protocol.ts"]
   },
   {
     "id": "memory-tools-channel-context",
@@ -147,7 +140,7 @@
       "Final reply returns the memory-only fact correctly in-channel."
     ],
     "docsRefs": ["docs/concepts/memory.md", "docs/concepts/memory-search.md"],
-    "codeRefs": ["extensions/memory-core/src/tools.ts", "extensions/qa-lab/src/suite.ts"]
+    "codeRefs": ["extensions/memory-core/src/tools.ts"]
   },
   {
     "id": "memory-failure-fallback",
@@ -159,8 +152,7 @@
       "Agent does not hallucinate the hidden fact.",
       "Agent says it could not confirm and surfaces the limitation."
     ],
-    "docsRefs": ["docs/concepts/memory.md", "docs/tools/index.md"],
-    "codeRefs": ["extensions/memory-core/src/tools.ts", "extensions/qa-lab/src/suite.ts"]
+    "docsRefs": ["docs/concepts/memory.md", "docs/tools/index.md"]
   },
   {
     "id": "model-switch-tool-continuity",
@@ -172,8 +164,7 @@
       "A tool call still happens after the model switch.",
       "Final answer acknowledges the handoff and uses the tool-derived evidence."
     ],
-    "docsRefs": ["docs/help/testing.md", "docs/concepts/model-failover.md"],
-    "codeRefs": ["extensions/qa-lab/src/suite.ts", "extensions/qa-lab/src/mock-openai-server.ts"]
+    "docsRefs": ["docs/help/testing.md", "docs/concepts/model-failover.md"]
   },
   {
     "id": "mcp-plugin-tools-call",
@@ -186,7 +177,7 @@
       "The returned MCP payload includes the expected memory-only fact."
     ],
     "docsRefs": ["docs/cli/mcp.md", "docs/gateway/protocol.md"],
-    "codeRefs": ["src/mcp/plugin-tools-serve.ts", "extensions/qa-lab/src/suite.ts"]
+    "codeRefs": ["src/mcp/plugin-tools-serve.ts"]
   },
   {
     "id": "skill-visibility-invocation",
@@ -199,7 +190,7 @@
       "The result stays scoped to the active QA workspace skill."
     ],
     "docsRefs": ["docs/tools/skills.md", "docs/gateway/protocol.md"],
-    "codeRefs": ["src/agents/skills-status.ts", "extensions/qa-lab/src/suite.ts"]
+    "codeRefs": ["src/agents/skills-status.ts"]
   },
   {
     "id": "skill-install-hot-availability",
@@ -212,7 +203,7 @@
       "The next agent turn reflects the new skill marker."
     ],
     "docsRefs": ["docs/tools/skills.md", "docs/gateway/configuration.md"],
-    "codeRefs": ["src/agents/skills-status.ts", "extensions/qa-lab/src/suite.ts"]
+    "codeRefs": ["src/agents/skills-status.ts"]
   },
   {
     "id": "native-image-generation",
@@ -226,8 +217,7 @@
     ],
     "docsRefs": ["docs/tools/image-generation.md", "docs/providers/openai.md"],
     "codeRefs": [
-      "src/agents/tools/image-generate-tool.ts",
-      "extensions/qa-lab/src/mock-openai-server.ts"
+      "src/agents/tools/image-generate-tool.ts"
     ]
   },
   {
@@ -241,7 +231,7 @@
       "New mention routing behavior works in the same gateway lifetime."
     ],
     "docsRefs": ["docs/gateway/configuration.md", "docs/gateway/protocol.md"],
-    "codeRefs": ["src/gateway/server-methods/config.ts", "extensions/qa-lab/src/suite.ts"]
+    "codeRefs": ["src/gateway/server-methods/config.ts"]
   },
   {
     "id": "config-apply-restart-wakeup",

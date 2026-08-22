@@ -72,8 +72,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "status",
     "usage.status",
     "usage.cost",
-    "tts.status",
-    "tts.providers",
+
     "models.list",
     "tools.catalog",
     "tools.effective",
@@ -116,11 +115,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "agent.wait",
     "wake",
     "talk.mode",
-    "talk.speak",
-    "tts.enable",
-    "tts.disable",
-    "tts.convert",
-    "tts.setProvider",
+
     "voicewake.set",
     "node.invoke",
     "chat.send",

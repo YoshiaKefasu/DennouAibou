@@ -51,9 +51,6 @@ function applyVitestCapabilityAliasOverrides(params: {
     "openclaw/plugin-sdk/provider-onboard": fileURLToPath(
       new URL("../plugin-sdk/provider-onboard.ts", import.meta.url),
     ),
-    "openclaw/plugin-sdk/speech-core": fileURLToPath(
-      new URL("./capability-runtime-vitest-shims/speech-core.ts", import.meta.url),
-    ),
   };
 }
 
@@ -121,7 +118,6 @@ function createCapabilityPluginRecord(params: {
     hookNames: [],
     channelIds: [],
     providerIds: [],
-    speechProviderIds: [],
     realtimeTranscriptionProviderIds: [],
     realtimeVoiceProviderIds: [],
     mediaUnderstandingProviderIds: [],
@@ -283,7 +279,6 @@ export function loadBundledCapabilityRuntimeRegistry(params: {
       const captured = createCapturedPluginRegistration();
       void register(captured.api);
       record.providerIds.push(...captured.providers.map((entry) => entry.id));
-      record.speechProviderIds.push(...captured.speechProviders.map((entry) => entry.id));
       record.realtimeTranscriptionProviderIds.push(
         ...captured.realtimeTranscriptionProviders.map((entry) => entry.id),
       );
@@ -311,15 +306,6 @@ export function loadBundledCapabilityRuntimeRegistry(params: {
 
       registry.providers.push(
         ...captured.providers.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
-      registry.speechProviders.push(
-        ...captured.speechProviders.map((provider) => ({
           pluginId: record.id,
           pluginName: record.name,
           provider,

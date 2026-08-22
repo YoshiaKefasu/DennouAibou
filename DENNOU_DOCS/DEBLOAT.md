@@ -1,6 +1,6 @@
 # DEBLOAT — 大規模削除クリーンアップ計画
 
-> 最終更新: 2026-08-16
+> 最終更新: 2026-08-21
 > 対象リポジトリ: DennouAibou（OpenClaw Hard Fork, base v2026.4.5）
 
 ## 1. 目的と方針
@@ -30,7 +30,8 @@ DENNOU_RULES.md の Smart Debloat は「エントリー無効化（feature flag�
 
 この判断の根拠:
 
-- モデルプロバイダー 35 個は KASOU 運用で完全に未使用。サブプロバイダー 6 個のうち elevenlabs は KASOU tts で実運用中のため、設定掃除（Phase 6）を伴う削除として扱う
+- モデルプロバイダー 35 個は KASOU 運用で完全に未使用。サブプロバイダー 6 個のうち elevenlabs は KASOU tts で実運用中 のため、設定掃除（Phase 6）を伴う削除として扱う
+  ※ **17章により TTS は完全撤去された（2026-08-21）。上記 elevenlabs の実運用記述は無効。**
 - コア編集は「削除プロバイダー専用の参照」に限定し、共有 API タイプ（`anthropic-messages` 等）は残す
 - 上流同期（`[SYNC]`）時に削除フォルダが復活するリスクは承知しており、`.gitignore` や merge 時の再削除運用で対応する（9 章）
 
@@ -893,3 +894,121 @@ Provider 削除で生まれたデッドコードの追加掃除:
 - `~/.gemini/` ディレクトリの削除（確認後）
 - `extensions/google-gemini-cli/` の削除（Phase B-1 で判定）
 - `src/agents/gemini-cli-provider.ts` の削除確認
+
+---
+
+## 17. TTS 完全撤去 + テスト残骸サージカルクリーンアップ（2026-08-21）
+
+### 17.1 目的
+
+**TTS（Text-to-Speech）サブシステムを DennouAibou から完全撤去する。**
+
+判断根拠:
+
+- TTS エンジン実体（`speech-core` dist）は以前のデブロートで削除済み。ファサードと表面（`/tts` コマンド、エージェント tts ツール、gateway RPC、UI、config キー）だけが残っていた
+- ユーザー決定「TTS 今は使わない。全部掃除で残らず」（2026-08-21）
+- OpenAI TTS プロバイダー（`extensions/openai/tts.ts`）は kept extension 内に存在するが、TTS サブシステム全体撤去に伴い一括除去する
+- **本キャンペーンにより TTS は完全撤去されたため、1章 / 4章 / 5.6章 / 6章（Phase 6）/ 8章 / 13章（Phase 6 実施記録）の elevenlabs / tts 記述は無効**
+
+### 17.2 対象と処方
+
+本キャンペーンは以下の5カテゴリをサージカルに掃除する。各カテゴリの削除パターンは、既存の slack / zalo / whatsapp 等の削除済みチャンネル参照掃除（14章 Phase B）と同一.
+
+#### 1. TTS サブシステム完全撤去
+
+| 種別 | ファイル / パス | 処方 |
+| --- | --- | --- |
+| TTS コア | `src/tts/`（15 ファイル） | ディレクトリ削除 |
+| TTS facade | `src/plugin-sdk/tts-runtime.ts`, `speech-core.ts`, `speech.ts`, `voice-call.ts` | ファイル削除。`declare module` 追加は**不要と判明**（型参照は全て除去済み、`build:plugin-sdk:dts` pass 実測） |
+| OpenAI TTS | `extensions/openai/tts.ts`, `extensions/openai/tts.test.ts` | ファイル削除（kept extension の一部） |
+| OpenAI TTS 定数 | `extensions/openai/default-models.ts` の `OPENAI_DEFAULT_TTS_MODEL` / `OPENAI_DEFAULT_TTS_VOICE` | 削除 |
+| OpenAI TTS export | `extensions/openai/api.ts` の TTS 関連 export | 削除 |
+| OpenAI TTS speech | `extensions/openai/speech-provider.ts` | ファイル削除 |
+| TTS 契約テスト | `src/plugins/contracts/tts.*.contract.test.ts`（4 ファイル） | ファイル削除 |
+| TTS 契約ヘルパー | `test/helpers/plugins/tts-contract-suites.ts` | ファイル削除 |
+| TTS /tts コマンド | `src/auto-reply/commands-registry.shared.ts` の `/tts` エントリ | 削除 |
+| TTS system prompt | `src/auto-reply/reply/commands-system-prompt.ts` の `buildTtsSystemPromptHint` import と使用箇所 | 削除 |
+| TTS dispatch | `src/auto-reply/reply/dispatch-from-config.ts` の tts-runtime import と tts 処理分岐 | 削除 |
+| TTS status | `src/auto-reply/status.ts` の `resolveStatusTtsSnapshot` import と使用箇所 | 削除 |
+| TTS config | KASOU `openclaw.json` の `messages.tts` ブロック（13章 Phase 6 で elevenlabs は削除済みだが、残りの tts.provider / tts.autoMode 等も除去） | 設定除去 |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.test.ts` の tts モック・tts テストケース | テスト削除・修正 |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.reply-dispatch.test.ts` の tts モック | テスト削除・修正 |
+
+#### 2. whatsapp 契約テスト残骸撤去
+
+拡張本体は 7ad2dcfad7b で削除済み。残骸テストを削除（slack / zalo 前例パターン）。
+
+| ファイル | 処方 |
+| --- | --- |
+| `src/channels/plugins/contracts/outbound-payload.whatsapp.contract.test.ts` | ファイル削除（本次実施 — tree に残存していたのはこの1件。下記4件は先行デブロート/コミットで既に不在を確認済み） |
+| `src/channels/plugins/contracts/inbound.whatsapp.contract.test.ts` | **温存**（実測 1/1 pass — 削除済みプラグインメタデータに依存せず finalizeInboundContext の現役契約をテスト） |
+| `plugins-core-extension.whatsapp` / `runtime-plugin-boundary.whatsapp` / `pi-tools.whatsapp-login-gating` / `isolated-agent...whatsapp-recipient` | 先行コミットで既に不在（tree 確認済み、対応不要） |
+
+#### 3. カタログ / レジストリ系テストの現実整合
+
+削除済みチャンネル（slack / msteams / zalo / whatsapp / matrix / irc 等 14 個）の参照をテストから除去し、「missing bundled channel plugin: slack」等のエラーを解消。
+
+| 対象 | 処方 |
+| --- | --- |
+| `package-manifest.contract.test.ts`（15 件失敗） | 削除済み manifest 参照（`extensions/{bluebubbles,feishu,irc,matrix,nextcloud-talk,nostr,slack,synology-chat,tlon,whatsapp,zalo,zalouser}/package.json`）の期待値を除去 |
+| `plugin-sdk-index.bundle.test.ts` / `plugin-sdk-runtime-api-guardrails.test.ts` | `missing bundled plugin root for matrix / irc` の期待値を除去 |
+| `src/channels/registry.helpers.test.ts` | MS Teams の bundled channel リスト言及を除去 |
+| `bundled-channel-config-metadata.generated.ts` | 削除済みチャンネルのエントリを除去し再生成 |
+
+#### 4. plugin-activation-boundary 3 件
+
+browser 拡張削除後の期待値整備。
+
+| 対象 | 処方 |
+| --- | --- |
+| `src/plugin-activation-boundary.test.ts` | browser plugin-sdk 参照（`browser-config.js` / `browser-host-inspection.js` / `browser-maintenance.js` の import 期待値）を削除。browser 拡張は削除済みのため、該当分岐の期待値を更新 |
+
+#### 5. 端物
+
+| 対象 | 処方 |
+| --- | --- |
+| `src/auto-reply/reply/followup-runner.test.ts` | 未使用 import `OpenClawConfig`（6行目）を除去（oxlint 残） |
+| `qa/seed-scenarios.json` | 削除済み `extensions/qa-lab/` と `extensions/qa-channel/` を参照する `codeRefs`（13行目、26行目等、計8箇所）を除去 or 空配列に更新 |
+| telegram rebrand 漏れ調査 | `src/plugin-sdk/telegram.ts` 及び関連ファイルの「OpenClaw」→「DennouAibou」rebrand 漏れを調査（本章スコープは調査のみ。修正は別タスク） |
+
+### 17.3 関連コミット
+
+| コミット | 内容 |
+| --- | --- |
+| `bfc9a1c2568` | [DEBLOAT] 未使用依存12個+孤児ファイル削除 |
+| `d6aab6f3156` | [FIX-SOUL] 型エラー220件→0件 |
+| `051f0e94857` | [FIX-SOUL] followup-runner テスト修復(28/28) |
+| (本コミット) | [DEBLOAT] TTS 完全撤去 + テスト残骸サージカルクリーンアップ |
+
+### 17.4 検証ゲート
+
+- [ ] `tsgo` ゼロ（型エラーなし）
+- [ ] `pnpm test` 全スイート pass（既存失敗が増えない）
+- [ ] `pnpm test:contracts` pass（TTS / whatsapp / channel テスト残骸が消滅）
+- [x] `pnpm build:plugin-sdk:dts` pass（facade declare module は不要と判明 — 型参照除去のみで通過）
+- [ ] code-reviewer APPROVE 必須
+- [ ] KASOU gateway 起動確認（`/` `/logs` が HTTP 200）
+- [ ] Telegram 応答確認（TTS なしで正常応答）
+
+### 17.5 数値（ステージング済み差分の実測値）
+
+実測コマンド: `git diff --cached --shortstat` / `git show HEAD:<file> | wc -l` / 各スイート実行。
+
+| 項目 | 最終値 | 根拠 |
+| --- | --- | --- |
+| 全体変更規模 | 187 ファイル変更 / +420 / -9,081（削除 47 ファイル） | `git diff --cached --shortstat` 実測 |
+| TTS 削除ファイル数 | 37 | 削除47ファイルのうち tts/speech 関連
+| TTS 削除行数 | 約 4,428 行（削除37ファイルの HEAD 時点合計） | 残りは修正ファイル内除去・他カテゴリ分 |
+| whatsapp テスト削除ファイル数 | 本次1件 + ハーネス編集（残り4件は先行コミットで不在確認済み） | outbound-payload.whatsapp.contract.test.ts 削除、inbound版は実測 pass のため温存 |
+| カタログ/レジストリ テスト修正数 | 11 ファイル（13件修復+追加12件+session-binding縮小） | channel-catalog / group-policy / registry-actions / registry-setup-status / registry / import-guardrails / manifest / session-binding / registry-session-binding / runtime-artifacts(削除) / plugins-core-extension-contract(Jiti統一) |
+| plugin-activation-boundary 修正数 | 3 | slack期待値・env-api-key現実化・browser定数/表面整備 |
+| followup-runner 修正数 | 1 | テストスイート修復コミット（051f0e94857）別途済み |
+| seed-scenarios.json 修正数 | qa-lab 参照19行除去 | `git diff --cached` 実測 |
+| 最終テスト失敗数（pre-existing 以外） | **0** | contracts 37ファイル/129テスト全pass、followup-runner 28/28、boundary 7/7 |
+| 最終 test スイート pass 数 | contracts 129/129、followup-runner 28/28、plugin-activation-boundary 7/7 | tsgo --noEmit エラーゼロと併せて検証済み |
+
+#### 次回キャンペーン候補（今回スコープ外として台帳化）
+
+- マニフェスト契約の `speechProviders` フィールド群（src/plugins/manifest.ts 等）— 外部プラグイン向けコントラクト層として恒久保持か判断が必要
+- `vitest.extension-voice-call.config.ts` + `vitest.extension-voice-call-paths.mjs` — 削除済み voice-call 拡張用の死んだテストインフラ
+- テストヘルパー側の `OPENCLAW_*` env 完全移行（今回 DENNOU_* 優先+OPENCLAW_* フォールバックで互換確保済み）

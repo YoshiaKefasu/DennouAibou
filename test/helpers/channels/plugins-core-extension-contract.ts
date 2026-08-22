@@ -1,24 +1,31 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import {
-  listDiscordDirectoryGroupsFromConfig,
-  listDiscordDirectoryPeersFromConfig,
-  type DiscordProbe,
-  type DiscordTokenResolution,
-} from "../../../extensions/discord/api.js";
+import type { DiscordProbe, DiscordTokenResolution } from "../../../extensions/discord/api.js";
+import type * as DiscordApiModule from "../../../extensions/discord/api.js";
+import type * as TelegramApiModule from "../../../extensions/telegram/api.js";
+import type { TelegramProbe, TelegramTokenResolution } from "../../../extensions/telegram/api.js";
 import type {
   BaseProbeResult,
   BaseTokenResolution,
   ChannelDirectoryEntry,
 } from "../../../src/channels/plugins/types.js";
-import {
-  listTelegramDirectoryGroupsFromConfig,
-  listTelegramDirectoryPeersFromConfig,
-  type TelegramProbe,
-  type TelegramTokenResolution,
-} from "../../../extensions/telegram/api.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
 import type { LineProbeResult } from "../../../src/plugin-sdk/line.js";
+import { loadBundledPluginPublicSurfaceSync } from "../../../src/test-utils/bundled-plugin-public-surface.js";
 import { withEnvAsync } from "../../../src/test-utils/env.js";
+
+// Load extension API surfaces through the same Jiti (require-path) loader the
+// other registry-backed contract helpers use, so every suite in this directory
+// shares one module graph. Mixing a static ESM import of extensions/*/api.js
+// with those Jiti loads makes Node throw "imported again after being required"
+// for modules both graphs touch.
+const discordApi = loadBundledPluginPublicSurfaceSync<typeof DiscordApiModule>({
+  pluginId: "discord",
+  artifactBasename: "api.js",
+});
+const telegramApi = loadBundledPluginPublicSurfaceSync<typeof TelegramApiModule>({
+  pluginId: "telegram",
+  artifactBasename: "api.js",
+});
 
 type DirectoryListFn = (params: {
   cfg: OpenClawConfig;
@@ -80,13 +87,13 @@ export function describeDiscordPluginsCoreExtensionContract() {
       } as unknown as OpenClawConfig;
 
       await expectDirectoryIds(
-        listDiscordDirectoryPeersFromConfig,
+        discordApi.listDiscordDirectoryPeersFromConfig,
         cfg,
         ["user:111", "user:12345", "user:222", "user:333", "user:444"],
         { sorted: true },
       );
       await expectDirectoryIds(
-        listDiscordDirectoryGroupsFromConfig,
+        discordApi.listDiscordDirectoryGroupsFromConfig,
         cfg,
         ["channel:555", "channel:666", "channel:777"],
         { sorted: true },
@@ -115,8 +122,10 @@ export function describeDiscordPluginsCoreExtensionContract() {
         },
       } as unknown as OpenClawConfig;
 
-      await expectDirectoryIds(listDiscordDirectoryPeersFromConfig, cfg, ["user:111"]);
-      await expectDirectoryIds(listDiscordDirectoryGroupsFromConfig, cfg, ["channel:555"]);
+      await expectDirectoryIds(discordApi.listDiscordDirectoryPeersFromConfig, cfg, ["user:111"]);
+      await expectDirectoryIds(discordApi.listDiscordDirectoryGroupsFromConfig, cfg, [
+        "channel:555",
+      ]);
     });
 
     it("applies query and limit filtering for config-backed directories", async () => {
@@ -137,7 +146,7 @@ export function describeDiscordPluginsCoreExtensionContract() {
         },
       } as unknown as OpenClawConfig;
 
-      const groups = await listDiscordDirectoryGroupsFromConfig({
+      const groups = await discordApi.listDiscordDirectoryGroupsFromConfig({
         cfg,
         accountId: "default",
         query: "666",
@@ -171,12 +180,12 @@ export function describeTelegramPluginsCoreExtensionContract() {
       } as unknown as OpenClawConfig;
 
       await expectDirectoryIds(
-        listTelegramDirectoryPeersFromConfig,
+        telegramApi.listTelegramDirectoryPeersFromConfig,
         cfg,
         ["123", "456", "@alice", "@bob"],
         { sorted: true },
       );
-      await expectDirectoryIds(listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
+      await expectDirectoryIds(telegramApi.listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
     });
 
     it("keeps fallback semantics when accountId is omitted", async () => {
@@ -197,8 +206,8 @@ export function describeTelegramPluginsCoreExtensionContract() {
           },
         } as unknown as OpenClawConfig;
 
-        await expectDirectoryIds(listTelegramDirectoryPeersFromConfig, cfg, ["@alice"]);
-        await expectDirectoryIds(listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
+        await expectDirectoryIds(telegramApi.listTelegramDirectoryPeersFromConfig, cfg, ["@alice"]);
+        await expectDirectoryIds(telegramApi.listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
       });
     });
 
@@ -218,8 +227,8 @@ export function describeTelegramPluginsCoreExtensionContract() {
         },
       } as unknown as OpenClawConfig;
 
-      await expectDirectoryIds(listTelegramDirectoryPeersFromConfig, cfg, ["@alice"]);
-      await expectDirectoryIds(listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
+      await expectDirectoryIds(telegramApi.listTelegramDirectoryPeersFromConfig, cfg, ["@alice"]);
+      await expectDirectoryIds(telegramApi.listTelegramDirectoryGroupsFromConfig, cfg, ["-1001"]);
     });
 
     it("applies query and limit filtering for config-backed directories", async () => {
@@ -232,7 +241,7 @@ export function describeTelegramPluginsCoreExtensionContract() {
         },
       } as unknown as OpenClawConfig;
 
-      const groups = await listTelegramDirectoryGroupsFromConfig({
+      const groups = await telegramApi.listTelegramDirectoryGroupsFromConfig({
         cfg,
         accountId: "default",
         query: "-100",

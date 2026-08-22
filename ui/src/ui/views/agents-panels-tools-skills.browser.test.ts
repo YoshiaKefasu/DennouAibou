@@ -48,15 +48,7 @@ describe("agents tools panel (browser)", () => {
                 id: "media",
                 label: "Media",
                 source: "core",
-                tools: [
-                  {
-                    id: "tts",
-                    label: "tts",
-                    description: "Text-to-speech conversion",
-                    source: "core",
-                    defaultProfiles: [],
-                  },
-                ],
+                tools: [],
               },
               {
                 id: "plugin:voice-call",
