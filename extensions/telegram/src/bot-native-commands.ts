@@ -1,3 +1,4 @@
+import type { Message } from "@grammyjs/types";
 import type { Bot, Context } from "grammy";
 import {
   resolveCommandAuthorization,
@@ -710,7 +711,7 @@ export const registerTelegramNativeCommands = ({
         if (!msg) {
           return;
         }
-        if (shouldSkipUpdate(ctx)) {
+        if (shouldSkipUpdate(ctx as TelegramUpdateKeyContext)) {
           return;
         }
         const runtimeCfg = loadFreshRuntimeConfig();
@@ -857,7 +858,7 @@ export const registerTelegramNativeCommands = ({
           ? msg.chat.title
             ? `${msg.chat.title} id:${chatId}`
             : `group:${chatId}`
-          : (buildSenderName(msg) ?? String(senderId || chatId));
+          : (buildSenderName(msg as Message) ?? String(senderId || chatId));
         const ctxPayload = nativeCommandRuntime.finalizeInboundContext({
           Body: prompt,
           BodyForAgent: prompt,
@@ -870,7 +871,7 @@ export const registerTelegramNativeCommands = ({
           ConversationLabel: conversationLabel,
           GroupSubject: isGroup ? (msg.chat.title ?? undefined) : undefined,
           GroupSystemPrompt: isGroup || (!isGroup && groupConfig) ? groupSystemPrompt : undefined,
-          SenderName: buildSenderName(msg),
+          SenderName: buildSenderName(msg as Message),
           SenderId: senderId || undefined,
           SenderUsername: senderUsername || undefined,
           Surface: "telegram",
@@ -972,7 +973,7 @@ export const registerTelegramNativeCommands = ({
         if (!msg) {
           return;
         }
-        if (shouldSkipUpdate(ctx)) {
+        if (shouldSkipUpdate(ctx as TelegramUpdateKeyContext)) {
           return;
         }
         const chatId = msg.chat.id;

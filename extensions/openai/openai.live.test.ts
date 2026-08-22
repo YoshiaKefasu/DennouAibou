@@ -107,7 +107,7 @@ function createLiveConfig(): OpenClawConfig {
   } as OpenClawConfig;
 }
 
-function createLiveTtsConfig(): ResolvedTtsConfig {
+function createLiveTtsConfig() {
   return {
     auto: "off",
     mode: "final",

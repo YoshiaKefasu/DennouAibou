@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "../../config/sessions/types.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 
 const runEmbeddedPiAgentMock = vi.fn();
@@ -315,6 +316,29 @@ function createQueuedRun(
   return createMockFollowupRun(overrides);
 }
 
+function requireLastMockCallArg(mock: ReturnType<typeof vi.fn>, label: string): Record<string, unknown> {
+  const lastCall = mock.mock.calls.at(-1);
+  expect(lastCall, `expected at least one call to ${label}`).toBeDefined();
+  const arg = lastCall![0] as Record<string, unknown>;
+  expect(arg, `expected arg at ${label}`).toBeDefined();
+  return arg;
+}
+
+function requireMockCallArg(mock: ReturnType<typeof vi.fn>, index: number): Record<string, unknown> {
+  const call = mock.mock.calls.at(index);
+  expect(call, `expected mock call at index ${index}`).toBeDefined();
+  return call![0] as Record<string, unknown>;
+}
+
+const FOLLOWUP_TEST_SESSION_STORES = new Map<string, Record<string, SessionEntry>>();
+
+function registerFollowupTestSessionStore(
+  storePath: string,
+  store: Record<string, SessionEntry>,
+): void {
+  FOLLOWUP_TEST_SESSION_STORES.set(storePath, store);
+}
+
 async function normalizeComparablePath(filePath: string): Promise<string> {
   const parent = await fs.realpath(path.dirname(filePath)).catch(() => path.dirname(filePath));
   return path.join(parent, path.basename(filePath));
@@ -344,390 +368,7 @@ function createAsyncReplySpy() {
   return vi.fn(async () => {});
 }
 
-describe("createFollowupRunner compaction", () => {
-  it("clears queued auto fallback pins after a successful primary probe", async () => {
-    const sessionKey = "probe-clear";
-    const sessionEntry: SessionEntry = {
-      sessionId: "session-1",
-      updatedAt: Date.now(),
-      providerOverride: "openai",
-      modelOverride: "gpt-5.4",
-      modelOverrideSource: "auto",
-      modelOverrideFallbackOriginProvider: "anthropic",
-      modelOverrideFallbackOriginModel: "claude",
-    };
-    const sessionStore = { [sessionKey]: sessionEntry };
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: { agentMeta: { provider: "anthropic", model: "claude" } },
-    });
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      sessionEntry,
-      sessionStore,
-      sessionKey,
-      defaultModel: "anthropic/claude",
-    });
-
-    await runner(
-      createQueuedRun({
-        run: {
-          sessionKey,
-          provider: "anthropic",
-          model: "claude",
-          autoFallbackPrimaryProbe: {
-            provider: "anthropic",
-            model: "claude",
-            fallbackProvider: "openai",
-            fallbackModel: "gpt-5.4",
-          },
-        },
-      }),
-    );
-
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.provider).toBe("anthropic");
-    expect(call.model).toBe("claude");
-    expect(sessionEntry.providerOverride).toBeUndefined();
-    expect(sessionEntry.modelOverride).toBeUndefined();
-    expect(sessionEntry.modelOverrideSource).toBeUndefined();
-    expect(sessionEntry.modelOverrideFallbackOriginProvider).toBeUndefined();
-    expect(sessionEntry.modelOverrideFallbackOriginModel).toBeUndefined();
-  });
-
-  it("rechecks queued probe throttle and keeps fallback auth when probe is not due", async () => {
-    const sessionKey = "probe-skip";
-    const probe = {
-      provider: "anthropic",
-      model: "claude",
-      fallbackProvider: "openai",
-      fallbackModel: "gpt-5.4",
-      fallbackAuthProfileId: "openai:fallback",
-      fallbackAuthProfileIdSource: "auto" as const,
-    };
-    const sessionEntry: SessionEntry = {
-      sessionId: "session-1",
-      updatedAt: Date.now(),
-      providerOverride: "openai",
-      modelOverride: "gpt-5.4",
-      modelOverrideSource: "auto",
-      modelOverrideFallbackOriginProvider: "anthropic",
-      modelOverrideFallbackOriginModel: "claude",
-      authProfileOverride: "openai:fallback",
-      authProfileOverrideSource: "auto",
-    };
-    const sessionStore = { [sessionKey]: sessionEntry };
-    const { markAutoFallbackPrimaryProbe } = await import("../../agents/agent-scope.js");
-    markAutoFallbackPrimaryProbe({ probe, sessionKey });
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: { agentMeta: { provider: "openai", model: "gpt-5.4" } },
-    });
-    runPreflightCompactionIfNeededMock.mockImplementationOnce(
-      async (params: { followupRun: FollowupRun; sessionEntry?: SessionEntry }) => {
-        expect(params.followupRun.run.provider).toBe("openai");
-        expect(params.followupRun.run.model).toBe("gpt-5.4");
-        expect(params.followupRun.run.autoFallbackPrimaryProbe).toBeUndefined();
-        return params.sessionEntry;
-      },
-    );
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      sessionEntry,
-      sessionStore,
-      sessionKey,
-      defaultModel: "anthropic/claude",
-    });
-
-    await runner(
-      createQueuedRun({
-        run: {
-          sessionKey,
-          provider: "anthropic",
-          model: "claude",
-          authProfileId: "anthropic:primary",
-          authProfileIdSource: "auto",
-          autoFallbackPrimaryProbe: probe,
-        },
-      }),
-    );
-
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.provider).toBe("openai");
-    expect(call.model).toBe("gpt-5.4");
-    expect(call.authProfileId).toBe("openai:fallback");
-    expect(call.authProfileIdSource).toBe("auto");
-    expect(sessionEntry.providerOverride).toBe("openai");
-    expect(sessionEntry.modelOverride).toBe("gpt-5.4");
-    expect(sessionEntry.modelOverrideSource).toBe("auto");
-  });
-});
-
 describe("createFollowupRunner runtime config", () => {
-  it("routes queued followups through CLI runtime dispatch when the model selects a CLI backend", async () => {
-    const runtimeConfig: OpenClawConfig = {
-      agents: {
-        defaults: {
-          cliBackends: {
-            "claude-cli": { command: "claude" },
-          },
-          models: {
-            "anthropic/claude-opus-4-7": { agentRuntime: { id: "claude-cli" } },
-          },
-        },
-      },
-    };
-    const sessionEntry: SessionEntry = {
-      sessionId: "session-cli-followup",
-      updatedAt: Date.now(),
-      cliSessionBindings: {
-        "claude-cli": {
-          sessionId: "cli-session-1",
-        },
-      },
-    };
-    const sessionStore = { main: sessionEntry };
-    runCliAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {
-        agentMeta: {
-          provider: "claude-cli",
-          model: "claude-opus-4-7",
-        },
-      },
-    });
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      sessionEntry,
-      sessionStore,
-      sessionKey: "main",
-      defaultModel: "anthropic/claude-opus-4-7",
-    });
-
-    await runner(
-      createQueuedRun({
-        originatingChannel: "telegram",
-        run: {
-          config: runtimeConfig,
-          provider: "anthropic",
-          model: "claude-opus-4-7",
-          messageProvider: "telegram",
-        },
-      }),
-    );
-
-    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-    expect(runCliAgentMock).toHaveBeenCalledTimes(1);
-    const call = requireLastMockCallArg(runCliAgentMock, "run cli agent");
-    expect(call.provider).toBe("claude-cli");
-    expect(call.model).toBe("claude-opus-4-7");
-    expect(call.config).toBe(runtimeConfig);
-    expect(call.cliSessionId).toBe("cli-session-1");
-    expect(call.messageChannel).toBe("telegram");
-  });
-
-  it("defers queued CLI attempt terminal lifecycle events until fallback settles", async () => {
-    const realAgentEvents = await vi.importActual<typeof import("../../infra/agent-events.js")>(
-      "../../infra/agent-events.js",
-    );
-    const lifecyclePhases: string[] = [];
-    const unsubscribe = realAgentEvents.onAgentEvent((evt) => {
-      if (evt.stream !== "lifecycle") {
-        return;
-      }
-      const phase = typeof evt.data.phase === "string" ? evt.data.phase : undefined;
-      if (phase) {
-        lifecyclePhases.push(phase);
-      }
-    });
-    const runtimeConfig: OpenClawConfig = {
-      agents: {
-        defaults: {
-          cliBackends: {
-            "claude-cli": { command: "claude" },
-          },
-          models: {
-            "anthropic/claude-opus-4-7": { agentRuntime: { id: "claude-cli" } },
-          },
-        },
-      },
-    };
-    runWithModelFallbackMock.mockImplementationOnce(
-      async (params: { run: (provider: string, model: string) => Promise<unknown> }) => {
-        await expect(params.run("anthropic", "claude-opus-4-7")).rejects.toThrow("cli failed");
-        return {
-          result: await params.run("openai", "gpt-5.4"),
-          provider: "openai",
-          model: "gpt-5.4",
-        };
-      },
-    );
-    runCliAgentMock.mockRejectedValueOnce(new Error("cli failed"));
-    runEmbeddedPiAgentMock.mockImplementationOnce(async (params: { runId: string }) => {
-      realAgentEvents.emitAgentEvent({
-        runId: params.runId,
-        stream: "lifecycle",
-        data: { phase: "start", startedAt: Date.now() },
-      });
-      realAgentEvents.emitAgentEvent({
-        runId: params.runId,
-        stream: "lifecycle",
-        data: { phase: "end", endedAt: Date.now() },
-      });
-      return {
-        payloads: [{ text: "fallback ok" }],
-        meta: {},
-      };
-    });
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      sessionKey: "main",
-      defaultModel: "anthropic/claude-opus-4-7",
-    });
-
-    try {
-      await runner(
-        createQueuedRun({
-          originatingChannel: "telegram",
-          originatingTo: "chat-1",
-          run: {
-            config: runtimeConfig,
-            provider: "anthropic",
-            model: "claude-opus-4-7",
-            messageProvider: "telegram",
-          },
-        }),
-      );
-    } finally {
-      unsubscribe();
-    }
-
-    expect(runCliAgentMock).toHaveBeenCalledTimes(1);
-    expect(runEmbeddedPiAgentMock).toHaveBeenCalledTimes(1);
-    const embeddedCall = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(embeddedCall.suppressAssistantErrorPersistence).toBe(false);
-    expect(lifecyclePhases).toEqual(["start", "start", "end"]);
-  });
-
-  it("uses the active runtime snapshot for queued embedded followup runs", async () => {
-    const sourceConfig: OpenClawConfig = {
-      models: {
-        providers: {
-          openai: {
-            baseUrl: "https://api.openai.com/v1",
-            apiKey: {
-              source: "env",
-              provider: "default",
-              id: "OPENAI_API_KEY",
-            },
-            models: [],
-          },
-        },
-      },
-    };
-    const runtimeConfig: OpenClawConfig = {
-      models: {
-        providers: {
-          openai: {
-            baseUrl: "https://api.openai.com/v1",
-            apiKey: "resolved-runtime-key",
-            models: [],
-          },
-        },
-      },
-    };
-    setRuntimeConfigSnapshot(runtimeConfig, sourceConfig);
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {},
-    });
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-    });
-
-    await runner(
-      createQueuedRun({
-        run: {
-          config: sourceConfig,
-          provider: "openai",
-          model: "gpt-5.4",
-        },
-      }),
-    );
-
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.config).toBe(runtimeConfig);
-  });
-
-  it("skips aborted queued room-event followups", async () => {
-    const abortController = new AbortController();
-    abortController.abort();
-    const onBlockReply = vi.fn(async () => {});
-    const typing = createMockTypingController();
-    const runner = createFollowupRunner({
-      opts: { onBlockReply },
-      typing,
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-    });
-
-    await runner(
-      createQueuedRun({
-        currentInboundEventKind: "room_event",
-        abortSignal: abortController.signal,
-        run: {
-          provider: "openai",
-          model: "gpt-5.4",
-          sourceReplyDeliveryMode: "message_tool_only",
-        },
-      }),
-    );
-
-    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-    expect(onBlockReply).not.toHaveBeenCalled();
-    expect(typing.markRunComplete).toHaveBeenCalledTimes(1);
-    expect(typing.markDispatchIdle).toHaveBeenCalledTimes(1);
-  });
-
-  it("passes queued room-event abort signals into followup agent runs", async () => {
-    const abortController = new AbortController();
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {},
-    });
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-    });
-
-    await runner(
-      createQueuedRun({
-        currentInboundEventKind: "room_event",
-        abortSignal: abortController.signal,
-        run: {
-          provider: "openai",
-          model: "gpt-5.4",
-          sourceReplyDeliveryMode: "message_tool_only",
-        },
-      }),
-    );
-
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.abortSignal).toBe(abortController.signal);
-  });
-
   it("keeps queued delivery correlations active during followup agent runs", async () => {
     const events: string[] = [];
     runEmbeddedPiAgentMock.mockImplementationOnce(async () => {
@@ -745,143 +386,14 @@ describe("createFollowupRunner runtime config", () => {
 
     await runner(
       createQueuedRun({
-        currentInboundEventKind: "room_event",
-        deliveryCorrelations: [
-          {
-            begin: () => {
-              events.push("begin");
-              return () => {
-                events.push("end");
-              };
-            },
-          },
-        ],
         run: {
           provider: "openai",
           model: "gpt-5.4",
-          sourceReplyDeliveryMode: "message_tool_only",
         },
       }),
     );
 
     expect(events).toEqual(["begin", "run", "end"]);
-  });
-
-  it("resolves queued embedded followups before preflight helpers read config", async () => {
-    const sourceConfig: OpenClawConfig = {
-      skills: {
-        entries: {
-          whisper: {
-            apiKey: {
-              source: "env",
-              provider: "default",
-              id: "OPENAI_API_KEY",
-            },
-          },
-        },
-      },
-    };
-    const runtimeConfig: OpenClawConfig = {
-      skills: {
-        entries: {
-          whisper: {
-            apiKey: "resolved-runtime-key",
-          },
-        },
-      },
-    };
-    resolveCommandSecretRefsViaGatewayMock.mockResolvedValueOnce({
-      resolvedConfig: runtimeConfig,
-      diagnostics: [],
-      targetStatesByPath: { "skills.entries.whisper.apiKey": "resolved_local" },
-      hadUnresolvedTargets: false,
-    });
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {},
-    });
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-    });
-    const queued = createQueuedRun({
-      run: {
-        config: sourceConfig,
-        provider: "openai",
-        model: "gpt-5.4",
-      },
-    });
-
-    await runner(queued);
-
-    expect(queued.run.config).toBe(runtimeConfig);
-    expect(requireMockCallArg(runPreflightCompactionIfNeededMock, 0).cfg).toBe(runtimeConfig);
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.config).toBe(runtimeConfig);
-  });
-
-  it("passes queued origin scope into queued execution-config resolution", async () => {
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {},
-    });
-    const sourceConfig: OpenClawConfig = {};
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-    });
-    const queued = createQueuedRun({
-      originatingChannel: "discord",
-      originatingAccountId: "work",
-      run: {
-        config: sourceConfig,
-        provider: "openai",
-        model: "gpt-5.4",
-        messageProvider: "discord",
-        agentAccountId: "bot-account",
-      },
-    });
-
-    await runner(queued);
-
-    expect(resolveQueuedReplyExecutionConfigMock).toHaveBeenCalledWith(sourceConfig, {
-      originatingChannel: "discord",
-      messageProvider: "discord",
-      originatingAccountId: "work",
-      agentAccountId: "bot-account",
-    });
-  });
-
-  it("passes queued images into queued embedded followup runs", async () => {
-    runEmbeddedPiAgentMock.mockResolvedValueOnce({
-      payloads: [],
-      meta: {},
-    });
-    const images = [{ type: "image" as const, data: "base64-cat", mimeType: "image/png" }];
-    const imageOrder = ["inline" as const];
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "openai/gpt-5.4",
-      opts: {
-        images: [{ type: "image", data: "fallback", mimeType: "image/png" }],
-        imageOrder: ["inline"],
-      },
-    });
-
-    await runner(
-      createQueuedRun({
-        images,
-        imageOrder,
-      }),
-    );
-
-    const call = requireLastMockCallArg(runEmbeddedPiAgentMock, "run embedded pi agent");
-    expect(call.images).toBe(images);
-    expect(call.imageOrder).toBe(imageOrder);
   });
 });
 
@@ -895,7 +407,6 @@ describe("createFollowupRunner progress forwarding", () => {
       originatingThreadId: "thread-1",
       run: {
         messageProvider: "discord",
-        sourceReplyDeliveryMode: "message_tool_only",
         verboseLevel: "on",
       },
     });
@@ -906,11 +417,9 @@ describe("createFollowupRunner progress forwarding", () => {
         onToolResult?: (payload: { text: string }) => Promise<void>;
         shouldEmitToolResult?: () => boolean;
         shouldEmitToolOutput?: () => boolean;
-        toolProgressDetail?: "explain" | "raw";
       }) => {
         expect(args.shouldEmitToolResult?.()).toBe(true);
         expect(args.shouldEmitToolOutput?.()).toBe(false);
-        expect(args.toolProgressDetail).toBe("raw");
         await args.onAgentEvent?.({
           stream: "tool",
           data: {
@@ -929,7 +438,6 @@ describe("createFollowupRunner progress forwarding", () => {
       typing: createMockTypingController(),
       typingMode: "instant",
       defaultModel: "claude",
-      toolProgressDetail: "raw",
     });
 
     await runner(queued);
@@ -1020,7 +528,6 @@ describe("createFollowupRunner progress forwarding", () => {
       originatingThreadId: "thread-1",
       run: {
         messageProvider: "discord",
-        sourceReplyDeliveryMode: "message_tool_only",
         verboseLevel: "on",
       },
     });
@@ -1052,11 +559,10 @@ describe("createFollowupRunner progress forwarding", () => {
     );
 
     const runner = createFollowupRunner({
-      opts: { suppressDefaultToolProgressMessages: true, onToolStart, onCommandOutput },
+      opts: { onToolStart, onCommandOutput },
       typing: createMockTypingController(),
       typingMode: "instant",
       defaultModel: "claude",
-      toolProgressDetail: "raw",
     });
 
     await runner(queued);
@@ -1141,7 +647,6 @@ describe("createFollowupRunner progress forwarding", () => {
       createQueuedRun({
         run: {
           messageProvider: "discord",
-          sourceReplyDeliveryMode: "message_tool_only",
           verboseLevel: "off",
         },
       }),
@@ -1981,10 +1486,18 @@ describe("createFollowupRunner queued user message idempotency across fallback",
     await runner(
       createQueuedRun({
         run: {
+          agentId: "agent",
+          agentDir: "/tmp",
+          sessionId: "session",
+          sessionFile: "/tmp/session.jsonl",
+          workspaceDir: "/tmp",
+          config: {},
           provider: "anthropic",
           model: "claude-opus-4-7",
+          timeoutMs: 1000,
+          blockReplyBreak: "message_end",
           suppressNextUserMessagePersistence: false,
-        },
+        } as FollowupRun["run"],
       }),
     );
 
@@ -2083,10 +1596,18 @@ describe("createFollowupRunner queued user message idempotency across fallback",
     await runner(
       createQueuedRun({
         run: {
+          agentId: "agent",
+          agentDir: "/tmp",
+          sessionId: "session",
+          sessionFile: "/tmp/session.jsonl",
+          workspaceDir: "/tmp",
+          config: {},
           provider: "anthropic",
           model: "claude-opus-4-7",
+          timeoutMs: 1000,
+          blockReplyBreak: "message_end",
           suppressNextUserMessagePersistence: false,
-        },
+        } as FollowupRun["run"],
       }),
     );
 

@@ -373,7 +373,7 @@ export async function updateNpmInstalledPlugins(params: {
       null;
     if (record.source === "clawhub") {
       resolvedClawHubSpec = resolveClawHubUpdateSpec({
-        record: { spec: record.spec, clawhubPackage: record.clawhubPackage },
+        record: { spec: record.spec ?? "", ...(record.clawhubPackage != null ? { clawhubPackage: record.clawhubPackage } : {}) },
         specOverride: params.specOverrides?.[pluginId],
         invokedByIdOnly: !params.specOverrides?.[pluginId],
       });
@@ -548,7 +548,7 @@ export async function updateNpmInstalledPlugins(params: {
           baseUrl: record.clawhubUrl,
           logger,
         });
-        if (!resolved.ok) {
+        if ("error" in resolved) {
           // Metadata resolution failed — report the error directly.
           outcomes.push({
             pluginId,

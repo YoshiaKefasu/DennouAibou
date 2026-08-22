@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildTelegramModelsProviderChannelData,
-  whatsappCommandPolicy,
 } from "../../../test/helpers/channels/command-contract.js";
+import type { ChannelCommandAdapter } from "../../channels/plugins/types.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { updateSessionStore, type SessionEntry } from "../../config/sessions.js";
@@ -166,7 +166,7 @@ const whatsappCommandTestPlugin: ChannelPlugin = {
       nativeCommands: true,
     },
   }),
-  commands: whatsappCommandPolicy,
+  commands: {} satisfies ChannelCommandAdapter,
   allowlist: buildDmGroupAccountAllowlistAdapter({
     channelId: "whatsapp",
     resolveAccount: ({ cfg }) => cfg.channels?.whatsapp ?? {},

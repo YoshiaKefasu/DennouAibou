@@ -2,6 +2,7 @@
 // NOTE: speech-core extension was removed in debloat. Types defined locally
 // based on actual usage in tts-tool.ts, commands-tts.ts, compact.ts, attempt.ts.
 import type { OpenClawConfig } from "../config/config.js";
+import type { TtsDirectiveOverrides } from "../tts/provider-types.js";
 import {
   createLazyFacadeObjectValue,
   loadActivatedBundledPluginPublicSurfaceModuleSync,
@@ -20,6 +21,8 @@ type TextToSpeechResult = {
   success: boolean;
   audioPath?: string;
   provider?: string;
+  outputFormat?: string;
+  fileExtension?: string;
   voiceCompatible?: boolean;
   error?: string;
   fallbackFrom?: string;
@@ -53,16 +56,44 @@ type TtsAppliedPayload = {
   [key: string]: unknown;
 };
 
+type SpeechSynthesisResult = {
+  success: boolean;
+  audioBuffer?: Buffer;
+  outputFormat?: string;
+  fileExtension?: string;
+  voiceCompatible?: boolean;
+  provider?: string;
+  error?: string;
+  fallbackFrom?: string;
+  attemptedProviders?: string[];
+  attempts?: TtsAttempt[];
+  latencyMs?: number;
+};
+
 // FacadeModule mirrors the public surface of @openclaw/speech-core/runtime-api.js
 // which was removed during debloat. Types derived from actual call-site usage.
+type TtsTestExport = {
+  parseTtsDirectives: typeof import("../tts/directives.js").parseTtsDirectives;
+  resolveModelOverridePolicy: (
+    partial?: Partial<import("../tts/provider-types.js").SpeechModelOverridePolicy>,
+  ) => import("../tts/provider-types.js").SpeechModelOverridePolicy;
+  summarizeText: typeof import("../tts/tts-core.js").summarizeText;
+  getResolvedSpeechProviderConfig: (
+    config: ResolvedTtsConfig,
+    providerId: string,
+    cfg?: OpenClawConfig,
+  ) => SpeechProviderConfig;
+  formatTtsProviderError: (provider: string, error: Error) => string;
+  sanitizeTtsErrorForLog: (error: Error) => string;
+};
 type FacadeModule = {
-  _test: Record<string, unknown>;
+  _test: TtsTestExport;
   buildTtsSystemPromptHint: (cfg: OpenClawConfig) => string | undefined;
   getLastTtsAttempt: () => LastTtsAttempt | undefined;
   getResolvedSpeechProviderConfig: (
     config: ResolvedTtsConfig,
     providerId: string,
-    cfg: OpenClawConfig,
+    cfg?: OpenClawConfig,
   ) => SpeechProviderConfig;
   getTtsMaxLength: (prefsPath: string) => number;
   getTtsProvider: (config: ResolvedTtsConfig, prefsPath: string) => string;
@@ -78,21 +109,35 @@ type FacadeModule = {
   resolveTtsAutoMode: (...args: unknown[]) => unknown;
   resolveTtsConfig: (cfg: OpenClawConfig) => ResolvedTtsConfig;
   resolveTtsPrefsPath: (config: ResolvedTtsConfig) => string;
-  resolveTtsProviderOrder: (...args: unknown[]) => unknown;
+  resolveTtsProviderOrder: (activeProvider: string, cfg: OpenClawConfig) => string[];
   setLastTtsAttempt: (attempt: LastTtsAttempt) => void;
   setSummarizationEnabled: (prefsPath: string, enabled: boolean) => void;
   setTtsAutoMode: (...args: unknown[]) => void;
   setTtsEnabled: (prefsPath: string, enabled: boolean) => void;
   setTtsMaxLength: (prefsPath: string, max: number) => void;
   setTtsProvider: (prefsPath: string, provider: string) => void;
-  synthesizeSpeech: (...args: unknown[]) => unknown;
+  synthesizeSpeech: (params: {
+    text: string;
+    cfg: OpenClawConfig;
+    overrides?: Record<string, unknown>;
+    disableFallback?: boolean;
+  }) => Promise<SpeechSynthesisResult>;
   textToSpeech: (params: {
     text: string;
     cfg: OpenClawConfig;
     channel?: string;
     prefsPath?: string;
+    overrides?: TtsDirectiveOverrides;
+    disableFallback?: boolean;
   }) => Promise<TextToSpeechResult>;
-  textToSpeechTelephony: (...args: unknown[]) => unknown;
+  textToSpeechTelephony: (params: {
+    text: string;
+    cfg: OpenClawConfig;
+    channel?: string;
+    prefsPath?: string;
+    overrides?: TtsDirectiveOverrides;
+    disableFallback?: boolean;
+  }) => Promise<TextToSpeechResult>;
 };
 
 function loadFacadeModule(): FacadeModule {
@@ -104,7 +149,7 @@ function loadFacadeModule(): FacadeModule {
 
 export const _test: FacadeModule["_test"] = createLazyFacadeObjectValue(
   () => loadFacadeModule()._test,
-);
+) as FacadeModule["_test"];
 export const buildTtsSystemPromptHint: FacadeModule["buildTtsSystemPromptHint"] =
   createLazyFacadeValue("buildTtsSystemPromptHint");
 export const getLastTtsAttempt: FacadeModule["getLastTtsAttempt"] =

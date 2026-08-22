@@ -9,3 +9,7 @@ export function parseBrowserMajorVersion(..._args: unknown[]): number {
 export async function readBrowserVersion(..._args: unknown[]): Promise<string> {
   throw new Error("browser extension removed");
 }
+
+export function resolveGoogleChromeExecutableForPlatform(..._args: unknown[]): string | undefined {
+  throw new Error("browser extension removed");
+}

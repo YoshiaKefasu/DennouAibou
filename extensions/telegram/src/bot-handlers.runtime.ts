@@ -73,7 +73,7 @@ import {
   resolveTelegramGroupAllowFromContext,
   withResolvedTelegramForumFlag,
 } from "./bot/helpers.js";
-import type { TelegramContext, TelegramGetChat } from "./bot/types.js";
+import type { TelegramContext, TelegramGetChat, TelegramSyntheticContextSource } from "./bot/types.js";
 import { buildCommandsPaginationKeyboard } from "./command-ui.js";
 import {
   resolveTelegramConversationBaseSessionKey,
@@ -783,7 +783,7 @@ export const registerTelegramHandlers = ({
       if (!reaction) {
         return;
       }
-      if (shouldSkipUpdate(ctx)) {
+      if (shouldSkipUpdate(ctx as TelegramUpdateKeyContext)) {
         return;
       }
 
@@ -1109,7 +1109,7 @@ export const registerTelegramHandlers = ({
     if (!callback) {
       return;
     }
-    if (shouldSkipUpdate(ctx)) {
+    if (shouldSkipUpdate(ctx as TelegramUpdateKeyContext)) {
       return;
     }
     const answerCallbackQuery =
@@ -1620,11 +1620,11 @@ export const registerTelegramHandlers = ({
 
       const nativeCallbackCommand = parseTelegramNativeCommandCallbackData(data);
       const syntheticMessage = buildSyntheticTextMessage({
-        base: withResolvedTelegramForumFlag(callbackMessage, isForum),
+        base: withResolvedTelegramForumFlag(callbackMessage, isForum) as Message,
         from: callback.from,
         text: nativeCallbackCommand ?? data,
       });
-      await processMessage(buildSyntheticContext(ctx, syntheticMessage), [], storeAllowFrom, {
+      await processMessage(buildSyntheticContext(ctx as unknown as TelegramSyntheticContextSource, syntheticMessage), [], storeAllowFrom, {
         ...(nativeCallbackCommand ? { commandSource: "native" as const } : {}),
         forceWasMentioned: true,
         messageIdOverride: callback.id,
@@ -1641,7 +1641,7 @@ export const registerTelegramHandlers = ({
       if (!msg?.migrate_to_chat_id) {
         return;
       }
-      if (shouldSkipUpdate(ctx)) {
+      if (shouldSkipUpdate(ctx as TelegramUpdateKeyContext)) {
         return;
       }
 
@@ -1799,15 +1799,15 @@ export const registerTelegramHandlers = ({
       isForum: msg.chat.is_forum,
       getChat,
     });
-    const normalizedMsg = withResolvedTelegramForumFlag(msg, isForum);
+    const normalizedMsg = withResolvedTelegramForumFlag(msg, isForum) as Message;
     // Bot-authored message updates can be echoed back by Telegram. Skip them here
     // and rely on the dedicated channel_post handler for channel-originated posts.
     if (normalizedMsg.from?.id != null && normalizedMsg.from.id === ctx.me?.id) {
       return;
     }
     await handleInboundMessageLike({
-      ctxForDedupe: ctx,
-      ctx: buildSyntheticContext(ctx, normalizedMsg),
+      ctxForDedupe: ctx as TelegramUpdateKeyContext,
+      ctx: buildSyntheticContext(ctx as unknown as TelegramSyntheticContextSource, normalizedMsg),
       msg: normalizedMsg,
       chatId: normalizedMsg.chat.id,
       isGroup,
@@ -1855,8 +1855,8 @@ export const registerTelegramHandlers = ({
     } as Message;
 
     await handleInboundMessageLike({
-      ctxForDedupe: ctx,
-      ctx: buildSyntheticContext(ctx, syntheticMsg),
+      ctxForDedupe: ctx as TelegramUpdateKeyContext,
+      ctx: buildSyntheticContext(ctx as unknown as TelegramSyntheticContextSource, syntheticMsg),
       msg: syntheticMsg,
       chatId,
       isGroup: true,

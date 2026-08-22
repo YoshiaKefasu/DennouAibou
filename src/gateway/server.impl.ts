@@ -958,7 +958,7 @@ export async function startGatewayServer(
             console.log("[raw-chat] Go sidecar started successfully");
             setRawChatClient(rawChatClient);
             // Backfill existing session files on startup (idempotent, non-blocking).
-            const defaultAgentId = resolveDefaultAgentId(runtimeConfig);
+            const defaultAgentId = resolveDefaultAgentId(cfgAtStart);
             backfillSessionFiles(defaultAgentId).catch(() => {
               // Best-effort: backfill errors don't block startup.
             });
@@ -970,7 +970,7 @@ export async function startGatewayServer(
         // Start the transcript update hook (non-blocking, best-effort).
         // Store cleanup function for shutdown.
         // Pass runtime config so kill switch (dennou.rawChat.indexing.enabled) is respected.
-        rawChatCleanupRef = startRawChatIndexer(runtimeConfig);
+        rawChatCleanupRef = startRawChatIndexer(cfgAtStart);
       } catch (err) {
         // Best-effort: raw chat indexer is optional and must never block gateway startup.
         console.error(

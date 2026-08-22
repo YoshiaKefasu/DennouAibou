@@ -1,6 +1,5 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildMemorySystemPromptAddition } from "../../../plugin-sdk/core.js";
 import {
   clearMemoryPluginState,
   registerMemoryPromptSection,
@@ -178,20 +177,17 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     );
   });
 
-  it("forwards availableTools and citationsMode to assemble", async () => {
+  it("forwards messages to assemble", async () => {
     const { bootstrap, assemble } = createContextEngineBootstrapAndAssemble();
     const contextEngine = createTestContextEngine({ bootstrap, assemble });
 
     await runBootstrap(sessionKey, contextEngine);
-    await runAssemble(sessionKey, contextEngine, {
-      availableTools: new Set(["memory_search", "wiki_search"]),
-      citationsMode: "on",
-    });
+    await runAssemble(sessionKey, contextEngine);
 
     expect(assemble).toHaveBeenCalledWith(
       expect.objectContaining({
-        availableTools: new Set(["memory_search", "wiki_search"]),
-        citationsMode: "on",
+        sessionId: embeddedSessionId,
+        messages: expect.any(Array),
       }),
     );
   });
@@ -210,20 +206,14 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     });
 
     const contextEngine = createTestContextEngine({
-      assemble: async ({ messages, availableTools, citationsMode }) => ({
+      assemble: async ({ messages }) => ({
         messages,
         estimatedTokens: messages.length,
-        systemPromptAddition: buildMemorySystemPromptAddition({
-          availableTools: availableTools ?? new Set(),
-          citationsMode,
-        }),
+        systemPromptAddition: "## Memory Recall\ntools=memory_search,wiki_search\ncitations=on",
       }),
     });
 
-    const result = await runAssemble(sessionKey, contextEngine, {
-      availableTools: new Set(["wiki_search", "memory_search"]),
-      citationsMode: "on",
-    });
+    const result = await runAssemble(sessionKey, contextEngine, {});
 
     expect(result).toMatchObject({
       estimatedTokens: 1,

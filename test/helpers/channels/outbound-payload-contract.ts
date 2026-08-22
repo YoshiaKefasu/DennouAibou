@@ -227,14 +227,8 @@ function createDirectTextMediaHarness(params: PayloadHarnessParams) {
 
 // Note: zalo and zalouser extensions have been removed (DennouAibou debloat).
 // Their harness functions are removed intentionally.
-
-export function installSlackOutboundPayloadContractSuite() {
-  installChannelOutboundPayloadContractSuite({
-    channel: "slack",
-    chunking: { mode: "passthrough", longTextLength: 5000 },
-    createHarness: createSlackOutboundPayloadHarness,
-  });
-}
+// Note: slack extension was also removed in DEBLOAT.
+// Its harness and contract suite are removed intentionally (same as zalo above).
 
 export function installDiscordOutboundPayloadContractSuite() {
   installChannelOutboundPayloadContractSuite({

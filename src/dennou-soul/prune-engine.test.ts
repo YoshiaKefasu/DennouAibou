@@ -353,7 +353,8 @@ describe("pruneToolOutputLines with protection", () => {
     expect(() => JSON.parse(resultLines[2])).not.toThrow();
     const reparsed = parseLine(resultLines[2]);
     expect(reparsed).not.toBeNull();
-    expect(reparsed?.parsed.message.role).toBe("toolResult");
+    const parsedMsg = reparsed?.parsed.message as Record<string, unknown> | undefined;
+    expect(parsedMsg?.role).toBe("toolResult");
   });
 
   it("preserves tool metadata and error flag when pruning toolResult", () => {

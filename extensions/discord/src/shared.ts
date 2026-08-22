@@ -132,20 +132,5 @@ export function createDiscordPluginBase(params: {
       collectRuntimeConfigAssignments,
     },
     setup: params.setup,
-  } as Pick<
-    ChannelPlugin<ResolvedDiscordAccount>,
-    | "id"
-    | "meta"
-    | "setupWizard"
-    | "capabilities"
-    | "commands"
-    | "doctor"
-    | "streaming"
-    | "reload"
-    | "configSchema"
-    | "config"
-    | "setup"
-    | "messaging"
-    | "secrets"
-  >;
+  };
 }

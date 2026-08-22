@@ -14,7 +14,7 @@ import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { logVerbose, shouldLogVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
-import { parseTtsDirectives } from "openclaw/plugin-sdk/speech";
+import { parseTtsDirectives, type SpeechModelOverridePolicy, type SpeechProviderConfig, type TtsDirectiveOverrides } from "openclaw/plugin-sdk/speech";
 import { formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { formatMention } from "../mentions.js";
@@ -690,9 +690,9 @@ export class DiscordVoiceManager {
       cfg: this.params.cfg,
       override: this.params.discordConfig.voice?.tts,
     });
-    const directive = parseTtsDirectives(replyText, ttsConfig.modelOverrides, {
+    const directive = parseTtsDirectives(replyText, ttsConfig.modelOverrides as SpeechModelOverridePolicy, {
       cfg: ttsCfg,
-      providerConfigs: ttsConfig.providerConfigs,
+      providerConfigs: ttsConfig.providerConfigs as Record<string, SpeechProviderConfig> | undefined,
     });
     const speakText = directive.overrides.ttsText ?? directive.cleanedText.trim();
     if (!speakText) {

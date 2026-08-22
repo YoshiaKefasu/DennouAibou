@@ -384,7 +384,7 @@ describe("doctor config flow", () => {
           homeserver: "https://matrix.example.org",
           userId: "@bot:example.org",
           accessToken: "tok-123",
-        });
+        }) as { rootDir: string };
         await fs.mkdir(path.join(accountRoot, "crypto"), { recursive: true });
         await fs.writeFile(
           path.join(stateDir, "dennou-aibou.json"),

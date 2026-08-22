@@ -5,18 +5,17 @@ import {
   type DiscordProbe,
   type DiscordTokenResolution,
 } from "../../../extensions/discord/api.js";
-import type { IMessageProbe } from "../../../extensions/imessage/runtime-api.js";
+import type {
+  BaseProbeResult,
+  BaseTokenResolution,
+  ChannelDirectoryEntry,
+} from "../../../src/channels/plugins/types.js";
 import {
   listTelegramDirectoryGroupsFromConfig,
   listTelegramDirectoryPeersFromConfig,
   type TelegramProbe,
   type TelegramTokenResolution,
 } from "../../../extensions/telegram/api.js";
-import type {
-  BaseProbeResult,
-  BaseTokenResolution,
-  ChannelDirectoryEntry,
-} from "../../../src/channels/plugins/types.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
 import type { LineProbeResult } from "../../../src/plugin-sdk/line.js";
 import { withEnvAsync } from "../../../src/test-utils/env.js";
@@ -245,11 +244,7 @@ export function describeTelegramPluginsCoreExtensionContract() {
 }
 
 export function describeIMessagePluginsCoreExtensionContract() {
-  describe("imessage plugins-core extension contract", () => {
-    it("IMessageProbe satisfies BaseProbeResult", () => {
-      expectTypeOf<IMessageProbe>().toMatchTypeOf<BaseProbeResult>();
-    });
-  });
+  // imessage extension was removed in Phase B DEBLOAT.
 }
 
 export function describeLinePluginsCoreExtensionContract() {

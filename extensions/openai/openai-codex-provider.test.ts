@@ -463,7 +463,7 @@ describe("openai codex provider", () => {
       ],
     } as never);
 
-    const ids = entries?.map((e) => e?.id) ?? [];
+    const ids = (entries as Array<{ id: string }> | undefined)?.map((e) => e?.id) ?? [];
     expect(ids).not.toContain("gpt-5.5");
     expect(ids).not.toContain("gpt-5.5-pro");
     expect(ids).not.toContain("gpt-5.6-sol");

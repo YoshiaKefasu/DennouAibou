@@ -9,7 +9,8 @@ export const DEFAULT_DENNOU_BROWSER_ENABLED = false;
 export const DEFAULT_DENNOU_BROWSER_PROFILE_NAME = "default";
 export const DEFAULT_UPLOAD_DIR = "/tmp/uploads";
 
-export function resolveBrowserConfig(..._args: unknown[]): unknown {
+export function resolveBrowserConfig(
+  ..._args: unknown[]): ResolvedBrowserConfig {
   throw new Error("browser extension removed");
 }
 

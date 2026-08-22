@@ -1214,7 +1214,7 @@ export function attachGatewayWsMessageHandler(params: {
         const deviceCanvasCapability =
           role === "node" && canvasHostUrl ? mintCanvasCapabilityToken() : undefined;
         const deviceCanvasCapabilityExpiresAtMs =
-          deviceCanvasCapability && Date.now() + CANVAS_CAPABILITY_TTL_MS;
+          deviceCanvasCapability ? Date.now() + CANVAS_CAPABILITY_TTL_MS : undefined;
         const deviceScopedCanvasHostUrl =
           canvasHostUrl && deviceCanvasCapability
             ? (buildCanvasScopedHostUrl(canvasHostUrl, deviceCanvasCapability) ?? canvasHostUrl)

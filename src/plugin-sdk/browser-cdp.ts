@@ -1,6 +1,9 @@
 // Stub: browser extension was removed in DennouAibou debloat.
 
-export function parseBrowserHttpUrl(..._args: unknown[]): string {
+export function parseBrowserHttpUrl(
+  _url?: string,
+  _label?: string,
+): { port: number; normalized: string } {
   throw new Error("browser extension removed");
 }
 
