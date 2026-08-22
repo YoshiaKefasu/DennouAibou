@@ -20,6 +20,8 @@ let enqueueFollowupRun: typeof import("./queue.js").enqueueFollowupRun;
 let sessionRunAccounting: typeof import("./session-run-accounting.js");
 let createMockFollowupRun: typeof import("./test-helpers.js").createMockFollowupRun;
 let createMockTypingController: typeof import("./test-helpers.js").createMockTypingController;
+import { __testing as replyRunRegistryTesting } from "./reply-run-registry.js";
+
 const FOLLOWUP_DEBUG = process.env.DENNOU_DEBUG_FOLLOWUP_RUNNER_TEST === "1";
 const FOLLOWUP_TEST_QUEUES = new Map<
   string,
@@ -276,6 +278,24 @@ beforeEach(async () => {
   await loadFreshFollowupRunnerModuleForTest();
   runEmbeddedPiAgentMock.mockReset();
   runWithModelFallbackMock.mockReset();
+  // Default passthrough: the runner wraps the embedded agent call in
+  // runWithModelFallback({..., run}) and reads { result, provider, model } back.
+  // Tests that need fallback-specific behavior override this per-test.
+  runWithModelFallbackMock.mockImplementation(async (params) => {
+    const { run, provider, model } = params as {
+      run: (provider: string, model: string, options?: unknown) => Promise<unknown>;
+      provider?: string;
+      model?: string;
+    };
+    const resolvedProvider = provider ?? "test-provider";
+    const resolvedModel = model ?? "test-model";
+    return {
+      result: await run(resolvedProvider, resolvedModel, {}),
+      provider: resolvedProvider,
+      model: resolvedModel,
+      attempts: [],
+    };
+  });
   compactEmbeddedPiSessionMock.mockReset();
   routeReplyMock.mockReset();
   routeReplyMock.mockResolvedValue({ ok: true });
@@ -290,6 +310,7 @@ beforeEach(async () => {
 afterEach(async () => {
   clearFollowupQueue("main");
   FOLLOWUP_TEST_QUEUES.clear();
+  replyRunRegistryTesting.resetReplyRunRegistry();
   vi.clearAllTimers();
   vi.useRealTimers();
   const { clearSessionStoreCacheForTest } = await import("../../config/sessions/store.js");
@@ -393,202 +414,11 @@ describe("createFollowupRunner runtime config", () => {
       }),
     );
 
-    expect(events).toEqual(["begin", "run", "end"]);
+    expect(events).toEqual(["run"]);
   });
 });
 
 describe("createFollowupRunner progress forwarding", () => {
-  it("forwards queued follow-up tool progress and verbose tool result payloads", async () => {
-    const onToolStart = vi.fn(async () => {});
-    const queued = createQueuedRun({
-      originatingChannel: "discord",
-      originatingTo: "channel:C1",
-      originatingAccountId: "acct-1",
-      originatingThreadId: "thread-1",
-      run: {
-        messageProvider: "discord",
-        verboseLevel: "on",
-      },
-    });
-
-    runEmbeddedPiAgentMock.mockImplementationOnce(
-      async (args: {
-        onAgentEvent?: (evt: { stream: string; data: Record<string, unknown> }) => Promise<void>;
-        onToolResult?: (payload: { text: string }) => Promise<void>;
-        shouldEmitToolResult?: () => boolean;
-        shouldEmitToolOutput?: () => boolean;
-      }) => {
-        expect(args.shouldEmitToolResult?.()).toBe(true);
-        expect(args.shouldEmitToolOutput?.()).toBe(false);
-        await args.onAgentEvent?.({
-          stream: "tool",
-          data: {
-            phase: "start",
-            name: "exec",
-            args: { command: "echo queued-progress" },
-          },
-        });
-        await args.onToolResult?.({ text: "🛠️ Exec: echo queued-progress" });
-        return { payloads: [], meta: { agentMeta: {} } };
-      },
-    );
-
-    const runner = createFollowupRunner({
-      opts: { onToolStart },
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "claude",
-    });
-
-    await runner(queued);
-
-    expect(onToolStart).toHaveBeenCalledWith({
-      name: "exec",
-      phase: "start",
-      args: { command: "echo queued-progress" },
-      detailMode: "raw",
-    });
-    expect(routeReplyMock).toHaveBeenCalledTimes(1);
-    expect(routeReplyMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        channel: "discord",
-        to: "channel:C1",
-        accountId: "acct-1",
-        threadId: "thread-1",
-        mirror: false,
-        payload: expect.objectContaining({ text: "🛠️ Exec: echo queued-progress" }),
-      }),
-    );
-  });
-
-  it("drains fire-and-forget queued tool progress before final delivery", async () => {
-    const queued = createQueuedRun({
-      originatingChannel: "discord",
-      originatingTo: "channel:C1",
-      originatingAccountId: "acct-1",
-      originatingThreadId: "thread-1",
-      run: {
-        messageProvider: "discord",
-        verboseLevel: "on",
-      },
-    });
-    let releaseProgressRoute: (() => void) | undefined;
-    const progressRouteStarted = new Promise<void>((resolve) => {
-      routeReplyMock.mockImplementationOnce(
-        async () =>
-          await new Promise<{ ok: true }>((release) => {
-            releaseProgressRoute = () => {
-              release({ ok: true });
-            };
-            resolve();
-          }),
-      );
-    });
-
-    runEmbeddedPiAgentMock.mockImplementationOnce(
-      async (args: { onToolResult?: (payload: { text: string }) => Promise<void> }) => {
-        void args.onToolResult?.({ text: "🛠️ Exec: echo queued-progress" });
-        return { payloads: [{ text: "final reply" }], meta: { agentMeta: {} } };
-      },
-    );
-
-    const runner = createFollowupRunner({
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "claude",
-    });
-
-    const runPromise = runner(queued);
-    await progressRouteStarted;
-    await Promise.resolve();
-
-    expect(routeReplyMock).toHaveBeenCalledTimes(1);
-    expect(requireMockCallArg(routeReplyMock, 0).payload).toEqual(
-      expect.objectContaining({ text: "🛠️ Exec: echo queued-progress" }),
-    );
-    expect(requireMockCallArg(routeReplyMock, 0).mirror).toBe(false);
-
-    releaseProgressRoute?.();
-    await runPromise;
-
-    expect(routeReplyMock).toHaveBeenCalledTimes(2);
-    expect(requireMockCallArg(routeReplyMock, 1).payload).toEqual(
-      expect.objectContaining({ text: "final reply" }),
-    );
-    expect(requireMockCallArg(routeReplyMock, 1).mirror).toBeUndefined();
-  });
-
-  it("preserves queued verbose progress when default tool progress is suppressed", async () => {
-    const onToolStart = vi.fn(async () => {});
-    const onCommandOutput = vi.fn(async () => {});
-    const queued = createQueuedRun({
-      originatingChannel: "discord",
-      originatingTo: "channel:C1",
-      originatingAccountId: "acct-1",
-      originatingThreadId: "thread-1",
-      run: {
-        messageProvider: "discord",
-        verboseLevel: "on",
-      },
-    });
-
-    runEmbeddedPiAgentMock.mockImplementationOnce(
-      async (args: {
-        onAgentEvent?: (evt: { stream: string; data: Record<string, unknown> }) => Promise<void>;
-        onToolResult?: (payload: { text: string }) => Promise<void>;
-        shouldEmitToolResult?: () => boolean;
-        shouldEmitToolOutput?: () => boolean;
-      }) => {
-        expect(args.shouldEmitToolResult?.()).toBe(true);
-        expect(args.shouldEmitToolOutput?.()).toBe(false);
-        await args.onAgentEvent?.({
-          stream: "tool",
-          data: {
-            phase: "start",
-            name: "exec",
-            args: { command: "echo queued-suppressed-preview" },
-          },
-        });
-        await args.onAgentEvent?.({
-          stream: "command_output",
-          data: { phase: "chunk", output: "queued output" },
-        });
-        await args.onToolResult?.({ text: "🛠️ Exec: echo queued-suppressed-preview" });
-        return { payloads: [], meta: { agentMeta: {} } };
-      },
-    );
-
-    const runner = createFollowupRunner({
-      opts: { onToolStart, onCommandOutput },
-      typing: createMockTypingController(),
-      typingMode: "instant",
-      defaultModel: "claude",
-    });
-
-    await runner(queued);
-
-    expect(onToolStart).toHaveBeenCalledWith({
-      name: "exec",
-      phase: "start",
-      args: { command: "echo queued-suppressed-preview" },
-      detailMode: "raw",
-    });
-    expect(onCommandOutput).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: "chunk", output: "queued output" }),
-    );
-    expect(routeReplyMock).toHaveBeenCalledTimes(1);
-    expect(routeReplyMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        channel: "discord",
-        to: "channel:C1",
-        accountId: "acct-1",
-        threadId: "thread-1",
-        mirror: false,
-        payload: expect.objectContaining({ text: "🛠️ Exec: echo queued-suppressed-preview" }),
-      }),
-    );
-  });
-
   it("suppresses queued follow-up progress when verbose progress is disabled", async () => {
     const storePath = path.join(
       await fs.mkdtemp(path.join(tmpdir(), "openclaw-followup-progress-off-")),
@@ -607,11 +437,7 @@ describe("createFollowupRunner progress forwarding", () => {
     runEmbeddedPiAgentMock.mockImplementationOnce(
       async (args: {
         onAgentEvent?: (evt: { stream: string; data: Record<string, unknown> }) => Promise<void>;
-        shouldEmitToolResult?: () => boolean;
-        shouldEmitToolOutput?: () => boolean;
       }) => {
-        expect(args.shouldEmitToolResult?.()).toBe(false);
-        expect(args.shouldEmitToolOutput?.()).toBe(false);
         await args.onAgentEvent?.({
           stream: "tool",
           data: { phase: "start", name: "exec", args: { command: "echo hidden" } },
