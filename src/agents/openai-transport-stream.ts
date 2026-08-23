@@ -32,6 +32,7 @@ import {
   resolveOpenAIStrictToolFlagForInventory,
   resolveOpenAIStrictToolSetting,
 } from "./openai-tool-schema.js";
+import { asSchemaJson } from "./schema/typebox.js";
 import { buildGuardedModelFetch } from "./provider-transport-fetch.js";
 import { stripSystemPromptCacheBoundary } from "./system-prompt-cache-boundary.js";
 import { transformTransportMessages } from "./transport-message-transform.js";
@@ -349,7 +350,9 @@ function convertResponsesTools(
     type: "function",
     name: tool.name,
     description: tool.description,
-    parameters: normalizeOpenAIStrictToolParameters(tool.parameters, strict),
+    // typebox 1.x TSchema lacks an index signature; the normalized output is
+    // plain JSON Schema, which is what FunctionTool.parameters expects.
+    parameters: asSchemaJson(normalizeOpenAIStrictToolParameters(tool.parameters, strict)),
     strict,
   }));
 }

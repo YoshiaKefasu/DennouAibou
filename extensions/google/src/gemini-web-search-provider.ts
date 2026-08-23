@@ -1,4 +1,5 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   buildUnsupportedSearchFilterResponse,
@@ -179,7 +180,7 @@ function createGeminiToolDefinition(
   return {
     description:
       "Search the web using Gemini with Google Search grounding. Returns AI-synthesized answers with citations from Google Search.",
-    parameters: createGeminiSchema(),
+    parameters: asSchemaJson(createGeminiSchema()),
     execute: async (args) => {
       const params = args as Record<string, unknown>;
       const unsupportedResponse = buildUnsupportedSearchFilterResponse(params, "gemini");

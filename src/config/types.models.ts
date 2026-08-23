@@ -36,7 +36,7 @@ type SupportedOpenAICompatFields = Pick<
 // config surface only accepts what remains after the debloat (openai).
 type SupportedThinkingFormat = Exclude<
   NonNullable<OpenAICompletionsCompat["thinkingFormat"]>,
-  "openrouter" | "zai" | "qwen" | "qwen-chat-template"
+  "openrouter" | "deepseek" | "zai" | "qwen" | "qwen-chat-template"
 >;
 
 export type ModelCompatConfig = SupportedOpenAICompatFields & {

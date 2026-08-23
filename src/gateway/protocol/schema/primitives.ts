@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { ENV_SECRET_REF_ID_RE } from "../../../config/types.secrets.js";
 import {
   EXEC_SECRET_REF_ID_JSON_SCHEMA_PATTERN,
@@ -30,13 +30,22 @@ export const InputProvenanceSchema = Type.Object(
   { additionalProperties: false },
 );
 
-export const GatewayClientIdSchema = Type.Union(
-  Object.values(GATEWAY_CLIENT_IDS).map((value) => Type.Literal(value)),
-);
+// NOTE: typebox 1.x collapses Type.Union over a non-tuple mapped array to
+// Static = never, silently disabling protocol payload type checks. Spell out
+// the literal tuple instead (values are fixed constants in client-info.ts).
+export const GatewayClientIdSchema = Type.Union([
+  ...Object.values(GATEWAY_CLIENT_IDS).map((value) => Type.Literal(value)),
+] as [
+  ReturnType<typeof Type.Literal<string>>,
+  ...(ReturnType<typeof Type.Literal<string>>[]),
+]);
 
-export const GatewayClientModeSchema = Type.Union(
-  Object.values(GATEWAY_CLIENT_MODES).map((value) => Type.Literal(value)),
-);
+export const GatewayClientModeSchema = Type.Union([
+  ...Object.values(GATEWAY_CLIENT_MODES).map((value) => Type.Literal(value)),
+] as [
+  ReturnType<typeof Type.Literal<string>>,
+  ...(ReturnType<typeof Type.Literal<string>>[]),
+]);
 
 export const SecretRefSourceSchema = Type.Union([
   Type.Literal("env"),

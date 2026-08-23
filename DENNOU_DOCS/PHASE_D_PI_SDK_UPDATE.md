@@ -176,11 +176,48 @@ pnpm add @mariozechner/pi-agent-core@0.65.2 @mariozechner/pi-ai@0.65.2 @mariozec
 
 ---
 
+## 8. 段階的実行 (D0-D5)
+
+### D0: 基盤固定 ✅ 完了
+
+**ベースライン記録** (2026-08-23, SDK 0.65.2 確認):
+
+| チェック | 結果 |
+| --- | --- |
+| `tsgo --noEmit --singleThreaded --checkers 1` | **0 errors** ✅ |
+| contracts (`vitest.contracts.config.ts` / `src/channels/plugins/contracts/`) | **37 files / 129 tests — all green** ✅ |
+| followup-runner (`vitest.auto-reply.config.ts` / `followup-runner.test.ts`) | **1 file / 28 tests — all green** ✅ |
+| plugin-activation-boundary (`vitest.unit.config.ts` / `plugin-activation-boundary.test.ts`) | **1 file / 7 tests — all green** ✅ |
+
+**セッション互換テスト**: `src/agents/pi-embedded-runner/session-compatibility.test.ts` を新規作成。
+- 方法: SDK 0.65.2 の CURRENT_SESSION_VERSION (=3) で書いた最小 JSONL (header + user + assistant) を
+  `SessionManager.open()` で開き、header/entries/branch/buildSessionContext が正しく読めることを検証。
+- 4 テスト: 古いセッション読み込み / バージョン定数安定性 / 旧JSONLへのappend / in-memory session append。
+- D1-D3 の各ゲートでこのテストを再実行し、互換性を監視する。
+
+**D0 実施記録**:
+- `pnpm install` 変更なし（D0 は基盤確認のみ）。
+- テスト環境: Kasou mount 上の session lock が一時的に warning を発したが、テスト結果には影響なし。
+
+---
+
+### D1: 0.65.2 → 0.73.1 (未実施)
+
+### D2: (未実施)
+
+### D3: (未実施)
+
+### D4: (未実施)
+
+### D5: (未実施)
+
+---
+
 ## 8. 実施記録
 
 | 日付 | 内容 | 状態 |
 | ---- | ---- | ---- |
-|      |      |      |
+| 2026-08-23 | D0: 基盤固定。ベースライン全green確認、セッション互換テスト新規作成(4/4 pass) | ✅ 完了 |
 
 ---
 

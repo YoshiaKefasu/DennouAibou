@@ -5,13 +5,17 @@ export function toSnakeCaseKey(key: string): string {
     .toLowerCase();
 }
 
-export function readSnakeCaseParamRaw(params: Record<string, unknown>, key: string): unknown {
-  if (Object.hasOwn(params, key)) {
-    return params[key];
+export function readSnakeCaseParamRaw(params: unknown, key: string): unknown {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return undefined;
+  }
+  const record = params as Record<string, unknown>;
+  if (Object.hasOwn(record, key)) {
+    return record[key];
   }
   const snakeKey = toSnakeCaseKey(key);
-  if (snakeKey !== key && Object.hasOwn(params, snakeKey)) {
-    return params[snakeKey];
+  if (snakeKey !== key && Object.hasOwn(record, snakeKey)) {
+    return record[snakeKey];
   }
   return undefined;
 }

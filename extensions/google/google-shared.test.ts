@@ -237,7 +237,9 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    // pi-ai 0.73.1 narrowed convertMessages to GoogleApiType; the gemini-cli
+    // message shapes are structurally compatible for this assertion.
+    const contents = convertMessages(model as unknown as Parameters<typeof convertMessages>[0], context);
     expectConvertedRoles(contents, ["user", "model", "model"]);
     expect(contents[1].parts).toHaveLength(1);
     expect(contents[2].parts).toHaveLength(1);
@@ -308,7 +310,9 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    // pi-ai 0.73.1 narrowed convertMessages to GoogleApiType; the gemini-cli
+    // message shapes are structurally compatible for this assertion.
+    const contents = convertMessages(model as unknown as Parameters<typeof convertMessages>[0], context);
     expectConvertedRoles(contents, ["user", "model", "model"]);
     const toolCallPart = contents[2].parts?.find(
       (part) => typeof part === "object" && part !== null && "functionCall" in part,
@@ -345,7 +349,10 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    const contents = convertMessages(
+      model as unknown as Parameters<typeof convertMessages>[0],
+      context,
+    );
     const parts = contents.flatMap((content) => content.parts ?? []);
     const toolCallPart = parts.find(
       (part) => typeof part === "object" && part !== null && "functionCall" in part,

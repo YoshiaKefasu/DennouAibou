@@ -809,7 +809,7 @@ export async function compactEmbeddedPiSessionDirect(
             modelRegistry,
             model: effectiveModel,
             thinkingLevel: mapThinkingLevel(thinkLevel),
-            tools: builtInTools,
+            noTools: "builtin",
             customTools,
             sessionManager,
             settingsManager,

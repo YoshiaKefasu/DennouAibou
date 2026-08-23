@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "../../config/config.js";
+import { asSchemaJson } from "../schema/typebox.js";
 import { resolveManifestContractOwnerPluginId } from "../../plugins/manifest-registry.js";
 import type { RuntimeWebSearchMetadata } from "../../secrets/runtime-web-tools.types.js";
 import {
@@ -35,8 +36,13 @@ export function createWebSearchTool(options?: {
     label: "Web Search",
     name: "web_search",
     description: resolved.definition.description,
-    parameters: resolved.definition.parameters,
-    execute: async (_toolCallId, args) => jsonResult(await resolved.definition.execute(args)),
+    parameters: asSchemaJson(resolved.definition.parameters),
+    execute: async (_toolCallId, rawArgs) =>
+      jsonResult(
+        await resolved.definition.execute(
+          rawArgs as Record<string, unknown>,
+        ),
+      ),
   };
 }
 

@@ -1,4 +1,5 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
@@ -455,7 +456,7 @@ function createExaToolDefinition(
   return {
     description:
       "Search the web using Exa AI. Supports neural or keyword search, publication date filters, and optional highlights or text extraction.",
-    parameters: createExaSchema(),
+    parameters: asSchemaJson(createExaSchema()),
     execute: async (args) => {
       const params = args as Record<string, unknown>;
       const exaConfig = resolveExaConfig(searchConfig);

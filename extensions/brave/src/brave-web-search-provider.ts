@@ -1,4 +1,5 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
@@ -450,7 +451,7 @@ function createBraveToolDefinition(
       braveMode === "llm-context"
         ? "Search the web using Brave Search LLM Context API. Returns pre-extracted page content (text chunks, tables, code blocks) optimized for LLM grounding."
         : "Search the web using Brave Search API. Supports region-specific and localized search via country and language parameters. Returns titles, URLs, and snippets for fast research.",
-    parameters: createBraveSchema(),
+    parameters: asSchemaJson(createBraveSchema()),
     execute: async (args) => {
       const apiKey = resolveBraveApiKey(searchConfig);
       if (!apiKey) {

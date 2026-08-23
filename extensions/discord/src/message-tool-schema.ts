@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { stringEnum } from "openclaw/plugin-sdk/channel-actions";
 
 const discordComponentEmojiSchema = Type.Object({
