@@ -1,4 +1,4 @@
-import type { OpenAICompletionsCompat } from "@mariozechner/pi-ai";
+import type { OpenAICompletionsCompat } from "@earendil-works/pi-ai";
 import type { ConfiguredModelProviderRequest } from "./types.provider-request.js";
 import type { SecretInput } from "./types.secrets.js";
 
@@ -36,7 +36,7 @@ type SupportedOpenAICompatFields = Pick<
 // config surface only accepts what remains after the debloat (openai).
 type SupportedThinkingFormat = Exclude<
   NonNullable<OpenAICompletionsCompat["thinkingFormat"]>,
-  "openrouter" | "deepseek" | "zai" | "qwen" | "qwen-chat-template"
+  "openrouter" | "deepseek" | "together" | "zai" | "qwen" | "qwen-chat-template"
 >;
 
 export type ModelCompatConfig = SupportedOpenAICompatFields & {

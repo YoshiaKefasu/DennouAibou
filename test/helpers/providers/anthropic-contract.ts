@@ -6,8 +6,8 @@
 // exercise this contract behavior, so the implementations live here as a
 // test-only helper. Shared payload-policy helpers come from the kept
 // plugin-sdk (src/plugin-sdk/provider-stream-shared.ts).
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import { streamSimple } from "@mariozechner/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { streamSimple } from "@earendil-works/pi-ai";
 import {
   applyAnthropicPayloadPolicyToParams,
   resolveAnthropicPayloadPolicy,

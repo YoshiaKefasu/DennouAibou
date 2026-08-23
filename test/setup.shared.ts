@@ -1,8 +1,8 @@
 import { vi } from "vitest";
 
-vi.mock("@mariozechner/pi-ai", async () => {
+vi.mock("@earendil-works/pi-ai", async () => {
   const original =
-    await vi.importActual<typeof import("@mariozechner/pi-ai")>("@mariozechner/pi-ai");
+    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
   return {
     ...original,
     getOAuthApiKey: () => undefined,
@@ -11,7 +11,7 @@ vi.mock("@mariozechner/pi-ai", async () => {
   };
 });
 
-vi.mock("@mariozechner/clipboard", () => ({
+vi.mock("@earendil-works/clipboard", () => ({
   availableFormats: () => [],
   getText: async () => "",
   setText: async () => {},

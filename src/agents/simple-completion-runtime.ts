@@ -1,4 +1,4 @@
-import { complete, type Api, type Model } from "@mariozechner/pi-ai";
+import { complete, type Api, type Model } from "@earendil-works/pi-ai";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentDir, resolveAgentEffectiveModelPrimary } from "./agent-scope.js";
 import { DEFAULT_PROVIDER } from "./defaults.js";

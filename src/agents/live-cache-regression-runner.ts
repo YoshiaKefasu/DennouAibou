@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import type { AssistantMessage, Message, Tool } from "@mariozechner/pi-ai";
+import type { AssistantMessage, Message, Tool } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
   LIVE_CACHE_REGRESSION_BASELINE,

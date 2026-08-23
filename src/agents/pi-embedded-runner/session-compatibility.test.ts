@@ -14,7 +14,7 @@ import {
   buildSessionContext,
   CURRENT_SESSION_VERSION,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
 let tmpDir: string;

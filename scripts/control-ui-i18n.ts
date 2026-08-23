@@ -554,7 +554,7 @@ async function resolvePiCommand(): Promise<PiCommand> {
         "--silent",
         "--no-audit",
         "--no-fund",
-        `@mariozechner/pi-coding-agent@${resolvePiPackageVersion()}`,
+        `@earendil-works/pi-coding-agent@${resolvePiPackageVersion()}`,
       ],
       {
         cwd: runtimeDir,
