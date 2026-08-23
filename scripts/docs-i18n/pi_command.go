@@ -67,7 +67,7 @@ func ensureMaterializedPiRuntime(ctx context.Context) (docsPiCommand, error) {
 		materializedPiRuntimeErr = err
 		return docsPiCommand{}, err
 	}
-	cliPath := filepath.Join(runtimeDir, "node_modules", "@mariozechner", "pi-coding-agent", "dist", "cli.js")
+	cliPath := filepath.Join(runtimeDir, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js")
 	if _, err := os.Stat(cliPath); errors.Is(err, os.ErrNotExist) {
 		installCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()

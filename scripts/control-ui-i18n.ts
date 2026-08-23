@@ -540,7 +540,7 @@ async function resolvePiCommand(): Promise<PiCommand> {
   const cliPath = path.join(
     runtimeDir,
     "node_modules",
-    "@mariozechner",
+    "@earendil-works",
     "pi-coding-agent",
     "dist",
     "cli.js",
