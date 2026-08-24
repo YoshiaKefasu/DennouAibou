@@ -103,7 +103,7 @@ export async function loadModelRegistry(
 ) {
   const agentDir = resolveOpenClawAgentDir();
   const authStorage = discoverAuthStorage(agentDir);
-  const registry = discoverModels(authStorage, agentDir);
+  const registry = await discoverModels(authStorage, agentDir);
   const models = registry
     .getAll()
     .filter((model) => !shouldSuppressBuiltInModel({ provider: model.provider, id: model.id }));

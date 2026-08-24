@@ -1,5 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
+// TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+import type { AuthStorage } from "../../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   applyProviderResolvedModelCompatWithPlugins,
@@ -576,7 +578,7 @@ export function resolveModel(
   model?: Model<Api>;
   error?: string;
   authStorage: AuthStorage;
-  modelRegistry: ModelRegistry;
+  modelRegistry?: ModelRegistry;
 } {
   const normalizedRef = {
     provider,
@@ -584,7 +586,13 @@ export function resolveModel(
   };
   const resolvedAgentDir = agentDir ?? resolveOpenClawAgentDir();
   const authStorage = options?.authStorage ?? discoverAuthStorage(resolvedAgentDir);
-  const modelRegistry = options?.modelRegistry ?? discoverModels(authStorage, resolvedAgentDir);
+  const modelRegistry = options?.modelRegistry;
+  if (!modelRegistry) {
+    return {
+      error: `resolveModel() requires options.modelRegistry (async discovery removed from sync path)`,
+      authStorage,
+    };
+  }
   const runtimeHooks = resolveRuntimeHooks(options);
   const model = resolveModelWithRegistry({
     provider: normalizedRef.provider,
@@ -635,7 +643,8 @@ export async function resolveModelAsync(
   };
   const resolvedAgentDir = agentDir ?? resolveOpenClawAgentDir();
   const authStorage = options?.authStorage ?? discoverAuthStorage(resolvedAgentDir);
-  const modelRegistry = options?.modelRegistry ?? discoverModels(authStorage, resolvedAgentDir);
+  const modelRegistry =
+    options?.modelRegistry ?? (await discoverModels(authStorage, resolvedAgentDir));
   const runtimeHooks = resolveRuntimeHooks(options);
   const explicitModel = resolveExplicitModelWithRegistry({
     provider: normalizedRef.provider,

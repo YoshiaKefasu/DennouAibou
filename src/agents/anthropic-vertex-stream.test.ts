@@ -24,6 +24,17 @@ vi.mock("@earendil-works/pi-ai", async () => {
   };
 });
 
+vi.mock("@earendil-works/pi-ai/compat", async () => {
+  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+    "@earendil-works/pi-ai/compat",
+  );
+  return {
+    ...original,
+    streamAnthropic: (model: unknown, context: unknown, options: unknown) =>
+      hoisted.streamAnthropicMock(model, context, options),
+  };
+});
+
 vi.mock("@anthropic-ai/vertex-sdk", () => ({
   AnthropicVertex: vi.fn(function MockAnthropicVertex(options: unknown) {
     hoisted.anthropicVertexCtorMock(options);
@@ -39,6 +50,16 @@ async function loadFreshAnthropicVertexStreamModuleForTest() {
   vi.doMock("@earendil-works/pi-ai", async () => {
     const original =
       await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+    return {
+      ...original,
+      streamAnthropic: (model: unknown, context: unknown, options: unknown) =>
+        hoisted.streamAnthropicMock(model, context, options),
+    };
+  });
+  vi.doMock("@earendil-works/pi-ai/compat", async () => {
+    const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+      "@earendil-works/pi-ai/compat",
+    );
     return {
       ...original,
       streamAnthropic: (model: unknown, context: unknown, options: unknown) =>

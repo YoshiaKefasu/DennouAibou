@@ -1,4 +1,5 @@
-import { streamSimpleOpenAICompletions, type Model } from "@earendil-works/pi-ai";
+import { type Model } from "@earendil-works/pi-ai";
+import { streamSimpleOpenAICompletions } from "@earendil-works/pi-ai/compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearRuntimeConfigSnapshot, setRuntimeConfigSnapshot } from "../config/config.js";
 import type { ModelProviderConfig } from "../config/config.js";

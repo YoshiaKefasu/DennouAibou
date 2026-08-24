@@ -1,4 +1,5 @@
-import { completeSimple, type Api, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
+import { type Api, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { loadConfig } from "../config/config.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { resolveOpenClawAgentDir } from "./agent-paths.js";
@@ -162,7 +163,7 @@ export async function resolveLiveDirectModel(params: {
   await ensureOpenClawModelsJson(cfg);
   const agentDir = resolveOpenClawAgentDir();
   const authStorage = discoverAuthStorage(agentDir);
-  const models = discoverModels(authStorage, agentDir).getAll();
+  const models = (await discoverModels(authStorage, agentDir)).getAll();
 
   const rawModel = process.env[params.envVar]?.trim();
   const parsed = rawModel ? parseModelRef(rawModel, params.provider) : null;

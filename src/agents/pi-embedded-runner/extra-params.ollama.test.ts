@@ -15,6 +15,19 @@ vi.mock("@earendil-works/pi-ai", async () => {
   };
 });
 
+vi.mock("@earendil-works/pi-ai/compat", async () => {
+  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+    "@earendil-works/pi-ai/compat",
+  );
+  return {
+    ...original,
+    streamSimple: vi.fn(() => ({
+      push: vi.fn(),
+      result: vi.fn(),
+    })),
+  };
+});
+
 beforeEach(() => {
   extraParamsTesting.setProviderRuntimeDepsForTest({
     prepareProviderExtraParams: ({ context }) => context.extraParams,

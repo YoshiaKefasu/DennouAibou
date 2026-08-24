@@ -1,11 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
-import type {
-  AuthStorage as PiAuthStorage,
-  ModelRegistry as PiModelRegistry,
+import type { ModelRegistry as PiModelRegistry } from "@earendil-works/pi-coding-agent";
+import {
+  ModelRegistry as PiModelRegistryImpl,
+  ModelRuntime as PiModelRuntimeImpl,
 } from "@earendil-works/pi-coding-agent";
+import {
+  type AuthStorage as PiAuthStorage,
+  AuthStorage as PiAuthStorageImpl,
+  InMemoryAuthStorageBackend,
+  // TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+} from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
 import { normalizeModelCompat } from "../plugins/provider-model-compat.js";
 import {
   applyProviderResolvedModelCompatWithPlugins,
@@ -16,10 +22,12 @@ import type { ProviderRuntimeModel } from "../plugins/types.js";
 import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { resolveProviderEnvApiKeyCandidates } from "./model-auth-env-vars.js";
 import { resolveEnvApiKey } from "./model-auth-env.js";
+import { detectOpenAICompletionsCompat } from "./openai-completions-compat.js";
 import { resolvePiCredentialMapFromStore, type PiCredentialMap } from "./pi-auth-credentials.js";
 
-const PiAuthStorageClass = PiCodingAgent.AuthStorage;
-const PiModelRegistryClass = PiCodingAgent.ModelRegistry;
+const PiAuthStorageClass = PiAuthStorageImpl;
+const PiModelRegistryClass = PiModelRegistryImpl;
+const PiModelRuntimeImplClass = PiModelRuntimeImpl;
 
 export { PiAuthStorageClass as AuthStorage, PiModelRegistryClass as ModelRegistry };
 
@@ -99,31 +107,32 @@ function normalizeRegistryModel<T>(value: T, agentDir: string): T {
         agentDir,
       },
     }) ?? compatNormalized;
-  return normalizeModelCompat(transportNormalized as Model<Api>) as T;
-}
-
-type PiModelRegistryClassLike = {
-  create?: (authStorage: PiAuthStorage, modelsJsonPath: string) => PiModelRegistry;
-  new (authStorage: PiAuthStorage, modelsJsonPath: string): PiModelRegistry;
-};
-
-function instantiatePiModelRegistry(
-  authStorage: PiAuthStorage,
-  modelsJsonPath: string,
-): PiModelRegistry {
-  const Registry = PiModelRegistryClass as unknown as PiModelRegistryClassLike;
-  if (typeof Registry.create === "function") {
-    return Registry.create(authStorage, modelsJsonPath);
+  // Detect openai-completions compat defaults BEFORE plugin transforms using
+  // pre-transform identity fields (provider, baseUrl, id). Note: this only
+  // applies when the model's api is still "openai-completions" after plugin
+  // normalization — models whose api gets promoted to "openai-responses" by a
+  // plugin do NOT receive these completions-specific defaults.
+  const compatDefaultsBeforePlugins =
+    model.api === "openai-completions"
+      ? detectOpenAICompletionsCompat(
+          model as Pick<Model<"openai-completions">, "provider" | "baseUrl" | "id" | "compat">,
+        ).defaults
+      : undefined;
+  const mergedModel = normalizeModelCompat(transportNormalized as Model<Api>) as Model<Api>;
+  if (compatDefaultsBeforePlugins && mergedModel.api === "openai-completions") {
+    const existing = (mergedModel.compat ?? {}) as Record<string, unknown>;
+    mergedModel.compat = {
+      ...compatDefaultsBeforePlugins,
+      ...existing,
+    } as typeof mergedModel.compat;
   }
-  return new Registry(authStorage, modelsJsonPath);
+  return mergedModel as T;
 }
 
-function createOpenClawModelRegistry(
-  authStorage: PiAuthStorage,
-  modelsJsonPath: string,
+function wrapRegistryWithNormalization(
+  registry: PiModelRegistry,
   agentDir: string,
 ): PiModelRegistry {
-  const registry = instantiatePiModelRegistry(authStorage, modelsJsonPath);
   const getAll = registry.getAll.bind(registry);
   const getAvailable = registry.getAvailable.bind(registry);
   const find = registry.find.bind(registry);
@@ -191,9 +200,7 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
     fromStorage?: (storage: unknown) => unknown;
   };
   if (typeof withFromStorage.fromStorage === "function") {
-    const backendCtor = (
-      PiCodingAgent as { InMemoryAuthStorageBackend?: new () => InMemoryAuthStorageBackendLike }
-    ).InMemoryAuthStorageBackend;
+    const backendCtor = InMemoryAuthStorageBackend;
     const backend =
       typeof backendCtor === "function"
         ? new backendCtor()
@@ -215,12 +222,13 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
   };
   const hasRuntimeApiKeyOverride = typeof withRuntimeOverride.setRuntimeApiKey === "function"; // pragma: allowlist secret
   if (hasRuntimeApiKeyOverride) {
+    const setKey = withRuntimeOverride.setRuntimeApiKey!;
     for (const [provider, credential] of Object.entries(creds)) {
       if (credential.type === "api_key") {
-        withRuntimeOverride.setRuntimeApiKey(provider, credential.key);
+        setKey(provider, credential.key);
         continue;
       }
-      withRuntimeOverride.setRuntimeApiKey(provider, credential.access);
+      setKey(provider, credential.access);
     }
   }
   return withRuntimeOverride;
@@ -256,6 +264,20 @@ export function discoverAuthStorage(agentDir: string): PiAuthStorage {
   return createAuthStorage(PiAuthStorageClass, authPath, credentials);
 }
 
-export function discoverModels(authStorage: PiAuthStorage, agentDir: string): PiModelRegistry {
-  return createOpenClawModelRegistry(authStorage, path.join(agentDir, "models.json"), agentDir);
+export async function discoverModels(
+  authStorage: PiAuthStorage,
+  agentDir: string,
+): Promise<PiModelRegistry> {
+  const modelsJsonPath = path.join(agentDir, "models.json");
+  // Note: always pass the path — the SDK handles ENOENT gracefully, and an
+  // undefined modelsPath would silently fall back to the global
+  // ~/.pi/agent/models.json which is not what we want.
+  const runtime = await PiModelRuntimeImplClass.create({
+    credentials: authStorage,
+    modelsPath: modelsJsonPath,
+    allowModelNetwork: false,
+    signal: AbortSignal.timeout(15_000),
+  });
+  const registry = new PiModelRegistryClass(runtime);
+  return wrapRegistryWithNormalization(registry, agentDir);
 }

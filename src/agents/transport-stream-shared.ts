@@ -1,4 +1,5 @@
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
 export type TransportUsage = {
   input: number;
@@ -27,10 +28,15 @@ export function sanitizeTransportPayloadText(text: string): string {
 }
 
 export function mergeTransportHeaders(
-  ...headerSources: Array<Record<string, string> | undefined>
+  ...headerSources: Array<Record<string, string> | ProviderHeaders | undefined>
 ): Record<string, string> | undefined {
+  const normalized = headerSources.map((source) =>
+    source && Object.values(source).some((v) => v === null)
+      ? Object.fromEntries(Object.entries(source).filter(([, v]) => v !== null))
+      : source,
+  ) as Array<Record<string, string> | undefined>;
   const merged: Record<string, string> = {};
-  for (const headers of headerSources) {
+  for (const headers of normalized) {
     if (headers) {
       Object.assign(merged, headers);
     }

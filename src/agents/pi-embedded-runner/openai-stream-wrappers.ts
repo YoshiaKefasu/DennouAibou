@@ -1,6 +1,6 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { SimpleStreamOptions } from "@earendil-works/pi-ai";
-import { streamSimple } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   patchCodexNativeWebSearchPayload,
@@ -11,6 +11,7 @@ import {
   resolveOpenAIResponsesPayloadPolicy,
 } from "../openai-responses-payload-policy.js";
 import { resolveProviderRequestPolicyConfig } from "../provider-request-config.js";
+import { toHeaderRecord } from "../transport-header-record.js";
 import { log } from "./logger.js";
 import { streamWithPayloadPatch } from "./stream-payload-utils.js";
 
@@ -382,7 +383,7 @@ export function createOpenAIAttributionHeadersWrapper(
         baseUrl: typeof model.baseUrl === "string" ? model.baseUrl : undefined,
         capability: "llm",
         transport: "stream",
-        callerHeaders: options?.headers,
+        callerHeaders: toHeaderRecord(options?.headers),
         precedence: "defaults-win",
       }).headers,
     });

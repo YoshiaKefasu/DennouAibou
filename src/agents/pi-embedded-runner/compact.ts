@@ -86,6 +86,7 @@ import {
 } from "../skills.js";
 import { resolveSystemPromptOverride } from "../system-prompt-override.js";
 import { resolveTranscriptPolicy } from "../transcript-policy.js";
+import { createLegacyAuthStorageAdapter } from "./auth-storage-adapter.js";
 import { classifyCompactionReason, resolveCompactionFailureReason } from "./compact-reasons.js";
 import {
   asCompactionHookRunner,
@@ -330,12 +331,13 @@ export async function compactEmbeddedPiSessionDirect(
   };
   const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
   await ensureOpenClawModelsJson(params.config, agentDir);
-  const { model, error, authStorage, modelRegistry } = await resolveModelAsync(
-    provider,
-    modelId,
-    agentDir,
-    params.config,
-  );
+  const {
+    model,
+    error,
+    authStorage: rawAuthStorage,
+    modelRegistry,
+  } = await resolveModelAsync(provider, modelId, agentDir, params.config);
+  const authStorage = await createLegacyAuthStorageAdapter(rawAuthStorage);
   if (!model) {
     const reason = error ?? `Unknown model: ${provider}/${modelId}`;
     return fail(reason);
@@ -805,8 +807,6 @@ export async function compactEmbeddedPiSessionDirect(
           const createdSession = await createAgentSession({
             cwd: effectiveWorkspace,
             agentDir,
-            authStorage,
-            modelRegistry,
             model: effectiveModel,
             thinkingLevel: mapThinkingLevel(thinkLevel),
             noTools: "builtin",
@@ -819,7 +819,7 @@ export async function compactEmbeddedPiSessionDirect(
           applySystemPromptOverrideToSession(session, buildSystemPromptOverride(thinkLevel)());
           // Compaction builds the same embedded system prompt, so it must flow
           // through the same transport/payload shaping stack as normal turns.
-          session.agent.streamFn = resolveEmbeddedAgentStreamFn({
+          session.agent.streamFunction = resolveEmbeddedAgentStreamFn({
             currentStreamFn: resolveEmbeddedAgentBaseStreamFn({ session }),
             providerStreamFn,
             shouldUseWebSocketTransport,

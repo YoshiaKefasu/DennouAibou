@@ -1,9 +1,10 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { streamSimple } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import { isProxyReasoningUnsupportedModelHint } from "../../plugin-sdk/provider-model-shared.js";
 import { resolveProviderRequestPolicy } from "../provider-attribution.js";
 import { resolveProviderRequestPolicyConfig } from "../provider-request-config.js";
+import { toHeaderRecord } from "../transport-header-record.js";
 import { applyAnthropicEphemeralCacheControlMarkers } from "./anthropic-cache-control-payload.js";
 import { isAnthropicModelRef } from "./anthropic-family-cache-semantics.js";
 import { streamWithPayloadPatch } from "./stream-payload-utils.js";
@@ -99,7 +100,7 @@ export function createOpenRouterWrapper(
       baseUrl: typeof model.baseUrl === "string" ? model.baseUrl : undefined,
       capability: "llm",
       transport: "stream",
-      callerHeaders: options?.headers,
+      callerHeaders: toHeaderRecord(options?.headers),
       precedence: "caller-wins",
     }).headers;
     return streamWithPayloadPatch(
@@ -133,7 +134,7 @@ export function createKilocodeWrapper(
       baseUrl: typeof model.baseUrl === "string" ? model.baseUrl : undefined,
       capability: "llm",
       transport: "stream",
-      callerHeaders: options?.headers,
+      callerHeaders: toHeaderRecord(options?.headers),
       providerHeaders: resolveKilocodeAppHeaders(),
       precedence: "defaults-win",
     }).headers;

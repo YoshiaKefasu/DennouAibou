@@ -30,6 +30,7 @@ import type {
   StopReason,
 } from "@earendil-works/pi-ai";
 import * as piAi from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import {
   resolveProviderTransportTurnStateWithPlugin,
   resolveProviderWebSocketSessionPolicyWithPlugin,
@@ -101,7 +102,7 @@ const wsRegistry = new Map<string, WsSession>();
 type OpenAIWsStreamDeps = {
   createManager: (options?: OpenAIWebSocketManagerOptions) => OpenAIWebSocketManager;
   createHttpFallbackStreamFn: (model: ProviderRuntimeModel) => StreamFn | undefined;
-  streamSimple: typeof piAi.streamSimple;
+  streamSimple: typeof streamSimple;
 };
 
 type AssistantMessageWithPhase = AssistantMessage & { phase?: OpenAIResponsesAssistantPhase };
@@ -109,7 +110,7 @@ type AssistantMessageWithPhase = AssistantMessage & { phase?: OpenAIResponsesAss
 const defaultOpenAIWsStreamDeps: OpenAIWsStreamDeps = {
   createManager: (options) => new OpenAIWebSocketManager(options),
   createHttpFallbackStreamFn: (model) => createBoundaryAwareStreamFnForModel(model),
-  streamSimple: (...args) => piAi.streamSimple(...args),
+  streamSimple: (...args: Parameters<typeof streamSimple>) => streamSimple(...args),
 };
 
 let openAIWsStreamDeps: OpenAIWsStreamDeps = defaultOpenAIWsStreamDeps;

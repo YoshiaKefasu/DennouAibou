@@ -1833,7 +1833,7 @@ describeLive("gateway live (dev agent, profile keys)", () => {
 
         const agentDir = resolveOpenClawAgentDir();
         const authStorage = discoverAuthStorage(agentDir);
-        const modelRegistry = discoverModels(authStorage, agentDir);
+        const modelRegistry = await discoverModels(authStorage, agentDir);
         const all = modelRegistry.getAll();
 
         const rawModels = process.env.DENNOU_LIVE_GATEWAY_MODELS?.trim();
@@ -1964,7 +1964,7 @@ describeLive("gateway live (dev agent, profile keys)", () => {
 
     const agentDir = resolveOpenClawAgentDir();
     const authStorage = discoverAuthStorage(agentDir);
-    const modelRegistry = discoverModels(authStorage, agentDir);
+    const modelRegistry = await discoverModels(authStorage, agentDir);
     const anthropic = modelRegistry.find("anthropic", "claude-opus-4-6") as Model<Api> | null;
     const zai = modelRegistry.find("zai", "glm-4.7") as Model<Api> | null;
 

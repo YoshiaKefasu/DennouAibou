@@ -36,6 +36,11 @@ async function loadHarness(options?: {
       authStorage: {} as never,
       modelRegistry: {} as never,
     })),
+    resolveModelAsync: vi.fn(async () => ({
+      model: options?.resolvedModelCompat ? { compat: options.resolvedModelCompat } : undefined,
+      authStorage: {} as never,
+      modelRegistry: {} as never,
+    })),
   }));
   vi.doMock("../plugins/tools.js", () => ({
     getPluginToolMeta: (tool: { name: string }) => options?.pluginMeta?.[tool.name],
@@ -61,7 +66,7 @@ describe("resolveEffectiveToolInventory", () => {
       channelMeta: { message_actions: { channelId: "telegram" } },
     });
 
-    const result = resolveEffectiveToolInventory({ cfg: {} });
+    const result = await resolveEffectiveToolInventory({ cfg: {} });
 
     expect(result).toEqual({
       agentId: "main",
@@ -127,7 +132,7 @@ describe("resolveEffectiveToolInventory", () => {
       },
     });
 
-    const result = resolveEffectiveToolInventory({ cfg: {} });
+    const result = await resolveEffectiveToolInventory({ cfg: {} });
     const labels = result.groups.flatMap((group) => group.tools.map((tool) => tool.label));
 
     expect(labels).toEqual(["Lookup (docs)", "Lookup (jira)"]);
@@ -145,7 +150,7 @@ describe("resolveEffectiveToolInventory", () => {
       ],
     });
 
-    const result = resolveEffectiveToolInventory({ cfg: {} });
+    const result = await resolveEffectiveToolInventory({ cfg: {} });
 
     expect(result.groups[0]?.tools[0]).toEqual({
       id: "cron",
@@ -168,7 +173,7 @@ describe("resolveEffectiveToolInventory", () => {
       ],
     });
 
-    const result = resolveEffectiveToolInventory({ cfg: {} });
+    const result = await resolveEffectiveToolInventory({ cfg: {} });
 
     const description = result.groups[0]?.tools[0]?.description ?? "";
     expect(description).toContain(
@@ -186,7 +191,7 @@ describe("resolveEffectiveToolInventory", () => {
       effectivePolicy: { profile: "minimal", providerProfile: "coding" },
     });
 
-    const result = resolveEffectiveToolInventory({ cfg: {} });
+    const result = await resolveEffectiveToolInventory({ cfg: {} });
 
     expect(result.profile).toBe("coding");
   });
@@ -200,7 +205,7 @@ describe("resolveEffectiveToolInventory", () => {
       resolvedModelCompat: { supportsTools: true, supportsNativeWebSearch: true },
     });
 
-    resolveEffectiveToolInventory({
+    await resolveEffectiveToolInventory({
       cfg: {},
       agentDir: "/tmp/agents/main/agent",
       modelProvider: "xai",

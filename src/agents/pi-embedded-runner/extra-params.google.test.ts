@@ -9,6 +9,12 @@ vi.mock("@earendil-works/pi-ai", async () =>
   ),
 );
 
+vi.mock("@earendil-works/pi-ai/compat", async () =>
+  createPiAiStreamSimpleMock(() =>
+    vi.importActual<typeof import("@earendil-works/pi-ai/compat")>("@earendil-works/pi-ai/compat"),
+  ),
+);
+
 describe("extra-params: Google thinking payload compatibility", () => {
   it("strips negative thinking budgets and fills Gemini 3.1 thinkingLevel", () => {
     const payload = runExtraParamsCase({

@@ -16,6 +16,16 @@ vi.mock("@earendil-works/pi-ai", async () => {
   };
 });
 
+vi.mock("@earendil-works/pi-ai/compat", async () => {
+  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+    "@earendil-works/pi-ai/compat",
+  );
+  return {
+    ...original,
+    completeSimple,
+  };
+});
+
 vi.mock("../../agents/model-auth.js", () => ({
   getApiKeyForModel,
   requireApiKey,

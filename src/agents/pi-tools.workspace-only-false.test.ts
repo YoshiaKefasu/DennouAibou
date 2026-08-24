@@ -11,6 +11,15 @@ vi.mock("@earendil-works/pi-ai", async () => {
   };
 });
 
+vi.mock("@earendil-works/pi-ai/compat", async () => {
+  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+    "@earendil-works/pi-ai/compat",
+  );
+  return {
+    ...original,
+  };
+});
+
 vi.mock("@earendil-works/pi-ai/oauth", async () => {
   const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
     "@earendil-works/pi-ai/oauth",

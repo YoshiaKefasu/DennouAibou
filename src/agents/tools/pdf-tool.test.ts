@@ -29,6 +29,16 @@ vi.mock("@earendil-works/pi-ai", async () => {
   };
 });
 
+vi.mock("@earendil-works/pi-ai/compat", async () => {
+  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
+    "@earendil-works/pi-ai/compat",
+  );
+  return {
+    ...actual,
+    complete: completeMock,
+  };
+});
+
 type PdfToolModule = typeof import("./pdf-tool.js");
 let createPdfTool: PdfToolModule["createPdfTool"];
 let resolvePdfModelConfigForTool: PdfToolModule["resolvePdfModelConfigForTool"];

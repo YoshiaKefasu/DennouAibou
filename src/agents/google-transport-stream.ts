@@ -1,12 +1,13 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import {
   calculateCost,
-  getEnvApiKey,
   type Context,
   type Model,
+  type ProviderHeaders,
   type SimpleStreamOptions,
   type ThinkingLevel,
 } from "@earendil-works/pi-ai";
+import { getEnvApiKey } from "@earendil-works/pi-ai/compat";
 import { parseGeminiAuth } from "../infra/gemini-auth.js";
 import { normalizeGoogleApiBaseUrl } from "../infra/google-api-base-url.js";
 import { buildGuardedModelFetch } from "./provider-transport-fetch.js";
@@ -186,8 +187,9 @@ function buildGoogleRequestUrl(model: GoogleTransportModel): string {
 }
 
 function resolveThinkingLevel(level: ThinkingLevel, modelId: string): GoogleThinkingLevel {
+  const normalizedLevel = level === "max" ? "high" : level;
   if (isGemini3ProModel(modelId)) {
-    switch (level) {
+    switch (normalizedLevel) {
       case "minimal":
       case "low":
         return "LOW";
@@ -197,7 +199,7 @@ function resolveThinkingLevel(level: ThinkingLevel, modelId: string): GoogleThin
         return "HIGH";
     }
   }
-  switch (level) {
+  switch (normalizedLevel) {
     case "minimal":
       return "MINIMAL";
     case "low":
@@ -225,7 +227,7 @@ function getGoogleThinkingBudget(
   effort: ThinkingLevel,
   customBudgets?: GoogleTransportOptions["thinkingBudgets"],
 ): number | undefined {
-  const normalizedEffort = effort === "xhigh" ? "high" : effort;
+  const normalizedEffort = effort === "xhigh" || effort === "max" ? "high" : effort;
   if (customBudgets?.[normalizedEffort] !== undefined) {
     return customBudgets[normalizedEffort];
   }
@@ -473,7 +475,7 @@ export function buildGoogleGenerativeAiParams(
 function buildGoogleHeaders(
   model: GoogleTransportModel,
   apiKey: string | undefined,
-  optionHeaders: Record<string, string> | undefined,
+  optionHeaders: ProviderHeaders | undefined,
 ): Record<string, string> {
   const authHeaders = apiKey ? parseGeminiAuth(apiKey).headers : undefined;
   return (

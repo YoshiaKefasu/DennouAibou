@@ -533,7 +533,7 @@ describe("applyExtraParamsToAgent", () => {
     };
     return {
       calls,
-      agent: { streamFn: baseStreamFn },
+      agent: { streamFunction: baseStreamFn },
     };
   }
 
@@ -568,7 +568,7 @@ describe("applyExtraParamsToAgent", () => {
       options?.onPayload?.(payload, model);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     applyExtraParamsToAgent(
       agent,
       params.cfg as Parameters<typeof applyExtraParamsToAgent>[1],
@@ -577,7 +577,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFn?.(params.model, context, params.options ?? {});
+    void agent.streamFunction?.(params.model, context, params.options ?? {});
     return payload;
   }
 
@@ -593,7 +593,7 @@ describe("applyExtraParamsToAgent", () => {
       resolvedModelId = String(model.id ?? "");
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     applyExtraParamsToAgent(
       agent,
       params.cfg as Parameters<typeof applyExtraParamsToAgent>[1],
@@ -602,7 +602,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFn?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, context, {});
     return resolvedModelId;
   }
 
@@ -623,7 +623,7 @@ describe("applyExtraParamsToAgent", () => {
       options?.onPayload?.(payload, model);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     applyExtraParamsToAgent(
       agent,
       params.cfg as Parameters<typeof applyExtraParamsToAgent>[1],
@@ -632,7 +632,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFn?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, context, {});
     return payload;
   }
 
@@ -659,10 +659,10 @@ describe("applyExtraParamsToAgent", () => {
       options?.onPayload?.(payload as unknown as Record<string, unknown>, model);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     applyExtraParamsToAgent(agent, undefined, params.applyProvider, params.applyModelId);
     const context: Context = { messages: [] };
-    void agent.streamFn?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, context, {});
     return payload;
   }
 
@@ -680,7 +680,7 @@ describe("applyExtraParamsToAgent", () => {
       id: params.modelId,
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, params.options ?? {});
+    void agent.streamFunction?.(model, context, params.options ?? {});
 
     expect(calls).toHaveLength(1);
     return calls[0]?.headers;
@@ -697,7 +697,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(
       agent,
@@ -714,7 +714,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "deepseek/deepseek-r1",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning");
@@ -729,7 +729,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "openrouter", "openrouter/auto", undefined, "low");
 
@@ -739,7 +739,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.reasoning).toEqual({ effort: "low" });
@@ -753,7 +753,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "minimax", "MiniMax-M2.7");
 
@@ -763,7 +763,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "MiniMax-M2.7",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -777,7 +777,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "openrouter", "openrouter/auto", undefined, "off");
 
@@ -787,7 +787,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning_effort");
@@ -825,7 +825,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "openrouter", "openrouter/auto", undefined, "low");
 
@@ -835,7 +835,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).toEqual({ reasoning: { max_tokens: 256 } });
@@ -849,7 +849,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(
       agent,
@@ -866,7 +866,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "x-ai/grok-4.1-fast",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning");
@@ -883,7 +883,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "openai", "gpt-5", undefined, "off");
 
@@ -894,7 +894,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://api.openai.com/v1",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).toEqual({
@@ -916,7 +916,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "openai", "gpt-5", undefined, "off");
 
@@ -927,7 +927,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://proxy.example.com/v1",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning");
@@ -1172,7 +1172,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(
       agent,
@@ -1189,7 +1189,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "Pro/MiniMaxAI/MiniMax-M2.7",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toBeNull();
@@ -1203,7 +1203,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(
       agent,
@@ -1220,7 +1220,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "deepseek-ai/DeepSeek-V3.2",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toBe("off");
@@ -1234,7 +1234,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "moonshot", "kimi-k2.5", undefined, "off");
 
@@ -1244,7 +1244,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1258,7 +1258,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "moonshot", "kimi-k2.5", undefined, "low");
 
@@ -1268,7 +1268,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "enabled" });
@@ -1285,7 +1285,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "moonshot", "kimi-k2.5", undefined, "low");
 
@@ -1295,7 +1295,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1310,7 +1310,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     const cfg = {
       agents: {
         defaults: {
@@ -1333,7 +1333,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1360,7 +1360,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "kimi", "kimi-code", undefined, "low");
 
@@ -1371,7 +1371,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://api.kimi.com/coding/",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.tools).toEqual([
@@ -1404,7 +1404,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "anthropic", "claude-sonnet-4-6", undefined, "low");
 
@@ -1415,7 +1415,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://api.anthropic.com",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.tools).toEqual([
@@ -1486,7 +1486,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(
       agent,
@@ -1503,7 +1503,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "proxy-model",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.tools).toEqual([
@@ -1548,7 +1548,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "atproxy", "gemini-3.1-pro-high", undefined, "high");
 
@@ -1558,7 +1558,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gemini-3.1-pro-high",
     } as Model<"google-generative-ai">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     const thinkingConfig = (
@@ -1595,7 +1595,7 @@ describe("applyExtraParamsToAgent", () => {
       payloads.push(payload);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
 
     applyExtraParamsToAgent(agent, undefined, "atproxy", "gemini-3.1-pro-high", undefined, "high");
 
@@ -1605,7 +1605,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gemini-3.1-pro-high",
     } as Model<"google-generative-ai">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.config).toEqual({
@@ -1639,7 +1639,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("websocket");
@@ -1669,7 +1669,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("websocket");
@@ -1686,7 +1686,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("auto");
@@ -1703,7 +1703,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("auto");
@@ -1837,7 +1837,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, { transport: "sse" });
+    void agent.streamFunction?.(model, context, { transport: "sse" });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1867,7 +1867,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.openaiWsWarmup).toBe(false);
@@ -1897,7 +1897,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {
+    void agent.streamFunction?.(model, context, {
       openaiWsWarmup: true,
     } as unknown as SimpleStreamOptions);
 
@@ -1929,7 +1929,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1959,7 +1959,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, { transport: "sse" });
+    void agent.streamFunction?.(model, context, { transport: "sse" });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1989,7 +1989,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("auto");
@@ -2073,7 +2073,7 @@ describe("applyExtraParamsToAgent", () => {
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
 
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.cacheRetention).toBeUndefined();
@@ -2104,7 +2104,7 @@ describe("applyExtraParamsToAgent", () => {
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
 
-    void agent.streamFn?.(model, context, {});
+    void agent.streamFunction?.(model, context, {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.cacheRetention).toBe("long");
@@ -2144,7 +2144,7 @@ describe("applyExtraParamsToAgent", () => {
 
     const context: Context = { messages: [] };
 
-    void agent.streamFn?.(
+    void agent.streamFunction?.(
       {
         api: "anthropic-messages",
         provider: "litellm",
@@ -2172,7 +2172,7 @@ describe("applyExtraParamsToAgent", () => {
     const context: Context = { messages: [] };
 
     // Simulate pi-agent-core passing apiKey in options (API key, not OAuth token)
-    void agent.streamFn?.(model, context, {
+    void agent.streamFunction?.(model, context, {
       apiKey: "sk-ant-api03-test", // pragma: allowlist secret
       headers: { "X-Custom": "1" },
     });
@@ -2205,7 +2205,7 @@ describe("applyExtraParamsToAgent", () => {
       calls.push(options);
       return {} as ReturnType<StreamFn>;
     };
-    const agent = { streamFn: baseStreamFn };
+    const agent = { streamFunction: baseStreamFn };
     const cfg = {
       agents: {
         defaults: {
@@ -2230,7 +2230,7 @@ describe("applyExtraParamsToAgent", () => {
     const context: Context = { messages: [] };
 
     // Simulate pi-agent-core passing an OAuth token (sk-ant-oat-*) as apiKey
-    void agent.streamFn?.(model, context, {
+    void agent.streamFunction?.(model, context, {
       apiKey: "sk-ant-oat01-test-oauth-token", // pragma: allowlist secret
       headers: { "X-Custom": "1" },
     });

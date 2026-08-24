@@ -10,6 +10,12 @@ vi.mock("@earendil-works/pi-ai", async () =>
   ),
 );
 
+vi.mock("@earendil-works/pi-ai/compat", async () =>
+  createPiAiStreamSimpleMock(() =>
+    vi.importActual<typeof import("@earendil-works/pi-ai/compat")>("@earendil-works/pi-ai/compat"),
+  ),
+);
+
 type ToolStreamCase = {
   applyProvider: string;
   applyModelId: string;

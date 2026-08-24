@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { getApiProvider, unregisterApiProviders } from "@earendil-works/pi-ai";
+import { getApiProvider, unregisterApiProviders } from "@earendil-works/pi-ai/compat";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getCustomApiRegistrySourceId } from "../custom-api-registry.js";
 import {
@@ -237,7 +237,7 @@ describe("compactEmbeddedPiSessionDirect hooks", () => {
     );
     expect(applyExtraParamsToAgentMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        streamFn: resolvedStreamFn,
+        streamFunction: resolvedStreamFn,
       }),
       undefined,
       "openai",

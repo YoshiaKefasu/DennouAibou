@@ -3,13 +3,14 @@ import type { StreamFn } from "@earendil-works/pi-agent-core";
 import {
   calculateCost,
   createAssistantMessageEventStream,
-  getEnvApiKey,
   parseStreamingJson,
   type Api,
   type Context,
   type Model,
 } from "@earendil-works/pi-ai";
-import { convertMessages } from "@earendil-works/pi-ai/openai-completions";
+import type { ProviderHeaders } from "@earendil-works/pi-ai";
+import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
+import { getEnvApiKey } from "@earendil-works/pi-ai/compat";
 import OpenAI, { AzureOpenAI } from "openai";
 import type { ChatCompletionChunk } from "openai/resources/chat/completions.js";
 import type {
@@ -35,6 +36,7 @@ import {
 import { buildGuardedModelFetch } from "./provider-transport-fetch.js";
 import { asSchemaJson } from "./schema/typebox.js";
 import { stripSystemPromptCacheBoundary } from "./system-prompt-cache-boundary.js";
+import { toHeaderRecord } from "./transport-header-record.js";
 import { transformTransportMessages } from "./transport-message-transform.js";
 import { mergeTransportMetadata, sanitizeTransportPayloadText } from "./transport-stream-shared.js";
 
@@ -48,7 +50,7 @@ type BaseStreamOptions = {
   cacheRetention?: "none" | "short" | "long";
   sessionId?: string;
   onPayload?: (payload: unknown, model: Model<Api>) => unknown;
-  headers?: Record<string, string>;
+  headers?: ProviderHeaders;
 };
 
 type OpenAIResponsesOptions = BaseStreamOptions & {
@@ -571,9 +573,20 @@ function mapResponsesStopReason(status: string | undefined): string {
 function buildOpenAIClientHeaders(
   model: Model<Api>,
   context: Context,
-  optionHeaders?: Record<string, string>,
-  turnHeaders?: Record<string, string>,
+  optionHeaders?: ProviderHeaders,
+  turnHeaders?: ProviderHeaders,
 ): Record<string, string> {
+  const dropNull = (h: ProviderHeaders | undefined): Record<string, string> | undefined => {
+    if (!h) {
+      return undefined;
+    }
+    return Object.fromEntries(Object.entries(h).filter(([, v]) => v !== null)) as Record<
+      string,
+      string
+    >;
+  };
+  const opt = dropNull(optionHeaders);
+  const turn = dropNull(turnHeaders);
   const headers = { ...model.headers };
   if (model.provider === "github-copilot") {
     Object.assign(
@@ -584,11 +597,11 @@ function buildOpenAIClientHeaders(
       }),
     );
   }
-  if (optionHeaders) {
-    Object.assign(headers, optionHeaders);
+  if (opt) {
+    Object.assign(headers, opt);
   }
-  if (turnHeaders) {
-    Object.assign(headers, turnHeaders);
+  if (turn) {
+    Object.assign(headers, turn);
   }
   return headers;
 }
@@ -620,8 +633,8 @@ function createOpenAIResponsesClient(
   model: Model<Api>,
   context: Context,
   apiKey: string,
-  optionHeaders?: Record<string, string>,
-  turnHeaders?: Record<string, string>,
+  optionHeaders?: ProviderHeaders,
+  turnHeaders?: ProviderHeaders,
 ) {
   return new OpenAI({
     apiKey,
@@ -882,8 +895,8 @@ function createAzureOpenAIClient(
   model: Model<Api>,
   context: Context,
   apiKey: string,
-  optionHeaders?: Record<string, string>,
-  turnHeaders?: Record<string, string>,
+  optionHeaders?: ProviderHeaders,
+  turnHeaders?: ProviderHeaders,
 ) {
   return new AzureOpenAI({
     apiKey,
@@ -920,7 +933,7 @@ function createOpenAICompletionsClient(
   model: Model<Api>,
   context: Context,
   apiKey: string,
-  optionHeaders?: Record<string, string>,
+  optionHeaders?: ProviderHeaders,
 ) {
   return new OpenAI({
     apiKey,

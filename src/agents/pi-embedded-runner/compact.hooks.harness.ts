@@ -234,7 +234,7 @@ export async function loadCompactHooksHarness(): Promise<{
             : JSON.parse(JSON.stringify(message)),
         ),
         agent: {
-          streamFn: vi.fn(),
+          streamFunction: vi.fn(),
           transport: "sse",
           state: {
             get messages() {

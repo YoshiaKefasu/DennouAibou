@@ -1,5 +1,5 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { streamSimple } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAnthropicVertexStreamFnForModel } from "../anthropic-vertex-stream.js";
 import { createOpenAIWebSocketStreamFn } from "../openai-ws-stream.js";
 import { createBoundaryAwareStreamFnForModel } from "../provider-transport-stream.js";
@@ -9,13 +9,13 @@ import type { EmbeddedRunAttemptParams } from "./run/types.js";
 let embeddedAgentBaseStreamFnCache = new WeakMap<object, StreamFn | undefined>();
 
 export function resolveEmbeddedAgentBaseStreamFn(params: {
-  session: { agent: { streamFn?: StreamFn } };
+  session: { agent: { streamFunction?: StreamFn } };
 }): StreamFn | undefined {
   const cached = embeddedAgentBaseStreamFnCache.get(params.session);
   if (cached !== undefined || embeddedAgentBaseStreamFnCache.has(params.session)) {
     return cached;
   }
-  const baseStreamFn = params.session.agent.streamFn;
+  const baseStreamFn = params.session.agent.streamFunction;
   embeddedAgentBaseStreamFnCache.set(params.session, baseStreamFn);
   return baseStreamFn;
 }

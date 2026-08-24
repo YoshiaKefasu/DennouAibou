@@ -1,6 +1,7 @@
 import { AnthropicVertex } from "@anthropic-ai/vertex-sdk";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { streamAnthropic, type AnthropicOptions, type Model } from "@earendil-works/pi-ai";
+import { type AnthropicOptions, type Model } from "@earendil-works/pi-ai";
+import { streamAnthropic } from "@earendil-works/pi-ai/compat";
 import {
   resolveAnthropicVertexClientRegion,
   resolveAnthropicVertexProjectId,

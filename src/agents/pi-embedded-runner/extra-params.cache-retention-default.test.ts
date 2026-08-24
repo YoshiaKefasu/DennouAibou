@@ -11,7 +11,7 @@ function applyAndExpectWrapped(params: {
   model?: Parameters<typeof applyExtraParamsToAgent>[8];
   provider: string;
 }) {
-  const agent: { streamFn?: StreamFn } = {};
+  const agent: { streamFunction?: StreamFn } = {};
 
   applyExtraParamsToAgent(
     agent,
@@ -25,7 +25,7 @@ function applyAndExpectWrapped(params: {
     params.model,
   );
 
-  expect(agent.streamFn).toBeDefined();
+  expect(agent.streamFunction).toBeDefined();
 }
 
 // Mock the logger to avoid noise in tests
@@ -43,7 +43,7 @@ describe("cacheRetention default behavior", () => {
       provider: "anthropic",
     });
 
-    // The fact that agent.streamFn was modified indicates that cacheRetention
+    // The fact that agent.streamFunction was modified indicates that cacheRetention
     // default "short" was applied. We don't need to call the actual function
     // since that would require API provider setup.
   });
@@ -109,7 +109,7 @@ describe("cacheRetention default behavior", () => {
   });
 
   it("returns undefined for non-Anthropic providers", () => {
-    const agent: { streamFn?: StreamFn } = {};
+    const agent: { streamFunction?: StreamFn } = {};
     const cfg = undefined;
     const provider = "openai";
     const modelId = "gpt-4";

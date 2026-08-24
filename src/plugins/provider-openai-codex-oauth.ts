@@ -1,8 +1,11 @@
-import { loginOpenAICodex, type OAuthCredentials } from "@earendil-works/pi-ai/oauth";
+import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
+import type { OAuthCredentials } from "@earendil-works/pi-ai/oauth";
+// Relative path required: pi-ai exports map does not expose this subpath.
+// TODO(pi-sdk): move to public export once pi-ai exposes openaiCodexOAuth in the exports map.
+import { openaiCodexOAuth } from "../../node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js";
 import { ensureGlobalUndiciEnvProxyDispatcher } from "../infra/net/undici-global-dispatcher.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
-import { createVpsAwareOAuthHandlers } from "./provider-oauth-flow.js";
 import {
   formatOpenAIOAuthTlsPreflightFix,
   runOpenAIOAuthTlsPreflight,
@@ -47,28 +50,56 @@ export async function loginOpenAICodexOAuth(params: {
   );
 
   const spin = prompter.progress("Starting OAuth flow…");
-  try {
-    const { onAuth: baseOnAuth, onPrompt } = createVpsAwareOAuthHandlers({
-      isRemote,
-      prompter,
-      runtime,
-      spin,
-      openUrl,
-      localBrowserMessage: localBrowserMessage ?? "Complete sign-in in browser…",
-      manualPromptMessage: manualInputPromptMessage,
-    });
+  const abortController = new AbortController();
+  let manualCodePromise: Promise<string | undefined> | undefined;
 
-    const creds = await loginOpenAICodex({
-      onAuth: baseOnAuth,
-      onPrompt,
-      onManualCodeInput: isRemote
-        ? async () =>
-            await onPrompt({
-              message: manualInputPromptMessage,
-            })
-        : undefined,
-      onProgress: (msg: string) => spin.update(msg),
-    });
+  try {
+    const interaction: ProviderAuthInteraction = {
+      signal: abortController.signal,
+      prompt: async (prompt: AuthPrompt): Promise<string> => {
+        if (prompt.type === "select") {
+          // Always select browser login (consistent with pre-0.84.2 behavior).
+          return "browser";
+        }
+        if (prompt.type === "manual_code") {
+          // On remote/VPS: show URL in terminal, get manual input from prompter.
+          if (isRemote && manualCodePromise) {
+            const code = await manualCodePromise;
+            if (!code) throw new Error("Manual code input cancelled");
+            return code;
+          }
+          return await prompter.text({
+            message: prompt.message,
+            placeholder: prompt.placeholder,
+          });
+        }
+        return await prompter.text({
+          message: prompt.message,
+          placeholder: prompt.placeholder,
+        });
+      },
+      notify: (event: AuthEvent): void => {
+        if (event.type === "auth_url") {
+          if (isRemote) {
+            spin.stop("OAuth URL ready");
+            runtime.log(`\nOpen this URL in your LOCAL browser:\n\n${event.url}\n`);
+            manualCodePromise = prompter
+              .text({
+                message: manualInputPromptMessage,
+              })
+              .then((value) => String(value));
+          } else {
+            spin.update(localBrowserMessage ?? "Complete sign-in in browser…");
+            void openUrl(event.url);
+            runtime.log(`Open: ${event.url}`);
+          }
+        } else if (event.type === "progress") {
+          spin.update(event.message);
+        }
+      },
+    };
+
+    const creds = await openaiCodexOAuth.login(interaction);
     spin.stop("OpenAI OAuth complete");
     return creds ?? null;
   } catch (err) {
@@ -76,5 +107,7 @@ export async function loginOpenAICodexOAuth(params: {
     runtime.error(String(err));
     await prompter.note("Trouble with OAuth? See https://docs.openclaw.ai/start/faq", "OAuth help");
     throw err;
+  } finally {
+    abortController.abort();
   }
 }

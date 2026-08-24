@@ -23,9 +23,10 @@ const resolveStoredSessionKeyForSessionIdMock = vi.fn();
 const loggerWarnMock = vi.fn();
 let refreshRuntimeAuthOnFirstPromptError = false;
 
-vi.mock("@earendil-works/pi-ai", async () => {
-  const actual =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+const createPiAiE2eMock = async (
+  specifier: "@earendil-works/pi-ai" | "@earendil-works/pi-ai/compat",
+) => {
+  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai")>(specifier);
 
   const buildAssistantMessage = (model: { api: string; provider: string; id: string }) => ({
     role: "assistant" as const,
@@ -80,7 +81,10 @@ vi.mock("@earendil-works/pi-ai", async () => {
       return stream;
     },
   };
-});
+};
+
+vi.mock("@earendil-works/pi-ai", () => createPiAiE2eMock("@earendil-works/pi-ai"));
+vi.mock("@earendil-works/pi-ai/compat", () => createPiAiE2eMock("@earendil-works/pi-ai/compat"));
 
 const installRunEmbeddedMocks = () => {
   vi.doMock("../plugins/hook-runner-global.js", () => ({

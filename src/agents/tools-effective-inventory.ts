@@ -1,9 +1,10 @@
+import type { ModelRegistry as PiModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { resolveAgentDir, resolveAgentWorkspaceDir, resolveSessionAgentId } from "./agent-scope.js";
 import { getChannelAgentToolMeta } from "./channel-tools.js";
-import { resolveModel } from "./pi-embedded-runner/model.js";
+import { resolveModel, resolveModelAsync } from "./pi-embedded-runner/model.js";
 import { createOpenClawCodingTools } from "./pi-tools.js";
 import { resolveEffectiveToolPolicy } from "./pi-tools.policy.js";
 import { summarizeToolDescriptionText } from "./tool-description-summary.js";
@@ -60,6 +61,7 @@ export type ResolveEffectiveToolInventoryParams = {
   modelHasVision?: boolean;
   requireExplicitMessageTarget?: boolean;
   disableMessageTool?: boolean;
+  modelRegistry?: PiModelRegistry;
 };
 
 function resolveEffectiveToolLabel(tool: AnyAgentTool): string {
@@ -122,11 +124,12 @@ function disambiguateLabels(entries: EffectiveToolInventoryEntry[]): EffectiveTo
   });
 }
 
-function resolveEffectiveModelCompat(params: {
+async function resolveEffectiveModelCompat(params: {
   cfg: OpenClawConfig;
   agentDir: string;
   modelProvider?: string;
   modelId?: string;
+  modelRegistry?: PiModelRegistry;
 }) {
   const provider = params.modelProvider?.trim();
   const modelId = params.modelId?.trim();
@@ -134,26 +137,35 @@ function resolveEffectiveModelCompat(params: {
     return undefined;
   }
   try {
-    return resolveModel(provider, modelId, params.agentDir, params.cfg).model?.compat;
+    // Sync resolveModel requires an explicit modelRegistry; when the caller
+    // cannot supply one, fall back to async discovery so compat is not
+    // silently dropped.
+    const resolved = params.modelRegistry
+      ? resolveModel(provider, modelId, params.agentDir, params.cfg, {
+          modelRegistry: params.modelRegistry,
+        })
+      : await resolveModelAsync(provider, modelId, params.agentDir, params.cfg);
+    return resolved.model?.compat;
   } catch {
     return undefined;
   }
 }
 
-export function resolveEffectiveToolInventory(
+export async function resolveEffectiveToolInventory(
   params: ResolveEffectiveToolInventoryParams,
-): EffectiveToolInventoryResult {
+): Promise<EffectiveToolInventoryResult> {
   const agentId =
     params.agentId?.trim() ||
     resolveSessionAgentId({ sessionKey: params.sessionKey, config: params.cfg });
   const workspaceDir = params.workspaceDir ?? resolveAgentWorkspaceDir(params.cfg, agentId);
   const agentDir = params.agentDir ?? resolveAgentDir(params.cfg, agentId);
-  const modelCompat = resolveEffectiveModelCompat({
+  const modelCompat = (await resolveEffectiveModelCompat({
     cfg: params.cfg,
     agentDir,
     modelProvider: params.modelProvider,
     modelId: params.modelId,
-  }) as ModelCompatConfig | undefined;
+    modelRegistry: params.modelRegistry,
+  })) as ModelCompatConfig | undefined;
 
   const effectiveTools = createOpenClawCodingTools({
     agentId,

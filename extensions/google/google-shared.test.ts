@@ -1,9 +1,6 @@
 import type { Context, Tool } from "@earendil-works/pi-ai";
+import { convertMessages, convertTools } from "@earendil-works/pi-ai/api/google-shared";
 import { describe, expect, it } from "vitest";
-import {
-  convertMessages,
-  convertTools,
-} from "../../node_modules/@earendil-works/pi-ai/dist/providers/google-shared.js";
 import {
   asRecord,
   expectConvertedRoles,

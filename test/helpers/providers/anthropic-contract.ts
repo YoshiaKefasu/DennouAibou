@@ -7,7 +7,7 @@
 // test-only helper. Shared payload-policy helpers come from the kept
 // plugin-sdk (src/plugin-sdk/provider-stream-shared.ts).
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { streamSimple } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import {
   applyAnthropicPayloadPolicyToParams,
   resolveAnthropicPayloadPolicy,
@@ -53,10 +53,12 @@ function parseHeaderList(value: unknown): string[] {
 }
 
 function mergeAnthropicBetaHeader(
-  headers: Record<string, string> | undefined,
+  headers: Record<string, string | null> | undefined,
   betas: string[],
 ): Record<string, string> {
-  const merged = { ...headers };
+  const merged = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([, v]) => v !== null),
+  ) as Record<string, string>;
   const existingKey = Object.keys(merged).find((key) => key.toLowerCase() === "anthropic-beta");
   const existing = existingKey ? parseHeaderList(merged[existingKey]) : [];
   const values = Array.from(new Set([...existing, ...betas]));

@@ -16,7 +16,7 @@ function applyAndCapture(params: {
 }) {
   const captured: ExtraParamsCapture<Record<string, unknown>> = { payload: {} };
   const baseStreamFn: StreamFn = (model, _context, options) => {
-    captured.headers = options?.headers;
+    captured.headers = options?.headers as Record<string, string> | undefined;
     options?.onPayload?.(captured.payload, model);
     return {} as ReturnType<StreamFn>;
   };
