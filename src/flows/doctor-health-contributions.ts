@@ -47,7 +47,6 @@ import {
 } from "../commands/doctor-state-migrations.js";
 import { noteWorkspaceStatus } from "../commands/doctor-workspace-status.js";
 import { MEMORY_SYSTEM_PROMPT, shouldSuggestMemorySystem } from "../commands/doctor-workspace.js";
-import { noteOpenAIOAuthTlsPrerequisites } from "../commands/oauth-tls-preflight.js";
 import { applyWizardMetadata, randomToken } from "../commands/onboard-helpers.js";
 import { ensureSystemdUserLingerInteractive } from "../commands/systemd-linger.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -314,13 +313,6 @@ async function runBrowserHealth(ctx: DoctorHealthFlowContext): Promise<void> {
   await noteChromeMcpBrowserReadiness(ctx.cfg);
 }
 
-async function runOpenAIOAuthTlsHealth(ctx: DoctorHealthFlowContext): Promise<void> {
-  await noteOpenAIOAuthTlsPrerequisites({
-    cfg: ctx.cfg,
-    deep: ctx.options.deep === true,
-  });
-}
-
 async function runHooksModelHealth(ctx: DoctorHealthFlowContext): Promise<void> {
   if (!ctx.cfg.hooks?.gmail?.model?.trim()) {
     return;
@@ -558,11 +550,6 @@ export function resolveDoctorHealthContributions(): DoctorHealthContribution[] {
       id: "doctor:browser",
       label: "Browser",
       run: runBrowserHealth,
-    }),
-    createDoctorHealthContribution({
-      id: "doctor:oauth-tls",
-      label: "OAuth TLS",
-      run: runOpenAIOAuthTlsHealth,
     }),
     createDoctorHealthContribution({
       id: "doctor:hooks-model",

@@ -58,11 +58,9 @@ describe("composeProviderStreamWrappers", () => {
 describe("buildProviderStreamFamilyHooks", () => {
   it("covers the stream family matrix", async () => {
     let capturedPayload: Record<string, unknown> | undefined;
-    let capturedModelId: string | undefined;
     let capturedHeaders: Record<string, string | null> | undefined;
 
     const baseStreamFn: StreamFn = (model, _context, options) => {
-      capturedModelId = String(model.id);
       const payload = { config: { thinkingConfig: { thinkingBudget: -1 } } } as Record<
         string,
         unknown
@@ -72,44 +70,6 @@ describe("buildProviderStreamFamilyHooks", () => {
       capturedHeaders = options?.headers;
       return {} as never;
     };
-
-    const googleHooks = buildProviderStreamFamilyHooks("google-thinking");
-    const googleStream = requireStreamFn(
-      requireWrapStreamFn(googleHooks.wrapStreamFn)({
-        streamFn: baseStreamFn,
-        thinkingLevel: "high",
-      } as never),
-    );
-    await googleStream(
-      { api: "google-generative-ai", id: "gemini-3.1-pro-preview" } as never,
-      {} as never,
-      {},
-    );
-    expect(capturedPayload).toMatchObject({
-      config: { thinkingConfig: { thinkingLevel: "HIGH" } },
-    });
-    const googleThinkingConfig = (
-      (capturedPayload as Record<string, unknown>).config as Record<string, unknown>
-    ).thinkingConfig as Record<string, unknown>;
-    expect(googleThinkingConfig).not.toHaveProperty("thinkingBudget");
-
-    const minimaxHooks = buildProviderStreamFamilyHooks("minimax-fast-mode");
-    const minimaxStream = requireStreamFn(
-      requireWrapStreamFn(minimaxHooks.wrapStreamFn)({
-        streamFn: baseStreamFn,
-        extraParams: { fastMode: true },
-      } as never),
-    );
-    await minimaxStream(
-      {
-        api: "anthropic-messages",
-        provider: "minimax",
-        id: "MiniMax-M2.7",
-      } as never,
-      {} as never,
-      {},
-    );
-    expect(capturedModelId).toBe("MiniMax-M2.7-highspeed");
 
     const kilocodeHooks = buildProviderStreamFamilyHooks("kilocode-thinking");
     void requireStreamFn(
@@ -153,13 +113,12 @@ describe("buildProviderStreamFamilyHooks", () => {
     void requireStreamFn(
       requireWrapStreamFn(openAiHooks.wrapStreamFn)({
         streamFn: baseStreamFn,
-        extraParams: { serviceTier: "flex" },
         config: {},
         agentDir: "/tmp/provider-stream-test",
       } as never),
     )(
       {
-        api: "openai-responses",
+        api: "openai-completions",
         provider: "openai",
         baseUrl: "https://api.openai.com/v1",
         id: "gpt-5.4",
@@ -167,10 +126,6 @@ describe("buildProviderStreamFamilyHooks", () => {
       {} as never,
       {},
     );
-    expect(capturedPayload).toMatchObject({
-      config: { thinkingConfig: { thinkingBudget: -1 } },
-      service_tier: "flex",
-    });
     expect(capturedHeaders).toBeDefined();
 
     const openRouterHooks = buildProviderStreamFamilyHooks("openrouter-thinking");

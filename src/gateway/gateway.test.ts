@@ -17,7 +17,6 @@ import {
   startGatewayWithClient,
 } from "./test-helpers.e2e.js";
 import { installOpenAiResponsesMock } from "./test-helpers.openai-mock.js";
-import { buildMockOpenAiResponsesProvider } from "./test-openai-responses-model.js";
 
 let writeConfigFile: typeof import("../config/config.js").writeConfigFile;
 let resolveConfigPath: typeof import("../config/config.js").resolveConfigPath;
@@ -128,7 +127,26 @@ describe("gateway e2e", () => {
       const configDir = path.join(tempHome, ".openclaw");
       await fs.mkdir(configDir, { recursive: true });
       const configPath = path.join(configDir, "dennou-aibou.json");
-      const mockProvider = buildMockOpenAiResponsesProvider(openaiBaseUrl);
+      const mockProvider = {
+        providerId: "mock-openai",
+        modelRef: "mock-openai/gpt-5.4",
+        config: {
+          baseUrl: openaiBaseUrl,
+          api: "openai-completions" as const,
+          models: [
+            {
+              id: "gpt-5.4",
+              name: "GPT-5.4",
+              api: "openai-completions" as const,
+              reasoning: false,
+              input: ["text" as const],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 128000,
+              maxTokens: 4096,
+            },
+          ],
+        },
+      };
 
       const cfg = {
         agents: {

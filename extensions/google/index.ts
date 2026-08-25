@@ -31,7 +31,6 @@ const GOOGLE_GEMINI_PROVIDER_HOOKS = {
   ...buildProviderReplayFamilyHooks({
     family: "google-gemini",
   }),
-  ...buildProviderStreamFamilyHooks("google-thinking"),
 };
 
 async function loadGoogleImageGenerationProvider(): Promise<ImageGenerationProvider> {

@@ -34,52 +34,17 @@ function buildModel<TApi extends Api>(
 
 describe("provider transport stream contracts", () => {
   it("covers the supported transport api alias matrix", () => {
-    const cases = [
-      {
-        api: "openai-responses" as const,
-        provider: "openai",
-        id: "gpt-5.4",
-        baseUrl: "https://api.openai.com/v1",
-        alias: "openclaw-openai-responses-transport",
-      },
-      {
-        api: "openai-codex-responses" as const,
-        provider: "openai-codex",
-        id: "codex-mini-latest",
-        baseUrl: "https://chatgpt.com/backend-api",
-        alias: "openclaw-openai-responses-transport",
-      },
+    const supportedCases = [
       {
         api: "openai-completions" as const,
         provider: "xai",
         id: "grok-4",
         baseUrl: "https://api.x.ai/v1",
-        alias: "openclaw-openai-completions-transport",
-      },
-      {
-        api: "azure-openai-responses" as const,
-        provider: "azure-openai-responses",
-        id: "gpt-5.4",
-        baseUrl: "https://example.openai.azure.com/openai/v1",
-        alias: "openclaw-azure-openai-responses-transport",
-      },
-      {
-        api: "anthropic-messages" as const,
-        provider: "anthropic",
-        id: "claude-sonnet-4.6",
-        baseUrl: "https://api.anthropic.com",
-        alias: "openclaw-anthropic-messages-transport",
-      },
-      {
-        api: "google-generative-ai" as const,
-        provider: "google",
-        id: "gemini-3.1-pro-preview",
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-        alias: "openclaw-google-generative-ai-transport",
+        alias: "openclaw-openai-completions-transport" as const,
       },
     ];
 
-    for (const testCase of cases) {
+    for (const testCase of supportedCases) {
       const model = attachModelProviderRequestTransport(
         buildModel(testCase.api, {
           id: testCase.id,
@@ -104,6 +69,19 @@ describe("provider transport stream contracts", () => {
         provider: testCase.provider,
         id: testCase.id,
       });
+    }
+
+    const unsupportedApis = [
+      "openai-responses",
+      "openai-codex-responses",
+      "azure-openai-responses",
+      "anthropic-messages",
+      "google-generative-ai",
+    ] as const;
+
+    for (const api of unsupportedApis) {
+      expect(isTransportAwareApiSupported(api as never)).toBe(false);
+      expect(resolveTransportAwareSimpleApi(api as never)).toBeUndefined();
     }
   });
 

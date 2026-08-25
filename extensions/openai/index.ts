@@ -1,10 +1,6 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { buildOpenAIImageGenerationProvider } from "./image-generation-provider.js";
-import {
-  openaiCodexMediaUnderstandingProvider,
-  openaiMediaUnderstandingProvider,
-} from "./media-understanding-provider.js";
-import { buildOpenAICodexProviderPlugin } from "./openai-codex-provider.js";
+import { openaiMediaUnderstandingProvider } from "./media-understanding-provider.js";
 import { buildOpenAIProvider } from "./openai-provider.js";
 import {
   resolveOpenAIPromptOverlayMode,
@@ -20,11 +16,7 @@ export default definePluginEntry({
   description: "Bundled OpenAI provider plugins",
   register(api) {
     const promptOverlayMode = resolveOpenAIPromptOverlayMode(api.pluginConfig);
-    const buildProviderWithPromptContribution = <
-      T extends
-        | ReturnType<typeof buildOpenAIProvider>
-        | ReturnType<typeof buildOpenAICodexProviderPlugin>,
-    >(
+    const buildProviderWithPromptContribution = <T extends ReturnType<typeof buildOpenAIProvider>>(
       provider: T,
     ): T => ({
       ...provider,
@@ -36,12 +28,10 @@ export default definePluginEntry({
         }),
     });
     api.registerProvider(buildProviderWithPromptContribution(buildOpenAIProvider()));
-    api.registerProvider(buildProviderWithPromptContribution(buildOpenAICodexProviderPlugin()));
     api.registerImageGenerationProvider(buildOpenAIImageGenerationProvider());
     api.registerRealtimeTranscriptionProvider(buildOpenAIRealtimeTranscriptionProvider());
     api.registerRealtimeVoiceProvider(buildOpenAIRealtimeVoiceProvider());
     api.registerMediaUnderstandingProvider(openaiMediaUnderstandingProvider);
-    api.registerMediaUnderstandingProvider(openaiCodexMediaUnderstandingProvider);
     api.registerVideoGenerationProvider(buildOpenAIVideoGenerationProvider());
   },
 });

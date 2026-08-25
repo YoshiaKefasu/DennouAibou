@@ -16,8 +16,8 @@ import { suggestOAuthProfileIdForLegacyDefault } from "./repair.js";
 import { ensureAuthProfileStore, saveAuthProfileStore } from "./store.js";
 import type { AuthProfileStore, OAuthCredential } from "./types.js";
 
-/** Local map of known OAuth provider IDs. The SDK no longer exports getOAuthProviders(). */
-const OAUTH_PROVIDER_IDS = new Set<string>(["openai-codex"]);
+/** Local map of known OAuth provider IDs. */
+const OAUTH_PROVIDER_IDS = new Set<string>([]);
 
 const isOAuthProvider = (provider: string): boolean => OAUTH_PROVIDER_IDS.has(provider);
 

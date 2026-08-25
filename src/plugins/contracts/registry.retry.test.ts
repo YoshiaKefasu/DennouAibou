@@ -185,7 +185,7 @@ describe("plugin contract registry scoped retries", () => {
 
     const { requireProviderContractProvider } = await import("./registry.js");
 
-    expect(requireProviderContractProvider("openai-codex").id).toBe("openai");
+    expect(requireProviderContractProvider("openai").id).toBe("openai");
     expect(loadBundledCapabilityRuntimeRegistry).toHaveBeenCalledTimes(1);
   });
 

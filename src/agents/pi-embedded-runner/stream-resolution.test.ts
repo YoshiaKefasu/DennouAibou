@@ -12,7 +12,6 @@ describe("describeEmbeddedAgentStreamStrategy", () => {
       describeEmbeddedAgentStreamStrategy({
         currentStreamFn: undefined,
         providerStreamFn: vi.fn() as never,
-        shouldUseWebSocketTransport: false,
         model: {
           api: "openai-completions",
           provider: "ollama",
@@ -26,37 +25,21 @@ describe("describeEmbeddedAgentStreamStrategy", () => {
     expect(
       describeEmbeddedAgentStreamStrategy({
         currentStreamFn: undefined,
-        shouldUseWebSocketTransport: false,
         model: {
-          api: "openai-responses",
+          api: "openai-completions",
           provider: "openai",
           id: "gpt-5.4",
         } as never,
       }),
-    ).toBe("boundary-aware:openai-responses");
-  });
-
-  it("describes default Codex fallback shaping", () => {
-    expect(
-      describeEmbeddedAgentStreamStrategy({
-        currentStreamFn: undefined,
-        shouldUseWebSocketTransport: false,
-        model: {
-          api: "openai-codex-responses",
-          provider: "openai-codex",
-          id: "codex-mini-latest",
-        } as never,
-      }),
-    ).toBe("boundary-aware:openai-codex-responses");
+    ).toBe("boundary-aware:openai-completions");
   });
 
   it("keeps custom session streams labeled as custom", () => {
     expect(
       describeEmbeddedAgentStreamStrategy({
         currentStreamFn: vi.fn() as never,
-        shouldUseWebSocketTransport: false,
         model: {
-          api: "openai-responses",
+          api: "openai-completions",
           provider: "openai",
           id: "gpt-5.4",
         } as never,
@@ -81,30 +64,14 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     expect(authStorage.getApiKey).not.toHaveBeenCalled();
   });
 
-  it("still routes supported streamSimple fallbacks through boundary-aware transports", () => {
+  it("routes completions fallbacks through boundary-aware transports", () => {
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: undefined,
-      shouldUseWebSocketTransport: false,
       sessionId: "session-1",
       model: {
-        api: "openai-responses",
+        api: "openai-completions",
         provider: "openai",
         id: "gpt-5.4",
-      } as never,
-    });
-
-    expect(streamFn).not.toBe(streamSimple);
-  });
-
-  it("routes Codex responses fallbacks through boundary-aware transports", () => {
-    const streamFn = resolveEmbeddedAgentStreamFn({
-      currentStreamFn: undefined,
-      shouldUseWebSocketTransport: false,
-      sessionId: "session-1",
-      model: {
-        api: "openai-codex-responses",
-        provider: "openai-codex",
-        id: "codex-mini-latest",
       } as never,
     });
 
@@ -118,24 +85,29 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     };
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: undefined,
-      providerStreamFn,
-      shouldUseWebSocketTransport: false,
+      providerStreamFn: providerStreamFn as never,
       sessionId: "session-1",
       model: {
         api: "openai-completions",
-        provider: "openai",
-        id: "gpt-5.4",
+        provider: "ollama",
+        id: "qwen",
       } as never,
       resolvedApiKey: "resolved-key",
       authStorage,
     });
 
-    await expect(
-      streamFn({ provider: "openai", id: "gpt-5.4" } as never, {} as never, {}),
-    ).resolves.toMatchObject({
+    const result = await streamFn(
+      {
+        api: "openai-completions",
+        provider: "ollama",
+        id: "qwen",
+      } as never,
+      { messages: [] },
+      {},
+    );
+
+    expect(result).toMatchObject({
       apiKey: "resolved-key",
     });
-    expect(authStorage.getApiKey).not.toHaveBeenCalled();
-    expect(providerStreamFn).toHaveBeenCalledTimes(1);
   });
 });

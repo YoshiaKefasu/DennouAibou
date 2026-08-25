@@ -17,14 +17,9 @@ export function composeProviderStreamWrappers(
 }
 
 export {
-  applyAnthropicPayloadPolicyToParams,
-  resolveAnthropicPayloadPolicy,
-} from "../agents/anthropic-payload-policy.js";
-export {
   buildCopilotDynamicHeaders,
   hasCopilotVisionInput,
 } from "../agents/copilot-dynamic-headers.js";
-export { applyAnthropicEphemeralCacheControlMarkers } from "../agents/pi-embedded-runner/anthropic-cache-control-payload.js";
 export {
   createBedrockNoCacheWrapper,
   isAnthropicBedrockModel,

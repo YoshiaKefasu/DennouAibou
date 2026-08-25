@@ -11,5 +11,3 @@ const bindProviderAuthLoginRuntime = createLazyRuntimeMethodBinder(loadProviderA
 
 export const githubCopilotLoginCommand: ProviderAuthLoginRuntime["githubCopilotLoginCommand"] =
   bindProviderAuthLoginRuntime((runtime) => runtime.githubCopilotLoginCommand);
-export const loginOpenAICodexOAuth: ProviderAuthLoginRuntime["loginOpenAICodexOAuth"] =
-  bindProviderAuthLoginRuntime((runtime) => runtime.loginOpenAICodexOAuth);

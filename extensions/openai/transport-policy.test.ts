@@ -1,15 +1,12 @@
 import type { ProviderRuntimeModel } from "openclaw/plugin-sdk/plugin-entry";
 import { describe, expect, it } from "vitest";
-import {
-  resolveOpenAITransportTurnState,
-  resolveOpenAIWebSocketSessionPolicy,
-} from "./transport-policy.js";
+import { resolveOpenAITransportTurnState } from "./transport-policy.js";
 
 describe("openai transport policy", () => {
   const nativeModel = {
     id: "gpt-5.4",
     name: "GPT-5.4",
-    api: "openai-responses",
+    api: "openai-completions",
     provider: "openai",
     baseUrl: "https://api.openai.com/v1",
     reasoning: true,
@@ -35,7 +32,7 @@ describe("openai transport policy", () => {
         sessionId: "session-123",
         turnId: "turn-123",
         attempt: 2,
-        transport: "websocket",
+        transport: "stream",
       }),
     ).toMatchObject({
       headers: {
@@ -48,7 +45,7 @@ describe("openai transport policy", () => {
         openclaw_session_id: "session-123",
         openclaw_turn_id: "turn-123",
         openclaw_turn_attempt: "2",
-        openclaw_transport: "websocket",
+        openclaw_transport: "stream",
       },
     });
   });
@@ -65,43 +62,5 @@ describe("openai transport policy", () => {
         transport: "stream",
       }),
     ).toBeUndefined();
-  });
-
-  it("returns websocket session headers and cooldown for native routes", () => {
-    expect(
-      resolveOpenAIWebSocketSessionPolicy({
-        provider: "openai",
-        modelId: nativeModel.id,
-        model: nativeModel,
-        sessionId: "session-123",
-      }),
-    ).toMatchObject({
-      headers: {
-        "x-client-request-id": "session-123",
-        "x-openclaw-session-id": "session-123",
-      },
-      degradeCooldownMs: 60_000,
-    });
-  });
-
-  it("treats Azure routes as native OpenAI-family transports", () => {
-    expect(
-      resolveOpenAIWebSocketSessionPolicy({
-        provider: "azure-openai-responses",
-        modelId: "gpt-5.4",
-        model: {
-          ...nativeModel,
-          provider: "azure-openai-responses",
-          baseUrl: "https://demo.openai.azure.com/openai/v1",
-        },
-        sessionId: "session-123",
-      }),
-    ).toMatchObject({
-      headers: {
-        "x-client-request-id": "session-123",
-        "x-openclaw-session-id": "session-123",
-      },
-      degradeCooldownMs: 60_000,
-    });
   });
 });

@@ -674,27 +674,27 @@ KASOU で実際に使われているチャンネル: **Telegram**（メイン）
 
 **注意**: GRKD-Jisho は**独自の discord.js 接続**を使い、DennouAibou の Discord extension には依存しない。ただし KASOU の `openclaw.json` に Discord channel 設定が存在するため、**Discord が DennouAibou gateway 経由で使われている可能性がある**。Phase B-1 の前に KASOU 設定を確認し、Discord の使用有無を確定すること。
 
-| チャンネル              | 用途                               | 削除判定     |
-| ----------------------- | ---------------------------------- | ------------ |
-| **telegram**            | KASOU main                         | **維持**     |
-| **discord**             | KASOU に channel 設定あり → 要確認 | **要確認**   |
-| **googlechat**          | 未使用                             | **削除候補** |
-| **imessage**            | 未使用                             | **削除候補** |
-| **mattermost**          | 未使用                             | **削除候補** |
-| **matrix**              | 未使用                             | **削除候補** |
-| **slack**               | 未使用                             | **削除候補** |
-| **whatsapp**            | 未使用                             | **削除候補** |
-| **irc**                 | 未使用                             | **削除候補** |
-| **nostr**               | 未使用                             | **削除候補** |
-| **bluebubbles**         | 未使用                             | **削除候補** |
-| **feishu**              | 未使用                             | **削除候補** |
-| **tlon**                | 未使用                             | **削除候補** |
-| **nextcloud-talk**      | 未使用                             | **削除候補** |
-| **synology-chat**       | 未使用                             | **削除候補** |
-| **zalo** / **zalouser** | 未使用                             | **削除候補** |
+| チャンネル              | 用途                               | 削除判定                                                               |
+| ----------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| **telegram**            | KASOU main                         | **維持**                                                               |
+| **discord**             | KASOU に channel 設定あり → 要確認 | **要確認**                                                             |
+| **googlechat**          | 未使用                             | **削除候補**                                                           |
+| **imessage**            | 未使用                             | **削除候補**                                                           |
+| **mattermost**          | 未使用                             | **削除候補**                                                           |
+| **matrix**              | 未使用                             | **削除候補**                                                           |
+| **slack**               | 未使用                             | **削除候補**                                                           |
+| **whatsapp**            | 未使用                             | **削除候補**                                                           |
+| **irc**                 | 未使用                             | **削除候補**                                                           |
+| **nostr**               | 未使用                             | **削除候補**                                                           |
+| **bluebubbles**         | 未使用                             | **削除候補**                                                           |
+| **feishu**              | 未使用                             | **削除候補**                                                           |
+| **tlon**                | 未使用                             | **削除候補**                                                           |
+| **nextcloud-talk**      | 未使用                             | **削除候補**                                                           |
+| **synology-chat**       | 未使用                             | **削除候補**                                                           |
+| **zalo** / **zalouser** | 未使用                             | **削除候補**                                                           |
 | **line**                | 未使用                             | **候補保留** → ch.18.2 で温存決定済み（メッセージAPIプラグイン化候補） |
-| **twitch**              | 未使用                             | **削除候補** |
-| **msteams**             | 未使用                             | **削除候補** |
+| **twitch**              | 未使用                             | **削除候補**                                                           |
+| **msteams**             | 未使用                             | **削除候補**                                                           |
 
 #### B. 未使用ツール・チャネルプラグイン
 
@@ -916,69 +916,69 @@ Provider 削除で生まれたデッドコードの追加掃除:
 
 #### 1. TTS サブシステム完全撤去
 
-| 種別 | ファイル / パス | 処方 |
-| --- | --- | --- |
-| TTS コア | `src/tts/`（15 ファイル） | ディレクトリ削除 |
-| TTS facade | `src/plugin-sdk/tts-runtime.ts`, `speech-core.ts`, `speech.ts`, `voice-call.ts` | ファイル削除。`declare module` 追加は**不要と判明**（型参照は全て除去済み、`build:plugin-sdk:dts` pass 実測） |
-| OpenAI TTS | `extensions/openai/tts.ts`, `extensions/openai/tts.test.ts` | ファイル削除（kept extension の一部） |
-| OpenAI TTS 定数 | `extensions/openai/default-models.ts` の `OPENAI_DEFAULT_TTS_MODEL` / `OPENAI_DEFAULT_TTS_VOICE` | 削除 |
-| OpenAI TTS export | `extensions/openai/api.ts` の TTS 関連 export | 削除 |
-| OpenAI TTS speech | `extensions/openai/speech-provider.ts` | ファイル削除 |
-| TTS 契約テスト | `src/plugins/contracts/tts.*.contract.test.ts`（4 ファイル） | ファイル削除 |
-| TTS 契約ヘルパー | `test/helpers/plugins/tts-contract-suites.ts` | ファイル削除 |
-| TTS /tts コマンド | `src/auto-reply/commands-registry.shared.ts` の `/tts` エントリ | 削除 |
-| TTS system prompt | `src/auto-reply/reply/commands-system-prompt.ts` の `buildTtsSystemPromptHint` import と使用箇所 | 削除 |
-| TTS dispatch | `src/auto-reply/reply/dispatch-from-config.ts` の tts-runtime import と tts 処理分岐 | 削除 |
-| TTS status | `src/auto-reply/status.ts` の `resolveStatusTtsSnapshot` import と使用箇所 | 削除 |
-| TTS config | KASOU `openclaw.json` の `messages.tts` ブロック（13章 Phase 6 で elevenlabs は削除済みだが、残りの tts.provider / tts.autoMode 等も除去） | 設定除去 |
-| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.test.ts` の tts モック・tts テストケース | テスト削除・修正 |
-| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.reply-dispatch.test.ts` の tts モック | テスト削除・修正 |
+| 種別                | ファイル / パス                                                                                                                            | 処方                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| TTS コア            | `src/tts/`（15 ファイル）                                                                                                                  | ディレクトリ削除                                                                                              |
+| TTS facade          | `src/plugin-sdk/tts-runtime.ts`, `speech-core.ts`, `speech.ts`, `voice-call.ts`                                                            | ファイル削除。`declare module` 追加は**不要と判明**（型参照は全て除去済み、`build:plugin-sdk:dts` pass 実測） |
+| OpenAI TTS          | `extensions/openai/tts.ts`, `extensions/openai/tts.test.ts`                                                                                | ファイル削除（kept extension の一部）                                                                         |
+| OpenAI TTS 定数     | `extensions/openai/default-models.ts` の `OPENAI_DEFAULT_TTS_MODEL` / `OPENAI_DEFAULT_TTS_VOICE`                                           | 削除                                                                                                          |
+| OpenAI TTS export   | `extensions/openai/api.ts` の TTS 関連 export                                                                                              | 削除                                                                                                          |
+| OpenAI TTS speech   | `extensions/openai/speech-provider.ts`                                                                                                     | ファイル削除                                                                                                  |
+| TTS 契約テスト      | `src/plugins/contracts/tts.*.contract.test.ts`（4 ファイル）                                                                               | ファイル削除                                                                                                  |
+| TTS 契約ヘルパー    | `test/helpers/plugins/tts-contract-suites.ts`                                                                                              | ファイル削除                                                                                                  |
+| TTS /tts コマンド   | `src/auto-reply/commands-registry.shared.ts` の `/tts` エントリ                                                                            | 削除                                                                                                          |
+| TTS system prompt   | `src/auto-reply/reply/commands-system-prompt.ts` の `buildTtsSystemPromptHint` import と使用箇所                                           | 削除                                                                                                          |
+| TTS dispatch        | `src/auto-reply/reply/dispatch-from-config.ts` の tts-runtime import と tts 処理分岐                                                       | 削除                                                                                                          |
+| TTS status          | `src/auto-reply/status.ts` の `resolveStatusTtsSnapshot` import と使用箇所                                                                 | 削除                                                                                                          |
+| TTS config          | KASOU `openclaw.json` の `messages.tts` ブロック（13章 Phase 6 で elevenlabs は削除済みだが、残りの tts.provider / tts.autoMode 等も除去） | 設定除去                                                                                                      |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.test.ts` の tts モック・tts テストケース                                                        | テスト削除・修正                                                                                              |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.reply-dispatch.test.ts` の tts モック                                                           | テスト削除・修正                                                                                              |
 
 #### 2. whatsapp 契約テスト残骸撤去
 
 拡張本体は 7ad2dcfad7b で削除済み。残骸テストを削除（slack / zalo 前例パターン）。
 
-| ファイル | 処方 |
-| --- | --- |
-| `src/channels/plugins/contracts/outbound-payload.whatsapp.contract.test.ts` | ファイル削除（本次実施 — tree に残存していたのはこの1件。下記4件は先行デブロート/コミットで既に不在を確認済み） |
-| `src/channels/plugins/contracts/inbound.whatsapp.contract.test.ts` | **温存**（実測 1/1 pass — 削除済みプラグインメタデータに依存せず finalizeInboundContext の現役契約をテスト） |
-| `plugins-core-extension.whatsapp` / `runtime-plugin-boundary.whatsapp` / `pi-tools.whatsapp-login-gating` / `isolated-agent...whatsapp-recipient` | 先行コミットで既に不在（tree 確認済み、対応不要） |
+| ファイル                                                                                                                                          | 処方                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/channels/plugins/contracts/outbound-payload.whatsapp.contract.test.ts`                                                                       | ファイル削除（本次実施 — tree に残存していたのはこの1件。下記4件は先行デブロート/コミットで既に不在を確認済み） |
+| `src/channels/plugins/contracts/inbound.whatsapp.contract.test.ts`                                                                                | **温存**（実測 1/1 pass — 削除済みプラグインメタデータに依存せず finalizeInboundContext の現役契約をテスト）    |
+| `plugins-core-extension.whatsapp` / `runtime-plugin-boundary.whatsapp` / `pi-tools.whatsapp-login-gating` / `isolated-agent...whatsapp-recipient` | 先行コミットで既に不在（tree 確認済み、対応不要）                                                               |
 
 #### 3. カタログ / レジストリ系テストの現実整合
 
 削除済みチャンネル（slack / msteams / zalo / whatsapp / matrix / irc 等 14 個）の参照をテストから除去し、「missing bundled channel plugin: slack」等のエラーを解消。
 
-| 対象 | 処方 |
-| --- | --- |
-| `package-manifest.contract.test.ts`（15 件失敗） | 削除済み manifest 参照（`extensions/{bluebubbles,feishu,irc,matrix,nextcloud-talk,nostr,slack,synology-chat,tlon,whatsapp,zalo,zalouser}/package.json`）の期待値を除去 |
-| `plugin-sdk-index.bundle.test.ts` / `plugin-sdk-runtime-api-guardrails.test.ts` | `missing bundled plugin root for matrix / irc` の期待値を除去 |
-| `src/channels/registry.helpers.test.ts` | MS Teams の bundled channel リスト言及を除去 |
-| `bundled-channel-config-metadata.generated.ts` | 削除済みチャンネルのエントリを除去し再生成 |
+| 対象                                                                            | 処方                                                                                                                                                                   |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-manifest.contract.test.ts`（15 件失敗）                                | 削除済み manifest 参照（`extensions/{bluebubbles,feishu,irc,matrix,nextcloud-talk,nostr,slack,synology-chat,tlon,whatsapp,zalo,zalouser}/package.json`）の期待値を除去 |
+| `plugin-sdk-index.bundle.test.ts` / `plugin-sdk-runtime-api-guardrails.test.ts` | `missing bundled plugin root for matrix / irc` の期待値を除去                                                                                                          |
+| `src/channels/registry.helpers.test.ts`                                         | MS Teams の bundled channel リスト言及を除去                                                                                                                           |
+| `bundled-channel-config-metadata.generated.ts`                                  | 削除済みチャンネルのエントリを除去し再生成                                                                                                                             |
 
 #### 4. plugin-activation-boundary 3 件
 
 browser 拡張削除後の期待値整備。
 
-| 対象 | 処方 |
-| --- | --- |
+| 対象                                     | 処方                                                                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/plugin-activation-boundary.test.ts` | browser plugin-sdk 参照（`browser-config.js` / `browser-host-inspection.js` / `browser-maintenance.js` の import 期待値）を削除。browser 拡張は削除済みのため、該当分岐の期待値を更新 |
 
 #### 5. 端物
 
-| 対象 | 処方 |
-| --- | --- |
-| `src/auto-reply/reply/followup-runner.test.ts` | 未使用 import `OpenClawConfig`（6行目）を除去（oxlint 残） |
-| `qa/seed-scenarios.json` | 削除済み `extensions/qa-lab/` と `extensions/qa-channel/` を参照する `codeRefs`（13行目、26行目等、計8箇所）を除去 or 空配列に更新 |
-| telegram rebrand 漏れ調査 | `src/plugin-sdk/telegram.ts` 及び関連ファイルの「OpenClaw」→「DennouAibou」rebrand 漏れを調査（本章スコープは調査のみ。修正は別タスク） |
+| 対象                                           | 処方                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/auto-reply/reply/followup-runner.test.ts` | 未使用 import `OpenClawConfig`（6行目）を除去（oxlint 残）                                                                              |
+| `qa/seed-scenarios.json`                       | 削除済み `extensions/qa-lab/` と `extensions/qa-channel/` を参照する `codeRefs`（13行目、26行目等、計8箇所）を除去 or 空配列に更新      |
+| telegram rebrand 漏れ調査                      | `src/plugin-sdk/telegram.ts` 及び関連ファイルの「OpenClaw」→「DennouAibou」rebrand 漏れを調査（本章スコープは調査のみ。修正は別タスク） |
 
 ### 17.3 関連コミット
 
-| コミット | 内容 |
-| --- | --- |
-| `bfc9a1c2568` | [DEBLOAT] 未使用依存12個+孤児ファイル削除 |
-| `d6aab6f3156` | [FIX-SOUL] 型エラー220件→0件 |
-| `051f0e94857` | [FIX-SOUL] followup-runner テスト修復(28/28) |
-| (本コミット) | [DEBLOAT] TTS 完全撤去 + テスト残骸サージカルクリーンアップ |
+| コミット      | 内容                                                        |
+| ------------- | ----------------------------------------------------------- |
+| `bfc9a1c2568` | [DEBLOAT] 未使用依存12個+孤児ファイル削除                   |
+| `d6aab6f3156` | [FIX-SOUL] 型エラー220件→0件                                |
+| `051f0e94857` | [FIX-SOUL] followup-runner テスト修復(28/28)                |
+| (本コミット)  | [DEBLOAT] TTS 完全撤去 + テスト残骸サージカルクリーンアップ |
 
 ### 17.4 検証ゲート
 
@@ -994,24 +994,24 @@ browser 拡張削除後の期待値整備。
 
 実測コマンド: `git diff --cached --shortstat` / `git show HEAD:<file> | wc -l` / 各スイート実行。
 
-| 項目 | 最終値 | 根拠 |
-| --- | --- | --- |
-| 全体変更規模 | 187 ファイル変更 / +420 / -9,081（削除 47 ファイル） | `git diff --cached --shortstat` 実測 |
-| TTS 削除ファイル数 | 37 | 削除47ファイルのうち tts/speech 関連
-| TTS 削除行数 | 約 4,428 行（削除37ファイルの HEAD 時点合計） | 残りは修正ファイル内除去・他カテゴリ分 |
-| whatsapp テスト削除ファイル数 | 本次1件 + ハーネス編集（残り4件は先行コミットで不在確認済み） | outbound-payload.whatsapp.contract.test.ts 削除、inbound版は実測 pass のため温存 |
-| カタログ/レジストリ テスト修正数 | 11 ファイル（13件修復+追加12件+session-binding縮小） | channel-catalog / group-policy / registry-actions / registry-setup-status / registry / import-guardrails / manifest / session-binding / registry-session-binding / runtime-artifacts(削除) / plugins-core-extension-contract(Jiti統一) |
-| plugin-activation-boundary 修正数 | 3 | slack期待値・env-api-key現実化・browser定数/表面整備 |
-| followup-runner 修正数 | 1 | テストスイート修復コミット（051f0e94857）別途済み |
-| seed-scenarios.json 修正数 | qa-lab 参照19行除去 | `git diff --cached` 実測 |
-| 最終テスト失敗数（pre-existing 以外） | **0** | contracts 37ファイル/129テスト全pass、followup-runner 28/28、boundary 7/7 |
-| 最終 test スイート pass 数 | contracts 129/129、followup-runner 28/28、plugin-activation-boundary 7/7 | tsgo --noEmit エラーゼロと併せて検証済み |
+| 項目                                  | 最終値                                                                   | 根拠                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 全体変更規模                          | 187 ファイル変更 / +420 / -9,081（削除 47 ファイル）                     | `git diff --cached --shortstat` 実測                                                                                                                                                                                                   |
+| TTS 削除ファイル数                    | 37                                                                       | 削除47ファイルのうち tts/speech 関連                                                                                                                                                                                                   |
+| TTS 削除行数                          | 約 4,428 行（削除37ファイルの HEAD 時点合計）                            | 残りは修正ファイル内除去・他カテゴリ分                                                                                                                                                                                                 |
+| whatsapp テスト削除ファイル数         | 本次1件 + ハーネス編集（残り4件は先行コミットで不在確認済み）            | outbound-payload.whatsapp.contract.test.ts 削除、inbound版は実測 pass のため温存                                                                                                                                                       |
+| カタログ/レジストリ テスト修正数      | 11 ファイル（13件修復+追加12件+session-binding縮小）                     | channel-catalog / group-policy / registry-actions / registry-setup-status / registry / import-guardrails / manifest / session-binding / registry-session-binding / runtime-artifacts(削除) / plugins-core-extension-contract(Jiti統一) |
+| plugin-activation-boundary 修正数     | 3                                                                        | slack期待値・env-api-key現実化・browser定数/表面整備                                                                                                                                                                                   |
+| followup-runner 修正数                | 1                                                                        | テストスイート修復コミット（051f0e94857）別途済み                                                                                                                                                                                      |
+| seed-scenarios.json 修正数            | qa-lab 参照19行除去                                                      | `git diff --cached` 実測                                                                                                                                                                                                               |
+| 最終テスト失敗数（pre-existing 以外） | **0**                                                                    | contracts 37ファイル/129テスト全pass、followup-runner 28/28、boundary 7/7                                                                                                                                                              |
+| 最終 test スイート pass 数            | contracts 129/129、followup-runner 28/28、plugin-activation-boundary 7/7 | tsgo --noEmit エラーゼロと併せて検証済み                                                                                                                                                                                               |
 
 #### 次回キャンペーン候補（今回スコープ外として台帳化）
 
 - マニフェスト契約の `speechProviders` フィールド群（src/plugins/manifest.ts 等）— 外部プラグイン向けコントラクト層として恒久保持か判断が必要
 - `vitest.extension-voice-call.config.ts` + `vitest.extension-voice-call-paths.mjs` — 削除済み voice-call 拡張用の死んだテストインフラ
-- テストヘルパー側の `OPENCLAW_*` env 完全移行（今回 DENNOU_* 優先+OPENCLAW_* フォールバックで互換確保済み）
+- テストヘルパー側の `OPENCLAW_*` env 完全移行（今回 DENNOU*\* 優先+OPENCLAW*\* フォールバックで互換確保済み）
 
 ---
 
@@ -1021,26 +1021,28 @@ browser 拡張削除後の期待値整備。
 
 Phase C 計画書は実施記録が空のまま残存していた計画ドキュメント。計画内容は既に別経路で実行済み:
 
-| 計画項目 | 実際の執行 |
-| --- | --- |
-| 型エラー修正 | 220件→0（`d6aab6f3156`、3 Executor 並列掃除） |
-| chutes / byteplus / tmp 生成物など Dead Code 除去 | DEBLOAT ch.14-16 および `bfc9a1c2568`（依存12個削除）で執行済み |
-| テスト整理（孤児テスト） | 同上コミット群に含む |
-| `@line/bot-sdk` 判断待ち | **本日確定**: 削除せず温存（18.2 参照）。TS2305 問題自体は pin 戻し `80f662c0c3c`（^11→^10.6.0）で解消済み |
-| 未執行の残項目 | PHASE_C 削除リストのうち `InstallationLog.txt` / `filter-*.jq` 4ファイルは tracked のまま残存 — 次回掃除対象 |
+| 計画項目                                          | 実際の執行                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 型エラー修正                                      | 220件→0（`d6aab6f3156`、3 Executor 並列掃除）                                                                |
+| chutes / byteplus / tmp 生成物など Dead Code 除去 | DEBLOAT ch.14-16 および `bfc9a1c2568`（依存12個削除）で執行済み                                              |
+| テスト整理（孤児テスト）                          | 同上コミット群に含む                                                                                         |
+| `@line/bot-sdk` 判断待ち                          | **本日確定**: 削除せず温存（18.2 参照）。TS2305 問題自体は pin 戻し `80f662c0c3c`（^11→^10.6.0）で解消済み   |
+| 未執行の残項目                                    | PHASE_C 削除リストのうち `InstallationLog.txt` / `filter-*.jq` 4ファイルは tracked のまま残存 — 次回掃除対象 |
 
 重複回避のため計画書本文は移植せず、結果記録のみ残す。原文は git 履歴参照。
 
 ### 18.2 スリム化新決定（未実施・次期 slim 化の第一波）
 
-| 項目 | 内容 | 状態 |
-| --- | --- | --- |
-| プロバイダー一本化 | 全モデルプロバイダーを OpenAI-compatible `/v1/chat/completions` のみに集約。OpenAI-compatible 以外の全トランスポート（anthropic-messages、google、vertex、openai-responses 等）とその compat 正規化層を撤去 | 未実施・計画確定 |
-| OpenAI native + Codex OAuth 撤去 | openai-codex OAuth（ChatGPT backend）経路と OpenAI 固有 auth を廃止 | 未実施・計画確定 |
-| モデルテスト整理 | 撤去対象プロバイダー固有のモデル live テスト類を削除 | 未実施・計画確定 |
-| `@line/bot-sdk` | **削除せず温存** — 将来のメッセージAPIプラグイン化候補（owner マーカー付き messenger plugin 構想の第一候補） | 方針確定 |
+| 項目                             | 内容                                                                                                                                                                                                        | 状態             |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| プロバイダー一本化               | 全モデルプロバイダーを OpenAI-compatible `/v1/chat/completions` のみに集約。OpenAI-compatible 以外の全トランスポート（anthropic-messages、google、vertex、openai-responses 等）とその compat 正規化層を撤去 | 未実施・計画確定 |
+| OpenAI native + Codex OAuth 撤去 | openai-codex OAuth（ChatGPT backend）経路と OpenAI 固有 auth を廃止                                                                                                                                         | 未実施・計画確定 |
+| モデルテスト整理                 | 撤去対象プロバイダー固有のモデル live テスト類を削除                                                                                                                                                        | 未実施・計画確定 |
+| `@line/bot-sdk`                  | **削除せず温存** — 将来のメッセージAPIプラグイン化候補（owner マーカー付き messenger plugin 構想の第一候補）                                                                                                | 方針確定         |
 
 **影響注記:**
+
 - KASOU の Google 系ルーティングおよび Codex OAuth トラック（Track B）は本決定により引退。KASOU 側は `/v1/chat/completions` 互換エンドポイントへの移行が必要
 - Phase D（D3 `cd30fe9dda9` 等）で整備した transport 層のうち、OpenAI-compatible 以外は本決定により役目を終える
 - 実施時は次期 slim 化の第2抽出波（カーネル外部への機能移植フェーズ）として、段階的コミット＋code-reviewer レビューを経る（一括削除しない）
+- 掃除候補メモ（Wave 2 以降）: `src/agents/auth-profiles/oauth.ts:20-21` の恒偽 `isOAuthProvider` および `src/agents/auth-profiles/usage.ts:78-84` の恒偽 `shouldProbeWhamForFailure`

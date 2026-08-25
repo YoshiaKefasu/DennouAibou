@@ -9,14 +9,12 @@ import {
   wrapProviderStreamFn as wrapProviderStreamFnRuntime,
 } from "../../plugins/provider-runtime.js";
 import type { ProviderRuntimeModel } from "../../plugins/types.js";
-import { createGoogleThinkingPayloadWrapper } from "./google-stream-wrappers.js";
 import { log } from "./logger.js";
 import { createMinimaxThinkingDisabledWrapper } from "./minimax-stream-wrappers.js";
 import {
   createSiliconFlowThinkingWrapper,
   shouldApplySiliconFlowThinkingOffCompat,
 } from "./moonshot-stream-wrappers.js";
-import { createOpenAIResponsesContextManagementWrapper } from "./openai-stream-wrappers.js";
 import { resolveCacheRetention } from "./prompt-cache-retention.js";
 import { createOpenRouterSystemCacheWrapper } from "./proxy-stream-wrappers.js";
 import { streamWithPayloadPatch } from "./stream-payload-utils.js";
@@ -389,23 +387,6 @@ function applyPostPluginStreamWrappers(
   ctx: ApplyExtraParamsContext & { providerWrapperHandled: boolean },
 ): void {
   ctx.agent.streamFunction = createOpenRouterSystemCacheWrapper(ctx.agent.streamFunction);
-
-  if (!ctx.providerWrapperHandled) {
-    // Guard Google-family payloads against invalid negative thinking budgets
-    // emitted by upstream model-ID heuristics for Gemini 3.1 variants.
-    ctx.agent.streamFunction = createGoogleThinkingPayloadWrapper(
-      ctx.agent.streamFunction,
-      ctx.thinkingLevel,
-    );
-
-    // Work around upstream pi-ai hardcoding `store: false` for Responses API.
-    // Force `store=true` for direct OpenAI Responses models and auto-enable
-    // server-side compaction for compatible Responses payloads.
-    ctx.agent.streamFunction = createOpenAIResponsesContextManagementWrapper(
-      ctx.agent.streamFunction,
-      ctx.effectiveExtraParams,
-    );
-  }
 
   // MiniMax's Anthropic-compatible stream can leak reasoning_content into the
   // visible reply path because it does not emit native Anthropic thinking

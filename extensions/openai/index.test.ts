@@ -15,27 +15,6 @@ import {
   OPENAI_GPT5_OUTPUT_CONTRACT,
 } from "./prompt-overlay.js";
 
-const runtimeMocks = vi.hoisted(() => ({
-  ensureGlobalUndiciEnvProxyDispatcher: vi.fn(),
-  refreshOpenAICodexToken: vi.fn(),
-}));
-
-vi.mock("openclaw/plugin-sdk/runtime-env", () => ({
-  ensureGlobalUndiciEnvProxyDispatcher: runtimeMocks.ensureGlobalUndiciEnvProxyDispatcher,
-}));
-
-vi.mock("@earendil-works/pi-ai/oauth", async () => {
-  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
-    "@earendil-works/pi-ai/oauth",
-  );
-  return {
-    ...actual,
-    refreshOpenAICodexToken: runtimeMocks.refreshOpenAICodexToken,
-  };
-});
-
-import { refreshOpenAICodexToken } from "./openai-codex-provider.runtime.js";
-
 const registerOpenAIPlugin = async () =>
   registerProviderPlugin({
     plugin,
@@ -232,23 +211,6 @@ describe("openai plugin", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("bootstraps the env proxy dispatcher before refreshing codex oauth credentials", async () => {
-    const refreshed = {
-      access: "next-access",
-      refresh: "next-refresh",
-      expires: Date.now() + 60_000,
-    };
-    runtimeMocks.refreshOpenAICodexToken.mockResolvedValue(refreshed);
-
-    await expect(refreshOpenAICodexToken("refresh-token")).resolves.toBe(refreshed);
-
-    expect(runtimeMocks.ensureGlobalUndiciEnvProxyDispatcher).toHaveBeenCalledOnce();
-    expect(runtimeMocks.refreshOpenAICodexToken).toHaveBeenCalledOnce();
-    expect(
-      runtimeMocks.ensureGlobalUndiciEnvProxyDispatcher.mock.invocationCallOrder[0],
-    ).toBeLessThan(runtimeMocks.refreshOpenAICodexToken.mock.invocationCallOrder[0]);
-  });
-
   it("registers GPT-5 system prompt contributions when the friendly overlay is enabled", async () => {
     const { on, providers } = await registerOpenAIPluginWithHook({
       pluginConfig: { personality: "friendly" },
@@ -257,7 +219,6 @@ describe("openai plugin", () => {
     expect(on).not.toHaveBeenCalledWith("before_prompt_build", expect.any(Function));
 
     const openaiProvider = requireRegisteredProvider(providers, "openai");
-    const codexProvider = requireRegisteredProvider(providers, "openai-codex");
     const contributionContext: Parameters<
       NonNullable<ProviderPlugin["resolveSystemPromptContribution"]>
     >[0] = {
@@ -289,13 +250,6 @@ describe("openai plugin", () => {
     expect(OPENAI_FRIENDLY_PROMPT_OVERLAY).toContain(
       "Occasional emoji are welcome when they fit naturally, especially for warmth or brief celebration; keep them sparse.",
     );
-    expect(codexProvider.resolveSystemPromptContribution?.(contributionContext)).toEqual({
-      stablePrefix: OPENAI_GPT5_OUTPUT_CONTRACT,
-      sectionOverrides: {
-        interaction_style: OPENAI_FRIENDLY_PROMPT_OVERLAY,
-        execution_bias: OPENAI_GPT5_EXECUTION_BIAS,
-      },
-    });
     expect(
       openaiProvider.resolveSystemPromptContribution?.({
         ...contributionContext,

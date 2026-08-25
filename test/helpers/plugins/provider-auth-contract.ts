@@ -10,31 +10,16 @@ import type {
   WizardSelectParams,
 } from "../../../src/wizard/prompts.js";
 
-type LoginOpenAICodexOAuth =
-  (typeof import("openclaw/plugin-sdk/provider-auth-login"))["loginOpenAICodexOAuth"];
-type CreateVpsAwareHandlers =
-  (typeof import("../../../src/plugins/provider-oauth-flow.js"))["createVpsAwareOAuthHandlers"];
 type EnsureAuthProfileStore =
   typeof import("openclaw/plugin-sdk/provider-auth").ensureAuthProfileStore;
 type ListProfilesForProvider =
   typeof import("openclaw/plugin-sdk/provider-auth").listProfilesForProvider;
 
-const loginOpenAICodexOAuthMock = vi.hoisted(() => vi.fn<LoginOpenAICodexOAuth>());
 const ensureAuthProfileStoreMock = vi.hoisted(() => vi.fn<EnsureAuthProfileStore>());
 const listProfilesForProviderMock = vi.hoisted(() => vi.fn<ListProfilesForProvider>());
 const providerAuthContractModules = vi.hoisted(() => ({
   openAIIndexModuleUrl: new URL("../../../extensions/openai/index.ts", import.meta.url).href,
 }));
-
-vi.mock("openclaw/plugin-sdk/provider-auth-login", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/provider-auth-login")>(
-    "openclaw/plugin-sdk/provider-auth-login",
-  );
-  return {
-    ...actual,
-    loginOpenAICodexOAuth: loginOpenAICodexOAuthMock,
-  };
-});
 
 vi.mock("openclaw/plugin-sdk/provider-auth", async () => {
   const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/provider-auth")>(
@@ -48,104 +33,57 @@ vi.mock("openclaw/plugin-sdk/provider-auth", async () => {
 });
 
 async function importBundledProviderPlugin<T>(moduleUrl: string): Promise<T> {
-  return (await import(`${moduleUrl}?t=${Date.now()}`)) as T;
+  return (await import(moduleUrl)) as T;
 }
 
-function buildPrompter(): WizardPrompter {
-  const progress: WizardProgress = {
-    update() {},
-    stop() {},
-  };
+function createDummyPrompter(): WizardPrompter {
   return {
-    intro: async () => {},
-    outro: async () => {},
-    note: async () => {},
-    select: async <T>(params: WizardSelectParams<T>) => {
-      const option = params.options[0];
-      if (!option) {
-        throw new Error("missing select option");
-      }
-      return option.value;
-    },
-    multiselect: async <T>(params: WizardMultiSelectParams<T>) => params.initialValues ?? [],
-    text: async () => "",
-    confirm: async () => false,
-    progress: () => progress,
+    intro: vi.fn(),
+    outro: vi.fn(),
+    note: vi.fn(),
+    select: vi.fn(
+      async (params: WizardSelectParams) => params.options[0]?.value,
+    ) as WizardPrompter["select"],
+    multiselect: vi.fn(async (params: WizardMultiSelectParams) =>
+      params.options.map((o) => o.value),
+    ) as WizardPrompter["multiselect"],
+    text: vi.fn(async () => "test-api-key"),
+    confirm: vi.fn(async () => true),
+    progress: vi.fn(
+      () =>
+        ({
+          start: vi.fn(),
+          stop: vi.fn(),
+        }) as unknown as WizardProgress,
+    ),
   };
 }
 
 function buildAuthContext() {
   return {
-    config: {},
-    prompter: buildPrompter(),
+    prompter: createDummyPrompter(),
     runtime: createNonExitingRuntime(),
     isRemote: false,
-    openUrl: async () => {},
-    oauth: {
-      createVpsAwareHandlers: vi.fn<CreateVpsAwareHandlers>(),
-    },
-  };
-}
-
-function createJwt(payload: Record<string, unknown>): string {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${header}.${body}.signature`;
-}
-
-function buildOpenAICodexOAuthResult(params: {
-  profileId: string;
-  access: string;
-  refresh: string;
-  expires: number;
-  email?: string;
-}) {
-  return {
-    profiles: [
-      {
-        profileId: params.profileId,
-        credential: {
-          type: "oauth" as const,
-          provider: "openai-codex",
-          access: params.access,
-          refresh: params.refresh,
-          expires: params.expires,
-          ...(params.email ? { email: params.email } : {}),
-        },
-      },
-    ],
-    configPatch: {
-      agents: {
-        defaults: {
-          models: {
-            "openai-codex/gpt-5.4": {},
-          },
-        },
-      },
-    },
-    defaultModel: "openai-codex/gpt-5.4",
-    notes: undefined,
+    options: {},
   };
 }
 
 function installSharedAuthProfileStoreHooks(state: { authStore: AuthProfileStore }) {
   beforeEach(() => {
     state.authStore = { version: 1, profiles: {} };
-    ensureAuthProfileStoreMock.mockReset();
-    ensureAuthProfileStoreMock.mockImplementation(() => state.authStore);
-    listProfilesForProviderMock.mockReset();
-    listProfilesForProviderMock.mockImplementation((store, providerId) =>
-      Object.entries(store.profiles)
-        .filter(([, credential]) => credential?.provider === providerId)
-        .map(([profileId]) => profileId),
-    );
+    clearRuntimeAuthProfileStoreSnapshots();
+    ensureAuthProfileStoreMock.mockImplementation(() => {
+      return state.authStore;
+    });
+    listProfilesForProviderMock.mockImplementation((_store, provider) => {
+      return Object.entries(state.authStore.profiles)
+        .filter(([, profile]) => profile.provider === provider)
+        .map(([id]) => id);
+    });
   });
 
   afterEach(() => {
-    loginOpenAICodexOAuthMock.mockReset();
-    ensureAuthProfileStoreMock.mockReset();
-    listProfilesForProviderMock.mockReset();
-    clearRuntimeAuthProfileStoreSnapshots();
+    vi.restoreAllMocks();
   });
 }
 
@@ -154,149 +92,18 @@ export function describeOpenAICodexProviderAuthContract() {
     authStore: { version: 1, profiles: {} } as AuthProfileStore,
   };
 
-  describe("openai-codex provider auth contract", () => {
+  describe("openai provider auth contract", () => {
     installSharedAuthProfileStoreHooks(state);
 
-    async function expectStableFallbackProfile(params: { access: string; profileId: string }) {
+    it("registers OpenAI api-key auth method", async () => {
       const { default: openAIPlugin } = await importBundledProviderPlugin<{
         default: Parameters<typeof registerProviders>[0];
       }>(providerAuthContractModules.openAIIndexModuleUrl);
-      const provider = requireProvider(await registerProviders(openAIPlugin), "openai-codex");
-      loginOpenAICodexOAuthMock.mockResolvedValueOnce({
-        refresh: "refresh-token",
-        access: params.access,
-        expires: 1_700_000_000_000,
-      });
-      const result = await provider.auth[0]?.run(buildAuthContext() as never);
-      expect(result).toEqual(
-        buildOpenAICodexOAuthResult({
-          profileId: params.profileId,
-          access: params.access,
-          refresh: "refresh-token",
-          expires: 1_700_000_000_000,
-        }),
-      );
-    }
+      const provider = requireProvider(await registerProviders(openAIPlugin), "openai");
 
-    async function getProvider() {
-      const { default: openAIPlugin } = await importBundledProviderPlugin<{
-        default: Parameters<typeof registerProviders>[0];
-      }>(providerAuthContractModules.openAIIndexModuleUrl);
-      return requireProvider(await registerProviders(openAIPlugin), "openai-codex");
-    }
-
-    it("keeps OAuth auth results provider-owned", async () => {
-      const provider = await getProvider();
-      loginOpenAICodexOAuthMock.mockResolvedValueOnce({
-        email: "user@example.com",
-        refresh: "refresh-token",
-        access: "access-token",
-        expires: 1_700_000_000_000,
-      });
-
-      const result = await provider.auth[0]?.run(buildAuthContext() as never);
-
-      expect(result).toEqual(
-        buildOpenAICodexOAuthResult({
-          profileId: "openai-codex:user@example.com",
-          access: "access-token",
-          refresh: "refresh-token",
-          expires: 1_700_000_000_000,
-          email: "user@example.com",
-        }),
-      );
-    });
-
-    it("backfills OAuth email from the JWT profile claim", async () => {
-      const provider = await getProvider();
-      const access = createJwt({
-        "https://api.openai.com/profile": {
-          email: "jwt-user@example.com",
-        },
-      });
-      loginOpenAICodexOAuthMock.mockResolvedValueOnce({
-        refresh: "refresh-token",
-        access,
-        expires: 1_700_000_000_000,
-      });
-
-      const result = await provider.auth[0]?.run(buildAuthContext() as never);
-
-      expect(result).toEqual(
-        buildOpenAICodexOAuthResult({
-          profileId: "openai-codex:jwt-user@example.com",
-          access,
-          refresh: "refresh-token",
-          expires: 1_700_000_000_000,
-          email: "jwt-user@example.com",
-        }),
-      );
-    });
-
-    it("uses a stable fallback id when JWT email is missing", async () => {
-      const access = createJwt({
-        "https://api.openai.com/auth": {
-          chatgpt_account_user_id: "user-123__acct-456",
-        },
-      });
-      const expectedStableId = Buffer.from("user-123__acct-456", "utf8").toString("base64url");
-      await expectStableFallbackProfile({
-        access,
-        profileId: `openai-codex:id-${expectedStableId}`,
-      });
-    });
-
-    it("uses iss and sub to build a stable fallback id when auth claims are missing", async () => {
-      const access = createJwt({
-        iss: "https://accounts.openai.com",
-        sub: "user-abc",
-      });
-      const expectedStableId = Buffer.from("https://accounts.openai.com|user-abc").toString(
-        "base64url",
-      );
-      await expectStableFallbackProfile({
-        access,
-        profileId: `openai-codex:id-${expectedStableId}`,
-      });
-    });
-
-    it("uses sub alone to build a stable fallback id when iss is missing", async () => {
-      const access = createJwt({
-        sub: "user-abc",
-      });
-      const expectedStableId = Buffer.from("user-abc").toString("base64url");
-      await expectStableFallbackProfile({
-        access,
-        profileId: `openai-codex:id-${expectedStableId}`,
-      });
-    });
-
-    it("falls back to the default profile when JWT parsing yields no identity", async () => {
-      const provider = await getProvider();
-      loginOpenAICodexOAuthMock.mockResolvedValueOnce({
-        refresh: "refresh-token",
-        access: "not-a-jwt-token",
-        expires: 1_700_000_000_000,
-      });
-
-      const result = await provider.auth[0]?.run(buildAuthContext() as never);
-
-      expect(result).toEqual(
-        buildOpenAICodexOAuthResult({
-          profileId: "openai-codex:default",
-          access: "not-a-jwt-token",
-          refresh: "refresh-token",
-          expires: 1_700_000_000_000,
-        }),
-      );
-    });
-
-    it("keeps OAuth failures non-fatal at the provider layer", async () => {
-      const provider = await getProvider();
-      loginOpenAICodexOAuthMock.mockRejectedValueOnce(new Error("oauth failed"));
-
-      await expect(provider.auth[0]?.run(buildAuthContext() as never)).resolves.toEqual({
-        profiles: [],
+      expect(provider.auth[0]).toMatchObject({
+        id: "api-key",
+        kind: "api_key",
       });
     });
   });

@@ -111,6 +111,7 @@
   "global-singleton",
   "directory-runtime",
   "media-generation-runtime-shared",
+  "media-understanding",
   "music-generation",
   "music-generation-core",
   "irc",

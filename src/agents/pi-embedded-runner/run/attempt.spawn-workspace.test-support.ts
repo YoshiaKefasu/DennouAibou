@@ -46,7 +46,6 @@ type AttemptSpawnWorkspaceHoisted = {
   acquireSessionWriteLockMock: Mock<AcquireSessionWriteLockFn>;
   installToolResultContextGuardMock: UnknownMock;
   flushPendingToolResultsAfterIdleMock: AsyncUnknownMock;
-  releaseWsSessionMock: UnknownMock;
   resolveBootstrapContextForRunMock: Mock<() => Promise<BootstrapContext>>;
   getGlobalHookRunnerMock: Mock<() => unknown>;
   initializeGlobalHookRunnerMock: UnknownMock;
@@ -61,7 +60,6 @@ const hoisted = vi.hoisted((): AttemptSpawnWorkspaceHoisted => {
   const resolveSandboxContextMock = vi.fn();
   const installToolResultContextGuardMock = vi.fn(() => () => {});
   const flushPendingToolResultsAfterIdleMock = vi.fn(async () => {});
-  const releaseWsSessionMock = vi.fn(() => {});
   const subscribeEmbeddedPiSessionMock = vi.fn<SubscribeEmbeddedPiSessionFn>(
     (_params) =>
       ({
@@ -111,7 +109,6 @@ const hoisted = vi.hoisted((): AttemptSpawnWorkspaceHoisted => {
     acquireSessionWriteLockMock,
     installToolResultContextGuardMock,
     flushPendingToolResultsAfterIdleMock,
-    releaseWsSessionMock,
     resolveBootstrapContextForRunMock,
     getGlobalHookRunnerMock,
     initializeGlobalHookRunnerMock,
@@ -296,16 +293,6 @@ vi.mock("../extra-params.js", async () => {
   };
 });
 
-vi.mock("../../openai-ws-stream.js", () => ({
-  createOpenAIWebSocketStreamFn: vi.fn(),
-  releaseWsSession: (...args: unknown[]) =>
-    (hoisted.releaseWsSessionMock as (...args: unknown[]) => unknown)(...args),
-}));
-
-vi.mock("../../anthropic-payload-log.js", () => ({
-  createAnthropicPayloadLogger: () => undefined,
-}));
-
 vi.mock("../../cache-trace.js", () => ({
   createCacheTrace: () => undefined,
 }));
@@ -352,10 +339,6 @@ vi.mock("../../../image-generation/runtime.js", () => ({
 vi.mock("../../model-selection.js", () => ({
   normalizeProviderId: (providerId?: string) => providerId?.trim().toLowerCase() ?? "",
   resolveDefaultModelForAgent: () => ({ provider: "openai", model: "gpt-test" }),
-}));
-
-vi.mock("../../anthropic-vertex-stream.js", () => ({
-  createAnthropicVertexStreamFnForModel: vi.fn(),
 }));
 
 vi.mock("../../custom-api-registry.js", () => ({
@@ -623,7 +606,6 @@ export function resetEmbeddedAttemptHarness(
   });
   hoisted.installToolResultContextGuardMock.mockReset().mockReturnValue(() => {});
   hoisted.flushPendingToolResultsAfterIdleMock.mockReset().mockResolvedValue(undefined);
-  hoisted.releaseWsSessionMock.mockReset().mockReturnValue(undefined);
   hoisted.resolveBootstrapContextForRunMock.mockReset().mockResolvedValue({
     bootstrapFiles: [],
     contextFiles: [],

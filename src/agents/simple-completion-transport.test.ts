@@ -2,15 +2,10 @@ import type { Model } from "@earendil-works/pi-ai";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 
-const createAnthropicVertexStreamFnForModel = vi.fn();
 const ensureCustomApiRegistered = vi.fn();
 const resolveProviderStreamFn = vi.fn();
 const buildTransportAwareSimpleStreamFn = vi.fn();
 const prepareTransportAwareSimpleModel = vi.fn();
-
-vi.mock("./anthropic-vertex-stream.js", () => ({
-  createAnthropicVertexStreamFnForModel,
-}));
 
 vi.mock("./custom-api-registry.js", () => ({
   ensureCustomApiRegistered,
@@ -33,12 +28,10 @@ describe("prepareModelForSimpleCompletion", () => {
   });
 
   beforeEach(() => {
-    createAnthropicVertexStreamFnForModel.mockReset();
     ensureCustomApiRegistered.mockReset();
     resolveProviderStreamFn.mockReset();
     buildTransportAwareSimpleStreamFn.mockReset();
     prepareTransportAwareSimpleModel.mockReset();
-    createAnthropicVertexStreamFnForModel.mockReturnValue("vertex-stream");
     resolveProviderStreamFn.mockReturnValue("ollama-stream");
     buildTransportAwareSimpleStreamFn.mockReturnValue(undefined);
     prepareTransportAwareSimpleModel.mockImplementation((model) => model);
@@ -89,40 +82,11 @@ describe("prepareModelForSimpleCompletion", () => {
     expect(result).toBe(model);
   });
 
-  it("uses a custom api alias for Anthropic Vertex simple completions", () => {
-    const model: Model<"anthropic-messages"> = {
-      id: "claude-sonnet",
-      name: "Claude Sonnet",
-      api: "anthropic-messages",
-      provider: "anthropic-vertex",
-      baseUrl: "https://us-central1-aiplatform.googleapis.com",
-      reasoning: true,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 200000,
-      maxTokens: 8192,
-    };
-
-    resolveProviderStreamFn.mockReturnValueOnce(undefined);
-
-    const result = prepareModelForSimpleCompletion({ model });
-
-    expect(createAnthropicVertexStreamFnForModel).toHaveBeenCalledWith(model);
-    expect(ensureCustomApiRegistered).toHaveBeenCalledWith(
-      "openclaw-anthropic-vertex-simple:https%3A%2F%2Fus-central1-aiplatform.googleapis.com",
-      "vertex-stream",
-    );
-    expect(result).toEqual({
-      ...model,
-      api: "openclaw-anthropic-vertex-simple:https%3A%2F%2Fus-central1-aiplatform.googleapis.com",
-    });
-  });
-
-  it("uses a transport-aware custom api alias when llm request transport overrides are present", () => {
-    const model: Model<"openai-responses"> = {
-      id: "gpt-5",
-      name: "GPT-5",
-      api: "openai-responses",
+  it("prepares transport-aware simple models and registers their stream function", () => {
+    const originalModel: Model<"openai-completions"> = {
+      id: "gpt-5.4",
+      name: "GPT-5.4",
+      api: "openai-completions",
       provider: "openai",
       baseUrl: "https://api.openai.com/v1",
       reasoning: true,
@@ -131,25 +95,23 @@ describe("prepareModelForSimpleCompletion", () => {
       contextWindow: 200000,
       maxTokens: 8192,
     };
+    const transportModel: Model<"openai-completions"> = {
+      ...originalModel,
+      api: "openclaw-openai-completions-transport" as never,
+    };
 
     resolveProviderStreamFn.mockReturnValueOnce(undefined);
-    buildTransportAwareSimpleStreamFn.mockReturnValueOnce("transport-stream");
-    prepareTransportAwareSimpleModel.mockReturnValueOnce({
-      ...model,
-      api: "openclaw-openai-responses-transport",
-    });
+    prepareTransportAwareSimpleModel.mockReturnValueOnce(transportModel);
+    buildTransportAwareSimpleStreamFn.mockReturnValueOnce("openai-stream");
 
-    const result = prepareModelForSimpleCompletion({ model });
+    const result = prepareModelForSimpleCompletion({ model: originalModel });
 
-    expect(prepareTransportAwareSimpleModel).toHaveBeenCalledWith(model);
-    expect(buildTransportAwareSimpleStreamFn).toHaveBeenCalledWith(model);
+    expect(prepareTransportAwareSimpleModel).toHaveBeenCalledWith(originalModel);
+    expect(buildTransportAwareSimpleStreamFn).toHaveBeenCalledWith(originalModel);
     expect(ensureCustomApiRegistered).toHaveBeenCalledWith(
-      "openclaw-openai-responses-transport",
-      "transport-stream",
+      "openclaw-openai-completions-transport",
+      "openai-stream",
     );
-    expect(result).toEqual({
-      ...model,
-      api: "openclaw-openai-responses-transport",
-    });
+    expect(result).toBe(transportModel);
   });
 });

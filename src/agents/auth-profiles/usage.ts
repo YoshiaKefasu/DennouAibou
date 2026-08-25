@@ -76,13 +76,10 @@ function isAuthCooldownBypassedForProvider(provider: string | undefined): boolea
 }
 
 function shouldProbeWhamForFailure(
-  provider: string | undefined,
-  reason: AuthProfileFailureReason,
+  _provider: string | undefined,
+  _reason: AuthProfileFailureReason,
 ): boolean {
-  return (
-    normalizeProviderId(provider ?? "") === "openai-codex" &&
-    (reason === "rate_limit" || reason === "unknown")
-  );
+  return false;
 }
 
 function resolveWhamResetMs(window: WhamUsageWindow | undefined, now: number): number | null {
