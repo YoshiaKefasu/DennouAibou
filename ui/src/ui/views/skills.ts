@@ -1,11 +1,7 @@
 import { html, nothing } from "lit";
 import { ref } from "lit/directives/ref.js";
 import { t } from "../../i18n/index.ts";
-import type {
-  ClawHubSearchResult,
-  ClawHubSkillDetail,
-  SkillMessageMap,
-} from "../controllers/skills.ts";
+import type { SkillMessageMap } from "../controllers/skills.ts";
 import { clampText } from "../format.ts";
 import { resolveSafeExternalUrl } from "../open-external-url.ts";
 import type { SkillStatusEntry, SkillStatusReport } from "../types.ts";
@@ -36,16 +32,6 @@ export type SkillsProps = {
   busyKey: string | null;
   messages: SkillMessageMap;
   detailKey: string | null;
-  clawhubQuery: string;
-  clawhubResults: ClawHubSearchResult[] | null;
-  clawhubSearchLoading: boolean;
-  clawhubSearchError: string | null;
-  clawhubDetail: ClawHubSkillDetail | null;
-  clawhubDetailSlug: string | null;
-  clawhubDetailLoading: boolean;
-  clawhubDetailError: string | null;
-  clawhubInstallSlug: string | null;
-  clawhubInstallMessage: { kind: "success" | "error"; text: string } | null;
   onFilterChange: (next: string) => void;
   onStatusFilterChange: (next: SkillsStatusFilter) => void;
   onRefresh: () => void;
@@ -55,10 +41,6 @@ export type SkillsProps = {
   onInstall: (skillKey: string, name: string, installId: string) => void;
   onDetailOpen: (skillKey: string) => void;
   onDetailClose: () => void;
-  onClawHubQueryChange: (query: string) => void;
-  onClawHubDetailOpen: (slug: string) => void;
-  onClawHubDetailClose: () => void;
-  onClawHubInstall: (slug: string) => void;
 };
 
 type StatusTabDef = { id: SkillsStatusFilter; label: string };
@@ -109,54 +91,63 @@ export function renderSkills(props: SkillsProps) {
     }
   }
 
-  const afterStatus =
-    props.statusFilter === "all"
-      ? skills
-      : skills.filter((s) => skillMatchesStatus(s, props.statusFilter));
+  const searchFilter = props.filter.trim().toLowerCase();
+  const filtered = skills.filter((s) => {
+    if (!skillMatchesStatus(s, props.statusFilter)) {
+      return false;
+    }
+    if (!searchFilter) {
+      return true;
+    }
+    return (
+      s.name.toLowerCase().includes(searchFilter) ||
+      s.description.toLowerCase().includes(searchFilter) ||
+      s.skillKey.toLowerCase().includes(searchFilter)
+    );
+  });
 
-  const filter = props.filter.trim().toLowerCase();
-  const filtered = filter
-    ? afterStatus.filter((skill) =>
-        [skill.name, skill.description, skill.source].join(" ").toLowerCase().includes(filter),
-      )
-    : afterStatus;
   const groups = groupSkills(filtered);
-
   const detailSkill = props.detailKey
     ? (skills.find((s) => s.skillKey === props.detailKey) ?? null)
     : null;
 
   return html`
     <section class="card">
-      <div class="row" style="justify-content: space-between;">
+      <div class="section-header">
         <div>
-          <div class="card-title">Skills</div>
-          <div class="card-sub">Installed skills and their status.</div>
+          <div class="section-title">${t("skills.title")}</div>
+          <div class="section-sub">${t("skills.subtitle")}</div>
         </div>
-        <button
-          class="btn"
-          ?disabled=${props.loading || !props.connected}
-          @click=${props.onRefresh}
-        >
-          ${props.loading ? t("common.loading") : t("common.refresh")}
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button
+            class="btn btn--sm"
+            ?disabled=${props.loading || !props.connected}
+            @click=${props.onRefresh}
+          >
+            ${props.loading ? t("common.loading") : t("common.refresh")}
+          </button>
+        </div>
       </div>
 
-      <div class="agent-tabs" style="margin-top: 14px;">
+      <!-- Status Filter Tabs -->
+      <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap;">
         ${STATUS_TABS.map(
           (tab) => html`
             <button
-              class="agent-tab ${props.statusFilter === tab.id ? "active" : ""}"
+              class="btn btn--sm ${props.statusFilter === tab.id ? "primary" : ""}"
               @click=${() => props.onStatusFilterChange(tab.id)}
             >
-              ${tab.label}<span class="agent-tab-count">${statusCounts[tab.id]}</span>
+              ${tab.label}
+              <span class="muted" style="margin-left: 4px; font-size: 11px;">
+                ${statusCounts[tab.id]}
+              </span>
             </button>
           `,
         )}
       </div>
 
+      <!-- Search Filter -->
       <div
-        class="filters"
         style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px;"
       >
         <label class="field" style="flex: 1; min-width: 180px;">
@@ -169,42 +160,6 @@ export function renderSkills(props: SkillsProps) {
           />
         </label>
         <div class="muted">${filtered.length} shown</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-          <div style="font-weight: 600;">ClawHub</div>
-          <div class="muted" style="font-size: 13px;">
-            Search and install skills from the registry
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <label class="field" style="flex: 1; min-width: 180px;">
-            <input
-              .value=${props.clawhubQuery}
-              @input=${(e: Event) =>
-                props.onClawHubQueryChange((e.target as HTMLInputElement).value)}
-              placeholder="Search ClawHub skills…"
-              autocomplete="off"
-              name="clawhub-search"
-            />
-          </label>
-          ${props.clawhubSearchLoading ? html`<span class="muted">Searching…</span>` : nothing}
-        </div>
-        ${props.clawhubSearchError
-          ? html`<div class="callout danger" style="margin-top: 8px;">
-              ${props.clawhubSearchError}
-            </div>`
-          : nothing}
-        ${props.clawhubInstallMessage
-          ? html`<div
-              class="callout ${props.clawhubInstallMessage.kind === "error" ? "danger" : "success"}"
-              style="margin-top: 8px;"
-            >
-              ${props.clawhubInstallMessage.text}
-            </div>`
-          : nothing}
-        ${renderClawHubResults(props)}
       </div>
 
       ${props.error
@@ -238,140 +193,6 @@ export function renderSkills(props: SkillsProps) {
     </section>
 
     ${detailSkill ? renderSkillDetail(detailSkill, props) : nothing}
-    ${props.clawhubDetailSlug ? renderClawHubDetailDialog(props) : nothing}
-  `;
-}
-
-function renderClawHubResults(props: SkillsProps) {
-  const results = props.clawhubResults;
-  if (!results) {
-    return nothing;
-  }
-  if (results.length === 0) {
-    return html`<div class="muted" style="margin-top: 8px;">No skills found on ClawHub.</div>`;
-  }
-  return html`
-    <div class="list" style="margin-top: 8px;">
-      ${results.map(
-        (r) => html`
-          <div
-            class="list-item list-item-clickable"
-            @click=${() => props.onClawHubDetailOpen(r.slug)}
-          >
-            <div class="list-main">
-              <div class="list-title">${r.displayName}</div>
-              <div class="list-sub">${r.summary ? clampText(r.summary, 120) : r.slug}</div>
-            </div>
-            <div class="list-meta" style="display: flex; align-items: center; gap: 8px;">
-              ${r.version
-                ? html`<span class="muted" style="font-size: 12px;">v${r.version}</span>`
-                : nothing}
-              <button
-                class="btn btn--sm"
-                ?disabled=${props.clawhubInstallSlug !== null}
-                @click=${(e: Event) => {
-                  e.stopPropagation();
-                  props.onClawHubInstall(r.slug);
-                }}
-              >
-                ${props.clawhubInstallSlug === r.slug ? "Installing\u2026" : "Install"}
-              </button>
-            </div>
-          </div>
-        `,
-      )}
-    </div>
-  `;
-}
-
-function renderClawHubDetailDialog(props: SkillsProps) {
-  const detail = props.clawhubDetail;
-  const ensureModalOpen = (el?: Element) => {
-    if (!(el instanceof HTMLDialogElement) || el.open) {
-      return;
-    }
-    el.showModal();
-  };
-
-  return html`
-    <dialog
-      class="md-preview-dialog"
-      ${ref(ensureModalOpen)}
-      @click=${(e: Event) => {
-        const dialog = e.currentTarget as HTMLDialogElement;
-        if (e.target === dialog) {
-          dialog.close();
-        }
-      }}
-      @close=${props.onClawHubDetailClose}
-    >
-      <div class="md-preview-dialog__panel">
-        <div class="md-preview-dialog__header">
-          <div class="md-preview-dialog__title">
-            ${detail?.skill?.displayName ?? props.clawhubDetailSlug}
-          </div>
-          <button
-            class="btn btn--sm"
-            @click=${(e: Event) => {
-              (e.currentTarget as HTMLElement).closest("dialog")?.close();
-            }}
-          >
-            Close
-          </button>
-        </div>
-        <div class="md-preview-dialog__body" style="display: grid; gap: 16px;">
-          ${props.clawhubDetailLoading
-            ? html`<div class="muted">${t("common.loading")}</div>`
-            : props.clawhubDetailError
-              ? html`<div class="callout danger">${props.clawhubDetailError}</div>`
-              : detail?.skill
-                ? html`
-                    <div style="font-size: 14px; line-height: 1.5;">
-                      ${detail.skill.summary ?? ""}
-                    </div>
-                    ${detail.owner?.displayName
-                      ? html`<div class="muted" style="font-size: 13px;">
-                          By
-                          ${detail.owner.displayName}${detail.owner.handle
-                            ? html` (@${detail.owner.handle})`
-                            : nothing}
-                        </div>`
-                      : nothing}
-                    ${detail.latestVersion
-                      ? html`<div class="muted" style="font-size: 13px;">
-                          Latest: v${detail.latestVersion.version}
-                        </div>`
-                      : nothing}
-                    ${detail.latestVersion?.changelog
-                      ? html`<div
-                          style="font-size: 13px; border-top: 1px solid var(--border); padding-top: 12px; white-space: pre-wrap;"
-                        >
-                          ${detail.latestVersion.changelog}
-                        </div>`
-                      : nothing}
-                    ${detail.metadata?.os
-                      ? html`<div class="muted" style="font-size: 12px;">
-                          Platforms: ${detail.metadata.os.join(", ")}
-                        </div>`
-                      : nothing}
-                    <button
-                      class="btn primary"
-                      ?disabled=${props.clawhubInstallSlug !== null}
-                      @click=${() => {
-                        if (props.clawhubDetailSlug) {
-                          props.onClawHubInstall(props.clawhubDetailSlug);
-                        }
-                      }}
-                    >
-                      ${props.clawhubInstallSlug === props.clawhubDetailSlug
-                        ? "Installing\u2026"
-                        : `Install ${detail.skill.displayName}`}
-                    </button>
-                  `
-                : html`<div class="muted">Skill not found.</div>`}
-        </div>
-      </div>
-    </dialog>
   `;
 }
 
@@ -399,25 +220,25 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
             class="skill-toggle"
             .checked=${!skill.disabled}
             ?disabled=${busy}
-            @change=${(e: Event) => {
-              e.stopPropagation();
-              props.onToggle(skill.skillKey, skill.disabled);
-            }}
+            @change=${(e: Event) =>
+              props.onToggle(skill.skillKey, (e.target as HTMLInputElement).checked)}
           />
+          <span>${skill.disabled ? "Disabled" : "Enabled"}</span>
         </label>
+        <span class="btn btn--sm">${t("common.manage")}</span>
       </div>
     </div>
   `;
 }
 
 function renderSkillDetail(skill: SkillStatusEntry, props: SkillsProps) {
+  const editValue = props.edits[skill.skillKey] ?? "";
   const busy = props.busyKey === skill.skillKey;
-  const apiKey = props.edits[skill.skillKey] ?? "";
-  const message = props.messages[skill.skillKey] ?? null;
-  const canInstall = skill.install.length > 0 && skill.missing.bins.length > 0;
-  const showBundledBadge = Boolean(skill.bundled && skill.source !== "openclaw-bundled");
+  const msg = props.messages[skill.skillKey];
   const missing = computeSkillMissing(skill);
   const reasons = computeSkillReasons(skill);
+  const homepage = safeExternalHref(skill.homepage);
+
   const ensureModalOpen = (el?: Element) => {
     if (!(el instanceof HTMLDialogElement) || el.open) {
       return;
@@ -439,13 +260,8 @@ function renderSkillDetail(skill: SkillStatusEntry, props: SkillsProps) {
     >
       <div class="md-preview-dialog__panel">
         <div class="md-preview-dialog__header">
-          <div
-            class="md-preview-dialog__title"
-            style="display: flex; align-items: center; gap: 8px;"
-          >
-            <span class="statusDot ${skillStatusClass(skill)}"></span>
-            ${skill.emoji ? html`<span style="font-size: 18px;">${skill.emoji}</span>` : nothing}
-            <span>${skill.name}</span>
+          <div class="md-preview-dialog__title">
+            ${skill.emoji ? `${skill.emoji} ` : ""}${skill.name}
           </div>
           <button
             class="btn btn--sm"
@@ -453,118 +269,107 @@ function renderSkillDetail(skill: SkillStatusEntry, props: SkillsProps) {
               (e.currentTarget as HTMLElement).closest("dialog")?.close();
             }}
           >
-            Close
+            ${t("common.close")}
           </button>
         </div>
-        <div class="md-preview-dialog__body" style="display: grid; gap: 16px;">
+        <div class="md-preview-dialog__body" style="display: grid; gap: 14px;">
           <div>
-            <div style="font-size: 14px; line-height: 1.5; color: var(--text);">
-              ${skill.description}
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              ${renderSkillStatusChips({ skill })}
             </div>
-            ${renderSkillStatusChips({ skill, showBundledBadge })}
+            <div class="muted" style="margin-top: 6px; font-size: 13px;">${skill.description}</div>
+          </div>
+
+          <div class="list-sub" style="display: grid; gap: 4px;">
+            <div><strong>Source:</strong> ${skill.source}</div>
+            <div><strong>Path:</strong> <code>${skill.filePath}</code></div>
+            ${skill.primaryEnv
+              ? html`<div><strong>Primary env:</strong> <code>${skill.primaryEnv}</code></div>`
+              : nothing}
+            ${homepage
+              ? html`
+                  <div>
+                    <strong>Homepage:</strong>
+                    <a href=${homepage} target="_blank" rel="noreferrer noopener">
+                      ${skill.homepage}
+                    </a>
+                  </div>
+                `
+              : nothing}
           </div>
 
           ${missing.length > 0
             ? html`
-                <div
-                  class="callout"
-                  style="border-color: var(--warn-subtle); background: var(--warn-subtle); color: var(--warn);"
-                >
-                  <div style="font-weight: 600; margin-bottom: 4px;">Missing requirements</div>
-                  <div>${missing.join(", ")}</div>
+                <div class="callout warn">
+                  <strong>Missing requirements:</strong>
+                  <div style="margin-top: 4px;">${missing.join(", ")}</div>
                 </div>
               `
             : nothing}
           ${reasons.length > 0
             ? html`
-                <div class="muted" style="font-size: 13px;">Reason: ${reasons.join(", ")}</div>
-              `
-            : nothing}
-
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <label class="skill-toggle-wrap">
-              <input
-                type="checkbox"
-                class="skill-toggle"
-                .checked=${!skill.disabled}
-                ?disabled=${busy}
-                @change=${() => props.onToggle(skill.skillKey, skill.disabled)}
-              />
-            </label>
-            <span style="font-size: 13px; font-weight: 500;">
-              ${skill.disabled ? "Disabled" : "Enabled"}
-            </span>
-            ${canInstall
-              ? html`<button
-                  class="btn"
-                  ?disabled=${busy}
-                  @click=${() => props.onInstall(skill.skillKey, skill.name, skill.install[0].id)}
-                >
-                  ${busy ? "Installing\u2026" : skill.install[0].label}
-                </button>`
-              : nothing}
-          </div>
-
-          ${message
-            ? html`<div class="callout ${message.kind === "error" ? "danger" : "success"}">
-                ${message.message}
-              </div>`
-            : nothing}
-          ${skill.primaryEnv
-            ? html`
-                <div style="display: grid; gap: 8px;">
-                  <div class="field">
-                    <span
-                      >API key
-                      <span class="muted" style="font-weight: normal; font-size: 0.88em;"
-                        >(${skill.primaryEnv})</span
-                      ></span
-                    >
-                    <input
-                      type="password"
-                      .value=${apiKey}
-                      @input=${(e: Event) =>
-                        props.onEdit(skill.skillKey, (e.target as HTMLInputElement).value)}
-                    />
-                  </div>
-                  ${(() => {
-                    const href = safeExternalHref(skill.homepage);
-                    return href
-                      ? html`<div class="muted" style="font-size: 13px;">
-                          Get your key:
-                          <a href="${href}" target="_blank" rel="noopener noreferrer"
-                            >${skill.homepage}</a
-                          >
-                        </div>`
-                      : nothing;
-                  })()}
-                  <button
-                    class="btn primary"
-                    ?disabled=${busy}
-                    @click=${() => props.onSaveKey(skill.skillKey)}
-                  >
-                    Save key
-                  </button>
+                <div class="callout muted">
+                  <strong>Status details:</strong>
+                  <div style="margin-top: 4px;">${reasons.join(", ")}</div>
                 </div>
               `
             : nothing}
-
-          <div
-            style="border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 6px; font-size: 12px; color: var(--muted);"
-          >
-            <div><span style="font-weight: 600;">Source:</span> ${skill.source}</div>
-            <div style="font-family: var(--mono); word-break: break-all;">${skill.filePath}</div>
-            ${(() => {
-              const safeHref = safeExternalHref(skill.homepage);
-              return safeHref
-                ? html`<div>
-                    <a href="${safeHref}" target="_blank" rel="noopener noreferrer"
-                      >${skill.homepage}</a
+          ${skill.primaryEnv
+            ? html`
+                <div class="card" style="padding: 12px; margin: 0;">
+                  <div class="list-title" style="font-size: 13px;">
+                    API Key (${skill.primaryEnv})
+                  </div>
+                  <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <input
+                      type="password"
+                      class="field"
+                      style="flex: 1;"
+                      placeholder="Enter API key"
+                      .value=${editValue}
+                      @input=${(e: Event) =>
+                        props.onEdit(skill.skillKey, (e.target as HTMLInputElement).value)}
+                    />
+                    <button
+                      class="btn btn--sm primary"
+                      ?disabled=${busy || !editValue.trim()}
+                      @click=${() => props.onSaveKey(skill.skillKey)}
                     >
-                  </div>`
-                : nothing;
-            })()}
-          </div>
+                      ${busy ? t("common.saving") : t("common.save")}
+                    </button>
+                  </div>
+                </div>
+              `
+            : nothing}
+          ${skill.install && skill.install.length > 0
+            ? html`
+                <div>
+                  <div class="list-title" style="font-size: 13px; margin-bottom: 6px;">
+                    Install Options
+                  </div>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    ${skill.install.map(
+                      (opt) => html`
+                        <button
+                          class="btn btn--sm"
+                          ?disabled=${busy}
+                          @click=${() => props.onInstall(skill.skillKey, skill.name, opt.id)}
+                        >
+                          ${opt.label || opt.id}
+                        </button>
+                      `,
+                    )}
+                  </div>
+                </div>
+              `
+            : nothing}
+          ${msg
+            ? html`
+                <div class="callout ${msg.kind === "error" ? "danger" : "success"}">
+                  ${msg.message}
+                </div>
+              `
+            : nothing}
         </div>
       </div>
     </dialog>

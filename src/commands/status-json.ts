@@ -78,15 +78,12 @@ export async function statusJsonCommand(
   ]);
   const channelInfo = resolveUpdateChannelDisplay({
     configChannel: normalizeUpdateChannel(scan.cfg.update?.channel),
-    installKind: scan.update.installKind,
-    gitTag: scan.update.git?.tag ?? null,
-    gitBranch: scan.update.git?.branch ?? null,
+    installKind: "unknown",
   });
 
   writeRuntimeJson(runtime, {
     ...scan.summary,
     os: scan.osSummary,
-    update: scan.update,
     updateChannel: channelInfo.channel,
     updateChannelSource: channelInfo.source,
     memory: scan.memory,

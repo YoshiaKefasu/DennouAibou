@@ -4,7 +4,6 @@ import {
   applyConfig,
   ensureAgentConfigEntry,
   findAgentConfigEntryIndex,
-  runUpdate,
   saveConfig,
   updateConfigFormValue,
   type ConfigState,
@@ -35,7 +34,6 @@ function createState(): ConfigState {
     configValid: null,
     connected: false,
     lastError: null,
-    updateRunning: false,
   };
 }
 
@@ -370,36 +368,5 @@ describe("saveConfig", () => {
     };
     expect(parsed.gateway.port).toBe("18789");
     expect(params.baseHash).toBe("hash-save-2");
-  });
-});
-
-describe("runUpdate", () => {
-  it("sends update.run with session key", async () => {
-    const request = vi.fn().mockResolvedValue({});
-    const state = createState();
-    state.connected = true;
-    state.client = { request } as unknown as ConfigState["client"];
-    state.applySessionKey = "agent:main:whatsapp:dm:+15555550123";
-
-    await runUpdate(state);
-
-    expect(request).toHaveBeenCalledWith("update.run", {
-      sessionKey: "agent:main:whatsapp:dm:+15555550123",
-    });
-  });
-
-  it("surfaces update errors returned in response payload", async () => {
-    const request = vi.fn().mockResolvedValue({
-      ok: false,
-      result: { status: "error", reason: "network unavailable" },
-    });
-    const state = createState();
-    state.connected = true;
-    state.client = { request } as unknown as ConfigState["client"];
-    state.applySessionKey = "main";
-
-    await runUpdate(state);
-
-    expect(state.lastError).toBe("Update error: network unavailable");
   });
 });

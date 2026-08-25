@@ -31,11 +31,7 @@ import {
   ModelsListResultSchema,
   SkillsBinsParamsSchema,
   SkillsBinsResultSchema,
-  SkillsDetailParamsSchema,
-  SkillsDetailResultSchema,
   SkillsInstallParamsSchema,
-  SkillsSearchParamsSchema,
-  SkillsSearchResultSchema,
   SkillsStatusParamsSchema,
   SkillsUpdateParamsSchema,
   ToolCatalogEntrySchema,
@@ -67,7 +63,6 @@ import {
   ConfigSchemaParamsSchema,
   ConfigSchemaResponseSchema,
   ConfigSetParamsSchema,
-  UpdateRunParamsSchema,
 } from "./config.js";
 import {
   CronAddParamsSchema,
@@ -287,10 +282,6 @@ export const ProtocolSchemas = {
   ToolsEffectiveResult: ToolsEffectiveResultSchema,
   SkillsBinsParams: SkillsBinsParamsSchema,
   SkillsBinsResult: SkillsBinsResultSchema,
-  SkillsSearchParams: SkillsSearchParamsSchema,
-  SkillsSearchResult: SkillsSearchResultSchema,
-  SkillsDetailParams: SkillsDetailParamsSchema,
-  SkillsDetailResult: SkillsDetailResultSchema,
   SkillsInstallParams: SkillsInstallParamsSchema,
   SkillsUpdateParams: SkillsUpdateParamsSchema,
   CronJob: CronJobSchema,
@@ -327,7 +318,6 @@ export const ProtocolSchemas = {
   ChatAbortParams: ChatAbortParamsSchema,
   ChatInjectParams: ChatInjectParamsSchema,
   ChatEvent: ChatEventSchema,
-  UpdateRunParams: UpdateRunParamsSchema,
   TickEvent: TickEventSchema,
   ShutdownEvent: ShutdownEventSchema,
 } satisfies Record<string, TSchema>;

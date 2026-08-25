@@ -380,6 +380,7 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    // @deprecated Update check is retired in Phase F Slim Kernel (Wave 2). Kept for config backwards compatibility.
     update: z
       .object({
         channel: z.union([z.literal("stable"), z.literal("beta"), z.literal("dev")]).optional(),

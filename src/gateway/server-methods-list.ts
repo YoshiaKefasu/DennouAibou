@@ -1,5 +1,4 @@
 import { listChannelPlugins } from "../channels/plugins/index.js";
-import { GATEWAY_EVENT_UPDATE_AVAILABLE } from "./events.js";
 
 const BASE_METHODS = [
   "health",
@@ -45,12 +44,9 @@ const BASE_METHODS = [
   "agents.files.get",
   "agents.files.set",
   "skills.status",
-  "skills.search",
-  "skills.detail",
   "skills.bins",
   "skills.install",
   "skills.update",
-  "update.run",
   "voicewake.get",
   "voicewake.set",
   "secrets.reload",
@@ -142,5 +138,4 @@ export const GATEWAY_EVENTS = [
   "exec.approval.resolved",
   "plugin.approval.requested",
   "plugin.approval.resolved",
-  GATEWAY_EVENT_UPDATE_AVAILABLE,
 ];

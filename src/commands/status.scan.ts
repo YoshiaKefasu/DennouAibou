@@ -9,7 +9,6 @@ import { readBestEffortConfig } from "../config/config.js";
 import { resolveConfigPath } from "../config/paths.js";
 import type { collectChannelStatusIssues as collectChannelStatusIssuesFn } from "../infra/channels-status-issues.js";
 import { resolveOsSummary } from "../infra/os-summary.js";
-import type { UpdateCheckResult } from "../infra/update-check.js";
 import {
   buildPluginCompatibilityNotices,
   type PluginCompatibilityNotice,
@@ -21,7 +20,7 @@ import { createEmptyTaskAuditSummary } from "../tasks/task-registry.audit.shared
 import { createEmptyTaskRegistrySummary } from "../tasks/task-registry.summary.js";
 import type { buildChannelsTable as buildChannelsTableFn } from "./status-all/channels.js";
 import type { getAgentLocalStatuses as getAgentLocalStatusesFn } from "./status.agent-local.js";
-import { buildColdStartUpdateResult, scanStatusJsonCore } from "./status.scan.json-core.js";
+import { scanStatusJsonCore } from "./status.scan.json-core.js";
 import {
   buildTailscaleHttpsUrl,
   pickGatewaySelfPresence,
@@ -41,7 +40,6 @@ let statusScanDepsRuntimeModulePromise:
   | undefined;
 let statusAgentLocalModulePromise: Promise<typeof import("./status.agent-local.js")> | undefined;
 let statusSummaryModulePromise: Promise<typeof import("./status.summary.js")> | undefined;
-let statusUpdateModulePromise: Promise<typeof import("./status.update.js")> | undefined;
 let gatewayCallModulePromise: Promise<typeof import("../gateway/call.js")> | undefined;
 
 const loadStatusScanRuntimeModule = createLazyRuntimeSurface(
@@ -62,11 +60,6 @@ function loadStatusAgentLocalModule() {
 function loadStatusSummaryModule() {
   statusSummaryModulePromise ??= import("./status.summary.js");
   return statusSummaryModulePromise;
-}
-
-function loadStatusUpdateModule() {
-  statusUpdateModulePromise ??= import("./status.update.js");
-  return statusUpdateModulePromise;
 }
 
 function loadGatewayCallModule() {
@@ -120,7 +113,6 @@ export type StatusScanResult = {
   tailscaleMode: string;
   tailscaleDns: string | null;
   tailscaleHttpsUrl: string | null;
-  update: UpdateCheckResult;
   gatewayConnection: GatewayProbeSnapshot["gatewayConnection"];
   remoteUrlMissing: boolean;
   gatewayMode: "local" | "remote";
@@ -260,18 +252,6 @@ export async function scanStatus(
                 ),
               )
               .catch(() => null);
-      const updateTimeoutMs = opts.all ? 6500 : 2500;
-      const updatePromise = deferResult(
-        skipColdStartNetworkChecks
-          ? Promise.resolve(buildColdStartUpdateResult())
-          : loadStatusUpdateModule().then(({ getUpdateCheckResult }) =>
-              getUpdateCheckResult({
-                timeoutMs: updateTimeoutMs,
-                fetchGit: true,
-                includeRegistry: true,
-              }),
-            ),
-      );
       const agentStatusPromise = deferResult(
         skipColdStartNetworkChecks
           ? Promise.resolve(buildColdStartAgentLocalStatuses())
@@ -295,10 +275,6 @@ export async function scanStatus(
         tailscaleDns,
         controlUiBasePath: cfg.gateway?.controlUi?.basePath,
       });
-      progress.tick();
-
-      progress.setLabel("Checking for updates…");
-      const update = unwrapDeferredResult(await updatePromise);
       progress.tick();
 
       progress.setLabel("Resolving agents…");
@@ -366,7 +342,6 @@ export async function scanStatus(
         tailscaleMode,
         tailscaleDns,
         tailscaleHttpsUrl,
-        update,
         gatewayConnection,
         remoteUrlMissing,
         gatewayMode,

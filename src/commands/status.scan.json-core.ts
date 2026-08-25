@@ -1,5 +1,4 @@
 import type { OpenClawConfig } from "../config/types.js";
-import type { UpdateCheckResult } from "../infra/update-check.js";
 import { loggingState } from "../logging/state.js";
 import { runExec } from "../process/exec.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -21,7 +20,6 @@ let statusScanDepsRuntimeModulePromise:
   | undefined;
 let statusAgentLocalModulePromise: Promise<typeof import("./status.agent-local.js")> | undefined;
 let statusSummaryModulePromise: Promise<typeof import("./status.summary.js")> | undefined;
-let statusUpdateModulePromise: Promise<typeof import("./status.update.js")> | undefined;
 
 function loadPluginRegistryModule() {
   pluginRegistryModulePromise ??= import("../cli/plugin-registry.js");
@@ -41,19 +39,6 @@ function loadStatusAgentLocalModule() {
 function loadStatusSummaryModule() {
   statusSummaryModulePromise ??= import("./status.summary.js");
   return statusSummaryModulePromise;
-}
-
-function loadStatusUpdateModule() {
-  statusUpdateModulePromise ??= import("./status.update.js");
-  return statusUpdateModulePromise;
-}
-
-export function buildColdStartUpdateResult(): UpdateCheckResult {
-  return {
-    root: null,
-    installKind: "unknown",
-    packageManager: "unknown",
-  };
 }
 
 function buildColdStartAgentLocalStatuses(): Awaited<ReturnType<typeof getAgentLocalStatusesFn>> {
@@ -117,18 +102,8 @@ export async function scanStatusJsonCore(params: {
 
   const osSummary = params.resolveOsSummary();
   const tailscaleMode = cfg.gateway?.tailscale?.mode ?? "off";
-  const updateTimeoutMs = opts.all ? 6500 : 2500;
   const skipColdStartNetworkChecks =
     params.coldStart && !hasConfiguredChannels && opts.all !== true;
-  const updatePromise = skipColdStartNetworkChecks
-    ? Promise.resolve(buildColdStartUpdateResult())
-    : loadStatusUpdateModule().then(({ getUpdateCheckResult }) =>
-        getUpdateCheckResult({
-          timeoutMs: updateTimeoutMs,
-          fetchGit: true,
-          includeRegistry: true,
-        }),
-      );
   const agentStatusPromise = skipColdStartNetworkChecks
     ? Promise.resolve(buildColdStartAgentLocalStatuses())
     : loadStatusAgentLocalModule().then(({ getAgentLocalStatuses }) => getAgentLocalStatuses(cfg));
@@ -155,9 +130,8 @@ export async function scanStatusJsonCore(params: {
     },
   });
 
-  const [tailscaleDns, update, agentStatus, gatewaySnapshot, summary] = await Promise.all([
+  const [tailscaleDns, agentStatus, gatewaySnapshot, summary] = await Promise.all([
     tailscaleDnsPromise,
-    updatePromise,
     agentStatusPromise,
     gatewayProbePromise,
     summaryPromise,
@@ -199,7 +173,6 @@ export async function scanStatusJsonCore(params: {
     tailscaleMode,
     tailscaleDns,
     tailscaleHttpsUrl,
-    update,
     gatewayConnection,
     remoteUrlMissing,
     gatewayMode,

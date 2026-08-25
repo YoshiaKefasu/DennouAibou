@@ -32,7 +32,6 @@ export type ConfigProps = {
   loading: boolean;
   saving: boolean;
   applying: boolean;
-  updating: boolean;
   connected: boolean;
   schema: unknown;
   schemaLoading: boolean;
@@ -54,7 +53,6 @@ export type ConfigProps = {
   onReload: () => void;
   onSave: () => void;
   onApply: () => void;
-  onUpdate: () => void;
   onOpenFile?: () => void;
   version: string;
   theme: ThemeName;
@@ -785,12 +783,7 @@ export function renderConfig(props: ConfigProps) {
   const canSave =
     props.connected && !props.saving && hasChanges && (formMode === "raw" ? true : canSaveForm);
   const canApply =
-    props.connected &&
-    !props.applying &&
-    !props.updating &&
-    hasChanges &&
-    (formMode === "raw" ? true : canSaveForm);
-  const canUpdate = props.connected && !props.applying && !props.updating;
+    props.connected && !props.applying && hasChanges && (formMode === "raw" ? true : canSaveForm);
 
   const showAppearanceOnRoot =
     includeVirtualSections &&
@@ -864,9 +857,6 @@ export function renderConfig(props: ConfigProps) {
             </button>
             <button class="btn btn--sm" ?disabled=${!canApply} @click=${props.onApply}>
               ${props.applying ? "Applying…" : "Apply"}
-            </button>
-            <button class="btn btn--sm" ?disabled=${!canUpdate} @click=${props.onUpdate}>
-              ${props.updating ? "Updating…" : "Update"}
             </button>
           </div>
         </div>

@@ -87,7 +87,7 @@ export function validateExternalCodePluginPackageJson(
 ): ExternalCodePluginValidationResult {
   const issues = listMissingExternalCodePluginFieldPaths(packageJson).map((fieldPath) => ({
     fieldPath,
-    message: `${fieldPath} is required for external code plugins published to ClawHub.`,
+    message: `${fieldPath} is required for external code plugins.`,
   }));
   return {
     compatibility: normalizeExternalPluginCompatibility(packageJson),

@@ -56,7 +56,6 @@ function configureScanStatus(
     sourceConfig,
     resolvedConfig,
     summary: options.summary,
-    update: options.update,
     gatewayProbe: options.gatewayProbe,
     ...(options.memoryConfigured ? { memoryManager: createStatusMemorySearchManager() } : {}),
   });
@@ -145,14 +144,12 @@ describe("scanStatus", () => {
       resolvedConfig: createStatusScanConfig({
         plugins: { enabled: false },
       }),
-      update: false,
       gatewayProbe: false,
     });
 
     await scanStatus({ json: true }, {} as never);
     await scanStatus({ json: false }, {} as never);
 
-    expect(mocks.getUpdateCheckResult).not.toHaveBeenCalled();
     expect(mocks.probeGateway).not.toHaveBeenCalled();
   });
 

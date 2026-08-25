@@ -4,7 +4,6 @@ import { noteSourceInstallIssues } from "../commands/doctor-install.js";
 import { noteStartupOptimizationHints } from "../commands/doctor-platform-notes.js";
 import { createDoctorPrompter, type DoctorOptions } from "../commands/doctor-prompter.js";
 import { maybeRepairUiProtocolFreshness } from "../commands/doctor-ui.js";
-import { maybeOfferUpdateBeforeDoctor } from "../commands/doctor-update.js";
 import { printWizardHeader } from "../commands/onboard-helpers.js";
 import { CONFIG_PATH } from "../config/config.js";
 import { resolveOpenClawPackageRoot } from "../infra/openclaw-root.js";
@@ -29,17 +28,6 @@ export async function doctorCommand(
     argv1: process.argv[1],
     cwd: process.cwd(),
   });
-
-  const updateResult = await maybeOfferUpdateBeforeDoctor({
-    runtime,
-    options,
-    root,
-    confirm: (p) => prompter.confirm(p),
-    outro,
-  });
-  if (updateResult.handled) {
-    return;
-  }
 
   await maybeRepairUiProtocolFreshness(runtime, prompter);
   noteSourceInstallIssues(root);

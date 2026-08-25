@@ -684,7 +684,7 @@ describe("installPluginFromArchive", () => {
     ).toBe(true);
   });
 
-  it("installs flat-root plugin archives from ClawHub-style downloads", async () => {
+  it("installs flat-root plugin archives", async () => {
     const result = await installArchivePackageAndReturnResult({
       packageJson: {
         name: "@openclaw/rootless",

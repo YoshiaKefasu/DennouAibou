@@ -454,31 +454,6 @@ vi.mock("../infra/os-summary.js", () => ({
     label: "macos 14.0 (arm64)",
   }),
 }));
-vi.mock("../infra/update-check.js", () => ({
-  checkUpdateStatus: vi.fn().mockResolvedValue({
-    root: "/tmp/openclaw",
-    installKind: "git",
-    packageManager: "pnpm",
-    git: {
-      root: "/tmp/openclaw",
-      branch: "main",
-      upstream: "origin/main",
-      dirty: false,
-      ahead: 0,
-      behind: 0,
-      fetchOk: true,
-    },
-    deps: {
-      manager: "pnpm",
-      status: "ok",
-      lockfilePath: "/tmp/openclaw/pnpm-lock.yaml",
-      markerPath: "/tmp/openclaw/node_modules/.modules.yaml",
-    },
-    registry: { latestVersion: "0.0.0" },
-  }),
-  formatGitInstallLabel: vi.fn(() => "main · @ deadbeef"),
-  compareSemverStrings: vi.fn(() => 0),
-}));
 vi.mock("../config/config.js", () => ({
   loadConfig: mocks.loadConfig,
   readBestEffortConfig: vi.fn(async () => mocks.loadConfig()),

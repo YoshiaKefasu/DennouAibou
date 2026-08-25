@@ -252,34 +252,6 @@ describe("gateway tool", () => {
     );
   });
 
-  it("passes update.run through gateway call", async () => {
-    const sessionKey = "agent:main:whatsapp:dm:+15555550123";
-    const tool = requireGatewayTool(sessionKey);
-
-    await tool.execute("call3", {
-      action: "update.run",
-      note: "test update",
-    });
-
-    expect(callGatewayTool).toHaveBeenCalledWith(
-      "update.run",
-      expect.any(Object),
-      expect.objectContaining({
-        note: "test update",
-        sessionKey,
-      }),
-    );
-    const updateCall = vi
-      .mocked(callGatewayTool)
-      .mock.calls.find((call) => call[0] === "update.run");
-    expect(updateCall).toBeDefined();
-    if (updateCall) {
-      const [, opts, params] = updateCall;
-      expect(opts).toMatchObject({ timeoutMs: 20 * 60_000 });
-      expect(params).toMatchObject({ timeoutMs: 20 * 60_000 });
-    }
-  });
-
   it("returns a path-scoped schema lookup result", async () => {
     const tool = requireGatewayTool();
 

@@ -2,7 +2,6 @@ import { loadConfig, readConfigFileSnapshot, replaceConfigFile } from "../config
 import type { HookInstallRecord } from "../config/types.hooks.js";
 import type { PluginInstallRecord } from "../config/types.plugins.js";
 import { updateNpmInstalledHookPacks } from "../hooks/update.js";
-import { parseClawHubPluginSpec } from "../infra/clawhub.js";
 import { parseRegistryNpmSpec } from "../infra/npm-registry-spec.js";
 import { updateNpmInstalledPlugins } from "../plugins/update.js";
 import { defaultRuntime } from "../runtime.js";
@@ -23,25 +22,6 @@ function resolvePluginUpdateSelection(params: {
   }
   if (!params.rawId) {
     return { pluginIds: [] };
-  }
-
-  // Handle raw clawhub: specs (e.g. clawhub:episodic-claw@0.5.0).
-  const clawhubParsed = parseClawHubPluginSpec(params.rawId);
-  if (clawhubParsed?.name) {
-    // Try to find a tracked ClawHub install matching this package name.
-    const clawhubMatches = Object.entries(params.installs).filter(([, install]) => {
-      return install.source === "clawhub" && install.clawhubPackage === clawhubParsed.name;
-    });
-    if (clawhubMatches.length === 1) {
-      const [pluginId] = clawhubMatches[0];
-      if (pluginId) {
-        return {
-          pluginIds: [pluginId],
-          specOverrides: { [pluginId]: params.rawId },
-        };
-      }
-    }
-    // If no tracked ClawHub install found, fall through to npm parsing.
   }
 
   const parsedSpec = parseRegistryNpmSpec(params.rawId);

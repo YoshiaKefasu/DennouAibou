@@ -137,7 +137,6 @@ export async function statusCommand(
     tailscaleMode,
     tailscaleDns,
     tailscaleHttpsUrl,
-    update,
     gatewayConnection,
     remoteUrlMissing,
     gatewayMode,
@@ -204,9 +203,7 @@ export async function statusCommand(
   const configChannel = normalizeUpdateChannel(cfg.update?.channel);
   const channelInfo = resolveUpdateChannelDisplay({
     configChannel,
-    installKind: update.installKind,
-    gitTag: update.git?.tag ?? null,
-    gitBranch: update.git?.branch ?? null,
+    installKind: "unknown",
   });
 
   if (opts.json) {
@@ -217,7 +214,6 @@ export async function statusCommand(
     writeRuntimeJson(runtime, {
       ...summary,
       os: osSummary,
-      update,
       updateChannel: channelInfo.channel,
       updateChannelSource: channelInfo.source,
       memory,
@@ -252,15 +248,12 @@ export async function statusCommand(
     formatCliCommand,
     formatDuration,
     formatGatewayAuthUsed,
-    formatGitInstallLabel,
     formatHealthChannelLines,
     formatKTokens,
     formatPromptCacheCompact,
     formatPluginCompatibilityNotice,
     formatTimeAgo,
     formatTokensCompact,
-    formatUpdateAvailableHint,
-    formatUpdateOneLiner,
     getTerminalTableWidth,
     groupChannelIssuesByChannel,
     info,
@@ -270,7 +263,6 @@ export async function statusCommand(
     resolveMemoryCacheSummary,
     resolveMemoryFtsState,
     resolveMemoryVectorState,
-    resolveUpdateAvailability,
     shortenText,
     summarizePluginCompatibility,
     theme,
@@ -481,10 +473,7 @@ export async function statusCommand(
     return parts.join(" · ");
   })();
 
-  const updateAvailability = resolveUpdateAvailability(update);
-  const updateLine = formatUpdateOneLiner(update).replace(/^Update:\s*/i, "");
   const channelLabel = channelInfo.label;
-  const gitLabel = formatGitInstallLabel(update);
   const pluginCompatibilitySummary = summarizePluginCompatibility(pluginCompatibility);
   const pluginCompatibilityValue =
     pluginCompatibilitySummary.noticeCount === 0
@@ -506,11 +495,6 @@ export async function statusCommand(
             : warn(`${tailscaleMode} · magicdns unknown`),
     },
     { Item: "Channel", Value: channelLabel },
-    ...(gitLabel ? [{ Item: "Git", Value: gitLabel }] : []),
-    {
-      Item: "Update",
-      Value: updateAvailability.available ? warn(`available · ${updateLine}`) : updateLine,
-    },
     { Item: "Gateway", Value: gatewayValue },
     ...(gatewayProbeAuthWarning
       ? [{ Item: "Gateway auth warning", Value: warn(gatewayProbeAuthWarning) }]
@@ -780,11 +764,6 @@ export async function statusCommand(
   runtime.log("FAQ: https://docs.openclaw.ai/faq");
   runtime.log("Troubleshooting: https://docs.openclaw.ai/troubleshooting");
   runtime.log("");
-  const updateHint = formatUpdateAvailableHint(update);
-  if (updateHint) {
-    runtime.log(theme.warn(updateHint));
-    runtime.log("");
-  }
   runtime.log("Next steps:");
   runtime.log(`  Need to share?      ${formatCliCommand("openclaw status --all")}`);
   runtime.log(`  Need to debug live? ${formatCliCommand("openclaw logs --follow")}`);

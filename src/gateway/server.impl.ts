@@ -45,7 +45,6 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
-import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import {
@@ -84,10 +83,6 @@ import { resolveGatewayAuth } from "./auth.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import type { ControlUiRootState } from "./control-ui.js";
-import {
-  GATEWAY_EVENT_UPDATE_AVAILABLE,
-  type GatewayUpdateAvailableEventPayload,
-} from "./events.js";
 import { createExecApprovalIosPushDelivery } from "./exec-approval-ios-push.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
 import { startMcpLoopbackServer } from "./mcp-http.js";
@@ -800,7 +795,6 @@ export async function startGatewayServer(
     stop: () => {},
     updateConfig: () => {},
   };
-  let stopGatewayUpdateCheck = () => {};
   let tailscaleCleanup: (() => Promise<void>) | null = null;
   let skillsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const skillsRefreshDelayMs = 30_000;
@@ -834,7 +828,6 @@ export async function startGatewayServer(
       pluginServices,
       cron,
       heartbeatRunner,
-      updateCheckStop: stopGatewayUpdateCheck,
       nodePresenceTimers,
       broadcast,
       tickInterval,
@@ -1422,17 +1415,6 @@ export async function startGatewayServer(
       isNixMode,
       startupStartedAt: opts.startupStartedAt,
     });
-    stopGatewayUpdateCheck = minimalTestGateway
-      ? () => {}
-      : scheduleGatewayUpdateCheck({
-          cfg: cfgAtStart,
-          log,
-          isNixMode,
-          onUpdateAvailableChange: (updateAvailable) => {
-            const payload: GatewayUpdateAvailableEventPayload = { updateAvailable };
-            broadcast(GATEWAY_EVENT_UPDATE_AVAILABLE, payload, { dropIfSlow: true });
-          },
-        });
     tailscaleCleanup = minimalTestGateway
       ? null
       : await startGatewayTailscaleExposure({
@@ -1576,7 +1558,6 @@ export async function startGatewayServer(
     pluginServices,
     cron,
     heartbeatRunner,
-    updateCheckStop: stopGatewayUpdateCheck,
     stopTaskRegistryMaintenance,
     nodePresenceTimers,
     broadcast,

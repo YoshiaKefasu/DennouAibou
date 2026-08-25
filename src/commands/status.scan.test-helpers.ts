@@ -10,7 +10,6 @@ export type StatusScanSharedMocks = {
   hasPotentialConfiguredChannels: UnknownMock;
   readBestEffortConfig: UnknownMock;
   resolveCommandSecretRefsViaGateway: UnknownMock;
-  getUpdateCheckResult: UnknownMock;
   getAgentLocalStatuses: UnknownMock;
   getStatusSummary: UnknownMock;
   getMemorySearchManager: UnknownMock;
@@ -27,7 +26,6 @@ export function createStatusScanSharedMocks(configPathLabel: string): StatusScan
     hasPotentialConfiguredChannels: vi.fn(),
     readBestEffortConfig: vi.fn(),
     resolveCommandSecretRefsViaGateway: vi.fn(),
-    getUpdateCheckResult: vi.fn(),
     getAgentLocalStatuses: vi.fn(),
     getStatusSummary: vi.fn(),
     getMemorySearchManager: vi.fn(),
@@ -106,14 +104,6 @@ export function createStatusPluginStatusModuleMock(
 ): { buildPluginCompatibilityNotices: StatusScanSharedMocks["buildPluginCompatibilityNotices"] } {
   return {
     buildPluginCompatibilityNotices: mocks.buildPluginCompatibilityNotices,
-  };
-}
-
-export function createStatusUpdateModuleMock(
-  mocks: Pick<StatusScanSharedMocks, "getUpdateCheckResult">,
-): { getUpdateCheckResult: StatusScanSharedMocks["getUpdateCheckResult"] } {
-  return {
-    getUpdateCheckResult: mocks.getUpdateCheckResult,
   };
 }
 
@@ -209,7 +199,6 @@ export async function loadStatusScanModuleForTest(
   vi.doMock("../cli/command-secret-gateway.js", () => ({
     resolveCommandSecretRefsViaGateway: mocks.resolveCommandSecretRefsViaGateway,
   }));
-  vi.doMock("./status.update.js", () => createStatusUpdateModuleMock(mocks));
   vi.doMock("./status.agent-local.js", () => createStatusAgentLocalModuleMock(mocks));
   vi.doMock("./status.summary.js", () => createStatusSummaryModuleMock(mocks));
   vi.doMock("../infra/os-summary.js", () => createStatusOsSummaryModuleMock());
@@ -284,14 +273,6 @@ export function createStatusSummary(
   };
 }
 
-export function createStatusUpdateResult() {
-  return {
-    installKind: "git",
-    git: null,
-    registry: null,
-  };
-}
-
 export function createStatusAgentLocalStatuses() {
   return {
     defaultId: "main",
@@ -351,7 +332,6 @@ export function applyStatusScanDefaults(
     sourceConfig?: OpenClawConfig;
     resolvedConfig?: OpenClawConfig;
     summary?: ReturnType<typeof createStatusSummary>;
-    update?: ReturnType<typeof createStatusUpdateResult> | false;
     gatewayProbe?: ReturnType<typeof createStatusGatewayProbeFailure> | false;
     memoryManager?: ReturnType<typeof createStatusMemorySearchManager>;
   } = {},
@@ -374,10 +354,6 @@ export function applyStatusScanDefaults(
   });
   mocks.ensurePluginRegistryLoaded.mockImplementation(() => {});
   mocks.buildPluginCompatibilityNotices.mockReturnValue([]);
-
-  if (options.update !== false) {
-    mocks.getUpdateCheckResult.mockResolvedValue(options.update ?? createStatusUpdateResult());
-  }
 
   if (options.gatewayProbe !== false) {
     mocks.probeGateway.mockResolvedValue(options.gatewayProbe ?? createStatusGatewayProbeFailure());

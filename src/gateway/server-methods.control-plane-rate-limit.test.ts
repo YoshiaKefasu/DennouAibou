@@ -113,11 +113,11 @@ describe("gateway control-plane write rate limit", () => {
     const context = buildContext();
     const client = buildClient();
 
-    await runRequest({ method: "update.run", context, client, handler });
-    await runRequest({ method: "update.run", context, client, handler });
-    await runRequest({ method: "update.run", context, client, handler });
+    await runRequest({ method: "config.apply", context, client, handler });
+    await runRequest({ method: "config.apply", context, client, handler });
+    await runRequest({ method: "config.apply", context, client, handler });
 
-    const blocked = await runRequest({ method: "update.run", context, client, handler });
+    const blocked = await runRequest({ method: "config.apply", context, client, handler });
     expect(blocked).toHaveBeenCalledWith(
       false,
       undefined,
@@ -126,7 +126,7 @@ describe("gateway control-plane write rate limit", () => {
 
     vi.advanceTimersByTime(60_001);
 
-    const allowed = await runRequest({ method: "update.run", context, client, handler });
+    const allowed = await runRequest({ method: "config.apply", context, client, handler });
     expect(allowed).toHaveBeenCalledWith(true, undefined, undefined);
     expect(handlerCalls).toHaveBeenCalledTimes(4);
   });
