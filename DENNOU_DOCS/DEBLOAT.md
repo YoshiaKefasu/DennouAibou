@@ -692,7 +692,7 @@ KASOU で実際に使われているチャンネル: **Telegram**（メイン）
 | **nextcloud-talk**      | 未使用                             | **削除候補** |
 | **synology-chat**       | 未使用                             | **削除候補** |
 | **zalo** / **zalouser** | 未使用                             | **削除候補** |
-| **line**                | 未使用                             | **削除候補** |
+| **line**                | 未使用                             | **候補保留** → ch.18.2 で温存決定済み（メッセージAPIプラグイン化候補） |
 | **twitch**              | 未使用                             | **削除候補** |
 | **msteams**             | 未使用                             | **削除候補** |
 
@@ -1012,3 +1012,35 @@ browser 拡張削除後の期待値整備。
 - マニフェスト契約の `speechProviders` フィールド群（src/plugins/manifest.ts 等）— 外部プラグイン向けコントラクト層として恒久保持か判断が必要
 - `vitest.extension-voice-call.config.ts` + `vitest.extension-voice-call-paths.mjs` — 削除済み voice-call 拡張用の死んだテストインフラ
 - テストヘルパー側の `OPENCLAW_*` env 完全移行（今回 DENNOU_* 優先+OPENCLAW_* フォールバックで互換確保済み）
+
+---
+
+## 18. Phase C 計画書統合 + スリム化新決定（2026-08-25）
+
+### 18.1 PHASE_C_CODE_CLEANUP.md の取扱い（本統合により廃止）
+
+Phase C 計画書は実施記録が空のまま残存していた計画ドキュメント。計画内容は既に別経路で実行済み:
+
+| 計画項目 | 実際の執行 |
+| --- | --- |
+| 型エラー修正 | 220件→0（`d6aab6f3156`、3 Executor 並列掃除） |
+| chutes / byteplus / tmp 生成物など Dead Code 除去 | DEBLOAT ch.14-16 および `bfc9a1c2568`（依存12個削除）で執行済み |
+| テスト整理（孤児テスト） | 同上コミット群に含む |
+| `@line/bot-sdk` 判断待ち | **本日確定**: 削除せず温存（18.2 参照）。TS2305 問題自体は pin 戻し `80f662c0c3c`（^11→^10.6.0）で解消済み |
+| 未執行の残項目 | PHASE_C 削除リストのうち `InstallationLog.txt` / `filter-*.jq` 4ファイルは tracked のまま残存 — 次回掃除対象 |
+
+重複回避のため計画書本文は移植せず、結果記録のみ残す。原文は git 履歴参照。
+
+### 18.2 スリム化新決定（未実施・次期 slim 化の第一波）
+
+| 項目 | 内容 | 状態 |
+| --- | --- | --- |
+| プロバイダー一本化 | 全モデルプロバイダーを OpenAI-compatible `/v1/chat/completions` のみに集約。OpenAI-compatible 以外の全トランスポート（anthropic-messages、google、vertex、openai-responses 等）とその compat 正規化層を撤去 | 未実施・計画確定 |
+| OpenAI native + Codex OAuth 撤去 | openai-codex OAuth（ChatGPT backend）経路と OpenAI 固有 auth を廃止 | 未実施・計画確定 |
+| モデルテスト整理 | 撤去対象プロバイダー固有のモデル live テスト類を削除 | 未実施・計画確定 |
+| `@line/bot-sdk` | **削除せず温存** — 将来のメッセージAPIプラグイン化候補（owner マーカー付き messenger plugin 構想の第一候補） | 方針確定 |
+
+**影響注記:**
+- KASOU の Google 系ルーティングおよび Codex OAuth トラック（Track B）は本決定により引退。KASOU 側は `/v1/chat/completions` 互換エンドポイントへの移行が必要
+- Phase D（D3 `cd30fe9dda9` 等）で整備した transport 層のうち、OpenAI-compatible 以外は本決定により役目を終える
+- 実施時は次期 slim 化の第2抽出波（カーネル外部への機能移植フェーズ）として、段階的コミット＋code-reviewer レビューを経る（一括削除しない）
