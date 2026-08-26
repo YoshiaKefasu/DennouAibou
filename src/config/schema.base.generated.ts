@@ -920,19 +920,18 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                     type: "boolean",
                     title: "Indexing Enabled",
                     description:
-                      "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
+                      "Master switch for raw chat indexing. When false, new transcript updates are not indexed and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
                   },
                 },
                 additionalProperties: false,
                 title: "Raw Chat Indexing",
-                description:
-                  "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+                description: "Controls for raw chat message indexing into the SQLite DB.",
               },
             },
             additionalProperties: false,
             title: "Raw Chat DB",
             description:
-              "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
+              "Raw chat permanent DB settings for SQLite-backed indexing and search of session transcripts.",
           },
         },
         additionalProperties: false,
@@ -22692,18 +22691,18 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
     },
     "dennou.rawChat": {
       label: "Raw Chat DB",
-      help: "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
+      help: "Raw chat permanent DB settings for SQLite-backed indexing and search of session transcripts.",
       order: 50,
       tags: ["advanced"],
     },
     "dennou.rawChat.indexing": {
       label: "Raw Chat Indexing",
-      help: "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+      help: "Controls for raw chat message indexing into the SQLite DB.",
       tags: ["advanced"],
     },
     "dennou.rawChat.indexing.enabled": {
       label: "Indexing Enabled",
-      help: "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
+      help: "Master switch for raw chat indexing. When false, new transcript updates are not indexed and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
       tags: ["advanced"],
     },
     "diagnostics.enabled": {

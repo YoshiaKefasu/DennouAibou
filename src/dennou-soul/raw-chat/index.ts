@@ -1,28 +1,32 @@
 /**
- * Raw chat permanent DB subsystem.
+ * Raw chat permanent DB subsystem (TS + SQLite + FTS5).
  *
- * Phase 1: Go sidecar as the production DB/index/search engine.
- * TypeScript owns only: sidecar launch/shutdown, transcript hook/debounce,
- * typed RPC request/response validation, tool registration, and compact result formatting.
- *
- * The session JSONL remains the source of truth; the Go-side SQLite DB is a derived index.
+ * Provides exact raw message ledger indexing from session JSONL
+ * and fast keyword/date/context search.
  */
 
 export {
-  RawChatClient,
+  RawChatDatabase,
+  getRawChatDatabase,
+  closeAllRawChatDatabases,
+  resolveRawChatDbPath,
+  indexSessionFile,
+  backfillSessionFiles,
+  extractTextFromContent,
+  startRawChatIndexer,
+  stopRawChatIndexer,
+  isRawChatIndexingEnabled,
+  resolveSessionAgentIdFromKey,
+  createChatSearchTool,
+  ChatSearchSchema,
+  type ChatMessageRecord,
+  type WatermarkRecord,
   type SearchParams,
-  type SearchResults,
   type SearchResult,
+  type SearchResults,
   type IndexSessionParams,
   type IndexSessionResult,
   type BackfillParams,
   type BackfillResult,
-} from "./sidecar-client.js";
-export { createChatSearchTool, ChatSearchSchema } from "./tool.js";
-export {
-  startRawChatIndexer,
-  stopRawChatIndexer,
-  isRawChatIndexingEnabled,
-  backfillSessionFiles,
-} from "./hook.js";
-export { setRawChatClient, getRawChatClient } from "./client-ref.js";
+  type RawChatMessageInput,
+} from "../../../extensions/raw-chat-search/index.js";
