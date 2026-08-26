@@ -249,11 +249,10 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("## Skills");
   });
 
-  it("omits the heartbeat section when no heartbeat prompt is provided", () => {
+  it("omits the heartbeat section", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
       promptMode: "full",
-      heartbeatPrompt: undefined,
     });
 
     expect(prompt).not.toContain("## Heartbeats");
@@ -669,11 +668,10 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("# Project Context");
   });
 
-  it("orders stable project context before the cache boundary and moves HEARTBEAT below it", () => {
+  it("orders stable project context before the cache boundary", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
       contextFiles: [
-        { path: "HEARTBEAT.md", content: "Check inbox." },
         { path: "MEMORY.md", content: "Long-term notes." },
         { path: "AGENTS.md", content: "Follow repo rules." },
         { path: "SOUL.md", content: "Warm but direct." },
@@ -686,35 +684,12 @@ describe("buildAgentSystemPrompt", () => {
     const toolsIndex = prompt.indexOf("## TOOLS.md");
     const memoryIndex = prompt.indexOf("## MEMORY.md");
     const boundaryIndex = prompt.indexOf(SYSTEM_PROMPT_CACHE_BOUNDARY);
-    const heartbeatHeadingIndex = prompt.indexOf("# Dynamic Project Context");
-    const heartbeatFileIndex = prompt.indexOf("## HEARTBEAT.md");
 
     expect(agentsIndex).toBeGreaterThan(-1);
     expect(soulIndex).toBeGreaterThan(agentsIndex);
     expect(toolsIndex).toBeGreaterThan(soulIndex);
     expect(memoryIndex).toBeGreaterThan(toolsIndex);
     expect(boundaryIndex).toBeGreaterThan(memoryIndex);
-    expect(heartbeatHeadingIndex).toBeGreaterThan(boundaryIndex);
-    expect(heartbeatFileIndex).toBeGreaterThan(heartbeatHeadingIndex);
-    expect(prompt).toContain(
-      "The following frequently-changing project context files are kept below the cache boundary when possible:",
-    );
-  });
-
-  it("keeps heartbeat-only project context below the cache boundary", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      contextFiles: [{ path: "HEARTBEAT.md", content: "Check inbox." }],
-    });
-
-    const boundaryIndex = prompt.indexOf(SYSTEM_PROMPT_CACHE_BOUNDARY);
-    const projectContextIndex = prompt.indexOf("# Project Context");
-    const heartbeatFileIndex = prompt.indexOf("## HEARTBEAT.md");
-
-    expect(boundaryIndex).toBeGreaterThan(-1);
-    expect(projectContextIndex).toBeGreaterThan(boundaryIndex);
-    expect(heartbeatFileIndex).toBeGreaterThan(projectContextIndex);
-    expect(prompt).not.toContain("# Dynamic Project Context");
   });
 
   it("replaces provider-owned prompt sections without disturbing core ordering", () => {
@@ -883,7 +858,6 @@ describe("buildAgentSystemPrompt", () => {
       },
       skillsPrompt:
         "<available_skills>\n  <skill>\n    <name>demo</name>\n  </skill>\n</available_skills>",
-      heartbeatPrompt: "ping",
       extraSystemPrompt: "Group chat context\nSecond line",
       workspaceNotes: ["Reminder: keep commits scoped."],
       modelAliasLines: ["- Sonnet: anthropic/claude-sonnet-4-5"],
@@ -896,7 +870,6 @@ describe("buildAgentSystemPrompt", () => {
       },
       skillsPrompt:
         "<available_skills>\r\n  <skill>  \r\n    <name>demo</name>\t\r\n  </skill>\r\n</available_skills>\r\n",
-      heartbeatPrompt: " ping  \r\n",
       extraSystemPrompt: "  Group chat context  \r\nSecond line \t\r\n",
       workspaceNotes: ["  Reminder: keep commits scoped. \t\r\n"],
       modelAliasLines: ["  - Sonnet: anthropic/claude-sonnet-4-5 \t\r\n"],

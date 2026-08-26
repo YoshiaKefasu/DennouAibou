@@ -10,7 +10,6 @@ import type {
 } from "../../../plugins/types.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../../../routing/session-key.js";
 import { joinPresentTextSegments } from "../../../shared/text/join-segments.js";
-import { resolveHeartbeatPromptForSystemPrompt } from "../../heartbeat-system-prompt.js";
 import { buildActiveMusicGenerationTaskPromptContextForSession } from "../../music-generation-task-status.js";
 import { prependSystemPromptAdditionAfterCacheBoundary } from "../../system-prompt-cache-boundary.js";
 import { resolveEffectiveToolFsWorkspaceOnly } from "../../tool-fs-policy.js";
@@ -95,24 +94,14 @@ export function resolvePromptModeForSession(sessionKey?: string): "minimal" | "f
   return isSubagentSessionKey(sessionKey) || isCronSessionKey(sessionKey) ? "minimal" : "full";
 }
 
-export function shouldInjectHeartbeatPrompt(params: {
+export function shouldInjectHeartbeatPrompt(_params?: {
   config?: OpenClawConfig;
   agentId?: string;
   defaultAgentId?: string;
-  isDefaultAgent: boolean;
+  isDefaultAgent?: boolean;
   trigger?: EmbeddedRunAttemptParams["trigger"];
 }): boolean {
-  return (
-    params.isDefaultAgent &&
-    shouldInjectHeartbeatPromptForTrigger(params.trigger) &&
-    Boolean(
-      resolveHeartbeatPromptForSystemPrompt({
-        config: params.config,
-        agentId: params.agentId,
-        defaultAgentId: params.defaultAgentId,
-      }),
-    )
-  );
+  return false;
 }
 
 export function shouldWarnOnOrphanedUserRepair(

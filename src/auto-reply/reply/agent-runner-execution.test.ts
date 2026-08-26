@@ -69,7 +69,7 @@ vi.mock("../../utils/message-channel.js", () => ({
   isInternalMessageChannel: (value: unknown) => state.isInternalMessageChannelMock(value),
 }));
 
-vi.mock("../heartbeat.js", () => ({
+vi.mock("../heartbeat-token.js", () => ({
   stripHeartbeatToken: (text: string) => ({
     text,
     didStrip: false,

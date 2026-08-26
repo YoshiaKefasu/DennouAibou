@@ -26,8 +26,7 @@ import { assertSafeCronSessionTargetId } from "../cron/session-target.js";
 import { resolveCronStorePath } from "../cron/store.js";
 import { normalizeHttpWebhookUrl } from "../cron/webhook-url.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import { runHeartbeatOnce } from "../infra/heartbeat-runner.js";
-import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
+import { requestWakeNow, runEventPumpOnce } from "../infra/event-pump.js";
 import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
 import { SsrFBlockedError } from "../infra/net/ssrf.js";
 import { deliverOutboundPayloads } from "../infra/outbound/deliver.js";
@@ -250,20 +249,16 @@ export function buildGatewayCronService(params: {
       });
       enqueueSystemEvent(text, { sessionKey, contextKey: opts?.contextKey });
     },
-    requestHeartbeatNow: (opts) => {
+    requestWakeNow: (opts) => {
       const { agentId, sessionKey } = resolveCronWakeTarget(opts);
-      requestHeartbeatNow({
+      requestWakeNow({
         reason: opts?.reason,
         agentId,
         sessionKey,
       });
     },
-    runHeartbeatOnce: async (opts) => {
+    runEventPumpOnce: async (opts) => {
       const { runtimeConfig, agentId, sessionKey } = resolveCronWakeTarget(opts);
-      // Merge cron-supplied heartbeat overrides (e.g. target: "last") with the
-      // fully resolved agent heartbeat config so cron-triggered heartbeats
-      // respect agent-specific overrides (agents.list[].heartbeat) before
-      // falling back to agents.defaults.heartbeat.
       const agentEntry =
         Array.isArray(runtimeConfig.agents?.list) &&
         runtimeConfig.agents.list.find(
@@ -279,7 +274,7 @@ export function buildGatewayCronService(params: {
       const heartbeatOverride = opts?.heartbeat
         ? { ...baseHeartbeat, ...opts.heartbeat }
         : undefined;
-      return await runHeartbeatOnce({
+      return await runEventPumpOnce({
         cfg: runtimeConfig,
         reason: opts?.reason,
         agentId,

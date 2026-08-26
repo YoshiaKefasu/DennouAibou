@@ -33,9 +33,8 @@ import {
 } from "../infra/control-ui-assets.js";
 import { isDiagnosticsEnabled } from "../infra/diagnostic-events.js";
 import { isTruthyEnvValue, logAcceptedEnvOption } from "../infra/env.js";
+import { runEventPumpOnce, setWakeHandler } from "../infra/event-pump.js";
 import { createExecApprovalForwarder } from "../infra/exec-approval-forwarder.js";
-import { onHeartbeatEvent } from "../infra/heartbeat-events.js";
-import { startHeartbeatRunner, type HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import { getMachineDisplayName } from "../infra/machine-name.js";
 import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
 import { setGatewaySigusr1RestartPolicy, setPreRestartDeferralCheck } from "../infra/restart.js";
@@ -57,6 +56,7 @@ import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/run
 import { createPluginRuntime } from "../plugins/runtime/index.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
+import { defaultRuntime } from "../runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { CommandSecretAssignment } from "../secrets/command-config.js";
 import {
@@ -791,10 +791,7 @@ export async function startGatewayServer(
   let healthInterval = noopInterval();
   let dedupeCleanup = noopInterval();
   let mediaCleanup: ReturnType<typeof setInterval> | null = null;
-  let heartbeatRunner: HeartbeatRunner = {
-    stop: () => {},
-    updateConfig: () => {},
-  };
+  let eventPumpDisposer: (() => void) | null = null;
   let tailscaleCleanup: (() => Promise<void>) | null = null;
   let skillsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const skillsRefreshDelayMs = 30_000;
@@ -827,7 +824,7 @@ export async function startGatewayServer(
       stopChannel,
       pluginServices,
       cron,
-      heartbeatRunner,
+      eventPumpDisposer,
       nodePresenceTimers,
       broadcast,
       tickInterval,
@@ -835,7 +832,6 @@ export async function startGatewayServer(
       dedupeCleanup,
       mediaCleanup,
       agentUnsub,
-      heartbeatUnsub,
       transcriptUnsub,
       lifecycleUnsub,
       chatRunState,
@@ -879,7 +875,6 @@ export async function startGatewayServer(
   const { getRuntimeSnapshot, startChannels, startChannel, stopChannel, markChannelLoggedOut } =
     channelManager;
   let agentUnsub: (() => void) | null = null;
-  let heartbeatUnsub: (() => void) | null = null;
   let transcriptUnsub: (() => void) | null = null;
   let lifecycleUnsub: (() => void) | null = null;
   try {
@@ -1009,12 +1004,6 @@ export async function startGatewayServer(
             sessionEventSubscribers,
           }),
         );
-
-    heartbeatUnsub = minimalTestGateway
-      ? null
-      : onHeartbeatEvent((evt) => {
-          broadcast("heartbeat", evt, { dropIfSlow: true });
-        });
 
     transcriptUnsub = minimalTestGateway
       ? null
@@ -1197,7 +1186,15 @@ export async function startGatewayServer(
         });
 
     if (!minimalTestGateway) {
-      heartbeatRunner = startHeartbeatRunner({ cfg: cfgAtStart });
+      eventPumpDisposer = setWakeHandler(async (opts) =>
+        runEventPumpOnce({
+          cfg: loadConfig(),
+          agentId: opts.agentId,
+          sessionKey: opts.sessionKey,
+          reason: opts.reason,
+          deps: { ...deps, runtime: defaultRuntime },
+        }),
+      );
     }
 
     const healthCheckMinutes = cfgAtStart.gateway?.channelHealthCheckMinutes;
@@ -1469,14 +1466,12 @@ export async function startGatewayServer(
             getState: () => ({
               hooksConfig,
               hookClientIpConfig,
-              heartbeatRunner,
               cronState,
               channelHealthMonitor,
             }),
             setState: (nextState) => {
               hooksConfig = nextState.hooksConfig;
               hookClientIpConfig = nextState.hookClientIpConfig;
-              heartbeatRunner = nextState.heartbeatRunner;
               cronState = nextState.cronState;
               cron = cronState.cron;
               cronStorePath = cronState.storePath;
@@ -1557,7 +1552,7 @@ export async function startGatewayServer(
     stopChannel,
     pluginServices,
     cron,
-    heartbeatRunner,
+    eventPumpDisposer,
     stopTaskRegistryMaintenance,
     nodePresenceTimers,
     broadcast,
@@ -1566,7 +1561,6 @@ export async function startGatewayServer(
     dedupeCleanup,
     mediaCleanup,
     agentUnsub,
-    heartbeatUnsub,
     transcriptUnsub,
     lifecycleUnsub,
     chatRunState,

@@ -126,14 +126,14 @@ describe("bootstrap prompt warnings", () => {
     expect(prompt.indexOf("  indented\nkeep tail  ")).toBe(0);
   });
 
-  it("preserves exact heartbeat prompts without warning suffixes", () => {
-    const heartbeatPrompt = "Read HEARTBEAT.md. Reply HEARTBEAT_OK.";
+  it("preserves exact prompts without warning suffixes when preserveExactPrompt matches", () => {
+    const exactPrompt = "Do something specific.";
 
     expect(
-      appendBootstrapPromptWarning(heartbeatPrompt, ["AGENTS.md: 200 raw -> 0 injected"], {
-        preserveExactPrompt: heartbeatPrompt,
+      appendBootstrapPromptWarning(exactPrompt, ["AGENTS.md: 200 raw -> 0 injected"], {
+        preserveExactPrompt: exactPrompt,
       }),
-    ).toBe(heartbeatPrompt);
+    ).toBe(exactPrompt);
   });
 
   it("resolves seen signatures from report history or legacy single signature", () => {

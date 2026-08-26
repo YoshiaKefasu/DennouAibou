@@ -13,8 +13,6 @@ export * from "../channels/plugins/outbound/interactive.js";
 export * from "../polls.js";
 export { enqueueSystemEvent, resetSystemEventsForTest } from "../infra/system-events.js";
 export { recordChannelActivity } from "../infra/channel-activity.js";
-export * from "../infra/heartbeat-events.ts";
-export * from "../infra/heartbeat-visibility.ts";
 export * from "../infra/transport-ready.js";
 export {
   createAccountStatusSink,

@@ -1046,3 +1046,4 @@ Phase C 計画書は実施記録が空のまま残存していた計画ドキュ
 - Phase D（D3 `cd30fe9dda9` 等）で整備した transport 層のうち、OpenAI-compatible 以外は本決定により役目を終える
 - 実施時は次期 slim 化の第2抽出波（カーネル外部への機能移植フェーズ）として、段階的コミット＋code-reviewer レビューを経る（一括削除しない）
 - 掃除候補メモ（Wave 2 以降）: `src/agents/auth-profiles/oauth.ts:20-21` の恒偽 `isOAuthProvider` および `src/agents/auth-profiles/usage.ts:78-84` の恒偽 `shouldProbeWhamForFailure`
+- **Wave 3 挙動変化**: heartbeat gates 撤去によりシステムイベント消化が常に即時実行される。dreaming（wakeMode next-heartbeat）はこれにより初めて実際に発火する。

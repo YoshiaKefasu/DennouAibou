@@ -8,14 +8,14 @@ import { mergeMockedModule } from "../test-utils/vitest-module-mocks.js";
 
 const {
   enqueueSystemEventMock,
-  requestHeartbeatNowMock,
+  requestWakeNowMock,
   loadConfigMock,
   fetchWithSsrFGuardMock,
   runCronIsolatedAgentTurnMock,
   cleanupBrowserSessionsForLifecycleEndMock,
 } = vi.hoisted(() => ({
   enqueueSystemEventMock: vi.fn(),
-  requestHeartbeatNowMock: vi.fn(),
+  requestWakeNowMock: vi.fn(),
   loadConfigMock: vi.fn(),
   fetchWithSsrFGuardMock: vi.fn(),
   runCronIsolatedAgentTurnMock: vi.fn(async () => ({ status: "ok" as const, summary: "ok" })),
@@ -26,21 +26,19 @@ function enqueueSystemEvent(...args: unknown[]) {
   return enqueueSystemEventMock(...args);
 }
 
-function requestHeartbeatNow(...args: unknown[]) {
-  return requestHeartbeatNowMock(...args);
+function requestWakeNow(...args: unknown[]) {
+  return requestWakeNowMock(...args);
 }
 
 vi.mock("../infra/system-events.js", () => ({
   enqueueSystemEvent,
 }));
 
-vi.mock("../infra/heartbeat-wake.js", async () => {
+vi.mock("../infra/event-pump.js", async () => {
   return await mergeMockedModule(
-    await vi.importActual<typeof import("../infra/heartbeat-wake.js")>(
-      "../infra/heartbeat-wake.js",
-    ),
+    await vi.importActual<typeof import("../infra/event-pump.js")>("../infra/event-pump.js"),
     () => ({
-      requestHeartbeatNow,
+      requestWakeNow,
     }),
   );
 });
@@ -82,7 +80,7 @@ function createCronConfig(name: string): OpenClawConfig {
 describe("buildGatewayCronService", () => {
   beforeEach(() => {
     enqueueSystemEventMock.mockClear();
-    requestHeartbeatNowMock.mockClear();
+    requestWakeNowMock.mockClear();
     loadConfigMock.mockClear();
     fetchWithSsrFGuardMock.mockClear();
     runCronIsolatedAgentTurnMock.mockClear();
@@ -117,7 +115,7 @@ describe("buildGatewayCronService", () => {
           sessionKey: "agent:main:discord:channel:ops",
         }),
       );
-      expect(requestHeartbeatNowMock).toHaveBeenCalledWith(
+      expect(requestWakeNowMock).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionKey: "agent:main:discord:channel:ops",
         }),

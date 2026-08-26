@@ -11,10 +11,6 @@ import { buildGatewayConnectionDetails, callGateway } from "../gateway/call.js";
 import { info } from "../globals.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import {
-  type HeartbeatSummary,
-  resolveHeartbeatSummaryForAgent,
-} from "../infra/heartbeat-summary.js";
 import { buildChannelAccountBindings, resolvePreferredAccountId } from "../routing/bindings.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
@@ -35,7 +31,15 @@ export type ChannelHealthSummary = ChannelAccountHealthSummary & {
   accounts?: Record<string, ChannelAccountHealthSummary>;
 };
 
-export type AgentHeartbeatSummary = HeartbeatSummary;
+export type AgentHeartbeatSummary = {
+  enabled: boolean;
+  every?: string;
+  everyMs?: number | null;
+  prompt?: string;
+  target?: string;
+  directPolicy?: string;
+  ackMaxChars?: number;
+};
 
 export type AgentHealthSummary = {
   agentId: string;
@@ -109,8 +113,14 @@ const formatDurationParts = (ms: number): string => {
   return parts.join(" ");
 };
 
-const resolveHeartbeatSummary = (cfg: ReturnType<typeof loadConfig>, agentId: string) =>
-  resolveHeartbeatSummaryForAgent(cfg, agentId);
+const resolveHeartbeatSummary = (
+  _cfg: ReturnType<typeof loadConfig>,
+  _agentId: string,
+): AgentHeartbeatSummary => ({
+  enabled: false,
+  every: "disabled",
+  everyMs: null,
+});
 
 const resolveAgentOrder = (cfg: ReturnType<typeof loadConfig>) => {
   const defaultAgentId = resolveDefaultAgentId(cfg);
@@ -438,9 +448,7 @@ export async function getHealthSnapshot(params?: {
     } satisfies AgentHealthSummary;
   });
   const defaultAgent = agents.find((agent) => agent.isDefault) ?? agents[0];
-  const heartbeatSeconds = defaultAgent?.heartbeat.everyMs
-    ? Math.round(defaultAgent.heartbeat.everyMs / 1000)
-    : 0;
+  const heartbeatSeconds = 0;
   const sessions =
     defaultAgent?.sessions ??
     buildSessionSummary(resolveStorePath(cfg.session?.store, { agentId: defaultAgentId }));

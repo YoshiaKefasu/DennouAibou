@@ -6,10 +6,7 @@ import {
   registerAgentRunContext,
   resetAgentRunContextForTest,
 } from "../infra/agent-events.js";
-import {
-  hasPendingHeartbeatWake,
-  resetHeartbeatWakeStateForTests,
-} from "../infra/heartbeat-wake.js";
+import { hasPendingWake, resetWakeStateForTests } from "../infra/event-pump.js";
 import { peekSystemEvents, resetSystemEventsForTest } from "../infra/system-events.js";
 import { withTempDir } from "../test-helpers/temp-dir.js";
 import { createManagedTaskFlow, resetTaskFlowRegistryForTests } from "./task-flow-registry.js";
@@ -225,7 +222,7 @@ describe("task-registry", () => {
       process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
     resetSystemEventsForTest();
-    resetHeartbeatWakeStateForTests();
+    resetWakeStateForTests();
     resetAgentRunContextForTest();
     resetCronActiveJobsForTests();
     resetTaskRegistryDeliveryRuntimeForTests();
@@ -621,7 +618,7 @@ describe("task-registry", () => {
         "Background task blocked: ACP background task (run run-deli). Writable session or apply_patch authorization required.",
         "Task needs follow-up: ACP background task (run run-deli). Writable session or apply_patch authorization required.",
       ]);
-      expect(hasPendingHeartbeatWake()).toBe(true);
+      expect(hasPendingWake()).toBe(true);
     });
   });
 
@@ -692,7 +689,7 @@ describe("task-registry", () => {
         "Background task blocked: ACP background task (run run-sess). Writable session or apply_patch authorization required.",
         "Task needs follow-up: ACP background task (run run-sess). Writable session or apply_patch authorization required.",
       ]);
-      expect(hasPendingHeartbeatWake()).toBe(true);
+      expect(hasPendingWake()).toBe(true);
       expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
@@ -787,7 +784,7 @@ describe("task-registry", () => {
       expect(peekSystemEvents("agent:main:main")).toEqual([
         "Task needs follow-up: ACP background task (run run-bloc). Writable session or apply_patch authorization required.",
       ]);
-      expect(hasPendingHeartbeatWake()).toBe(true);
+      expect(hasPendingWake()).toBe(true);
     });
   });
 
@@ -827,7 +824,7 @@ describe("task-registry", () => {
         ),
       );
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
-      expect(hasPendingHeartbeatWake()).toBe(false);
+      expect(hasPendingWake()).toBe(false);
     });
   });
 

@@ -32,13 +32,6 @@ const hoisted = vi.hoisted(() => {
     }
   }
 
-  const heartbeatStop = vi.fn();
-  const heartbeatUpdateConfig = vi.fn();
-  const startHeartbeatRunner = vi.fn(() => ({
-    stop: heartbeatStop,
-    updateConfig: heartbeatUpdateConfig,
-  }));
-
   const startGmailWatcher = vi.fn(async () => ({ started: true }));
   const stopGmailWatcher = vi.fn(async () => {});
 
@@ -132,9 +125,6 @@ const hoisted = vi.hoisted(() => {
   return {
     CronService: CronServiceMock,
     cronInstances,
-    heartbeatStop,
-    heartbeatUpdateConfig,
-    startHeartbeatRunner,
     startGmailWatcher,
     stopGmailWatcher,
     providerManager,
@@ -148,10 +138,6 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock("../cron/service.js", () => ({
   CronService: hoisted.CronService,
-}));
-
-vi.mock("../infra/heartbeat-runner.js", () => ({
-  startHeartbeatRunner: hoisted.startHeartbeatRunner,
 }));
 
 vi.mock("../hooks/gmail-watcher.js", () => ({
@@ -495,7 +481,6 @@ describe("gateway hot reload", () => {
           changedPaths: [
             "hooks.gmail.account",
             "cron.enabled",
-            "agents.defaults.heartbeat.every",
             "web.enabled",
             "channels.telegram.botToken",
             "channels.discord.token",
@@ -508,7 +493,7 @@ describe("gateway hot reload", () => {
           reloadHooks: true,
           restartGmailWatcher: true,
           restartCron: true,
-          restartHeartbeat: true,
+          restartHealthMonitor: false,
           restartChannels: new Set(["whatsapp", "telegram", "discord", "signal", "imessage"]),
           noopPaths: [],
         },
@@ -517,12 +502,6 @@ describe("gateway hot reload", () => {
 
       expect(hoisted.stopGmailWatcher).toHaveBeenCalled();
       expect(hoisted.startGmailWatcher).toHaveBeenCalledWith(expect.objectContaining(nextConfig));
-
-      expect(hoisted.startHeartbeatRunner).toHaveBeenCalledTimes(1);
-      expect(hoisted.heartbeatUpdateConfig).toHaveBeenCalledTimes(1);
-      expect(hoisted.heartbeatUpdateConfig).toHaveBeenCalledWith(
-        expect.objectContaining(nextConfig),
-      );
 
       expect(hoisted.cronInstances.length).toBe(2);
       expect(hoisted.cronInstances[0].stop).toHaveBeenCalledTimes(1);

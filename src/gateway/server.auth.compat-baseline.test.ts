@@ -50,7 +50,7 @@ async function expectSharedOperatorScopesCleared(
     });
     expect(res.ok).toBe(true);
 
-    const adminRes = await rpcReq(ws, "set-heartbeats", { enabled: false });
+    const adminRes = await rpcReq(ws, "system-event", { text: "ping" });
     expect(adminRes.ok).toBe(false);
     expect(adminRes.error?.message ?? "").toContain("missing scope");
   } finally {

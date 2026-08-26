@@ -12,6 +12,7 @@ import {
 } from "./zod-schema.core.js";
 import { sensitive } from "./zod-schema.sensitive.js";
 
+/** @deprecated Heartbeat configuration has been retired. Preserved for strict-parse schema compatibility. */
 export const HeartbeatSchema = z
   .object({
     every: z.string().optional(),

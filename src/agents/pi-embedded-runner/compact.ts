@@ -46,7 +46,6 @@ import { resolveContextWindowInfo } from "../context-window-guard.js";
 import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
 import { resolveOpenClawDocsPath } from "../docs-path.js";
-import { resolveHeartbeatPromptForSystemPrompt } from "../heartbeat-system-prompt.js";
 import {
   applyAuthHeaderOverride,
   applyLocalNoAuthHeaderOverride,
@@ -686,11 +685,7 @@ export async function compactEmbeddedPiSessionDirect(
             ownerDisplay: ownerDisplay.ownerDisplay,
             ownerDisplaySecret: ownerDisplay.ownerDisplaySecret,
             reasoningTagHint,
-            heartbeatPrompt: resolveHeartbeatPromptForSystemPrompt({
-              config: params.config,
-              agentId: sessionAgentId,
-              defaultAgentId,
-            }),
+            heartbeatPrompt: undefined,
             skillsPrompt,
             docsPath: docsPath ?? undefined,
             promptMode,

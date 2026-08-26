@@ -6,7 +6,6 @@ import {
   DefaultResourceLoader,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { filterHeartbeatPairs } from "../../../auto-reply/heartbeat-filter.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { ModelCompatConfig } from "../../../config/types.models.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
@@ -42,7 +41,6 @@ import {
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
-import { resolveHeartbeatPromptForSystemPrompt } from "../../heartbeat-system-prompt.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
 import { buildModelAliasLines } from "../../model-alias-lines.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
@@ -705,19 +703,7 @@ export async function runEmbeddedAttempt(
       moduleUrl: import.meta.url,
     });
     const ownerDisplay = resolveOwnerDisplaySetting(params.config);
-    const heartbeatPrompt = shouldInjectHeartbeatPrompt({
-      config: params.config,
-      agentId: sessionAgentId,
-      defaultAgentId,
-      isDefaultAgent,
-      trigger: params.trigger,
-    })
-      ? resolveHeartbeatPromptForSystemPrompt({
-          config: params.config,
-          agentId: sessionAgentId,
-          defaultAgentId,
-        })
-      : undefined;
+    const heartbeatPrompt = undefined;
     const promptContribution = resolveProviderSystemPromptContribution({
       provider: params.provider,
       config: params.config,

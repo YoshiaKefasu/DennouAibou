@@ -19,13 +19,13 @@ import {
   normalizeRpcAttachmentsToChatAttachments,
   parseMessageWithAttachments,
   registerApnsRegistration,
-  requestHeartbeatNow,
+  requestWakeNow,
   resolveGatewayModelSupportsImages,
   resolveOutboundTarget,
   resolveSessionAgentId,
   resolveSessionModelRef,
   sanitizeInboundSystemTags,
-  scopedHeartbeatWakeOptions,
+  scopedWakeOptions,
   updateSessionStore,
 } from "./server-node-events.runtime.js";
 
@@ -547,7 +547,7 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
         trusted: false,
       });
       if (queued) {
-        requestHeartbeatNow({ reason: "notifications-event", sessionKey });
+        requestWakeNow({ reason: "notifications-event", sessionKey });
       }
       return;
     }
@@ -636,7 +636,7 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
       // Scope wakes only for canonical agent sessions. Synthetic node-* fallback
       // keys should keep legacy unscoped behavior so enabled non-main heartbeat
       // agents still run when no explicit agent session is provided.
-      requestHeartbeatNow(scopedHeartbeatWakeOptions(sessionKey, { reason: "exec-event" }));
+      requestWakeNow(scopedWakeOptions(sessionKey, { reason: "exec-event" }));
       return;
     }
     case "push.apns.register": {

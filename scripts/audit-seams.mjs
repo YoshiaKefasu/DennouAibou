@@ -599,10 +599,10 @@ function describeCronSeamKinds(relativePath, source) {
     "../../cli/outbound-send-deps.js",
   ]);
   const importsHeartbeat = hasAnyImportSource(source, [
-    "../auto-reply/heartbeat.js",
-    "../../auto-reply/heartbeat.js",
-    "../infra/heartbeat-wake.js",
-    "../../infra/heartbeat-wake.js",
+    "../auto-reply/heartbeat-token.js",
+    "../../auto-reply/heartbeat-token.js",
+    "../infra/event-pump.js",
+    "../../infra/event-pump.js",
   ]);
   const importsFollowup = hasAnyImportSource(source, [
     "./subagent-followup.js",
@@ -718,7 +718,7 @@ function describeSubagentSeamKinds(relativePath, source) {
   ]);
   const importsParentStream = hasAnyImportSource(source, [
     "./acp-spawn-parent-stream.js",
-    "../infra/heartbeat-wake.js",
+    "../infra/event-pump.js",
     "../infra/system-events.js",
     "../infra/agent-events.js",
   ]);
@@ -761,7 +761,7 @@ function describeSubagentSeamKinds(relativePath, source) {
 
   if (
     importsParentStream &&
-    /\bstartAcpSpawnParentStreamRelay\b|\brequestHeartbeatNow\b|\benqueueSystemEvent\b|\bonAgentEvent\b|\bstreamTo\b/.test(
+    /\bstartAcpSpawnParentStreamRelay\b|\brequestWakeNow\b|\benqueueSystemEvent\b|\bonAgentEvent\b|\bstreamTo\b/.test(
       source,
     )
   ) {

@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { stripHeartbeatToken } from "../auto-reply/heartbeat.js";
+import { stripHeartbeatToken } from "../auto-reply/heartbeat-token.js";
 import { isSilentReplyText } from "../auto-reply/tokens.js";
 
 export const TOOL_RESULT_REAL_CONVERSATION_LOOKBACK = 20;

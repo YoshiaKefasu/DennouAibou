@@ -16,8 +16,8 @@ function createMockState(jobs: CronJob[]): CronServiceState {
         error: vi.fn(),
       },
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
-      runHeartbeatOnce: vi.fn(),
+      requestWakeNow: vi.fn(),
+      runEventPumpOnce: vi.fn(),
       runIsolatedAgentJob: vi.fn(),
       onEvent: vi.fn(),
       persistence: {

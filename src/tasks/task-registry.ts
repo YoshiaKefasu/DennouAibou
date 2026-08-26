@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { OpenClawConfig } from "../config/config.js";
 import { onAgentEvent } from "../infra/agent-events.js";
-import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
+import { requestWakeNow } from "../infra/event-pump.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
@@ -969,7 +969,7 @@ function queueTaskSystemEvent(task: TaskRecord, text: string) {
     contextKey: `task:${task.taskId}`,
     deliveryContext: owner.requesterOrigin,
   });
-  requestHeartbeatNow({
+  requestWakeNow({
     reason: "background-task",
     sessionKey: ownerKey,
   });
@@ -991,7 +991,7 @@ function queueBlockedTaskFollowup(task: TaskRecord) {
     contextKey: `task:${task.taskId}:blocked-followup`,
     deliveryContext: owner.requesterOrigin,
   });
-  requestHeartbeatNow({
+  requestWakeNow({
     reason: "background-task-blocked",
     sessionKey: ownerKey,
   });

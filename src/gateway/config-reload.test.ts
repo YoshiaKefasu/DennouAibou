@@ -177,32 +177,27 @@ describe("buildGatewayReloadPlan", () => {
     expect(plan.restartChannels).toEqual(expected);
   });
 
-  it("restarts heartbeat when model-related config changes", () => {
+  it("treats model-related config changes as noop paths without restarting gateway", () => {
     const plan = buildGatewayReloadPlan([
       "models.providers.openai.models",
       "agents.defaults.model",
     ]);
     expect(plan.restartGateway).toBe(false);
-    expect(plan.restartHeartbeat).toBe(true);
-    expect(plan.hotReasons).toEqual(
+    expect(plan.noopPaths).toEqual(
       expect.arrayContaining(["models.providers.openai.models", "agents.defaults.model"]),
     );
   });
 
-  it("restarts heartbeat when agents.defaults.models allowlist changes", () => {
+  it("treats agents.defaults.models allowlist changes as no-op paths", () => {
     const plan = buildGatewayReloadPlan(["agents.defaults.models"]);
     expect(plan.restartGateway).toBe(false);
-    expect(plan.restartHeartbeat).toBe(true);
-    expect(plan.hotReasons).toContain("agents.defaults.models");
-    expect(plan.noopPaths).toEqual([]);
+    expect(plan.noopPaths).toContain("agents.defaults.models");
   });
 
-  it("restarts heartbeat when agents.list entries change", () => {
+  it("treats agents.list entries changes as no-op paths", () => {
     const plan = buildGatewayReloadPlan(["agents.list"]);
     expect(plan.restartGateway).toBe(false);
-    expect(plan.restartHeartbeat).toBe(true);
-    expect(plan.hotReasons).toContain("agents.list");
-    expect(plan.noopPaths).toEqual([]);
+    expect(plan.noopPaths).toContain("agents.list");
   });
 
   it("hot-reloads health monitor when channelHealthCheckMinutes changes", () => {
@@ -269,8 +264,7 @@ describe("buildGatewayReloadPlan", () => {
     {
       path: "agents.list",
       expectRestartGateway: false,
-      expectHotPath: "agents.list",
-      expectRestartHeartbeat: true,
+      expectNoopPath: "agents.list",
     },
     {
       path: "gateway.remote.url",
@@ -307,9 +301,6 @@ describe("buildGatewayReloadPlan", () => {
     }
     if (testCase.expectReloadHooks) {
       expect(plan.reloadHooks).toBe(true);
-    }
-    if (testCase.expectRestartHeartbeat) {
-      expect(plan.restartHeartbeat).toBe(true);
     }
   });
 });

@@ -3,7 +3,6 @@ import type { WebSocketServer } from "ws";
 import type { CanvasHostHandler, CanvasHostServer } from "../canvas-host/server.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
 import { stopGmailWatcher } from "../hooks/gmail-watcher.js";
-import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 
@@ -20,7 +19,7 @@ export function createGatewayCloseHandler(params: {
   stopChannel: (name: ChannelId, accountId?: string) => Promise<void>;
   pluginServices: PluginServicesHandle | null;
   cron: { stop: () => void };
-  heartbeatRunner: HeartbeatRunner;
+  eventPumpDisposer?: (() => void) | null;
   stopTaskRegistryMaintenance?: (() => void) | null;
   nodePresenceTimers: Map<string, ReturnType<typeof setInterval>>;
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
@@ -29,7 +28,6 @@ export function createGatewayCloseHandler(params: {
   dedupeCleanup: ReturnType<typeof setInterval>;
   mediaCleanup: ReturnType<typeof setInterval> | null;
   agentUnsub: (() => void) | null;
-  heartbeatUnsub: (() => void) | null;
   transcriptUnsub: (() => void) | null;
   lifecycleUnsub: (() => void) | null;
   chatRunState: { clear: () => void };
@@ -79,7 +77,13 @@ export function createGatewayCloseHandler(params: {
       }
       await stopGmailWatcher();
       params.cron.stop();
-      params.heartbeatRunner.stop();
+      if (params.eventPumpDisposer) {
+        try {
+          params.eventPumpDisposer();
+        } catch {
+          /* ignore */
+        }
+      }
       try {
         params.stopTaskRegistryMaintenance?.();
       } catch {
@@ -102,13 +106,6 @@ export function createGatewayCloseHandler(params: {
       if (params.agentUnsub) {
         try {
           params.agentUnsub();
-        } catch {
-          /* ignore */
-        }
-      }
-      if (params.heartbeatUnsub) {
-        try {
-          params.heartbeatUnsub();
         } catch {
           /* ignore */
         }

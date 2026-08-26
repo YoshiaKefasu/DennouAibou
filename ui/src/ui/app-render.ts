@@ -1938,7 +1938,6 @@ export function renderApp(state: AppViewState) {
                 status: state.debugStatus,
                 health: state.debugHealth,
                 models: state.debugModels,
-                heartbeat: state.debugHeartbeat,
                 eventLog: state.eventLog,
                 methods: (state.hello?.features?.methods ?? []).toSorted(),
                 callMethod: state.debugCallMethod,

@@ -158,11 +158,11 @@ export type AgentDefaultsConfig = {
   typingIntervalSeconds?: number;
   /** Typing indicator start mode (never|instant|thinking|message). */
   typingMode?: TypingMode;
-  /** Periodic background heartbeat runs. */
+  /** @deprecated Periodic background heartbeat runs have been retired. Kept for config compatibility. */
   heartbeat?: {
-    /** Heartbeat interval (duration string, default unit: minutes; default: 30m). */
+    /** @deprecated Heartbeat cadence setting (retired). */
     every?: string;
-    /** Optional active-hours window (local time); heartbeats run only inside this window. */
+    /** @deprecated Optional active-hours window (retired). */
     activeHours?: {
       /** Start time (24h, HH:MM). Inclusive. */
       start?: string;
@@ -171,44 +171,31 @@ export type AgentDefaultsConfig = {
       /** Timezone for the window ("user", "local", or IANA TZ id). Default: "user". */
       timezone?: string;
     };
-    /** Heartbeat model override (provider/model). */
+    /** @deprecated Heartbeat model override (retired). */
     model?: string;
-    /** Session key for heartbeat runs ("main" or explicit session key). */
+    /** @deprecated Session key for heartbeat runs (retired). */
     session?: string;
-    /** Delivery target ("last", "none", or a channel id). */
+    /** @deprecated Delivery target (retired). */
     target?: ChannelId;
-    /** Direct/DM delivery policy. Default: "allow". */
+    /** @deprecated Direct/DM delivery policy (retired). */
     directPolicy?: "allow" | "block";
-    /** Optional delivery override (E.164 for WhatsApp, chat id for Telegram). Supports :topic:NNN suffix for Telegram topics. */
+    /** @deprecated Optional delivery override (retired). */
     to?: string;
-    /** Optional account id for multi-account channels. */
+    /** @deprecated Optional account id for multi-account channels (retired). */
     accountId?: string;
-    /** Override the heartbeat prompt body (default: "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK."). */
+    /** @deprecated Override the heartbeat prompt body (retired). */
     prompt?: string;
-    /** Include the ## Heartbeats system prompt section for the default agent (default: true). */
+    /** @deprecated Include the system prompt section (retired). */
     includeSystemPromptSection?: boolean;
-    /** Max chars allowed after HEARTBEAT_OK before delivery (default: 30). */
+    /** @deprecated Max chars allowed after HEARTBEAT_OK before delivery (retired). */
     ackMaxChars?: number;
-    /** Suppress tool error warning payloads during heartbeat runs. */
+    /** @deprecated Suppress tool error warning payloads during heartbeat runs (retired). */
     suppressToolErrorWarnings?: boolean;
-    /**
-     * If true, run heartbeat turns with lightweight bootstrap context.
-     * Lightweight mode keeps only HEARTBEAT.md from workspace bootstrap files.
-     */
+    /** @deprecated Run heartbeat turns with lightweight bootstrap context (retired). */
     lightContext?: boolean;
-    /**
-     * If true, run heartbeat turns in an isolated session with no prior
-     * conversation history. The heartbeat only sees its bootstrap context
-     * (HEARTBEAT.md when lightContext is also enabled). Dramatically reduces
-     * per-heartbeat token cost by avoiding the full session transcript.
-     */
+    /** @deprecated Run heartbeat turns in an isolated session (retired). */
     isolatedSession?: boolean;
-    /**
-     * When enabled, deliver the model's reasoning payload for heartbeat runs (when available)
-     * as a separate message prefixed with `Reasoning:` (same as `/reasoning on`).
-     *
-     * Default: false (only the final heartbeat payload is delivered).
-     */
+    /** @deprecated Deliver reasoning payload for heartbeat runs (retired). */
     includeReasoning?: boolean;
   };
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
 import { onAgentEvent } from "../../infra/agent-events.js";
-import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
+import { requestWakeNow } from "../../infra/event-pump.js";
 import * as execModule from "../../process/exec.js";
 import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import { VERSION } from "../../version.js";
@@ -142,10 +142,9 @@ describe("plugin runtime command execution", () => {
       expected: onSessionTranscriptUpdate,
     },
     {
-      name: "exposes runtime.system.requestHeartbeatNow",
-      readValue: (runtime: ReturnType<typeof createPluginRuntime>) =>
-        runtime.system.requestHeartbeatNow,
-      expected: requestHeartbeatNow,
+      name: "exposes runtime.system.requestWakeNow",
+      readValue: (runtime: ReturnType<typeof createPluginRuntime>) => runtime.system.requestWakeNow,
+      expected: requestWakeNow,
     },
     {
       name: "exposes runtime.version from the shared VERSION constant",
@@ -238,18 +237,13 @@ describe("plugin runtime command execution", () => {
   });
 
   it("modelAuth wrappers strip agentDir and store to prevent credential steering", async () => {
-    // The wrappers should not forward agentDir or store from plugin callers.
-    // We verify this by checking the wrapper functions exist and are not the
-    // raw implementations (they are wrapped, not direct references).
     const { getApiKeyForModel: rawGetApiKey } = await import("../../agents/model-auth.js");
     const runtime = createPluginRuntime();
-    // Wrappers should NOT be the same reference as the raw functions
     expect(runtime.modelAuth.getApiKeyForModel).not.toBe(rawGetApiKey);
   });
 
   it("keeps subagent unavailable by default even after gateway initialization", async () => {
     const { runtime } = createGatewaySubagentRunFixture();
-
     expectGatewaySubagentRunFailure(runtime, { sessionKey: "s-1", message: "hello" });
   });
 

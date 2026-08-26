@@ -1,9 +1,8 @@
-import { DEFAULT_HEARTBEAT_ACK_MAX_CHARS, stripHeartbeatToken } from "../auto-reply/heartbeat.js";
+import { stripHeartbeatToken } from "../auto-reply/heartbeat-token.js";
 import { normalizeVerboseLevel } from "../auto-reply/thinking.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { loadConfig } from "../config/config.js";
 import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
-import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
 import { loadGatewaySessionRow } from "./server-chat.load-gateway-session-row.runtime.js";
 import { persistGatewaySessionLifecycleEvent } from "./server-chat.persist-session-lifecycle.runtime.js";
@@ -14,12 +13,9 @@ import { formatForLog } from "./ws-log.js";
 function resolveHeartbeatAckMaxChars(): number {
   try {
     const cfg = loadConfig();
-    return Math.max(
-      0,
-      cfg.agents?.defaults?.heartbeat?.ackMaxChars ?? DEFAULT_HEARTBEAT_ACK_MAX_CHARS,
-    );
+    return Math.max(0, cfg.agents?.defaults?.heartbeat?.ackMaxChars ?? 300);
   } catch {
-    return DEFAULT_HEARTBEAT_ACK_MAX_CHARS;
+    return 300;
   }
 }
 
@@ -42,18 +38,7 @@ function resolveHeartbeatContext(runId: string, sourceRunId?: string) {
  */
 function shouldHideHeartbeatChatOutput(runId: string, sourceRunId?: string): boolean {
   const runContext = resolveHeartbeatContext(runId, sourceRunId);
-  if (!runContext?.isHeartbeat) {
-    return false;
-  }
-
-  try {
-    const cfg = loadConfig();
-    const visibility = resolveHeartbeatVisibility({ cfg, channel: "webchat" });
-    return !visibility.showOk;
-  } catch {
-    // Default to suppressing if we can't load config
-    return true;
-  }
+  return Boolean(runContext?.isHeartbeat);
 }
 
 function normalizeHeartbeatChatFinalText(params: {

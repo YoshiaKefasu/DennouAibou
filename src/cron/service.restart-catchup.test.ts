@@ -20,14 +20,14 @@ describe("CronService restart catch-up", () => {
   function createRestartCronService(params: {
     storePath: string;
     enqueueSystemEvent: ReturnType<typeof vi.fn>;
-    requestHeartbeatNow: ReturnType<typeof vi.fn>;
+    requestWakeNow: ReturnType<typeof vi.fn>;
   }) {
     return new CronService({
       storePath: params.storePath,
       cronEnabled: true,
       log: noopLogger,
       enqueueSystemEvent: params.enqueueSystemEvent as never,
-      requestHeartbeatNow: params.requestHeartbeatNow as never,
+      requestWakeNow: params.requestWakeNow as never,
       runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })) as never,
     });
   }
@@ -52,24 +52,24 @@ describe("CronService restart catch-up", () => {
     run: (params: {
       cron: CronService;
       enqueueSystemEvent: ReturnType<typeof vi.fn>;
-      requestHeartbeatNow: ReturnType<typeof vi.fn>;
+      requestWakeNow: ReturnType<typeof vi.fn>;
     }) => Promise<void>,
   ) {
     const store = await makeStorePath();
     const enqueueSystemEvent = vi.fn();
-    const requestHeartbeatNow = vi.fn();
+    const requestWakeNow = vi.fn();
 
     await writeStoreJobs(store.storePath, jobs);
 
     const cron = createRestartCronService({
       storePath: store.storePath,
       enqueueSystemEvent,
-      requestHeartbeatNow,
+      requestWakeNow,
     });
 
     try {
       await cron.start();
-      await run({ cron, enqueueSystemEvent, requestHeartbeatNow });
+      await run({ cron, enqueueSystemEvent, requestWakeNow });
     } finally {
       cron.stop();
       await store.cleanup();
@@ -99,12 +99,12 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ cron, enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ cron, enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).toHaveBeenCalledWith(
           "digest now",
           expect.objectContaining({ agentId: undefined }),
         );
-        expect(requestHeartbeatNow).toHaveBeenCalled();
+        expect(requestWakeNow).toHaveBeenCalled();
 
         const listedJobs = await cron.list({ includeDisabled: true });
         const updated = listedJobs.find((job) => job.id === "restart-overdue-job");
@@ -137,7 +137,7 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ cron, enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ cron, enqueueSystemEvent, requestWakeNow }) => {
         expect(noopLogger.warn).toHaveBeenCalledWith(
           expect.objectContaining({ jobId: "restart-stale-running" }),
           "cron: clearing stale running marker on startup",
@@ -147,7 +147,7 @@ describe("CronService restart catch-up", () => {
           "resume stale marker",
           expect.objectContaining({ agentId: undefined }),
         );
-        expect(requestHeartbeatNow).toHaveBeenCalled();
+        expect(requestWakeNow).toHaveBeenCalled();
 
         const listedJobs = await cron.list({ includeDisabled: true });
         const updated = listedJobs.find((job) => job.id === "restart-stale-running");
@@ -180,12 +180,12 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ cron, enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ cron, enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).toHaveBeenCalledWith(
           "catch missed slot",
           expect.objectContaining({ agentId: undefined }),
         );
-        expect(requestHeartbeatNow).toHaveBeenCalled();
+        expect(requestWakeNow).toHaveBeenCalled();
 
         const listedJobs = await cron.list({ includeDisabled: true });
         const updated = listedJobs.find((job) => job.id === "restart-missed-slot");
@@ -216,9 +216,9 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ cron, enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ cron, enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).not.toHaveBeenCalled();
-        expect(requestHeartbeatNow).not.toHaveBeenCalled();
+        expect(requestWakeNow).not.toHaveBeenCalled();
 
         const listedJobs = await cron.list({ includeDisabled: true });
         const updated = listedJobs.find((job) => job.id === "restart-stale-one-shot");
@@ -248,9 +248,9 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).not.toHaveBeenCalled();
-        expect(requestHeartbeatNow).not.toHaveBeenCalled();
+        expect(requestWakeNow).not.toHaveBeenCalled();
       },
     );
   });
@@ -278,9 +278,9 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).not.toHaveBeenCalled();
-        expect(requestHeartbeatNow).not.toHaveBeenCalled();
+        expect(requestWakeNow).not.toHaveBeenCalled();
       },
     );
   });
@@ -309,12 +309,12 @@ describe("CronService restart catch-up", () => {
           },
         },
       ],
-      async ({ enqueueSystemEvent, requestHeartbeatNow }) => {
+      async ({ enqueueSystemEvent, requestWakeNow }) => {
         expect(enqueueSystemEvent).toHaveBeenCalledWith(
           "replay after backoff elapsed",
           expect.objectContaining({ agentId: undefined }),
         );
-        expect(requestHeartbeatNow).toHaveBeenCalled();
+        expect(requestWakeNow).toHaveBeenCalled();
       },
     );
   });
@@ -336,7 +336,7 @@ describe("CronService restart catch-up", () => {
       log: noopLogger,
       nowMs: () => now,
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
+      requestWakeNow: vi.fn(),
       runIsolatedAgentJob: vi.fn(async () => {
         now += 6_000;
         return { status: "ok" as const, summary: "ok" };

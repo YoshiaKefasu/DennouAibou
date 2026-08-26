@@ -44,6 +44,9 @@
 3. cron のメインセッション配信はイベントポンプ経由に接続し直し（挙動維持、名称だけ変わる）
 4. `types.agent-defaults.ts:163` の虚偽 JSDoc（「default: 30m」、実際はデフォルト無効）はこの際に修正
 
+**挙動変化（意図的）**:
+- wake 優先度マップを整理: `cron:*` は DEFAULT から ACTION へ昇格、`notifications-event` を新規 ACTION として追加、定期巡回専用だった INTERVAL tier は廃止。システムイベント契機の wake が高優先度で即座に消化される設計へ統一。
+
 ---
 
 ## 4. F-2 抽出波（実施順・各波=段階コミット+code-reviewer レビュー）
