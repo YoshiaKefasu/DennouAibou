@@ -51,30 +51,98 @@ vi.mock("../plugin-sdk/memory-core-engine-runtime.js", () => ({
   repairShortTermPromotionArtifacts,
   getBuiltinMemoryEmbeddingProviderDoctorMetadata: vi.fn((provider: string) => {
     if (provider === "gemini") {
-      return { authProviderId: "google", envVars: ["GEMINI_API_KEY"] };
+      return {
+        authProviderId: "google",
+        envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+        transport: "remote",
+      };
     }
     if (provider === "mistral") {
-      return { authProviderId: "mistral", envVars: ["MISTRAL_API_KEY"] };
+      return { authProviderId: "mistral", envVars: ["MISTRAL_API_KEY"], transport: "remote" };
     }
     if (provider === "openai") {
-      return { authProviderId: "openai", envVars: ["OPENAI_API_KEY"] };
+      return { authProviderId: "openai", envVars: ["OPENAI_API_KEY"], transport: "remote" };
+    }
+    if (provider === "voyage") {
+      return { authProviderId: "voyage", envVars: ["VOYAGE_API_KEY"], transport: "remote" };
     }
     return null;
   }),
   listBuiltinAutoSelectMemoryEmbeddingProviderDoctorMetadata: vi.fn(() => [
+    { providerId: "local", authProviderId: "local", envVars: [], transport: "local" },
     {
       providerId: "openai",
       authProviderId: "openai",
       envVars: ["OPENAI_API_KEY"],
       transport: "remote",
     },
-    { providerId: "local", authProviderId: "local", envVars: [], transport: "local" },
+    {
+      providerId: "gemini",
+      authProviderId: "google",
+      envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      transport: "remote",
+    },
+    {
+      providerId: "voyage",
+      authProviderId: "voyage",
+      envVars: ["VOYAGE_API_KEY"],
+      transport: "remote",
+    },
+    {
+      providerId: "mistral",
+      authProviderId: "mistral",
+      envVars: ["MISTRAL_API_KEY"],
+      transport: "remote",
+    },
   ]),
 }));
 
 import { noteMemorySearchHealth } from "./doctor-memory-search.js";
 import { maybeRepairMemoryRecallHealth, noteMemoryRecallHealth } from "./doctor-memory-search.js";
 import { detectLegacyWorkspaceDirs } from "./doctor-workspace.js";
+
+// beforeEach moved to file top-level so the 2nd describe (memory recall doctor
+// integration) and 3rd describe (detectLegacyWorkspaceDirs) also get clean
+// mock state. Previously leaked from the 1st describe's beforeEach.
+beforeEach(() => {
+  note.mockClear();
+  resolveDefaultAgentId.mockClear();
+  resolveAgentDir.mockClear();
+  resolveAgentWorkspaceDir.mockClear();
+  resolveMemorySearchConfig.mockReset();
+  resolveApiKeyForProvider.mockReset();
+  resolveApiKeyForProvider.mockRejectedValue(new Error("missing key"));
+  resolveActiveMemoryBackendConfig.mockReset();
+  resolveActiveMemoryBackendConfig.mockReturnValue({ backend: "builtin", citations: "auto" });
+  getActiveMemorySearchManager.mockReset();
+  getActiveMemorySearchManager.mockResolvedValue({
+    manager: {
+      status: () => ({ workspaceDir: "/tmp/agent-default/workspace", backend: "builtin" }),
+      close: vi.fn(async () => {}),
+    },
+  });
+  checkQmdBinaryAvailability.mockReset();
+  checkQmdBinaryAvailability.mockResolvedValue({ available: true });
+  auditShortTermPromotionArtifacts.mockReset();
+  auditShortTermPromotionArtifacts.mockResolvedValue({
+    storePath: "/tmp/agent-default/workspace/memory/.dreams/short-term-recall.json",
+    lockPath: "/tmp/agent-default/workspace/memory/.dreams/short-term-promotion.lock",
+    exists: true,
+    entryCount: 1,
+    promotedCount: 0,
+    spacedEntryCount: 0,
+    conceptTaggedEntryCount: 1,
+    invalidEntryCount: 0,
+    issues: [],
+  });
+  repairShortTermPromotionArtifacts.mockReset();
+  repairShortTermPromotionArtifacts.mockResolvedValue({
+    changed: false,
+    removedInvalidEntries: 0,
+    rewroteStore: false,
+    removedStaleLock: false,
+  });
+});
 
 describe("noteMemorySearchHealth", () => {
   const cfg = {} as OpenClawConfig;
@@ -91,46 +159,6 @@ describe("noteMemorySearchHealth", () => {
     expect(note).not.toHaveBeenCalled();
     expect(resolveApiKeyForProvider).not.toHaveBeenCalled();
   }
-
-  beforeEach(() => {
-    note.mockClear();
-    resolveDefaultAgentId.mockClear();
-    resolveAgentDir.mockClear();
-    resolveAgentWorkspaceDir.mockClear();
-    resolveMemorySearchConfig.mockReset();
-    resolveApiKeyForProvider.mockReset();
-    resolveApiKeyForProvider.mockRejectedValue(new Error("missing key"));
-    resolveActiveMemoryBackendConfig.mockReset();
-    resolveActiveMemoryBackendConfig.mockReturnValue({ backend: "builtin", citations: "auto" });
-    getActiveMemorySearchManager.mockReset();
-    getActiveMemorySearchManager.mockResolvedValue({
-      manager: {
-        status: () => ({ workspaceDir: "/tmp/agent-default/workspace", backend: "builtin" }),
-        close: vi.fn(async () => {}),
-      },
-    });
-    checkQmdBinaryAvailability.mockReset();
-    checkQmdBinaryAvailability.mockResolvedValue({ available: true });
-    auditShortTermPromotionArtifacts.mockReset();
-    auditShortTermPromotionArtifacts.mockResolvedValue({
-      storePath: "/tmp/agent-default/workspace/memory/.dreams/short-term-recall.json",
-      lockPath: "/tmp/agent-default/workspace/memory/.dreams/short-term-promotion.lock",
-      exists: true,
-      entryCount: 1,
-      promotedCount: 0,
-      spacedEntryCount: 0,
-      conceptTaggedEntryCount: 1,
-      invalidEntryCount: 0,
-      issues: [],
-    });
-    repairShortTermPromotionArtifacts.mockReset();
-    repairShortTermPromotionArtifacts.mockResolvedValue({
-      changed: false,
-      removedInvalidEntries: 0,
-      rewroteStore: false,
-      removedStaleLock: false,
-    });
-  });
 
   it("does not warn when local provider is set with no explicit modelPath (default model fallback)", async () => {
     resolveMemorySearchConfig.mockReturnValue({

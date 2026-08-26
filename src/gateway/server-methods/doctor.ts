@@ -11,7 +11,7 @@ import {
   resolveMemoryRemDreamingConfig,
   resolveMemoryDreamingConfig,
   resolveMemoryDreamingWorkspaces,
-} from "../../memory-host-sdk/dreaming.js";
+} from "../../plugin-sdk/memory-core-host-status.js";
 import { getActiveMemorySearchManager } from "../../plugins/memory-runtime.js";
 import { formatError } from "../server-utils.js";
 import type { GatewayRequestHandlers } from "./types.js";
