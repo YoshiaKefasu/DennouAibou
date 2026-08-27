@@ -591,7 +591,7 @@ describe("agentCommand", () => {
     });
   });
 
-  it("uses origin.provider for channel-specific session reset overrides", async () => {
+  it("reuses an existing main session even with legacy reset / resetByChannel config (no auto-reset)", async () => {
     await withTempHome(async (home) => {
       const store = path.join(home, "sessions.json");
       writeSessionStoreSeed(store, {
@@ -602,6 +602,10 @@ describe("agentCommand", () => {
         },
       });
       const cfg = mockConfig(home, store);
+      // The legacy `session.reset` / `session.resetByChannel` keys are still
+      // accepted by the zod schema for backward compatibility, but they have
+      // no effect at runtime. Sessions are never rotated automatically, so an
+      // existing entry must always be reused when present.
       cfg.session = {
         ...cfg.session,
         reset: { mode: "idle", idleMinutes: 10 },

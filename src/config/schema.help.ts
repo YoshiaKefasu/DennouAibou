@@ -1243,29 +1243,29 @@ export const FIELD_HELP: Record<string, string> = {
   "session.identityLinks":
     "Maps canonical identities to provider-prefixed peer IDs so equivalent users resolve to one DM thread (example: telegram:123456). Use this when the same human appears across multiple channels or accounts.",
   "session.resetTriggers":
-    "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation.",
+    "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation. @deprecated Accepted for backward compatibility; automatic session reset machinery has been removed and this field has no effect at runtime.",
   "session.idleMinutes":
-    "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType.",
+    "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
   "session.reset":
-    "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ.",
+    "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ. @deprecated Accepted for backward compatibility; automatic session reset policies (idle / daily) have been removed.",
   "session.reset.mode":
-    'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns.',
+    'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns. @deprecated Accepted for backward compatibility; the value has no effect at runtime.',
   "session.reset.atHour":
-    "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior.",
+    "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.reset.idleMinutes":
-    "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads.",
+    "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
   "session.resetByType":
-    "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages.",
+    "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages. @deprecated Accepted for backward compatibility; per-type automatic reset overrides have been removed.",
   "session.resetByType.direct":
-    "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias.",
+    "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.dm":
-    "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent.",
+    "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.group":
-    "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem.",
+    "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.thread":
-    "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types.",
+    "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByChannel":
-    "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies.",
+    "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies. @deprecated Accepted for backward compatibility; per-channel automatic reset overrides have been removed.",
   "session.store":
     "Sets the session storage file path used to persist session records across restarts. Use an explicit path only when you need custom disk layout, backup routing, or mounted-volume storage.",
   "session.typingIntervalSeconds":

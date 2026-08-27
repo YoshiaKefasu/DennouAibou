@@ -13,11 +13,6 @@ import {
   resolveSessionTranscriptPathInDir,
   validateSessionId,
 } from "./paths.js";
-import {
-  evaluateSessionFreshness,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-} from "./reset.js";
 import { resolveAndPersistSessionFile } from "./session-file.js";
 import { clearSessionStoreCacheForTest, loadSessionStore, updateSessionStore } from "./store.js";
 import { mergeSessionEntry, type SessionEntry } from "./types.js";
@@ -132,196 +127,19 @@ describe("session path safety", () => {
   });
 });
 
-describe("resolveSessionResetPolicy", () => {
-  describe("backward compatibility: resetByType.dm -> direct", () => {
-    it("does not use dm fallback for group/thread types", () => {
-      const sessionCfg = {
-        resetByType: {
-          dm: { mode: "idle" as const, idleMinutes: 45 },
-        },
-      } as unknown as SessionConfig;
-
-      const groupPolicy = resolveSessionResetPolicy({
-        sessionCfg,
-        resetType: "group",
-      });
-
-      // dm alias only feeds the "direct" type; group/thread fall back to the
-      // default reset mode ("off"), never to the dm idle window.
-      expect(groupPolicy.mode).toBe("off");
-    });
-  });
-
-  it("uses the configured daily reset at 4am local time", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: { mode: "daily" },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toMatchObject({
-      mode: "daily",
-      atHour: 4,
-    });
-  });
-
-  it("treats idleMinutes=0 as never expiring by inactivity", () => {
-    const freshness = evaluateSessionFreshness({
-      updatedAt: 1_000,
-      now: 60 * 60 * 1_000,
-      policy: {
-        mode: "idle",
-        atHour: 4,
-        idleMinutes: 0,
-      },
-    });
-
-    expect(freshness).toEqual({
-      fresh: true,
-      dailyResetAt: undefined,
-      idleExpiresAt: undefined,
-    });
-  });
-
-  it("disables automatic resets when mode=off", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: {
-          mode: "off",
-          atHour: 9,
-          idleMinutes: 45,
-        },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toEqual({
-      mode: "off",
-      atHour: 9,
-      idleMinutes: undefined,
-    });
-
-    expect(
-      evaluateSessionFreshness({
-        updatedAt: 1_000,
-        now: 60 * 60 * 1_000,
-        policy,
-      }),
-    ).toEqual({
-      fresh: true,
-      dailyResetAt: undefined,
-      idleExpiresAt: undefined,
-    });
-  });
-
-  it("lets type-specific off override a daily base reset", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: {
-          mode: "daily",
-          atHour: 4,
-          idleMinutes: 120,
-        },
-        resetByType: {
-          direct: {
-            mode: "off",
-          },
-        },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toEqual({
-      mode: "off",
-      atHour: 4,
-      idleMinutes: undefined,
-    });
-  });
-
-  describe("resolveProtectedSessionResetPolicy", () => {
-    it("forces mode off for the protected main session", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "daily" },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:main",
-      });
-
-      expect(policy).toEqual({
-        mode: "off",
-        atHour: 4,
-        idleMinutes: undefined,
-      });
-    });
-
-    it("recognizes main aliases when forcing the policy off", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "idle", idleMinutes: 45 },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "main",
-      });
-
-      expect(policy.mode).toBe("off");
-      expect(policy.idleMinutes).toBeUndefined();
-    });
-
-    it("forces off configured protected keys", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "daily" },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:telegram:direct:123",
-        cfg: {
-          session: { protectedKeys: ["agent:main:telegram:direct:123"] },
-        },
-      });
-
-      expect(policy.mode).toBe("off");
-    });
-
-    it("leaves non-protected sessions unchanged", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "idle", idleMinutes: 45 },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:telegram:direct:other",
-      });
-
-      expect(policy).toEqual({
-        mode: "idle",
-        atHour: 4,
-        idleMinutes: 45,
-      });
-    });
-
-    it("returns the policy unchanged when no session key is provided", () => {
-      const original = resolveSessionResetPolicy({
-        sessionCfg: {
-          reset: { mode: "daily" },
-        },
-        resetType: "direct",
-      });
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: original,
-      });
-      expect(policy).toBe(original);
-    });
-  });
-});
+// Note: `describe("resolveSessionResetPolicy")` and its inner
+// `resolveProtectedSessionResetPolicy` suite have been removed because the
+// automatic session reset policy computation has been dismantled. Kasou's
+// master session is permanent; sessions are NEVER rotated based on idle
+// windows, daily boundaries, or per-type/per-channel overrides. The legacy
+// `session.reset`, `session.resetByType`, `session.resetByChannel`,
+// `session.resetTriggers`, and `session.idleMinutes` config keys remain
+// accepted by the zod schema for backward compatibility with existing KASOU
+// config files, but they have no effect at runtime. Manual reset triggers
+// (`/new`, `/reset`) remain in effect; their master session protection
+// guard is enforced in `auto-reply/reply/session.ts` via
+// `isProtectedSessionKey` and verified by the master-session immutability
+// architectural-invariant tests.
 
 describe("session store lock (Promise chain mutex)", () => {
   let lockFixtureRoot = "";

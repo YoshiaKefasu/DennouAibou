@@ -9,12 +9,6 @@ vi.mock("../../config/sessions/paths.js", () => ({
   resolveStorePath: vi.fn().mockReturnValue("/tmp/test-store.json"),
 }));
 
-vi.mock("../../config/sessions/reset.js", () => ({
-  evaluateSessionFreshness: vi.fn().mockReturnValue({ fresh: true }),
-  resolveProtectedSessionResetPolicy: vi.fn(({ policy }) => policy),
-  resolveSessionResetPolicy: vi.fn().mockReturnValue({ mode: "idle", idleMinutes: 60 }),
-}));
-
 vi.mock("../../agents/bootstrap-cache.js", () => ({
   clearBootstrapSnapshot: vi.fn(),
   clearBootstrapSnapshotOnSessionRollover: vi.fn(({ sessionKey, previousSessionId }) => {
@@ -25,7 +19,6 @@ vi.mock("../../agents/bootstrap-cache.js", () => ({
 }));
 
 import { clearBootstrapSnapshot } from "../../agents/bootstrap-cache.js";
-import { evaluateSessionFreshness } from "../../config/sessions/reset.js";
 import { loadSessionStore } from "../../config/sessions/store.js";
 import { resolveCronSession } from "./session.js";
 
@@ -39,16 +32,12 @@ function resolveWithStoredEntry(params?: {
   sessionKey?: string;
   entry?: MockSessionStoreEntry;
   forceNew?: boolean;
-  fresh?: boolean;
 }) {
   const sessionKey = params?.sessionKey ?? "webhook:stable-key";
   const store: SessionStore = params?.entry
     ? ({ [sessionKey]: params.entry as SessionStoreEntry } as SessionStore)
     : {};
   vi.mocked(loadSessionStore).mockReturnValue(store);
-  vi.mocked(evaluateSessionFreshness).mockReturnValue({
-    fresh: params?.fresh ?? true,
-  });
 
   return resolveCronSession({
     cfg: {} as OpenClawConfig,
@@ -111,14 +100,13 @@ describe("resolveCronSession", () => {
 
   // New tests for session reuse behavior (#18027)
   describe("session reuse for webhooks/cron", () => {
-    it("reuses existing sessionId when session is fresh", () => {
+    it("reuses existing sessionId when an entry is present", () => {
       const result = resolveWithStoredEntry({
         entry: {
           sessionId: "existing-session-id-123",
           updatedAt: NOW_MS - 1000,
           systemSent: true,
         },
-        fresh: true,
       });
 
       expect(result.sessionEntry.sessionId).toBe("existing-session-id-123");
@@ -127,7 +115,10 @@ describe("resolveCronSession", () => {
       expect(clearBootstrapSnapshot).not.toHaveBeenCalled();
     });
 
-    it("creates new sessionId when session is stale", () => {
+    it("reuses existing sessionId even when the entry is very stale (no auto-reset)", () => {
+      // Kasou's master session is permanent: no automatic idle/daily reset
+      // ever rotates a cron/webhook session. A 1-day-stale entry must
+      // continue to be reused.
       const result = resolveWithStoredEntry({
         entry: {
           sessionId: "old-session-id",
@@ -137,16 +128,14 @@ describe("resolveCronSession", () => {
           providerOverride: "openai",
           sendPolicy: "allow",
         },
-        fresh: false,
       });
 
-      expect(result.sessionEntry.sessionId).not.toBe("old-session-id");
-      expect(result.isNewSession).toBe(true);
-      expect(result.systemSent).toBe(false);
+      expect(result.sessionEntry.sessionId).toBe("old-session-id");
+      expect(result.isNewSession).toBe(false);
+      expect(result.systemSent).toBe(true);
       expect(result.sessionEntry.modelOverride).toBe("gpt-4.1-mini");
       expect(result.sessionEntry.providerOverride).toBe("openai");
       expect(result.sessionEntry.sendPolicy).toBe("allow");
-      expect(clearBootstrapSnapshot).toHaveBeenCalledWith("webhook:stable-key");
     });
 
     it("creates new sessionId when forceNew is true", () => {
@@ -158,7 +147,6 @@ describe("resolveCronSession", () => {
           modelOverride: "sonnet-4",
           providerOverride: "anthropic",
         },
-        fresh: true,
         forceNew: true,
       });
 
@@ -187,7 +175,6 @@ describe("resolveCronSession", () => {
           },
           modelOverride: "gpt-5.4",
         },
-        fresh: true,
         forceNew: true,
       });
 
@@ -204,32 +191,7 @@ describe("resolveCronSession", () => {
       expect(result.sessionEntry.modelOverride).toBe("gpt-5.4");
     });
 
-    it("clears delivery routing metadata when session is stale", () => {
-      const result = resolveWithStoredEntry({
-        entry: {
-          sessionId: "old-session-id",
-          updatedAt: NOW_MS - 86_400_000,
-          lastChannel: "slack" as never,
-          lastTo: "channel:C0XXXXXXXXX",
-          lastThreadId: "1737500000.999999",
-          deliveryContext: {
-            channel: "slack",
-            to: "channel:C0XXXXXXXXX",
-            threadId: "1737500000.999999",
-          },
-        },
-        fresh: false,
-      });
-
-      expect(result.isNewSession).toBe(true);
-      expect(result.sessionEntry.lastChannel).toBeUndefined();
-      expect(result.sessionEntry.lastTo).toBeUndefined();
-      expect(result.sessionEntry.lastAccountId).toBeUndefined();
-      expect(result.sessionEntry.lastThreadId).toBeUndefined();
-      expect(result.sessionEntry.deliveryContext).toBeUndefined();
-    });
-
-    it("preserves delivery routing metadata when reusing fresh session", () => {
+    it("preserves delivery routing metadata when reusing an existing entry", () => {
       const result = resolveWithStoredEntry({
         entry: {
           sessionId: "existing-session-id-101",
@@ -244,7 +206,6 @@ describe("resolveCronSession", () => {
             threadId: "1737500000.123456",
           },
         },
-        fresh: true,
       });
 
       expect(result.isNewSession).toBe(false);

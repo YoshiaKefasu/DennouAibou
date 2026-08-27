@@ -11,15 +11,7 @@ import { canonicalizeMainSessionAlias } from "../../config/sessions/main-session
 import { deriveSessionMetaPatch } from "../../config/sessions/metadata.js";
 import { resolveSessionTranscriptPath, resolveStorePath } from "../../config/sessions/paths.js";
 import { isProtectedSessionKey } from "../../config/sessions/protected-session.js";
-import {
-  evaluateSessionFreshness,
-  resolveChannelResetConfig,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-  resolveSessionResetType,
-  resolveThreadFlag,
-  type SessionFreshness,
-} from "../../config/sessions/reset.js";
+import { resolveThreadFlag } from "../../config/sessions/reset.js";
 import { resolveAndPersistSessionFile } from "../../config/sessions/session-file.js";
 import { resolveSessionKey } from "../../config/sessions/session-key.js";
 import { loadSessionStore, updateSessionStore } from "../../config/sessions/store.js";
@@ -61,12 +53,6 @@ function loadSessionArchiveRuntime() {
   return sessionArchiveRuntimePromise;
 }
 
-function resolveExplicitSessionEndReason(
-  matchedResetTriggerLower?: string,
-): PluginHookSessionEndReason {
-  return matchedResetTriggerLower === "/reset" ? "reset" : "new";
-}
-
 function resolveSessionDefaultAccountId(params: {
   cfg: OpenClawConfig;
   channelRaw?: string;
@@ -92,25 +78,10 @@ function resolveSessionDefaultAccountId(params: {
     : undefined;
 }
 
-function resolveStaleSessionEndReason(params: {
-  entry: SessionEntry | undefined;
-  freshness?: SessionFreshness;
-  now: number;
-}): PluginHookSessionEndReason | undefined {
-  if (!params.entry || !params.freshness) {
-    return undefined;
-  }
-  const staleDaily =
-    params.freshness.dailyResetAt != null && params.entry.updatedAt < params.freshness.dailyResetAt;
-  const staleIdle =
-    params.freshness.idleExpiresAt != null && params.now > params.freshness.idleExpiresAt;
-  if (staleIdle) {
-    return "idle";
-  }
-  if (staleDaily) {
-    return "daily";
-  }
-  return undefined;
+function resolveExplicitSessionEndReason(
+  matchedResetTriggerLower?: string,
+): PluginHookSessionEndReason {
+  return matchedResetTriggerLower === "/reset" ? "reset" : "new";
 }
 
 export type SessionInitResult = {
@@ -443,7 +414,6 @@ export async function initSessionState(params: {
     sessionStore[retiredLegacyMainDelivery.key] = retiredLegacyMainDelivery.entry;
   }
   const entry = sessionStore[sessionKey];
-  const now = Date.now();
   const isThread = resolveThreadFlag({
     sessionKey,
     messageThreadId: ctx.MessageThreadId,
@@ -451,52 +421,17 @@ export async function initSessionState(params: {
     threadStarterBody: ctx.ThreadStarterBody,
     parentSessionKey: ctx.ParentSessionKey,
   });
-  const resetType = resolveSessionResetType({ sessionKey, isGroup, isThread });
-  const channelReset = resolveChannelResetConfig({
-    sessionCfg,
-    channel:
-      groupResolution?.channel ??
-      (ctx.OriginatingChannel as string | undefined) ??
-      ctx.Surface ??
-      ctx.Provider,
-  });
-  const resetPolicy = resolveProtectedSessionResetPolicy({
-    policy: resolveSessionResetPolicy({
-      sessionCfg,
-      resetType,
-      resetOverride: channelReset,
-    }),
-    sessionKey,
-    cfg,
-  });
-  // Heartbeat, cron-event, and exec-event runs should NEVER trigger session resets.
-  // These are automated system events, not user interactions that should affect
-  // session continuity. Forcing freshEntry=true prevents accidental data loss.
-  // See #58409 for details on silent session reset bug.
-  const isSystemEvent =
-    ctx.Provider === "heartbeat" || ctx.Provider === "cron-event" || ctx.Provider === "exec-event";
-  const entryFreshness = entry
-    ? isSystemEvent
-      ? ({ fresh: true } satisfies SessionFreshness)
-      : evaluateSessionFreshness({
-          updatedAt: entry.updatedAt,
-          now,
-          policy: resetPolicy,
-        })
-    : undefined;
-  const freshEntry = entryFreshness?.fresh ?? false;
+  // Kasou's master session is permanent: no automatic idle/daily reset ever
+  // rotates a session. Existing entries are always reused, so `freshEntry` is
+  // unconditionally true when an entry is present and only flips to false for
+  // brand-new (no-entry) sessions. This makes `previousSessionEntry` capture
+  // only explicit `/new` / `/reset` triggers — automatic rotation is gone.
+  const freshEntry = entry != null;
   // Capture the current session entry before any reset so its transcript can be
-  // archived afterward.  We need to do this for both explicit resets (/new, /reset)
-  // and for scheduled/daily resets where the session has become stale (!freshEntry).
-  // Without this, daily-reset transcripts are left as orphaned files on disk (#35481).
-  const previousSessionEntry = (resetTriggered || !freshEntry) && entry ? { ...entry } : undefined;
-  const previousSessionEndReason = resetTriggered
-    ? resolveExplicitSessionEndReason(matchedResetTriggerLower)
-    : resolveStaleSessionEndReason({
-        entry,
-        freshness: entryFreshness,
-        now,
-      });
+  // archived afterward. With automatic resets removed, this is only relevant
+  // for explicit `/new` / `/reset` triggers.
+  const previousSessionEntry = resetTriggered && entry ? { ...entry } : undefined;
+  const previousSessionEndReason = resolveExplicitSessionEndReason(matchedResetTriggerLower);
   clearBootstrapSnapshotOnSessionRollover({
     sessionKey,
     previousSessionId: previousSessionEntry?.sessionId,

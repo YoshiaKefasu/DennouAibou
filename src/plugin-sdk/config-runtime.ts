@@ -104,19 +104,12 @@ export {
   resolveStorePath,
   updateLastRoute,
   updateSessionStore,
-  type SessionResetMode,
   type SessionScope,
 } from "../config/sessions.js";
+export type { SessionResetMode } from "../config/types.base.js";
 export { resolveGroupSessionKey } from "../config/sessions/group.js";
 export { canonicalizeMainSessionAlias } from "../config/sessions/main-session.js";
-export {
-  evaluateSessionFreshness,
-  resolveChannelResetConfig,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-  resolveSessionResetType,
-  resolveThreadFlag,
-} from "../config/sessions/reset.js";
+export { resolveThreadFlag } from "../config/sessions/reset.js";
 export { resolveSessionStoreEntry } from "../config/sessions/store.js";
 export {
   isDangerousNameMatchingEnabled,

@@ -11,7 +11,8 @@
  * 検証軸:
  *  A) 単一 Kasou エージェント集約 (`resolveDefaultAgentId`, `resolveMainSessionKey`)
  *  B) マスターセッション保護の真理表 (`isProtectedSessionKey`)
- *  C) 自動リセットの強制 off (`resolveProtectedSessionResetPolicy`)
+ *  C) 自動リセット機構の完全撤去 (`reset.ts` / `initSessionState` /
+ *     `resolveCronSession` / `resolveSession` から自動リセット判定が消えている)
  *  D) ストアメンテ除外 (`pruneStaleEntries`, `capEntryCount`, `enforceSessionDiskBudget`)
  *  E) 攻撃的一斉投入 E2E — マスターセッションが 1 バイトも消えない
  *  F) 5 系統の chokepoint が `isProtectedSessionKey` を経由している
@@ -26,7 +27,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { enforceSessionDiskBudget } from "./disk-budget.js";
 import { resolveDefaultAgentId, resolveMainSessionKey } from "./main-session.js";
 import { isProtectedSessionKey, type ProtectedSessionConfig } from "./protected-session.js";
-import { resolveProtectedSessionResetPolicy, type SessionResetPolicy } from "./reset.js";
 import { capEntryCount, pruneStaleEntries, saveSessionStore, updateSessionStore } from "./store.js";
 import type { SessionEntry } from "./types.js";
 
@@ -156,52 +156,105 @@ describe("B) isProtectedSessionKey truth table", () => {
 });
 
 // ===========================================================================
-// C) 自動リセットの強制 off — chokepoint: resolveProtectedSessionResetPolicy
+// C) 自動リセット機構の完全撤去 — ソースコードから自動リセット判定が消えている
 // ===========================================================================
+//
+// Kasou のマスターセッションは恒久的に継続する存在であり、いかなる「時間経過」
+// (idle) や「定時」 (daily) による自動ローテーションも存在しない。以下のテストは、
+// その不変条件が ソースコードレベルで一掃されていることを静的アーキテクチャ不変
+// 条件として固定化する。
+//
+//   - 自動リセット計算ロジックを提供する関数が `reset.ts` から消えている
+//   - 受信パス (`auto-reply/reply/session.ts`) から自動リセット判定が消えている
+//   - cron / webhook パス (`cron/isolated-agent/session.ts`) から自動リセット
+//     判定が消えている
+//   - コマンド解決パス (`agents/command/session.ts`) から自動リセット判定が
+//     消えている
+//   - `DEFAULT_IDLE_MINUTES` 定数が `config/sessions/types.ts` から消えている
+//     (内部実装定数としてのみ存在していた)
+//   - プラグイン SDK 経由の re-export (`plugin-sdk/config-runtime.ts`) から
+//     関数 API が消えている
+//   - マスターセッションは、完全に新規エントリか `/new`/`/reset` トリガーの
+//     どちらでもない限り、永続的に再利用される
+//   - マスターセッションに対して `/new` ガードが `isProtectedSessionKey` を
+//     通じて効く
 
-describe("C) auto-reset policy is forced to 'off' for the master session", () => {
-  const policy: SessionResetPolicy = {
-    mode: "daily",
-    atHour: 4,
-    idleMinutes: 60,
-  };
+describe("C) automatic session reset machinery has been removed from the runtime", () => {
+  // Static-source read; cheap and stable.
+  function readSrc(rel: string): string {
+    return readFileSync(path.join(__dirname, rel), "utf-8");
+  }
 
-  it("daily policy collapses to mode:'off' with idleMinutes cleared", () => {
-    const out = resolveProtectedSessionResetPolicy({
-      policy,
-      sessionKey: "agent:main:main",
-      cfg: PROTECTED_CFG,
-    });
-    expect(out.mode).toBe("off");
-    expect(out.idleMinutes).toBeUndefined();
+  it("reset.ts no longer exports the automatic-reset policy computation functions", () => {
+    const src = readSrc("./reset.ts");
+    expect(src).not.toMatch(/export\s+function\s+resolveSessionResetPolicy/);
+    expect(src).not.toMatch(/export\s+function\s+resolveProtectedSessionResetPolicy/);
+    expect(src).not.toMatch(/export\s+function\s+evaluateSessionFreshness/);
+    expect(src).not.toMatch(/export\s+function\s+resolveChannelResetConfig/);
+    expect(src).not.toMatch(/export\s+function\s+resolveDailyResetAtMs/);
+    expect(src).not.toMatch(/export\s+type\s+SessionResetPolicy\b/);
+    expect(src).not.toMatch(/export\s+type\s+SessionFreshness\b/);
+    expect(src).not.toMatch(/DEFAULT_RESET_MODE/);
+    expect(src).not.toMatch(/DEFAULT_RESET_AT_HOUR/);
   });
 
-  it("idle policy collapses to mode:'off'", () => {
-    const out = resolveProtectedSessionResetPolicy({
-      policy: { mode: "idle", atHour: 4, idleMinutes: 30 },
-      sessionKey: "agent:main:main",
-      cfg: PROTECTED_CFG,
-    });
-    expect(out.mode).toBe("off");
-    expect(out.idleMinutes).toBeUndefined();
+  it("reset.ts still exports the thread-detection helpers used by the runtime", () => {
+    const src = readSrc("./reset.ts");
+    expect(src).toMatch(/export\s+function\s+isThreadSessionKey/);
+    expect(src).toMatch(/export\s+function\s+resolveThreadFlag/);
+    expect(src).toMatch(/export\s+function\s+resolveSessionResetType/);
   });
 
-  it("does NOT alter the policy for non-protected session keys", () => {
-    const out = resolveProtectedSessionResetPolicy({
-      policy,
-      sessionKey: "agent:main:telegram:direct:123",
-      cfg: PROTECTED_CFG,
-    });
-    expect(out).toBe(policy);
+  it("auto-reply body-parse path no longer calls the auto-reset policy / freshness API", () => {
+    const src = readSrc("./../../auto-reply/reply/session.ts");
+    expect(src).not.toMatch(/\bresolveSessionResetPolicy\s*\(/);
+    expect(src).not.toMatch(/\bevaluateSessionFreshness\s*\(/);
+    expect(src).not.toMatch(/\bresolveChannelResetConfig\s*\(/);
+    expect(src).not.toMatch(/\bresolveProtectedSessionResetPolicy\s*\(/);
+    expect(src).not.toMatch(/\bSessionFreshness\b/);
   });
 
-  it("is a no-op when sessionKey is empty", () => {
-    const out = resolveProtectedSessionResetPolicy({
-      policy,
-      sessionKey: "",
-      cfg: PROTECTED_CFG,
-    });
-    expect(out).toBe(policy);
+  it("cron / isolated-agent path no longer calls the auto-reset policy / freshness API", () => {
+    const src = readSrc("./../../cron/isolated-agent/session.ts");
+    expect(src).not.toMatch(/\bresolveSessionResetPolicy\s*\(/);
+    expect(src).not.toMatch(/\bevaluateSessionFreshness\s*\(/);
+    expect(src).not.toMatch(/\bresolveProtectedSessionResetPolicy\s*\(/);
+  });
+
+  it("agents/command session resolution no longer calls the auto-reset policy / freshness API", () => {
+    const src = readSrc("./../../agents/command/session.ts");
+    expect(src).not.toMatch(/\bresolveSessionResetPolicy\s*\(/);
+    expect(src).not.toMatch(/\bevaluateSessionFreshness\s*\(/);
+    expect(src).not.toMatch(/\bresolveProtectedSessionResetPolicy\s*\(/);
+    expect(src).not.toMatch(/\bresolveChannelResetConfig\s*\(/);
+    expect(src).not.toMatch(/\bresolveSessionResetType\s*\(/);
+  });
+
+  it("types.ts no longer defines DEFAULT_IDLE_MINUTES (was only consumed by the auto-reset path)", () => {
+    const src = readSrc("./types.ts");
+    expect(src).not.toMatch(/DEFAULT_IDLE_MINUTES/);
+  });
+
+  it("plugin-sdk/config-runtime.ts no longer re-exports the auto-reset function API", () => {
+    const src = readSrc("./../../plugin-sdk/config-runtime.ts");
+    expect(src).not.toMatch(/evaluateSessionFreshness/);
+    expect(src).not.toMatch(/resolveChannelResetConfig/);
+    expect(src).not.toMatch(/resolveProtectedSessionResetPolicy/);
+    expect(src).not.toMatch(/resolveSessionResetPolicy/);
+    expect(src).not.toMatch(/resolveSessionResetType/);
+  });
+
+  it("legacy config keys remain accepted by the zod schema (backward compat)", () => {
+    // Static check: the deprecated session.reset / resetByType / resetByChannel
+    // / resetTriggers / idleMinutes fields are still defined on SessionSchema
+    // so existing KASOU config files keep parsing without errors. They are
+    // marked @deprecated but not removed.
+    const src = readSrc("./../zod-schema.session.ts");
+    expect(src).toMatch(/resetTriggers:\s*z\.array\(z\.string\(\)\)\.optional\(\)/);
+    expect(src).toMatch(/idleMinutes:\s*z\.number\(\)\.int\(\)\.positive\(\)\.optional\(\)/);
+    expect(src).toMatch(/reset:\s*SessionResetConfigSchema\.optional\(\)/);
+    expect(src).toMatch(/resetByType:/);
+    expect(src).toMatch(/resetByChannel:\s*z\.record/);
   });
 });
 
