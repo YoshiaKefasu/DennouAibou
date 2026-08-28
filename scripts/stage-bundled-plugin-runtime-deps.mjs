@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import semverSatisfies from "semver/functions/satisfies.js";
+import semverValid from "semver/functions/valid.js";
 import { resolveNpmRunner } from "./npm-runner.mjs";
 
 function readJson(filePath) {
@@ -59,7 +60,20 @@ function readInstalledDependencyVersion(nodeModulesDir, depName) {
 }
 
 function dependencyVersionSatisfied(spec, installedVersion) {
-  return semverSatisfies(installedVersion, spec, { includePrerelease: false });
+  if (semverSatisfies(installedVersion, spec, { includePrerelease: false })) {
+    return true;
+  }
+  // Transitive bare exact pins inside bundled plugins (e.g. @buape/carbon
+  // pinning discord-api-types 0.38.37 while the workspace installs 0.38.44)
+  // reject the exact-spec check even though the installed version is newer.
+  // Accept ONLY bare exact pins (semverValid(spec) !== null) matched against a
+  // caret range so a newer patch/minor within the same major passes, while
+  // out-of-range newer versions (e.g. ^1.2.3 vs installed 2.5.0) still fall
+  // back to a network npm install that resolves the right version.
+  return (
+    semverValid(spec) !== null &&
+    semverSatisfies(installedVersion, `^${spec}`, { includePrerelease: false })
+  );
 }
 
 const stagedRuntimeDepPruneRules = new Map([
@@ -68,16 +82,41 @@ const stagedRuntimeDepPruneRules = new Map([
 ]);
 const runtimeDepsStagingVersion = 2;
 
-function collectInstalledRuntimeClosure(rootNodeModulesDir, dependencySpecs) {
+function collectInstalledRuntimeClosure(
+  rootNodeModulesDir,
+  dependencySpecs,
+  dependencyOptionality,
+) {
   const packageCache = new Map();
   const closure = new Set();
-  const queue = Object.entries(dependencySpecs);
+  const queue = Object.entries(dependencySpecs).map(([name, spec]) => [
+    name,
+    spec,
+    dependencyOptionality.get(name) === true,
+  ]);
 
   while (queue.length > 0) {
-    const [depName, spec] = queue.shift();
+    const [depName, spec, optional] = queue.shift();
     const installedVersion = readInstalledDependencyVersion(rootNodeModulesDir, depName);
-    if (installedVersion === null || !dependencyVersionSatisfied(spec, installedVersion)) {
+    if (installedVersion === null) {
+      // Optional dependencies (and optional transitive deps, e.g. @snazzah/davey's
+      // per-platform native binaries) may legitimately be absent from the hoisted
+      // root install; skip them instead of failing the fast path.
+      if (optional) {
+        continue;
+      }
       return null;
+    }
+    if (!dependencyVersionSatisfied(spec, installedVersion)) {
+      // Same tolerance for optional deps pinned to versions overridden at the
+      // workspace root (e.g. @buape/carbon pins ws 8.19.0 while the root override
+      // installs 8.20.0). An installed newer version still satisfies runtime use;
+      // a genuinely missing/mismatched required dep still falls back to npm.
+      if (optional) {
+        // Keep walking children so optional chains still contribute closure deps.
+      } else {
+        return null;
+      }
     }
     if (closure.has(depName)) {
       continue;
@@ -92,10 +131,10 @@ function collectInstalledRuntimeClosure(rootNodeModulesDir, dependencySpecs) {
     closure.add(depName);
 
     for (const [childName, childSpec] of Object.entries(packageJson.dependencies ?? {})) {
-      queue.push([childName, childSpec]);
+      queue.push([childName, childSpec, false]);
     }
     for (const [childName, childSpec] of Object.entries(packageJson.optionalDependencies ?? {})) {
-      queue.push([childName, childSpec]);
+      queue.push([childName, childSpec, true]);
     }
   }
 
@@ -221,12 +260,20 @@ function stageInstalledRootRuntimeDeps(params) {
     ...packageJson.dependencies,
     ...packageJson.optionalDependencies,
   };
+  const dependencyOptionality = new Map([
+    ...Object.keys(packageJson.dependencies ?? {}).map((name) => [name, false]),
+    ...Object.keys(packageJson.optionalDependencies ?? {}).map((name) => [name, true]),
+  ]);
   const rootNodeModulesDir = path.join(repoRoot, "node_modules");
   if (Object.keys(dependencySpecs).length === 0 || !fs.existsSync(rootNodeModulesDir)) {
     return false;
   }
 
-  const dependencyNames = collectInstalledRuntimeClosure(rootNodeModulesDir, dependencySpecs);
+  const dependencyNames = collectInstalledRuntimeClosure(
+    rootNodeModulesDir,
+    dependencySpecs,
+    dependencyOptionality,
+  );
   if (dependencyNames === null) {
     return false;
   }
@@ -287,10 +334,26 @@ function installPluginRuntimeDeps(params) {
   });
   try {
     writeJson(path.join(tempInstallDir, "package.json"), packageJson);
+    // Strip npm/pnpm lifecycle env leakage (npm_config_*, npm_command, PNPM_*).
+    // When this script runs inside `pnpm build`, inherited npm_config_* vars
+    // (user-agent, registry overrides, verify-deps flags, ...) change how the
+    // child npm install resolves packages and can fail it spuriously.
+    // npm-runner's toolchain runner omits `env` on Windows; fall back to
+    // process.env so PATH/USERPROFILE/SystemRoot survive the sanitize pass.
+    const childEnv = { ...(npmRunner.env ?? process.env) };
+    for (const key of Object.keys(childEnv)) {
+      if (
+        /^npm_config_/i.test(key) ||
+        /^npm_(command|lifecycle_event)$/i.test(key) ||
+        /^pnpm_/i.test(key)
+      ) {
+        delete childEnv[key];
+      }
+    }
     const result = spawnSync(npmRunner.command, npmRunner.args, {
       cwd: tempInstallDir,
       encoding: "utf8",
-      env: npmRunner.env,
+      env: childEnv,
       stdio: "pipe",
       shell: npmRunner.shell,
       windowsVerbatimArguments: npmRunner.windowsVerbatimArguments,

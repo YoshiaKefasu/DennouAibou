@@ -178,7 +178,6 @@
   "secret-input",
   "channel-status",
   "status-helpers",
-  "speech",
   "session-store-runtime",
   "string-normalization-runtime",
   "state-paths",
