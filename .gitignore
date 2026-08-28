@@ -159,3 +159,6 @@ analysis/
 .artifacts/qa-e2e/
 extensions/qa-lab/web/dist/
 *.exe
+
+# Bun B2 soak test artifacts
+.bun-soak-tmp/
