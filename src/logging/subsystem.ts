@@ -43,6 +43,15 @@ function shouldLogToConsole(level: LogLevel, settings: { level: LogLevel }): boo
 type ChalkInstance = InstanceType<typeof Chalk>;
 
 const inspectValue: ((value: unknown) => string) | null = (() => {
+  // Safe: this IIFE runs at module load time. In a browser tab `process` is
+  // not defined as a global, so we must guard before touching
+  // `process.getBuiltinModule`. Without the guard the access throws
+  // `ReferenceError: process is not defined` at module scope, which crashes
+  // any consumer that imports this module from the WebUI bundle before
+  // entry body has a chance to run.
+  if (typeof process === "undefined") {
+    return null;
+  }
   const getBuiltinModule = (
     process as NodeJS.Process & {
       getBuiltinModule?: (id: string) => unknown;

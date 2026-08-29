@@ -162,3 +162,8 @@ extensions/qa-lab/web/dist/
 
 # Bun B2 soak test artifacts
 .bun-soak-tmp/
+
+# WebUI bundle browser-load test scratch artefacts
+.tmp-webui-bundle-probe.mjs
+.tmp-webui-bundle-probe.out
+.tmp-webui-bundle-fixture/
