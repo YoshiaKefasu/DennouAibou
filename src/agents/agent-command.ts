@@ -3,10 +3,12 @@ import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../ac
 import { toAcpRuntimeError } from "../acp/runtime/errors.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import {
+  formatMaxModelHint,
   formatThinkingLevels,
   formatXHighModelHint,
   normalizeThinkLevel,
   normalizeVerboseLevel,
+  supportsMaxThinking,
   supportsXHighThinking,
   type VerboseLevel,
 } from "../auto-reply/thinking.js";
@@ -697,13 +699,24 @@ async function agentCommandInternal(
         catalog: catalogForThinking,
       });
     }
-    if (resolvedThinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) {
+    if (
+      (resolvedThinkLevel === "xhigh" || resolvedThinkLevel === "max") &&
+      (resolvedThinkLevel === "xhigh"
+        ? !supportsXHighThinking(provider, model)
+        : !supportsMaxThinking(provider, model))
+    ) {
       const explicitThink = Boolean(thinkOnce || thinkOverride);
       if (explicitThink) {
-        throw new Error(`Thinking level "xhigh" is only supported for ${formatXHighModelHint()}.`);
+        const hint = resolvedThinkLevel === "max" ? formatMaxModelHint() : formatXHighModelHint();
+        throw new Error(`Thinking level "${resolvedThinkLevel}" is only supported for ${hint}.`);
       }
       resolvedThinkLevel = "high";
-      if (sessionEntry && sessionStore && sessionKey && sessionEntry.thinkingLevel === "xhigh") {
+      if (
+        sessionEntry &&
+        sessionStore &&
+        sessionKey &&
+        (sessionEntry.thinkingLevel === "xhigh" || sessionEntry.thinkingLevel === "max")
+      ) {
         const entry = sessionEntry;
         entry.thinkingLevel = "high";
         entry.updatedAt = Date.now();

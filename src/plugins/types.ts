@@ -1391,6 +1391,15 @@ export type ProviderPlugin = {
    */
   supportsXHighThinking?: (ctx: ProviderThinkingPolicyContext) => boolean | undefined;
   /**
+   * Provider-owned max reasoning support.
+   *
+   * Return true only for models that should expose the `max` thinking level
+   * (above `xhigh`). Defaults to false so non-providers never widen the
+   * surface by accident; opt in by model id when the model accepts a
+   * `reasoning_effort: "max"` wire value.
+   */
+  supportsMaxThinking?: (ctx: ProviderThinkingPolicyContext) => boolean | undefined;
+  /**
    * Provider-owned default thinking level.
    *
    * Use this to keep model-family defaults (for example Claude 4.6 =>

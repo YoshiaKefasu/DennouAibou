@@ -1,4 +1,12 @@
-export type ThinkLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+export type ThinkLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "adaptive";
 export type VerboseLevel = "off" | "on" | "full";
 export type NoticeLevel = "off" | "on" | "full";
 export type ElevatedLevel = "off" | "on" | "ask" | "full";
@@ -41,6 +49,9 @@ export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined
   if (collapsed === "xhigh" || collapsed === "extrahigh") {
     return "xhigh";
   }
+  if (collapsed === "max" || collapsed === "maximum") {
+    return "max";
+  }
   if (["off"].includes(key)) {
     return "off";
   }
@@ -56,9 +67,7 @@ export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined
   if (["mid", "med", "medium", "thinkharder", "think-harder", "harder"].includes(key)) {
     return "medium";
   }
-  if (
-    ["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest", "max"].includes(key)
-  ) {
+  if (["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest"].includes(key)) {
     return "high";
   }
   if (["think"].includes(key)) {
@@ -91,6 +100,10 @@ export function formatThinkingLevels(
 
 export function formatXHighModelHint(): string {
   return "provider models that advertise xhigh reasoning";
+}
+
+export function formatMaxModelHint(): string {
+  return "provider models that advertise max reasoning";
 }
 
 export function resolveThinkingDefaultForModel(params: {

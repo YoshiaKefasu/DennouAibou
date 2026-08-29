@@ -40,6 +40,12 @@ export function resolveProviderXHighThinking(
   return resolveActiveThinkingProvider(params.provider)?.supportsXHighThinking?.(params.context);
 }
 
+export function resolveProviderMaxThinking(
+  params: ThinkingHookParams<ProviderThinkingPolicyContext>,
+) {
+  return resolveActiveThinkingProvider(params.provider)?.supportsMaxThinking?.(params.context);
+}
+
 export function resolveProviderDefaultThinkingLevel(
   params: ThinkingHookParams<ProviderDefaultThinkingPolicyContext>,
 ) {

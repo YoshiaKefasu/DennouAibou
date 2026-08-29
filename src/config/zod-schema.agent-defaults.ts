@@ -163,6 +163,7 @@ export const AgentDefaultsSchema = z
         z.literal("medium"),
         z.literal("high"),
         z.literal("xhigh"),
+        z.literal("max"),
         z.literal("adaptive"),
       ])
       .optional(),

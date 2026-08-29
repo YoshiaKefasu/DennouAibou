@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const providerRuntimeMocks = vi.hoisted(() => ({
   resolveProviderBinaryThinking: vi.fn(),
   resolveProviderDefaultThinkingLevel: vi.fn(),
+  resolveProviderMaxThinking: vi.fn(),
   resolveProviderXHighThinking: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ async function loadFreshThinkingModuleForTest() {
   vi.doMock("../plugins/provider-thinking.js", () => ({
     resolveProviderBinaryThinking: providerRuntimeMocks.resolveProviderBinaryThinking,
     resolveProviderDefaultThinkingLevel: providerRuntimeMocks.resolveProviderDefaultThinkingLevel,
+    resolveProviderMaxThinking: providerRuntimeMocks.resolveProviderMaxThinking,
     resolveProviderXHighThinking: providerRuntimeMocks.resolveProviderXHighThinking,
   }));
   return await import("./thinking.js");
@@ -27,6 +29,8 @@ beforeEach(async () => {
   providerRuntimeMocks.resolveProviderBinaryThinking.mockReturnValue(undefined);
   providerRuntimeMocks.resolveProviderDefaultThinkingLevel.mockReset();
   providerRuntimeMocks.resolveProviderDefaultThinkingLevel.mockReturnValue(undefined);
+  providerRuntimeMocks.resolveProviderMaxThinking.mockReset();
+  providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(undefined);
   providerRuntimeMocks.resolveProviderXHighThinking.mockReset();
   providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(undefined);
 
@@ -72,6 +76,12 @@ describe("normalizeThinkLevel", () => {
     expect(normalizeThinkLevel("auto")).toBe("adaptive");
     expect(normalizeThinkLevel("Adaptive")).toBe("adaptive");
   });
+
+  it("accepts max and maximum as the max reasoning level", () => {
+    expect(normalizeThinkLevel("max")).toBe("max");
+    expect(normalizeThinkLevel("MAX")).toBe("max");
+    expect(normalizeThinkLevel("maximum")).toBe("max");
+  });
 });
 
 describe("listThinkingLevels", () => {
@@ -109,6 +119,30 @@ describe("listThinkingLevels", () => {
   it("always includes adaptive", () => {
     expect(listThinkingLevels(undefined, "gpt-4.1-mini")).toContain("adaptive");
     expect(listThinkingLevels("anthropic", "claude-opus-4-6")).toContain("adaptive");
+  });
+
+  it("excludes max unless supportsMaxThinking opts in", () => {
+    expect(listThinkingLevels(undefined, "gpt-4.1-mini")).not.toContain("max");
+  });
+
+  it("includes max right after xhigh when the plugin opts in", () => {
+    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(true);
+    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(true);
+
+    const levels = listThinkingLevels("demo", "demo-model");
+    const xhighIndex = levels.indexOf("xhigh");
+    const maxIndex = levels.indexOf("max");
+    expect(maxIndex).toBe(xhighIndex + 1);
+  });
+
+  it("omits max when only xhigh is opted in via provider but max returns false", () => {
+    // When the plugin says false for max but xhigh returns true, we honor
+    // the explicit false (no fallback to xhigh) and keep max hidden.
+    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(true);
+    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(false);
+
+    expect(listThinkingLevels("demo", "demo-model")).not.toContain("max");
+    expect(listThinkingLevels("demo", "demo-model")).toContain("xhigh");
   });
 });
 

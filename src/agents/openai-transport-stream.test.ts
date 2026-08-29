@@ -135,4 +135,31 @@ describe("openai transport stream", () => {
   it("sanitizes unpaired surrogates in transport payload text", () => {
     expect(sanitizeTransportPayloadText("test\uD800string")).toBe("teststring");
   });
+
+  it("forwards reasoning_effort: max when the model advertises reasoning and supportsReasoningEffort", () => {
+    const model = {
+      id: "kimi-k3",
+      name: "Kimi K3",
+      api: "openai-completions",
+      provider: "cli-router",
+      baseUrl: "http://127.0.0.1:8317/v1",
+      reasoning: true,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 8192,
+      compat: { supportsReasoningEffort: true },
+    } as unknown as Model<"openai-completions">;
+
+    const params = buildOpenAICompletionsParams(
+      model,
+      {
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
+      },
+      { reasoningEffort: "max" },
+    );
+
+    expect(params.reasoning_effort).toBe("max");
+    expect(params.reasoning).toBeUndefined();
+  });
 });

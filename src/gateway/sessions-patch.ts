@@ -8,6 +8,7 @@ import {
 } from "../agents/model-selection.js";
 import { normalizeGroupActivation } from "../auto-reply/group-activation.js";
 import {
+  formatMaxModelHint,
   formatThinkingLevels,
   formatXHighModelHint,
   normalizeElevatedLevel,
@@ -15,6 +16,7 @@ import {
   normalizeReasoningLevel,
   normalizeThinkLevel,
   normalizeUsageDisplay,
+  supportsMaxThinking,
   supportsXHighThinking,
 } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -415,12 +417,17 @@ export async function applySessionsPatchToStore(params: {
     }
   }
 
-  if (next.thinkingLevel === "xhigh") {
+  if (next.thinkingLevel === "xhigh" || next.thinkingLevel === "max") {
     const effectiveProvider = next.providerOverride ?? resolvedDefault.provider;
     const effectiveModel = next.modelOverride ?? resolvedDefault.model;
-    if (!supportsXHighThinking(effectiveProvider, effectiveModel)) {
+    const isMax = next.thinkingLevel === "max";
+    const supportsGate = isMax
+      ? supportsMaxThinking(effectiveProvider, effectiveModel)
+      : supportsXHighThinking(effectiveProvider, effectiveModel);
+    if (!supportsGate) {
       if ("thinkingLevel" in patch) {
-        return invalid(`thinkingLevel "xhigh" is only supported for ${formatXHighModelHint()}`);
+        const hint = isMax ? formatMaxModelHint() : formatXHighModelHint();
+        return invalid(`thinkingLevel "${next.thinkingLevel}" is only supported for ${hint}`);
       }
       next.thinkingLevel = "high";
     }

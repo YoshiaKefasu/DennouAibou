@@ -7,7 +7,13 @@ import { updateSessionStore } from "../../config/sessions.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { applyVerboseOverride } from "../../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
-import { formatThinkingLevels, formatXHighModelHint, supportsXHighThinking } from "../thinking.js";
+import {
+  formatMaxModelHint,
+  formatThinkingLevels,
+  formatXHighModelHint,
+  supportsMaxThinking,
+  supportsXHighThinking,
+} from "../thinking.js";
 import type { ReplyPayload } from "../types.js";
 import { resolveModelSelectionFromDirective } from "./directive-handling.model-selection.js";
 import { maybeHandleModelDirectiveInfo } from "./directive-handling.model.js";
@@ -265,11 +271,14 @@ export async function handleDirectiveOnly(
 
   if (
     directives.hasThinkDirective &&
-    directives.thinkLevel === "xhigh" &&
-    !supportsXHighThinking(resolvedProvider, resolvedModel)
+    (directives.thinkLevel === "xhigh" || directives.thinkLevel === "max") &&
+    ((directives.thinkLevel === "xhigh" &&
+      !supportsXHighThinking(resolvedProvider, resolvedModel)) ||
+      (directives.thinkLevel === "max" && !supportsMaxThinking(resolvedProvider, resolvedModel)))
   ) {
+    const hint = directives.thinkLevel === "max" ? formatMaxModelHint() : formatXHighModelHint();
     return {
-      text: `Thinking level "xhigh" is only supported for ${formatXHighModelHint()}.`,
+      text: `Thinking level "${directives.thinkLevel}" is only supported for ${hint}.`,
     };
   }
 
@@ -280,6 +289,11 @@ export async function handleDirectiveOnly(
     !directives.hasThinkDirective &&
     nextThinkLevel === "xhigh" &&
     !supportsXHighThinking(resolvedProvider, resolvedModel);
+  const shouldDowngradeMax =
+    !directives.hasThinkDirective &&
+    nextThinkLevel === "max" &&
+    !supportsMaxThinking(resolvedProvider, resolvedModel);
+  const shouldDowngradeElevatedReasoning = shouldDowngradeXHigh || shouldDowngradeMax;
 
   const prevElevatedLevel =
     currentElevatedLevel ??
@@ -503,6 +517,11 @@ export async function handleDirectiveOnly(
   if (shouldDowngradeXHigh) {
     parts.push(
       `Thinking level set to high (xhigh not supported for ${resolvedProvider}/${resolvedModel}).`,
+    );
+  }
+  if (shouldDowngradeMax) {
+    parts.push(
+      `Thinking level set to high (max not supported for ${resolvedProvider}/${resolvedModel}).`,
     );
   }
   if (modelSelection) {

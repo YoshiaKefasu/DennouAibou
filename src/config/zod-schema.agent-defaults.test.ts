@@ -22,4 +22,20 @@ describe("agent defaults schema", () => {
       }),
     ).not.toThrow();
   });
+
+  it('accepts thinkingDefault "max" as a canonical level', () => {
+    expect(() =>
+      AgentDefaultsSchema.parse({
+        thinkingDefault: "max",
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects unknown thinkingDefault values", () => {
+    expect(() =>
+      AgentDefaultsSchema.parse({
+        thinkingDefault: "ultra",
+      }),
+    ).toThrow();
+  });
 });

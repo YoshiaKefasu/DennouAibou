@@ -37,7 +37,15 @@ export type ModelRef = {
   model: string;
 };
 
-export type ThinkLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+export type ThinkLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "adaptive";
 
 export type ModelAliasIndex = {
   byAlias: Map<string, { alias: string; ref: ModelRef }>;
@@ -750,6 +758,7 @@ export function resolveThinkingDefault(params: {
     perModelThinking === "medium" ||
     perModelThinking === "high" ||
     perModelThinking === "xhigh" ||
+    perModelThinking === "max" ||
     perModelThinking === "adaptive"
   ) {
     return perModelThinking;

@@ -3000,6 +3000,22 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                                 type: "string",
                                 const: "openai",
                               },
+                              {
+                                type: "string",
+                                const: "baseten",
+                              },
+                              {
+                                type: "string",
+                                const: "chat-template",
+                              },
+                              {
+                                type: "string",
+                                const: "string-thinking",
+                              },
+                              {
+                                type: "string",
+                                const: "ant-ling",
+                              },
                             ],
                           },
                           requiresToolResultName: {
@@ -4352,6 +4368,10 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   },
                   {
                     type: "string",
+                    const: "max",
+                  },
+                  {
+                    type: "string",
                     const: "adaptive",
                   },
                 ],
@@ -5294,7 +5314,7 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 },
                 thinkingDefault: {
                   type: "string",
-                  enum: ["off", "minimal", "low", "medium", "high", "xhigh", "adaptive"],
+                  enum: ["off", "minimal", "low", "medium", "high", "xhigh", "max", "adaptive"],
                   title: "Agent Thinking Default",
                   description:
                     "Optional per-agent default thinking level. Overrides agents.defaults.thinkingDefault for this agent when no per-message or session override is set.",
@@ -18608,17 +18628,17 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
             items: {
               type: "string",
             },
-            title: "Session Reset Triggers",
+            title: "Session Reset Triggers (deprecated)",
             description:
-              "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation.",
+              "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation. @deprecated Accepted for backward compatibility; automatic session reset machinery has been removed and this field has no effect at runtime.",
           },
           idleMinutes: {
             type: "integer",
             exclusiveMinimum: 0,
             maximum: 9007199254740991,
-            title: "Session Idle Minutes",
+            title: "Session Idle Minutes (deprecated)",
             description:
-              "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType.",
+              "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
           },
           reset: {
             type: "object",
@@ -18638,31 +18658,31 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                     const: "off",
                   },
                 ],
-                title: "Session Reset Mode",
+                title: "Session Reset Mode (deprecated)",
                 description:
-                  'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns.',
+                  'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns. @deprecated Accepted for backward compatibility; the value has no effect at runtime.',
               },
               atHour: {
                 type: "integer",
                 minimum: 0,
                 maximum: 23,
-                title: "Session Daily Reset Hour",
+                title: "Session Daily Reset Hour (deprecated)",
                 description:
-                  "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior.",
+                  "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
               },
               idleMinutes: {
                 type: "integer",
                 exclusiveMinimum: 0,
                 maximum: 9007199254740991,
-                title: "Session Reset Idle Minutes",
+                title: "Session Reset Idle Minutes (deprecated)",
                 description:
-                  "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads.",
+                  "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
               },
             },
             additionalProperties: false,
-            title: "Session Reset Policy",
+            title: "Session Reset Policy (deprecated)",
             description:
-              "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ.",
+              "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ. @deprecated Accepted for backward compatibility; automatic session reset policies (idle / daily) have been removed.",
           },
           resetByType: {
             type: "object",
@@ -18698,9 +18718,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   },
                 },
                 additionalProperties: false,
-                title: "Session Reset (Direct)",
+                title: "Session Reset (Direct) (deprecated)",
                 description:
-                  "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias.",
+                  "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
               },
               dm: {
                 type: "object",
@@ -18735,7 +18755,7 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 additionalProperties: false,
                 title: "Session Reset (DM Deprecated Alias)",
                 description:
-                  "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent.",
+                  "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
               },
               group: {
                 type: "object",
@@ -18768,9 +18788,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   },
                 },
                 additionalProperties: false,
-                title: "Session Reset (Group)",
+                title: "Session Reset (Group) (deprecated)",
                 description:
-                  "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem.",
+                  "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
               },
               thread: {
                 type: "object",
@@ -18803,15 +18823,15 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   },
                 },
                 additionalProperties: false,
-                title: "Session Reset (Thread)",
+                title: "Session Reset (Thread) (deprecated)",
                 description:
-                  "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types.",
+                  "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
               },
             },
             additionalProperties: false,
-            title: "Session Reset by Chat Type",
+            title: "Session Reset by Chat Type (deprecated)",
             description:
-              "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages.",
+              "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages. @deprecated Accepted for backward compatibility; per-type automatic reset overrides have been removed.",
           },
           resetByChannel: {
             type: "object",
@@ -18850,9 +18870,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
               },
               additionalProperties: false,
             },
-            title: "Session Reset by Channel",
+            title: "Session Reset by Channel (deprecated)",
             description:
-              "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies.",
+              "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies. @deprecated Accepted for backward compatibility; per-channel automatic reset overrides have been removed.",
           },
           store: {
             type: "string",
@@ -25437,63 +25457,63 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       tags: ["storage"],
     },
     "session.resetTriggers": {
-      label: "Session Reset Triggers",
-      help: "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation.",
+      label: "Session Reset Triggers (deprecated)",
+      help: "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation. @deprecated Accepted for backward compatibility; automatic session reset machinery has been removed and this field has no effect at runtime.",
       tags: ["storage"],
     },
     "session.idleMinutes": {
-      label: "Session Idle Minutes",
-      help: "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType.",
+      label: "Session Idle Minutes (deprecated)",
+      help: "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
       tags: ["storage"],
     },
     "session.reset": {
-      label: "Session Reset Policy",
-      help: "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ.",
+      label: "Session Reset Policy (deprecated)",
+      help: "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ. @deprecated Accepted for backward compatibility; automatic session reset policies (idle / daily) have been removed.",
       tags: ["storage"],
     },
     "session.reset.mode": {
-      label: "Session Reset Mode",
-      help: 'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns.',
+      label: "Session Reset Mode (deprecated)",
+      help: 'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns. @deprecated Accepted for backward compatibility; the value has no effect at runtime.',
       tags: ["storage"],
     },
     "session.reset.atHour": {
-      label: "Session Daily Reset Hour",
-      help: "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior.",
+      label: "Session Daily Reset Hour (deprecated)",
+      help: "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
       tags: ["storage"],
     },
     "session.reset.idleMinutes": {
-      label: "Session Reset Idle Minutes",
-      help: "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads.",
+      label: "Session Reset Idle Minutes (deprecated)",
+      help: "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
       tags: ["storage"],
     },
     "session.resetByType": {
-      label: "Session Reset by Chat Type",
-      help: "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages.",
+      label: "Session Reset by Chat Type (deprecated)",
+      help: "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages. @deprecated Accepted for backward compatibility; per-type automatic reset overrides have been removed.",
       tags: ["storage"],
     },
     "session.resetByType.direct": {
-      label: "Session Reset (Direct)",
-      help: "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias.",
+      label: "Session Reset (Direct) (deprecated)",
+      help: "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
       tags: ["storage"],
     },
     "session.resetByType.dm": {
       label: "Session Reset (DM Deprecated Alias)",
-      help: "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent.",
+      help: "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
       tags: ["storage"],
     },
     "session.resetByType.group": {
-      label: "Session Reset (Group)",
-      help: "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem.",
+      label: "Session Reset (Group) (deprecated)",
+      help: "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
       tags: ["storage"],
     },
     "session.resetByType.thread": {
-      label: "Session Reset (Thread)",
-      help: "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types.",
+      label: "Session Reset (Thread) (deprecated)",
+      help: "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
       tags: ["storage"],
     },
     "session.resetByChannel": {
-      label: "Session Reset by Channel",
-      help: "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies.",
+      label: "Session Reset by Channel (deprecated)",
+      help: "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies. @deprecated Accepted for backward compatibility; per-channel automatic reset overrides have been removed.",
       tags: ["storage"],
     },
     "session.store": {

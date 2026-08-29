@@ -114,6 +114,7 @@ vi.mock("./run.runtime.js", () => ({
   ensureAgentWorkspace: ensureAgentWorkspaceMock,
   normalizeThinkLevel: normalizeThinkLevelMock,
   supportsXHighThinking: supportsXHighThinkingMock,
+  supportsMaxThinking: supportsXHighThinkingMock,
   setSessionRuntimeModel: setSessionRuntimeModelMock,
   setCliSessionId: vi.fn(),
   logWarn: (...args: unknown[]) => logWarnMock(...args),

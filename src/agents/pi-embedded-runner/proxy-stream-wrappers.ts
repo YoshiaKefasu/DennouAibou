@@ -18,7 +18,7 @@ function resolveKilocodeAppHeaders(): Record<string, string> {
 
 function mapThinkingLevelToOpenRouterReasoningEffort(
   thinkingLevel: ThinkLevel,
-): "none" | "minimal" | "low" | "medium" | "high" | "xhigh" {
+): "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" {
   if (thinkingLevel === "off") {
     return "none";
   }

@@ -178,6 +178,8 @@ function formatThinkingLevelName(level: string): string {
   switch (level) {
     case "xhigh":
       return "Extra High";
+    case "max":
+      return "Max";
     case "adaptive":
       return "Adaptive";
     default:
@@ -196,6 +198,8 @@ function formatConfigValueName(value: string): string {
   switch (value) {
     case "xhigh":
       return "Extra High";
+    case "max":
+      return "Max";
     default:
       return value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : "Unknown";
   }

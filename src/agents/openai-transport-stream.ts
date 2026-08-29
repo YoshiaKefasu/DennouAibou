@@ -44,7 +44,7 @@ export type OpenAICompletionsOptions = BaseStreamOptions & {
           name: string;
         };
       };
-  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 };
 
 export type OpenAIModeModel = Model<Api>;

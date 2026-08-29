@@ -84,7 +84,7 @@ export function registerCronAddCommand(cron: Command) {
       .option("--message <text>", "Agent message payload")
       .option(
         "--thinking <level>",
-        "Thinking level for agent jobs (off|minimal|low|medium|high|xhigh)",
+        "Thinking level for agent jobs (off|minimal|low|medium|high|xhigh|max)",
       )
       .option("--model <model>", "Model override for agent jobs (provider/model or alias)")
       .option("--timeout-seconds <n>", "Timeout seconds for agent jobs")

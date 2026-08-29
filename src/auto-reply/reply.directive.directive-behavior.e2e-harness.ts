@@ -61,6 +61,7 @@ function createThinkingPolicyProvider(
     label: providerId,
     auth: [],
     supportsXHighThinking: ({ modelId }) => xhighModelIds.includes(modelId.trim().toLowerCase()),
+    supportsMaxThinking: ({ modelId }) => xhighModelIds.includes(modelId.trim().toLowerCase()),
   };
 }
 
