@@ -15,7 +15,14 @@ export function resolveIsNixMode(env: NodeJS.ProcessEnv = process.env): boolean 
   return env.DENNOU_NIX_MODE === "1";
 }
 
-export const isNixMode = resolveIsNixMode();
+// Safe: `process` may be undefined in browser bundles that pull this module in.
+export const isNixMode: boolean = (() => {
+  try {
+    return resolveIsNixMode();
+  } catch {
+    return false;
+  }
+})();
 
 // Support the remaining legacy pre-rebrand state dir.
 const LEGACY_STATE_DIRNAMES = [".clawdbot"] as const;

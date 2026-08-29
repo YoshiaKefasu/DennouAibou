@@ -21,7 +21,14 @@ export function resolveDefaultAgentWorkspaceDir(
   return path.join(home, ".openclaw", "workspace");
 }
 
-export const DEFAULT_AGENT_WORKSPACE_DIR = resolveDefaultAgentWorkspaceDir();
+// Safe: `process` may be undefined in browser bundles that pull this module in.
+export const DEFAULT_AGENT_WORKSPACE_DIR: string = (() => {
+  try {
+    return resolveDefaultAgentWorkspaceDir();
+  } catch {
+    return "";
+  }
+})();
 const DEFAULT_HABITS_FILENAME = "HABITS.md";
 export const DEFAULT_AGENTS_FILENAME = "AGENTS.md";
 export const DEFAULT_SOUL_FILENAME = "SOUL.md";
