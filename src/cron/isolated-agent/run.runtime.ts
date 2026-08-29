@@ -26,6 +26,7 @@ export { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 export { deriveSessionTotalTokens, hasNonzeroUsage } from "../../agents/usage.js";
 export { DEFAULT_IDENTITY_FILENAME, ensureAgentWorkspace } from "../../agents/workspace.js";
 export {
+  isElevatedThinkingDenied,
   normalizeThinkLevel,
   supportsMaxThinking,
   supportsXHighThinking,

@@ -1,6 +1,6 @@
 import { normalizeProviderId } from "../agents/provider-id.js";
+import { loadConfig } from "../config/config.js";
 import {
-  formatMaxModelHint as formatMaxModelHintFallback,
   formatThinkingLevels as formatThinkingLevelsFallback,
   listThinkingLevelLabels as listThinkingLevelLabelsFallback,
   listThinkingLevels as listThinkingLevelsFallback,
@@ -95,11 +95,68 @@ export function supportsMaxThinking(provider?: string | null, model?: string | n
       return pluginDecision;
     }
   }
-  // No plugin decision: fall back to xhigh so max doesn't widen the surface
-  // beyond what xhigh already exposes. Use formatMaxModelHint so the user can
-  // see the rationale when a directive is rejected.
-  void formatMaxModelHintFallback;
-  return supportsXHighThinking(provider, model);
+  // No explicit plugin opt-in: fall back to the model catalog's compat entry.
+  // Any model that advertises `compat.supportsReasoningEffort: true` is
+  // assumed to accept the highest wire value the SDK emits, which now
+  // includes "max" (see openai-completions.reasoningEffort in pi-ai 0.84.2).
+  // This unblocks the cli-router moonshotai/kimi-k3 path whose plugin slot
+  // does not exist yet, without widening the surface for the openai provider
+  // (which has its own explicit `supportsMaxThinking: () => false`).
+  if (lookupModelCompatSupportsReasoningEffort(providerKey, modelKey)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Resolve whether a (provider, model) pair advertises the
+ * `compat.supportsReasoningEffort` flag in the user config. The lookup is
+ * performed against the loaded config's `models.providers.<id>.models[]`
+ * entries, matching modelId case-insensitively. Returns `undefined` when
+ * the model is not present (callers should treat that as "not opted in").
+ */
+function lookupModelCompatSupportsReasoningEffort(
+  provider: string,
+  model: string,
+): boolean | undefined {
+  if (!provider || !model) {
+    return undefined;
+  }
+  try {
+    const cfg = loadConfig();
+    const providerEntry = (cfg.models?.providers ?? {})[provider];
+    const models = providerEntry?.models;
+    if (!Array.isArray(models)) {
+      return undefined;
+    }
+    const target = model.toLowerCase();
+    for (const m of models) {
+      if (typeof m?.id === "string" && m.id.toLowerCase() === target) {
+        const compat = m.compat ?? {};
+        return typeof compat.supportsReasoningEffort === "boolean"
+          ? compat.supportsReasoningEffort
+          : undefined;
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Returns true when a `xhigh` or `max` directive is unsupported by the
+ * configured (provider, model) pair. Centralises the down-or-reject decision
+ * that was previously repeated as a ternary across multiple call sites.
+ */
+export function isElevatedThinkingDenied(
+  level: ThinkLevel,
+  provider: string | null | undefined,
+  model: string | null | undefined,
+): boolean {
+  if (level === "xhigh") return !supportsXHighThinking(provider, model);
+  if (level === "max") return !supportsMaxThinking(provider, model);
+  return false;
 }
 
 export function listThinkingLevels(provider?: string | null, model?: string | null): ThinkLevel[] {

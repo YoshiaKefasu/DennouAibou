@@ -16,8 +16,7 @@ import {
   normalizeReasoningLevel,
   normalizeThinkLevel,
   normalizeUsageDisplay,
-  supportsMaxThinking,
-  supportsXHighThinking,
+  isElevatedThinkingDenied,
 } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
@@ -421,10 +420,7 @@ export async function applySessionsPatchToStore(params: {
     const effectiveProvider = next.providerOverride ?? resolvedDefault.provider;
     const effectiveModel = next.modelOverride ?? resolvedDefault.model;
     const isMax = next.thinkingLevel === "max";
-    const supportsGate = isMax
-      ? supportsMaxThinking(effectiveProvider, effectiveModel)
-      : supportsXHighThinking(effectiveProvider, effectiveModel);
-    if (!supportsGate) {
+    if (isElevatedThinkingDenied(next.thinkingLevel, effectiveProvider, effectiveModel)) {
       if ("thinkingLevel" in patch) {
         const hint = isMax ? formatMaxModelHint() : formatXHighModelHint();
         return invalid(`thinkingLevel "${next.thinkingLevel}" is only supported for ${hint}`);

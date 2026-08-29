@@ -6,6 +6,7 @@ import {
   formatMaxModelHint,
   formatThinkingLevels,
   formatXHighModelHint,
+  isElevatedThinkingDenied,
   normalizeThinkLevel,
   normalizeVerboseLevel,
   supportsMaxThinking,
@@ -701,9 +702,7 @@ async function agentCommandInternal(
     }
     if (
       (resolvedThinkLevel === "xhigh" || resolvedThinkLevel === "max") &&
-      (resolvedThinkLevel === "xhigh"
-        ? !supportsXHighThinking(provider, model)
-        : !supportsMaxThinking(provider, model))
+      isElevatedThinkingDenied(resolvedThinkLevel, provider, model)
     ) {
       const explicitThink = Boolean(thinkOnce || thinkOverride);
       if (explicitThink) {

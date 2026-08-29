@@ -7,6 +7,11 @@ const providerRuntimeMocks = vi.hoisted(() => ({
   resolveProviderXHighThinking: vi.fn(),
 }));
 
+const configMocks = vi.hoisted(() => ({
+  loadConfig: vi.fn(),
+}));
+
+let isElevatedThinkingDenied: typeof import("./thinking.js").isElevatedThinkingDenied;
 let listThinkingLevelLabels: typeof import("./thinking.js").listThinkingLevelLabels;
 let listThinkingLevels: typeof import("./thinking.js").listThinkingLevels;
 let normalizeReasoningLevel: typeof import("./thinking.js").normalizeReasoningLevel;
@@ -21,6 +26,9 @@ async function loadFreshThinkingModuleForTest() {
     resolveProviderMaxThinking: providerRuntimeMocks.resolveProviderMaxThinking,
     resolveProviderXHighThinking: providerRuntimeMocks.resolveProviderXHighThinking,
   }));
+  vi.doMock("../config/config.js", () => ({
+    loadConfig: configMocks.loadConfig,
+  }));
   return await import("./thinking.js");
 }
 
@@ -34,7 +42,11 @@ beforeEach(async () => {
   providerRuntimeMocks.resolveProviderXHighThinking.mockReset();
   providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(undefined);
 
+  configMocks.loadConfig.mockReset();
+  configMocks.loadConfig.mockReturnValue({});
+
   ({
+    isElevatedThinkingDenied,
     listThinkingLevelLabels,
     listThinkingLevels,
     normalizeReasoningLevel,
@@ -249,5 +261,47 @@ describe("normalizeReasoningLevel", () => {
   it("accepts stream", () => {
     expect(normalizeReasoningLevel("stream")).toBe("stream");
     expect(normalizeReasoningLevel("streaming")).toBe("stream");
+  });
+});
+
+describe("isElevatedThinkingDenied", () => {
+  it("rejects xhigh when the provider plugin does not opt in", () => {
+    // No plugin opt-in, no compat flag → xhigh denied.
+    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(false);
+    expect(isElevatedThinkingDenied("xhigh", "demo", "demo-model")).toBe(true);
+  });
+
+  it("rejects max when the provider plugin does not opt in and compat flag is absent", () => {
+    // No plugin opt-in, no compat flag → max denied.
+    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(false);
+    expect(isElevatedThinkingDenied("max", "demo", "demo-model")).toBe(true);
+  });
+
+  it("returns false for non-elevated levels regardless of provider support", () => {
+    expect(isElevatedThinkingDenied("high", "demo", "demo-model")).toBe(false);
+    expect(isElevatedThinkingDenied("off", "demo", "demo-model")).toBe(false);
+    expect(isElevatedThinkingDenied("low", "demo", "demo-model")).toBe(false);
+  });
+
+  it("opts max in when the model advertises compat.supportsReasoningEffort", () => {
+    // The cli-router moonshotai/kimi-k3 path: no plugin opt-in, but the
+    // catalog entry sets compat.supportsReasoningEffort = true, which is
+    // the only signal that the openai-completions wire accepts "max".
+    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(undefined);
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          "cli-router": {
+            models: [
+              {
+                id: "kimi-k3",
+                compat: { supportsReasoningEffort: true },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(isElevatedThinkingDenied("max", "cli-router", "kimi-k3")).toBe(false);
   });
 });

@@ -22,6 +22,7 @@ import {
   type ElevatedLevel,
   formatMaxModelHint,
   formatXHighModelHint,
+  isElevatedThinkingDenied,
   normalizeThinkLevel,
   type ReasoningLevel,
   supportsMaxThinking,
@@ -379,8 +380,8 @@ export async function runPreparedReply(
     resolvedThinkLevel = await modelState.resolveDefaultThinkingLevel();
   }
   if (
-    (resolvedThinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) ||
-    (resolvedThinkLevel === "max" && !supportsMaxThinking(provider, model))
+    (resolvedThinkLevel === "xhigh" || resolvedThinkLevel === "max") &&
+    isElevatedThinkingDenied(resolvedThinkLevel, provider, model)
   ) {
     const isMax = resolvedThinkLevel === "max";
     const explicitThink = directives.hasThinkDirective && directives.thinkLevel !== undefined;

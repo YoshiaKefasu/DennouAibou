@@ -51,8 +51,7 @@ import {
   resolveSessionAuthProfileOverride,
   resolveThinkingDefault,
   setSessionRuntimeModel,
-  supportsMaxThinking,
-  supportsXHighThinking,
+  isElevatedThinkingDenied,
 } from "./run.runtime.js";
 import { resolveCronAgentSessionKey } from "./session-key.js";
 import { resolveCronSession } from "./session.js";
@@ -345,10 +344,7 @@ async function prepareCronRunContext(params: {
       catalog: await loadCatalog(),
     });
   }
-  if (
-    (thinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) ||
-    (thinkLevel === "max" && !supportsMaxThinking(provider, model))
-  ) {
+  if (thinkLevel && isElevatedThinkingDenied(thinkLevel, provider, model)) {
     logWarn(
       `[cron:${input.job.id}] Thinking level "${thinkLevel}" is not supported for ${provider}/${model}; downgrading to "high".`,
     );

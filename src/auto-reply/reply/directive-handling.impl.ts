@@ -11,6 +11,7 @@ import {
   formatMaxModelHint,
   formatThinkingLevels,
   formatXHighModelHint,
+  isElevatedThinkingDenied,
   supportsMaxThinking,
   supportsXHighThinking,
 } from "../thinking.js";
@@ -272,9 +273,7 @@ export async function handleDirectiveOnly(
   if (
     directives.hasThinkDirective &&
     (directives.thinkLevel === "xhigh" || directives.thinkLevel === "max") &&
-    ((directives.thinkLevel === "xhigh" &&
-      !supportsXHighThinking(resolvedProvider, resolvedModel)) ||
-      (directives.thinkLevel === "max" && !supportsMaxThinking(resolvedProvider, resolvedModel)))
+    isElevatedThinkingDenied(directives.thinkLevel, resolvedProvider, resolvedModel)
   ) {
     const hint = directives.thinkLevel === "max" ? formatMaxModelHint() : formatXHighModelHint();
     return {
@@ -318,7 +317,7 @@ export async function handleDirectiveOnly(
     (directives.hasExecDirective && directives.hasExecOptions && allowInternalExecPersistence) ||
     Boolean(modelSelection) ||
     directives.hasQueueDirective ||
-    shouldDowngradeXHigh;
+    shouldDowngradeElevatedReasoning;
   const fastModeChanged =
     directives.hasFastDirective &&
     directives.fastMode !== undefined &&
