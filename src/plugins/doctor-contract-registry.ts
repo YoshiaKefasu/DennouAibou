@@ -13,10 +13,28 @@ import {
 } from "./sdk-alias.js";
 
 const CONTRACT_API_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"] as const;
-const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
-const RUNNING_FROM_BUILT_ARTIFACT =
-  CURRENT_MODULE_PATH.includes(`${path.sep}dist${path.sep}`) ||
-  CURRENT_MODULE_PATH.includes(`${path.sep}dist-runtime${path.sep}`);
+// Safe: `fileURLToPath(import.meta.url)` may be unavailable in browser bundles
+// that pull this module in (see the chain documented in src/plugins/bundled-dir.ts).
+// The fallback values keep the module loadable; `RUNNING_FROM_BUILT_ARTIFACT`
+// is only consulted inside `resolvePluginDoctorContracts`, which is never
+// reached from the ui bundle.
+const CURRENT_MODULE_PATH: string = (() => {
+  try {
+    return fileURLToPath(import.meta.url);
+  } catch {
+    return "";
+  }
+})();
+const RUNNING_FROM_BUILT_ARTIFACT = (() => {
+  try {
+    return (
+      CURRENT_MODULE_PATH.includes(`${path.sep}dist${path.sep}`) ||
+      CURRENT_MODULE_PATH.includes(`${path.sep}dist-runtime${path.sep}`)
+    );
+  } catch {
+    return false;
+  }
+})();
 
 type PluginDoctorContractModule = {
   legacyConfigRules?: unknown;

@@ -5,7 +5,22 @@ import { fileURLToPath } from "node:url";
 import { resolveOpenClawPackageRootSync } from "../infra/openclaw-root.js";
 import { resolveUserPath } from "../utils.js";
 
-const DISABLED_BUNDLED_PLUGINS_DIR = path.join(os.tmpdir(), "openclaw-empty-bundled-plugins");
+// Safe: `os.tmpdir()` may be unavailable in browser bundles that pull this
+// module in (ui bundle: src/auto-reply/thinking.ts -> src/config/config.ts ->
+// src/config/io.ts -> src/config/validation.ts ->
+// src/plugins/doctor-contract-registry.ts -> src/plugins/roots.ts ->
+// src/plugins/bundled-dir.ts). Resolving eagerly at module load crashes the
+// browser tab with `TypeError: q.default.tmpdir is not a function` because
+// `node:os` is an empty shim in the SPA build. The fallback sentinel is fine
+// for ui consumers (none of which call resolveDisabledBundledPluginsDir);
+// Node-only callers will trigger the real resolution on first use.
+const DISABLED_BUNDLED_PLUGINS_DIR: string = (() => {
+  try {
+    return path.join(os.tmpdir(), "openclaw-empty-bundled-plugins");
+  } catch {
+    return "";
+  }
+})();
 
 function bundledPluginsDisabled(env: NodeJS.ProcessEnv): boolean {
   const raw = env.DENNOU_DISABLE_BUNDLED_PLUGINS?.trim().toLowerCase();

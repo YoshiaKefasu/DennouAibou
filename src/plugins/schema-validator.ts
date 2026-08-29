@@ -3,7 +3,27 @@ import type { ErrorObject, ValidateFunction } from "ajv";
 import { appendAllowedValuesHint, summarizeAllowedValues } from "../config/allowed-values.js";
 import { sanitizeTerminalText } from "../terminal/safe-text.js";
 
-const require = createRequire(import.meta.url);
+// Safe: `createRequire` may be unavailable in browser bundles that pull this
+// module in (see the chain documented in src/plugins/bundled-dir.ts). The
+// require is only consulted inside `getValidator`, which is never reached from
+// the ui bundle, so a placeholder is fine for browser-side evaluation. Real
+// callers will re-resolve lazily on first use and surface the error then.
+let moduleRequire: NodeRequire | undefined;
+let moduleRequireFailed = false;
+function getModuleRequire(): NodeRequire {
+  if (moduleRequire === undefined) {
+    if (moduleRequireFailed) {
+      throw new Error("createRequire unavailable in browser bundle");
+    }
+    try {
+      moduleRequire = createRequire(import.meta.url);
+    } catch (err) {
+      moduleRequireFailed = true;
+      throw err;
+    }
+  }
+  return moduleRequire;
+}
 type AjvLike = {
   addFormat: (
     name: string,
@@ -23,7 +43,7 @@ function getAjv(mode: "default" | "defaults"): AjvLike {
   if (cached) {
     return cached;
   }
-  const ajvModule = require("ajv") as { default?: new (opts?: object) => AjvLike };
+  const ajvModule = getModuleRequire()("ajv") as { default?: new (opts?: object) => AjvLike };
   const AjvCtor =
     typeof ajvModule.default === "function"
       ? ajvModule.default
