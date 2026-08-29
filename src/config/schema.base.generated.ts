@@ -4103,7 +4103,7 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 properties: {
                   idleTimeoutSeconds: {
                     description:
-                      "Idle timeout for LLM streaming responses in seconds. If no token is received within this time, the request is aborted. Set to 0 to disable. Default: 60 seconds.",
+                      "Idle timeout for LLM streaming responses in seconds. If no token is received within this time, the request is aborted. Set to 0 to disable. Default: 300 seconds (5 minutes).",
                     type: "integer",
                     minimum: 0,
                     maximum: 9007199254740991,
@@ -26935,5 +26935,5 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
     },
   },
   version: "2026.4.6",
-  generatedAt: "2026-03-22T21:17:33.302Z",
+  generatedAt: "2026-08-29T18:05:14.072Z",
 };

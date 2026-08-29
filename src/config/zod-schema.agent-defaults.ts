@@ -97,7 +97,7 @@ export const AgentDefaultsSchema = z
           .nonnegative()
           .optional()
           .describe(
-            "Idle timeout for LLM streaming responses in seconds. If no token is received within this time, the request is aborted. Set to 0 to disable. Default: 60 seconds.",
+            "Idle timeout for LLM streaming responses in seconds. If no token is received within this time, the request is aborted. Set to 0 to disable. Default: 300 seconds (5 minutes).",
           ),
       })
       .strict()
