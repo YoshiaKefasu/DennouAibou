@@ -331,7 +331,7 @@ export async function handleDirectiveOnly(
     if (directives.hasFastDirective && directives.fastMode !== undefined) {
       sessionEntry.fastMode = directives.fastMode;
     }
-    if (shouldDowngradeXHigh) {
+    if (shouldDowngradeXHigh || shouldDowngradeMax) {
       sessionEntry.thinkingLevel = "high";
     }
     if (

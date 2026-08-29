@@ -84,6 +84,7 @@ const resolveHookExternalContentSourceMock = createMock();
 const getSkillsSnapshotVersionMock = createMock();
 const loadModelCatalogMock = createMock();
 const getRemoteSkillEligibilityMock = createMock();
+const isElevatedThinkingDeniedMock = createMock();
 
 vi.mock("./run.runtime.js", () => ({
   resolveAgentConfig: resolveAgentConfigMock,
@@ -115,6 +116,7 @@ vi.mock("./run.runtime.js", () => ({
   normalizeThinkLevel: normalizeThinkLevelMock,
   supportsXHighThinking: supportsXHighThinkingMock,
   supportsMaxThinking: supportsXHighThinkingMock,
+  isElevatedThinkingDenied: isElevatedThinkingDeniedMock,
   setSessionRuntimeModel: setSessionRuntimeModelMock,
   setCliSessionId: vi.fn(),
   logWarn: (...args: unknown[]) => logWarnMock(...args),
@@ -252,6 +254,7 @@ function resetRunConfigMocks(): void {
   ensureAgentWorkspaceMock.mockResolvedValue({ dir: "/tmp/workspace" });
   normalizeThinkLevelMock.mockImplementation((value: unknown) => value);
   supportsXHighThinkingMock.mockReturnValue(false);
+  isElevatedThinkingDeniedMock.mockReturnValue(false);
   buildSafeExternalPromptMock.mockImplementation(
     ({ message }: { message?: string }) => message ?? "",
   );
