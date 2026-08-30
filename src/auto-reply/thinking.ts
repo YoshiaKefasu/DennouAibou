@@ -177,6 +177,13 @@ function resolveMapWire(
   return map[level] ?? null;
 }
 
+// Note: `resolveMapReasoningEffort` previously lived here as a thin wrapper
+// around `resolveMapWire` for the openai transport. The transport now uses
+// its own `mapReasoningEffort` (in `src/agents/openai-transport-stream.ts`)
+// and reads `compat.reasoningEffortMap` directly from the model, so the
+// wrapper has no remaining callers and was removed. Keep `resolveMapWire`
+// module-private since it is only consumed by `isElevatedThinkingDenied`.
+
 /**
  * Returns true when a `xhigh` or `max` directive is unsupported by the
  * configured (provider, model) pair. With map-driven resolution, a model
@@ -251,19 +258,4 @@ export function resolveThinkingDefaultForModel(params: {
     return pluginDecision;
   }
   return resolveThinkingDefaultForModelFallback(params);
-}
-
-/**
- * For `openai-transport-stream.ts`: resolve the wire-level reasoning effort
- * for a model based on its declared `compat.reasoningEffortMap`. Returns
- * `null` when the model declares the level as unsupported (entry is
- * present but `null`), and `undefined` when the model has no map (caller
- * falls back to the legacy path).
- */
-export function resolveMapReasoningEffort(
-  provider: string | null | undefined,
-  model: string | null | undefined,
-  level: ThinkLevel,
-): string | null | undefined {
-  return resolveMapWire(provider ?? "", model ?? "", level);
 }
