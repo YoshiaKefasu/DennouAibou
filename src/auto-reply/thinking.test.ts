@@ -380,3 +380,12 @@ describe("isElevatedThinkingDenied", () => {
     expect(isElevatedThinkingDenied("low", "demo", "demo-model")).toBe(false);
   });
 });
+
+describe("runtime catalog sync accessor", () => {
+  it("returns undefined before the catalog is loaded", async () => {
+    const { getCachedModelCatalogSync, resetModelCatalogCacheForTest } =
+      await import("../agents/model-catalog.js");
+    resetModelCatalogCacheForTest();
+    expect(getCachedModelCatalogSync()).toBeUndefined();
+  });
+});
