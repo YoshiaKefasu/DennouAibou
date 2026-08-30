@@ -197,9 +197,7 @@ export const ModelCompatSchema = z
      * by `isElevatedThinkingDenied`). Models without this map fall back to
      * the legacy plugin/compat-flag resolution.
      */
-    reasoningEffortMap: z
-      .record(z.string(), z.union([z.string(), z.null()]))
-      .optional(),
+    reasoningEffortMap: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
     supportsUsageInStreaming: z.boolean().optional(),
     supportsTools: z.boolean().optional(),
     supportsStrictMode: z.boolean().optional(),
