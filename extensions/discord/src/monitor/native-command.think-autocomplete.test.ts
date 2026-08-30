@@ -36,7 +36,6 @@ const resolveConfiguredBindingRouteMock = vi.hoisted(() =>
 const providerThinkingMocks = vi.hoisted(() => ({
   resolveProviderBinaryThinking: vi.fn(),
   resolveProviderDefaultThinkingLevel: vi.fn(),
-  resolveProviderXHighThinking: vi.fn(),
 }));
 const buildModelsProviderDataMock = vi.hoisted(() => vi.fn());
 
@@ -129,7 +128,6 @@ async function loadDiscordThinkAutocompleteModulesForTest() {
   vi.doMock("../../../../src/plugins/provider-thinking.js", () => ({
     resolveProviderBinaryThinking: providerThinkingMocks.resolveProviderBinaryThinking,
     resolveProviderDefaultThinkingLevel: providerThinkingMocks.resolveProviderDefaultThinkingLevel,
-    resolveProviderXHighThinking: providerThinkingMocks.resolveProviderXHighThinking,
   }));
   const commandAuth = await import("openclaw/plugin-sdk/command-auth");
   const nativeCommandUi = await import("./native-command-ui.js");
@@ -144,9 +142,6 @@ describe("discord native /think autocomplete", () => {
   beforeAll(async () => {
     providerThinkingMocks.resolveProviderBinaryThinking.mockReturnValue(undefined);
     providerThinkingMocks.resolveProviderDefaultThinkingLevel.mockReturnValue(undefined);
-    providerThinkingMocks.resolveProviderXHighThinking.mockImplementation(({ provider, context }) =>
-      provider === "openai-codex" && context.modelId === "gpt-5.4" ? true : undefined,
-    );
     buildModelsProviderDataMock.mockResolvedValue({
       byProvider: new Map<string, Set<string>>(),
       providers: [],
@@ -170,10 +165,6 @@ describe("discord native /think autocomplete", () => {
     providerThinkingMocks.resolveProviderBinaryThinking.mockReturnValue(undefined);
     providerThinkingMocks.resolveProviderDefaultThinkingLevel.mockReset();
     providerThinkingMocks.resolveProviderDefaultThinkingLevel.mockReturnValue(undefined);
-    providerThinkingMocks.resolveProviderXHighThinking.mockReset();
-    providerThinkingMocks.resolveProviderXHighThinking.mockImplementation(({ provider, context }) =>
-      provider === "openai-codex" && context.modelId === "gpt-5.4" ? true : undefined,
-    );
     fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
     fs.writeFileSync(
       STORE_PATH,

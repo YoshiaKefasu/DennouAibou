@@ -34,18 +34,6 @@ export function resolveProviderBinaryThinking(
   return resolveActiveThinkingProvider(params.provider)?.isBinaryThinking?.(params.context);
 }
 
-export function resolveProviderXHighThinking(
-  params: ThinkingHookParams<ProviderThinkingPolicyContext>,
-) {
-  return resolveActiveThinkingProvider(params.provider)?.supportsXHighThinking?.(params.context);
-}
-
-export function resolveProviderMaxThinking(
-  params: ThinkingHookParams<ProviderThinkingPolicyContext>,
-) {
-  return resolveActiveThinkingProvider(params.provider)?.supportsMaxThinking?.(params.context);
-}
-
 export function resolveProviderDefaultThinkingLevel(
   params: ThinkingHookParams<ProviderDefaultThinkingPolicyContext>,
 ) {

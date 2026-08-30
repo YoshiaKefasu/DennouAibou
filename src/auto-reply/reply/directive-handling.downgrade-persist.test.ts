@@ -9,8 +9,6 @@ import { handleDirectiveOnly } from "./directive-handling.impl.js";
 import { parseInlineDirectives } from "./directive-handling.js";
 
 const thinkingMocks = vi.hoisted(() => ({
-  supportsXHighThinking: vi.fn(),
-  supportsMaxThinking: vi.fn(),
   isElevatedThinkingDenied: vi.fn(),
 }));
 
@@ -54,8 +52,6 @@ vi.mock("../thinking.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../thinking.js")>();
   return {
     ...original,
-    supportsXHighThinking: thinkingMocks.supportsXHighThinking,
-    supportsMaxThinking: thinkingMocks.supportsMaxThinking,
     isElevatedThinkingDenied: thinkingMocks.isElevatedThinkingDenied,
   };
 });
@@ -85,8 +81,6 @@ beforeEach(() => {
       store: { version: 1, profiles: {} },
     },
   ]);
-  thinkingMocks.supportsXHighThinking.mockReset().mockReturnValue(false);
-  thinkingMocks.supportsMaxThinking.mockReset().mockReturnValue(false);
   thinkingMocks.isElevatedThinkingDenied.mockReset().mockReturnValue(false);
   liveModelSwitchMocks.requestLiveSessionModelSwitch.mockReset().mockReturnValue(false);
   queueMocks.refreshQueuedFollowupSession.mockReset();
@@ -139,7 +133,9 @@ describe("handleDirectiveOnly elevated thinking downgrade persist", () => {
 
   it("persists thinkingLevel=high when xhigh is not supported for the resolved model", async () => {
     // Model does NOT support xhigh => downgrade path must persist "high".
-    thinkingMocks.supportsXHighThinking.mockReturnValue(false);
+    thinkingMocks.isElevatedThinkingDenied.mockImplementation(
+      (level) => level === "xhigh" || level === "max",
+    );
 
     const directives = parseInlineDirectives("hello world");
     const sessionEntry = createSessionEntry({ thinkingLevel: "xhigh" });
@@ -161,7 +157,9 @@ describe("handleDirectiveOnly elevated thinking downgrade persist", () => {
 
   it("persists thinkingLevel=high when max is not supported for the resolved model", async () => {
     // Model does NOT support max => downgrade path must persist "high".
-    thinkingMocks.supportsMaxThinking.mockReturnValue(false);
+    thinkingMocks.isElevatedThinkingDenied.mockImplementation(
+      (level) => level === "xhigh" || level === "max",
+    );
 
     const directives = parseInlineDirectives("hello world");
     const sessionEntry = createSessionEntry({ thinkingLevel: "max" });

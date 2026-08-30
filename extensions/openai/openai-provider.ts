@@ -193,13 +193,10 @@ export function buildOpenAIProvider(): ProviderPlugin {
       /content_filter.*(?:prompt|input).*(?:too long|exceed)/i.test(errorMessage),
     resolveTransportTurnState: (ctx) => resolveOpenAITransportTurnState(ctx),
     resolveReasoningOutputMode: () => "native",
-    supportsXHighThinking: ({ modelId }) => matchesExactOrPrefix(modelId, OPENAI_XHIGH_MODEL_IDS),
-    // OpenAI native models do not accept a "max" reasoning effort value; opt
-    // out explicitly so this surface is never widened by accident. Models like
-    // moonshotai/kimi-k3 served via CPA / openai-completions go through a
-    // different provider id and are covered by the compat-based fallback in
-    // src/auto-reply/thinking.ts:supportsMaxThinking.
-    supportsMaxThinking: () => false,
+    // Elevated-reasoning support (`xhigh`, `max`) is no longer declared via
+    // provider hooks. The openai synthetic models advertise their level set
+    // in `compat.reasoningEffortMap`, which is wired up in
+    // `resolveOpenAIGpt54ForwardCompatModel` / `augmentModelCatalog`.
     isModernModelRef: ({ modelId }) => matchesExactOrPrefix(modelId, OPENAI_MODERN_MODEL_IDS),
     augmentModelCatalog: (ctx) => {
       const openAiGpt54Template = findCatalogTemplate({

@@ -25,8 +25,6 @@ import {
   isElevatedThinkingDenied,
   normalizeThinkLevel,
   type ReasoningLevel,
-  supportsMaxThinking,
-  supportsXHighThinking,
   type ThinkLevel,
   type VerboseLevel,
 } from "../thinking.js";
@@ -299,8 +297,8 @@ export async function runPreparedReply(
     const maybeLevel = normalizeThinkLevel(parts[0]);
     if (
       maybeLevel &&
-      ((maybeLevel === "xhigh" && supportsXHighThinking(provider, model)) ||
-        (maybeLevel === "max" && supportsMaxThinking(provider, model)) ||
+      ((maybeLevel === "xhigh" && !isElevatedThinkingDenied("xhigh", provider, model)) ||
+        (maybeLevel === "max" && !isElevatedThinkingDenied("max", provider, model)) ||
         (maybeLevel !== "xhigh" && maybeLevel !== "max"))
     ) {
       resolvedThinkLevel = maybeLevel;

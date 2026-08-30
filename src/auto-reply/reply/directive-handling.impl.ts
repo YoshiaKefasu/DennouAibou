@@ -12,8 +12,6 @@ import {
   formatThinkingLevels,
   formatXHighModelHint,
   isElevatedThinkingDenied,
-  supportsMaxThinking,
-  supportsXHighThinking,
 } from "../thinking.js";
 import type { ReplyPayload } from "../types.js";
 import { resolveModelSelectionFromDirective } from "./directive-handling.model-selection.js";
@@ -287,11 +285,11 @@ export async function handleDirectiveOnly(
   const shouldDowngradeXHigh =
     !directives.hasThinkDirective &&
     nextThinkLevel === "xhigh" &&
-    !supportsXHighThinking(resolvedProvider, resolvedModel);
+    isElevatedThinkingDenied("xhigh", resolvedProvider, resolvedModel);
   const shouldDowngradeMax =
     !directives.hasThinkDirective &&
     nextThinkLevel === "max" &&
-    !supportsMaxThinking(resolvedProvider, resolvedModel);
+    isElevatedThinkingDenied("max", resolvedProvider, resolvedModel);
   const shouldDowngradeElevatedReasoning = shouldDowngradeXHigh || shouldDowngradeMax;
 
   const prevElevatedLevel =

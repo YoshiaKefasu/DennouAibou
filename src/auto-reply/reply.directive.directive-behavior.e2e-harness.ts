@@ -54,14 +54,16 @@ const OPENAI_CODEX_XHIGH_MODEL_IDS = [
 
 function createThinkingPolicyProvider(
   providerId: string,
-  xhighModelIds: readonly string[],
+  _xhighModelIds: readonly string[],
 ): ProviderPlugin {
+  // Elevated-reasoning support (`xhigh`, `max`) is no longer declared via
+  // provider hooks. The harness still wires up a ProviderPlugin so other
+  // provider-shape tests can run; consumers must look at the model's
+  // `compat.reasoningEffortMap` to know which levels it advertises.
   return {
     id: providerId,
     label: providerId,
     auth: [],
-    supportsXHighThinking: ({ modelId }) => xhighModelIds.includes(modelId.trim().toLowerCase()),
-    supportsMaxThinking: ({ modelId }) => xhighModelIds.includes(modelId.trim().toLowerCase()),
   };
 }
 

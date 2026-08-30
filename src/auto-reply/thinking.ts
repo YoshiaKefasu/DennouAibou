@@ -83,28 +83,6 @@ export function isBinaryThinkingProvider(provider?: string | null, model?: strin
 }
 
 /**
- * Thin wrapper kept for back-compat with call sites that still import the
- * legacy helpers. The map-driven implementation makes these obsolete, but
- * the symbol is retained until all 5 call sites migrate in the follow-up
- * commit that retires the provider-hook machinery.
- *
- * @deprecated Use `isElevatedThinkingDenied` for policy decisions and the
- * model's `compat.reasoningEffortMap` (via `lookupModelReasoningEffortMap`)
- * for choices. Will be removed once the call-site migration lands.
- */
-export function supportsXHighThinking(provider?: string | null, model?: string | null): boolean {
-  return !isElevatedThinkingDenied("xhigh", provider ?? null, model ?? null);
-}
-
-/**
- * @deprecated See {@link supportsXHighThinking}. Removed in the follow-up
- * commit that retires the provider-hook machinery.
- */
-export function supportsMaxThinking(provider?: string | null, model?: string | null): boolean {
-  return !isElevatedThinkingDenied("max", provider ?? null, model ?? null);
-}
-
-/**
  * Looks up the per-model `compat.reasoningEffortMap` from the loaded config
  * and, as a fallback, from the cached runtime model catalog. The map is the
  * single source of truth for which thinking levels a model advertises and

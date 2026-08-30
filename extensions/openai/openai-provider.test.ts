@@ -70,21 +70,8 @@ describe("buildOpenAIProvider", () => {
     });
   });
 
-  it("surfaces gpt-5.4 mini and nano in xhigh and augmented catalog metadata", () => {
+  it("surfaces gpt-5.4 mini and nano via the augmented catalog reasoningEffortMap", () => {
     const provider = buildOpenAIProvider();
-
-    expect(
-      provider.supportsXHighThinking?.({
-        provider: "openai",
-        modelId: "gpt-5.4-mini",
-      } as never),
-    ).toBe(true);
-    expect(
-      provider.supportsXHighThinking?.({
-        provider: "openai",
-        modelId: "gpt-5.4-nano",
-      } as never),
-    ).toBe(true);
 
     const entries = provider.augmentModelCatalog?.({
       env: process.env,

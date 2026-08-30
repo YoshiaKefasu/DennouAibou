@@ -9,8 +9,6 @@ import {
   isElevatedThinkingDenied,
   normalizeThinkLevel,
   normalizeVerboseLevel,
-  supportsMaxThinking,
-  supportsXHighThinking,
   type VerboseLevel,
 } from "../auto-reply/thinking.js";
 import { formatCliCommand } from "../cli/command-format.js";
