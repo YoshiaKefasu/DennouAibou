@@ -2973,6 +2973,22 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                           supportsReasoningEffort: {
                             type: "boolean",
                           },
+                          reasoningEffortMap: {
+                            type: "object",
+                            propertyNames: {
+                              type: "string",
+                            },
+                            additionalProperties: {
+                              anyOf: [
+                                {
+                                  type: "string",
+                                },
+                                {
+                                  type: "null",
+                                },
+                              ],
+                            },
+                          },
                           supportsUsageInStreaming: {
                             type: "boolean",
                           },
@@ -26935,5 +26951,5 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
     },
   },
   version: "2026.4.6",
-  generatedAt: "2026-08-29T18:05:14.072Z",
+  generatedAt: "2026-08-30T09:59:46.595Z",
 };

@@ -29,6 +29,12 @@ type SupportedOpenAICompatFields = Pick<
   | "requiresThinkingAsText"
 >;
 
+/**
+ * Per-model reasoning effort map (PI agent `models.json` design).
+ * See `ModelCompatSchema.reasoningEffortMap` for the full contract.
+ */
+export type ReasoningEffortMap = Record<string, string | null>;
+
 // TODO(debloat): once "openrouter" / "zai" are removed from pi-ai compat
 // (upstream), drop this Exclude and the cast sites in
 // pi-embedded-runner/{compact,attempt}.ts. The type/runtime divergence is
@@ -40,6 +46,7 @@ type SupportedThinkingFormat = Exclude<
 >;
 
 export type ModelCompatConfig = SupportedOpenAICompatFields & {
+  reasoningEffortMap?: ReasoningEffortMap;
   thinkingFormat?: SupportedThinkingFormat;
   supportsTools?: boolean;
   toolSchemaProfile?: string;
