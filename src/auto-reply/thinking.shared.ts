@@ -27,14 +27,11 @@ export function isBinaryThinkingProvider(provider?: string | null): boolean {
   return false;
 }
 
-export function supportsBuiltInXHighThinking(
-  provider?: string | null,
-  model?: string | null,
-): boolean {
-  void provider;
-  void model;
-  return false;
-}
+// Note: there is no `supportsBuiltInXHighThinking` anymore. Reasoning level
+// support is declared per-model via `compat.reasoningEffortMap` (PI agent
+// `models.json` design), and resolved through `src/auto-reply/thinking.ts`.
+// Removing the hook keeps a single source of truth and avoids drift between
+// choices/denial/wire layers.
 
 // Normalize user-provided thinking level strings to the canonical enum.
 export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined {
@@ -99,11 +96,11 @@ export function formatThinkingLevels(
 }
 
 export function formatXHighModelHint(): string {
-  return "provider models that advertise xhigh reasoning";
+  return "models that declare xhigh in their reasoningEffortMap";
 }
 
 export function formatMaxModelHint(): string {
-  return "provider models that advertise max reasoning";
+  return "models that declare max in their reasoningEffortMap";
 }
 
 export function resolveThinkingDefaultForModel(params: {

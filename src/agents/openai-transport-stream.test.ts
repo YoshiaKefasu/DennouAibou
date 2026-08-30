@@ -148,7 +148,17 @@ describe("openai transport stream", () => {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 200000,
       maxTokens: 8192,
-      compat: { supportsReasoningEffort: true },
+      compat: {
+        supportsReasoningEffort: true,
+        reasoningEffortMap: {
+          minimal: null,
+          low: "low",
+          medium: null,
+          high: "high",
+          xhigh: null,
+          max: "max",
+        },
+      },
     } as unknown as Model<"openai-completions">;
 
     const params = buildOpenAICompletionsParams(
@@ -161,5 +171,72 @@ describe("openai transport stream", () => {
 
     expect(params.reasoning_effort).toBe("max");
     expect(params.reasoning).toBeUndefined();
+  });
+
+  it("omits reasoning_effort when the model's map marks the requested level as null", () => {
+    const model = {
+      id: "kimi-k3",
+      name: "Kimi K3",
+      api: "openai-completions",
+      provider: "cli-router",
+      baseUrl: "http://127.0.0.1:8317/v1",
+      reasoning: true,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 8192,
+      compat: {
+        supportsReasoningEffort: true,
+        reasoningEffortMap: {
+          minimal: null,
+          low: "low",
+          medium: null,
+          high: "high",
+          xhigh: null,
+          max: null,
+        },
+      },
+    } as unknown as Model<"openai-completions">;
+
+    const params = buildOpenAICompletionsParams(
+      model,
+      {
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
+      },
+      { reasoningEffort: "max" },
+    );
+
+    // The map says "max" is not supported → reasoning_effort must not appear
+    // on the wire (defense against sending an unsupported effort level).
+    expect(params.reasoning_effort).toBeUndefined();
+    expect(params.reasoning).toBeUndefined();
+  });
+
+  it("passes reasoning_effort through when the model has no map but supportsReasoningEffort is true", () => {
+    // Back-compat: legacy configs that only set supportsReasoningEffort
+    // should still emit the raw effort token on the wire.
+    const model = {
+      id: "legacy-model",
+      name: "Legacy Model",
+      api: "openai-completions",
+      provider: "demo",
+      baseUrl: "http://127.0.0.1/v1",
+      reasoning: true,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 8192,
+      compat: { supportsReasoningEffort: true },
+    } as unknown as Model<"openai-completions">;
+
+    const params = buildOpenAICompletionsParams(
+      model,
+      {
+        messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
+      },
+      { reasoningEffort: "low" },
+    );
+
+    expect(params.reasoning_effort).toBe("low");
   });
 });

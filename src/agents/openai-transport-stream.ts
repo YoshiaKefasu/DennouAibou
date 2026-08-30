@@ -334,7 +334,7 @@ function detectCompat(model: OpenAIModeModel) {
   const endpointClass = capabilities.endpointClass;
   const isDefaultRoute = endpointClass === "default";
   const isGroq = endpointClass === "groq-native" || (isDefaultRoute && provider === "groq");
-  const reasoningEffortMap: Record<string, string> =
+  const reasoningEffortMap: Record<string, string | null> =
     isGroq && model.id === "qwen/qwen3-32b"
       ? {
           minimal: "default",
@@ -342,6 +342,7 @@ function detectCompat(model: OpenAIModeModel) {
           medium: "default",
           high: "default",
           xhigh: "default",
+          max: null,
         }
       : {};
   return {
@@ -365,7 +366,7 @@ function getCompat(model: OpenAIModeModel): {
   supportsStore: boolean;
   supportsDeveloperRole: boolean;
   supportsReasoningEffort: boolean;
-  reasoningEffortMap: Record<string, string>;
+  reasoningEffortMap: Record<string, string | null>;
   supportsUsageInStreaming: boolean;
   maxTokensField: string;
   requiresToolResultName: boolean;
@@ -390,7 +391,7 @@ function getCompat(model: OpenAIModeModel): {
       (compat.supportsDeveloperRole as boolean | undefined) ?? detected.supportsDeveloperRole,
     supportsReasoningEffort,
     reasoningEffortMap:
-      (compat.reasoningEffortMap as Record<string, string> | undefined) ??
+      (compat.reasoningEffortMap as Record<string, string | null> | undefined) ??
       detected.reasoningEffortMap,
     supportsUsageInStreaming:
       (compat.supportsUsageInStreaming as boolean | undefined) ?? detected.supportsUsageInStreaming,
@@ -412,8 +413,20 @@ function getCompat(model: OpenAIModeModel): {
   };
 }
 
-function mapReasoningEffort(effort: string, reasoningEffortMap: Record<string, string>): string {
-  return reasoningEffortMap[effort] ?? effort;
+function mapReasoningEffort(
+  effort: string,
+  reasoningEffortMap: Record<string, string | null>,
+): string | null | undefined {
+  // The map is the single source of truth. Three states:
+  //   - entry absent: caller likely has no map declared; emit the raw effort
+  //     (back-compat for legacy configs that only set supportsReasoningEffort).
+  //   - entry present + string: emit the declared wire value.
+  //   - entry present + null: declared as unsupported — do NOT leak the raw
+  //     token, drop the parameter entirely.
+  if (!Object.prototype.hasOwnProperty.call(reasoningEffortMap, effort)) {
+    return effort;
+  }
+  return reasoningEffortMap[effort] ?? undefined;
 }
 
 function convertTools(
@@ -481,14 +494,15 @@ export function buildOpenAICompletionsParams(
     params.tool_choice = options.toolChoice;
   }
   if (compat.thinkingFormat === "openrouter" && model.reasoning && options?.reasoningEffort) {
-    params.reasoning = {
-      effort: mapReasoningEffort(options.reasoningEffort, compat.reasoningEffortMap),
-    };
+    const wire = mapReasoningEffort(options.reasoningEffort, compat.reasoningEffortMap);
+    if (wire) {
+      params.reasoning = { effort: wire };
+    }
   } else if (options?.reasoningEffort && model.reasoning && compat.supportsReasoningEffort) {
-    params.reasoning_effort = mapReasoningEffort(
-      options.reasoningEffort,
-      compat.reasoningEffortMap,
-    );
+    const wire = mapReasoningEffort(options.reasoningEffort, compat.reasoningEffortMap);
+    if (wire) {
+      params.reasoning_effort = wire;
+    }
   }
   return params;
 }

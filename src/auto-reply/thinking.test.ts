@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const providerRuntimeMocks = vi.hoisted(() => ({
   resolveProviderBinaryThinking: vi.fn(),
   resolveProviderDefaultThinkingLevel: vi.fn(),
-  resolveProviderMaxThinking: vi.fn(),
-  resolveProviderXHighThinking: vi.fn(),
 }));
 
 const configMocks = vi.hoisted(() => ({
@@ -23,8 +21,6 @@ async function loadFreshThinkingModuleForTest() {
   vi.doMock("../plugins/provider-thinking.js", () => ({
     resolveProviderBinaryThinking: providerRuntimeMocks.resolveProviderBinaryThinking,
     resolveProviderDefaultThinkingLevel: providerRuntimeMocks.resolveProviderDefaultThinkingLevel,
-    resolveProviderMaxThinking: providerRuntimeMocks.resolveProviderMaxThinking,
-    resolveProviderXHighThinking: providerRuntimeMocks.resolveProviderXHighThinking,
   }));
   vi.doMock("../config/config.js", () => ({
     loadConfig: configMocks.loadConfig,
@@ -37,10 +33,6 @@ beforeEach(async () => {
   providerRuntimeMocks.resolveProviderBinaryThinking.mockReturnValue(undefined);
   providerRuntimeMocks.resolveProviderDefaultThinkingLevel.mockReset();
   providerRuntimeMocks.resolveProviderDefaultThinkingLevel.mockReturnValue(undefined);
-  providerRuntimeMocks.resolveProviderMaxThinking.mockReset();
-  providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(undefined);
-  providerRuntimeMocks.resolveProviderXHighThinking.mockReset();
-  providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(undefined);
 
   configMocks.loadConfig.mockReset();
   configMocks.loadConfig.mockReturnValue({});
@@ -97,64 +89,85 @@ describe("normalizeThinkLevel", () => {
 });
 
 describe("listThinkingLevels", () => {
-  it("uses provider runtime hooks for xhigh support", () => {
-    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(true);
-
-    expect(listThinkingLevels("demo", "demo-model")).toContain("xhigh");
+  it("returns base levels for models without a map", () => {
+    // No map, no plugin opt-in → base levels only.
+    expect(listThinkingLevels("demo", "demo-model")).toEqual([
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "adaptive",
+    ]);
   });
 
-  it("includes xhigh for provider-advertised models", () => {
-    providerRuntimeMocks.resolveProviderXHighThinking.mockImplementation(({ provider, context }) =>
-      (provider === "openai" && ["gpt-5.4", "gpt-5.4", "gpt-5.4-pro"].includes(context.modelId)) ||
-      (provider === "openai-codex" &&
-        ["gpt-5.4", "gpt-5.4", "gpt-5.3-codex-spark"].includes(context.modelId)) ||
-      (provider === "github-copilot" && ["gpt-5.4", "gpt-5.4"].includes(context.modelId))
-        ? true
-        : undefined,
-    );
+  it("derives choices from the reasoningEffortMap when present", () => {
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          "cli-router": {
+            models: [
+              {
+                id: "kimi-k3",
+                compat: {
+                  reasoningEffortMap: {
+                    minimal: null,
+                    low: "low",
+                    medium: null,
+                    high: "high",
+                    xhigh: null,
+                    max: "max",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
 
-    expect(listThinkingLevels("openai-codex", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("openai-codex", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("openai-codex", "gpt-5.3-codex-spark")).toContain("xhigh");
-    expect(listThinkingLevels("openai", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("openai", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("openai", "gpt-5.4-pro")).toContain("xhigh");
-    expect(listThinkingLevels("openai-codex", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("github-copilot", "gpt-5.4")).toContain("xhigh");
-    expect(listThinkingLevels("github-copilot", "gpt-5.4")).toContain("xhigh");
+    expect(listThinkingLevels("cli-router", "kimi-k3")).toEqual([
+      "off",
+      "low",
+      "high",
+      "max",
+      "adaptive",
+    ]);
   });
 
-  it("excludes xhigh for non-codex models", () => {
-    expect(listThinkingLevels(undefined, "gpt-4.1-mini")).not.toContain("xhigh");
+  it("places map entries in PI canonical order, dropping null entries", () => {
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          demo: {
+            models: [
+              {
+                id: "demo-model",
+                compat: {
+                  reasoningEffortMap: {
+                    max: "max",
+                    minimal: "minimal",
+                    medium: "medium",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(listThinkingLevels("demo", "demo-model")).toEqual([
+      "off",
+      "minimal",
+      "medium",
+      "max",
+      "adaptive",
+    ]);
   });
 
   it("always includes adaptive", () => {
     expect(listThinkingLevels(undefined, "gpt-4.1-mini")).toContain("adaptive");
-    expect(listThinkingLevels("anthropic", "claude-opus-4-6")).toContain("adaptive");
-  });
-
-  it("excludes max unless supportsMaxThinking opts in", () => {
-    expect(listThinkingLevels(undefined, "gpt-4.1-mini")).not.toContain("max");
-  });
-
-  it("includes max right after xhigh when the plugin opts in", () => {
-    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(true);
-    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(true);
-
-    const levels = listThinkingLevels("demo", "demo-model");
-    const xhighIndex = levels.indexOf("xhigh");
-    const maxIndex = levels.indexOf("max");
-    expect(maxIndex).toBe(xhighIndex + 1);
-  });
-
-  it("omits max when only xhigh is opted in via provider but max returns false", () => {
-    // When the plugin says false for max but xhigh returns true, we honor
-    // the explicit false (no fallback to xhigh) and keep max hidden.
-    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(true);
-    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(false);
-
-    expect(listThinkingLevels("demo", "demo-model")).not.toContain("max");
-    expect(listThinkingLevels("demo", "demo-model")).toContain("xhigh");
   });
 });
 
@@ -265,29 +278,15 @@ describe("normalizeReasoningLevel", () => {
 });
 
 describe("isElevatedThinkingDenied", () => {
-  it("rejects xhigh when the provider plugin does not opt in", () => {
-    // No plugin opt-in, no compat flag → xhigh denied.
-    providerRuntimeMocks.resolveProviderXHighThinking.mockReturnValue(false);
+  it("denies xhigh for models with no map", () => {
     expect(isElevatedThinkingDenied("xhigh", "demo", "demo-model")).toBe(true);
   });
 
-  it("rejects max when the provider plugin does not opt in and compat flag is absent", () => {
-    // No plugin opt-in, no compat flag → max denied.
-    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(false);
+  it("denies max for models with no map", () => {
     expect(isElevatedThinkingDenied("max", "demo", "demo-model")).toBe(true);
   });
 
-  it("returns false for non-elevated levels regardless of provider support", () => {
-    expect(isElevatedThinkingDenied("high", "demo", "demo-model")).toBe(false);
-    expect(isElevatedThinkingDenied("off", "demo", "demo-model")).toBe(false);
-    expect(isElevatedThinkingDenied("low", "demo", "demo-model")).toBe(false);
-  });
-
-  it("opts max in when the model advertises compat.supportsReasoningEffort", () => {
-    // The cli-router moonshotai/kimi-k3 path: no plugin opt-in, but the
-    // catalog entry sets compat.supportsReasoningEffort = true, which is
-    // the only signal that the openai-completions wire accepts "max".
-    providerRuntimeMocks.resolveProviderMaxThinking.mockReturnValue(undefined);
+  it("denies xhigh when the model map sets xhigh to null", () => {
     configMocks.loadConfig.mockReturnValue({
       models: {
         providers: {
@@ -295,7 +294,77 @@ describe("isElevatedThinkingDenied", () => {
             models: [
               {
                 id: "kimi-k3",
-                compat: { supportsReasoningEffort: true },
+                compat: {
+                  reasoningEffortMap: {
+                    low: "low",
+                    high: "high",
+                    max: "max",
+                    xhigh: null,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(isElevatedThinkingDenied("xhigh", "cli-router", "kimi-k3")).toBe(true);
+  });
+
+  it("denies max when the model map sets max to null", () => {
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          demo: {
+            models: [
+              {
+                id: "demo-model",
+                compat: { reasoningEffortMap: { low: "low", high: "high" } },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(isElevatedThinkingDenied("max", "demo", "demo-model")).toBe(true);
+  });
+
+  it("allows xhigh when the model map declares it", () => {
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          demo: {
+            models: [
+              {
+                id: "demo-model",
+                compat: { reasoningEffortMap: { high: "high", xhigh: "xhigh" } },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(isElevatedThinkingDenied("xhigh", "demo", "demo-model")).toBe(false);
+  });
+
+  it("allows max when the model map declares it (cli-router kimi-k3 path)", () => {
+    configMocks.loadConfig.mockReturnValue({
+      models: {
+        providers: {
+          "cli-router": {
+            models: [
+              {
+                id: "kimi-k3",
+                compat: {
+                  reasoningEffortMap: {
+                    minimal: null,
+                    low: "low",
+                    medium: null,
+                    high: "high",
+                    xhigh: null,
+                    max: "max",
+                  },
+                },
               },
             ],
           },
@@ -303,5 +372,11 @@ describe("isElevatedThinkingDenied", () => {
       },
     });
     expect(isElevatedThinkingDenied("max", "cli-router", "kimi-k3")).toBe(false);
+  });
+
+  it("returns false for non-elevated levels regardless of map presence", () => {
+    expect(isElevatedThinkingDenied("high", "demo", "demo-model")).toBe(false);
+    expect(isElevatedThinkingDenied("off", "demo", "demo-model")).toBe(false);
+    expect(isElevatedThinkingDenied("low", "demo", "demo-model")).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import { type OpenClawConfig, loadConfig } from "../config/config.js";
+import type { ReasoningEffortMap } from "../config/types.models.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { augmentModelCatalogWithProviderPlugins } from "../plugins/provider-runtime.runtime.js";
 import { resolveOpenClawAgentDir } from "./agent-paths.js";
@@ -16,6 +17,8 @@ export type ModelCatalogEntry = {
   contextWindow?: number;
   reasoning?: boolean;
   input?: ModelInputType[];
+  /** Optional per-model reasoning-effort map (PI `models.json` design). */
+  compat?: { reasoningEffortMap?: ReasoningEffortMap };
 };
 
 type DiscoveredModel = {
@@ -25,11 +28,13 @@ type DiscoveredModel = {
   contextWindow?: number;
   reasoning?: boolean;
   input?: ModelInputType[];
+  compat?: { reasoningEffortMap?: ReasoningEffortMap };
 };
 
 type PiSdkModule = typeof import("./pi-model-discovery.js");
 
 let modelCatalogPromise: Promise<ModelCatalogEntry[]> | null = null;
+let resolvedCatalog: ModelCatalogEntry[] | undefined;
 let hasLoggedModelCatalogError = false;
 const defaultImportPiSdk = () => import("./pi-model-discovery-runtime.js");
 let importPiSdk = defaultImportPiSdk;
@@ -39,6 +44,22 @@ const NON_PI_NATIVE_MODEL_PROVIDERS = new Set(["deepseek", "kilocode", "ollama"]
 
 function shouldLogModelCatalogTiming(): boolean {
   return process.env.DENNOU_DEBUG_INGRESS_TIMING === "1";
+}
+
+/**
+ * Narrow an unknown value to a `ReasoningEffortMap` if it looks like one.
+ * Used to safely propagate a map that came from upstream catalog discovery.
+ */
+function isReasoningEffortMap(value: unknown): value is ReasoningEffortMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  for (const entry of Object.values(value as Record<string, unknown>)) {
+    if (entry !== null && typeof entry !== "string") {
+      return false;
+    }
+  }
+  return true;
 }
 
 function loadModelSuppression() {
@@ -131,6 +152,7 @@ function mergeConfiguredOptInProviderModels(params: {
 
 export function resetModelCatalogCacheForTest() {
   modelCatalogPromise = null;
+  resolvedCatalog = undefined;
   hasLoggedModelCatalogError = false;
   importPiSdk = defaultImportPiSdk;
 }
@@ -208,7 +230,10 @@ export async function loadModelCatalog(params?: {
             : undefined;
         const reasoning = typeof entry?.reasoning === "boolean" ? entry.reasoning : undefined;
         const input = Array.isArray(entry?.input) ? entry.input : undefined;
-        models.push({ id, name, provider, contextWindow, reasoning, input });
+        const compat = isReasoningEffortMap(entry?.compat?.reasoningEffortMap)
+          ? { reasoningEffortMap: entry.compat.reasoningEffortMap }
+          : undefined;
+        models.push({ id, name, provider, contextWindow, reasoning, input, compat });
       }
       mergeConfiguredOptInProviderModels({ config: cfg, models });
       logStage("configured-models-merged", `entries=${models.length}`);
@@ -245,6 +270,7 @@ export async function loadModelCatalog(params?: {
       }
 
       const sorted = sortModels(models);
+      resolvedCatalog = sorted;
       logStage("complete", `entries=${sorted.length}`);
       return sorted;
     } catch (error) {
@@ -255,13 +281,27 @@ export async function loadModelCatalog(params?: {
       // Don't poison the cache on transient dependency/filesystem issues.
       modelCatalogPromise = null;
       if (models.length > 0) {
-        return sortModels(models);
+        const sorted = sortModels(models);
+        resolvedCatalog = sorted;
+        return sorted;
       }
       return [];
     }
   })();
 
   return modelCatalogPromise;
+}
+
+/**
+ * Returns the most recently resolved runtime model catalog if it has already
+ * been cached by `loadModelCatalog`. Returns `undefined` when the catalog has
+ * never been loaded (or after a reset). This is a *sync* accessor used by
+ * callers that need the catalog without triggering an async load
+ * (e.g. policy checks in `src/auto-reply/thinking.ts`). When the catalog is
+ * still warming up the caller falls back to base levels (safe side).
+ */
+export function getCachedModelCatalogSync(): ModelCatalogEntry[] | undefined {
+  return resolvedCatalog;
 }
 
 /**
