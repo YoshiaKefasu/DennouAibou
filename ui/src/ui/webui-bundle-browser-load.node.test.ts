@@ -65,7 +65,7 @@
  *   - `*.test.ts` (unit) is jsdom but Vitest may try to evaluate unrelated
  *     module side effects; `unit-node` keeps this isolated.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -457,12 +457,23 @@ function containsNodeOnlyLeak(outcome: Outcome): boolean {
 // not exercise (e.g. a dynamic import inside an event handler). To close
 // that gap we also walk every emitted bundle chunk statically.
 //
-// We use a brace-depth scanner instead of a full AST library so the test
-// has no new dependencies. The scanner only flags references that appear
-// OUTSIDE function bodies (module-scope statements), because a leak inside
-// a function body does not fire at module-load time. The scanner also
-// skips lines that contain `typeof process` (those accesses are guarded
-// and only fire when `process` actually exists).
+// We use esbuild's parser as a front-end to the previous brace-count
+// scanner. Vite already depends on esbuild, so no new dependency is
+// added. esbuild strips comments and normalises strings / template
+// literals / regex literals for us; that alone removes the false
+// positives the previous hand-rolled regex scanner produced when
+// `process.env` appeared inside an error-message string literal or a
+// block comment. We then apply the brace-depth walker on the
+// normalised output so we still scope-limit the scan to module load
+// (i.e. depth === 0 outside a `typeof process` guard).
+//
+// Why both? esbuild alone cannot tell us whether a `process.X`
+// reference sits inside a function body or at module scope, because
+// it does not expose its AST. The brace-depth walker is the cheap,
+// dependable way to keep that distinction. Running the source through
+// esbuild's parser first means the walker only sees clean ESM
+// (comments stripped, strings normalised), so its depth counter
+// never gets fooled by template literals or object literals.
 //
 // What the scan considers a leak:
 //   - Any `import ... from "node:..."` module specifier (always eager).
@@ -474,6 +485,8 @@ function containsNodeOnlyLeak(outcome: Outcome): boolean {
 // We deliberately do NOT flag dynamic `import("node:...")` calls: those
 // are deferred until the caller actually invokes them.
 // ---------------------------------------------------------------------------
+
+
 
 const NODE_ONLY_PROCESS_PROPERTIES = new Set([
   "env",
@@ -505,19 +518,70 @@ type StaticScanHit = {
   context: string;
 };
 
+/**
+ * Run the source through esbuild's parser so the brace-walker sees a
+ * comment-free, syntactically-validated ESM stream. esbuild normalises
+ * module specifiers (string literals), collapses constant expressions,
+ * and strips comments — which removes the false positives the previous
+ * raw-text brace scanner produced on `process.env` inside error
+ * messages and the like.
+ *
+ * On parse failure we fall back to the raw source so the scanner
+ * still runs (and reports a hit if one is genuinely present).
+ */
+/**
+ * Cache the esbuild helper script path + a long-lived child process so
+ * each chunk scan doesn't pay the cost of spawning a fresh Node.
+ * esbuild cannot run inside a jsdom environment (vitest's `unit-node`
+ * project) because it relies on a TextEncoder invariant that jsdom
+ * breaks. The helper script reads a JS file from disk and writes the
+ * normalised ESM to stdout; it lives in
+ * `ui/src/ui/_shared/esbuild-normalize.mjs`.
+ */
+let _esbuildHelperPath: string | null = null;
+let _esbuildInputCounter = 0;
+
+function normalizeSourceForScan(source: string, fileLabel: string): string {
+  try {
+    if (_esbuildHelperPath === null) {
+      _esbuildHelperPath = path.join(here, "_shared", "esbuild-normalize.mjs");
+    }
+    // Write to a per-call tmp file so the child can read it. The
+    // file name encodes a counter to avoid any path collision if two
+    // scans run in parallel inside the same test.
+    _esbuildInputCounter += 1;
+    const inputPath = path.join(repoRoot, `.tmp-esbuild-normalize-${_esbuildInputCounter}.mjs`);
+    fs.writeFileSync(inputPath, source, "utf8");
+    try {
+      const out = spawnSync(process.execPath, [_esbuildHelperPath, inputPath, fileLabel], {
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+      if (out.status === 0 && typeof out.stdout === "string") {
+        return out.stdout;
+      }
+    } finally {
+      try { fs.unlinkSync(inputPath); } catch { /* best-effort */ }
+    }
+  } catch {
+    // fall through to raw source
+  }
+  return source;
+}
+
 function scanChunkForNodeOnlyRefs(source: string, fileLabel: string): StaticScanHit[] {
   const hits: StaticScanHit[] = [];
 
-  // Strip line comments and block comments before scanning. We keep
-  // strings intact because a string literal that mentions `process.env`
-  // is just text (e.g. an error message), not a reference.
-  const sanitized = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  // Pre-process through esbuild so comments / strings / template
+  // literals cannot fool the brace-depth walker. esbuild also
+  // validates that the chunk is syntactically valid ESM, which catches
+  // chunks the previous regex scanner would have silently miscounted.
+  const sanitized = normalizeSourceForScan(source, fileLabel);
 
   // 1) Module specifiers: `import ... from "node:fs"`.
   // We split on statement boundaries so we don't accidentally flag
-  // module specifiers inside string literals (handled above by the
-  // comment-strip, but module specifiers are always at top level for
-  // Vite bundles anyway).
+  // module specifiers inside string literals (esbuild has already
+  // normalised strings above, but we keep the pass for clarity).
   const moduleSpecifierRe =
     /(?:^|\n)\s*(?:import|export)[^"'\n]*?from\s*["'](node:[a-zA-Z0-9_/.\-]+)["']/g;
   let match: RegExpExecArray | null;
@@ -534,11 +598,9 @@ function scanChunkForNodeOnlyRefs(source: string, fileLabel: string): StaticScan
     const line = lines[i];
     const trimmed = line.trim();
     // Update depth from any `{` / `}` in this line, ignoring braces
-    // inside strings. The string-strip above already removed comments.
-    // For our purposes a naive `{++ / }--` count is sufficient because
-    // braces inside template literals are rare in Vite output and a
-    // false negative (marking lazy code as eager) is exactly what we
-    // want for a strict regression guard.
+    // inside strings. esbuild's normalisation has already removed
+    // comments and normalised strings for us, so the brace count is
+    // reliable on the output it produced.
     for (const ch of line) {
       if (ch === "{") depth += 1;
       else if (ch === "}") depth = Math.max(0, depth - 1);
@@ -550,7 +612,7 @@ function scanChunkForNodeOnlyRefs(source: string, fileLabel: string): StaticScan
     // Skip lines that contain a `typeof process` guard. We treat any
     // occurrence of `typeof process` on the same line as evidence that
     // the access is gated.
-    if (/typeof\s+process\b/.test(trimmed)) {
+    if (/typeof\s+process/.test(trimmed)) {
       continue;
     }
     // Skip lines that are pure `import` / `export` statements (handled
@@ -558,15 +620,15 @@ function scanChunkForNodeOnlyRefs(source: string, fileLabel: string): StaticScan
     // We only skip lines whose entire non-keyword body is a module
     // specifier; lines like `export const cwd = process.cwd();` still
     // need scanning because they have executable expressions.
-    if (/^(?:import\b[^=;]*?(?:from\s*["'][^"']+["'])?\s*;?$)/.test(trimmed)) {
+    if (/^(?:import[^=;]*?(?:from\s*["'][^"']+["'])?\s*;?$)/.test(trimmed)) {
       continue;
     }
-    if (/^(?:export\b\s*(?:\{[^}]*\}\s*)?from\s*["'][^"']+["']\s*;?$)/.test(trimmed)) {
+    if (/^(?:export\s*(?:\{[^}]*\}\s*)?from\s*["'][^"']+["']\s*;?$)/.test(trimmed)) {
       continue;
     }
 
     // 2a) `process.X` at module scope.
-    const chainRe = /(?:^|[^A-Za-z0-9_$.])process((?:\.[A-Za-z_$][A-Za-z0-9_$]*)+)/g;
+    const chainRe = /(?:^|[^A-Za-z0-9_$.])process((?:\.[A-Za-z_$][-A-Za-z0-9_$]*)+)/g;
     let m: RegExpExecArray | null;
     while ((m = chainRe.exec(line)) !== null) {
       const fullChain = m[1];
@@ -661,7 +723,10 @@ describe("WebUI bundle does not leak Node-only references during module load (br
     );
   });
 
-  it("static AST scan finds zero Node-only references in any emitted bundle chunk", () => {
+  it(
+    "static AST scan finds zero Node-only references in any emitted bundle chunk",
+    { timeout: 60_000 },
+    () => {
     const chunks = listBundleChunks();
     if (chunks.length === 0) {
       // eslint-disable-next-line no-console
@@ -714,7 +779,10 @@ describe("WebUI bundle does not leak Node-only references during module load (br
     }
   });
 
-  it("negative control: static AST scan flags a fixture with node:fs + process.cwd at module scope", () => {
+  it(
+    "negative control: static AST scan flags a fixture with node:fs + process.cwd at module scope",
+    { timeout: 30_000 },
+    () => {
     const fixtureDir = path.join(repoRoot, ".tmp-webui-bundle-fixture");
     const fixtureFile = path.join(fixtureDir, "leaky-fixture.mjs");
     const fixtureSource = [

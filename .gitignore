@@ -167,3 +167,6 @@ extensions/qa-lab/web/dist/
 .tmp-webui-bundle-probe.mjs
 .tmp-webui-bundle-probe.out
 .tmp-webui-bundle-fixture/
+# webui-bundle-browser-load: per-chunk esbuild normalise scratch files
+.tmp-esbuild-normalize-*.mjs
+.tmp-esbuild-normalize.mjs
