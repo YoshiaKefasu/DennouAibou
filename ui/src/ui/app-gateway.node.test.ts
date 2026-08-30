@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConnectErrorDetailCodes } from "../../../src/gateway/protocol/connect-error-details.js";
+import { ConnectErrorDetailCodes } from "./_shared/connect-error-details.js";
 import { connectGateway, resolveControlUiClientVersion } from "./app-gateway.ts";
 import type { GatewayHelloOk } from "./gateway.ts";
 

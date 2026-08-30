@@ -3,7 +3,7 @@ import {
   isToolCallContentType,
   isToolResultContentType,
   resolveToolBlockArgs,
-} from "../../../../src/chat/tool-content.js";
+} from "../_shared/tool-content.ts";
 import { icons } from "../icons.ts";
 import { formatToolDetail, resolveToolDisplay } from "../tool-display.ts";
 import type { ToolCard } from "../types/chat-types.ts";

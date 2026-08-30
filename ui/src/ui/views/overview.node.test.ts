@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConnectErrorDetailCodes } from "../../../../src/gateway/protocol/connect-error-details.js";
+import { ConnectErrorDetailCodes } from "../_shared/connect-error-details.js";
 import { resolveAuthHintKind, shouldShowPairingHint } from "./overview-hints.ts";
 
 describe("shouldShowPairingHint", () => {

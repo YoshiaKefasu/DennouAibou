@@ -1,4 +1,4 @@
-import { roleScopesAllow } from "../../../src/shared/operator-scope-compat.js";
+import { roleScopesAllow } from "./_shared/operator-scope.ts";
 import { refreshChat } from "./app-chat.ts";
 import {
   startLogsPolling,

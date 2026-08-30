@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
-import { formatDurationCompact } from "../../../../src/infra/format-time/format-duration.ts";
 import { t } from "../../i18n/index.ts";
+import { formatDurationCompact } from "../_shared/format-duration.ts";
 import {
   formatCost,
   formatDayLabel,

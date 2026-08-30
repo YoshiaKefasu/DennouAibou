@@ -1,8 +1,5 @@
-import { buildBuiltinChatCommands } from "../../../../src/auto-reply/commands-registry.shared.js";
-import type {
-  ChatCommandDefinition,
-  CommandArgChoice,
-} from "../../../../src/auto-reply/commands-registry.types.js";
+import { buildBuiltinChatCommands } from "../_shared/chat-commands.ts";
+import type { ChatCommandDefinition, CommandArgChoice } from "../_shared/chat-command-types.ts";
 import type { IconName } from "../icons.ts";
 
 export type SlashCommandCategory = "session" | "model" | "agents" | "tools";

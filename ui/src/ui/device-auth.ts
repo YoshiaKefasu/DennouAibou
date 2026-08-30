@@ -3,8 +3,8 @@ import {
   type DeviceAuthEntry,
   loadDeviceAuthTokenFromStore,
   storeDeviceAuthTokenInStore,
-} from "../../../src/shared/device-auth-store.js";
-import type { DeviceAuthStore } from "../../../src/shared/device-auth.js";
+} from "./_shared/device-auth-store.ts";
+import type { DeviceAuthStore } from "./_shared/device-auth-types.ts";
 import { getSafeLocalStorage } from "../local-storage.ts";
 
 const STORAGE_KEY = "openclaw.device.auth.v1";
