@@ -42,13 +42,25 @@ const OPENAI_GPT_54_TEMPLATE_MODEL_IDS = ["gpt-5.2"] as const;
 const OPENAI_GPT_54_PRO_TEMPLATE_MODEL_IDS = ["gpt-5.2-pro", "gpt-5.2"] as const;
 const OPENAI_GPT_54_MINI_TEMPLATE_MODEL_IDS = ["gpt-5-mini"] as const;
 const OPENAI_GPT_54_NANO_TEMPLATE_MODEL_IDS = ["gpt-5-nano", "gpt-5-mini"] as const;
-const OPENAI_XHIGH_MODEL_IDS = [
-  "gpt-5.4",
-  "gpt-5.4-pro",
-  "gpt-5.4-mini",
-  "gpt-5.4-nano",
-  "gpt-5.2",
-] as const;
+
+/**
+ * PI `models.json` reasoning-effort map for OpenAI native synthetic models.
+ *
+ * - `xhigh` is supported (carried over from the old `supportsXHighThinking`
+ *   hook).
+ * - `max` is **not** supported — OpenAI's native `reasoning_effort` enum
+ *   does not include `max`, so we declare it explicitly as `null` to
+ *   prevent the level from being offered in choices or sent on the wire.
+ * - `minimal` is supported for gpt-5.4 (matches upstream behavior).
+ */
+const OPENAI_REASONING_EFFORT_MAP: Readonly<Record<string, string | null>> = {
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: null,
+};
 const OPENAI_MODERN_MODEL_IDS = [
   "gpt-5.4",
   "gpt-5.4-pro",
@@ -117,18 +129,31 @@ function resolveOpenAIGpt54ForwardCompatModel(
     return undefined;
   }
 
+  // The pi-ai `Model<Api>.compat` union does not yet know about
+  // `reasoningEffortMap` (the PI `models.json` design landed upstream after
+  // the type was frozen). Cast through `unknown` to attach the map without
+  // changing the upstream surface.
+  const compatWithMap = {
+    ...(patch.compat ?? {}),
+    reasoningEffortMap: { ...OPENAI_REASONING_EFFORT_MAP },
+  } as unknown as ProviderRuntimeModel["compat"];
+  const patchWithMap: Partial<ProviderRuntimeModel> = {
+    ...patch,
+    compat: compatWithMap,
+  };
+
   return (
     cloneFirstTemplateModel({
       providerId: PROVIDER_ID,
       modelId: trimmedModelId,
       templateIds,
       ctx,
-      patch,
+      patch: patchWithMap,
     }) ??
     normalizeModelCompat({
       id: trimmedModelId,
       name: trimmedModelId,
-      ...patch,
+      ...patchWithMap,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: patch.contextWindow ?? DEFAULT_CONTEXT_TOKENS,
       maxTokens: patch.maxTokens ?? DEFAULT_CONTEXT_TOKENS,
@@ -148,6 +173,12 @@ function buildSyntheticCatalogEntry(
   if (!template) {
     return undefined;
   }
+  // `compat` is not part of `ModelCatalogEntry` directly, but `thinking.ts`
+  // walks `entry.compat?.reasoningEffortMap` for map-driven level support.
+  // We attach the map onto the supplemental entry here so that the runtime
+  // catalog (consumed by `getCachedModelCatalogSync`) carries the same
+  // single source of truth that `resolveOpenAIGpt54ForwardCompatModel`
+  // writes onto the dynamic-model path.
   return {
     ...template,
     id: entry.id,
@@ -155,6 +186,7 @@ function buildSyntheticCatalogEntry(
     reasoning: entry.reasoning,
     input: [...entry.input],
     contextWindow: entry.contextWindow,
+    compat: { reasoningEffortMap: { ...OPENAI_REASONING_EFFORT_MAP } },
   };
 }
 

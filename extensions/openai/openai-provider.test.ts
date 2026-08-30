@@ -89,6 +89,14 @@ describe("buildOpenAIProvider", () => {
         reasoning: true,
         input: ["text", "image"],
         contextWindow: 400_000,
+        compat: {
+          reasoningEffortMap: expect.objectContaining({
+            xhigh: "xhigh",
+            max: null,
+            low: "low",
+            high: "high",
+          }),
+        },
       }),
     );
     expect(entries).toContainEqual(
@@ -99,8 +107,52 @@ describe("buildOpenAIProvider", () => {
         reasoning: true,
         input: ["text", "image"],
         contextWindow: 400_000,
+        compat: {
+          reasoningEffortMap: expect.objectContaining({
+            xhigh: "xhigh",
+            max: null,
+            low: "low",
+            high: "high",
+          }),
+        },
       }),
     );
+  });
+
+  it("attaches the same reasoningEffortMap to dynamic-model resolves for the gpt-5.4 family", () => {
+    const provider = buildOpenAIProvider();
+
+    const gpt54 = provider.resolveDynamicModel?.({
+      provider: "openai",
+      modelId: "gpt-5.4",
+      modelRegistry: { find: () => null },
+    } as never);
+
+    const compatWithMap = (gpt54?.compat ?? {}) as unknown as {
+      reasoningEffortMap?: Record<string, string | null>;
+    };
+    expect(compatWithMap.reasoningEffortMap).toMatchObject({
+      xhigh: "xhigh",
+      max: null,
+      low: "low",
+      medium: "medium",
+      high: "high",
+      minimal: "minimal",
+    });
+
+    const gpt54Mini = provider.resolveDynamicModel?.({
+      provider: "openai",
+      modelId: "gpt-5.4-mini",
+      modelRegistry: { find: () => null },
+    } as never);
+
+    const compatMiniWithMap = (gpt54Mini?.compat ?? {}) as unknown as {
+      reasoningEffortMap?: Record<string, string | null>;
+    };
+    expect(compatMiniWithMap.reasoningEffortMap).toMatchObject({
+      xhigh: "xhigh",
+      max: null,
+    });
   });
 
   it("owns native reasoning output mode for OpenAI", () => {
