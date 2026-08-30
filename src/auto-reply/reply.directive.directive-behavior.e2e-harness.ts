@@ -4,12 +4,14 @@ import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.j
 import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles.js";
 import { resetSkillsRefreshForTest } from "../agents/skills/refresh.js";
 import { clearSessionStoreCacheForTest, loadSessionStore } from "../config/sessions.js";
+import type { ReasoningEffortMap } from "../config/types.models.js";
 import { resetSystemEventsForTest } from "../infra/system-events.js";
 import { createEmptyPluginRegistry } from "../plugins/registry-empty.js";
 import type { PluginProviderRegistration } from "../plugins/registry.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../plugins/runtime.js";
 import type { ProviderPlugin } from "../plugins/types.js";
 import {
+  getCachedModelCatalogSyncMock,
   loadModelCatalogMock,
   runEmbeddedPiAgentMock,
 } from "./reply.directive.directive-behavior.e2e-mocks.js";
@@ -17,49 +19,92 @@ import {
 export const MAIN_SESSION_KEY = "agent:main:main";
 type RunPreparedReply = typeof import("./reply/get-reply-run.js").runPreparedReply;
 
+// PI `models.json` reasoning-effort map for OpenAI native synthetic models.
+// Mirrors `OPENAI_REASONING_EFFORT_MAP` in `extensions/openai/openai-provider.ts`
+// (the openai provider's built-in catalog). openai-codex uses the same wire
+// surface as the openai gpt-5.4 family — `xhigh` is supported, `max` is not.
+export const OPENAI_CODEX_REASONING_EFFORT_MAP: ReasoningEffortMap = {
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: null,
+};
+
 export const DEFAULT_TEST_MODEL_CATALOG: Array<{
   id: string;
   name: string;
   provider: string;
+  compat?: { reasoningEffortMap?: ReasoningEffortMap };
 }> = [
   { id: "claude-opus-4-6", name: "Opus 4.5", provider: "anthropic" },
   { id: "claude-sonnet-4-1", name: "Sonnet 4.1", provider: "anthropic" },
-  { id: "gpt-5.4", name: "GPT-5.4", provider: "openai" },
-  { id: "gpt-5.4-pro", name: "GPT-5.4 Pro", provider: "openai" },
-  { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", provider: "openai" },
-  { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", provider: "openai" },
-  { id: "gpt-5.4", name: "GPT-5.4 (Codex)", provider: "openai-codex" },
-  { id: "gpt-5.4-mini", name: "GPT-5.4 Mini (Codex)", provider: "openai-codex" },
+  // The `openai` gpt-5.4 family mirrors `OPENAI_REASONING_EFFORT_MAP` from
+  // `extensions/openai/openai-provider.ts` (the openai provider's
+  // `augmentModelCatalog` hook wires the same map onto these entries in
+  // production). `openai-codex` entries below mirror the same shape; in
+  // production today there is no equivalent built-in catalog for the codex
+  // provider plugin, but openai-codex uses the same OpenAI-native wire
+  // surface as openai so the policy is identical.
+  {
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    provider: "openai",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  {
+    id: "gpt-5.4-pro",
+    name: "GPT-5.4 Pro",
+    provider: "openai",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  {
+    id: "gpt-5.4-mini",
+    name: "GPT-5.4 Mini",
+    provider: "openai",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  {
+    id: "gpt-5.4-nano",
+    name: "GPT-5.4 Nano",
+    provider: "openai",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  {
+    id: "gpt-5.4",
+    name: "GPT-5.4 (Codex)",
+    provider: "openai-codex",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  {
+    id: "gpt-5.4-mini",
+    name: "GPT-5.4 Mini (Codex)",
+    provider: "openai-codex",
+    compat: { reasoningEffortMap: { ...OPENAI_CODEX_REASONING_EFFORT_MAP } },
+  },
+  // `gpt-4.1-mini` is intentionally map-less: this is the model used to
+  // exercise the "xhigh not supported" denial path, so leaving the map off
+  // preserves the original test assertion that the directive should be
+  // rejected with the new "models that declare xhigh in their
+  // reasoningEffortMap" wording.
   { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", provider: "openai" },
 ];
 
 export type ReplyPayloadText = { text?: string | null } | null | undefined;
 
-const OPENAI_XHIGH_MODEL_IDS = [
-  "gpt-5.4",
-  "gpt-5.4-pro",
-  "gpt-5.4-mini",
-  "gpt-5.4-nano",
-  "gpt-5.2",
-] as const;
+// The historical `OPENAI_XHIGH_MODEL_IDS` / `OPENAI_CODEX_XHIGH_MODEL_IDS`
+// lists lived here to back the now-removed `supportsXHighThinking` provider
+// hook. Elevated-reasoning policy now flows through
+// `compat.reasoningEffortMap` on each model entry, so these lists are no
+// longer referenced from `createThinkingPolicyProvider` and have been
+// deleted. The harness registry still wires up an `openai` and
+// `openai-codex` provider plugin so provider-shape tests can run; consumers
+// must look at the model's `compat.reasoningEffortMap` (mirrored from
+// `OPENAI_CODEX_REASONING_EFFORT_MAP` above) to know which levels each
+// model advertises.
 
-const OPENAI_CODEX_XHIGH_MODEL_IDS = [
-  "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-5.3-codex",
-  "gpt-5.3-codex-spark",
-  "gpt-5.2-codex",
-  "gpt-5.1-codex",
-] as const;
-
-function createThinkingPolicyProvider(
-  providerId: string,
-  _xhighModelIds: readonly string[],
-): ProviderPlugin {
-  // Elevated-reasoning support (`xhigh`, `max`) is no longer declared via
-  // provider hooks. The harness still wires up a ProviderPlugin so other
-  // provider-shape tests can run; consumers must look at the model's
-  // `compat.reasoningEffortMap` to know which levels it advertises.
+function createThinkingPolicyProvider(providerId: string): ProviderPlugin {
   return {
     id: providerId,
     label: providerId,
@@ -74,13 +119,13 @@ function createDirectiveBehaviorProviderRegistry(): ReturnType<typeof createEmpt
       pluginId: "openai",
       pluginName: "OpenAI Provider",
       source: "test",
-      provider: createThinkingPolicyProvider("openai", OPENAI_XHIGH_MODEL_IDS),
+      provider: createThinkingPolicyProvider("openai"),
     },
     {
       pluginId: "openai",
       pluginName: "OpenAI Provider",
       source: "test",
-      provider: createThinkingPolicyProvider("openai-codex", OPENAI_CODEX_XHIGH_MODEL_IDS),
+      provider: createThinkingPolicyProvider("openai-codex"),
     },
   ];
   registry.providers.push(...providers);
@@ -231,9 +276,21 @@ export function installFreshDirectiveBehaviorReplyMocks(params?: {
     resolveEmbeddedSessionLane: (key: string) => `session:${key.trim() || "main"}`,
     isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
     isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
+    // Added after the thinkingLevelMap migration surfaced these calls in
+    // `src/auto-reply/reply/get-reply-run.ts`. The production module exports
+    // them; the harness mock must too, otherwise `runPreparedReply` throws
+    // `resolveActiveEmbeddedRunSessionId is not a function`.
+    resolveActiveEmbeddedRunSessionId: vi.fn().mockReturnValue(undefined),
+    waitForEmbeddedPiRunEnd: vi.fn().mockResolvedValue(undefined),
   }));
   vi.doMock("../agents/model-catalog.js", () => ({
     loadModelCatalog: loadModelCatalogMock,
+    // Mirror the harness's `loadModelCatalog` resolved value so callers
+    // that read `getCachedModelCatalogSync()` (e.g. `thinking.ts` when
+    // resolving `compat.reasoningEffortMap`) see the same catalog that
+    // `loadModelCatalog` returned.
+    getCachedModelCatalogSync: (...args: unknown[]) => getCachedModelCatalogSyncMock(...args),
+    resetModelCatalogCacheForTest: vi.fn(),
   }));
   if (params?.runPreparedReply || params?.onActualRunPreparedReply) {
     vi.doMock("./reply/get-reply-run.js", async () => {
