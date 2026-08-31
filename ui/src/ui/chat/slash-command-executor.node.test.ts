@@ -464,8 +464,11 @@ describe("executeSlashCommand directives", () => {
       "",
     );
 
+    // gpt-4.1-mini has no reasoningEffortMap: choices fall back to the base
+    // levels, mirroring the backend contract (xhigh/max are denied without a
+    // map by `isElevatedThinkingDenied`).
     expect(result.content).toBe(
-      "Current thinking level: low.\nOptions: off, minimal, low, medium, high, xhigh, max, adaptive.",
+      "Current thinking level: low.\nOptions: off, minimal, low, medium, high, adaptive.",
     );
     expect(request).toHaveBeenNthCalledWith(1, "sessions.list", {});
     expect(request).toHaveBeenNthCalledWith(2, "models.list", {});

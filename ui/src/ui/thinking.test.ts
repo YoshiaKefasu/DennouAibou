@@ -6,16 +6,7 @@ import {
   type ThinkingCatalogEntry,
 } from "./thinking.ts";
 
-const BASE_THINKING_LEVELS = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "adaptive",
-] as const;
+const BASE_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "adaptive"] as const;
 
 // kimi-k3-style map: only low/high/max are advertised; minimal/medium/xhigh
 // are declared-but-null (dropped, mirroring the backend behavior).
@@ -101,27 +92,48 @@ describe("listThinkingLevelLabels", () => {
     ]);
   });
 
-  it("supports flat reasoningEffortMap entries (non-compat) as a fallback", () => {
+  it("falls back to base levels when the model has no reasoningEffortMap", () => {
     const catalog: ThinkingCatalogEntry[] = [
-      {
-        id: "moonshotai/kimi-k3",
-        provider: "moonshotai",
-        reasoning: true,
-        reasoningEffortMap: { low: "low", high: "high", max: "max" },
-      },
+      { id: "gpt-4.1-mini", provider: "openai", reasoning: true },
     ];
-    expect(listThinkingLevelLabels("moonshotai", "moonshotai/kimi-k3", catalog)).toEqual([
+    // Backend contract: without a map, xhigh/max are denied by
+    // `isElevatedThinkingDenied`, so the UI must not offer them either.
+    expect(listThinkingLevelLabels("openai", "gpt-4.1-mini", catalog)).toEqual([
       "off",
+      "minimal",
       "low",
+      "medium",
       "high",
-      "max",
       "adaptive",
     ]);
   });
 
-  it("falls back to base levels when the model has no reasoningEffortMap", () => {
-    const catalog: ThinkingCatalogEntry[] = [{ id: "gpt-5", provider: "openai", reasoning: true }];
-    expect(listThinkingLevelLabels("openai", "gpt-5", catalog)).toEqual([...BASE_THINKING_LEVELS]);
+  it("falls back to base levels when the map is all-null (no advertised level)", () => {
+    const catalog: ThinkingCatalogEntry[] = [
+      {
+        id: "demo-model",
+        provider: "demo",
+        reasoning: true,
+        compat: {
+          reasoningEffortMap: {
+            minimal: null,
+            low: null,
+            medium: null,
+            high: null,
+            xhigh: null,
+            max: null,
+          },
+        },
+      },
+    ];
+    expect(listThinkingLevelLabels("demo", "demo-model", catalog)).toEqual([
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "adaptive",
+    ]);
   });
 
   it("falls back to base levels when the catalog is missing or the model is absent", () => {
@@ -161,7 +173,7 @@ describe("formatThinkingLevels", () => {
 
   it("formats base levels without a map", () => {
     expect(formatThinkingLevels("openai", "gpt-5", null)).toBe(
-      "off, minimal, low, medium, high, xhigh, max, adaptive",
+      "off, minimal, low, medium, high, adaptive",
     );
   });
 });

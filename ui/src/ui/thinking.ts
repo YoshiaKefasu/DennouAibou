@@ -3,22 +3,12 @@ export type ThinkingCatalogEntry = {
   id: string;
   reasoning?: boolean;
   compat?: { reasoningEffortMap?: Record<string, string | null> };
-  reasoningEffortMap?: Record<string, string | null>;
 };
 
 /** PI-style canonical order for map-driven thinking levels (mirrors backend `src/auto-reply/thinking.ts`). */
 const PI_ORDERED_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
-const BASE_THINKING_LEVELS = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "adaptive",
-] as const;
+const BASE_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "adaptive"] as const;
 const BINARY_THINKING_LEVELS = ["off", "on"] as const;
 const ANTHROPIC_CLAUDE_46_MODEL_RE = /^claude-(?:opus|sonnet)-4(?:\.|-)6(?:$|[-.])/i;
 const AMAZON_BEDROCK_CLAUDE_46_MODEL_RE = /claude-(?:opus|sonnet)-4(?:\.|-)6(?:$|[-.])/i;
@@ -97,12 +87,14 @@ export function listThinkingLevelLabels(
         candidate.provider.toLowerCase() === trimmedProvider.toLowerCase() &&
         candidate.id.toLowerCase() === target,
     );
-    const map = entry?.compat?.reasoningEffortMap ?? entry?.reasoningEffortMap;
+    const map = entry?.compat?.reasoningEffortMap;
     if (map) {
       const present = PI_ORDERED_LEVELS.filter(
         (level) => Object.prototype.hasOwnProperty.call(map, level) && map[level] != null,
       );
-      return ["off", ...present, "adaptive"];
+      if (present.length > 0) {
+        return ["off", ...present, "adaptive"];
+      }
     }
   }
   return BASE_THINKING_LEVELS;
