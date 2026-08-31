@@ -22,6 +22,7 @@ import {
   listThinkingLevelLabels,
   normalizeThinkLevel,
   resolveThinkingDefaultForModel,
+  type ThinkingCatalogEntry,
 } from "./thinking.ts";
 import type { SessionsListResult } from "./types.ts";
 
@@ -599,6 +600,7 @@ function buildThinkingOptions(
   provider: string | null,
   model: string | null,
   currentOverride: string,
+  catalog?: ThinkingCatalogEntry[] | null,
 ): ChatThinkingSelectOption[] {
   const seen = new Set<string>();
   const options: ChatThinkingSelectOption[] = [];
@@ -624,7 +626,7 @@ function buildThinkingOptions(
     });
   };
 
-  for (const label of listThinkingLevelLabels(provider)) {
+  for (const label of listThinkingLevelLabels(provider, model, catalog)) {
     const normalized = normalizeThinkLevel(label) ?? label.trim().toLowerCase();
     addOption(normalized);
   }
@@ -653,7 +655,7 @@ function resolveChatThinkingSelectState(state: AppViewState): ChatThinkingSelect
   return {
     currentOverride,
     defaultLabel: `Default (${defaultLevel})`,
-    options: buildThinkingOptions(provider, model, currentOverride),
+    options: buildThinkingOptions(provider, model, currentOverride, state.chatModelCatalog),
   };
 }
 
