@@ -108,7 +108,7 @@ describe("listThinkingLevelLabels", () => {
     ]);
   });
 
-  it("falls back to base levels when the map is all-null (no advertised level)", () => {
+  it('returns ["off", "adaptive"] for all-null map (backend parity)', () => {
     const catalog: ThinkingCatalogEntry[] = [
       {
         id: "demo-model",
@@ -126,14 +126,10 @@ describe("listThinkingLevelLabels", () => {
         },
       },
     ];
-    expect(listThinkingLevelLabels("demo", "demo-model", catalog)).toEqual([
-      "off",
-      "minimal",
-      "low",
-      "medium",
-      "high",
-      "adaptive",
-    ]);
+    // Backend parity: backend `resolveMapLevels` returns `[]` for an all-null
+    // map (an empty array is truthy), so `listThinkingLevels` yields
+    // `["off", "adaptive"]` instead of falling back to the base levels.
+    expect(listThinkingLevelLabels("demo", "demo-model", catalog)).toEqual(["off", "adaptive"]);
   });
 
   it("falls back to base levels when the catalog is missing or the model is absent", () => {

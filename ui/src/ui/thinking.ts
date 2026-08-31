@@ -92,9 +92,10 @@ export function listThinkingLevelLabels(
       const present = PI_ORDERED_LEVELS.filter(
         (level) => Object.prototype.hasOwnProperty.call(map, level) && map[level] != null,
       );
-      if (present.length > 0) {
-        return ["off", ...present, "adaptive"];
-      }
+      // Backend parity: an all-null/empty map yields `["off", "adaptive"]`
+      // (backend `resolveMapLevels` returns `[]`, which is truthy), not a
+      // fallback to the base levels.
+      return ["off", ...present, "adaptive"];
     }
   }
   return BASE_THINKING_LEVELS;
