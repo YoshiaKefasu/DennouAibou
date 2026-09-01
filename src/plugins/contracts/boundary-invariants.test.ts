@@ -6,6 +6,12 @@ import { describe, expect, it } from "vitest";
 const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const REPO_ROOT = resolve(SRC_ROOT, "..");
 
+// Normalise globSync results to POSIX separators so the allow-list Sets
+// (which use forward slashes) match consistently across platforms. Without
+// this, glob v13+ returns Windows backslash paths and every entry falls
+// through the .has() check as an offender.
+const toPosix = (file: string): string => file.split("\\").join("/");
+
 const ALLOWED_BUNDLED_CAPABILITY_METADATA_CONSUMERS = new Set([
   "src/plugins/bundled-capability-metadata.test.ts",
   "src/plugins/contracts/boundary-invariants.test.ts",
@@ -33,7 +39,7 @@ describe("plugin contract boundary invariants", () => {
     const files = globSync("src/**/*.ts", {
       cwd: REPO_ROOT,
       nodir: true,
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       if (ALLOWED_BUNDLED_CAPABILITY_METADATA_CONSUMERS.has(file)) {
         return false;
@@ -50,7 +56,7 @@ describe("plugin contract boundary invariants", () => {
       cwd: REPO_ROOT,
       nodir: true,
       ignore: ["src/**/*.test.ts"],
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       const source = readFileSync(resolve(REPO_ROOT, file), "utf8");
       return source.includes("contracts/inventory/bundled-capability-metadata");
@@ -63,7 +69,7 @@ describe("plugin contract boundary invariants", () => {
     const files = globSync("src/**/*.test.ts", {
       cwd: REPO_ROOT,
       nodir: true,
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       if (ALLOWED_EXTENSION_PATH_STRING_TESTS.has(file)) {
         return false;
@@ -83,7 +89,7 @@ describe("plugin contract boundary invariants", () => {
     const files = globSync("src/plugins/contracts/**/*.test.ts", {
       cwd: REPO_ROOT,
       nodir: true,
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       if (ALLOWED_CONTRACT_BUNDLED_PATH_HELPERS.has(file)) {
         return false;
@@ -100,7 +106,7 @@ describe("plugin contract boundary invariants", () => {
       cwd: REPO_ROOT,
       nodir: true,
       ignore: ["src/channels/**/*.test.ts"],
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       if (ALLOWED_CHANNEL_BUNDLED_METADATA_CONSUMERS.has(file)) {
         return false;
@@ -117,7 +123,7 @@ describe("plugin contract boundary invariants", () => {
       cwd: REPO_ROOT,
       nodir: true,
       ignore: ["src/**/*.test.ts"],
-    });
+    }).map(toPosix);
     const offenders = files.filter((file) => {
       const source = readFileSync(resolve(REPO_ROOT, file), "utf8");
       return /extensions\/\$\{|\.\.\/\.\.\/\.\.\/\.\.\/extensions\//u.test(source);

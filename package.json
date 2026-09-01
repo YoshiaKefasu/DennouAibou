@@ -1282,6 +1282,7 @@
   "devDependencies": {
     "@grammyjs/types": "^3.26.0",
     "@types/express": "^5.0.6",
+    "@types/glob": "^9.0.0",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.5.2",
     "@types/qrcode-terminal": "^0.12.2",

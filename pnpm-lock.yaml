@@ -181,6 +181,9 @@ importers:
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
+      '@types/glob':
+        specifier: ^9.0.0
+        version: 9.0.0
       '@types/markdown-it':
         specifier: ^14.1.2
         version: 14.1.2
@@ -2425,6 +2428,10 @@ packages:
 
   '@types/express@5.0.6':
     resolution: {integrity: sha512-sKYVuV7Sv9fbPIt/442koC7+IIwK5olP1KWeD88e/idgoJqDm3JV/YUiPwkoKK92ylff2MGxSz1CSjsXelx0YA==}
+
+  '@types/glob@9.0.0':
+    resolution: {integrity: sha512-00UxlRaIUvYm4R4W9WYkN8/J+kV8fmOQ7okeH6YFtGWFMt3odD45tpG5yA5wnL7HE6lLgjaTW5n14ju2hl2NNA==}
+    deprecated: This is a stub types definition. glob provides its own type definitions, so you do not need this installed.
 
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
@@ -7229,6 +7236,10 @@ snapshots:
       '@types/body-parser': 1.19.6
       '@types/express-serve-static-core': 5.1.1
       '@types/serve-static': 2.2.0
+
+  '@types/glob@9.0.0':
+    dependencies:
+      glob: 13.0.6
 
   '@types/hast@3.0.4':
     dependencies:
