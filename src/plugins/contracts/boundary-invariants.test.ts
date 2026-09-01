@@ -21,6 +21,31 @@ const ALLOWED_EXTENSION_PATH_STRING_TESTS = new Set([
   "src/channels/plugins/bundled.shape-guard.test.ts",
   "src/plugins/contracts/bundled-extension-config-api-guardrails.test.ts",
   "src/scripts/test-projects.test.ts",
+  // This inventory file is exempt from its own regex check: the comments
+  // above document bundled extension paths that match the deep-import
+  // patterns, and the file legitimately references those paths to explain
+  // each allow-list entry. The regexes are evaluated against the raw
+  // source (including comments), so we have to opt this file in.
+  "src/plugins/contracts/boundary-invariants.test.ts",
+  // src/plugin-sdk/browser-maintenance.test.ts
+  //   vi.mock('../../extensions/browser/browser-maintenance.js') stubs the
+  //   bundled browser extension so the plugin-sdk/browser-maintenance.ts
+  //   facade (a deliberate throw-stub after debloat) records the expected
+  //   call signature without ever loading the real extension. The
+  //   extension itself is removed; the mock is the only way to exercise
+  //   the facade's contract from a unit test.
+  "src/plugin-sdk/browser-maintenance.test.ts",
+  // src/channels/plugins/setup-wizard-helpers.test.ts
+  //   Imports `singleAccountKeysToMove` from the bundled telegram
+  //   extension's public contract-api barrel to feed a generic setup
+  //   wizard registry entry. The test asserts the *core* helper
+  //   behaviour; telegram's exported helper is just realistic input.
+  "src/channels/plugins/setup-wizard-helpers.test.ts",
+  // src/channels/plugins/setup-helpers.test.ts
+  //   Same pattern as setup-wizard-helpers.test.ts: the bundled
+  //   telegram contract-api supplies the input used to drive the
+  //   core setup-helpers behaviour under test.
+  "src/channels/plugins/setup-helpers.test.ts",
 ]);
 
 const ALLOWED_CONTRACT_BUNDLED_PATH_HELPERS = new Set([
