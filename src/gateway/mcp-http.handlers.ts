@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { AnyAgentTool } from "../agents/tools/common.js";
 import {
   MCP_LOOPBACK_SERVER_NAME,
   MCP_LOOPBACK_SERVER_VERSION,
@@ -69,8 +70,7 @@ export async function handleMcpJsonRpc(params: {
       }
       const toolCallId = `mcp-${crypto.randomUUID()}`;
       try {
-        // oxlint-disable-next-line typescript/no-explicit-any
-        const result = await (tool as any).execute(toolCallId, toolArgs);
+        const result = await (tool as AnyAgentTool).execute(toolCallId, toolArgs);
         return jsonRpcResult(id, {
           content: normalizeToolCallContent(result),
           isError: false,
