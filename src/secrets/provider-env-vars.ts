@@ -6,6 +6,7 @@ const CORE_PROVIDER_AUTH_ENV_VAR_CANDIDATES = {
   cerebras: ["CEREBRAS_API_KEY"],
   "anthropic-openai": ["ANTHROPIC_API_KEY"],
   "qwen-dashscope": ["DASHSCOPE_API_KEY"],
+  "cli-router": ["CLI_ROUTER_API_KEY"],
 } as const;
 
 const CORE_PROVIDER_SETUP_ENV_VAR_OVERRIDES = {
