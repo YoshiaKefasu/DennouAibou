@@ -19,6 +19,7 @@ import { formatAgentInternalEventsForPrompt } from "../internal-events.js";
 import { hasInternalRuntimeContext } from "../internal-runtime-context.js";
 import { prepareSessionManagerForRun } from "../pi-embedded-runner/session-manager-init.js";
 import { runEmbeddedPiAgent } from "../pi-embedded.js";
+import { guardSessionManager } from "../session-tool-result-guard-wrapper.js";
 import { buildWorkspaceSkillSnapshot } from "../skills.js";
 import { resolveAgentRunContext } from "./run-context.js";
 import type { AgentCommandOpts } from "./types.js";
@@ -260,7 +261,10 @@ export async function persistAcpTurnTranscript(params: {
     .access(sessionFile)
     .then(() => true)
     .catch(() => false);
-  const sessionManager = SessionManager.open(sessionFile);
+  const sessionManager = guardSessionManager(SessionManager.open(sessionFile), {
+    agentId: params.sessionAgentId,
+    sessionKey: params.sessionKey,
+  });
   await prepareSessionManagerForRun({
     sessionManager,
     sessionFile,

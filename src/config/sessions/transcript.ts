@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION, SessionManager } from "@earendil-works/pi-coding-agent";
+import { guardSessionManager } from "../../agents/session-tool-result-guard-wrapper.js";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import {
   resolveDefaultSessionStorePath,
@@ -162,7 +163,10 @@ export async function appendAssistantMessageToSessionTranscript(params: {
     timestamp: Date.now(),
     ...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
   } as Parameters<SessionManager["appendMessage"]>[0];
-  const sessionManager = SessionManager.open(sessionFile);
+  const sessionManager = guardSessionManager(SessionManager.open(sessionFile), {
+    agentId: params.agentId,
+    sessionKey: params.sessionKey,
+  });
   const messageId = sessionManager.appendMessage(message);
 
   emitSessionTranscriptUpdate({ sessionFile, sessionKey, message, messageId });

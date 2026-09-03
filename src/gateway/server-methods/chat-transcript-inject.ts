@@ -1,4 +1,5 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { guardSessionManager } from "../../agents/session-tool-result-guard-wrapper.js";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 
 type AppendMessageArg = Parameters<SessionManager["appendMessage"]>[0];
@@ -23,6 +24,10 @@ export function appendInjectedAssistantMessageToTranscript(params: {
   idempotencyKey?: string;
   abortMeta?: GatewayInjectedAbortMeta;
   now?: number;
+  /** Optional sessionKey for the integrity guard's log metadata. */
+  sessionKey?: string;
+  /** Optional agentId for the integrity guard's log metadata. */
+  agentId?: string;
 }): GatewayInjectedTranscriptAppendResult {
   const now = params.now ?? Date.now();
   const labelPrefix = params.label ? `[${params.label}]\n\n` : "";
@@ -67,7 +72,10 @@ export function appendInjectedAssistantMessageToTranscript(params: {
   try {
     // IMPORTANT: Use SessionManager so the entry is attached to the current leaf via parentId.
     // Raw jsonl appends break the parent chain and can hide compaction summaries from context.
-    const sessionManager = SessionManager.open(params.transcriptPath);
+    const sessionManager = guardSessionManager(SessionManager.open(params.transcriptPath), {
+      agentId: params.agentId,
+      sessionKey: params.sessionKey,
+    });
     const messageId = sessionManager.appendMessage(messageBody);
     emitSessionTranscriptUpdate({
       sessionFile: params.transcriptPath,
