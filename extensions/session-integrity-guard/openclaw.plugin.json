@@ -1,0 +1,26 @@
+{
+  "id": "session-integrity-guard",
+  "kind": "memory",
+  "uiHints": {
+    "frequency": {
+      "label": "Health Check Frequency",
+      "placeholder": "0 3 * * *",
+      "help": "Cron cadence for the session integrity health check (default: 0 3 * * *)."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
+      "frequency": {
+        "type": "string"
+      },
+      "timezone": {
+        "type": "string"
+      }
+    }
+  }
+}
