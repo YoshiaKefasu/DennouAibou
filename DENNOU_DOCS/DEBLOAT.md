@@ -1047,3 +1047,155 @@ Phase C 計画書は実施記録が空のまま残存していた計画ドキュ
 - 実施時は次期 slim 化の第2抽出波（カーネル外部への機能移植フェーズ）として、段階的コミット＋code-reviewer レビューを経る（一括削除しない）
 - 掃除候補メモ（Wave 2 以降）: `src/agents/auth-profiles/oauth.ts:20-21` の恒偽 `isOAuthProvider` および `src/agents/auth-profiles/usage.ts:78-84` の恒偽 `shouldProbeWhamForFailure`
 - **Wave 3 挙動変化**: heartbeat gates 撤去によりシステムイベント消化が常に即時実行される。dreaming（wakeMode next-heartbeat）はこれにより初めて実際に発火する。
+
+---
+
+## 19. memory-core プラグイン 完全削除（DEBLOAT）
+
+> **日付**: 2026-09-04
+> **対象コミット**: feature/pi-sdk-update
+> **状態**: 1コミットで完了（push 禁止）
+
+### 19.1 背景と判定
+
+Wave 4（コミット `e37232e80f1`、PHASE_F §4）で memory-core のカーネル分離は完了済みだったが、plugin-sdk ファサード13ファイルと extensions/memory-core/ ディレクトリは残存していた。
+
+**ユーザー裁定（2026-09-04）**:
+
+- KASOU で memory-core は `enabled=False` で運用中、実体は未ロード
+- 「DEBLOATします。WEBUIのnav-sectionのDreaming部分もクリーンアップします」
+- push 禁止、commit は1個まで
+
+### 19.2 削除対象
+
+#### A. extensions/ ディレクトリ
+
+- `extensions/memory-core/` を **完全削除**（88ファイル、`xargs wc -l` 合計29,131行）
+
+#### B. src/plugin-sdk/ ファサード
+
+13ファイルを削除（Wave 4 で「KEEP」とされたファイル群 — 今回再評価の結果、利用元がなくなったため削除）:
+
+```
+src/plugin-sdk/memory-core.ts
+src/plugin-sdk/memory-core-engine-runtime.ts
+src/plugin-sdk/memory-core-host-engine-embeddings.ts
+src/plugin-sdk/memory-core-host-engine-foundation.ts
+src/plugin-sdk/memory-core-host-engine-qmd.ts
+src/plugin-sdk/memory-core-host-engine-storage.ts
+src/plugin-sdk/memory-core-host-multimodal.ts       ← import 0 件（完全に未使用）
+src/plugin-sdk/memory-core-host-query.ts
+src/plugin-sdk/memory-core-host-runtime-cli.ts
+src/plugin-sdk/memory-core-host-runtime-core.ts
+src/plugin-sdk/memory-core-host-runtime-files.ts
+src/plugin-sdk/memory-core-host-secret.ts
+src/plugin-sdk/memory-core-host-status.ts
+```
+
+#### C. src/memory-host-sdk/ カーネル側 dreaming 設定
+
+- `src/memory-host-sdk/dreaming.ts`（612行）— デフォルト dreaming 設定（`DEFAULT_MEMORY_DREAMING_*`）とリゾルバ群。`memory-core-host-status` ファサードからのみ参照されており、削除安全。
+- `src/memory-host-sdk/dreaming.test.ts` — 同上。
+
+#### D. WebUI dreaming 部分
+
+- `ui/src/ui/views/dreaming.ts`（429行）+ `dreaming.test.ts`
+- `ui/src/ui/controllers/dreaming.ts`（309行）+ `dreaming.test.ts`
+- `ui/src/styles/dreams.css`（711行）
+- `ui/src/styles/layout.css` の dreaming 関連 CSS（~2.2KB削除）
+- `ui/src/ui/navigation.ts` の `dreams` タブ（`TAB_GROUPS`、`Tab` ユニオン、`TAB_PATHS`、`PATH_ALIASES`、`iconForTab`）
+- `ui/src/ui/app-render.ts` の dreaming セクション（`lazyDreamingView`、`resolveConfiguredDreaming`、`formatDreamNextCycle`、`resolveDreamingNextCycle`、`refreshDreaming`、`applyDreamingEnabled`、ヘッダーコントロール、`renderDreaming` レンダリング）
+- `ui/src/ui/app.ts` の `dreaming*` / `dreamDiary*` `@state` フィールド
+- `ui/src/ui/app-settings.ts` / `app-settings.test.ts` / `app-view-state.ts` の dreaming 関連 state 型と `host.tab === "dreams"` ブランチ
+
+### 19.3 参照の除去（再配線・削除）
+
+#### A. カーネル側 — memory-core 専用ファサードから kernel-side SDK への直接参照へ
+
+| ファイル                                              | 変更内容                                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/agents/pi-hooks/compaction-safeguard-quality.ts` | `extractKeywords` / `isQueryStopWordToken` の import を `memory-core-host-query.js` → `memory-host-sdk/query.js` に切替     |
+| `src/commands/doctor-state-integrity.ts`              | `resolveMemoryBackendConfig` の import を `memory-core-host-engine-storage.js` → `memory-host-sdk/engine-storage.js` に切替 |
+| `src/commands/status.command.ts`                      | `Tone` 型の import を `memory-core-host-status.js` → `memory-host-sdk/status.js` に切替                                     |
+| `src/commands/status.command.text-runtime.ts`         | `resolveMemoryCacheSummary` 等3関数の re-export 元を `memory-core-host-status.js` → `memory-host-sdk/status.js` に切替      |
+| `src/commands/status.scan.deps.runtime.ts`            | `MemoryProviderStatus` 型の import 元を `memory-core-host-engine-storage.js` → `memory-host-sdk/engine-storage.js` に切替   |
+| `src/commands/status.scan.shared.ts`                  | 同上                                                                                                                        |
+| `extensions/raw-chat-search/src/tools.ts`             | runtime helper の import 元を `memory-core-host-runtime-core.js` → `memory-host-sdk/runtime-core.js` に切替                 |
+
+#### B. カーネル側 — memory-core 専用コードの削除
+
+| ファイル                                    | 変更内容                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/commands/doctor-memory-search.ts`      | **削除**（429行）— memory-core 専用の doctor 機能                                                                                          |
+| `src/commands/doctor-memory-search.test.ts` | **削除**（569行）                                                                                                                          |
+| `src/gateway/server-methods/doctor.ts`      | **削除**（658行）— memory-core dreaming status / dream diary gateway endpoint 全体                                                         |
+| `src/gateway/server-methods/doctor.test.ts` | **削除**（649行）                                                                                                                          |
+| `src/gateway/server-methods.ts`             | `doctorHandlers` の import と spread を削除                                                                                                |
+| `src/gateway/server-methods-list.ts`        | `doctor.memory.status` / `doctor.memory.dreamDiary` を BASE_METHODS から削除                                                               |
+| `src/gateway/method-scopes.ts`              | `[READ_SCOPE]` から上記2メソッドを削除                                                                                                     |
+| `src/commands/doctor-gateway-health.ts`     | `probeGatewayMemoryStatus` と `DoctorMemoryStatusPayload` 関連を削除し、`checkGatewayHealth` のみに縮小                                    |
+| `src/commands/doctor.fast-path-mocks.ts`    | `./doctor-memory-search.js` モック削除、`probeGatewayMemoryStatus` モック削除                                                              |
+| `src/flows/doctor-health-contributions.ts`  | `doctor-memory-search.js` import と `runMemorySearchHealthContribution` / `probeGatewayMemoryStatus` import と `gatewayMemoryProbe` を削除 |
+
+#### C. 周辺掃除
+
+| ファイル                                             | 変更内容                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/gateway/tools-invoke-http.ts`                   | エラーメッセージから `plugins.slots.memory="memory-core"` ヒントを削除                                              |
+| `src/cli/plugins-cli.ts`                             | `memory slot (will reset to "memory-core")` → `memory slot` に短縮                                                  |
+| `src/cli/command-secret-resolution.coverage.test.ts` | `bundledPluginFile("memory-core", ...)` エントリを削除（`bundledPluginFile` import も削除）                         |
+| `src/docker-build-cache.test.ts`                     | `extensions/memory-core/package.json` の COPY regex assert を2箇所削除                                              |
+| `src/plugins/contracts/plugin-sdk-subpaths.test.ts`  | `memory-core-host-runtime-core` / `-cli` / `-files` の `expectSourceContains` ブロック削除                          |
+| `src/scripts/test-projects.test.ts`                  | `extensions/memory-core/src/memory/test-runtime-mocks.ts` を入力とする「widens extension helper targets」テスト削除 |
+| `src/ui-app-settings.agents-files-refresh.test.ts`   | test fixture から `dreaming*` / `dreamDiary*` フィールド削除                                                        |
+
+#### D. package.json / vitest / scripts メタデータ
+
+- `package.json` — `./plugin-sdk/memory-core*` の13 exports を削除
+- `vitest.extension-memory-paths.mjs` — `memoryExtensionTestRoots` から `extensions/memory-core`, `extensions/memory-lancedb` を削除（残りは `extensions/session-integrity-guard` のみ）
+- `scripts/lib/plugin-sdk-entrypoints.json` — 13 エントリ削除（`memory-core` 等）
+- `scripts/lib/bundled-runtime-sidecar-paths.json` — `dist/extensions/memory-core/runtime-api.js` 削除
+- `qa/seed-scenarios.json` — `memory-tools-channel-context` シナリオの `codeRefs` を空配列に
+
+### 19.4 保持したもの（意図的）
+
+- `src/plugins/slots.ts` の `DEFAULT_SLOT_BY_KEY.memory = "memory-core"` 文字列 — **既存設定との互換性のため保持**（KASOU `openclaw.json` の `plugins.slots.memory` 値を変更すると re-load でエラーになるため）。値はただの識別子で、対応するプラグインは存在しない（ユーザー側で別プラグインを当てれば有効化される）。config 側掃除は Phase 6 相当のユーザー判断で実施予定。
+- `src/plugins/slots.test.ts` / `src/plugins/config-state.test.ts` / `src/plugins/uninstall.test.ts` / `src/plugins/loader.test.ts` / `src/plugins/cli.test.ts` / `src/plugins/enable.test.ts` 等 — `"memory-core"` を **テスト fixture の文字列 id** として継続使用（プラグインローダー自体は generic、テストの assertion は slot id 文字列に依存しないため問題なし）
+- `src/plugins/contracts/memory-embedding-provider.contract.test.ts` — プラグインフレームワーク側の capability 契約テストで `"memory-core"` をサンプルとして使用。フレームワーク自体は健在。
+- `src/memory-host-sdk/host/` 配下の embedding / qmd / session-files / batch ライブラリ — memory-core 以外からも利用される kernel-side インフラのため温存
+- `src/memory-host-sdk/{engine-embeddings,engine-foundation,engine-qmd,engine-storage,multimodal,query,runtime-cli,runtime-core,runtime-files,secret,status}.ts`（ファサードに re-export されていた wrapper）— 今回の `src/plugin-sdk/memory-core-host-*` 削除後も直接参照されるファイルなので温存
+- WebUI i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` 翻訳キー — 他のロケールとの同期崩壊リスクを避けるため **orphaned translation として温存**（次期 i18n cleanup 時に削除検討）
+- `extensions/session-integrity-guard/src/cron-job.ts` / `notify.ts` の doc コメント内 `extensions/memory-core/src/dreaming.ts` への参照 — 歴史的パターン参照としてコメント温存
+- `DENNOU_DOCS/BUN_MIGRATION.md` / `DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md` / `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md` の `memory-core` 言及 — 歴史的記録・稼働ログ・パターン参照として温存
+
+### 19.5 dreaming cron / memory flush 経路の調査結果
+
+**結論**: dreaming cron も memory flush 経路もカーネル本体には **残存していない**（memory-core 削除と同時に消失した、が問題なし）。
+
+- `extensions/memory-core/src/dreaming.ts`（削除済み）が `cron.add()` 経由で登録していた `Memory Dreaming Promotion` cron は、プラグインが `enabled=False` のため未登録
+- `src/agents/pi-embedded-runner/run/attempt.ts:598` と `src/agents/pi-tools.ts:312-620` の `memoryFlushWritePath` / `wrapToolMemoryFlushAppendOnlyWrite` 経路は **session memory file への append-only write**（実行中エージェントの memory/YYYY-MM-DD.md 追記）で、memory-core の dreaming とは **別系統**。KASOU でも日常的に使用されているため **削除対象外**（タスクスコープ外）
+- `src/memory-host-sdk/dreaming.ts` 削除により `resolveMemoryDreamingConfig` 等のリゾルバがカーネルから消えたが、これらは status レポート用のみであり、cron 登録や wakeup 経路ではない（cron 登録は完全に extension 側実装）
+
+### 19.6 検証ゲート結果
+
+| ゲート                                              | 結果                                                                                                                                                                             |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec tsgo --noEmit`                           | **0 errors**（baseline も 0、新規エラーなし）                                                                                                                                    |
+| `pnpm exec oxfmt --check`                           | **34 files** flagged（baseline 35 — `extensions/memory-core/src/tools.shared.ts` 削除分のみ減、新規エラーなし）                                                                  |
+| `vitest.plugins.config.ts` (135 files / 1050 tests) | **19 files failed / 54 tests failed** — baseline と同数（pre-existing: `package-manifest.contract` の missing-extension 参照、`bundled-plugin-metadata` の sidecar baseline 等） |
+| `ui/vitest` navigation.test.ts                      | **28/28 pass**（`/dreaming` `/dreams` アサーション削除済み）                                                                                                                     |
+| `ui/vitest` app-settings.test.ts                    | **12/12 pass**（`dreaming*` state 削除済み）                                                                                                                                     |
+| `ui/vitest` webui-bundle-browser-load               | **4/4 pass**（dreams.css 削除後もバンドル正常）                                                                                                                                  |
+| `ui/vitest` (full unit suite)                       | **412/413 pass**（唯一の失敗は pre-existing の `src/ui/chat/tool-cards.test.ts:31`）                                                                                             |
+
+### 19.7 変更規模
+
+- 削除: 119 ファイル（extensions/memory-core/ 配下 88 + plugin-sdk facade 13 + dreaming.ts/.test.ts 4 + doctor.ts/.test.ts 2 + ui dreaming files 6 + WebUI styles/layout 部分）+ scripts/lib/plugin-sdk-entrypoints.json / scripts/lib/bundled-runtime-sidecar-paths.json 内の2エントリ削除 + 各種 inline deletion
+- 修正: 35 ファイル（参照再配線 7、memory-core 専用コード削除周辺 14、テスト fixture 4、WebUI 6、package.json + scripts/lib 4 + その他）
+- 削除行数: 約 33,500 行（`extensions/memory-core/` 29,131行 + src plugin-sdk 13 facade + doctor.ts/.test.ts 1,307 + dreaming files 1,350 + ui dreaming 738 + css 2,231 + その他数千行）
+
+### 19.8 残作業（次フェーズ）
+
+- KASOU `~/.openclaw/openclaw.json` の `plugins.slots.memory = "memory-core"` および `plugins.entries["memory-core"].enabled = false` の除去 — **本タスクスコープ外**（ユーザー判断待ち）
+- i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` orphan translation 削除（次期 i18n cleanup）
+- `src/plugins/slots.ts` の `DEFAULT_SLOT_BY_KEY.memory = "memory-core"` 文字列の取扱い（デフォルト slot id の再選定 or 空文字化）— 既存設定互換性を考慮し要ユーザー判断

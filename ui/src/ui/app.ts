@@ -60,7 +60,6 @@ import {
 } from "./controllers/agents.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
-import type { DreamingStatus } from "./controllers/dreaming.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
@@ -216,14 +215,6 @@ export class OpenClawApp extends LitElement {
   @state() configUiHints: ConfigUiHints = {};
   @state() configForm: Record<string, unknown> | null = null;
   @state() configFormOriginal: Record<string, unknown> | null = null;
-  @state() dreamingStatusLoading = false;
-  @state() dreamingStatusError: string | null = null;
-  @state() dreamingStatus: DreamingStatus | null = null;
-  @state() dreamingModeSaving = false;
-  @state() dreamDiaryLoading = false;
-  @state() dreamDiaryError: string | null = null;
-  @state() dreamDiaryPath: string | null = null;
-  @state() dreamDiaryContent: string | null = null;
   @state() configFormDirty = false;
   @state() configFormMode: "form" | "raw" = "form";
   @state() configSearchQuery = "";

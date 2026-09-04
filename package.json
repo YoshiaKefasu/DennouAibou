@@ -705,62 +705,6 @@
       "types": "./dist/plugin-sdk/mattermost-policy.d.ts",
       "default": "./dist/plugin-sdk/mattermost-policy.js"
     },
-    "./plugin-sdk/memory-core": {
-      "types": "./dist/plugin-sdk/memory-core.d.ts",
-      "default": "./dist/plugin-sdk/memory-core.js"
-    },
-    "./plugin-sdk/memory-core-engine-runtime": {
-      "types": "./dist/plugin-sdk/memory-core-engine-runtime.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-engine-runtime.js"
-    },
-    "./plugin-sdk/memory-core-host-engine-embeddings": {
-      "types": "./dist/plugin-sdk/memory-core-host-engine-embeddings.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-engine-embeddings.js"
-    },
-    "./plugin-sdk/memory-core-host-engine-foundation": {
-      "types": "./dist/plugin-sdk/memory-core-host-engine-foundation.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-engine-foundation.js"
-    },
-    "./plugin-sdk/memory-core-host-engine-qmd": {
-      "types": "./dist/plugin-sdk/memory-core-host-engine-qmd.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-engine-qmd.js"
-    },
-    "./plugin-sdk/memory-core-host-engine-storage": {
-      "types": "./dist/plugin-sdk/memory-core-host-engine-storage.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-engine-storage.js"
-    },
-    "./plugin-sdk/memory-core-host-multimodal": {
-      "types": "./dist/plugin-sdk/memory-core-host-multimodal.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-multimodal.js"
-    },
-    "./plugin-sdk/memory-core-host-query": {
-      "types": "./dist/plugin-sdk/memory-core-host-query.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-query.js"
-    },
-    "./plugin-sdk/memory-core-host-secret": {
-      "types": "./dist/plugin-sdk/memory-core-host-secret.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-secret.js"
-    },
-    "./plugin-sdk/memory-core-host-events": {
-      "types": "./dist/plugin-sdk/memory-core-host-events.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-events.js"
-    },
-    "./plugin-sdk/memory-core-host-status": {
-      "types": "./dist/plugin-sdk/memory-core-host-status.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-status.js"
-    },
-    "./plugin-sdk/memory-core-host-runtime-cli": {
-      "types": "./dist/plugin-sdk/memory-core-host-runtime-cli.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-runtime-cli.js"
-    },
-    "./plugin-sdk/memory-core-host-runtime-core": {
-      "types": "./dist/plugin-sdk/memory-core-host-runtime-core.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-runtime-core.js"
-    },
-    "./plugin-sdk/memory-core-host-runtime-files": {
-      "types": "./dist/plugin-sdk/memory-core-host-runtime-files.d.ts",
-      "default": "./dist/plugin-sdk/memory-core-host-runtime-files.js"
-    },
     "./plugin-sdk/memory-host-core": {
       "types": "./dist/plugin-sdk/memory-host-core.d.ts",
       "default": "./dist/plugin-sdk/memory-host-core.js"

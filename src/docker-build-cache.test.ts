@@ -108,12 +108,6 @@ describe("docker build cache layout", () => {
     expect(
       indexOfPattern(
         dockerfile,
-        /^COPY(?:\s+--chown=\S+)?\s+extensions\/memory-core\/package\.json \.\/extensions\/memory-core\/package\.json$/m,
-      ),
-    ).toBeLessThan(installIndex);
-    expect(
-      indexOfPattern(
-        dockerfile,
         /^COPY(?:\s+--chown=\S+)?\s+tsconfig\.json tsconfig\.plugin-sdk\.dts\.json tsdown\.config\.ts vitest\.config\.ts vitest\.e2e\.config\.ts vitest\.performance-config\.ts vitest\.shared\.config\.ts vitest\.bundled-plugin-paths\.ts openclaw\.mjs \.\/$/m,
       ),
     ).toBeGreaterThan(installIndex);
@@ -150,12 +144,6 @@ describe("docker build cache layout", () => {
     expect(dockerfile).toContain(
       "This image only exercises the root qrcode-terminal dependency path.",
     );
-    expect(
-      indexOfPattern(
-        dockerfile,
-        /^COPY(?:\s+--chown=\S+)?\s+extensions\/memory-core\/package\.json \.\/extensions\/memory-core\/package\.json$/m,
-      ),
-    ).toBe(-1);
     expect(indexOfPattern(dockerfile, /^COPY(?:\s+--chown=\S+)?\s+\.\s+\.$/m)).toBeGreaterThan(
       installIndex,
     );

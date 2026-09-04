@@ -130,8 +130,6 @@ describe("tabFromPath", () => {
     expect(tabFromPath("/chat")).toBe("chat");
     expect(tabFromPath("/overview")).toBe("overview");
     expect(tabFromPath("/sessions")).toBe("sessions");
-    expect(tabFromPath("/dreaming")).toBe("dreams");
-    expect(tabFromPath("/dreams")).toBe("dreams");
   });
 
   it("returns chat for root path", () => {
@@ -161,8 +159,6 @@ describe("inferBasePathFromPathname", () => {
   it("returns empty string for direct tab path", () => {
     expect(inferBasePathFromPathname("/chat")).toBe("");
     expect(inferBasePathFromPathname("/overview")).toBe("");
-    expect(inferBasePathFromPathname("/dreaming")).toBe("");
-    expect(inferBasePathFromPathname("/dreams")).toBe("");
   });
 
   it("infers base path from nested paths", () => {

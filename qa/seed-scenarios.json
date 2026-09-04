@@ -140,7 +140,7 @@
       "Final reply returns the memory-only fact correctly in-channel."
     ],
     "docsRefs": ["docs/concepts/memory.md", "docs/concepts/memory-search.md"],
-    "codeRefs": ["extensions/memory-core/src/tools.ts"]
+    "codeRefs": []
   },
   {
     "id": "memory-failure-fallback",

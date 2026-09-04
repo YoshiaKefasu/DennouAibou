@@ -417,19 +417,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("widens extension helper targets to sibling extension tests", () => {
-    expect(
-      buildVitestRunPlans(["extensions/memory-core/src/memory/test-runtime-mocks.ts"]),
-    ).toEqual([
-      {
-        config: "vitest.extension-memory.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/memory-core/src/memory/**/*.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes msteams extension tests to the msteams config", () => {
     expect(buildVitestRunPlans(["extensions/msteams/src/config.test.ts"])).toEqual([
       {

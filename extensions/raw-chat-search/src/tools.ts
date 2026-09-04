@@ -6,7 +6,7 @@ import {
   readStringParam,
   resolveSessionAgentId,
   type AnyAgentTool,
-} from "../../../src/plugin-sdk/memory-core-host-runtime-core.js";
+} from "../../../src/memory-host-sdk/runtime-core.js";
 import { getRawChatDatabase, type RawChatDatabase } from "./database.js";
 import { isRawChatIndexingEnabled } from "./hook.js";
 import type { SearchParams } from "./types.js";

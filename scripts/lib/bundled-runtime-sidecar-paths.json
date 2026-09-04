@@ -16,7 +16,6 @@
   "dist/extensions/matrix/runtime-api.js",
   "dist/extensions/matrix/thread-bindings-runtime.js",
   "dist/extensions/mattermost/runtime-api.js",
-  "dist/extensions/memory-core/runtime-api.js",
   "dist/extensions/msteams/runtime-api.js",
   "dist/extensions/nextcloud-talk/runtime-api.js",
   "dist/extensions/nostr/runtime-api.js",

@@ -21,16 +21,11 @@ import { maybeRepairBundledPluginRuntimeDeps } from "../commands/doctor-bundled-
 import { doctorShellCompletion } from "../commands/doctor-completion.js";
 import { maybeRepairLegacyCronStore } from "../commands/doctor-cron.js";
 import { maybeRepairGatewayDaemon } from "../commands/doctor-gateway-daemon-flow.js";
-import { checkGatewayHealth, probeGatewayMemoryStatus } from "../commands/doctor-gateway-health.js";
+import { checkGatewayHealth } from "../commands/doctor-gateway-health.js";
 import {
   maybeRepairGatewayServiceConfig,
   maybeScanExtraGatewayServices,
 } from "../commands/doctor-gateway-services.js";
-import {
-  maybeRepairMemoryRecallHealth,
-  noteMemoryRecallHealth,
-  noteMemorySearchHealth,
-} from "../commands/doctor-memory-search.js";
 import {
   noteMacLaunchAgentOverrides,
   noteMacLaunchctlGatewayEnvOverrides,
@@ -82,7 +77,6 @@ export type DoctorHealthFlowContext = {
   configPath: string;
   gatewayDetails?: ReturnType<typeof buildGatewayConnectionDetails>;
   healthOk?: boolean;
-  gatewayMemoryProbe?: Awaited<ReturnType<typeof probeGatewayMemoryStatus>>;
 };
 
 export type DoctorHealthContribution = FlowContribution & {
@@ -405,23 +399,6 @@ async function runGatewayHealthChecks(ctx: DoctorHealthFlowContext): Promise<voi
     timeoutMs: ctx.options.nonInteractive === true ? 3000 : 10_000,
   });
   ctx.healthOk = healthOk;
-  ctx.gatewayMemoryProbe = healthOk
-    ? await probeGatewayMemoryStatus({
-        cfg: ctx.cfg,
-        timeoutMs: ctx.options.nonInteractive === true ? 3000 : 10_000,
-      })
-    : { checked: false, ready: false };
-}
-
-async function runMemorySearchHealthContribution(ctx: DoctorHealthFlowContext): Promise<void> {
-  await maybeRepairMemoryRecallHealth({
-    cfg: ctx.cfg,
-    prompter: ctx.prompter,
-  });
-  await noteMemorySearchHealth(ctx.cfg, {
-    gatewayMemoryProbe: ctx.gatewayMemoryProbe ?? { checked: false, ready: false },
-  });
-  await noteMemoryRecallHealth(ctx.cfg);
 }
 
 async function runGatewayDaemonHealth(ctx: DoctorHealthFlowContext): Promise<void> {
@@ -580,11 +557,6 @@ export function resolveDoctorHealthContributions(): DoctorHealthContribution[] {
       id: "doctor:gateway-health",
       label: "Gateway health",
       run: runGatewayHealthChecks,
-    }),
-    createDoctorHealthContribution({
-      id: "doctor:memory-search",
-      label: "Memory search",
-      run: runMemorySearchHealthContribution,
     }),
     createDoctorHealthContribution({
       id: "doctor:gateway-daemon",
