@@ -73,16 +73,6 @@ const subagentLifecycleHookState = vi.hoisted(() => ({
 const threadBindingMocks = vi.hoisted(() => ({
   unbindThreadBindingsBySessionKey: vi.fn((_params?: unknown) => []),
 }));
-const acpRuntimeMocks = vi.hoisted(() => ({
-  cancel: vi.fn(async () => {}),
-  close: vi.fn(async () => {}),
-  getAcpRuntimeBackend: vi.fn(),
-  requireAcpRuntimeBackend: vi.fn(),
-}));
-const acpManagerMocks = vi.hoisted(() => ({
-  cancelSession: vi.fn(async () => {}),
-  closeSession: vi.fn(async () => {}),
-}));
 const browserSessionTabMocks = vi.hoisted(() => ({
   closeTrackedBrowserTabsForSessions: vi.fn(async () => 0),
 }));
@@ -162,29 +152,7 @@ vi.mock("../infra/outbound/session-binding-service.js", async () => {
   };
 });
 
-vi.mock("../acp/runtime/registry.js", async () => {
-  const actual = await vi.importActual<typeof import("../acp/runtime/registry.js")>(
-    "../acp/runtime/registry.js",
-  );
-  return {
-    ...actual,
-    getAcpRuntimeBackend: acpRuntimeMocks.getAcpRuntimeBackend,
-    requireAcpRuntimeBackend: (backendId?: string) => {
-      const backend = acpRuntimeMocks.requireAcpRuntimeBackend(backendId);
-      if (!backend) {
-        throw new Error("missing mocked ACP backend");
-      }
-      return backend;
-    },
-  };
-});
 
-vi.mock("../acp/control-plane/manager.js", () => ({
-  getAcpSessionManager: () => ({
-    cancelSession: acpManagerMocks.cancelSession,
-    closeSession: acpManagerMocks.closeSession,
-  }),
-}));
 
 vi.mock("../plugin-sdk/browser-maintenance.js", () => ({
   closeTrackedBrowserTabsForSessions: browserSessionTabMocks.closeTrackedBrowserTabsForSessions,
@@ -303,16 +271,6 @@ describe("gateway server sessions", () => {
     subagentLifecycleHookMocks.runSubagentEnded.mockClear();
     subagentLifecycleHookState.hasSubagentEndedHook = true;
     threadBindingMocks.unbindThreadBindingsBySessionKey.mockClear();
-    acpRuntimeMocks.cancel.mockClear();
-    acpRuntimeMocks.close.mockClear();
-    acpRuntimeMocks.getAcpRuntimeBackend.mockReset();
-    acpRuntimeMocks.getAcpRuntimeBackend.mockReturnValue(null);
-    acpRuntimeMocks.requireAcpRuntimeBackend.mockReset();
-    acpRuntimeMocks.requireAcpRuntimeBackend.mockImplementation((backendId?: string) =>
-      acpRuntimeMocks.getAcpRuntimeBackend(backendId),
-    );
-    acpManagerMocks.cancelSession.mockClear();
-    acpManagerMocks.closeSession.mockClear();
     browserSessionTabMocks.closeTrackedBrowserTabsForSessions.mockClear();
     browserSessionTabMocks.closeTrackedBrowserTabsForSessions.mockResolvedValue(0);
   });
@@ -1113,18 +1071,6 @@ describe("gateway server sessions", () => {
     expect(spawnedPatched.ok).toBe(true);
     expect(spawnedPatched.payload?.entry.spawnedBy).toBe("agent:main:main");
 
-    const acpPatched = await rpcReq<{
-      ok: true;
-      entry: { spawnedBy?: string; spawnDepth?: number };
-    }>(ws, "sessions.patch", {
-      key: "agent:main:acp:child",
-      spawnedBy: "agent:main:main",
-      spawnDepth: 1,
-    });
-    expect(acpPatched.ok).toBe(true);
-    expect(acpPatched.payload?.entry.spawnedBy).toBe("agent:main:main");
-    expect(acpPatched.payload?.entry.spawnDepth).toBe(1);
-
     const spawnedPatchedInvalidKey = await rpcReq(ws, "sessions.patch", {
       key: "agent:main:main",
       spawnedBy: "agent:main:main",
@@ -1794,7 +1740,7 @@ describe("gateway server sessions", () => {
     expect(subagentLifecycleHookMocks.runSubagentEnded).toHaveBeenCalledWith(
       {
         targetSessionKey: "agent:main:discord:group:dev",
-        targetKind: "acp",
+        targetKind: "subagent",
         reason: "session-delete",
         sendFarewell: true,
         outcome: "deleted",
@@ -1821,16 +1767,8 @@ describe("gateway server sessions", () => {
       entries: {
         main: { sessionId: "sess-main", updatedAt: Date.now() },
         "discord:group:dev": {
-          sessionId: "sess-acp",
+          sessionId: "sess-dev",
           updatedAt: Date.now(),
-          acp: {
-            backend: "acpx",
-            agent: "codex",
-            runtimeSessionName: "runtime:delete",
-            mode: "persistent",
-            state: "idle",
-            lastActivityAt: Date.now(),
-          },
         },
       },
     });
@@ -1840,18 +1778,6 @@ describe("gateway server sessions", () => {
     });
     expect(deleted.ok).toBe(true);
     expect(deleted.payload?.deleted).toBe(true);
-    expect(acpManagerMocks.closeSession).toHaveBeenCalledWith({
-      allowBackendUnavailable: true,
-      cfg: expect.any(Object),
-      requireAcpSession: false,
-      reason: "session-delete",
-      sessionKey: "agent:main:discord:group:dev",
-    });
-    expect(acpManagerMocks.cancelSession).toHaveBeenCalledWith({
-      cfg: expect.any(Object),
-      reason: "session-delete",
-      sessionKey: "agent:main:discord:group:dev",
-    });
 
     ws.close();
   });
@@ -2073,7 +1999,7 @@ describe("gateway server sessions", () => {
     expect(subagentLifecycleHookMocks.runSubagentEnded).toHaveBeenCalledWith(
       {
         targetSessionKey: "agent:main:discord:group:dev",
-        targetKind: "acp",
+        targetKind: "subagent",
         reason: "session-reset",
         sendFarewell: true,
         outcome: "reset",
@@ -2100,92 +2026,18 @@ describe("gateway server sessions", () => {
         "discord:group:dev": {
           sessionId: "sess-main",
           updatedAt: Date.now(),
-          acp: {
-            backend: "acpx",
-            agent: "codex",
-            runtimeSessionName: "runtime:reset",
-            mode: "persistent",
-            runtimeOptions: {
-              runtimeMode: "auto",
-              timeoutSeconds: 30,
-            },
-            cwd: "/tmp/acp-session",
-            state: "idle",
-            lastActivityAt: Date.now(),
-          },
         },
       },
     });
     const { ws } = await openClient();
-    const reset = await rpcReq<{
-      ok: true;
-      key: string;
-      entry: {
-        acp?: {
-          backend?: string;
-          agent?: string;
-          runtimeSessionName?: string;
-          mode?: string;
-          runtimeOptions?: {
-            runtimeMode?: string;
-            timeoutSeconds?: number;
-          };
-          cwd?: string;
-          state?: string;
-        };
-      };
-    }>(ws, "sessions.reset", {
-      key: "discord:group:dev",
-    });
-    expect(reset.ok).toBe(true);
-    expect(reset.payload?.entry.acp).toMatchObject({
-      backend: "acpx",
-      agent: "codex",
-      runtimeSessionName: "runtime:reset",
-      mode: "persistent",
-      runtimeOptions: {
-        runtimeMode: "auto",
-        timeoutSeconds: 30,
-      },
-      cwd: "/tmp/acp-session",
-      state: "idle",
-    });
-    expect(acpManagerMocks.closeSession).toHaveBeenCalledWith({
-      allowBackendUnavailable: true,
-      cfg: expect.any(Object),
-      requireAcpSession: false,
-      reason: "session-reset",
-      sessionKey: "agent:main:discord:group:dev",
-    });
-    const store = JSON.parse(await fs.readFile(storePath, "utf-8")) as Record<
-      string,
+    const reset = await rpcReq<{ ok: true; key: string; entry: { sessionId?: string } }>(
+      ws,
+      "sessions.reset",
       {
-        acp?: {
-          backend?: string;
-          agent?: string;
-          runtimeSessionName?: string;
-          mode?: string;
-          runtimeOptions?: {
-            runtimeMode?: string;
-            timeoutSeconds?: number;
-          };
-          cwd?: string;
-          state?: string;
-        };
-      }
-    >;
-    expect(store["agent:main:discord:group:dev"]?.acp).toMatchObject({
-      backend: "acpx",
-      agent: "codex",
-      runtimeSessionName: "runtime:reset",
-      mode: "persistent",
-      runtimeOptions: {
-        runtimeMode: "auto",
-        timeoutSeconds: 30,
+        key: "discord:group:dev",
       },
-      cwd: "/tmp/acp-session",
-      state: "idle",
-    });
+    );
+    expect(reset.ok).toBe(true);
 
     ws.close();
   });

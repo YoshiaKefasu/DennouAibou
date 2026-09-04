@@ -7,19 +7,6 @@ export type {
   PluginLogger,
 } from "openclaw/plugin-sdk/core";
 import type { OpenClawConfig as RuntimeOpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
-export type {
-  AcpRuntime,
-  AcpRuntimeCapabilities,
-  AcpRuntimeDoctorReport,
-  AcpRuntimeEnsureInput,
-  AcpRuntimeEvent,
-  AcpRuntimeHandle,
-  AcpRuntimeStatus,
-  AcpRuntimeTurnInput,
-  AcpRuntimeErrorCode,
-  AcpSessionUpdateTag,
-} from "openclaw/plugin-sdk/acp-runtime";
-export { AcpRuntimeError } from "openclaw/plugin-sdk/acp-runtime";
 
 export {
   clearAccountEntryFields,

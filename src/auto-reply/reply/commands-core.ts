@@ -4,10 +4,9 @@ import { resetConfiguredBindingTargetInPlace } from "../../channels/plugins/bind
 import { logVerbose } from "../../globals.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
-import { isAcpSessionKey, resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
+import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
-import { resolveBoundAcpThreadSessionKey } from "./commands-acp/targets.js";
 import type {
   CommandHandler,
   CommandHandlerResult,
@@ -194,7 +193,6 @@ function applyAcpResetTailContext(ctx: HandleCommandsParams["ctx"], resetTail: s
   mutableCtx.BodyForCommands = resetTail;
   mutableCtx.BodyForAgent = resetTail;
   mutableCtx.BodyStripped = resetTail;
-  mutableCtx.AcpDispatchTailAfterReset = true;
 }
 
 function resolveSessionEntryForHookSessionKey(
@@ -236,74 +234,6 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
   // Trigger internal hook for reset/new commands
   if (resetRequested && params.command.isAuthorizedSender) {
     const commandAction: ResetCommandAction = resetMatch?.[1] === "reset" ? "reset" : "new";
-    const resetTail =
-      resetMatch != null
-        ? params.command.commandBodyNormalized.slice(resetMatch[0].length).trimStart()
-        : "";
-    const boundAcpSessionKey = resolveBoundAcpThreadSessionKey(params);
-    const boundAcpKey =
-      boundAcpSessionKey && isAcpSessionKey(boundAcpSessionKey)
-        ? boundAcpSessionKey.trim()
-        : undefined;
-    if (boundAcpKey) {
-      const resetResult = await resetConfiguredBindingTargetInPlace({
-        cfg: params.cfg,
-        sessionKey: boundAcpKey,
-        reason: commandAction,
-      });
-      if (!resetResult.ok && !resetResult.skipped) {
-        logVerbose(
-          `acp reset-in-place failed for ${boundAcpKey}: ${resetResult.error ?? "unknown error"}`,
-        );
-      }
-      if (resetResult.ok) {
-        const hookSessionEntry =
-          boundAcpKey === params.sessionKey
-            ? params.sessionEntry
-            : resolveSessionEntryForHookSessionKey(params.sessionStore, boundAcpKey);
-        const hookPreviousSessionEntry =
-          boundAcpKey === params.sessionKey
-            ? params.previousSessionEntry
-            : resolveSessionEntryForHookSessionKey(params.sessionStore, boundAcpKey);
-        await emitResetCommandHooks({
-          action: commandAction,
-          ctx: params.ctx,
-          cfg: params.cfg,
-          command: params.command,
-          sessionKey: boundAcpKey,
-          sessionEntry: hookSessionEntry,
-          previousSessionEntry: hookPreviousSessionEntry,
-          workspaceDir: params.workspaceDir,
-        });
-        if (resetTail) {
-          applyAcpResetTailContext(params.ctx, resetTail);
-          if (params.rootCtx && params.rootCtx !== params.ctx) {
-            applyAcpResetTailContext(params.rootCtx, resetTail);
-          }
-          return {
-            shouldContinue: false,
-          };
-        }
-        return {
-          shouldContinue: false,
-          reply: { text: "✅ ACP session reset in place." },
-        };
-      }
-      if (resetResult.skipped) {
-        return {
-          shouldContinue: false,
-          reply: {
-            text: "⚠️ ACP session reset unavailable for this bound conversation. Rebind with /acp bind or /acp spawn.",
-          },
-        };
-      }
-      return {
-        shouldContinue: false,
-        reply: {
-          text: "⚠️ ACP session reset failed. Check /acp status and try again.",
-        },
-      };
-    }
     await emitResetCommandHooks({
       action: commandAction,
       ctx: params.ctx,

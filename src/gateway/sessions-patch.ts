@@ -22,7 +22,6 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
 import { normalizeExecTarget } from "../infra/exec-approvals.js";
 import {
-  isAcpSessionKey,
   isSubagentSessionKey,
   normalizeAgentId,
   parseAgentSessionKey,
@@ -59,7 +58,7 @@ function normalizeExecAsk(raw: string): "off" | "on-miss" | "always" | undefined
 }
 
 function supportsSpawnLineage(storeKey: string): boolean {
-  return isSubagentSessionKey(storeKey) || isAcpSessionKey(storeKey);
+  return isSubagentSessionKey(storeKey);
 }
 
 function normalizeSubagentRole(raw: string): "orchestrator" | "leaf" | undefined {
@@ -114,7 +113,7 @@ export async function applySessionsPatchToStore(params: {
         return invalid("invalid spawnedBy: empty");
       }
       if (!supportsSpawnLineage(storeKey)) {
-        return invalid("spawnedBy is only supported for subagent:* or acp:* sessions");
+        return invalid("spawnedBy is only supported for subagent:* sessions");
       }
       if (existing?.spawnedBy && existing.spawnedBy !== trimmed) {
         return invalid("spawnedBy cannot be changed once set");
@@ -131,7 +130,7 @@ export async function applySessionsPatchToStore(params: {
       }
     } else if (raw !== undefined) {
       if (!supportsSpawnLineage(storeKey)) {
-        return invalid("spawnedWorkspaceDir is only supported for subagent:* or acp:* sessions");
+        return invalid("spawnedWorkspaceDir is only supported for subagent:* sessions");
       }
       const trimmed = String(raw).trim();
       if (!trimmed) {
@@ -152,7 +151,7 @@ export async function applySessionsPatchToStore(params: {
       }
     } else if (raw !== undefined) {
       if (!supportsSpawnLineage(storeKey)) {
-        return invalid("spawnDepth is only supported for subagent:* or acp:* sessions");
+        return invalid("spawnDepth is only supported for subagent:* sessions");
       }
       const numeric = Number(raw);
       if (!Number.isInteger(numeric) || numeric < 0) {
@@ -174,7 +173,7 @@ export async function applySessionsPatchToStore(params: {
       }
     } else if (raw !== undefined) {
       if (!supportsSpawnLineage(storeKey)) {
-        return invalid("subagentRole is only supported for subagent:* or acp:* sessions");
+        return invalid("subagentRole is only supported for subagent:* sessions");
       }
       const normalized = normalizeSubagentRole(String(raw));
       if (!normalized) {
@@ -195,7 +194,7 @@ export async function applySessionsPatchToStore(params: {
       }
     } else if (raw !== undefined) {
       if (!supportsSpawnLineage(storeKey)) {
-        return invalid("subagentControlScope is only supported for subagent:* or acp:* sessions");
+        return invalid("subagentControlScope is only supported for subagent:* sessions");
       }
       const normalized = normalizeSubagentControlScope(String(raw));
       if (!normalized) {

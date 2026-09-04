@@ -103,7 +103,6 @@ const hoisted = vi.hoisted(() => {
   const roomChannel = "room-chat";
   const topicChannel = "topic-chat";
   const callGatewayMock = vi.fn();
-  const readAcpSessionEntryMock = vi.fn();
   const sessionBindingCapabilitiesMock = vi.fn();
   const sessionBindingBindMock = vi.fn();
   const sessionBindingResolveByConversationMock = vi.fn();
@@ -150,7 +149,6 @@ const hoisted = vi.hoisted(() => {
   };
   return {
     callGatewayMock,
-    readAcpSessionEntryMock,
     sessionBindingCapabilitiesMock,
     sessionBindingBindMock,
     sessionBindingResolveByConversationMock,
@@ -184,16 +182,6 @@ function buildFocusSessionBindingService() {
 vi.mock("../../gateway/call.js", () => ({
   callGateway: hoisted.callGatewayMock,
 }));
-
-vi.mock("../../acp/runtime/session-meta.js", async () => {
-  const actual = await vi.importActual<typeof import("../../acp/runtime/session-meta.js")>(
-    "../../acp/runtime/session-meta.js",
-  );
-  return {
-    ...actual,
-    readAcpSessionEntry: (params: unknown) => hoisted.readAcpSessionEntryMock(params),
-  };
-});
 
 vi.mock("../../infra/outbound/session-binding-service.js", async () => {
   const actual = await vi.importActual<
@@ -307,8 +295,8 @@ function createSessionBindingRecord(
 ): SessionBindingRecord {
   return {
     bindingId: "default:thread-1",
-    targetSessionKey: "agent:codex-acp:session-1",
-    targetKind: "session",
+    targetSessionKey: "agent:main:subagent:run-1",
+    targetKind: "subagent",
     conversation: {
       channel: THREAD_CHANNEL,
       accountId: "default",
@@ -319,7 +307,7 @@ function createSessionBindingRecord(
     boundAt: Date.now(),
     metadata: {
       boundBy: "user-1",
-      agentId: "codex-acp",
+      agentId: "main",
     },
     ...overrides,
   };
@@ -334,8 +322,8 @@ function createSessionBindingCapabilities() {
   };
 }
 
-async function focusCodexAcp(
-  params = createThreadCommandParams("/focus codex-acp"),
+async function focusSubagent(
+  params = createThreadCommandParams("/focus run-1"),
   options?: { existingBinding?: SessionBindingRecord | null },
 ) {
   hoisted.sessionBindingCapabilitiesMock.mockReturnValue(createSessionBindingCapabilities());
@@ -371,7 +359,7 @@ async function focusCodexAcp(
   hoisted.callGatewayMock.mockImplementation(async (request: unknown) => {
     const method = (request as { method?: string }).method;
     if (method === "sessions.resolve") {
-      return { key: "agent:codex-acp:session-1" };
+      return { key: "agent:main:subagent:run-1" };
     }
     return {};
   });
@@ -382,7 +370,6 @@ describe("/focus, /unfocus, /agents", () => {
   beforeEach(() => {
     resetSubagentRegistryForTests();
     hoisted.callGatewayMock.mockReset();
-    hoisted.readAcpSessionEntryMock.mockReset().mockReturnValue(null);
     hoisted.sessionBindingCapabilitiesMock
       .mockReset()
       .mockReturnValue(createSessionBindingCapabilities());
@@ -392,30 +379,25 @@ describe("/focus, /unfocus, /agents", () => {
     hoisted.sessionBindingBindMock.mockReset();
   });
 
-  it("/focus resolves ACP sessions and binds the current thread-chat thread", async () => {
-    const result = await focusCodexAcp();
+  it("/focus binds the current thread-chat thread to the resolved subagent", async () => {
+    const result = await focusSubagent();
 
     expect(result?.reply?.text).toContain("bound this conversation");
-    expect(result?.reply?.text).toContain("(acp)");
     expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
       expect.objectContaining({
         placement: "current",
-        targetKind: "session",
-        targetSessionKey: "agent:codex-acp:session-1",
+        targetKind: "subagent",
+        targetSessionKey: "agent:main:subagent:run-1",
         conversation: expect.objectContaining({
           channel: THREAD_CHANNEL,
           conversationId: "thread-1",
-        }),
-        metadata: expect.objectContaining({
-          introText:
-            "⚙️ codex-acp session active (idle auto-unfocus after 24h inactivity). Messages here go directly to this session.",
         }),
       }),
     );
   });
 
   it("/focus binds topic-chat topics as current conversations", async () => {
-    const result = await focusCodexAcp(createTopicCommandParams("/focus codex-acp"));
+    const result = await focusSubagent(createTopicCommandParams("/focus run-1"));
 
     expect(result?.reply?.text).toContain("bound this conversation");
     expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
@@ -442,7 +424,7 @@ describe("/focus, /unfocus, /agents", () => {
       } as OpenClawConfig["channels"],
     } as OpenClawConfig;
 
-    const result = await focusCodexAcp(createRoomCommandParams("/focus codex-acp", cfg));
+    const result = await focusSubagent(createRoomCommandParams("/focus run-1", cfg));
 
     expect(result?.reply?.text).toContain("created child conversation thread-created and bound it");
     expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
@@ -457,7 +439,7 @@ describe("/focus, /unfocus, /agents", () => {
   });
 
   it("/focus treats the triggering room-chat always-thread turn as the current thread", async () => {
-    const result = await focusCodexAcp(createRoomTriggerThreadCommandParams("/focus codex-acp"));
+    const result = await focusSubagent(createRoomTriggerThreadCommandParams("/focus run-1"));
 
     expect(result?.reply?.text).toContain("bound this conversation");
     expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
@@ -484,57 +466,12 @@ describe("/focus, /unfocus, /agents", () => {
       } as OpenClawConfig["channels"],
     } as OpenClawConfig;
 
-    const result = await focusCodexAcp(createRoomCommandParams("/focus codex-acp", cfg));
+    const result = await focusSubagent(createRoomCommandParams("/focus run-1", cfg));
 
     expect(result?.reply?.text).toContain(
       `channels.${ROOM_CHANNEL}.threadBindings.spawnSubagentSessions=true`,
     );
     expect(hoisted.sessionBindingBindMock).not.toHaveBeenCalled();
-  });
-
-  it("/focus includes ACP session identifiers in intro text when available", async () => {
-    hoisted.readAcpSessionEntryMock.mockReturnValue({
-      sessionKey: "agent:codex-acp:session-1",
-      storeSessionKey: "agent:codex-acp:session-1",
-      acp: {
-        backend: "acpx",
-        agent: "codex",
-        runtimeSessionName: "runtime-1",
-        identity: {
-          state: "resolved",
-          source: "status",
-          acpxSessionId: "acpx-456",
-          agentSessionId: "codex-123",
-          lastUpdatedAt: Date.now(),
-        },
-        mode: "persistent",
-        state: "idle",
-        lastActivityAt: Date.now(),
-      },
-    });
-    await focusCodexAcp();
-
-    expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          introText: expect.stringContaining("agent session id: codex-123"),
-        }),
-      }),
-    );
-    expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          introText: expect.stringContaining("acpx session id: acpx-456"),
-        }),
-      }),
-    );
-    expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          introText: expect.stringContaining("codex resume codex-123"),
-        }),
-      }),
-    );
   });
 
   it("/unfocus removes an active binding for the binding owner", async () => {
@@ -586,7 +523,7 @@ describe("/focus, /unfocus, /agents", () => {
   });
 
   it("/focus rejects rebinding when the thread is focused by another user", async () => {
-    const result = await focusCodexAcp(undefined, {
+    const result = await focusSubagent(undefined, {
       existingBinding: createSessionBindingRecord({
         metadata: { boundBy: "user-2" },
       }),
@@ -625,17 +562,6 @@ describe("/focus, /unfocus, /agents", () => {
       }
       if (sessionKey === "agent:main:main") {
         return [
-          createSessionBindingRecord({
-            bindingId: "default:thread-2",
-            targetSessionKey: sessionKey,
-            targetKind: "session",
-            conversation: {
-              channel: THREAD_CHANNEL,
-              accountId: "default",
-              conversationId: "thread-2",
-            },
-            metadata: { label: "main-session" },
-          }),
           // Mismatched channel should be filtered.
           createSessionBindingRecord({
             bindingId: "default:tg-1",
@@ -657,8 +583,6 @@ describe("/focus, /unfocus, /agents", () => {
 
     expect(text).toContain("agents:");
     expect(text).toContain("binding:thread-1");
-    expect(text).toContain("acp/session bindings:");
-    expect(text).toContain("session:agent:main:main");
     expect(text).not.toContain("default:tg-1");
   });
 
@@ -742,7 +666,7 @@ describe("/focus, /unfocus, /agents", () => {
   });
 
   it("/focus rejects unsupported channels", async () => {
-    const params = buildCommandTestParams("/focus codex-acp", baseCfg);
+    const params = buildCommandTestParams("/focus run-1", baseCfg);
     const result = await handleSubagentsCommand(params, true);
     expect(result?.reply?.text).toContain("must be run inside a bindable conversation");
   });

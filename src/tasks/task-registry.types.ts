@@ -1,6 +1,6 @@
 import type { DeliveryContext } from "../utils/delivery-context.js";
 
-export type TaskRuntime = "subagent" | "acp" | "cli" | "cron";
+export type TaskRuntime = "subagent" | "cli" | "cron";
 
 export type TaskStatus =
   | "queued"

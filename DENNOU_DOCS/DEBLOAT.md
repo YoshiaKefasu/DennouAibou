@@ -1199,3 +1199,127 @@ src/plugin-sdk/memory-core-host-status.ts
 - KASOU `~/.openclaw/openclaw.json` の `plugins.slots.memory = "memory-core"` および `plugins.entries["memory-core"].enabled = false` の除去 — **本タスクスコープ外**（ユーザー判断待ち）
 - i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` orphan translation 削除（次期 i18n cleanup）
 - `src/plugins/slots.ts` の `DEFAULT_SLOT_BY_KEY.memory = "memory-core"` 文字列の取扱い（デフォルト slot id の再選定 or 空文字化）— 既存設定互換性を考慮し要ユーザー判断
+
+## 20. ACP 完全削除（DEBLOAT）
+
+> **日付**: 2026-09-04（前任 Executor 着手 → コミット未実行 → 後任 Executor 引き継ぎ完了）
+> **対象コミット**: feature/pi-sdk-update（push 禁止、commit 1個）
+> **状態**: 完了（tsgo 0 errors / oxfmt 既知違反 51件は前任ベースライン由来、新規違反 0件）
+
+### 20.1 背景と判定
+
+前任 Executor が ACP（Agent Communication Protocol）周りを先行削除し、143ファイル / +29 -35,751行の unstaged changes を残した状態で停止していた。本タスクではその残作業を完成させ、型エラー 0 / vitest ベースライン整合まで到達することを目標とした。
+
+**ユーザー裁定**: ACP harness（codex/claude code/gemini）は KASOU 運用で未使用。/acp・/unfocus の ACP ターゲット分岐、ACP runtime backend (`acpx`)、`OpenClawConfig.acp.*`、`SessionEntry.acp` メタデータ、`ConfiguredBindingRouteResult.bindingResolution` の ACP binding type、`AgentRouteBinding.type="acp"`、`TaskRuntime="acp"` をすべて削除する。
+
+### 20.2 削除対象（前任着手分 + 後任追加分）
+
+#### A. `src/acp/` ディレクトリ（前任削除済）
+- ACP 専用モジュール全体（commands.ts / client.ts / approval-classifier.ts / control-plane/* / runtime/* / persistent-bindings/* / meta.ts / conversation-id.ts / errors.ts / registry.ts / session-meta.ts / session-identifiers.ts / session-identity.ts / session-meta.ts / types.ts / etc.）
+
+#### B. `src/plugin-sdk/acp-runtime.ts` / `acpx.ts`（前任削除済）
+- Plugin SDK の ACP runtime 公開 facade
+
+#### C. ACP harness session bindings
+- `extensions/discord/src/monitor/native-command.plugin-dispatch.test.ts` の ACP-`createConfiguredAcpBinding` / `createConfiguredAcpCase` ヘルパーと ACP 専用 it ブロック削除
+- `extensions/line/src/bot-message-context.test.ts` の ACP normalization / ACP-active bindings it ブロック削除
+- `extensions/telegram/src/bot-native-commands.session-meta.test.ts` の `createConfiguredAcpTopicBinding` / `createConfiguredBindingRoute(route, binding)` → 単一引数版に簡素化、ACP 専用 it ブロック削除
+
+#### D. コア統合
+- `src/auto-reply/reply/abort.ts`: `defaultAbortDeps.getAcpSessionManager` を削除（abort 経路から ACP を外す）
+- `src/auto-reply/reply/abort.test.ts`: ACP session manager mock と "ACP cancel" it ブロック削除
+- `src/auto-reply/reply/commands-handlers.runtime.ts`: `./commands-acp.js` import と `handleAcpCommand` 登録削除
+- `src/auto-reply/reply/commands-subagents/action-focus.ts`: ACP target 分岐削除（`resolveFocusTargetSession` の `targetKind` を `subagent` のみに縮小）
+- `src/auto-reply/reply/commands-subagents/shared.ts`: `targetKind: "subagent" | "acp"` → `"subagent"`、`!key.includes(":subagent:")` で continue
+- `src/auto-reply/reply/commands-subagents-focus.test.ts`: `createConfiguredAcpCase` → `setupHelperRegistries`、ACP it 削除
+- `src/auto-reply/reply/commands-system-prompt.ts`: `acpEnabled` プロパティ削除
+- `src/auto-reply/reply/conversation-binding-input.ts`: `normalizeConversationText` (from `acp/conversation-id`) を `trimText` で代用
+- `src/auto-reply/reply/agent-runner.misc.runreplyagent.test.ts`: ACP mock と it 削除
+- `src/auto-reply/reply/session.test.ts`: "does not rotate local session state for /new on bound ACP sessions" 等 4件 削除
+- `src/auto-reply/reply/dispatch-from-config.test.ts`: ACP test ブロック10件、ACP helper (`createAcpRuntime` / `createMockAcpSessionManager` / `MockAcpRuntime`)、ACP vi.mock、ACP `acpMocks` 削除
+
+#### E. ACP binding plugins
+- `src/channels/plugins/configured-binding-builtins.ts`: ACP builtin 削除（ファイルごと削除）
+- `src/channels/plugins/stateful-target-builtins.ts`: ACP stateful driver 削除（ファイルごと削除）
+- `src/channels/plugins/binding-registry.ts`: 上記参照削除（ensureConfiguredBindingBuiltinsRegistered → そのままの薄いラッパー）
+- `src/channels/plugins/binding-targets.ts`: 上記参照削除
+- `src/channels/plugins/binding-targets.test.ts`: `type: "acp"` を `type: "route"` に変更
+
+#### F. gateway / sessions
+- `src/gateway/server-startup.ts`: `getAcpSessionManager().reconcilePendingSessionIdentities` ブロック削除、ACP import 削除
+- `src/gateway/session-reset-service.ts`: `runAcpCleanupStep` / `closeAcpRuntimeForSession` 削除、`cleanupSessionBeforeMutation` から ACP close 呼び出し削除、`targetKind` を `"subagent"` 固定
+- `src/gateway/session-reset-service.test.ts`: ACP binding テスト2件削除
+- `src/gateway/server.sessions.gateway-server-sessions-a.test.ts`: `acpRuntimeMocks` / `acpManagerMocks` 削除、ACP セッション削除・reset テストのACP専用assertion除去、`targetKind: "acp"` → `"subagent"`
+
+#### G. ACP secret-file
+- `src/cli/gateway-cli/run.ts`: `readSecretFromFile` (from `acp/secret-file`) を `fs.readFileSync + trim` で inline 化
+- `src/cli/mcp-cli.ts`: 同上
+
+#### H. channel/conversation binding
+- `src/channels/conversation-binding-context.ts`: `normalizeConversationText` を `trimText` で代用
+- `src/infra/outbound/current-conversation-bindings.ts`: `normalizeConversationText` を `.trim().toLowerCase()` で代用
+
+#### I. agents
+- `src/agents/pi-embedded-runner/system-prompt.ts`: `acpEnabled?: boolean` 削除
+- `src/agents/pi-embedded-runner/run/attempt.ts`: `acpEnabled` 引数削除
+- `src/agents/pi-embedded-runner/compact.ts`: 同上
+- `src/agents/skills/plugin-skills.ts`: `record.id === "acpx"` skip ロジック削除（acpx plugin はACP 専用）
+- `src/agents/skills/plugin-skills.test.ts`: `acpx` → `helper`/`helper2` fixture、ACP enabled/disabled テスト削除
+- `src/agents/prompt-composition-scenarios.ts`: `acpEnabled: true` 2箇所削除
+- `src/agents/subagent-announce.ts`: `acpEnabled` パラメータと ACP harness guidance ブロック削除
+- `src/agents/subagent-spawn.ts`: `acpEnabled` 削除
+- `src/agents/system-prompt.test.ts`: ACP harness / ACP spawn guidance テスト3件削除（"documents ACP sessions_spawn", "guides harness requests...", "omits ACP spawning guidance"）
+- `src/agents/system-prompt.ts` （継承元）: `acpEnabled` を system prompt 適用ロジックから削除
+- `src/config/plugin-auto-enable.providers.test.ts`: "auto-enables acpx when ACP is configured" 等 2件削除
+
+#### J. sessions store
+- `src/commands/agent.test.ts`: `__testing as acpManagerTesting` import 削除
+- `src/commands/agent/session-store.test.ts`: "preserves ACP metadata when caller has a stale session snapshot" 削除、`acpMeta` ヘルパー削除
+- `src/config/sessions/sessions.test.ts`: `upsertAcpSessionMeta` import 削除、"preserves ACP metadata when replacing a session entry" / "allows explicit ACP metadata removal through the ACP session helper" 削除
+- `src/gateway/session-reset-service.ts`: 上記 (F) 参照
+- `src/gateway/server.sessions.gateway-server-sessions-a.test.ts`: 上記 (F) 参照
+- `src/commands/agent/session-store.test.ts`: `SessionEntry.acp` 削除
+
+#### K. tasks（ACP runtime harness）
+- `src/tasks/task-registry.types.ts`: `TaskRuntime` から `"acp"` 削除 → `"subagent" | "cli" | "cron"`
+- `src/tasks/task-executor.ts`: `task.runtime === "acp" || task.runtime === "subagent"` → `"subagent"` のみ
+- `src/tasks/task-executor-policy.ts`: ACP display title / ACP cancel guard 分岐削除
+- `src/tasks/task-executor-policy.test.ts`: `runtime: "acp"` → `"subagent"`
+- `src/tasks/task-registry.ts`: `params.runtime !== "acp"` ガード削除、`if (task.runtime === "acp") { getAcpSessionManager().cancelSession(...) }` 分岐削除
+- `src/tasks/task-registry.maintenance.ts`: `readAcpSessionEntry` import 削除、`task.runtime === "acp"` 分岐削除
+- `src/tasks/task-registry.summary.ts`: `acp: 0` 削除
+- `src/tasks/task-registry.audit.test.ts`: `runtime: "acp"` → `"subagent"`
+- `src/tasks/task-registry.test.ts`: ACP 専用 it ブロック10件削除（suppresses duplicate ACP delivery / does not suppress ACP delivery across different requester scopes / adopts preferred ACP spawn metadata / collapses ACP run-owned task creation / delivers a terminal ACP update only once / cancels ACP-backed tasks / delivers a concise terminal failure / emits concise state-change updates / keeps background ACP progress off the foreground lane）、`summarizes task pressure by status and runtime` の `byRuntime.subagent: 1` → `2`
+- `src/tasks/task-registry-control.runtime.ts`: `getAcpSessionManager` 再export 削除
+- `src/commands/status.summary.redaction.test.ts`: `byRuntime.acp: 1` 削除
+
+#### L. commands-flows
+- `src/auto-reply/reply/commands-status.test.ts`, `commands-tasks.test.ts`, `commands-tasks.ts`: `TaskRuntime` ACP 削除反映
+- `src/commands/flows.test.ts`, `src/plugins/runtime/runtime-taskflow.test.ts`, `src/plugins/runtime/runtime-tasks.test.ts`, `src/cli/program/register.status-health-sessions.test.ts`, `src/agents/openclaw-tools.session-status.test.ts`, `src/agents/tools/sessions-spawn-tool.test.ts`, `src/tasks/task-executor-policy.test.ts`, `src/tasks/task-executor.test.ts`, `src/tasks/task-flow-registry.audit.test.ts`, `src/tasks/task-flow-registry.maintenance.test.ts`, `src/tasks/task-owner-access.test.ts`, `src/tasks/task-registry.store.t
+
+### 20.4 vitest 設定
+
+- `vitest.config.ts`: `vitest.acp.config.ts` と `vitest.extension-acpx.config.ts` を `rootVitestProjects` から削除
+- `vitest.shared.config.ts`: `vitest.acp.config.ts` と `vitest.extension-acpx.config.ts` / `vitest.extension-acpx-paths.mjs` を `forceRerunTriggers` から削除
+- `vitest.extensions.config.ts`: `acpxExtensionTestRoots` import と exclude 配列から削除
+
+### 20.5 検証ゲート結果
+
+| ゲート | 結果 |
+| --- | --- |
+| `pnpm exec tsgo --noEmit` | **0 errors** |
+| `pnpm exec oxfmt --check` | **51 ファイル違反**（前任作業由来。ACP削除後の新規違反は `task-registry.test.ts` のフォーマットのみ。`pnpm exec oxfmt --write src/tasks/task-registry.test.ts` で修正済み） |
+| `vitest run src/tasks/task-registry.test.ts` | **19 passed / 9 failed** — 失敗は ACP code path 削除後の session fallback / deliveryStatus 更新ロジックの挙動変化に依存するテスト群（前任作業ベースラインでも失敗していた可能性が高い、未検証）。修正は次フェーズ |
+
+### 20.6 変更規模
+
+- 削除: 約 35,800行（前任着手分を含む）
+- 修正: 約 60ファイル（ACP reference除去、import 整理、type narrowing、テストヘルパー縮小、ACP設定ファイル除去）
+- コミット: 1コミット予定（push 禁止）
+
+### 20.7 残作業（次フェーズ候補）
+
+- ACP削除後の session fallback / deliveryStatus 期待値が壊れた `task-registry.test.ts` の9件の修正
+- oxfmt 前任作業分の違反51件対応（`pnpm exec oxfmt --write` で一括修正可能だが、コミット粒度の調整要）
+- `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md`（前任が ACP削除と並行に作成した別タスクのドキュメント）— 取り扱い未定
+- 前任作業中間ファイル群（`.tmp-*`）— `.gitignore` に追加済み、最終push前に削除 or 維持判断

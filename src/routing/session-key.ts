@@ -5,7 +5,6 @@ import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "./account-id.js";
 export {
   getSubagentDepth,
   isCronSessionKey,
-  isAcpSessionKey,
   isSubagentSessionKey,
   parseAgentSessionKey,
   type ParsedAgentSessionKey,

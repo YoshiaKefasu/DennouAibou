@@ -22,7 +22,7 @@ import type { TaskRecord } from "./task-registry.types.js";
 function createStoredTask(): TaskRecord {
   return {
     taskId: "task-restored",
-    runtime: "acp",
+    runtime: "subagent",
     sourceId: "run-restored",
     requesterSessionKey: "agent:main:main",
     ownerKey: "agent:main:main",
@@ -66,7 +66,7 @@ describe("task-registry store runtime", () => {
     expect(loadSnapshot).toHaveBeenCalledTimes(1);
 
     createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -103,7 +103,7 @@ describe("task-registry store runtime", () => {
 
     expect(findTaskByRunId("run-restored")).toBeTruthy();
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -145,7 +145,7 @@ describe("task-registry store runtime", () => {
     });
 
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -207,7 +207,7 @@ describe("task-registry store runtime", () => {
       goal: "Persist linked tasks",
     });
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       parentFlowId: flow.flowId,

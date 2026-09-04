@@ -1,18 +1,10 @@
 import type { OpenClawConfig } from "./config.js";
-import type { AgentAcpBinding, AgentBinding, AgentRouteBinding } from "./types.agents.js";
+import type { AgentBinding, AgentRouteBinding } from "./types.agents.js";
 
 export type ConfiguredBindingRule = AgentBinding;
 
-function normalizeBindingType(binding: AgentBinding): "route" | "acp" {
-  return binding.type === "acp" ? "acp" : "route";
-}
-
 export function isRouteBinding(binding: AgentBinding): binding is AgentRouteBinding {
-  return normalizeBindingType(binding) === "route";
-}
-
-export function isAcpBinding(binding: AgentBinding): binding is AgentAcpBinding {
-  return normalizeBindingType(binding) === "acp";
+  return true;
 }
 
 export function listConfiguredBindings(cfg: OpenClawConfig): AgentBinding[] {
@@ -21,8 +13,4 @@ export function listConfiguredBindings(cfg: OpenClawConfig): AgentBinding[] {
 
 export function listRouteBindings(cfg: OpenClawConfig): AgentRouteBinding[] {
   return listConfiguredBindings(cfg).filter(isRouteBinding);
-}
-
-export function listAcpBindings(cfg: OpenClawConfig): AgentAcpBinding[] {
-  return listConfiguredBindings(cfg).filter(isAcpBinding);
 }

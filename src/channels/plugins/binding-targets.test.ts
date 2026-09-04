@@ -21,7 +21,7 @@ function createBindingResolution(driverId: string): ConfiguredBindingResolution 
     compiledBinding: {
       channel: "demo-binding",
       binding: {
-        type: "acp" as const,
+        type: "route" as const,
         agentId: "codex",
         match: {
           channel: "demo-binding",
@@ -29,9 +29,6 @@ function createBindingResolution(driverId: string): ConfiguredBindingResolution 
             kind: "channel" as const,
             id: "123",
           },
-        },
-        acp: {
-          mode: "persistent",
         },
       },
       bindingConversationId: "123",

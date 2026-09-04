@@ -50,7 +50,7 @@ describe("buildTasksReply", () => {
       task: "queued background task",
     });
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:tasks-failed",
       runId: "run-tasks-failed",
@@ -74,7 +74,7 @@ describe("buildTasksReply", () => {
 
   it("sanitizes leaked internal runtime context from visible task details", async () => {
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:tasks-sanitized-failed",
       runId: "run-tasks-sanitized-failed",

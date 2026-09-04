@@ -434,7 +434,7 @@ describe("session_status tool", () => {
     listTasksForRelatedSessionKeyForOwnerMock.mockReturnValue([
       {
         taskId: "task-1",
-        runtime: "acp",
+        runtime: "subagent",
         requesterSessionKey: "agent:main:main",
         task: "Summarize inbox backlog",
         status: "running",

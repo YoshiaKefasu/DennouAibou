@@ -255,7 +255,7 @@ describe("registerStatusHealthSessionsCommands", () => {
     expect(tasksListCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         json: true,
-        runtime: "acp",
+        runtime: "subagent",
         status: "running",
       }),
       runtime,

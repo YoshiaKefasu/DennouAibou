@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Command } from "commander";
-import { readSecretFromFile } from "../../acp/secret-file.js";
 import type { GatewayAuthMode, GatewayTailscaleMode } from "../../config/config.js";
 import {
   CONFIG_PATH,
@@ -144,7 +143,12 @@ function resolveGatewayPasswordOption(opts: GatewayRunOpts): string | undefined 
     throw new Error("Use either --password or --password-file.");
   }
   if (file) {
-    return readSecretFromFile(file, "Gateway password");
+    const raw = fs.readFileSync(path.resolve(file), "utf8");
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      throw new Error("Gateway password file is empty.");
+    }
+    return trimmed;
   }
   return direct;
 }

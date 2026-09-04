@@ -116,7 +116,7 @@ describe("task-flow-registry maintenance", () => {
       });
 
       const child = createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         parentFlowId: flow.flowId,

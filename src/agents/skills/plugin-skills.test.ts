@@ -17,22 +17,10 @@ let resolvePluginSkillDirs: typeof import("./plugin-skills.js").resolvePluginSki
 
 const tempDirs = createTrackedTempDirs();
 
-function buildRegistry(params: { acpxRoot: string; helperRoot: string }): PluginManifestRegistry {
+function buildRegistry(params: { helperRoot: string; helper2Root: string }): PluginManifestRegistry {
   return {
     diagnostics: [],
     plugins: [
-      {
-        id: "acpx",
-        name: "ACPX Runtime",
-        channels: [],
-        providers: [],
-        skills: ["./skills"],
-        hooks: [],
-        origin: "workspace",
-        rootDir: params.acpxRoot,
-        source: params.acpxRoot,
-        manifestPath: path.join(params.acpxRoot, "openclaw.plugin.json"),
-      },
       {
         id: "helper",
         name: "Helper",
@@ -44,6 +32,18 @@ function buildRegistry(params: { acpxRoot: string; helperRoot: string }): Plugin
         rootDir: params.helperRoot,
         source: params.helperRoot,
         manifestPath: path.join(params.helperRoot, "openclaw.plugin.json"),
+      },
+      {
+        id: "helper2",
+        name: "Helper2",
+        channels: [],
+        providers: [],
+        skills: ["./skills"],
+        hooks: [],
+        origin: "workspace",
+        rootDir: params.helper2Root,
+        source: params.helper2Root,
+        manifestPath: path.join(params.helper2Root, "openclaw.plugin.json"),
       },
     ],
   };
@@ -76,14 +76,14 @@ function createSinglePluginRegistry(params: {
   };
 }
 
-async function setupAcpxAndHelperRegistry() {
+async function setupHelperRegistries() {
   const workspaceDir = await tempDirs.make("openclaw-");
-  const acpxRoot = await tempDirs.make("openclaw-acpx-plugin-");
   const helperRoot = await tempDirs.make("openclaw-helper-plugin-");
-  await fs.mkdir(path.join(acpxRoot, "skills"), { recursive: true });
+  const helper2Root = await tempDirs.make("openclaw-helper2-plugin-");
   await fs.mkdir(path.join(helperRoot, "skills"), { recursive: true });
-  hoisted.loadPluginManifestRegistry.mockReturnValue(buildRegistry({ acpxRoot, helperRoot }));
-  return { workspaceDir, acpxRoot, helperRoot };
+  await fs.mkdir(path.join(helper2Root, "skills"), { recursive: true });
+  hoisted.loadPluginManifestRegistry.mockReturnValue(buildRegistry({ helperRoot, helper2Root }));
+  return { workspaceDir, helperRoot, helper2Root };
 }
 
 async function setupPluginOutsideSkills() {
@@ -110,37 +110,28 @@ describe("resolvePluginSkillDirs", () => {
 
   it.each([
     {
-      name: "keeps acpx plugin skills when ACP is enabled",
-      acpEnabled: true,
-      expectedDirs: ({ acpxRoot, helperRoot }: { acpxRoot: string; helperRoot: string }) => [
-        path.resolve(acpxRoot, "skills"),
+      name: "resolves plugin skill dirs for activated plugins",
+      expectedDirs: ({ helperRoot, helper2Root }: { helperRoot: string; helper2Root: string }) => [
         path.resolve(helperRoot, "skills"),
+        path.resolve(helper2Root, "skills"),
       ],
     },
-    {
-      name: "skips acpx plugin skills when ACP is disabled",
-      acpEnabled: false,
-      expectedDirs: ({ helperRoot }: { acpxRoot: string; helperRoot: string }) => [
-        path.resolve(helperRoot, "skills"),
-      ],
-    },
-  ])("$name", async ({ acpEnabled, expectedDirs }) => {
-    const { workspaceDir, acpxRoot, helperRoot } = await setupAcpxAndHelperRegistry();
+  ])("$name", async ({ expectedDirs }) => {
+    const { workspaceDir, helperRoot, helper2Root } = await setupHelperRegistries();
 
     const dirs = resolvePluginSkillDirs({
       workspaceDir,
       config: {
-        acp: { enabled: acpEnabled },
         plugins: {
           entries: {
-            acpx: { enabled: true },
             helper: { enabled: true },
+            helper2: { enabled: true },
           },
         },
       } as OpenClawConfig,
     });
 
-    expect(dirs).toEqual(expectedDirs({ acpxRoot, helperRoot }));
+    expect(dirs).toEqual(expectedDirs({ helperRoot, helper2Root }));
   });
 
   it("rejects plugin skill paths that escape the plugin root", async () => {

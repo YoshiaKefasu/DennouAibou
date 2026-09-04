@@ -689,7 +689,6 @@ export async function compactEmbeddedPiSessionDirect(
             skillsPrompt,
             docsPath: docsPath ?? undefined,
             promptMode,
-            acpEnabled: params.config?.acp?.enabled !== false,
             runtimeInfo,
             reactionGuidance,
             messageToolHints,

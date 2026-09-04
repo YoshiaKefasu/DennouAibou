@@ -1,6 +1,6 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
-import { isAcpSessionKey, normalizeMainKey } from "../../routing/session-key.js";
+import { normalizeMainKey } from "../../routing/session-key.js";
 import { looksLikeSessionId } from "../../sessions/session-id.js";
 
 type GatewayCaller = typeof callGateway;
@@ -154,9 +154,6 @@ export function looksLikeSessionKey(value: string): boolean {
   }
   // These are canonical key shapes that should never be treated as sessionIds.
   if (raw === "main" || raw === "global" || raw === "unknown" || raw === "current") {
-    return true;
-  }
-  if (isAcpSessionKey(raw)) {
     return true;
   }
   if (raw.startsWith("agent:")) {

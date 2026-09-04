@@ -47,15 +47,6 @@ export const loadValidatedConfigForPluginRegistration =
 // and set the flag accordingly.
 const entries: SubCliEntry[] = [
   {
-    name: "acp",
-    description: "Agent Control Protocol tools",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../acp-cli.js");
-      mod.registerAcpCli(program);
-    },
-  },
-  {
     name: "gateway",
     description: "Run, inspect, and query the WebSocket Gateway",
     hasSubcommands: true,

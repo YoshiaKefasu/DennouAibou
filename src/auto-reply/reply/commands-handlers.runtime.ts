@@ -1,4 +1,3 @@
-import { handleAcpCommand } from "./commands-acp.js";
 import { handleAllowlistCommand } from "./commands-allowlist.js";
 import { handleApproveCommand } from "./commands-approve.js";
 import { handleBashCommand } from "./commands-bash.js";
@@ -54,7 +53,6 @@ export function loadCommandHandlers(): CommandHandler[] {
     handleExportSessionCommand,
     handleWhoamiCommand,
     handleSubagentsCommand,
-    handleAcpCommand,
     handleMcpCommand,
     handlePluginsCommand,
     handleConfigCommand,

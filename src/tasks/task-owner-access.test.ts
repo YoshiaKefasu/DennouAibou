@@ -68,7 +68,7 @@ describe("task owner access", () => {
   it("denies cross-owner task reads", async () => {
     await withTaskRegistryTempDir(() => {
       const task = createTaskRecord({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         childSessionKey: "agent:main:acp:child-1",
@@ -101,7 +101,7 @@ describe("task owner access", () => {
   it("requires an exact owner-key match", async () => {
     await withTaskRegistryTempDir(() => {
       const task = createTaskRecord({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:MixedCase",
         scopeKind: "session",
         runId: "case-sensitive-owner-run",

@@ -146,7 +146,7 @@ describe("task-flow-registry audit", () => {
       });
 
       createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         parentFlowId: flow.flowId,

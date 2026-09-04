@@ -1,4 +1,3 @@
-import { getAcpSessionManager } from "../../acp/control-plane/manager.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { abortEmbeddedPiRun } from "../../agents/pi-embedded.js";
 import {
@@ -51,7 +50,6 @@ export {
 };
 
 const defaultAbortDeps = {
-  getAcpSessionManager,
   abortEmbeddedPiRun,
   getLatestSubagentRunByChildSessionKey,
   listSubagentRunsForController,
@@ -64,8 +62,6 @@ const abortDeps = {
 
 export const __testing = {
   setDepsForTests(deps: Partial<typeof defaultAbortDeps> | undefined): void {
-    abortDeps.getAcpSessionManager =
-      deps?.getAcpSessionManager ?? defaultAbortDeps.getAcpSessionManager;
     abortDeps.abortEmbeddedPiRun = deps?.abortEmbeddedPiRun ?? defaultAbortDeps.abortEmbeddedPiRun;
     abortDeps.getLatestSubagentRunByChildSessionKey =
       deps?.getLatestSubagentRunByChildSessionKey ??
@@ -76,7 +72,6 @@ export const __testing = {
       deps?.markSubagentRunTerminated ?? defaultAbortDeps.markSubagentRunTerminated;
   },
   resetDepsForTests(): void {
-    abortDeps.getAcpSessionManager = defaultAbortDeps.getAcpSessionManager;
     abortDeps.abortEmbeddedPiRun = defaultAbortDeps.abortEmbeddedPiRun;
     abortDeps.getLatestSubagentRunByChildSessionKey =
       defaultAbortDeps.getLatestSubagentRunByChildSessionKey;
@@ -272,24 +267,6 @@ export async function tryFastAbortFromMessage(params: {
     const store = loadSessionStore(storePath);
     const { entry, key, legacyKeys } = resolveSessionEntryForKey(store, targetKey);
     const resolvedTargetKey = key ?? targetKey;
-    const acpManager = abortDeps.getAcpSessionManager();
-    const acpResolution = acpManager.resolveSession({
-      cfg,
-      sessionKey: resolvedTargetKey,
-    });
-    if (acpResolution.kind !== "none") {
-      try {
-        await acpManager.cancelSession({
-          cfg,
-          sessionKey: resolvedTargetKey,
-          reason: "fast-abort",
-        });
-      } catch (error) {
-        logVerbose(
-          `abort: ACP cancel failed for ${resolvedTargetKey}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
     const sessionId = replyRunRegistry.resolveSessionId(resolvedTargetKey) ?? entry?.sessionId;
     const aborted =
       replyRunRegistry.abort(resolvedTargetKey) ||

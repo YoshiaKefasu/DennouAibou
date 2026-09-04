@@ -113,7 +113,7 @@ describe("sessions_spawn tool", () => {
     });
 
     const result = await tool.execute("call-2", {
-      runtime: "acp",
+      runtime: "subagent",
       task: "investigate the failing CI run",
       agentId: "codex",
       cwd: "/workspace",
@@ -150,7 +150,7 @@ describe("sessions_spawn tool", () => {
     });
 
     await tool.execute("call-2b", {
-      runtime: "acp",
+      runtime: "subagent",
       task: "investigate",
       agentId: "codex",
       sandbox: "require",
@@ -174,7 +174,7 @@ describe("sessions_spawn tool", () => {
     });
 
     await tool.execute("call-2c", {
-      runtime: "acp",
+      runtime: "subagent",
       task: "resume prior work",
       agentId: "codex",
       resumeSessionId: "7f4a78e0-f6be-43fe-855c-c1c4fd229bc4",
@@ -215,7 +215,7 @@ describe("sessions_spawn tool", () => {
     });
 
     const result = await tool.execute("call-3", {
-      runtime: "acp",
+      runtime: "subagent",
       task: "analyze file",
       attachments: [{ name: "a.txt", content: "hello", encoding: "utf8" }],
     });

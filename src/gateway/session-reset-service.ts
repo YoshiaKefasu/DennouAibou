@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
-import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { clearBootstrapSnapshot } from "../agents/bootstrap-cache.js";
 import { abortEmbeddedPiRun, waitForEmbeddedPiRunEnd } from "../agents/pi-embedded.js";
@@ -26,7 +25,7 @@ import { getSessionBindingService } from "../infra/outbound/session-binding-serv
 import { closeTrackedBrowserTabsForSessions } from "../plugin-sdk/browser-maintenance.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import {
-  isSubagentSessionKey,
+  
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../routing/session-key.js";
@@ -44,7 +43,7 @@ import {
   resolveSessionModelRef,
 } from "./session-utils.js";
 
-const ACP_RUNTIME_CLEANUP_TIMEOUT_MS = 15_000;
+
 
 function stripRuntimeModelState(entry?: SessionEntry): SessionEntry | undefined {
   if (!entry) {
@@ -158,7 +157,7 @@ export async function emitSessionUnboundLifecycleEvent(params: {
   reason: "session-reset" | "session-delete";
   emitHooks?: boolean;
 }) {
-  const targetKind = isSubagentSessionKey(params.targetSessionKey) ? "subagent" : "acp";
+  const targetKind = "subagent";
   await getSessionBindingService().unbind({
     targetSessionKey: params.targetSessionKey,
     reason: params.reason,
@@ -233,79 +232,7 @@ async function ensureSessionRuntimeCleanup(params: {
   );
 }
 
-async function runAcpCleanupStep(params: {
-  op: () => Promise<void>;
-}): Promise<{ status: "ok" } | { status: "timeout" } | { status: "error"; error: unknown }> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeoutPromise = new Promise<{ status: "timeout" }>((resolve) => {
-    timer = setTimeout(() => resolve({ status: "timeout" }), ACP_RUNTIME_CLEANUP_TIMEOUT_MS);
-  });
-  const opPromise = params
-    .op()
-    .then(() => ({ status: "ok" as const }))
-    .catch((error: unknown) => ({ status: "error" as const, error }));
-  const outcome = await Promise.race([opPromise, timeoutPromise]);
-  if (timer) {
-    clearTimeout(timer);
-  }
-  return outcome;
-}
 
-async function closeAcpRuntimeForSession(params: {
-  cfg: ReturnType<typeof loadConfig>;
-  sessionKey: string;
-  entry?: SessionEntry;
-  reason: "session-reset" | "session-delete";
-}) {
-  if (!params.entry?.acp) {
-    return undefined;
-  }
-  const acpManager = getAcpSessionManager();
-  const cancelOutcome = await runAcpCleanupStep({
-    op: async () => {
-      await acpManager.cancelSession({
-        cfg: params.cfg,
-        sessionKey: params.sessionKey,
-        reason: params.reason,
-      });
-    },
-  });
-  if (cancelOutcome.status === "timeout") {
-    return errorShape(
-      ErrorCodes.UNAVAILABLE,
-      `Session ${params.sessionKey} is still active; try again in a moment.`,
-    );
-  }
-  if (cancelOutcome.status === "error") {
-    logVerbose(
-      `sessions.${params.reason}: ACP cancel failed for ${params.sessionKey}: ${String(cancelOutcome.error)}`,
-    );
-  }
-
-  const closeOutcome = await runAcpCleanupStep({
-    op: async () => {
-      await acpManager.closeSession({
-        cfg: params.cfg,
-        sessionKey: params.sessionKey,
-        reason: params.reason,
-        requireAcpSession: false,
-        allowBackendUnavailable: true,
-      });
-    },
-  });
-  if (closeOutcome.status === "timeout") {
-    return errorShape(
-      ErrorCodes.UNAVAILABLE,
-      `Session ${params.sessionKey} is still active; try again in a moment.`,
-    );
-  }
-  if (closeOutcome.status === "error") {
-    logVerbose(
-      `sessions.${params.reason}: ACP runtime close failed for ${params.sessionKey}: ${String(closeOutcome.error)}`,
-    );
-  }
-  return undefined;
-}
 
 export async function cleanupSessionBeforeMutation(params: {
   cfg: ReturnType<typeof loadConfig>;
@@ -316,20 +243,11 @@ export async function cleanupSessionBeforeMutation(params: {
   canonicalKey?: string;
   reason: "session-reset" | "session-delete";
 }) {
-  const cleanupError = await ensureSessionRuntimeCleanup({
+  return await ensureSessionRuntimeCleanup({
     cfg: params.cfg,
     key: params.key,
     target: params.target,
     sessionId: params.entry?.sessionId,
-  });
-  if (cleanupError) {
-    return cleanupError;
-  }
-  return await closeAcpRuntimeForSession({
-    cfg: params.cfg,
-    sessionKey: params.legacyKey ?? params.canonicalKey ?? params.target.canonicalKey ?? params.key,
-    entry: params.entry,
-    reason: params.reason,
   });
 }
 
@@ -510,7 +428,6 @@ export async function performGatewaySessionReset(params: {
       lastAccountId: currentEntry?.lastAccountId,
       lastThreadId: currentEntry?.lastThreadId,
       skillsSnapshot: currentEntry?.skillsSnapshot,
-      acp: currentEntry?.acp,
       inputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,

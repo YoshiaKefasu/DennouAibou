@@ -1,5 +1,4 @@
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
-import { isParentOwnedBackgroundAcpSession } from "../../acp/session-interaction-mode.js";
 import { resolveAgentConfig, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   resolveConversationBindingRecord,
@@ -247,11 +246,11 @@ export async function dispatchReplyFromConfig(params: {
     return { queuedFinal: false, counts: dispatcher.getQueuedCounts() };
   }
 
-  const acpDispatchSessionKey = sessionStoreEntry.sessionKey ?? sessionKey;
-  const sessionAgentId = resolveSessionAgentId({ sessionKey: acpDispatchSessionKey, config: cfg });
+  const dispatchSessionKey = sessionStoreEntry.sessionKey ?? sessionKey;
+  const sessionAgentId = resolveSessionAgentId({ sessionKey: dispatchSessionKey, config: cfg });
   const sessionAgentCfg = resolveAgentConfig(cfg, sessionAgentId);
   const shouldEmitVerboseProgress = createShouldEmitVerboseProgress({
-    sessionKey: acpDispatchSessionKey,
+    sessionKey: dispatchSessionKey,
     storePath: sessionStoreEntry.storePath,
     fallbackLevel:
       normalizeVerboseLevel(
@@ -268,7 +267,7 @@ export async function dispatchReplyFromConfig(params: {
   // folded back into lastThreadId/deliveryContext during store normalisation and resurrect a
   // stale route after thread delivery was intentionally cleared.
   const routeThreadId =
-    ctx.MessageThreadId ?? parseSessionThreadInfo(acpDispatchSessionKey).threadId;
+    ctx.MessageThreadId ?? parseSessionThreadInfo(dispatchSessionKey).threadId;
   const inboundAudio = isInboundAudioContext(ctx);
   const hookRunner = getGlobalHookRunner();
 
@@ -293,7 +292,6 @@ export async function dispatchReplyFromConfig(params: {
   // flow when the provider handles its own messages.
   //
   // Debug: `pnpm test src/auto-reply/reply/dispatch-from-config.test.ts`
-  const suppressAcpChildUserDelivery = isParentOwnedBackgroundAcpSession(sessionStoreEntry.entry);
   const routeReplyRuntime = await loadRouteReplyRuntime();
   const { originatingChannel, currentSurface, shouldRouteToOriginating, shouldSuppressTyping } =
     resolveReplyRoutingDecision({
@@ -302,7 +300,7 @@ export async function dispatchReplyFromConfig(params: {
       explicitDeliverRoute: ctx.ExplicitDeliverRoute,
       originatingChannel: ctx.OriginatingChannel,
       originatingTo: ctx.OriginatingTo,
-      suppressDirectUserDelivery: suppressAcpChildUserDelivery,
+      suppressDirectUserDelivery: false,
       isRoutableChannel: routeReplyRuntime.isRoutableChannel,
     });
   const originatingTo = ctx.OriginatingTo;
@@ -623,9 +621,9 @@ export async function dispatchReplyFromConfig(params: {
         {
           ctx,
           runId: params.replyOptions?.runId,
-          sessionKey: acpDispatchSessionKey,
+          sessionKey: dispatchSessionKey,
           inboundAudio,
-          suppressUserDelivery: suppressAcpChildUserDelivery,
+          suppressUserDelivery: false,
           shouldRouteToOriginating,
           originatingChannel,
           originatingTo,
@@ -862,16 +860,12 @@ export async function dispatchReplyFromConfig(params: {
       params.configOverride,
     );
 
-    if (ctx.AcpDispatchTailAfterReset === true) {
-      // Command handling prepared a trailing prompt after ACP in-place reset.
-      // Route that tail through ACP now (same turn) instead of embedded dispatch.
-      ctx.AcpDispatchTailAfterReset = false;
-      if (hookRunner?.hasHooks("reply_dispatch")) {
+    if (hookRunner?.hasHooks("reply_dispatch")) {
         const tailDispatchResult = await hookRunner.runReplyDispatch(
           {
             ctx,
             runId: params.replyOptions?.runId,
-            sessionKey: acpDispatchSessionKey,
+            sessionKey: dispatchSessionKey,
             inboundAudio,
             shouldRouteToOriginating,
             originatingChannel,
@@ -896,7 +890,6 @@ export async function dispatchReplyFromConfig(params: {
           };
         }
       }
-    }
 
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
 

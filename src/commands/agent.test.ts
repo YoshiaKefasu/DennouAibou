@@ -3,7 +3,6 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
-import { __testing as acpManagerTesting } from "../acp/control-plane/manager.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../agents/agent-scope.js";
 import * as authProfilesModule from "../agents/auth-profiles.js";
 import { resolveSession } from "../agents/command/session.js";
@@ -320,7 +319,7 @@ beforeEach(() => {
   resetAgentEventsForTest();
   resetAgentRunContextForTest();
   resetPluginRuntimeStateForTest();
-  acpManagerTesting.resetAcpSessionManagerForTests();
+  
   configModule.clearRuntimeConfigSnapshot();
   vi.mocked(runEmbeddedPiAgent).mockResolvedValue(createDefaultAgentResult());
   vi.mocked(loadModelCatalog).mockResolvedValue([]);

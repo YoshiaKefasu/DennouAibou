@@ -500,49 +500,6 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
-    acp: z
-      .object({
-        enabled: z.boolean().optional(),
-        dispatch: z
-          .object({
-            enabled: z.boolean().optional(),
-          })
-          .strict()
-          .optional(),
-        backend: z.string().optional(),
-        defaultAgent: z.string().optional(),
-        allowedAgents: z.array(z.string()).optional(),
-        maxConcurrentSessions: z.number().int().positive().optional(),
-        stream: z
-          .object({
-            coalesceIdleMs: z.number().int().nonnegative().optional(),
-            maxChunkChars: z.number().int().positive().optional(),
-            repeatSuppression: z.boolean().optional(),
-            deliveryMode: z.union([z.literal("live"), z.literal("final_only")]).optional(),
-            hiddenBoundarySeparator: z
-              .union([
-                z.literal("none"),
-                z.literal("space"),
-                z.literal("newline"),
-                z.literal("paragraph"),
-              ])
-              .optional(),
-            maxOutputChars: z.number().int().positive().optional(),
-            maxSessionUpdateChars: z.number().int().positive().optional(),
-            tagVisibility: z.record(z.string(), z.boolean()).optional(),
-          })
-          .strict()
-          .optional(),
-        runtime: z
-          .object({
-            ttlMinutes: z.number().int().positive().optional(),
-            installCommand: z.string().optional(),
-          })
-          .strict()
-          .optional(),
-      })
-      .strict()
-      .optional(),
     models: ModelsConfigSchema,
     nodeHost: NodeHostSchema,
     agents: AgentsSchema,

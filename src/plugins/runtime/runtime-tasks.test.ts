@@ -72,7 +72,7 @@ describe("runtime tasks", () => {
     });
     const child = legacyTaskFlow.runTask({
       flowId: created.flowId,
-      runtime: "acp",
+      runtime: "subagent",
       childSessionKey: "agent:main:subagent:child",
       runId: "runtime-task-run",
       label: "Inbox triage",
@@ -168,7 +168,7 @@ describe("runtime tasks", () => {
     });
     const child = legacyTaskFlow.runTask({
       flowId: created.flowId,
-      runtime: "acp",
+      runtime: "subagent",
       childSessionKey: "agent:main:subagent:child",
       runId: "runtime-task-cancel",
       task: "Cancel me",
@@ -215,7 +215,7 @@ describe("runtime tasks", () => {
     });
     const child = legacyTaskFlow.runTask({
       flowId: created.flowId,
-      runtime: "acp",
+      runtime: "subagent",
       childSessionKey: "agent:main:subagent:child",
       runId: "runtime-task-isolation",
       task: "Do not cancel me",

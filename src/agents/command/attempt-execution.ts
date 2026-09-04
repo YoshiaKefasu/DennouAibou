@@ -1,7 +1,5 @@
 import fs from "node:fs/promises";
 import readline from "node:readline";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { normalizeReplyPayload } from "../../auto-reply/reply/normalize-reply.js";
 import type { ThinkLevel, VerboseLevel } from "../../auto-reply/thinking.js";
 import {
   isSilentReplyPrefixText,
@@ -10,16 +8,12 @@ import {
 } from "../../auto-reply/tokens.js";
 import { loadConfig } from "../../config/config.js";
 import { mergeSessionEntry, type SessionEntry, updateSessionStore } from "../../config/sessions.js";
-import { resolveSessionTranscriptFile } from "../../config/sessions/transcript.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
-import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import { resolveMessageChannel } from "../../utils/message-channel.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../bootstrap-budget.js";
 import { formatAgentInternalEventsForPrompt } from "../internal-events.js";
 import { hasInternalRuntimeContext } from "../internal-runtime-context.js";
-import { prepareSessionManagerForRun } from "../pi-embedded-runner/session-manager-init.js";
 import { runEmbeddedPiAgent } from "../pi-embedded.js";
-import { guardSessionManager } from "../session-tool-result-guard-wrapper.js";
 import { buildWorkspaceSkillSnapshot } from "../skills.js";
 import { resolveAgentRunContext } from "./run-context.js";
 import type { AgentCommandOpts } from "./types.js";
@@ -140,164 +134,6 @@ export function prependInternalEventContext(
   return [renderedEvents, body].filter(Boolean).join("\n\n");
 }
 
-export function createAcpVisibleTextAccumulator() {
-  let pendingSilentPrefix = "";
-  let visibleText = "";
-  const startsWithWordChar = (chunk: string): boolean => /^[\p{L}\p{N}]/u.test(chunk);
-
-  const resolveNextCandidate = (base: string, chunk: string): string => {
-    if (!base) {
-      return chunk;
-    }
-    if (
-      isSilentReplyText(base, SILENT_REPLY_TOKEN) &&
-      !chunk.startsWith(base) &&
-      startsWithWordChar(chunk)
-    ) {
-      return chunk;
-    }
-    if (chunk.startsWith(base) && chunk.length > base.length) {
-      return chunk;
-    }
-    return `${base}${chunk}`;
-  };
-
-  const mergeVisibleChunk = (base: string, chunk: string): { text: string; delta: string } => {
-    if (!base) {
-      return { text: chunk, delta: chunk };
-    }
-    if (chunk.startsWith(base) && chunk.length > base.length) {
-      const delta = chunk.slice(base.length);
-      return { text: chunk, delta };
-    }
-    return {
-      text: `${base}${chunk}`,
-      delta: chunk,
-    };
-  };
-
-  return {
-    consume(chunk: string): { text: string; delta: string } | null {
-      if (!chunk) {
-        return null;
-      }
-
-      if (!visibleText) {
-        const leadCandidate = resolveNextCandidate(pendingSilentPrefix, chunk);
-        const trimmedLeadCandidate = leadCandidate.trim();
-        if (
-          isSilentReplyText(trimmedLeadCandidate, SILENT_REPLY_TOKEN) ||
-          isSilentReplyPrefixText(trimmedLeadCandidate, SILENT_REPLY_TOKEN)
-        ) {
-          pendingSilentPrefix = leadCandidate;
-          return null;
-        }
-        if (pendingSilentPrefix) {
-          pendingSilentPrefix = "";
-          visibleText = leadCandidate;
-          return {
-            text: visibleText,
-            delta: leadCandidate,
-          };
-        }
-      }
-
-      const nextVisible = mergeVisibleChunk(visibleText, chunk);
-      visibleText = nextVisible.text;
-      return nextVisible.delta ? nextVisible : null;
-    },
-    finalize(): string {
-      return visibleText.trim();
-    },
-    finalizeRaw(): string {
-      return visibleText;
-    },
-  };
-}
-
-const ACP_TRANSCRIPT_USAGE = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-} as const;
-
-export async function persistAcpTurnTranscript(params: {
-  body: string;
-  finalText: string;
-  sessionId: string;
-  sessionKey: string;
-  sessionEntry: SessionEntry | undefined;
-  sessionStore?: Record<string, SessionEntry>;
-  storePath?: string;
-  sessionAgentId: string;
-  threadId?: string | number;
-  sessionCwd: string;
-}): Promise<SessionEntry | undefined> {
-  const promptText = params.body;
-  const replyText = params.finalText;
-  if (!promptText && !replyText) {
-    return params.sessionEntry;
-  }
-
-  const { sessionFile, sessionEntry } = await resolveSessionTranscriptFile({
-    sessionId: params.sessionId,
-    sessionKey: params.sessionKey,
-    sessionEntry: params.sessionEntry,
-    sessionStore: params.sessionStore,
-    storePath: params.storePath,
-    agentId: params.sessionAgentId,
-    threadId: params.threadId,
-  });
-  const hadSessionFile = await fs
-    .access(sessionFile)
-    .then(() => true)
-    .catch(() => false);
-  const sessionManager = guardSessionManager(SessionManager.open(sessionFile), {
-    agentId: params.sessionAgentId,
-    sessionKey: params.sessionKey,
-  });
-  await prepareSessionManagerForRun({
-    sessionManager,
-    sessionFile,
-    hadSessionFile,
-    sessionId: params.sessionId,
-    cwd: params.sessionCwd,
-  });
-
-  if (promptText) {
-    sessionManager.appendMessage({
-      role: "user",
-      content: promptText,
-      timestamp: Date.now(),
-    });
-  }
-
-  if (replyText) {
-    sessionManager.appendMessage({
-      role: "assistant",
-      content: [{ type: "text", text: replyText }],
-      api: "openai-responses",
-      provider: "openclaw",
-      model: "acp-runtime",
-      usage: ACP_TRANSCRIPT_USAGE,
-      stopReason: "stop",
-      timestamp: Date.now(),
-    });
-  }
-
-  emitSessionTranscriptUpdate(sessionFile);
-  return sessionEntry;
-}
-
 export function runAgentAttempt(params: {
   providerOverride: string;
   modelOverride: string;
@@ -387,70 +223,5 @@ export function runAgentAttempt(params: {
     onAgentEvent: params.onAgentEvent,
     bootstrapPromptWarningSignaturesSeen,
     bootstrapPromptWarningSignature,
-  });
-}
-
-export function buildAcpResult(params: {
-  payloadText: string;
-  startedAt: number;
-  stopReason?: string;
-  abortSignal?: AbortSignal;
-}) {
-  const normalizedFinalPayload = normalizeReplyPayload({
-    text: params.payloadText,
-  });
-  const payloads = normalizedFinalPayload ? [normalizedFinalPayload] : [];
-  return {
-    payloads,
-    meta: {
-      durationMs: Date.now() - params.startedAt,
-      aborted: params.abortSignal?.aborted === true,
-      stopReason: params.stopReason,
-    },
-  };
-}
-
-export function emitAcpLifecycleStart(params: { runId: string; startedAt: number }) {
-  emitAgentEvent({
-    runId: params.runId,
-    stream: "lifecycle",
-    data: {
-      phase: "start",
-      startedAt: params.startedAt,
-    },
-  });
-}
-
-export function emitAcpLifecycleEnd(params: { runId: string }) {
-  emitAgentEvent({
-    runId: params.runId,
-    stream: "lifecycle",
-    data: {
-      phase: "end",
-      endedAt: Date.now(),
-    },
-  });
-}
-
-export function emitAcpLifecycleError(params: { runId: string; message: string }) {
-  emitAgentEvent({
-    runId: params.runId,
-    stream: "lifecycle",
-    data: {
-      phase: "error",
-      error: params.message,
-      endedAt: Date.now(),
-    },
-  });
-}
-
-export function emitAcpAssistantDelta(params: { runId: string; text: string; delta: string }) {
-  emitAgentEvent({
-    runId: params.runId,
-    stream: "assistant",
-    data: {
-      text: params.text,
-      delta: params.delta,
-    },
   });
 }

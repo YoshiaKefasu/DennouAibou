@@ -741,7 +741,6 @@ export async function runEmbeddedAttempt(
         workspaceNotes,
         reactionGuidance,
         promptMode: effectivePromptMode,
-        acpEnabled: params.config?.acp?.enabled !== false,
         runtimeInfo,
         messageToolHints,
         sandboxInfo,
