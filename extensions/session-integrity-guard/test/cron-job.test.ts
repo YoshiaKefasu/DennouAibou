@@ -88,18 +88,33 @@ describe("resolveSessionIntegrityConfig", () => {
     expect(resolveSessionIntegrityConfig({})).toEqual({
       enabled: true,
       cron: "0 3 * * *",
+      autoRepair: false,
+      notify: { enabled: false, channel: "discord" },
     });
   });
 
   it("honors plugin overrides", () => {
     expect(
       resolveSessionIntegrityConfig({
-        pluginConfig: { enabled: false, frequency: "*/5 * * * *", timezone: "Asia/Tokyo" },
+        pluginConfig: {
+          enabled: false,
+          frequency: "*/5 * * * *",
+          timezone: "Asia/Tokyo",
+          autoRepair: true,
+          notify: { enabled: true, channel: "telegram", to: "-1001", accountId: "ops" },
+        },
       }),
     ).toEqual({
       enabled: false,
       cron: "*/5 * * * *",
       timezone: "Asia/Tokyo",
+      autoRepair: true,
+      notify: {
+        enabled: true,
+        channel: "telegram",
+        to: "-1001",
+        accountId: "ops",
+      },
     });
   });
 });

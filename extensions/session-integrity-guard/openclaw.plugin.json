@@ -20,6 +20,33 @@
       },
       "timezone": {
         "type": "string"
+      },
+      "autoRepair": {
+        "type": "boolean",
+        "description": "When true, orphan rows with type !== \"message\" are removed automatically after a backup is taken."
+      },
+      "notify": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Toggle the Discord / Telegram announce cron job."
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["discord", "telegram"]
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "bestEffort": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }
