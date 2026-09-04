@@ -7,6 +7,36 @@ import {
 } from "./session-integrity-guard.js";
 import { guardSessionManager } from "./session-tool-result-guard-wrapper.js";
 
+const subsystemErrorLog = vi.hoisted(() => vi.fn());
+
+vi.mock("../logging/subsystem.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../logging/subsystem.js")>("../logging/subsystem.js");
+  const mockLogger: import("../logging/subsystem.js").SubsystemLogger = (() => {
+    const passthrough = (level: string) => (message: string, meta?: Record<string, unknown>) => {
+      if (level === "error") {
+        subsystemErrorLog(message, meta);
+      }
+    };
+    return {
+      subsystem: "sessions/integrity",
+      isEnabled: () => true,
+      trace: passthrough("trace"),
+      debug: passthrough("debug"),
+      info: passthrough("info"),
+      warn: passthrough("warn"),
+      error: passthrough("error"),
+      fatal: passthrough("fatal"),
+      raw: () => {},
+      child: () => mockLogger,
+    };
+  })();
+  return {
+    ...actual,
+    createSubsystemLogger: () => mockLogger,
+  };
+});
+
 type AppendMessage = Parameters<SessionManager["appendMessage"]>[0];
 const asAppendMessage = (message: unknown) => message as AppendMessage;
 
@@ -25,7 +55,7 @@ describe("verifyAppendedEntry", () => {
     expect(verifyAppendedEntry(sm, id)).toEqual({ ok: true });
   });
 
-  it("returns ok for an empty session (no entries, leafId is null)", () => {
+  it("returns entry-not-found when the session is empty and the id does not exist", () => {
     const sm = SessionManager.inMemory();
     // Sanity check: in-memory session starts with leafId === null.
     expect(sm.getLeafId()).toBeNull();
@@ -157,24 +187,52 @@ describe("guardSessionManager + integrity integration", () => {
   });
 
   it("logs an error when verification fails (leaf disappears)", () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
+    // Trigger the leaf-not-found path by stubbing `getLeafId` to return an id
+    // that does not exist in the entry map. The verification hook runs after
+    // each `appendMessage` and logs an error when the leaf is unresolvable.
     const sm = guardSessionManager(SessionManager.inMemory());
-    const id = sm.appendMessage(userMessage("hi")) as string;
+    sm.appendMessage(userMessage("seed"));
 
-    // Force the leaf pointer to point at a non-existent id. The verification
-    // hook inside the integrity wrapper should fire on the *next* append.
-    (sm as unknown as { leafId: string | null }).leafId = "ghost-leaf-id";
-    const prevLeafId = sm.getLeafId();
-    expect(prevLeafId).toBe("ghost-leaf-id");
+    const originalGetLeafId = sm.getLeafId.bind(sm);
+    vi.spyOn(sm, "getLeafId").mockImplementation(() => "ghost-leaf-id");
+    expect(originalGetLeafId()).not.toBe("ghost-leaf-id");
 
+    subsystemErrorLog.mockClear();
     sm.appendMessage(userMessage("trigger"));
 
-    // The errorSpy may not match if the subsystem writes through a file logger
-    // instead of console; but it must not throw, and the append must still
-    // return an id. We assert behavior, not the log transport.
-    expect(typeof id).toBe("string");
+    expect(subsystemErrorLog).toHaveBeenCalledWith(
+      "session integrity verification failed (appendMessage)",
+      expect.objectContaining({
+        appendedId: expect.any(String),
+        reason: expect.stringContaining("leaf id not found"),
+      }),
+    );
+  });
 
-    errorSpy.mockRestore();
+  it("installs integrity as the outermost wrapper (integrity → toolResult → raw)", async () => {
+    // Install order check (per DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §3.2):
+    // the integrity wrapper sits at sm.appendMessage (outermost), the raw
+    // underlying remains reachable via [RAW_APPEND_MESSAGE] (protocol
+    // inheritance), and both wrappers co-exist so neither is bypassed.
+    const sm = SessionManager.inMemory();
+    const rawBeforeInstall = sm.appendMessage;
+    expect(typeof rawBeforeInstall).toBe("function");
+
+    guardSessionManager(sm, { agentId: "main", sessionKey: "main" });
+
+    // 1. integrity is outermost: sm.appendMessage is no longer the raw.
+    const outermost = sm.appendMessage;
+    expect(outermost).not.toBe(rawBeforeInstall);
+    expect(typeof outermost).toBe("function");
+
+    // 2. protocol inheritance: raw is still reachable via the shared symbol,
+    // and it is distinct from the integrity wrapper that now sits at
+    // sm.appendMessage (regression guard for the duplicate-symbol fix in this
+    // commit — previously the integrity guard wrote to its own symbol which
+    // nothing read).
+    const { getRawSessionAppendMessage } = await import("./session-tool-result-guard.js");
+    const resolvedRaw = getRawSessionAppendMessage(sm);
+    expect(resolvedRaw).not.toBe(outermost);
+    expect(typeof resolvedRaw).toBe("function");
   });
 });

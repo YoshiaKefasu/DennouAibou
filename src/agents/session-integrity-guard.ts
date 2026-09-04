@@ -11,9 +11,8 @@
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import { getRawSessionAppendMessage } from "./session-tool-result-guard.js";
+import { getRawSessionAppendMessage, RAW_APPEND_MESSAGE } from "./session-tool-result-guard.js";
 
-const RAW_APPEND_MESSAGE = Symbol("openclaw.session.rawAppendMessage");
 const RAW_APPEND_CUSTOM_ENTRY = Symbol("openclaw.session.rawAppendCustomEntry");
 const INTEGRITY_GUARD_INSTALLED = Symbol("openclaw.session.integrityGuardInstalled");
 
@@ -27,7 +26,6 @@ const log = createSubsystemLogger("sessions/integrity");
 
 type AppendMessageArg = Parameters<SessionManager["appendMessage"]>[0];
 
-export const RAW_APPEND_MESSAGE_SYMBOL = RAW_APPEND_MESSAGE;
 export const RAW_APPEND_CUSTOM_ENTRY_SYMBOL = RAW_APPEND_CUSTOM_ENTRY;
 
 function isSkipGuardEnabled(): boolean {
@@ -77,7 +75,7 @@ function safeSessionFile(sm: SessionManager): string | undefined {
  *   tool-result wrapper when installed after it) so verification runs through
  *   the downstream chain instead of bypassing it.
  * - Install order: must run **after** `installSessionToolResultGuard` so this
- *   wrapper is the outer "前段" stage. Resulting chain:
+ *   wrapper sits on the outermost call path. Resulting chain:
  *   `sm.appendMessage -> integrityWrapper -> toolResultWrapper -> rawAppend`,
  *   per DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §3.2.
  */
@@ -95,6 +93,8 @@ export function installSessionIntegrityGuard(sessionManager: SessionManager): vo
   // symbol. The helper reads the symbol if already set (e.g. tool-result guard
   // installed first), otherwise falls back to the bound raw method. Either way
   // we land on the raw underlying, which is what protocol inheritance expects.
+  // We use the same symbol `installSessionToolResultGuard` writes so both
+  // guards share a single source of truth for the raw underlying path.
   const rawAppendMessage = getRawSessionAppendMessage(sessionManager);
   sm[RAW_APPEND_MESSAGE] = rawAppendMessage;
   sm[RAW_APPEND_CUSTOM_ENTRY] = sessionManager.appendCustomEntry.bind(sessionManager);
@@ -103,8 +103,8 @@ export function installSessionIntegrityGuard(sessionManager: SessionManager): vo
 
   // Snapshot the current `appendMessage` (e.g. the tool-result wrapper) at
   // install time so the integrity wrapper calls through it instead of bypassing
-  // downstream wrappers. The integrity wrapper is intentionally the outer
-  // "前段" stage — it surrounds everything installed before it.
+  // downstream wrappers. The integrity wrapper sits on the outermost call path
+  // — it surrounds everything installed before it.
   const wrappedAppendMessage = sessionManager.appendMessage.bind(sessionManager);
 
   const guardedAppendMessage = (message: AppendMessageArg) => {

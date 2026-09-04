@@ -1,6 +1,5 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { guardSessionManager } from "../../agents/session-tool-result-guard-wrapper.js";
-import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 
 type AppendMessageArg = Parameters<SessionManager["appendMessage"]>[0];
 
@@ -77,11 +76,14 @@ export function appendInjectedAssistantMessageToTranscript(params: {
       sessionKey: params.sessionKey,
     });
     const messageId = sessionManager.appendMessage(messageBody);
-    emitSessionTranscriptUpdate({
-      sessionFile: params.transcriptPath,
-      message: messageBody,
-      messageId,
-    });
+    if (typeof messageId !== "string") {
+      // before_message_write hook blocked the write; the tool-result guard has
+      // already swallowed the message and no transcript update was emitted.
+      return {
+        ok: false,
+        error: "blocked by before_message_write hook",
+      };
+    }
     return { ok: true, messageId, message: messageBody };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

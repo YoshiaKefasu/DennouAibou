@@ -46,7 +46,7 @@ export function guardSessionManager(
   // chain is `sm.appendMessage -> integrityWrapper -> toolResultWrapper -> rawAppend`,
   // keeping post-append verification inside the tool-result wrapper (see
   // DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §3.2). The integrity guard installs
-  // AFTER the tool-result guard so its wrapper is the outer stage ("前段").
+  // AFTER the tool-result guard so its wrapper sits on the outer call path.
   const hookRunner = getGlobalHookRunner();
   const beforeMessageWrite = hookRunner?.hasHooks("before_message_write")
     ? (event: { message: import("@earendil-works/pi-agent-core").AgentMessage }) => {
@@ -94,7 +94,8 @@ export function guardSessionManager(
   });
   (sessionManager as GuardedSessionManager).flushPendingToolResults = guard.flushPendingToolResults;
   (sessionManager as GuardedSessionManager).clearPendingToolResults = guard.clearPendingToolResults;
-  // Install after tool-result guard so this is the outer "前段" wrapper.
+  // Install after tool-result guard so this wrapper sits on the outermost
+  // call path.
   installSessionIntegrityGuard(sessionManager);
   return sessionManager as GuardedSessionManager;
 }

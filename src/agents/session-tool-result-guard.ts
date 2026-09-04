@@ -16,7 +16,13 @@ import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-
 const GUARD_TRUNCATION_SUFFIX =
   "\n\n⚠️ [Content truncated during persistence — original exceeded size limit. " +
   "Use offset/limit parameters or request specific sections for large content.]";
-const RAW_APPEND_MESSAGE = Symbol("openclaw.session.rawAppendMessage");
+/**
+ * Shared symbol used by `installSessionToolResultGuard` and
+ * `installSessionIntegrityGuard` to expose the raw underlying appendMessage on
+ * the SessionManager instance. Exported so the integrity guard can write to the
+ * same symbol (protocol inheritance with the tool-result guard).
+ */
+export const RAW_APPEND_MESSAGE = Symbol("openclaw.session.rawAppendMessage");
 
 type SessionManagerWithRawAppend = SessionManager & {
   [RAW_APPEND_MESSAGE]?: SessionManager["appendMessage"];
