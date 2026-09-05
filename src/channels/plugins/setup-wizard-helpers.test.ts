@@ -11,6 +11,7 @@ import {
   resolveSetupWizardGroupAllowlist,
 } from "../../../test/helpers/plugins/setup-wizard.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { getChannelSection } from "../../config/types.channels.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import {
@@ -678,7 +679,7 @@ describe("promptParsedAllowFromForAccount", () => {
             },
           },
         },
-      } as OpenClawConfig,
+      } as unknown as OpenClawConfig,
       accountId: "alt",
       defaultAccountId: DEFAULT_ACCOUNT_ID,
       prompter,
@@ -688,8 +689,12 @@ describe("promptParsedAllowFromForAccount", () => {
       placeholder: "placeholder",
       parseEntries: (raw) =>
         parseSetupEntriesWithParser(raw, (entry) => ({ value: entry.toLowerCase() })),
-      getExistingAllowFrom: ({ cfg, accountId }) =>
-        cfg.channels?.bluebubbles?.accounts?.[accountId]?.allowFrom ?? [],
+      getExistingAllowFrom: ({ cfg, accountId }) => {
+        const bluebubbles = getChannelSection<{
+          accounts?: Record<string, { allowFrom?: string[] }>;
+        }>(cfg.channels?.bluebubbles);
+        return bluebubbles?.accounts?.[accountId ?? ""]?.allowFrom ?? [];
+      },
       applyAllowFrom: ({ cfg, accountId, allowFrom }) =>
         patchChannelConfigForAccount({
           cfg,
@@ -699,7 +704,11 @@ describe("promptParsedAllowFromForAccount", () => {
         }),
     });
 
-    expect(next.channels?.bluebubbles?.accounts?.alt?.allowFrom).toEqual(["alice"]);
+    expect(
+      getChannelSection<{ accounts?: Record<string, { allowFrom?: string[] }> }>(
+        next.channels?.bluebubbles,
+      )?.accounts?.alt?.allowFrom,
+    ).toEqual(["alice"]);
     expect(prompter.note).toHaveBeenCalledWith("line", "BlueBubbles allowlist");
   });
 
@@ -740,8 +749,12 @@ describe("createPromptParsedAllowFromForAccount", () => {
       message: "msg",
       placeholder: "placeholder",
       parseEntries: (raw) => ({ entries: [raw.trim().toLowerCase()] }),
-      getExistingAllowFrom: ({ cfg, accountId }) =>
-        cfg.channels?.bluebubbles?.accounts?.[accountId]?.allowFrom ?? [],
+      getExistingAllowFrom: ({ cfg, accountId }) => {
+        const bluebubbles = getChannelSection<{
+          accounts?: Record<string, { allowFrom?: string[] }>;
+        }>(cfg.channels?.bluebubbles);
+        return bluebubbles?.accounts?.[accountId ?? ""]?.allowFrom ?? [];
+      },
       applyAllowFrom: ({ cfg, accountId, allowFrom }) =>
         patchChannelConfigForAccount({
           cfg,
@@ -768,7 +781,11 @@ describe("createPromptParsedAllowFromForAccount", () => {
       prompter: prompter as any,
     });
 
-    expect(next.channels?.bluebubbles?.accounts?.work?.allowFrom).toEqual(["alice"]);
+    expect(
+      getChannelSection<{ accounts?: Record<string, { allowFrom?: string[] }> }>(
+        next.channels?.bluebubbles,
+      )?.accounts?.work?.allowFrom,
+    ).toEqual(["alice"]);
     expect(prompter.note).not.toHaveBeenCalled();
   });
 });

@@ -85,7 +85,7 @@ export async function resolveDefaultChannelAccountContext(
       accountId: defaultAccountId,
     }));
 
-  let account = inspected;
+  let account: unknown = inspected;
   if (!account) {
     try {
       account = plugin.config.resolveAccount(cfg, defaultAccountId);

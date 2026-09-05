@@ -50,6 +50,115 @@ export interface ChannelsConfig {
   /** Map provider -> channel id -> model override. */
   modelByChannel?: ChannelModelByChannelConfig;
   /** Channel sections are plugin-owned; concrete channel files augment this interface. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+/**
+ * Narrow an unknown value obtained from `ChannelsConfig[key]` into a typed
+ * channel section shape. Plugin-owned sections live behind the index signature
+ * so they need an explicit narrowing step before property access.
+ */
+export function getChannelSection<T extends Record<string, unknown>>(
+  value: unknown,
+): T | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as T;
+}
+
+/**
+ * Augment `ChannelsConfig` with the channel sections that ship in-repo but are
+ * owned by external plugins (line, matrix, bluebubbles, nostr, zalouser,
+ * synology-chat, msteams). Each plugin is free to extend this further.
+ */
+declare module "./types.channels.js" {
+  interface ChannelsConfig {
+    bluebubbles?: {
+      enabled?: boolean;
+      allowFrom?: Array<string | number>;
+      dmPolicy?: string;
+      channelAccessToken?: string;
+      channelSecret?: string;
+      accounts?: Record<
+        string,
+        { allowFrom?: Array<string | number>; dmPolicy?: string; enabled?: boolean }
+      >;
+      [key: string]: unknown;
+    };
+    nostr?: {
+      enabled?: boolean;
+      allowFrom?: Array<string | number>;
+      privateKey?: string;
+      relays?: string[];
+      dmPolicy?: string;
+      dm?: {
+        allowFrom?: Array<string | number>;
+        policy?: "open" | "allowlist" | "pairing" | "disabled";
+      };
+      [key: string]: unknown;
+    };
+    matrix?: {
+      homeserver?: string;
+      userId?: string;
+      accessToken?: string;
+      password?: string;
+      allowBots?: boolean;
+      groups?: Record<string, unknown>;
+      allowFrom?: Array<string | number>;
+      accounts?: Record<
+        string,
+        { rooms?: Record<string, { enabled?: boolean }>; policy?: string; password?: string }
+      >;
+      dm?: {
+        allowFrom?: Array<string | number>;
+        policy?: "open" | "allowlist" | "pairing" | "disabled";
+      };
+      [key: string]: unknown;
+    };
+    zalo?: {
+      botToken?: string;
+      botSecret?: string;
+      apiPassword?: string;
+      accounts?: Record<string, { botToken?: string; botSecret?: string; apiPassword?: string }>;
+      [key: string]: unknown;
+    };
+    zalouser?: {
+      groups?: Record<string, unknown>;
+      accounts?: Record<string, { groups?: Record<string, unknown> }>;
+      [key: string]: unknown;
+    };
+    "synology-chat"?: {
+      accounts?: Record<
+        string,
+        { dangerouslyAllowNameMatching?: boolean; token?: string; incomingUrl?: string }
+      >;
+      dangerouslyAllowNameMatching?: boolean;
+      token?: string;
+      incomingUrl?: string;
+      [key: string]: unknown;
+    };
+    "nextcloud-talk"?: {
+      allowFrom?: Array<string | number>;
+      botSecret?: string;
+      apiPassword?: string;
+      accounts?: Record<
+        string,
+        { botSecret?: string; apiPassword?: string; allowFrom?: Array<string | number> }
+      >;
+      [key: string]: unknown;
+    };
+    mattermost?: {
+      enabled?: boolean;
+      botToken?: string;
+      baseUrl?: string;
+      [key: string]: unknown;
+    };
+    feishu?: {
+      enabled?: boolean;
+      appId?: string;
+      appSecret?: string | { source: "env" | "file" | "exec"; provider: string; id: string };
+      [key: string]: unknown;
+    };
+  }
 }

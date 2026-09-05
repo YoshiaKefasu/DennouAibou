@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "../../config/config.js";
+import { getChannelSection } from "../../config/types.channels.js";
 import type { DmPolicy, GroupPolicy } from "../../config/types.js";
 import type { SecretInput } from "../../config/types.secrets.js";
 import { resolveSecretInputModeForEnvSelection } from "../../plugins/provider-auth-mode.js";
@@ -539,14 +540,15 @@ export function setChannelDmPolicyWithAllowFrom(params: {
   dmPolicy: DmPolicy;
 }): OpenClawConfig {
   const { cfg, channel, dmPolicy } = params;
+  const currentSection = getChannelSection<{ allowFrom?: string[] }>(cfg.channels?.[channel]);
   const allowFrom =
-    dmPolicy === "open" ? addWildcardAllowFrom(cfg.channels?.[channel]?.allowFrom) : undefined;
+    dmPolicy === "open" ? addWildcardAllowFrom(currentSection?.allowFrom) : undefined;
   return {
     ...cfg,
     channels: {
       ...cfg.channels,
       [channel]: {
-        ...cfg.channels?.[channel],
+        ...currentSection,
         dmPolicy,
         ...(allowFrom ? { allowFrom } : {}),
       },

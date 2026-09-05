@@ -11,6 +11,12 @@ import type { BaseProbeResult } from "openclaw/plugin-sdk/channel-contract";
 
 export type LineTokenSource = "config" | "env" | "file" | "none";
 
+declare module "../../../src/config/types.channels.js" {
+  interface ChannelsConfig {
+    line?: LineConfig;
+  }
+}
+
 export interface LineThreadBindingsConfig {
   enabled?: boolean;
   idleHours?: number;
@@ -42,7 +48,24 @@ export interface LineConfig extends LineAccountBaseConfig {
   defaultAccount?: string;
 }
 
-export interface LineAccountConfig extends LineAccountBaseConfig {}
+export interface LineAccountConfig {
+  enabled?: boolean;
+  channelAccessToken?: string;
+  channelSecret?: string;
+  tokenFile?: string;
+  secretFile?: string;
+  name?: string;
+  allowFrom?: Array<string | number>;
+  groupAllowFrom?: Array<string | number>;
+  dmPolicy?: "open" | "allowlist" | "pairing" | "disabled";
+  groupPolicy?: "open" | "allowlist" | "disabled";
+  responsePrefix?: string;
+  mediaMaxMb?: number;
+  webhookPath?: string;
+  threadBindings?: LineThreadBindingsConfig;
+  groups?: Record<string, LineGroupConfig>;
+  [key: string]: unknown;
+}
 
 export interface LineGroupConfig {
   enabled?: boolean;

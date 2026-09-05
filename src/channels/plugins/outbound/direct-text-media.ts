@@ -8,6 +8,7 @@ import {
 } from "openclaw/plugin-sdk/reply-payload";
 import { chunkText } from "../../../auto-reply/chunk.js";
 import type { OpenClawConfig } from "../../../config/config.js";
+import { getChannelSection } from "../../../config/types.channels.js";
 import type { OutboundSendDeps } from "../../../infra/outbound/deliver.js";
 import type { OutboundMediaAccess } from "../../../media/load-options.js";
 import { resolveChannelMediaMaxBytes } from "../media-limits.js";
@@ -56,9 +57,13 @@ export function createScopedChannelMediaMaxBytesResolver(channel: string) {
     resolveScopedChannelMediaMaxBytes({
       cfg: params.cfg,
       accountId: params.accountId,
-      resolveChannelLimitMb: ({ cfg, accountId }) =>
-        cfg.channels?.[channel]?.accounts?.[accountId]?.mediaMaxMb ??
-        cfg.channels?.[channel]?.mediaMaxMb,
+      resolveChannelLimitMb: ({ cfg, accountId }) => {
+        const section = getChannelSection<{
+          accounts?: Record<string, { mediaMaxMb?: number }>;
+          mediaMaxMb?: number;
+        }>(cfg.channels?.[channel]);
+        return section?.accounts?.[accountId ?? ""]?.mediaMaxMb ?? section?.mediaMaxMb;
+      },
     });
 }
 

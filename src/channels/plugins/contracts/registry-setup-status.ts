@@ -52,9 +52,14 @@ export function getSetupContractRegistry(): SetupContractEntry[] {
           },
           expectedAccountId: "default",
           assertPatchedConfig: (cfg) => {
-            expect(cfg.channels?.line?.enabled).toBe(true);
-            expect(cfg.channels?.line?.channelAccessToken).toBe("line-token");
-            expect(cfg.channels?.line?.channelSecret).toBe("line-secret");
+            expect((cfg.channels?.line as { enabled?: boolean } | undefined)?.enabled).toBe(true);
+            expect(
+              (cfg.channels?.line as { channelAccessToken?: string } | undefined)
+                ?.channelAccessToken,
+            ).toBe("line-token");
+            expect(
+              (cfg.channels?.line as { channelSecret?: string } | undefined)?.channelSecret,
+            ).toBe("line-secret");
           },
         },
         {

@@ -117,7 +117,7 @@ export async function collectChannelSecurityFindings(params: {
       enabled?: boolean;
       configured?: boolean;
     } | null;
-    let resolvedAccount = resolvedInspectedAccount;
+    let resolvedAccount: unknown = resolvedInspectedAccount;
     if (!resolvedAccount) {
       try {
         resolvedAccount = plugin.config.resolveAccount(params.cfg, accountId);

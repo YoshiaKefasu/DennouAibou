@@ -27,7 +27,9 @@ vi.mock("@line/bot-sdk", () => ({
   messagingApi: { MessagingApiClient: MessagingApiClientMock },
 }));
 
-const lineConfigure = createPluginSetupWizardConfigure(linePlugin);
+const lineConfigure = createPluginSetupWizardConfigure(
+  linePlugin as unknown as Parameters<typeof createPluginSetupWizardConfigure>[0],
+);
 const LINE_SRC_PREFIX = `../../${bundledPluginRoot("line")}/src/`;
 
 function normalizeModuleSpecifier(specifier: string): string | null {

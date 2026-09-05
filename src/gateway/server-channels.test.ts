@@ -102,7 +102,7 @@ function installTestRegistry(...plugins: ChannelPlugin<TestAccount>[]) {
     registry.channels.push({
       pluginId: plugin.id,
       source: "test",
-      plugin,
+      plugin: plugin as unknown as ChannelPlugin,
     });
   }
   setActivePluginRegistry(registry);

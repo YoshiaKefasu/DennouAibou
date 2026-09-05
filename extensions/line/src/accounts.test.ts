@@ -278,7 +278,7 @@ describe("LINE accounts", () => {
         expected: DEFAULT_ACCOUNT_ID,
       },
     ])("$name", ({ cfg, expected }) => {
-      expect(resolveDefaultLineAccountId(cfg)).toBe(expected);
+      expect(resolveDefaultLineAccountId(cfg as unknown as OpenClawConfig)).toBe(expected);
     });
   });
 
