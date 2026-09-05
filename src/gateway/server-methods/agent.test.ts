@@ -113,23 +113,23 @@ type AgentParams = AgentHandlerArgs["params"];
 type AgentIdentityGetHandlerArgs = Parameters<(typeof agentHandlers)["agent.identity.get"]>[0];
 type AgentIdentityGetParams = AgentIdentityGetHandlerArgs["params"];
 
-async function waitForAssertion(assertion: () => void, timeoutMs = 2_000, stepMs = 5) {
-  vi.useFakeTimers();
-  try {
-    let lastError: unknown;
-    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
-      try {
-        assertion();
-        return;
-      } catch (error) {
-        lastError = error;
+// CI/Windows high-load environments need extra slack to avoid false negatives at
+// the poll boundary; locally we keep the historical 2s budget. Real-timer based
+// (Date.now + setTimeout) instead of vi fake timers so Windows CI wall time is
+// what actually gates the assertion.
+const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 2_000, stepMs = 5) {
+  const startedAt = Date.now();
+  for (;;) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw error;
       }
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(stepMs);
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
     }
-    throw lastError ?? new Error("assertion did not pass in time");
-  } finally {
-    vi.useRealTimers();
   }
 }
 

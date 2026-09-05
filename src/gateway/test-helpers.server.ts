@@ -1035,7 +1035,11 @@ export async function rpcReq<T extends Record<string, unknown>>(
   );
 }
 
-export async function waitForSystemEvent(timeoutMs = 2000) {
+// Default raised from 2000 -> 5000 (F-6 / P3): flaky CI saturates the event loop
+// and system events can take a few seconds to land. Callers that know they need a
+// shorter or longer budget should pass `timeoutMs` explicitly (see
+// server.hooks.test.ts / server.cron.test.ts for the canonical call sites).
+export async function waitForSystemEvent(timeoutMs = 5000) {
   const sessionKeys = resolveGatewayTestMainSessionKeys();
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

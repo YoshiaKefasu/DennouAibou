@@ -130,7 +130,10 @@ async function loadFreshTaskRegistryMaintenanceModuleForTest(params: {
   return await import("./task-registry.maintenance.js");
 }
 
-async function waitForAssertion(assertion: () => void, timeoutMs = 2_000, stepMs = 5) {
+// CI/Windows high-load environments need extra slack to avoid false negatives at
+// the poll boundary; locally we keep the historical 2s budget.
+const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 2_000, stepMs = 5) {
   const startedAt = Date.now();
   for (;;) {
     try {

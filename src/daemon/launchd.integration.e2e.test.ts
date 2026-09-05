@@ -131,8 +131,12 @@ describeLaunchdIntegration("launchd integration", () => {
         timeoutMs: STARTUP_TIMEOUT_MS,
         message: "Timed out initializing launchd integration runtime",
       });
-    } catch {
+    } catch (err) {
       // Best-effort integration check only; skip when launchctl is unstable in CI.
+      // F-2 / P4: log the reason so the skip is not silent in JUnit / test output.
+      console.warn(
+        `[launchd integration] skipping restart check: launchctl failed to stabilize runtime (${(err as Error)?.message ?? String(err)})`,
+      );
       return;
     }
     const before = await waitForRunningRuntime({ env: launchEnv });

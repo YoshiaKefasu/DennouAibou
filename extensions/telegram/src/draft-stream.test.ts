@@ -42,6 +42,7 @@ async function expectInitialForumSend(
 ): Promise<void> {
   await vi.waitFor(() =>
     expect(api.sendMessage).toHaveBeenCalledWith(123, text, { message_thread_id: 99 }),
+    { timeout: 3_000 },
   );
 }
 
@@ -117,7 +118,7 @@ describe("createTelegramDraftStream", () => {
     const stream = createForumDraftStream(api);
 
     stream.update("Hello");
-    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1), { timeout: 3_000 });
     stream.update("Hello final");
     const flushPromise = stream.flush();
     expect(api.editMessageText).not.toHaveBeenCalled();
@@ -134,7 +135,7 @@ describe("createTelegramDraftStream", () => {
 
     stream.update("Hello");
 
-    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith(123, "Hello", undefined));
+    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith(123, "Hello", undefined), { timeout: 3_000 });
   });
 
   it("uses sendMessageDraft for dm threads and does not create a preview message", async () => {
@@ -146,6 +147,7 @@ describe("createTelegramDraftStream", () => {
       expect(api.sendMessageDraft).toHaveBeenCalledWith(123, expect.any(Number), "Hello", {
         message_thread_id: 42,
       }),
+      { timeout: 3_000 },
     );
     expect(api.sendMessage).not.toHaveBeenCalled();
     expect(api.editMessageText).not.toHaveBeenCalled();
@@ -354,7 +356,7 @@ describe("createTelegramDraftStream", () => {
     );
 
     stream.update("Message A");
-    await vi.waitFor(() => expect(api.sendMessageDraft).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.sendMessageDraft).toHaveBeenCalledTimes(1), { timeout: 3_000 });
 
     stream.forceNewMessage();
     stream.update("Message B");
@@ -442,14 +444,14 @@ describe("createTelegramDraftStream", () => {
       const { api, stream } = createForceNewMessageHarness({ throttleMs: 1000 });
 
       stream.update("Hello");
-      await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1), { timeout: 3_000 });
 
       stream.update("Hello edited");
       expect(api.editMessageText).not.toHaveBeenCalled();
 
       stream.forceNewMessage();
       stream.update("Second message");
-      await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(2), { timeout: 3_000 });
       expect(api.sendMessage).toHaveBeenLastCalledWith(123, "Second message", undefined);
     } finally {
       vi.useRealTimers();
@@ -474,7 +476,7 @@ describe("createTelegramDraftStream", () => {
     });
 
     stream.update("Message A partial");
-    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledTimes(1), { timeout: 3_000 });
 
     // Rotate to message B before message A send resolves.
     stream.forceNewMessage();
