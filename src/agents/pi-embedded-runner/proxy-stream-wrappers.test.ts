@@ -1,6 +1,6 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import type { Context, Model } from "@mariozechner/pi-ai";
-import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { Context, Model } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import {
   createOpenRouterSystemCacheWrapper,
@@ -9,7 +9,7 @@ import {
 
 describe("proxy stream wrappers", () => {
   it("adds OpenRouter attribution headers to stream options", () => {
-    const calls: Array<{ headers?: Record<string, string> }> = [];
+    const calls: Array<{ headers?: Record<string, string | null> }> = [];
     const baseStreamFn: StreamFn = (_model, _context, options) => {
       calls.push({
         headers: options?.headers,

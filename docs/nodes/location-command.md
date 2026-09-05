@@ -82,7 +82,7 @@ Errors (stable codes):
 ## Background behavior
 
 - Android app denies `location.get` while backgrounded.
-- Keep OpenClaw open when requesting location on Android.
+- Keep DennouAibou open when requesting location on Android.
 - Other node platforms may differ.
 
 ## Model/tooling integration
@@ -94,5 +94,5 @@ Errors (stable codes):
 ## UX copy (suggested)
 
 - Off: “Location sharing is disabled.”
-- While Using: “Only when OpenClaw is open.”
+- While Using: “Only when DennouAibou is open.”
 - Precise: “Use precise GPS location. Toggle off to share approximate location.”

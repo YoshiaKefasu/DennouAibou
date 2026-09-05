@@ -1,12 +1,11 @@
-export type UpdateAvailable = import("../../../src/infra/update-startup.js").UpdateAvailable;
-import type { CronJobBase } from "../../../src/cron/types-shared.js";
-import type { ConfigUiHints } from "../../../src/shared/config-ui-hints-types.js";
+import type { ConfigUiHints } from "./_shared/config-ui-hints.ts";
+import type { CronJobBase } from "./_shared/cron-types.ts";
 import type {
   GatewayAgentRow as SharedGatewayAgentRow,
   SessionsListResultBase,
   SessionsPatchResultBase,
-} from "../../../src/shared/session-types.js";
-export type { ConfigUiHint, ConfigUiHints } from "../../../src/shared/config-ui-hints-types.js";
+} from "./_shared/session-types.ts";
+export type { ConfigUiHint, ConfigUiHints } from "./_shared/config-ui-hints.ts";
 
 export type ChannelsStatusSnapshot = {
   ts: number;

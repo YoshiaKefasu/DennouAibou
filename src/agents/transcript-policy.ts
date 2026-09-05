@@ -60,11 +60,7 @@ function buildUnownedProviderTransportReplayFallback(params: {
   const isGoogle = isGoogleModelApi(params.modelApi);
   const isAnthropic = isAnthropicApi(params.modelApi);
   const isStrictOpenAiCompatible = params.modelApi === "openai-completions";
-  const requiresOpenAiCompatibleToolIdSanitization =
-    params.modelApi === "openai-completions" ||
-    params.modelApi === "openai-responses" ||
-    params.modelApi === "openai-codex-responses" ||
-    params.modelApi === "azure-openai-responses";
+  const requiresOpenAiCompatibleToolIdSanitization = params.modelApi === "openai-completions";
 
   if (
     !isGoogle &&

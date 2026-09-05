@@ -15,9 +15,7 @@ import { sensitive } from "./zod-schema.sensitive.js";
 
 const SessionResetConfigSchema = z
   .object({
-    mode: z
-      .union([z.literal("daily"), z.literal("idle"), z.literal("off")])
-      .optional(),
+    mode: z.union([z.literal("daily"), z.literal("idle"), z.literal("off")]).optional(),
     atHour: z.number().int().min(0).max(23).optional(),
     idleMinutes: z.number().int().positive().optional(),
   })
@@ -37,9 +35,31 @@ export const SessionSchema = z
       ])
       .optional(),
     identityLinks: z.record(z.string(), z.array(z.string())).optional(),
+    /**
+     * @deprecated Manual `/new` / `/reset` triggers remain supported, but the
+     * automatic session reset machinery (idle / daily / resetByType /
+     * resetByChannel / idleMinutes) has been removed. This field is accepted
+     * for backward compatibility with existing KASOU config files; new
+     * configurations should omit it.
+     */
     resetTriggers: z.array(z.string()).optional(),
+    /**
+     * @deprecated The automatic idle reset window has been removed; sessions
+     * are never rotated based on inactivity. Accepted for backward
+     * compatibility with existing KASOU config files.
+     */
     idleMinutes: z.number().int().positive().optional(),
+    /**
+     * @deprecated Automatic session reset policies (idle / daily) have been
+     * removed. Sessions are never rotated automatically. Accepted for backward
+     * compatibility with existing KASOU config files.
+     */
     reset: SessionResetConfigSchema.optional(),
+    /**
+     * @deprecated Per-type automatic reset overrides have been removed.
+     * Sessions are never rotated automatically. Accepted for backward
+     * compatibility with existing KASOU config files.
+     */
     resetByType: z
       .object({
         direct: SessionResetConfigSchema.optional(),
@@ -50,6 +70,11 @@ export const SessionSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * @deprecated Per-channel automatic reset overrides have been removed.
+     * Sessions are never rotated automatically. Accepted for backward
+     * compatibility with existing KASOU config files.
+     */
     resetByChannel: z.record(z.string(), SessionResetConfigSchema).optional(),
     store: z.string().optional(),
     typingIntervalSeconds: z.number().int().positive().optional(),
@@ -80,9 +105,7 @@ export const SessionSchema = z
         pruneDays: z.number().int().positive().optional(),
         maxEntries: z.number().int().positive().optional(),
         rotateBytes: z.union([z.string(), z.number()]).optional(),
-        resetArchiveRetention: z
-          .union([z.string(), z.number(), z.literal(false)])
-          .optional(),
+        resetArchiveRetention: z.union([z.string(), z.number(), z.literal(false)]).optional(),
         maxDiskBytes: z.union([z.string(), z.number()]).optional(),
         highWaterBytes: z.union([z.string(), z.number()]).optional(),
       })
@@ -112,10 +135,7 @@ export const SessionSchema = z
             });
           }
         }
-        if (
-          val.resetArchiveRetention !== undefined &&
-          val.resetArchiveRetention !== false
-        ) {
+        if (val.resetArchiveRetention !== undefined && val.resetArchiveRetention !== false) {
           try {
             parseDurationMs(String(val.resetArchiveRetention).trim(), {
               defaultUnit: "d",

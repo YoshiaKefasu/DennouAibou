@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   ProviderReasoningOutputMode,
   ProviderReplayPolicy,
@@ -10,29 +10,16 @@ import type {
 export function buildOpenAICompatibleReplayPolicy(
   modelApi: string | null | undefined,
 ): ProviderReplayPolicy | undefined {
-  if (
-    modelApi !== "openai-completions" &&
-    modelApi !== "openai-responses" &&
-    modelApi !== "openai-codex-responses" &&
-    modelApi !== "azure-openai-responses"
-  ) {
+  if (modelApi !== "openai-completions") {
     return undefined;
   }
 
   return {
     sanitizeToolCallIds: true,
     toolCallIdMode: "strict",
-    ...(modelApi === "openai-completions"
-      ? {
-          applyAssistantFirstOrderingFix: true,
-          validateGeminiTurns: true,
-          validateAnthropicTurns: true,
-        }
-      : {
-          applyAssistantFirstOrderingFix: false,
-          validateGeminiTurns: false,
-          validateAnthropicTurns: false,
-        }),
+    applyAssistantFirstOrderingFix: true,
+    validateGeminiTurns: true,
+    validateAnthropicTurns: true,
   };
 }
 

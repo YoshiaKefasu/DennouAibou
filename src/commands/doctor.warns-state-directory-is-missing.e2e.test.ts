@@ -20,7 +20,7 @@ describe("doctor command", () => {
 
     const missingDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-missing-state-"));
     fs.rmSync(missingDir, { recursive: true, force: true });
-    process.env.OPENCLAW_STATE_DIR = missingDir;
+    process.env.DENNOU_STATE_DIR = missingDir;
     await doctorCommand(createDoctorRuntime(), {
       nonInteractive: true,
       workspaceSuggestions: false,
@@ -65,15 +65,15 @@ describe("doctor command", () => {
     expect(warned).toBe(true);
   });
 
-  it("skips gateway auth warning when OPENCLAW_GATEWAY_TOKEN is set", async () => {
+  it("skips gateway auth warning when DENNOU_GATEWAY_TOKEN is set", async () => {
     mockDoctorConfigSnapshot({
       config: {
         gateway: { mode: "local" },
       },
     });
 
-    const prevToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-    process.env.OPENCLAW_GATEWAY_TOKEN = "env-token-1234567890";
+    const prevToken = process.env.DENNOU_GATEWAY_TOKEN;
+    process.env.DENNOU_GATEWAY_TOKEN = "env-token-1234567890";
     try {
       await doctorCommand(createDoctorRuntime(), {
         nonInteractive: true,
@@ -81,9 +81,9 @@ describe("doctor command", () => {
       });
     } finally {
       if (prevToken === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = prevToken;
+        process.env.DENNOU_GATEWAY_TOKEN = prevToken;
       }
     }
 
@@ -130,7 +130,7 @@ describe("doctor command", () => {
             token: {
               source: "env",
               provider: "default",
-              id: "OPENCLAW_GATEWAY_TOKEN",
+              id: "DENNOU_GATEWAY_TOKEN",
             },
           },
         },
@@ -142,8 +142,8 @@ describe("doctor command", () => {
       },
     });
 
-    const previousToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-    delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    const previousToken = process.env.DENNOU_GATEWAY_TOKEN;
+    delete process.env.DENNOU_GATEWAY_TOKEN;
     try {
       await doctorCommand(createDoctorRuntime(), {
         nonInteractive: true,
@@ -151,9 +151,9 @@ describe("doctor command", () => {
       });
     } finally {
       if (previousToken === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = previousToken;
+        process.env.DENNOU_GATEWAY_TOKEN = previousToken;
       }
     }
 

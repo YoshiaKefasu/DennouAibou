@@ -8,13 +8,9 @@ import {
 } from "../../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
-  evaluateSessionFreshness,
   loadSessionStore,
   resolveAgentIdFromSessionKey,
-  resolveChannelResetConfig,
   resolveExplicitAgentSessionKey,
-  resolveSessionResetPolicy,
-  resolveSessionResetType,
   resolveSessionKey,
   resolveStorePath,
   type SessionEntry,
@@ -88,7 +84,9 @@ function collectSessionIdMatchesForRequest(opts: {
     if (agentId === opts.storeAgentId) {
       continue;
     }
-    const candidateStorePath = resolveStorePath(opts.cfg.session?.store, { agentId });
+    const candidateStorePath = resolveStorePath(opts.cfg.session?.store, {
+      agentId,
+    });
     addMatches(loadSessionStore(candidateStorePath), candidateStorePath);
   }
 
@@ -199,7 +197,6 @@ export function resolveSession(opts: {
   sessionKey?: string;
   agentId?: string;
 }): SessionResolution {
-  const sessionCfg = opts.cfg.session;
   const { sessionKey, sessionStore, storePath } = resolveSessionKeyForRequest({
     cfg: opts.cfg,
     to: opts.to,
@@ -207,31 +204,19 @@ export function resolveSession(opts: {
     sessionKey: opts.sessionKey,
     agentId: opts.agentId,
   });
-  const now = Date.now();
 
-  const sessionEntry = sessionKey ? sessionStore[sessionKey] : undefined;
-
-  const resetType = resolveSessionResetType({ sessionKey });
-  const channelReset = resolveChannelResetConfig({
-    sessionCfg,
-    channel: sessionEntry?.lastChannel ?? sessionEntry?.channel ?? sessionEntry?.origin?.provider,
-  });
-  const resetPolicy = resolveSessionResetPolicy({
-    sessionCfg,
-    resetType,
-    resetOverride: channelReset,
-  });
-  const fresh = sessionEntry
-    ? evaluateSessionFreshness({ updatedAt: sessionEntry.updatedAt, now, policy: resetPolicy })
-        .fresh
-    : false;
+  const sessionEntry: SessionEntry | undefined = sessionKey ? sessionStore[sessionKey] : undefined;
+  // Kasou's master session is permanent: no automatic idle/daily reset ever
+  // rotates a session, so an existing entry is always reused when present.
+  const fresh = sessionEntry != null;
+  const existingSessionId = sessionEntry?.sessionId;
   const sessionId =
-    opts.sessionId?.trim() || (fresh ? sessionEntry?.sessionId : undefined) || crypto.randomUUID();
+    opts.sessionId?.trim() || (fresh ? existingSessionId : undefined) || crypto.randomUUID();
   const isNewSession = !fresh && !opts.sessionId;
 
   clearBootstrapSnapshotOnSessionRollover({
     sessionKey,
-    previousSessionId: isNewSession ? sessionEntry?.sessionId : undefined,
+    previousSessionId: isNewSession ? existingSessionId : undefined,
   });
 
   const persistedThinking =

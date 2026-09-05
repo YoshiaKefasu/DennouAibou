@@ -26,7 +26,6 @@ describe("bundled capability metadata", () => {
       .map(({ manifest }) => ({
         pluginId: manifest.id,
         providerIds: uniqueStrings(manifest.providers),
-        speechProviderIds: uniqueStrings(manifest.contracts?.speechProviders),
         realtimeTranscriptionProviderIds: uniqueStrings(
           manifest.contracts?.realtimeTranscriptionProviders,
         ),
@@ -44,7 +43,6 @@ describe("bundled capability metadata", () => {
       .filter(
         (entry) =>
           entry.providerIds.length > 0 ||
-          entry.speechProviderIds.length > 0 ||
           entry.realtimeTranscriptionProviderIds.length > 0 ||
           entry.realtimeVoiceProviderIds.length > 0 ||
           entry.mediaUnderstandingProviderIds.length > 0 ||

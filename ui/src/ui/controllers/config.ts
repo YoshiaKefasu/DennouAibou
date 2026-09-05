@@ -20,7 +20,6 @@ export type ConfigState = {
   configIssues: unknown[];
   configSaving: boolean;
   configApplying: boolean;
-  updateRunning: boolean;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
   configSchemaVersion: string | null;
@@ -181,31 +180,6 @@ export async function applyConfig(state: ConfigState) {
     state.lastError = String(err);
   } finally {
     state.configApplying = false;
-  }
-}
-
-export async function runUpdate(state: ConfigState) {
-  if (!state.client || !state.connected) {
-    return;
-  }
-  state.updateRunning = true;
-  state.lastError = null;
-  try {
-    const res = await state.client.request<{
-      ok?: boolean;
-      result?: { status?: string; reason?: string };
-    }>("update.run", {
-      sessionKey: state.applySessionKey,
-    });
-    if (res && res.ok === false) {
-      const status = res.result?.status ?? "error";
-      const reason = res.result?.reason ?? "Update failed.";
-      state.lastError = `Update ${status}: ${reason}`;
-    }
-  } catch (err) {
-    state.lastError = String(err);
-  } finally {
-    state.updateRunning = false;
   }
 }
 

@@ -3,7 +3,6 @@ export { resolveGatewayPort } from "../config/config.js";
 export { info } from "../globals.js";
 export { resolveControlUiLinks } from "../gateway/control-ui-links.js";
 export { formatTimeAgo } from "../infra/format-time/format-relative.ts";
-export { formatGitInstallLabel } from "../infra/update-check.js";
 export {
   resolveMemoryCacheSummary,
   resolveMemoryFtsState,
@@ -25,8 +24,3 @@ export {
   formatTokensCompact,
   shortenText,
 } from "./status.format.js";
-export {
-  formatUpdateAvailableHint,
-  formatUpdateOneLiner,
-  resolveUpdateAvailability,
-} from "./status.update.js";

@@ -10,15 +10,17 @@
  */
 import * as path from "node:path";
 import { setAfterSaveHook } from "../config/sessions/store.js";
+import { logDebug } from "../logger.js";
 import { getDennouConfig } from "./config.js";
 import { pruneAllClosedSessions } from "./prune-closed-sessions.js";
-import { logDebug } from "../logger.js";
 
 /** キャッシュ済みのワークスペースパス（初回呼び出し時に解決） */
 let cachedWsProtection: import("./types.js").DennouPruneProtectionConfig | null = null;
 
 /** ワークスペースパスを解決して保護設定を返す（失敗時は設定ファイルの値） */
-async function resolveProtectionWithWorkspacePaths(): Promise<import("./types.js").DennouPruneProtectionConfig> {
+async function resolveProtectionWithWorkspacePaths(): Promise<
+  import("./types.js").DennouPruneProtectionConfig
+> {
   if (cachedWsProtection) return cachedWsProtection;
   const config = getDennouConfig();
   const base = config.pruneProtection;
@@ -26,7 +28,7 @@ async function resolveProtectionWithWorkspacePaths(): Promise<import("./types.js
     const { resolveAgentWorkspaceDir, listAgentIds } = await import("../agents/agent-scope.js");
     const { getRuntimeConfig } = await import("../config/config.js");
     const cfg = getRuntimeConfig();
-    const wsPaths = listAgentIds(cfg).map(id => resolveAgentWorkspaceDir(cfg, id));
+    const wsPaths = listAgentIds(cfg).map((id) => resolveAgentWorkspaceDir(cfg, id));
     if (wsPaths.length > 0) {
       cachedWsProtection = { ...base, resolvedWorkspacePaths: wsPaths };
       return cachedWsProtection;
@@ -42,7 +44,7 @@ async function resolveProtectionWithWorkspacePaths(): Promise<import("./types.js
  * saveSessionStore() 完了後のコールバック。
  *
  * @param storePath - 保存された session store のパス
- *   （例: ~/.openclaw/agents/{agentId}/store.json）
+ *   （例: ~/.dennou-aibou/agents/{agentId}/store.json）
  */
 async function afterSavePrune(storePath: string): Promise<void> {
   try {
@@ -58,14 +60,17 @@ async function afterSavePrune(storePath: string): Promise<void> {
     // protection設定（ワークスペースパス自動解決込み）
     const protection = await resolveProtectionWithWorkspacePaths();
 
-    pruneAllClosedSessions(sessionsDir, config.sessionToolsPrune, (msg) => {
-      logDebug(msg);
-    }, protection);
+    pruneAllClosedSessions(
+      sessionsDir,
+      config.sessionToolsPrune,
+      (msg) => {
+        logDebug(msg);
+      },
+      protection,
+    );
   } catch (err) {
     console.warn(
-      `[DennouAibou] afterSavePrune failed: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      `[DennouAibou] afterSavePrune failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

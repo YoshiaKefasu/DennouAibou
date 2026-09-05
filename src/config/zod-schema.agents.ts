@@ -43,36 +43,7 @@ const RouteBindingSchema = z
   })
   .strict();
 
-const AcpBindingSchema = z
-  .object({
-    type: z.literal("acp"),
-    agentId: z.string(),
-    comment: z.string().optional(),
-    match: BindingMatchSchema,
-    acp: z
-      .object({
-        mode: z.enum(["persistent", "oneshot"]).optional(),
-        label: z.string().optional(),
-        cwd: z.string().optional(),
-        backend: z.string().optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    const peerId = value.match.peer?.id?.trim() ?? "";
-    if (!peerId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["match", "peer"],
-        message: "ACP bindings require match.peer.id to target a concrete conversation.",
-      });
-      return;
-    }
-  });
-
-export const BindingsSchema = z.array(z.union([RouteBindingSchema, AcpBindingSchema])).optional();
+export const BindingsSchema = z.array(RouteBindingSchema).optional();
 
 export const BroadcastStrategySchema = z.enum(["parallel", "sequential"]);
 

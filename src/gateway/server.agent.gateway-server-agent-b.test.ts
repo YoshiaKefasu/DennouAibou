@@ -161,14 +161,22 @@ function sendAgentWsRequest(
       type: "req",
       id: params.reqId,
       method: "agent",
-      params: { message: params.message, idempotencyKey: params.idempotencyKey },
+      params: {
+        message: params.message,
+        idempotencyKey: params.idempotencyKey,
+      },
     }),
   );
 }
 
 async function sendAgentWsRequestAndWaitFinal(
   socket: WebSocket,
-  params: { reqId: string; message: string; idempotencyKey: string; timeoutMs?: number },
+  params: {
+    reqId: string;
+    message: string;
+    idempotencyKey: string;
+    timeoutMs?: number;
+  },
 ) {
   const finalP = onceMessage(
     socket,
@@ -332,12 +340,18 @@ describe("gateway server agent", () => {
       {
         pluginId: "discord",
         source: "test",
-        plugin: createConfiguredChannelPlugin({ id: "discord", label: "Discord" }),
+        plugin: createConfiguredChannelPlugin({
+          id: "discord",
+          label: "Discord",
+        }),
       },
       {
         pluginId: "telegram",
         source: "test",
-        plugin: createConfiguredChannelPlugin({ id: "telegram", label: "Telegram" }),
+        plugin: createConfiguredChannelPlugin({
+          id: "telegram",
+          label: "Telegram",
+        }),
       },
     ]);
     setRegistry(registry);
@@ -373,25 +387,19 @@ describe("gateway server agent", () => {
     expectAgentRoutingCall({ channel: "webchat", deliver: false });
   });
 
-  test("agent routes bare /new through session reset before running greeting prompt", async () => {
+  test("agent /new on the main session is rejected as a protected session", async () => {
     await writeMainSessionEntry({ sessionId: "sess-main-before-reset" });
     const spy = vi.mocked(agentCommand);
-    const calls = spy.mock.calls;
-    const callsBefore = calls.length;
+    const callsBefore = spy.mock.calls.length;
     const res = await rpcReq(ws, "agent", {
       message: "/new",
       sessionKey: "main",
       idempotencyKey: "idem-agent-new",
     });
-    expect(res.ok).toBe(true);
-
-    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(callsBefore));
-    const call = (calls.at(-1)?.[0] ?? {}) as Record<string, unknown>;
-    expect(call.message).toBeTypeOf("string");
-    expect(call.message).toContain("Run your Session Startup sequence");
-    expect(call.message).toContain("Current time:");
-    expect(typeof call.sessionId).toBe("string");
-    expect(call.sessionId).not.toBe("sess-main-before-reset");
+    expect(res.ok).toBe(false);
+    expect(res.error?.message ?? "").toMatch(/Cannot reset protected session/);
+    // No greeting run is started because the reset is rejected up front.
+    expect(spy.mock.calls.length).toBe(callsBefore);
   });
 
   test("write-scoped callers cannot reset conversations via agent", async () => {
@@ -416,7 +424,9 @@ describe("gateway server agent", () => {
       await new Promise<void>((resolve) => writeWs.once("open", resolve));
       await connectOk(writeWs, { scopes: ["operator.write"] });
 
-      const directReset = await rpcReq(writeWs, "sessions.reset", { key: "main" });
+      const directReset = await rpcReq(writeWs, "sessions.reset", {
+        key: "main",
+      });
       expect(directReset.ok).toBe(false);
       expect(directReset.error?.message).toContain("missing scope: operator.admin");
 

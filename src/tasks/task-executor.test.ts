@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetAgentEventsForTest, resetAgentRunContextForTest } from "../infra/agent-events.js";
-import { resetHeartbeatWakeStateForTests } from "../infra/heartbeat-wake.js";
+import { resetWakeStateForTests } from "../infra/event-pump.js";
 import { resetSystemEventsForTest } from "../infra/system-events.js";
 import { withStateDirEnv } from "../test-helpers/state-dir-env.js";
 import {
@@ -33,7 +33,7 @@ import {
   resetTaskRegistryForTests,
 } from "./task-registry.js";
 
-const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 const hoisted = vi.hoisted(() => {
   const sendMessageMock = vi.fn();
   const cancelSessionMock = vi.fn();
@@ -61,7 +61,7 @@ async function withTaskExecutorStateDir(run: (stateDir: string) => Promise<void>
       sendMessage: hoisted.sendMessageMock,
     });
     resetSystemEventsForTest();
-    resetHeartbeatWakeStateForTests();
+    resetWakeStateForTests();
     resetAgentEventsForTest();
     resetTaskRegistryDeliveryRuntimeForTests();
     resetAgentRunContextForTest();
@@ -71,7 +71,7 @@ async function withTaskExecutorStateDir(run: (stateDir: string) => Promise<void>
       await run(stateDir);
     } finally {
       resetSystemEventsForTest();
-      resetHeartbeatWakeStateForTests();
+      resetWakeStateForTests();
       resetAgentEventsForTest();
       resetTaskRegistryDeliveryRuntimeForTests();
       resetAgentRunContextForTest();
@@ -84,12 +84,12 @@ async function withTaskExecutorStateDir(run: (stateDir: string) => Promise<void>
 describe("task-executor", () => {
   afterEach(() => {
     if (ORIGINAL_STATE_DIR === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = ORIGINAL_STATE_DIR;
+      process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
     resetSystemEventsForTest();
-    resetHeartbeatWakeStateForTests();
+    resetWakeStateForTests();
     resetAgentEventsForTest();
     resetTaskRegistryDeliveryRuntimeForTests();
     resetAgentRunContextForTest();
@@ -103,7 +103,7 @@ describe("task-executor", () => {
   it("advances a queued run through start and completion", async () => {
     await withTaskExecutorStateDir(async () => {
       const created = createQueuedTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         childSessionKey: "agent:codex:acp:child",
@@ -265,7 +265,7 @@ describe("task-executor", () => {
   it("records blocked metadata on one-task flows and reuses the same flow for queued retries", async () => {
     await withTaskExecutorStateDir(async () => {
       const created = createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         requesterOrigin: {
@@ -350,7 +350,7 @@ describe("task-executor", () => {
         },
       });
       const child = createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         parentFlowId: flow.flowId,
@@ -395,7 +395,7 @@ describe("task-executor", () => {
 
       const created = runTaskInFlow({
         flowId: flow.flowId,
-        runtime: "acp",
+        runtime: "subagent",
         childSessionKey: "agent:codex:acp:child",
         runId: "run-flow-child",
         label: "Inspect a PR",
@@ -443,7 +443,7 @@ describe("task-executor", () => {
 
       const created = runTaskInFlow({
         flowId: flow.flowId,
-        runtime: "acp",
+        runtime: "subagent",
         childSessionKey: "agent:codex:acp:child",
         runId: "run-flow-after-cancel",
         task: "Should be denied",
@@ -468,7 +468,7 @@ describe("task-executor", () => {
       });
       const child = runTaskInFlow({
         flowId: flow.flowId,
-        runtime: "acp",
+        runtime: "subagent",
         childSessionKey: "agent:codex:acp:child",
         runId: "run-flow-sticky-cancel",
         task: "Inspect a PR",
@@ -551,7 +551,7 @@ describe("task-executor", () => {
       const created = runTaskInFlowForOwner({
         flowId: flow.flowId,
         callerOwnerKey: "agent:main:other",
-        runtime: "acp",
+        runtime: "subagent",
         childSessionKey: "agent:codex:acp:child",
         runId: "run-flow-cross-owner",
         task: "Should be denied",
@@ -571,7 +571,7 @@ describe("task-executor", () => {
       hoisted.cancelSessionMock.mockResolvedValue(undefined);
 
       const child = createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         childSessionKey: "agent:codex:acp:child",
@@ -643,7 +643,7 @@ describe("task-executor", () => {
   it("scopes run-id updates to the matching runtime and session", async () => {
     await withTaskExecutorStateDir(async () => {
       const victim = createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:victim:main",
         scopeKind: "session",
         childSessionKey: "agent:victim:acp:child",

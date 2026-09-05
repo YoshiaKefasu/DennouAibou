@@ -2,7 +2,7 @@
 title: "Google (Gemini)"
 summary: "Google Gemini setup (API key, image generation, media understanding, web search)"
 read_when:
-  - You want to use Google Gemini models with OpenClaw
+  - You want to use Google Gemini models with DennouAibou
   - You need the API key auth flow
 ---
 
@@ -60,14 +60,14 @@ openclaw onboard --non-interactive \
 
 ## Direct Gemini cache reuse
 
-For direct Gemini API runs (`api: "google-generative-ai"`), OpenClaw now
+For direct Gemini API runs (`api: "google-generative-ai"`), DennouAibou now
 passes a configured `cachedContent` handle through to Gemini requests.
 
 - Configure per-model or global params with either
   `cachedContent` or legacy `cached_content`
 - If both are present, `cachedContent` wins
 - Example value: `cachedContents/prebuilt-context`
-- Gemini cache-hit usage is normalized into OpenClaw `cacheRead` from
+- Gemini cache-hit usage is normalized into DennouAibou `cacheRead` from
   upstream `cachedContentTokenCount`
 
 Example:

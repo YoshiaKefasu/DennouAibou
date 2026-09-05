@@ -26,18 +26,18 @@ import {
   shouldPreferNativeJiti,
 } from "../plugins/sdk-alias.js";
 
-const OPENCLAW_PACKAGE_ROOT =
+const DENNOU_PACKAGE_ROOT =
   resolveLoaderPackageRoot({
     modulePath: fileURLToPath(import.meta.url),
     moduleUrl: import.meta.url,
   }) ?? fileURLToPath(new URL("../..", import.meta.url));
 const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
 const PUBLIC_SURFACE_SOURCE_EXTENSIONS = [".ts", ".mts", ".js", ".mjs", ".cts", ".cjs"] as const;
-const ALWAYS_ALLOWED_RUNTIME_DIR_NAMES = new Set([
-  "image-generation-core",
-  "media-understanding-core",
-  "speech-core",
-]);
+// NOTE: image-generation-core / media-understanding-core / speech-core extensions were removed by DEBLOAT.
+// ALWAYS_ALLOWED_RUNTIME_DIR_NAMES used to whitelist these for runtime-api.js access, but every
+// referenced directory is gone, so the runtime-api.js short-circuit is now dead. Keep the const
+// shape (empty Set) so downstream conditions remain well-typed without behaviour change.
+const ALWAYS_ALLOWED_RUNTIME_DIR_NAMES = new Set<string>();
 const EMPTY_FACADE_BOUNDARY_CONFIG: OpenClawConfig = {};
 const jitiLoaders = new Map<string, ReturnType<typeof createJiti>>();
 const loadedFacadeModules = new Map<string, unknown>();
@@ -59,7 +59,7 @@ function resolveSourceFirstPublicSurfacePath(params: {
   artifactBasename: string;
 }): string | null {
   const sourceBaseName = params.artifactBasename.replace(/\.js$/u, "");
-  const sourceRoot = params.bundledPluginsDir ?? path.resolve(OPENCLAW_PACKAGE_ROOT, "extensions");
+  const sourceRoot = params.bundledPluginsDir ?? path.resolve(DENNOU_PACKAGE_ROOT, "extensions");
   for (const ext of PUBLIC_SURFACE_SOURCE_EXTENSIONS) {
     const candidate = path.resolve(sourceRoot, params.dirName, `${sourceBaseName}${ext}`);
     if (fs.existsSync(candidate)) {
@@ -114,7 +114,7 @@ function resolveFacadeModuleLocation(params: {
       }) ??
       resolveSourceFirstPublicSurfacePath(params) ??
       resolveBundledPluginPublicSurfacePath({
-        rootDir: OPENCLAW_PACKAGE_ROOT,
+        rootDir: DENNOU_PACKAGE_ROOT,
         ...(bundledPluginsDir ? { bundledPluginsDir } : {}),
         dirName: params.dirName,
         artifactBasename: params.artifactBasename,
@@ -125,13 +125,13 @@ function resolveFacadeModuleLocation(params: {
         boundaryRoot:
           bundledPluginsDir && modulePath.startsWith(path.resolve(bundledPluginsDir) + path.sep)
             ? path.resolve(bundledPluginsDir)
-            : OPENCLAW_PACKAGE_ROOT,
+            : DENNOU_PACKAGE_ROOT,
       };
     }
     return resolveRegistryPluginModuleLocation(params);
   }
   const modulePath = resolveBundledPluginPublicSurfacePath({
-    rootDir: OPENCLAW_PACKAGE_ROOT,
+    rootDir: DENNOU_PACKAGE_ROOT,
     ...(bundledPluginsDir ? { bundledPluginsDir } : {}),
     dirName: params.dirName,
     artifactBasename: params.artifactBasename,
@@ -142,7 +142,7 @@ function resolveFacadeModuleLocation(params: {
       boundaryRoot:
         bundledPluginsDir && modulePath.startsWith(path.resolve(bundledPluginsDir) + path.sep)
           ? path.resolve(bundledPluginsDir)
-          : OPENCLAW_PACKAGE_ROOT,
+          : DENNOU_PACKAGE_ROOT,
     };
   }
   return resolveRegistryPluginModuleLocation(params);
@@ -377,7 +377,7 @@ export function loadBundledPluginPublicSurfaceModuleSync<T extends object>(param
     absolutePath: location.modulePath,
     rootPath: location.boundaryRoot,
     boundaryLabel:
-      location.boundaryRoot === OPENCLAW_PACKAGE_ROOT
+      location.boundaryRoot === DENNOU_PACKAGE_ROOT
         ? "OpenClaw package root"
         : (() => {
             const bundledDir = resolveBundledPluginsDir();

@@ -1,14 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-// extensions/matrix削除済みのため、matrix関連のインポートを無効化
-// import {
-//   namedAccountPromotionKeys as matrixNamedAccountPromotionKeys,
-//   resolveSingleAccountPromotionTarget as resolveMatrixSingleAccountPromotionTarget,
-//   singleAccountKeysToMove as matrixSingleAccountKeysToMove,
-// } from "../../../extensions/matrix/contract-api.js";
 import { singleAccountKeysToMove as telegramSingleAccountKeysToMove } from "../../../extensions/telegram/contract-api.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";
-import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../../routing/session-key.js";
 import {
   createChannelTestPluginBase,
   createTestRegistry,
@@ -21,6 +15,87 @@ import {
   moveSingleAccountChannelSectionToDefaultAccount,
   prepareScopedSetupConfig,
 } from "./setup-helpers.js";
+
+// Restored from extensions/matrix/src/setup-contract.ts (commit 4785a073d6c)
+const matrixSingleAccountKeysToMove = [
+  "deviceId",
+  "avatarUrl",
+  "initialSyncLimit",
+  "encryption",
+  "allowlistOnly",
+  "dangerouslyAllowNameMatching",
+  "allowBots",
+  "blockStreaming",
+  "replyToMode",
+  "threadReplies",
+  "textChunkLimit",
+  "chunkMode",
+  "responsePrefix",
+  "ackReaction",
+  "ackReactionScope",
+  "reactionNotifications",
+  "threadBindings",
+  "startupVerification",
+  "startupVerificationCooldownHours",
+  "mediaMaxMb",
+  "autoJoin",
+  "autoJoinAllowlist",
+  "dm",
+  "groups",
+  "rooms",
+  "actions",
+] as const;
+
+const matrixNamedAccountPromotionKeys = [
+  "name",
+  "homeserver",
+  "userId",
+  "accessToken",
+  "password",
+  "deviceId",
+  "deviceName",
+  "avatarUrl",
+  "initialSyncLimit",
+  "encryption",
+] as const;
+
+const singleAccountKeysToMove = [...matrixSingleAccountKeysToMove];
+const namedAccountPromotionKeys = [...matrixNamedAccountPromotionKeys];
+
+function resolveSingleAccountPromotionTarget(params: {
+  channel: Record<string, unknown>;
+}): string {
+  const accounts =
+    typeof params.channel.accounts === "object" && params.channel.accounts
+      ? (params.channel.accounts as Record<string, unknown>)
+      : {};
+  const normalizedDefaultAccount =
+    typeof params.channel.defaultAccount === "string" && params.channel.defaultAccount.trim()
+      ? normalizeAccountId(params.channel.defaultAccount)
+      : undefined;
+  const matchedAccountId = normalizedDefaultAccount
+    ? Object.entries(accounts).find(
+        ([accountId, value]) =>
+          accountId &&
+          value &&
+          typeof value === "object" &&
+          normalizeAccountId(accountId) === normalizedDefaultAccount,
+      )?.[0]
+    : undefined;
+  if (matchedAccountId) {
+    return matchedAccountId;
+  }
+  if (normalizedDefaultAccount) {
+    return DEFAULT_ACCOUNT_ID;
+  }
+  const namedAccounts = Object.entries(accounts).filter(
+    ([accountId, value]) => accountId && typeof value === "object" && value,
+  );
+  if (namedAccounts.length === 1) {
+    return namedAccounts[0][0];
+  }
+  return DEFAULT_ACCOUNT_ID;
+}
 
 function asConfig(value: unknown): OpenClawConfig {
   return value as OpenClawConfig;
@@ -35,9 +110,9 @@ beforeEach(() => {
         plugin: {
           ...createChannelTestPluginBase({ id: "matrix", label: "Matrix" }),
           setup: {
-            singleAccountKeysToMove: matrixSingleAccountKeysToMove,
-            namedAccountPromotionKeys: matrixNamedAccountPromotionKeys,
-            resolveSingleAccountPromotionTarget: resolveMatrixSingleAccountPromotionTarget,
+            singleAccountKeysToMove,
+            namedAccountPromotionKeys,
+            resolveSingleAccountPromotionTarget,
           },
         },
       },

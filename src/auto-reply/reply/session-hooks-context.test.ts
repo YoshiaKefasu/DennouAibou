@@ -178,113 +178,12 @@ describe("session hook context wiring", () => {
     expect(event).toMatchObject({ reason: "new" });
   });
 
-  it("marks daily stale rollovers and exposes the archived transcript path", async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date(2026, 0, 18, 5, 0, 0));
-      const sessionKey = "agent:main:telegram:direct:daily";
-      const storePath = await createStorePath("openclaw-session-hook-daily");
-      const transcriptPath = await writeTranscript(storePath, "daily-session", "daily");
-      await writeStore(storePath, {
-        [sessionKey]: {
-          sessionId: "daily-session",
-          sessionFile: transcriptPath,
-          updatedAt: new Date(2026, 0, 18, 3, 0, 0).getTime(),
-        },
-      });
-      const cfg = { session: { store: storePath } } as OpenClawConfig;
-
-      await initSessionState({
-        ctx: { Body: "hello", SessionKey: sessionKey },
-        cfg,
-        commandAuthorized: true,
-      });
-
-      const [event] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
-      const [startEvent] = hookRunnerMocks.runSessionStart.mock.calls[0] ?? [];
-      expect(event).toMatchObject({
-        reason: "daily",
-        transcriptArchived: true,
-      });
-      expect(event?.sessionFile).toContain(".jsonl.reset.");
-      expect(event?.nextSessionId).toBe(startEvent?.sessionId);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("marks idle stale rollovers with reason idle", async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date(2026, 0, 18, 5, 0, 0));
-      const sessionKey = "agent:main:telegram:direct:idle";
-      const storePath = await createStorePath("openclaw-session-hook-idle");
-      const transcriptPath = await writeTranscript(storePath, "idle-session", "idle");
-      await writeStore(storePath, {
-        [sessionKey]: {
-          sessionId: "idle-session",
-          sessionFile: transcriptPath,
-          updatedAt: new Date(2026, 0, 18, 3, 0, 0).getTime(),
-        },
-      });
-      const cfg = {
-        session: {
-          store: storePath,
-          reset: {
-            mode: "idle",
-            idleMinutes: 30,
-          },
-        },
-      } as OpenClawConfig;
-
-      await initSessionState({
-        ctx: { Body: "hello", SessionKey: sessionKey },
-        cfg,
-        commandAuthorized: true,
-      });
-
-      const [event] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
-      expect(event).toMatchObject({ reason: "idle" });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("prefers idle over daily when both rollover conditions are true", async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date(2026, 0, 18, 5, 30, 0));
-      const sessionKey = "agent:main:telegram:direct:overlap";
-      const storePath = await createStorePath("openclaw-session-hook-overlap");
-      const transcriptPath = await writeTranscript(storePath, "overlap-session", "overlap");
-      await writeStore(storePath, {
-        [sessionKey]: {
-          sessionId: "overlap-session",
-          sessionFile: transcriptPath,
-          updatedAt: new Date(2026, 0, 18, 4, 45, 0).getTime(),
-        },
-      });
-      const cfg = {
-        session: {
-          store: storePath,
-          reset: {
-            mode: "daily",
-            atHour: 4,
-            idleMinutes: 30,
-          },
-        },
-      } as OpenClawConfig;
-
-      await initSessionState({
-        ctx: { Body: "hello", SessionKey: sessionKey },
-        cfg,
-        commandAuthorized: true,
-      });
-
-      const [event] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
-      expect(event).toMatchObject({ reason: "idle" });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+  // Note: the previous "marks daily stale rollovers and exposes the archived
+  // transcript path", "marks idle stale rollovers with reason idle", and
+  // "prefers idle over daily when both rollover conditions are true" tests
+  // have been removed because the automatic session reset machinery (idle /
+  // daily / resetByType / resetByChannel) has been dismantled. Kasou's
+  // master session is permanent; sessions are NEVER rotated based on
+  // inactivity or a daily boundary, so no `session_end` event is fired with
+  // reason `"idle"` or `"daily"` at runtime.
 });

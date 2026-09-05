@@ -20,7 +20,7 @@ describe("loadIncludePatternsFromEnv", () => {
 
   it("loads include patterns from a JSON file", () => {
     const filePath = patternFiles.writePatternFile("include.json", [
-      "src/infra/update-runner.test.ts",
+      "src/infra/runtime-guard.test.ts",
       42,
       "",
       "ui/src/ui/views/chat.test.ts",
@@ -30,7 +30,7 @@ describe("loadIncludePatternsFromEnv", () => {
       loadIncludePatternsFromEnv({
         OPENCLAW_VITEST_INCLUDE_FILE: filePath,
       }),
-    ).toEqual(["src/infra/update-runner.test.ts", "ui/src/ui/views/chat.test.ts"]);
+    ).toEqual(["src/infra/runtime-guard.test.ts", "ui/src/ui/views/chat.test.ts"]);
   });
 });
 
@@ -41,7 +41,7 @@ describe("loadExtraExcludePatternsFromEnv", () => {
 
   it("loads extra exclude patterns from a JSON file", () => {
     const filePath = patternFiles.writePatternFile("extra-exclude.json", [
-      "src/infra/update-runner.test.ts",
+      "src/infra/runtime-guard.test.ts",
       42,
       "",
       "ui/src/ui/views/chat.test.ts",
@@ -51,12 +51,12 @@ describe("loadExtraExcludePatternsFromEnv", () => {
       loadExtraExcludePatternsFromEnv({
         OPENCLAW_VITEST_EXTRA_EXCLUDE_FILE: filePath,
       }),
-    ).toEqual(["src/infra/update-runner.test.ts", "ui/src/ui/views/chat.test.ts"]);
+    ).toEqual(["src/infra/runtime-guard.test.ts", "ui/src/ui/views/chat.test.ts"]);
   });
 
   it("throws when the configured file is not a JSON array", () => {
     const filePath = patternFiles.writePatternFile("extra-exclude.json", {
-      exclude: ["src/infra/update-runner.test.ts"],
+      exclude: ["src/infra/runtime-guard.test.ts"],
     });
 
     expect(() =>

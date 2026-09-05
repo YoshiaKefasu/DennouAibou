@@ -33,9 +33,8 @@ import {
 } from "../infra/control-ui-assets.js";
 import { isDiagnosticsEnabled } from "../infra/diagnostic-events.js";
 import { isTruthyEnvValue, logAcceptedEnvOption } from "../infra/env.js";
+import { runEventPumpOnce, setWakeHandler } from "../infra/event-pump.js";
 import { createExecApprovalForwarder } from "../infra/exec-approval-forwarder.js";
-import { onHeartbeatEvent } from "../infra/heartbeat-events.js";
-import { startHeartbeatRunner, type HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import { getMachineDisplayName } from "../infra/machine-name.js";
 import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
 import { setGatewaySigusr1RestartPolicy, setPreRestartDeferralCheck } from "../infra/restart.js";
@@ -45,7 +44,6 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
-import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import {
@@ -58,6 +56,7 @@ import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/run
 import { createPluginRuntime } from "../plugins/runtime/index.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
+import { defaultRuntime } from "../runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { CommandSecretAssignment } from "../secrets/command-config.js";
 import {
@@ -84,10 +83,6 @@ import { resolveGatewayAuth } from "./auth.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import type { ControlUiRootState } from "./control-ui.js";
-import {
-  GATEWAY_EVENT_UPDATE_AVAILABLE,
-  type GatewayUpdateAvailableEventPayload,
-} from "./events.js";
 import { createExecApprovalIosPushDelivery } from "./exec-approval-ios-push.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
 import { startMcpLoopbackServer } from "./mcp-http.js";
@@ -175,8 +170,7 @@ const logChannels = log.child("channels");
 
 let cachedChannelRuntime: ReturnType<typeof createPluginRuntime>["channel"] | null = null;
 
-// Module-level reference to raw chat sidecar client for clean shutdown.
-let rawChatClientRef: InstanceType<typeof import("../dennou-soul/raw-chat/sidecar-client.js").RawChatClient> | null = null;
+// Module-level reference to raw chat indexer cleanup.
 let rawChatCleanupRef: (() => void) | null = null;
 
 function getChannelRuntime() {
@@ -186,8 +180,8 @@ function getChannelRuntime() {
 
 function pruneSkippedStartupSecretSurfaces(config: OpenClawConfig): OpenClawConfig {
   const skipChannels =
-    isTruthyEnvValue(process.env.OPENCLAW_SKIP_CHANNELS) ||
-    isTruthyEnvValue(process.env.OPENCLAW_SKIP_PROVIDERS);
+    isTruthyEnvValue(process.env.DENNOU_SKIP_CHANNELS) ||
+    isTruthyEnvValue(process.env.DENNOU_SKIP_PROVIDERS);
   if (!skipChannels || !config.channels) {
     return config;
   }
@@ -415,16 +409,16 @@ export async function startGatewayServer(
   opts: GatewayServerOptions = {},
 ): Promise<GatewayServer> {
   const minimalTestGateway =
-    process.env.VITEST === "1" && process.env.OPENCLAW_TEST_MINIMAL_GATEWAY === "1";
+    process.env.VITEST === "1" && process.env.DENNOU_TEST_MINIMAL_GATEWAY === "1";
 
   // Ensure all default port derivations (browser/canvas) see the actual runtime port.
-  process.env.OPENCLAW_GATEWAY_PORT = String(port);
+  process.env.DENNOU_GATEWAY_PORT = String(port);
   logAcceptedEnvOption({
-    key: "OPENCLAW_RAW_STREAM",
+    key: "DENNOU_RAW_STREAM",
     description: "raw stream logging enabled",
   });
   logAcceptedEnvOption({
-    key: "OPENCLAW_RAW_STREAM_PATH",
+    key: "DENNOU_RAW_STREAM_PATH",
     description: "raw stream log path override",
   });
 
@@ -794,11 +788,7 @@ export async function startGatewayServer(
   let healthInterval = noopInterval();
   let dedupeCleanup = noopInterval();
   let mediaCleanup: ReturnType<typeof setInterval> | null = null;
-  let heartbeatRunner: HeartbeatRunner = {
-    stop: () => {},
-    updateConfig: () => {},
-  };
-  let stopGatewayUpdateCheck = () => {};
+  let eventPumpDisposer: (() => void) | null = null;
   let tailscaleCleanup: (() => Promise<void>) | null = null;
   let skillsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const skillsRefreshDelayMs = 30_000;
@@ -831,8 +821,7 @@ export async function startGatewayServer(
       stopChannel,
       pluginServices,
       cron,
-      heartbeatRunner,
-      updateCheckStop: stopGatewayUpdateCheck,
+      eventPumpDisposer,
       nodePresenceTimers,
       broadcast,
       tickInterval,
@@ -840,7 +829,6 @@ export async function startGatewayServer(
       dedupeCleanup,
       mediaCleanup,
       agentUnsub,
-      heartbeatUnsub,
       transcriptUnsub,
       lifecycleUnsub,
       chatRunState,
@@ -884,7 +872,6 @@ export async function startGatewayServer(
   const { getRuntimeSnapshot, startChannels, startChannel, stopChannel, markChannelLoggedOut } =
     channelManager;
   let agentUnsub: (() => void) | null = null;
-  let heartbeatUnsub: (() => void) | null = null;
   let transcriptUnsub: (() => void) | null = null;
   let lifecycleUnsub: (() => void) | null = null;
   try {
@@ -937,34 +924,25 @@ export async function startGatewayServer(
 
     if (!minimalTestGateway) {
       startTaskRegistryMaintenance();
-      // Raw chat indexer: Go sidecar manages SQLite schema, indexing, and search.
-      // TypeScript owns only: sidecar launch/shutdown, transcript hook, RPC client, tool registration.
+      // Raw chat indexer (SQLite + FTS5 permanent ledger)
       try {
-        const { RawChatClient, setRawChatClient, startRawChatIndexer, stopRawChatIndexer, backfillSessionFiles } = await import(
-          "../dennou-soul/raw-chat/index.js"
-        );
-        const rawChatClient = new RawChatClient();
-        // Retain reference at module scope so shutdown hook can call stop().
-        rawChatClientRef = rawChatClient;
-        rawChatClient.start().then(() => {
-          console.log("[raw-chat] Go sidecar started successfully");
-          setRawChatClient(rawChatClient);
-          // Backfill existing session files on startup (idempotent, non-blocking).
-          const defaultAgentId = resolveDefaultAgentId(runtimeConfig);
-          backfillSessionFiles(defaultAgentId).catch(() => {
-            // Best-effort: backfill errors don't block startup.
-          });
-        }).catch((err) => {
-          console.warn("[raw-chat] Go sidecar failed to start:", err.message);
+        const { startRawChatIndexer, backfillSessionFiles } =
+          await import("../dennou-soul/raw-chat/index.js");
+        const defaultAgentId = resolveDefaultAgentId(cfgAtStart);
+        backfillSessionFiles(defaultAgentId).catch(() => {
+          // Best-effort: backfill errors don't block startup.
         });
 
         // Start the transcript update hook (non-blocking, best-effort).
         // Store cleanup function for shutdown.
         // Pass runtime config so kill switch (dennou.rawChat.indexing.enabled) is respected.
-        rawChatCleanupRef = startRawChatIndexer(runtimeConfig);
+        rawChatCleanupRef = startRawChatIndexer(cfgAtStart);
       } catch (err) {
         // Best-effort: raw chat indexer is optional and must never block gateway startup.
-        console.error("[raw-chat] Failed to initialize raw chat indexer:", err instanceof Error ? err.message : String(err));
+        console.error(
+          "[raw-chat] Failed to initialize raw chat indexer:",
+          err instanceof Error ? err.message : String(err),
+        );
       }
       ({ tickInterval, healthInterval, dedupeCleanup, mediaCleanup } =
         startGatewayMaintenanceTimers({
@@ -1004,12 +982,6 @@ export async function startGatewayServer(
             sessionEventSubscribers,
           }),
         );
-
-    heartbeatUnsub = minimalTestGateway
-      ? null
-      : onHeartbeatEvent((evt) => {
-          broadcast("heartbeat", evt, { dropIfSlow: true });
-        });
 
     transcriptUnsub = minimalTestGateway
       ? null
@@ -1192,7 +1164,15 @@ export async function startGatewayServer(
         });
 
     if (!minimalTestGateway) {
-      heartbeatRunner = startHeartbeatRunner({ cfg: cfgAtStart });
+      eventPumpDisposer = setWakeHandler(async (opts) =>
+        runEventPumpOnce({
+          cfg: loadConfig(),
+          agentId: opts.agentId,
+          sessionKey: opts.sessionKey,
+          reason: opts.reason,
+          deps: { ...deps, runtime: defaultRuntime },
+        }),
+      );
     }
 
     const healthCheckMinutes = cfgAtStart.gateway?.channelHealthCheckMinutes;
@@ -1410,17 +1390,6 @@ export async function startGatewayServer(
       isNixMode,
       startupStartedAt: opts.startupStartedAt,
     });
-    stopGatewayUpdateCheck = minimalTestGateway
-      ? () => {}
-      : scheduleGatewayUpdateCheck({
-          cfg: cfgAtStart,
-          log,
-          isNixMode,
-          onUpdateAvailableChange: (updateAvailable) => {
-            const payload: GatewayUpdateAvailableEventPayload = { updateAvailable };
-            broadcast(GATEWAY_EVENT_UPDATE_AVAILABLE, payload, { dropIfSlow: true });
-          },
-        });
     tailscaleCleanup = minimalTestGateway
       ? null
       : await startGatewayTailscaleExposure({
@@ -1475,14 +1444,12 @@ export async function startGatewayServer(
             getState: () => ({
               hooksConfig,
               hookClientIpConfig,
-              heartbeatRunner,
               cronState,
               channelHealthMonitor,
             }),
             setState: (nextState) => {
               hooksConfig = nextState.hooksConfig;
               hookClientIpConfig = nextState.hookClientIpConfig;
-              heartbeatRunner = nextState.heartbeatRunner;
               cronState = nextState.cronState;
               cron = cronState.cron;
               cronStorePath = cronState.storePath;
@@ -1563,8 +1530,7 @@ export async function startGatewayServer(
     stopChannel,
     pluginServices,
     cron,
-    heartbeatRunner,
-    updateCheckStop: stopGatewayUpdateCheck,
+    eventPumpDisposer,
     stopTaskRegistryMaintenance,
     nodePresenceTimers,
     broadcast,
@@ -1573,7 +1539,6 @@ export async function startGatewayServer(
     dedupeCleanup,
     mediaCleanup,
     agentUnsub,
-    heartbeatUnsub,
     transcriptUnsub,
     lifecycleUnsub,
     chatRunState,
@@ -1605,21 +1570,14 @@ export async function startGatewayServer(
       stopModelPricingRefresh();
       channelHealthMonitor?.stop();
       clearSecretsRuntimeSnapshot();
-      // Stop raw chat Go sidecar to avoid orphaned process.
-      if (rawChatClientRef) {
-        try {
-          rawChatClientRef.stop();
-        } catch (err) {
-          log.warn(`raw chat sidecar stop failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-        rawChatClientRef = null;
-      }
       // Clean up raw chat indexer hook (remove listener, clear pending timers).
       if (rawChatCleanupRef) {
         try {
           rawChatCleanupRef();
         } catch (err) {
-          log.warn(`raw chat hook cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
+          log.warn(
+            `raw chat hook cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
         rawChatCleanupRef = null;
       }

@@ -6,7 +6,6 @@ import { readSessionStoreReadOnly } from "../config/sessions/store-read.js";
 import { resolveFreshSessionTotalTokens, type SessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.js";
 import { listGatewayAgentsBasic } from "../gateway/agent-list.js";
-import { resolveHeartbeatSummaryForAgent } from "../infra/heartbeat-summary.js";
 import { peekSystemEvents } from "../infra/system-events.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
@@ -124,15 +123,12 @@ export async function getStatusSummary(
       )
     : null;
   const agentList = listGatewayAgentsBasic(cfg);
-  const heartbeatAgents: HeartbeatStatus[] = agentList.agents.map((agent) => {
-    const summary = resolveHeartbeatSummaryForAgent(cfg, agent.id);
-    return {
-      agentId: agent.id,
-      enabled: summary.enabled,
-      every: summary.every,
-      everyMs: summary.everyMs,
-    } satisfies HeartbeatStatus;
-  });
+  const heartbeatAgents: HeartbeatStatus[] = agentList.agents.map((agent) => ({
+    agentId: agent.id,
+    enabled: false,
+    every: "",
+    everyMs: null,
+  }));
   const channelSummary = needsChannelPlugins
     ? await loadChannelSummaryModule().then(({ buildChannelSummary }) =>
         buildChannelSummary(cfg, {

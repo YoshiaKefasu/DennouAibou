@@ -131,8 +131,8 @@ export function toText(value: unknown): string | undefined {
 export function resolveMessageId(entry: Record<string, unknown>): string | undefined {
   return (
     toText(entry.id) ??
-    (entry.__openclaw && typeof entry.__openclaw === "object"
-      ? toText((entry.__openclaw as { id?: unknown }).id)
+    (entry.__dennou && typeof entry.__dennou === "object"
+      ? toText((entry.__dennou as { id?: unknown }).id)
       : undefined)
   );
 }

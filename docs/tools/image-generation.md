@@ -38,10 +38,10 @@ The agent calls `image_generate` automatically. No tool allow-listing needed —
 
 ## Supported providers
 
-| Provider | Default model                    | Edit support                       | API key                                               |
-| -------- | -------------------------------- | ---------------------------------- | ----------------------------------------------------- |
-| OpenAI   | `gpt-image-1`                    | Yes (up to 5 images)               | `OPENAI_API_KEY`                                      |
-| Google   | `gemini-3.1-flash-image-preview` | Yes                                | `GEMINI_API_KEY` or `GOOGLE_API_KEY`                  |
+| Provider | Default model                    | Edit support         | API key                              |
+| -------- | -------------------------------- | -------------------- | ------------------------------------ |
+| OpenAI   | `gpt-image-1`                    | Yes (up to 5 images) | `OPENAI_API_KEY`                     |
+| Google   | `gemini-3.1-flash-image-preview` | Yes                  | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 
 Use `action: "list"` to inspect available providers and models at runtime:
 
@@ -85,7 +85,7 @@ Not all providers support all parameters. The tool passes what each provider sup
 
 ### Provider selection order
 
-When generating an image, OpenClaw tries providers in this order:
+When generating an image, DennouAibou tries providers in this order:
 
 1. **`model` parameter** from the tool call (if the agent specifies one)
 2. **`imageGenerationModel.primary`** from config
@@ -99,7 +99,7 @@ If a provider fails (auth error, rate limit, etc.), the next candidate is tried 
 Notes:
 
 - Auto-detection is auth-aware. A provider default only enters the candidate list
-  when OpenClaw can actually authenticate that provider.
+  when DennouAibou can actually authenticate that provider.
 - Use `action: "list"` to inspect the currently registered providers, their
   default models, and auth env-var hints.
 
@@ -115,7 +115,7 @@ OpenAI and Google support up to 5 reference images via the `images` parameter.
 
 ## Provider capabilities
 
-| Capability            | OpenAI               | Google |
+| Capability            | OpenAI               | Google               |
 | --------------------- | -------------------- | -------------------- |
 | Generate              | Yes (up to 4)        | Yes (up to 4)        |
 | Edit/reference        | Yes (up to 5 images) | Yes (up to 5 images) |

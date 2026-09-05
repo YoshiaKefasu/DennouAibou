@@ -19,7 +19,21 @@ type PluginSdkPackageJson = {
   bin?: string | Record<string, unknown>;
 };
 
-const STARTUP_ARGV1 = process.argv[1];
+// Safe: `process.argv[1]` is a Node-only global. The ui bundle is built by
+// Vite from this file and statically imports it indirectly via
+// `resolveLoaderPluginSdkPackageRoot` defaults; if a future tree-shake change
+// keeps this top-level reference alive, the browser tab would crash with
+// `ReferenceError: process is not defined` before any UI code runs. Wrap the
+// eager read in a try/catch so the bundle degrades gracefully to an empty
+// sentinel that downstream code already handles via the `argv1` parameter
+// override.
+const STARTUP_ARGV1: string = (() => {
+  try {
+    return process.argv[1] ?? "";
+  } catch {
+    return "";
+  }
+})();
 
 export function normalizeJitiAliasTargetPath(targetPath: string): string {
   return process.platform === "win32" ? targetPath.replace(/\\/g, "/") : targetPath;

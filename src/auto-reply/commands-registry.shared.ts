@@ -229,49 +229,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       ],
     }),
     defineChatCommand({
-      key: "tts",
-      nativeName: "tts",
-      description: "Control text-to-speech (TTS).",
-      textAlias: "/tts",
-      category: "media",
-      args: [
-        {
-          name: "action",
-          description: "TTS action",
-          type: "string",
-          choices: [
-            { value: "on", label: "On" },
-            { value: "off", label: "Off" },
-            { value: "status", label: "Status" },
-            { value: "provider", label: "Provider" },
-            { value: "limit", label: "Limit" },
-            { value: "summary", label: "Summary" },
-            { value: "audio", label: "Audio" },
-            { value: "help", label: "Help" },
-          ],
-        },
-        {
-          name: "value",
-          description: "Provider, limit, or text",
-          type: "string",
-          captureRemaining: true,
-        },
-      ],
-      argsMenu: {
-        arg: "action",
-        title:
-          "TTS Actions:\n" +
-          "• On – Enable TTS for responses\n" +
-          "• Off – Disable TTS\n" +
-          "• Status – Show current settings\n" +
-          "• Provider – Show or set the voice provider\n" +
-          "• Limit – Set max characters for TTS\n" +
-          "• Summary – Toggle AI summary for long texts\n" +
-          "• Audio – Generate TTS from custom text\n" +
-          "• Help – Show usage guide",
-      },
-    }),
-    defineChatCommand({
       key: "whoami",
       nativeName: "whoami",
       description: "Show your sender id.",
@@ -321,46 +278,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
         {
           name: "value",
           description: "Additional input (limit/message)",
-          type: "string",
-          captureRemaining: true,
-        },
-      ],
-      argsMenu: "auto",
-    }),
-    defineChatCommand({
-      key: "acp",
-      nativeName: "acp",
-      description: "Manage ACP sessions and runtime options.",
-      textAlias: "/acp",
-      category: "management",
-      args: [
-        {
-          name: "action",
-          description: "Action to run",
-          type: "string",
-          preferAutocomplete: true,
-          choices: [
-            "spawn",
-            "cancel",
-            "steer",
-            "close",
-            "sessions",
-            "status",
-            "set-mode",
-            "set",
-            "cwd",
-            "permissions",
-            "timeout",
-            "model",
-            "reset-options",
-            "doctor",
-            "install",
-            "help",
-          ],
-        },
-        {
-          name: "value",
-          description: "Action arguments",
           type: "string",
           captureRemaining: true,
         },
@@ -640,7 +557,7 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       args: [
         {
           name: "level",
-          description: "off, minimal, low, medium, high, xhigh",
+          description: "off, minimal, low, medium, high, xhigh, max",
           type: "string",
           choices: ({ provider, model }) => listThinkingLevels(provider, model),
         },

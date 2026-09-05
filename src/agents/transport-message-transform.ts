@@ -1,4 +1,4 @@
-import type { Api, Context, Model } from "@mariozechner/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
 
 export function transformTransportMessages(
   messages: Context["messages"],

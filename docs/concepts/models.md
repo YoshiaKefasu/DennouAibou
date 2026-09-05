@@ -15,7 +15,7 @@ Quick provider overview + examples: [/concepts/model-providers](/concepts/model-
 
 ## How model selection works
 
-OpenClaw selects models in this order:
+DennouAibou selects models in this order:
 
 1. **Primary** model (`agents.defaults.model.primary` or `agents.defaults.model`).
 2. **Fallbacks** in `agents.defaults.model.fallbacks` (in order).
@@ -24,7 +24,7 @@ OpenClaw selects models in this order:
 
 Related:
 
-- `agents.defaults.models` is the allowlist/catalog of models OpenClaw can use (plus aliases).
+- `agents.defaults.models` is the allowlist/catalog of models DennouAibou can use (plus aliases).
 - `agents.defaults.imageModel` is used **only when** the primary model can’t accept images.
 - `agents.defaults.pdfModel` is used by the `pdf` tool. If omitted, the tool
   falls back to `agents.defaults.imageModel`, then the resolved session/default
@@ -71,7 +71,7 @@ Provider configuration examples live in
 
 If `agents.defaults.models` is set, it becomes the **allowlist** for `/model` and for
 session overrides. When a user selects a model that isn’t in that allowlist,
-OpenClaw returns:
+DennouAibou returns:
 
 ```
 Model "provider/model" is not allowed. Use /model to list available models.
@@ -117,16 +117,16 @@ Notes:
 - `/model <#>` selects from that picker.
 - `/model` persists the new session selection immediately.
 - If the agent is idle, the next run uses the new model right away.
-- If a run is already active, OpenClaw marks a live switch as pending and only restarts into the new model at a clean retry point.
+- If a run is already active, DennouAibou marks a live switch as pending and only restarts into the new model at a clean retry point.
 - If tool activity or reply output has already started, the pending switch can stay queued until a later retry opportunity or the next user turn.
 - `/model status` is the detailed view (auth candidates and, when configured, provider endpoint `baseUrl` + `api` mode).
 - Model refs are parsed by splitting on the **first** `/`. Use `provider/model` when typing `/model <ref>`.
 - If the model ID itself contains `/` (OpenRouter-style), you must include the provider prefix (example: `/model openrouter/moonshotai/kimi-k2`).
-- If you omit the provider, OpenClaw resolves the input in this order:
+- If you omit the provider, DennouAibou resolves the input in this order:
   1. alias match
   2. unique configured-provider match for that exact unprefixed model id
   3. deprecated fallback to the configured default provider
-     If that provider no longer exposes the configured default model, OpenClaw
+     If that provider no longer exposes the configured default model, DennouAibou
      instead falls back to the first configured provider/model to avoid
      surfacing a stale removed-provider default.
 
@@ -246,8 +246,8 @@ Merge mode precedence for matching provider IDs:
 - Empty or missing agent `apiKey`/`baseUrl` fall back to config `models.providers`.
 - Other provider fields are refreshed from config and normalized catalog data.
 
-Marker persistence is source-authoritative: OpenClaw writes markers from the active source config snapshot (pre-resolution), not from resolved runtime secret values.
-This applies whenever OpenClaw regenerates `models.json`, including command-driven paths like `openclaw agent`.
+Marker persistence is source-authoritative: DennouAibou writes markers from the active source config snapshot (pre-resolution), not from resolved runtime secret values.
+This applies whenever DennouAibou regenerates `models.json`, including command-driven paths like `openclaw agent`.
 
 ## Related
 

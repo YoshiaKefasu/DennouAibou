@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/raw-chat-search",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "DennouAibou raw chat permanent SQLite index and search plugin",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.5"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

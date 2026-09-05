@@ -14,11 +14,9 @@ export function isTerminalTaskStatus(status: TaskStatus): boolean {
 function resolveTaskDisplayTitle(task: TaskRecord): string {
   return formatTaskStatusTitleText(
     task.label?.trim() ||
-      (task.runtime === "acp"
-        ? "ACP background task"
-        : task.runtime === "subagent"
-          ? "Subagent task"
-          : task.task.trim() || "Background task"),
+      (task.runtime === "subagent"
+        ? "Subagent task"
+        : task.task.trim() || "Background task"),
   );
 }
 
@@ -114,7 +112,7 @@ export function shouldSuppressDuplicateTerminalDelivery(params: {
   task: TaskRecord;
   preferredTaskId?: string;
 }): boolean {
-  if (params.task.runtime !== "acp" || !params.task.runId?.trim()) {
+  if (!params.preferredTaskId) {
     return false;
   }
   return Boolean(params.preferredTaskId && params.preferredTaskId !== params.task.taskId);

@@ -361,11 +361,11 @@ describe("config strict validation", () => {
   it("does not treat resolved-only gateway.bind aliases as source-literal legacy or invalid", async () => {
     await withTempHome(async (home) => {
       await writeOpenClawConfig(home, {
-        gateway: { bind: "${OPENCLAW_BIND}" },
+        gateway: { bind: "${DENNOU_BIND}" },
       });
 
-      const prev = process.env.OPENCLAW_BIND;
-      process.env.OPENCLAW_BIND = "0.0.0.0";
+      const prev = process.env.DENNOU_BIND;
+      process.env.DENNOU_BIND = "0.0.0.0";
       try {
         const snap = await readConfigFileSnapshot();
         expect(snap.valid).toBe(true);
@@ -373,9 +373,9 @@ describe("config strict validation", () => {
         expect(snap.issues).toHaveLength(0);
       } finally {
         if (prev === undefined) {
-          delete process.env.OPENCLAW_BIND;
+          delete process.env.DENNOU_BIND;
         } else {
-          process.env.OPENCLAW_BIND = prev;
+          process.env.DENNOU_BIND = prev;
         }
       }
     });

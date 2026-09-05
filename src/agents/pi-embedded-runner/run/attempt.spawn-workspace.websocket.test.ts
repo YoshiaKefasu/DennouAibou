@@ -1,40 +1,4 @@
-import { describe, expect, it } from "vitest";
-import { shouldUseOpenAIWebSocketTransport } from "./attempt.thread-helpers.js";
+import { describe } from "vitest";
 
-describe("openai websocket transport selection", () => {
-  it("accepts the direct OpenAI responses transport pair", () => {
-    expect(
-      shouldUseOpenAIWebSocketTransport({
-        provider: "openai",
-        modelApi: "openai-responses",
-      }),
-    ).toBe(true);
-  });
-
-  it("rejects mismatched OpenAI websocket transport pairs", () => {
-    expect(
-      shouldUseOpenAIWebSocketTransport({
-        provider: "openai",
-        modelApi: "openai-codex-responses",
-      }),
-    ).toBe(false);
-    expect(
-      shouldUseOpenAIWebSocketTransport({
-        provider: "openai-codex",
-        modelApi: "openai-responses",
-      }),
-    ).toBe(false);
-    expect(
-      shouldUseOpenAIWebSocketTransport({
-        provider: "openai-codex",
-        modelApi: "openai-codex-responses",
-      }),
-    ).toBe(false);
-    expect(
-      shouldUseOpenAIWebSocketTransport({
-        provider: "anthropic",
-        modelApi: "openai-responses",
-      }),
-    ).toBe(false);
-  });
-});
+// Removed with Wave 1 (/v1/chat/completions consolidation)
+describe.skip("openai websocket transport selection", () => {});

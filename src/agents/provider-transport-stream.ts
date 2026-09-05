@@ -1,45 +1,18 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import { createAnthropicMessagesTransportStreamFn } from "./anthropic-transport-stream.js";
-import { createGoogleGenerativeAiTransportStreamFn } from "./google-transport-stream.js";
-import {
-  createAzureOpenAIResponsesTransportStreamFn,
-  createOpenAICompletionsTransportStreamFn,
-  createOpenAIResponsesTransportStreamFn,
-} from "./openai-transport-stream.js";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import { createOpenAICompletionsTransportStreamFn } from "./openai-transport-stream.js";
 import { getModelProviderRequestTransport } from "./provider-request-config.js";
 
-const SUPPORTED_TRANSPORT_APIS = new Set<Api>([
-  "openai-responses",
-  "openai-codex-responses",
-  "openai-completions",
-  "azure-openai-responses",
-  "anthropic-messages",
-  "google-generative-ai",
-]);
+const SUPPORTED_TRANSPORT_APIS = new Set<Api>(["openai-completions"]);
 
 const SIMPLE_TRANSPORT_API_ALIAS: Record<string, Api> = {
-  "openai-responses": "openclaw-openai-responses-transport",
-  "openai-codex-responses": "openclaw-openai-responses-transport",
   "openai-completions": "openclaw-openai-completions-transport",
-  "azure-openai-responses": "openclaw-azure-openai-responses-transport",
-  "anthropic-messages": "openclaw-anthropic-messages-transport",
-  "google-generative-ai": "openclaw-google-generative-ai-transport",
 };
 
 function createSupportedTransportStreamFn(api: Api): StreamFn | undefined {
   switch (api) {
-    case "openai-responses":
-    case "openai-codex-responses":
-      return createOpenAIResponsesTransportStreamFn();
     case "openai-completions":
       return createOpenAICompletionsTransportStreamFn();
-    case "azure-openai-responses":
-      return createAzureOpenAIResponsesTransportStreamFn();
-    case "anthropic-messages":
-      return createAnthropicMessagesTransportStreamFn();
-    case "google-generative-ai":
-      return createGoogleGenerativeAiTransportStreamFn();
     default:
       return undefined;
   }

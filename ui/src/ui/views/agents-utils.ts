@@ -3,7 +3,7 @@ import {
   expandToolGroups,
   normalizeToolName,
   resolveToolProfilePolicy,
-} from "../../../../src/agents/tool-policy-shared.js";
+} from "../_shared/tool-policy.ts";
 import type {
   AgentIdentityResult,
   AgentsFilesListResult,

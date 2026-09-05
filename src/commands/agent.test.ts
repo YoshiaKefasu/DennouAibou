@@ -3,7 +3,6 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
-import { __testing as acpManagerTesting } from "../acp/control-plane/manager.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../agents/agent-scope.js";
 import * as authProfilesModule from "../agents/auth-profiles.js";
 import { resolveSession } from "../agents/command/session.js";
@@ -320,7 +319,7 @@ beforeEach(() => {
   resetAgentEventsForTest();
   resetAgentRunContextForTest();
   resetPluginRuntimeStateForTest();
-  acpManagerTesting.resetAcpSessionManagerForTests();
+  
   configModule.clearRuntimeConfigSnapshot();
   vi.mocked(runEmbeddedPiAgent).mockResolvedValue(createDefaultAgentResult());
   vi.mocked(loadModelCatalog).mockResolvedValue([]);
@@ -591,7 +590,7 @@ describe("agentCommand", () => {
     });
   });
 
-  it("uses origin.provider for channel-specific session reset overrides", async () => {
+  it("reuses an existing main session even with legacy reset / resetByChannel config (no auto-reset)", async () => {
     await withTempHome(async (home) => {
       const store = path.join(home, "sessions.json");
       writeSessionStoreSeed(store, {
@@ -602,6 +601,10 @@ describe("agentCommand", () => {
         },
       });
       const cfg = mockConfig(home, store);
+      // The legacy `session.reset` / `session.resetByChannel` keys are still
+      // accepted by the zod schema for backward compatibility, but they have
+      // no effect at runtime. Sessions are never rotated automatically, so an
+      // existing entry must always be reused when present.
       cfg.session = {
         ...cfg.session,
         reset: { mode: "idle", idleMinutes: 10 },

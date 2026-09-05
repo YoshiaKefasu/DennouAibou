@@ -14,7 +14,7 @@ type RegisterContextEngineForOwnerOptions = {
   allowSameOwnerRefresh?: boolean;
 };
 
-const LEGACY_SESSION_KEY_COMPAT = Symbol.for("openclaw.contextEngine.sessionKeyCompat");
+const LEGACY_SESSION_KEY_COMPAT = Symbol.for("dennou.contextEngine.sessionKeyCompat");
 const SESSION_KEY_COMPAT_METHODS = [
   "bootstrap",
   "maintain",
@@ -302,7 +302,7 @@ function wrapContextEngineWithSessionKeyCompat(engine: ContextEngine): ContextEn
 // Registry (module-level singleton)
 // ---------------------------------------------------------------------------
 
-const CONTEXT_ENGINE_REGISTRY_STATE = Symbol.for("openclaw.contextEngineRegistryState");
+const CONTEXT_ENGINE_REGISTRY_STATE = Symbol.for("dennou.contextEngineRegistryState");
 const CORE_CONTEXT_ENGINE_OWNER = "core";
 const PUBLIC_CONTEXT_ENGINE_OWNER = "public-sdk";
 

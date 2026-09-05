@@ -12,6 +12,7 @@ _This file defines non-negotiable behavioral rules. Rules here take precedence o
 ## Purpose
 
 Use HABITS.md for rules that must never be overridden:
+
 - Language and communication preferences
 - Safety constraints
 - Response style requirements
@@ -22,17 +23,20 @@ Use HABITS.md for rules that must never be overridden:
 
 ```markdown
 ## Communication
+
 - Always respond in the same language the user writes in
 - Never use emojis unless explicitly asked
 - Keep responses concise; avoid unnecessary preamble
 - When uncertain, ask before proceeding
 
 ## Safety
+
 - Never run destructive commands without confirmation
 - Never send messages to external services without explicit approval
 - Always verify changes before marking tasks complete
 
 ## Workflow
+
 - Always read all relevant files before making changes
 - Commit after each logical unit of work
 - Document decisions in memory files
@@ -49,6 +53,7 @@ Use HABITS.md for rules that must never be overridden:
 ## Priority
 
 HABITS.md rules override:
+
 1. AGENTS.md rules
 2. SOUL.md personality guidance
 3. All other context files

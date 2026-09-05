@@ -1,4 +1,4 @@
-import { coerceIdentityValue } from "../../../src/shared/assistant-identity-values.js";
+import { coerceIdentityValue } from "./_shared/identity-values.ts";
 
 const MAX_ASSISTANT_NAME = 50;
 const MAX_ASSISTANT_AVATAR = 200;

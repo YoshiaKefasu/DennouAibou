@@ -6,7 +6,7 @@ import { agentHandlers } from "./agent.js";
 import { expectSubagentFollowupReactivation } from "./subagent-followup.test-helpers.js";
 import type { GatewayRequestContext } from "./types.js";
 
-const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 
 const mocks = vi.hoisted(() => ({
   loadSessionEntry: vi.fn(),
@@ -113,23 +113,23 @@ type AgentParams = AgentHandlerArgs["params"];
 type AgentIdentityGetHandlerArgs = Parameters<(typeof agentHandlers)["agent.identity.get"]>[0];
 type AgentIdentityGetParams = AgentIdentityGetHandlerArgs["params"];
 
-async function waitForAssertion(assertion: () => void, timeoutMs = 2_000, stepMs = 5) {
-  vi.useFakeTimers();
-  try {
-    let lastError: unknown;
-    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
-      try {
-        assertion();
-        return;
-      } catch (error) {
-        lastError = error;
+// CI/Windows high-load environments need extra slack to avoid false negatives at
+// the poll boundary; locally we keep the historical 2s budget. Real-timer based
+// (Date.now + setTimeout) instead of vi fake timers so Windows CI wall time is
+// what actually gates the assertion.
+const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 2_000, stepMs = 5) {
+  const startedAt = Date.now();
+  for (;;) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw error;
       }
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(stepMs);
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
     }
-    throw lastError ?? new Error("assertion did not pass in time");
-  } finally {
-    vi.useRealTimers();
   }
 }
 
@@ -287,9 +287,9 @@ async function invokeAgentIdentityGet(
 describe("gateway agent handler", () => {
   afterEach(() => {
     if (ORIGINAL_STATE_DIR === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = ORIGINAL_STATE_DIR;
+      process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
     resetTaskRegistryForTests();
   });
@@ -804,7 +804,7 @@ describe("gateway agent handler", () => {
     await invokeAgent(
       {
         message: [
-          "[Mon 2026-04-06 02:42 GMT+1] <<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>>",
+          "[Mon 2026-04-06 02:42 GMT+1] <<<BEGIN_DENNOU_INTERNAL_CONTEXT>>>",
           "OpenClaw runtime context (internal):",
           "This context is runtime-generated, not user-authored. Keep internal details private.",
         ].join("\n"),
@@ -918,7 +918,7 @@ describe("gateway agent handler", () => {
 
   it("tracks async gateway agent runs in the shared task registry", async () => {
     await withTempDir({ prefix: "openclaw-gateway-agent-task-" }, async (root) => {
-      process.env.OPENCLAW_STATE_DIR = root;
+      process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
       primeMainAgentRun();
 

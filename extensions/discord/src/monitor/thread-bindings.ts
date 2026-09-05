@@ -32,13 +32,10 @@ export {
   autoBindSpawnedDiscordSubagent,
   listThreadBindingsBySessionKey,
   listThreadBindingsForAccount,
-  reconcileAcpThreadBindingsOnStartup,
   setThreadBindingIdleTimeoutBySessionKey,
   setThreadBindingMaxAgeBySessionKey,
   unbindThreadBindingsBySessionKey,
 } from "./thread-bindings.lifecycle.js";
-
-export type { AcpThreadBindingReconciliationResult } from "./thread-bindings.lifecycle.js";
 
 export {
   __testing,

@@ -7,14 +7,12 @@ import { ChannelType, type Client, ReadyListener } from "@buape/carbon";
 import type { VoicePlugin } from "@buape/carbon/voice";
 import { resolveAgentDir } from "openclaw/plugin-sdk/agent-runtime";
 import { agentCommandFromIngress } from "openclaw/plugin-sdk/agent-runtime";
-import { resolveTtsConfig, type ResolvedTtsConfig } from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
-import type { DiscordAccountConfig, TtsConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { DiscordAccountConfig } from "openclaw/plugin-sdk/config-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { logVerbose, shouldLogVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
-import { parseTtsDirectives } from "openclaw/plugin-sdk/speech";
 import { formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { formatMention } from "../mentions.js";
@@ -26,121 +24,24 @@ import { loadDiscordVoiceSdk } from "./sdk-runtime.js";
 
 const require = createRequire(import.meta.url);
 
-const SAMPLE_RATE = 48_000;
-const CHANNELS = 2;
-const BIT_DEPTH = 16;
 const MIN_SEGMENT_SECONDS = 0.35;
 const SILENCE_DURATION_MS = 1_000;
 const VOICE_CONNECT_READY_TIMEOUT_MS = 15_000;
-const PLAYBACK_READY_TIMEOUT_MS = 60_000;
-const SPEAKING_READY_TIMEOUT_MS = 60_000;
+
 const DECRYPT_FAILURE_WINDOW_MS = 30_000;
 const DECRYPT_FAILURE_RECONNECT_THRESHOLD = 3;
 const DECRYPT_FAILURE_PATTERN = /DecryptionFailed\(/;
 const SPEAKER_CONTEXT_CACHE_TTL_MS = 60_000;
+
+const SAMPLE_RATE = 48_000;
+const CHANNELS = 2;
+const BIT_DEPTH = 16;
 
 const logger = createSubsystemLogger("discord/voice");
 
 const logVoiceVerbose = (message: string) => {
   logVerbose(`discord voice: ${message}`);
 };
-
-type VoiceOperationResult = {
-  ok: boolean;
-  message: string;
-  channelId?: string;
-  guildId?: string;
-};
-
-type VoiceSessionEntry = {
-  guildId: string;
-  guildName?: string;
-  channelId: string;
-  channelName?: string;
-  sessionChannelId: string;
-  route: ReturnType<typeof resolveAgentRoute>;
-  connection: import("@discordjs/voice").VoiceConnection;
-  player: import("@discordjs/voice").AudioPlayer;
-  playbackQueue: Promise<void>;
-  processingQueue: Promise<void>;
-  activeSpeakers: Set<string>;
-  decryptFailureCount: number;
-  lastDecryptFailureAt: number;
-  decryptRecoveryInFlight: boolean;
-  stop: () => void;
-};
-
-function mergeTtsConfig(base: TtsConfig, override?: TtsConfig): TtsConfig {
-  if (!override) {
-    return base;
-  }
-  const baseProviders = base.providers ?? {};
-  const overrideProviders = override.providers ?? {};
-  const mergedProviders = Object.fromEntries(
-    [...new Set([...Object.keys(baseProviders), ...Object.keys(overrideProviders)])].map(
-      (providerId) => {
-        const baseProvider = baseProviders[providerId] ?? {};
-        const overrideProvider = overrideProviders[providerId] ?? {};
-        return [
-          providerId,
-          {
-            ...baseProvider,
-            ...overrideProvider,
-          },
-        ];
-      },
-    ),
-  );
-  return {
-    ...base,
-    ...override,
-    modelOverrides: {
-      ...base.modelOverrides,
-      ...override.modelOverrides,
-    },
-    ...(Object.keys(mergedProviders).length === 0 ? {} : { providers: mergedProviders }),
-  };
-}
-
-function resolveVoiceTtsConfig(params: { cfg: OpenClawConfig; override?: TtsConfig }): {
-  cfg: OpenClawConfig;
-  resolved: ResolvedTtsConfig;
-} {
-  if (!params.override) {
-    return { cfg: params.cfg, resolved: resolveTtsConfig(params.cfg) };
-  }
-  const base = params.cfg.messages?.tts ?? {};
-  const merged = mergeTtsConfig(base, params.override);
-  const messages = params.cfg.messages ?? {};
-  const cfg = {
-    ...params.cfg,
-    messages: {
-      ...messages,
-      tts: merged,
-    },
-  };
-  return { cfg, resolved: resolveTtsConfig(cfg) };
-}
-
-function buildWavBuffer(pcm: Buffer): Buffer {
-  const blockAlign = (CHANNELS * BIT_DEPTH) / 8;
-  const byteRate = SAMPLE_RATE * blockAlign;
-  const header = Buffer.alloc(44);
-  header.write("RIFF", 0);
-  header.writeUInt32LE(36 + pcm.length, 4);
-  header.write("WAVE", 8);
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(CHANNELS, 22);
-  header.writeUInt32LE(SAMPLE_RATE, 24);
-  header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(BIT_DEPTH, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(pcm.length, 40);
-  return Buffer.concat([header, pcm]);
-}
 
 type OpusDecoder = {
   decode: (buffer: Buffer) => Buffer;
@@ -201,9 +102,25 @@ function estimateDurationSeconds(pcm: Buffer): number {
 }
 
 async function writeWavFile(pcm: Buffer): Promise<{ path: string; durationSeconds: number }> {
+  const blockAlign = (CHANNELS * BIT_DEPTH) / 8;
+  const byteRate = SAMPLE_RATE * blockAlign;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(CHANNELS, 22);
+  header.writeUInt32LE(SAMPLE_RATE, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(BIT_DEPTH, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(pcm.length, 40);
+  const wav = Buffer.concat([header, pcm]);
   const tempDir = await fs.mkdtemp(path.join(resolvePreferredOpenClawTmpDir(), "discord-voice-"));
   const filePath = path.join(tempDir, `segment-${randomUUID()}.wav`);
-  const wav = buildWavBuffer(pcm);
   await fs.writeFile(filePath, wav);
   scheduleTempCleanup(tempDir);
   return { path: filePath, durationSeconds: estimateDurationSeconds(pcm) };
@@ -219,6 +136,30 @@ function scheduleTempCleanup(tempDir: string, delayMs: number = 30 * 60 * 1000):
   }, delayMs);
   timer.unref();
 }
+
+type VoiceOperationResult = {
+  ok: boolean;
+  message: string;
+  channelId?: string;
+  guildId?: string;
+};
+
+type VoiceSessionEntry = {
+  guildId: string;
+  guildName?: string;
+  channelId: string;
+  channelName?: string;
+  sessionChannelId: string;
+  route: ReturnType<typeof resolveAgentRoute>;
+  connection: import("@discordjs/voice").VoiceConnection;
+  player: import("@discordjs/voice").AudioPlayer;
+  processingQueue: Promise<void>;
+  activeSpeakers: Set<string>;
+  decryptFailureCount: number;
+  lastDecryptFailureAt: number;
+  decryptRecoveryInFlight: boolean;
+  stop: () => void;
+};
 
 async function transcribeAudio(params: {
   cfg: OpenClawConfig;
@@ -444,7 +385,6 @@ export class DiscordVoiceManager {
       route,
       connection,
       player,
-      playbackQueue: Promise.resolve(),
       processingQueue: Promise.resolve(),
       activeSpeakers: new Set(),
       decryptFailureCount: 0,
@@ -538,12 +478,6 @@ export class DiscordVoiceManager {
     entry.processingQueue = entry.processingQueue
       .then(task)
       .catch((err) => logger.warn(`discord voice: processing failed: ${formatErrorMessage(err)}`));
-  }
-
-  private enqueuePlayback(entry: VoiceSessionEntry, task: () => Promise<void>) {
-    entry.playbackQueue = entry.playbackQueue
-      .then(task)
-      .catch((err) => logger.warn(`discord voice: playback failed: ${formatErrorMessage(err)}`));
   }
 
   private async handleSpeakingStart(entry: VoiceSessionEntry, userId: string) {
@@ -685,53 +619,7 @@ export class DiscordVoiceManager {
     logVoiceVerbose(
       `reply ok (${replyText.length} chars): guild ${entry.guildId} channel ${entry.channelId}`,
     );
-
-    const { cfg: ttsCfg, resolved: ttsConfig } = resolveVoiceTtsConfig({
-      cfg: this.params.cfg,
-      override: this.params.discordConfig.voice?.tts,
-    });
-    const directive = parseTtsDirectives(replyText, ttsConfig.modelOverrides, {
-      cfg: ttsCfg,
-      providerConfigs: ttsConfig.providerConfigs,
-    });
-    const speakText = directive.overrides.ttsText ?? directive.cleanedText.trim();
-    if (!speakText) {
-      logVoiceVerbose(
-        `tts skipped (empty): guild ${entry.guildId} channel ${entry.channelId} user ${userId}`,
-      );
-      return;
-    }
-
-    const ttsResult = await getDiscordRuntime().tts.textToSpeech({
-      text: speakText,
-      cfg: ttsCfg,
-      channel: "discord",
-      overrides: directive.overrides,
-    });
-    if (!ttsResult.success || !ttsResult.audioPath) {
-      logger.warn(`discord voice: TTS failed: ${ttsResult.error ?? "unknown error"}`);
-      return;
-    }
-    const audioPath = ttsResult.audioPath;
-    logVoiceVerbose(
-      `tts ok (${speakText.length} chars): guild ${entry.guildId} channel ${entry.channelId}`,
-    );
-
-    this.enqueuePlayback(entry, async () => {
-      logVoiceVerbose(
-        `playback start: guild ${entry.guildId} channel ${entry.channelId} file ${path.basename(audioPath)}`,
-      );
-      const voiceSdk = loadDiscordVoiceSdk();
-      const resource = voiceSdk.createAudioResource(audioPath);
-      entry.player.play(resource);
-      await voiceSdk
-        .entersState(entry.player, voiceSdk.AudioPlayerStatus.Playing, PLAYBACK_READY_TIMEOUT_MS)
-        .catch(() => undefined);
-      await voiceSdk
-        .entersState(entry.player, voiceSdk.AudioPlayerStatus.Idle, SPEAKING_READY_TIMEOUT_MS)
-        .catch(() => undefined);
-      logVoiceVerbose(`playback done: guild ${entry.guildId} channel ${entry.channelId}`);
-    });
+    // Text reply is delivered as text only.
   }
 
   private handleReceiveError(entry: VoiceSessionEntry, err: unknown) {

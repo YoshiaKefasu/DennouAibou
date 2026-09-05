@@ -1,6 +1,6 @@
 import { sanitizeUserFacingText } from "../../agents/pi-embedded-helpers.js";
 import { hasReplyPayloadContent } from "../../interactive/payload.js";
-import { stripHeartbeatToken } from "../heartbeat.js";
+import { stripHeartbeatToken } from "../heartbeat-token.js";
 import {
   HEARTBEAT_TOKEN,
   isSilentReplyPayloadText,

@@ -13,7 +13,6 @@ import { createDaemonVitestConfig } from "../vitest.daemon.config.ts";
 import { createExtensionAcpxVitestConfig } from "../vitest.extension-acpx.config.ts";
 import { createExtensionChannelsVitestConfig } from "../vitest.extension-channels.config.ts";
 import { createExtensionDiffsVitestConfig } from "../vitest.extension-diffs.config.ts";
-
 import { createExtensionMattermostVitestConfig } from "../vitest.extension-mattermost.config.ts";
 import { createExtensionMemoryVitestConfig } from "../vitest.extension-memory.config.ts";
 import { createExtensionMessagingVitestConfig } from "../vitest.extension-messaging.config.ts";

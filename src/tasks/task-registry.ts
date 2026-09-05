@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { OpenClawConfig } from "../config/config.js";
 import { onAgentEvent } from "../infra/agent-events.js";
-import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
+import { requestWakeNow } from "../infra/event-pump.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
@@ -639,7 +639,7 @@ function findExistingTaskForCreate(params: {
   if (exact) {
     return exact;
   }
-  if (!runId || params.runtime !== "acp") {
+  if (!runId) {
     return undefined;
   }
   if (runScopeMatches.length === 0) {
@@ -969,7 +969,7 @@ function queueTaskSystemEvent(task: TaskRecord, text: string) {
     contextKey: `task:${task.taskId}`,
     deliveryContext: owner.requesterOrigin,
   });
-  requestHeartbeatNow({
+  requestWakeNow({
     reason: "background-task",
     sessionKey: ownerKey,
   });
@@ -991,7 +991,7 @@ function queueBlockedTaskFollowup(task: TaskRecord) {
     contextKey: `task:${task.taskId}:blocked-followup`,
     deliveryContext: owner.requesterOrigin,
   });
-  requestHeartbeatNow({
+  requestWakeNow({
     reason: "background-task-blocked",
     sessionKey: ownerKey,
   });
@@ -1736,14 +1736,7 @@ export async function cancelTaskById(params: {
     };
   }
   try {
-    if (task.runtime === "acp") {
-      const { getAcpSessionManager } = await loadTaskRegistryControlRuntime();
-      await getAcpSessionManager().cancelSession({
-        cfg: params.cfg,
-        sessionKey: childSessionKey,
-        reason: "task-cancel",
-      });
-    } else if (task.runtime === "subagent") {
+    if (task.runtime === "subagent") {
       const { killSubagentRunAdmin } = await loadTaskRegistryControlRuntime();
       const result = await killSubagentRunAdmin({
         cfg: params.cfg,

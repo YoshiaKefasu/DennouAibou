@@ -1,5 +1,5 @@
 import type { CronConfig } from "../../config/types.cron.js";
-import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
+import type { WakeRunResult } from "../../infra/event-pump.js";
 import type {
   CronDeliveryStatus,
   CronJob,
@@ -64,22 +64,23 @@ export type CronServiceDeps = {
     text: string,
     opts?: { agentId?: string; sessionKey?: string; contextKey?: string },
   ) => void;
-  requestHeartbeatNow: (opts?: { reason?: string; agentId?: string; sessionKey?: string }) => void;
-  runHeartbeatOnce?: (opts?: {
+  requestWakeNow: (opts?: { reason?: string; agentId?: string; sessionKey?: string }) => void;
+  runEventPumpOnce?: (opts?: {
     reason?: string;
     agentId?: string;
     sessionKey?: string;
     /** Optional heartbeat config override (e.g. target: "last" for cron-triggered heartbeats). */
     heartbeat?: { target?: string };
-  }) => Promise<HeartbeatRunResult>;
+    deliveryTarget?: string;
+  }) => Promise<WakeRunResult>;
   /**
-   * WakeMode=now: max time to wait for runHeartbeatOnce to stop returning
+   * WakeMode=now: max time to wait for runEventPumpOnce to stop returning
    * { status:"skipped", reason:"requests-in-flight" } before falling back to
-   * requestHeartbeatNow.
+   * requestWakeNow.
    */
-  wakeNowHeartbeatBusyMaxWaitMs?: number;
-  /** WakeMode=now: delay between runHeartbeatOnce retries while busy. */
-  wakeNowHeartbeatBusyRetryDelayMs?: number;
+  wakeNowBusyMaxWaitMs?: number;
+  /** WakeMode=now: delay between runEventPumpOnce retries while busy. */
+  wakeNowBusyRetryDelayMs?: number;
   runIsolatedAgentJob: (params: {
     job: CronJob;
     message: string;

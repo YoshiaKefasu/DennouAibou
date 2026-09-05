@@ -58,7 +58,7 @@ describe("gateway config.apply", () => {
   });
 
   it("rejects config.apply when SecretRef resolution fails", async () => {
-    const missingEnvVar = `OPENCLAW_MISSING_SECRETREF_APPLY_${Date.now()}`;
+    const missingEnvVar = `DENNOU_MISSING_SECRETREF_APPLY_${Date.now()}`;
     delete process.env[missingEnvVar];
     const current = await sendConfigGet("req-secretref-get-before");
     expect(current.ok).toBe(true);
@@ -90,7 +90,7 @@ describe("gateway config.apply", () => {
   });
 
   it("does not reject config.apply for unresolved auth-profile refs outside submitted config", async () => {
-    const missingEnvVar = `OPENCLAW_MISSING_AUTH_PROFILE_REF_APPLY_${Date.now()}`;
+    const missingEnvVar = `DENNOU_MISSING_AUTH_PROFILE_REF_APPLY_${Date.now()}`;
     delete process.env[missingEnvVar];
 
     const authStorePath = path.join(resolveOpenClawAgentDir(), AUTH_PROFILE_FILENAME);

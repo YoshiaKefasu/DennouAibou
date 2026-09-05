@@ -1,4 +1,4 @@
-import { streamSimple } from "@mariozechner/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../../config/config.js";
 import { appendBootstrapPromptWarning } from "../../bootstrap-budget.js";
@@ -237,12 +237,12 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     const wrapperStreamFn = vi.fn();
     const session = {
       agent: {
-        streamFn: baseStreamFn,
+        streamFunction: baseStreamFn,
       },
     };
 
     expect(resolveEmbeddedAgentBaseStreamFn({ session })).toBe(baseStreamFn);
-    session.agent.streamFn = wrapperStreamFn;
+    session.agent.streamFunction = wrapperStreamFn;
     expect(resolveEmbeddedAgentBaseStreamFn({ session })).toBe(baseStreamFn);
   });
 
@@ -251,7 +251,6 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: undefined,
       providerStreamFn,
-      shouldUseWebSocketTransport: false,
       sessionId: "session-1",
       model: {
         api: "openai-completions",
@@ -276,7 +275,6 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: undefined,
       providerStreamFn,
-      shouldUseWebSocketTransport: false,
       sessionId: "session-1",
       model: {
         api: "openai-completions",
@@ -301,10 +299,9 @@ describe("resolveEmbeddedAgentStreamFn", () => {
   it("routes supported default streamSimple fallbacks through boundary-aware transports", () => {
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: undefined,
-      shouldUseWebSocketTransport: false,
       sessionId: "session-1",
       model: {
-        api: "openai-responses",
+        api: "openai-completions",
         provider: "openai",
         id: "gpt-5.4",
       } as never,
@@ -317,10 +314,9 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     const currentStreamFn = vi.fn();
     const streamFn = resolveEmbeddedAgentStreamFn({
       currentStreamFn: currentStreamFn as never,
-      shouldUseWebSocketTransport: false,
       sessionId: "session-1",
       model: {
-        api: "openai-responses",
+        api: "openai-completions",
         provider: "openai",
         id: "gpt-5.4",
       } as never,

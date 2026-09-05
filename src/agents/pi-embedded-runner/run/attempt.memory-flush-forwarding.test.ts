@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+// TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+import type { AuthStorage } from "../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
 import type { AnyAgentTool } from "../../pi-tools.types.js";
 import { buildEmbeddedAttemptToolRunContext } from "./attempt.tool-run-context.js";
 

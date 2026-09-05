@@ -95,7 +95,7 @@ describe("ensureAuthProfileStore", () => {
 
   it("merges main auth profiles into agent store and keeps agent overrides", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-auth-merge-"));
-    const previousAgentDir = process.env.OPENCLAW_AGENT_DIR;
+    const previousAgentDir = process.env.DENNOU_AGENT_DIR;
     const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
     try {
       const mainDir = path.join(root, "main-agent");
@@ -103,7 +103,7 @@ describe("ensureAuthProfileStore", () => {
       fs.mkdirSync(mainDir, { recursive: true });
       fs.mkdirSync(agentDir, { recursive: true });
 
-      process.env.OPENCLAW_AGENT_DIR = mainDir;
+      process.env.DENNOU_AGENT_DIR = mainDir;
       process.env.PI_CODING_AGENT_DIR = mainDir;
 
       const mainStore = {
@@ -156,9 +156,9 @@ describe("ensureAuthProfileStore", () => {
       });
     } finally {
       if (previousAgentDir === undefined) {
-        delete process.env.OPENCLAW_AGENT_DIR;
+        delete process.env.DENNOU_AGENT_DIR;
       } else {
-        process.env.OPENCLAW_AGENT_DIR = previousAgentDir;
+        process.env.DENNOU_AGENT_DIR = previousAgentDir;
       }
       if (previousPiAgentDir === undefined) {
         delete process.env.PI_CODING_AGENT_DIR;
@@ -271,8 +271,8 @@ describe("ensureAuthProfileStore", () => {
 
   it("merges legacy oauth.json into auth-profiles.json", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-oauth-migrate-"));
-    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
-    const previousAgentDir = process.env.OPENCLAW_AGENT_DIR;
+    const previousStateDir = process.env.DENNOU_STATE_DIR;
+    const previousAgentDir = process.env.DENNOU_AGENT_DIR;
     const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
     try {
       const agentDir = path.join(root, "agent");
@@ -296,8 +296,8 @@ describe("ensureAuthProfileStore", () => {
         "utf8",
       );
 
-      process.env.OPENCLAW_STATE_DIR = root;
-      process.env.OPENCLAW_AGENT_DIR = agentDir;
+      process.env.DENNOU_STATE_DIR = root;
+      process.env.DENNOU_AGENT_DIR = agentDir;
       process.env.PI_CODING_AGENT_DIR = agentDir;
       clearRuntimeAuthProfileStoreSnapshots();
 
@@ -323,14 +323,14 @@ describe("ensureAuthProfileStore", () => {
     } finally {
       clearRuntimeAuthProfileStoreSnapshots();
       if (previousStateDir === undefined) {
-        delete process.env.OPENCLAW_STATE_DIR;
+        delete process.env.DENNOU_STATE_DIR;
       } else {
-        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+        process.env.DENNOU_STATE_DIR = previousStateDir;
       }
       if (previousAgentDir === undefined) {
-        delete process.env.OPENCLAW_AGENT_DIR;
+        delete process.env.DENNOU_AGENT_DIR;
       } else {
-        process.env.OPENCLAW_AGENT_DIR = previousAgentDir;
+        process.env.DENNOU_AGENT_DIR = previousAgentDir;
       }
       if (previousPiAgentDir === undefined) {
         delete process.env.PI_CODING_AGENT_DIR;
@@ -344,7 +344,7 @@ describe("ensureAuthProfileStore", () => {
   it("exposes Codex CLI auth without persisting copied tokens into auth-profiles.json", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-codex-external-sync-"));
     const previousCodexHome = process.env.CODEX_HOME;
-    const previousAgentDir = process.env.OPENCLAW_AGENT_DIR;
+    const previousAgentDir = process.env.DENNOU_AGENT_DIR;
     const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
     try {
       const agentDir = path.join(root, "agent");
@@ -370,7 +370,7 @@ describe("ensureAuthProfileStore", () => {
       );
 
       process.env.CODEX_HOME = codexHome;
-      process.env.OPENCLAW_AGENT_DIR = agentDir;
+      process.env.DENNOU_AGENT_DIR = agentDir;
       process.env.PI_CODING_AGENT_DIR = agentDir;
       clearRuntimeAuthProfileStoreSnapshots();
 
@@ -392,9 +392,9 @@ describe("ensureAuthProfileStore", () => {
         process.env.CODEX_HOME = previousCodexHome;
       }
       if (previousAgentDir === undefined) {
-        delete process.env.OPENCLAW_AGENT_DIR;
+        delete process.env.DENNOU_AGENT_DIR;
       } else {
-        process.env.OPENCLAW_AGENT_DIR = previousAgentDir;
+        process.env.DENNOU_AGENT_DIR = previousAgentDir;
       }
       if (previousPiAgentDir === undefined) {
         delete process.env.PI_CODING_AGENT_DIR;

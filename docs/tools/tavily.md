@@ -10,7 +10,7 @@ title: "Tavily"
 
 # Tavily
 
-OpenClaw can use **Tavily** in two ways:
+DennouAibou can use **Tavily** in two ways:
 
 - as the `web_search` provider
 - as explicit plugin tools: `tavily_search` and `tavily_extract`

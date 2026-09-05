@@ -80,7 +80,7 @@ describe("applyPluginAutoEnable channels", () => {
       },
       env: {
         ...makeIsolatedEnv(),
-        OPENCLAW_STATE_DIR: stateDir,
+        DENNOU_STATE_DIR: stateDir,
       },
       manifestRegistry: makeRegistry([]),
     });
@@ -225,9 +225,9 @@ describe("applyPluginAutoEnable channels", () => {
         config: makeApnChannelConfig(),
         env: {
           ...makeIsolatedEnv(),
-          OPENCLAW_HOME: undefined,
-          OPENCLAW_STATE_DIR: stateDir,
-          OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
+          DENNOU_HOME: undefined,
+          DENNOU_STATE_DIR: stateDir,
+          DENNOU_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
         },
       });
 

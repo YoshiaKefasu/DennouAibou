@@ -1,8 +1,4 @@
 import {
-  GATEWAY_EVENT_UPDATE_AVAILABLE,
-  type GatewayUpdateAvailableEventPayload,
-} from "../../../src/gateway/events.js";
-import {
   CHAT_SESSIONS_ACTIVE_MINUTES,
   clearPendingQueueItemsForRun,
   flushChatQueueForEvent,
@@ -43,13 +39,7 @@ import {
 import { GatewayBrowserClient } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
-import type {
-  AgentsListResult,
-  PresenceEntry,
-  HealthSummary,
-  StatusSummary,
-  UpdateAvailable,
-} from "./types.ts";
+import type { AgentsListResult, PresenceEntry, HealthSummary, StatusSummary } from "./types.ts";
 
 function isGenericBrowserFetchFailure(message: string): boolean {
   return /^(?:typeerror:\s*)?(?:fetch failed|failed to fetch)$/i.test(message.trim());
@@ -87,7 +77,6 @@ type GatewayHost = {
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
-  updateAvailable: UpdateAvailable | null;
 };
 
 type SessionDefaultsSnapshot = {
@@ -217,7 +206,7 @@ export function connectGateway(host: GatewayHost, options?: ConnectGatewayOption
     url: host.settings.gatewayUrl,
     token: host.settings.token.trim() ? host.settings.token : undefined,
     password: host.password.trim() ? host.password : undefined,
-    clientName: "openclaw-control-ui",
+    clientName: "dennou-control-ui",
     clientVersion,
     mode: "webchat",
     instanceId: host.clientInstanceId,
@@ -463,11 +452,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     }
     return;
   }
-
-  if (evt.event === GATEWAY_EVENT_UPDATE_AVAILABLE) {
-    const payload = evt.payload as GatewayUpdateAvailableEventPayload | undefined;
-    host.updateAvailable = payload?.updateAvailable ?? null;
-  }
 }
 
 export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
@@ -476,7 +460,6 @@ export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
         presence?: PresenceEntry[];
         health?: HealthSummary;
         sessionDefaults?: SessionDefaultsSnapshot;
-        updateAvailable?: UpdateAvailable;
       }
     | undefined;
   if (snapshot?.presence && Array.isArray(snapshot.presence)) {
@@ -489,5 +472,4 @@ export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   if (snapshot?.sessionDefaults) {
     applySessionDefaults(host, snapshot.sessionDefaults);
   }
-  host.updateAvailable = snapshot?.updateAvailable ?? null;
 }

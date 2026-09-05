@@ -73,24 +73,14 @@ Do **not** rename the npm package, binary, service names, or install paths as pa
 
 ## Rule 6: Raw Chat DB Ownership
 
-**Raw chat DB/index/search production logic must be Go-owned.**
+**Raw chat DB/index/search is TS + SQLite + FTS5 plugin-owned (`extensions/raw-chat-search/`).**
 
-The raw chat permanent DB subsystem uses a Go sidecar (`go/raw-chat/`) for SQLite schema, indexing, FTS search, and context expansion. TypeScript must only own the gateway-facing boundary:
+The raw chat permanent DB subsystem uses a pure TypeScript SQLite engine (`node:sqlite` + FTS5 + WAL mode) packaged as a plugin (`extensions/raw-chat-search/`) for schema management, incremental JSONL indexing, FTS5 keyword search, date/time filtering, and context expansion.
 
-- Go sidecar launch/shutdown
-- Transcript update hook and debounce
-- Typed RPC request/response validation
-- `chat_search` tool registration and compact result formatting
-- Config flag and kill switch wiring
-
-TypeScript must NOT own:
-
-- SQLite schema/migration body
-- JSONL tail indexer as production path
-- FTS search engine as production path
-- Context-window expansion as production path
-
-This separation ensures long-running DB work and memory pressure stay outside the interactive Node.js gateway process. The Go sidecar can be independently tested, profiled, and replaced without touching the TypeScript boundary.
+- `extensions/raw-chat-search/` owns the SQLite schema, FTS5 virtual table, indexer, search engine, and plugin entry.
+- `src/dennou-soul/raw-chat/` delegates to the plugin implementation and exposes backward-compatible entrypoints.
+- Indexing is asynchronous and non-blocking via `onSessionTranscriptUpdate` debounce hook.
+- FTS5 keyword search and exact date/time range queries provide lightweight, fast raw chat history discovery.
 
 ## Rule 7: Test Execution (Speed)
 

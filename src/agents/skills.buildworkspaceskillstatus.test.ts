@@ -141,7 +141,7 @@ describe("buildWorkspaceSkillStatus", () => {
       description: "Bundled peekaboo",
     });
 
-    await withEnvAsync({ OPENCLAW_BUNDLED_SKILLS_DIR: bundledDir }, async () => {
+    await withEnvAsync({ DENNOU_BUNDLED_SKILLS_DIR: bundledDir }, async () => {
       const report = buildWorkspaceSkillStatus("/tmp/ws", {
         entries: [
           makeEntry({

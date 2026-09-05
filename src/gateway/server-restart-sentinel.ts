@@ -3,7 +3,7 @@ import { getChannelPlugin, normalizeChannelId } from "../channels/plugins/index.
 import type { CliDeps } from "../cli/deps.js";
 import { resolveMainSessionKeyFromConfig } from "../config/sessions.js";
 import { parseSessionThreadInfo } from "../config/sessions/thread-info.js";
-import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
+import { requestWakeNow } from "../infra/event-pump.js";
 import { deliverOutboundPayloads } from "../infra/outbound/deliver.js";
 import { ackDelivery, enqueueDelivery, failDelivery } from "../infra/outbound/delivery-queue.js";
 import { buildOutboundSessionContext } from "../infra/outbound/session-context.js";
@@ -36,7 +36,7 @@ function enqueueRestartSentinelWake(
     sessionKey,
     ...(deliveryContext ? { deliveryContext } : {}),
   });
-  requestHeartbeatNow({ reason: "wake", sessionKey });
+  requestWakeNow({ reason: "wake", sessionKey });
 }
 
 async function waitForOutboundRetry(delayMs: number) {

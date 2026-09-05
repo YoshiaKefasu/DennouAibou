@@ -1,5 +1,5 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import type { Context, Model, SimpleStreamOptions } from "@mariozechner/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import type { ThinkLevel } from "../../auto-reply/thinking.shared.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { applyExtraParamsToAgent } from "./extra-params.js";
@@ -45,12 +45,12 @@ export function runExtraParamsCase<
   };
 
   const baseStreamFn: StreamFn = (model, _context, options) => {
-    captured.headers = options?.headers;
+    captured.headers = options?.headers as Record<string, string> | undefined;
     captured.options = options;
     options?.onPayload?.(params.payload, model);
     return createMockStream();
   };
-  const agent = { streamFn: baseStreamFn };
+  const agent = { streamFunction: baseStreamFn };
 
   applyExtraParamsToAgent(
     agent,
@@ -62,7 +62,7 @@ export function runExtraParamsCase<
   );
 
   const context: Context = { messages: [] };
-  void agent.streamFn?.(params.model, context, {
+  void agent.streamFunction?.(params.model, context, {
     ...params.options,
     headers: params.callerHeaders ?? params.options?.headers,
   });

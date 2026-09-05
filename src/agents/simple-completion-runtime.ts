@@ -1,4 +1,5 @@
-import { complete, type Api, type Model } from "@mariozechner/pi-ai";
+import { type Api, type Model } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentDir, resolveAgentEffectiveModelPrimary } from "./agent-scope.js";
 import { DEFAULT_PROVIDER } from "./defaults.js";
@@ -13,7 +14,8 @@ import {
   resolveDefaultModelForAgent,
   resolveModelRefFromString,
 } from "./model-selection.js";
-import { resolveModel } from "./pi-embedded-runner/model.js";
+import { createLegacyAuthStorageAdapter } from "./pi-embedded-runner/auth-storage-adapter.js";
+import { resolveModelAsync } from "./pi-embedded-runner/model.js";
 
 type SimpleCompletionAuthStorage = {
   setRuntimeApiKey: (provider: string, apiKey: string) => void;
@@ -129,7 +131,12 @@ export async function prepareSimpleCompletionModel(params: {
   preferredProfile?: string;
   allowMissingApiKeyModes?: ReadonlyArray<AllowedMissingApiKeyMode>;
 }): Promise<PreparedSimpleCompletionModel> {
-  const resolved = resolveModel(params.provider, params.modelId, params.agentDir, params.cfg);
+  const resolved = await resolveModelAsync(
+    params.provider,
+    params.modelId,
+    params.agentDir,
+    params.cfg,
+  );
   if (!resolved.model) {
     return {
       error: resolved.error ?? `Unknown model: ${params.provider}/${params.modelId}`,
@@ -168,7 +175,7 @@ export async function prepareSimpleCompletionModel(params: {
   let resolvedModel = resolved.model;
   if (rawApiKey) {
     const runtimeCredential = await setRuntimeApiKeyForCompletion({
-      authStorage: resolved.authStorage,
+      authStorage: await createLegacyAuthStorageAdapter(resolved.authStorage),
       model: resolved.model,
       apiKey: rawApiKey,
     });

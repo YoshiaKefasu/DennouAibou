@@ -8,8 +8,8 @@ import { captureEnv } from "../test-utils/env.js";
 let envSnapshot: ReturnType<typeof captureEnv>;
 
 beforeAll(() => {
-  envSnapshot = captureEnv(["OPENCLAW_PROFILE"]);
-  process.env.OPENCLAW_PROFILE = "isolated";
+  envSnapshot = captureEnv(["DENNOU_PROFILE"]);
+  process.env.DENNOU_PROFILE = "isolated";
 });
 
 afterAll(() => {
@@ -434,7 +434,7 @@ vi.mock("../gateway/call.js", () => ({
       if (token && typeof token === "object" && "source" in token) {
         throw new GatewaySecretRefUnavailableError("gateway.auth.token");
       }
-      const envToken = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
+      const envToken = process.env.DENNOU_GATEWAY_TOKEN?.trim();
       return envToken ? { token: envToken } : {};
     },
   ),
@@ -453,31 +453,6 @@ vi.mock("../infra/os-summary.js", () => ({
     release: "23.0.0",
     label: "macos 14.0 (arm64)",
   }),
-}));
-vi.mock("../infra/update-check.js", () => ({
-  checkUpdateStatus: vi.fn().mockResolvedValue({
-    root: "/tmp/openclaw",
-    installKind: "git",
-    packageManager: "pnpm",
-    git: {
-      root: "/tmp/openclaw",
-      branch: "main",
-      upstream: "origin/main",
-      dirty: false,
-      ahead: 0,
-      behind: 0,
-      fetchOk: true,
-    },
-    deps: {
-      manager: "pnpm",
-      status: "ok",
-      lockfilePath: "/tmp/openclaw/pnpm-lock.yaml",
-      markerPath: "/tmp/openclaw/node_modules/.modules.yaml",
-    },
-    registry: { latestVersion: "0.0.0" },
-  }),
-  formatGitInstallLabel: vi.fn(() => "main · @ deadbeef"),
-  compareSemverStrings: vi.fn(() => 0),
 }));
 vi.mock("../config/config.js", () => ({
   loadConfig: mocks.loadConfig,
@@ -923,7 +898,7 @@ describe("statusCommand", () => {
       session: {},
       channels: { whatsapp: { allowFrom: ["*"] } },
     });
-    await withEnvVar("OPENCLAW_GATEWAY_TOKEN", "abcd1234", async () => {
+    await withEnvVar("DENNOU_GATEWAY_TOKEN", "abcd1234", async () => {
       mockProbeGatewayResult({
         ok: true,
         connectLatencyMs: 123,

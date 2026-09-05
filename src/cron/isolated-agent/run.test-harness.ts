@@ -72,7 +72,6 @@ const hasNonzeroUsageMock = createMock();
 const ensureAgentWorkspaceMock = createMock();
 const normalizeThinkLevelMock = createMock();
 const normalizeVerboseLevelMock = createMock();
-const supportsXHighThinkingMock = createMock();
 const resolveSessionTranscriptPathMock = createMock();
 const setSessionRuntimeModelMock = createMock();
 const registerAgentRunContextMock = createMock();
@@ -84,6 +83,7 @@ const resolveHookExternalContentSourceMock = createMock();
 const getSkillsSnapshotVersionMock = createMock();
 const loadModelCatalogMock = createMock();
 const getRemoteSkillEligibilityMock = createMock();
+const isElevatedThinkingDeniedMock = createMock();
 
 vi.mock("./run.runtime.js", () => ({
   resolveAgentConfig: resolveAgentConfigMock,
@@ -113,7 +113,7 @@ vi.mock("./run.runtime.js", () => ({
   DEFAULT_IDENTITY_FILENAME: "IDENTITY.md",
   ensureAgentWorkspace: ensureAgentWorkspaceMock,
   normalizeThinkLevel: normalizeThinkLevelMock,
-  supportsXHighThinking: supportsXHighThinkingMock,
+  isElevatedThinkingDenied: isElevatedThinkingDeniedMock,
   setSessionRuntimeModel: setSessionRuntimeModelMock,
   setCliSessionId: vi.fn(),
   logWarn: (...args: unknown[]) => logWarnMock(...args),
@@ -250,7 +250,7 @@ function resetRunConfigMocks(): void {
   hasNonzeroUsageMock.mockReturnValue(true);
   ensureAgentWorkspaceMock.mockResolvedValue({ dir: "/tmp/workspace" });
   normalizeThinkLevelMock.mockImplementation((value: unknown) => value);
-  supportsXHighThinkingMock.mockReturnValue(false);
+  isElevatedThinkingDeniedMock.mockReturnValue(false);
   buildSafeExternalPromptMock.mockImplementation(
     ({ message }: { message?: string }) => message ?? "",
   );
@@ -336,17 +336,17 @@ export function resetRunCronIsolatedAgentTurnHarness(): void {
 }
 
 export function clearFastTestEnv(): string | undefined {
-  const previousFastTestEnv = process.env.OPENCLAW_TEST_FAST;
-  delete process.env.OPENCLAW_TEST_FAST;
+  const previousFastTestEnv = process.env.DENNOU_TEST_FAST;
+  delete process.env.DENNOU_TEST_FAST;
   return previousFastTestEnv;
 }
 
 export function restoreFastTestEnv(previousFastTestEnv: string | undefined): void {
   if (previousFastTestEnv == null) {
-    delete process.env.OPENCLAW_TEST_FAST;
+    delete process.env.DENNOU_TEST_FAST;
     return;
   }
-  process.env.OPENCLAW_TEST_FAST = previousFastTestEnv;
+  process.env.DENNOU_TEST_FAST = previousFastTestEnv;
 }
 
 export async function loadRunCronIsolatedAgentTurn() {

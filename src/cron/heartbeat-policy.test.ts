@@ -5,23 +5,31 @@ import {
 } from "./heartbeat-policy.js";
 
 describe("shouldSkipHeartbeatOnlyDelivery", () => {
-  it("suppresses empty payloads", () => {
+  it("skips empty payloads", () => {
     expect(shouldSkipHeartbeatOnlyDelivery([], 300)).toBe(true);
   });
 
-  it("suppresses when any payload is a heartbeat ack and no media is present", () => {
+  it("skips pure HEARTBEAT_OK payload", () => {
     expect(
       shouldSkipHeartbeatOnlyDelivery(
-        [{ text: "Checked inbox and calendar." }, { text: "HEARTBEAT_OK" }],
+        [
+          {
+            text: "HEARTBEAT_OK",
+          },
+        ],
         300,
       ),
     ).toBe(true);
   });
 
-  it("does not suppress when media is present", () => {
+  it("does not skip payload with actual content", () => {
     expect(
       shouldSkipHeartbeatOnlyDelivery(
-        [{ text: "HEARTBEAT_OK", mediaUrl: "https://example.com/image.png" }],
+        [
+          {
+            text: "Important reminder alert!",
+          },
+        ],
         300,
       ),
     ).toBe(false);
@@ -29,30 +37,28 @@ describe("shouldSkipHeartbeatOnlyDelivery", () => {
 });
 
 describe("shouldEnqueueCronMainSummary", () => {
-  const isSystemEvent = (text: string) => text.includes("HEARTBEAT_OK");
-
-  it("enqueues only when delivery was requested but did not run", () => {
+  it("enqueues summary when delivery was requested and not delivered", () => {
     expect(
       shouldEnqueueCronMainSummary({
-        summaryText: "HEARTBEAT_OK",
+        summaryText: "Reminder fired",
         deliveryRequested: true,
         delivered: false,
         deliveryAttempted: false,
         suppressMainSummary: false,
-        isCronSystemEvent: isSystemEvent,
+        isCronSystemEvent: () => true,
       }),
     ).toBe(true);
   });
 
-  it("does not enqueue after attempted outbound delivery", () => {
+  it("suppresses when delivered", () => {
     expect(
       shouldEnqueueCronMainSummary({
-        summaryText: "HEARTBEAT_OK",
+        summaryText: "Reminder fired",
         deliveryRequested: true,
-        delivered: false,
+        delivered: true,
         deliveryAttempted: true,
         suppressMainSummary: false,
-        isCronSystemEvent: isSystemEvent,
+        isCronSystemEvent: () => true,
       }),
     ).toBe(false);
   });

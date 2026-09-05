@@ -28,7 +28,7 @@ function createGatewayLog(): GatewayLogMocks {
 export function createConfigWriteSnapshot(config: OpenClawConfig) {
   return {
     snapshot: {
-      path: "/tmp/openclaw.json",
+      path: "/tmp/dennou-aibou.json",
       exists: true,
       raw: JSON.stringify(config, null, 2),
       parsed: config,

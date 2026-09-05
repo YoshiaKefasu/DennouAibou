@@ -168,8 +168,6 @@ export default defineConfig([
     deps: {
       neverBundle: [
         "@lancedb/lancedb",
-        "@matrix-org/matrix-sdk-crypto-nodejs",
-        "matrix-js-sdk",
         ...bundledPluginRuntimeDependencies,
       ],
     },

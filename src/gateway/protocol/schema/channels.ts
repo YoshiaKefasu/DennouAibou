@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { NonEmptyString, SecretInputSchema } from "./primitives.js";
 
 export const TalkModeParamsSchema = Type.Object(
@@ -12,26 +12,6 @@ export const TalkModeParamsSchema = Type.Object(
 export const TalkConfigParamsSchema = Type.Object(
   {
     includeSecrets: Type.Optional(Type.Boolean()),
-  },
-  { additionalProperties: false },
-);
-
-export const TalkSpeakParamsSchema = Type.Object(
-  {
-    text: NonEmptyString,
-    voiceId: Type.Optional(Type.String()),
-    modelId: Type.Optional(Type.String()),
-    outputFormat: Type.Optional(Type.String()),
-    speed: Type.Optional(Type.Number()),
-    rateWpm: Type.Optional(Type.Integer({ minimum: 1 })),
-    stability: Type.Optional(Type.Number()),
-    similarity: Type.Optional(Type.Number()),
-    style: Type.Optional(Type.Number()),
-    speakerBoost: Type.Optional(Type.Boolean()),
-    seed: Type.Optional(Type.Integer({ minimum: 0 })),
-    normalize: Type.Optional(Type.String()),
-    language: Type.Optional(Type.String()),
-    latencyTier: Type.Optional(Type.Integer({ minimum: 0 })),
   },
   { additionalProperties: false },
 );
@@ -87,18 +67,6 @@ export const TalkConfigResultSchema = Type.Object(
       },
       { additionalProperties: false },
     ),
-  },
-  { additionalProperties: false },
-);
-
-export const TalkSpeakResultSchema = Type.Object(
-  {
-    audioBase64: NonEmptyString,
-    provider: NonEmptyString,
-    outputFormat: Type.Optional(Type.String()),
-    voiceCompatible: Type.Optional(Type.Boolean()),
-    mimeType: Type.Optional(Type.String()),
-    fileExtension: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );

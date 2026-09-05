@@ -83,8 +83,8 @@ export function resolveGatewayServiceDescription(params: {
   return (
     params.description ??
     formatGatewayServiceDescription({
-      profile: params.env.OPENCLAW_PROFILE,
-      version: params.environment?.OPENCLAW_SERVICE_VERSION ?? params.env.OPENCLAW_SERVICE_VERSION,
+      profile: params.env.DENNOU_PROFILE,
+      version: params.environment?.DENNOU_SERVICE_VERSION ?? params.env.DENNOU_SERVICE_VERSION,
     })
   );
 }

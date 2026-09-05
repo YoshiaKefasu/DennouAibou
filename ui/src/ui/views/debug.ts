@@ -8,7 +8,6 @@ export type DebugProps = {
   status: Record<string, unknown> | null;
   health: Record<string, unknown> | null;
   models: unknown[];
-  heartbeat: unknown;
   eventLog: EventLogEntry[];
   methods: string[];
   callMethod: string;
@@ -40,7 +39,7 @@ export function renderDebug(props: DebugProps) {
         <div class="row" style="justify-content: space-between;">
           <div>
             <div class="card-title">Snapshots</div>
-            <div class="card-sub">Status, health, and heartbeat data.</div>
+            <div class="card-sub">Status and health data.</div>
           </div>
           <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
             ${props.loading ? t("common.refreshing") : t("common.refresh")}
@@ -60,10 +59,6 @@ export function renderDebug(props: DebugProps) {
           <div>
             <div class="muted">Health</div>
             <pre class="code-block">${JSON.stringify(props.health ?? {}, null, 2)}</pre>
-          </div>
-          <div>
-            <div class="muted">Last heartbeat</div>
-            <pre class="code-block">${JSON.stringify(props.heartbeat ?? {}, null, 2)}</pre>
           </div>
         </div>
       </div>

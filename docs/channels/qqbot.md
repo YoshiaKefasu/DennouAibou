@@ -1,7 +1,7 @@
 ---
 summary: "QQ Bot setup, config, and usage"
 read_when:
-  - You want to connect OpenClaw to QQ
+  - You want to connect DennouAibou to QQ
   - You need QQ Bot credential setup
   - You want QQ Bot group or private chat support
 title: QQ Bot
@@ -9,7 +9,7 @@ title: QQ Bot
 
 # QQ Bot
 
-QQ Bot connects to OpenClaw via the official QQ Bot API (WebSocket gateway). The
+QQ Bot connects to DennouAibou via the official QQ Bot API (WebSocket gateway). The
 plugin supports C2C private chat, group @messages, and guild channel messages with
 rich media (images, voice, video, files).
 
@@ -18,7 +18,7 @@ media are supported. Reactions and threads are not supported.
 
 ## Bundled plugin
 
-Current OpenClaw releases bundle QQ Bot, so normal packaged builds do not need
+Current DennouAibou releases bundle QQ Bot, so normal packaged builds do not need
 a separate `openclaw plugins install` step.
 
 ## Setup
@@ -90,7 +90,7 @@ Notes:
 
 ### Multi-account setup
 
-Run multiple QQ bots under a single OpenClaw instance:
+Run multiple QQ bots under a single DennouAibou instance:
 
 ```json5
 {
@@ -171,13 +171,13 @@ Outbound audio upload/transcode behavior can also be tuned with
 
 Built-in commands intercepted before the AI queue:
 
-| Command        | Description                          |
-| -------------- | ------------------------------------ |
-| `/bot-ping`    | Latency test                         |
-| `/bot-version` | Show the OpenClaw framework version  |
-| `/bot-help`    | List all commands                    |
-| `/bot-upgrade` | Show the QQBot upgrade guide link    |
-| `/bot-logs`    | Export recent gateway logs as a file |
+| Command        | Description                            |
+| -------------- | -------------------------------------- |
+| `/bot-ping`    | Latency test                           |
+| `/bot-version` | Show the DennouAibou framework version |
+| `/bot-help`    | List all commands                      |
+| `/bot-upgrade` | Show the QQBot upgrade guide link      |
+| `/bot-logs`    | Export recent gateway logs as a file   |
 
 Append `?` to any command for usage help (for example `/bot-upgrade ?`).
 

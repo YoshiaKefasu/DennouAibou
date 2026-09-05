@@ -9,7 +9,7 @@ title: "DuckDuckGo Search"
 
 # DuckDuckGo Search
 
-OpenClaw supports DuckDuckGo as a **key-free** `web_search` provider. No API
+DennouAibou supports DuckDuckGo as a **key-free** `web_search` provider. No API
 key or account is required.
 
 <Warning>

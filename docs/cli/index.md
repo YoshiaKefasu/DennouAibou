@@ -1,5 +1,5 @@
 ---
-summary: "OpenClaw CLI reference for `openclaw` commands, subcommands, and options"
+summary: "DennouAibou CLI reference for `openclaw` commands, subcommands, and options"
 read_when:
   - Adding or modifying CLI commands or options
   - Documenting new command surfaces
@@ -81,7 +81,7 @@ This page describes the current CLI behavior. If commands change, update this do
 
 ## Color palette
 
-OpenClaw uses a lobster palette for CLI output.
+DennouAibou uses a lobster palette for CLI output.
 
 - `accent` (#FF5A2D): headings, labels, primary highlights.
 - `accentBright` (#FF7A3D): command names, emphasis.
@@ -467,7 +467,7 @@ Options:
 Notes:
 
 - Without `--install` or `--write-state`, `completion` prints the script to stdout.
-- `--install` writes an `OpenClaw Completion` block into your shell profile and points it at the cached script under the OpenClaw state directory.
+- `--install` writes an `DennouAibou Completion` block into your shell profile and points it at the cached script under the DennouAibou state directory.
 
 ### `setup`
 
@@ -618,7 +618,7 @@ Notes:
 
 ### `backup`
 
-Create and verify local backup archives for OpenClaw state.
+Create and verify local backup archives for DennouAibou state.
 
 Subcommands:
 
@@ -651,7 +651,7 @@ Subcommands:
 - Tip: `channels status` prints warnings with suggested fixes when it can detect common misconfigurations (then points you to `openclaw doctor`).
 - `channels logs`: show recent channel logs from the gateway log file.
 - `channels add`: wizard-style setup when no flags are passed; flags switch to non-interactive mode.
-  - When adding a non-default account to a channel still using single-account top-level config, OpenClaw promotes account-scoped values into the channel account map before writing the new account. Most channels use `accounts.default`; Matrix can preserve an existing matching named/default target instead.
+  - When adding a non-default account to a channel still using single-account top-level config, DennouAibou promotes account-scoped values into the channel account map before writing the new account. Most channels use `accounts.default`; Matrix can preserve an existing matching named/default target instead.
   - Non-interactive `channels add` does not auto-create/upgrade bindings; channel-only bindings continue to match the default account.
 - `channels remove`: disable by default; pass `--delete` to remove config entries without prompts.
 - `channels login`: interactive channel login (WhatsApp Web only).
@@ -880,7 +880,7 @@ Subcommands:
 
 Notes:
 
-- `setup` configures the Gmail watch plus the OpenClaw-facing push path.
+- `setup` configures the Gmail watch plus the DennouAibou-facing push path.
 - `run` starts the local Gmail watcher/renew loop with optional runtime overrides.
 
 ### `dns`
@@ -900,7 +900,7 @@ Options:
 
 Notes:
 
-- Without `--apply`, this is a planning helper that prints the recommended OpenClaw + Tailscale DNS config.
+- Without `--apply`, this is a planning helper that prints the recommended DennouAibou + Tailscale DNS config.
 - `--apply` currently supports macOS with Homebrew CoreDNS only.
 
 ## Messaging + agent
@@ -988,7 +988,7 @@ Options:
 - `--non-interactive`
 - `--json`
 
-Binding specs use `channel[:accountId]`. When `accountId` is omitted, OpenClaw may resolve account scope via channel defaults/plugin hooks; otherwise it is a channel binding without explicit account scope.
+Binding specs use `channel[:accountId]`. When `accountId` is omitted, DennouAibou may resolve account scope via channel defaults/plugin hooks; otherwise it is a channel binding without explicit account scope.
 Passing any explicit add flags switches the command into the non-interactive path. `main` is reserved and cannot be used as the new agent id.
 
 #### `agents bindings`
@@ -1093,11 +1093,11 @@ See [`acp`](/cli/acp) for full behavior, security notes, and examples.
 
 ### `mcp`
 
-Manage saved MCP server definitions and expose OpenClaw channels over MCP stdio.
+Manage saved MCP server definitions and expose DennouAibou channels over MCP stdio.
 
 #### `mcp serve`
 
-Expose routed OpenClaw channel conversations over MCP stdio.
+Expose routed DennouAibou channel conversations over MCP stdio.
 
 Options:
 
@@ -1194,7 +1194,7 @@ Notes:
 
 ### Usage tracking
 
-OpenClaw can surface provider usage/quota when OAuth/API creds are available.
+DennouAibou can surface provider usage/quota when OAuth/API creds are available.
 
 Surfaces:
 
@@ -1207,7 +1207,7 @@ Notes:
 - Data comes directly from provider usage endpoints (no estimates).
 - Human-readable output is normalized to `X% left` across providers.
 - Providers with current usage windows: Gemini CLI and OpenAI Codex.
-- Usage auth comes from provider-specific hooks when available; otherwise OpenClaw falls back to matching OAuth/API-key credentials from auth profiles, env, or config. If none resolve, usage is hidden.
+- Usage auth comes from provider-specific hooks when available; otherwise DennouAibou falls back to matching OAuth/API-key credentials from auth profiles, env, or config. If none resolve, usage is hidden.
 - Details: see [Usage tracking](/concepts/usage-tracking).
 
 ### `health`
@@ -1349,7 +1349,7 @@ Notes:
 
 - `gateway status` probes the Gateway RPC by default using the service’s resolved port/config (override with `--url/--token/--password`).
 - `gateway status` supports `--no-probe`, `--deep`, `--require-rpc`, and `--json` for scripting.
-- `gateway status` also surfaces legacy or extra gateway services when it can detect them (`--deep` adds system-level scans). Profile-named OpenClaw services are treated as first-class and aren't flagged as "extra".
+- `gateway status` also surfaces legacy or extra gateway services when it can detect them (`--deep` adds system-level scans). Profile-named DennouAibou services are treated as first-class and aren't flagged as "extra".
 - `gateway status` stays available for diagnostics even when the local CLI config is missing or invalid.
 - `gateway status` prints the resolved file log path, the CLI-vs-service config paths/validity snapshot, and the resolved probe target URL.
 - If gateway auth SecretRefs are unresolved in the current command path, `gateway status --json` reports `rpc.authWarning` only when probe connectivity/auth fails (warnings are suppressed when probe succeeds).
@@ -1755,7 +1755,7 @@ Common commands:
 
 ### `docs`
 
-Search the live OpenClaw docs index.
+Search the live DennouAibou docs index.
 
 ### `docs [query...]`
 

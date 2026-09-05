@@ -46,7 +46,7 @@ describe("workspace .env UV_PYTHON handling for uv skill installs", () => {
           fakeUvPath,
           [
             "#!/bin/sh",
-            'printf "%s\\n" "$UV_PYTHON" > "$OPENCLAW_POC_MARKER_PATH"',
+            'printf "%s\\n" "$UV_PYTHON" > "$DENNOU_POC_MARKER_PATH"',
             "exit 0",
             "",
           ].join("\n"),
@@ -57,9 +57,9 @@ describe("workspace .env UV_PYTHON handling for uv skill installs", () => {
         const attackerPython = path.join(base, "attacker-python");
         await fs.writeFile(path.join(cwdDir, ".env"), `UV_PYTHON=${attackerPython}\n`, "utf8");
 
-        envSnapshot = captureEnv(["PATH", "UV_PYTHON", "OPENCLAW_POC_MARKER_PATH"]);
+        envSnapshot = captureEnv(["PATH", "UV_PYTHON", "DENNOU_POC_MARKER_PATH"]);
         delete process.env.UV_PYTHON;
-        process.env.OPENCLAW_POC_MARKER_PATH = markerPath;
+        process.env.DENNOU_POC_MARKER_PATH = markerPath;
         process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH ?? ""}`;
 
         loadWorkspaceDotEnvFile(path.join(cwdDir, ".env"), { quiet: true });

@@ -20,10 +20,11 @@ import { buildInboundMediaNote } from "../media-note.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
 import {
   type ElevatedLevel,
+  formatMaxModelHint,
   formatXHighModelHint,
+  isElevatedThinkingDenied,
   normalizeThinkLevel,
   type ReasoningLevel,
-  supportsXHighThinking,
   type ThinkLevel,
   type VerboseLevel,
 } from "../thinking.js";
@@ -294,7 +295,12 @@ export async function runPreparedReply(
   if (!resolvedThinkLevel && prefixedBodyBase) {
     const parts = prefixedBodyBase.split(/\s+/);
     const maybeLevel = normalizeThinkLevel(parts[0]);
-    if (maybeLevel && (maybeLevel !== "xhigh" || supportsXHighThinking(provider, model))) {
+    if (
+      maybeLevel &&
+      ((maybeLevel === "xhigh" && !isElevatedThinkingDenied("xhigh", provider, model)) ||
+        (maybeLevel === "max" && !isElevatedThinkingDenied("max", provider, model)) ||
+        (maybeLevel !== "xhigh" && maybeLevel !== "max"))
+    ) {
       resolvedThinkLevel = maybeLevel;
       prefixedBodyBase = parts.slice(1).join(" ").trim();
     }
@@ -340,7 +346,7 @@ export async function runPreparedReply(
     return { prefixedCommandBody, queuedBody };
   };
   const skillResult =
-    process.env.OPENCLAW_TEST_FAST === "1"
+    process.env.DENNOU_TEST_FAST === "1"
       ? {
           sessionEntry,
           skillsSnapshot: sessionEntry?.skillsSnapshot,
@@ -371,16 +377,26 @@ export async function runPreparedReply(
   if (!resolvedThinkLevel) {
     resolvedThinkLevel = await modelState.resolveDefaultThinkingLevel();
   }
-  if (resolvedThinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) {
+  if (
+    (resolvedThinkLevel === "xhigh" || resolvedThinkLevel === "max") &&
+    isElevatedThinkingDenied(resolvedThinkLevel, provider, model)
+  ) {
+    const isMax = resolvedThinkLevel === "max";
     const explicitThink = directives.hasThinkDirective && directives.thinkLevel !== undefined;
     if (explicitThink) {
+      const hint = isMax ? formatMaxModelHint() : formatXHighModelHint();
       typing.cleanup();
       return {
-        text: `Thinking level "xhigh" is only supported for ${formatXHighModelHint()}. Use /think high or switch to one of those models.`,
+        text: `Thinking level "${resolvedThinkLevel}" is only supported for ${hint}. Use /think high or switch to one of those models.`,
       };
     }
     resolvedThinkLevel = "high";
-    if (sessionEntry && sessionStore && sessionKey && sessionEntry.thinkingLevel === "xhigh") {
+    if (
+      sessionEntry &&
+      sessionStore &&
+      sessionKey &&
+      (sessionEntry.thinkingLevel === "xhigh" || sessionEntry.thinkingLevel === "max")
+    ) {
       sessionEntry.thinkingLevel = "high";
       sessionEntry.updatedAt = Date.now();
       sessionStore[sessionKey] = sessionEntry;

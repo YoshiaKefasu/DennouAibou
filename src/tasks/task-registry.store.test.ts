@@ -22,7 +22,7 @@ import type { TaskRecord } from "./task-registry.types.js";
 function createStoredTask(): TaskRecord {
   return {
     taskId: "task-restored",
-    runtime: "acp",
+    runtime: "subagent",
     sourceId: "run-restored",
     requesterSessionKey: "agent:main:main",
     ownerKey: "agent:main:main",
@@ -40,7 +40,7 @@ function createStoredTask(): TaskRecord {
 
 describe("task-registry store runtime", () => {
   afterEach(() => {
-    delete process.env.OPENCLAW_STATE_DIR;
+    delete process.env.DENNOU_STATE_DIR;
     resetTaskRegistryForTests();
     resetTaskFlowRegistryForTests({ persist: false });
   });
@@ -66,7 +66,7 @@ describe("task-registry store runtime", () => {
     expect(loadSnapshot).toHaveBeenCalledTimes(1);
 
     createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -103,7 +103,7 @@ describe("task-registry store runtime", () => {
 
     expect(findTaskByRunId("run-restored")).toBeTruthy();
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -145,7 +145,7 @@ describe("task-registry store runtime", () => {
     });
 
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       childSessionKey: "agent:codex:acp:new",
@@ -207,7 +207,7 @@ describe("task-registry store runtime", () => {
       goal: "Persist linked tasks",
     });
     const created = createTaskRecord({
-      runtime: "acp",
+      runtime: "subagent",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       parentFlowId: flow.flowId,
@@ -231,7 +231,7 @@ describe("task-registry store runtime", () => {
       return;
     }
     const stateDir = mkdtempSync(path.join(os.tmpdir(), "openclaw-task-store-"));
-    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.env.DENNOU_STATE_DIR = stateDir;
 
     createTaskRecord({
       runtime: "cron",
@@ -256,7 +256,7 @@ describe("task-registry store runtime", () => {
 
   it("migrates legacy ownerless cron rows to system scope", () => {
     const stateDir = mkdtempSync(path.join(os.tmpdir(), "openclaw-task-store-legacy-"));
-    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.env.DENNOU_STATE_DIR = stateDir;
     const sqlitePath = resolveTaskRegistrySqlitePath(process.env);
     mkdirSync(path.dirname(sqlitePath), { recursive: true });
     const { DatabaseSync } = requireNodeSqlite();
@@ -338,7 +338,7 @@ describe("task-registry store runtime", () => {
 
   it("keeps legacy requester_session_key rows writable after restore", () => {
     const stateDir = mkdtempSync(path.join(os.tmpdir(), "openclaw-task-store-legacy-write-"));
-    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.env.DENNOU_STATE_DIR = stateDir;
     const sqlitePath = resolveTaskRegistrySqlitePath(process.env);
     mkdirSync(path.dirname(sqlitePath), { recursive: true });
     const { DatabaseSync } = requireNodeSqlite();

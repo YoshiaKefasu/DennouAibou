@@ -1,20 +1,28 @@
-import { type Message, type UserFromGetMe } from "@grammyjs/types";
 import { isAbortRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import { isBtwRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveTelegramForumThreadId } from "./bot/helpers.js";
 
+/** Structural subset of grammy Message used to avoid @grammyjs/types version mismatches. */
+type MinimalMessage = {
+  chat?: { id?: number; type?: string; is_forum?: boolean };
+  text?: string;
+  caption?: string;
+  message_id?: number;
+  message_thread_id?: number;
+};
+
 export type TelegramSequentialKeyContext = {
   chat?: { id?: number };
-  me?: UserFromGetMe;
-  message?: Message;
-  channelPost?: Message;
-  editedChannelPost?: Message;
+  me?: { username?: string };
+  message?: MinimalMessage;
+  channelPost?: MinimalMessage;
+  editedChannelPost?: MinimalMessage;
   update?: {
-    message?: Message;
-    edited_message?: Message;
-    channel_post?: Message;
-    edited_channel_post?: Message;
-    callback_query?: { message?: Message };
+    message?: MinimalMessage;
+    edited_message?: MinimalMessage;
+    channel_post?: MinimalMessage;
+    edited_channel_post?: MinimalMessage;
+    callback_query?: { message?: MinimalMessage };
     message_reaction?: { chat?: { id?: number } };
   };
 };

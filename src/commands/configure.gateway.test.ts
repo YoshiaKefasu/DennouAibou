@@ -240,26 +240,26 @@ describe("promptGatewayConfig", () => {
   });
 
   it("stores gateway token as SecretRef when token source is ref", async () => {
-    const previous = process.env.OPENCLAW_GATEWAY_TOKEN;
-    process.env.OPENCLAW_GATEWAY_TOKEN = "env-gateway-token";
+    const previous = process.env.DENNOU_GATEWAY_TOKEN;
+    process.env.DENNOU_GATEWAY_TOKEN = "env-gateway-token";
     try {
       const { call, result } = await runGatewayPrompt({
         selectQueue: ["loopback", "token", "off", "ref"],
-        textQueue: ["18789", "OPENCLAW_GATEWAY_TOKEN"],
+        textQueue: ["18789", "DENNOU_GATEWAY_TOKEN"],
         authConfigFactory: ({ mode, token }) => ({ mode, token }),
       });
 
       expect(call?.token).toEqual({
         source: "env",
         provider: "default",
-        id: "OPENCLAW_GATEWAY_TOKEN",
+        id: "DENNOU_GATEWAY_TOKEN",
       });
       expect(result.token).toBeUndefined();
     } finally {
       if (previous === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = previous;
+        process.env.DENNOU_GATEWAY_TOKEN = previous;
       }
     }
   });

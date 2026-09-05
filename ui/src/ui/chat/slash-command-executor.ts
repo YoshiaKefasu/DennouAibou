@@ -98,7 +98,7 @@ export async function executeSlashCommand(
     case "model":
       return await executeModel(client, sessionKey, args, context);
     case "think":
-      return await executeThink(client, sessionKey, args);
+      return await executeThink(client, sessionKey, args, context);
     case "fast":
       return await executeFast(client, sessionKey, args);
     case "verbose":
@@ -213,6 +213,7 @@ async function executeThink(
   client: GatewayBrowserClient,
   sessionKey: string,
   args: string,
+  context: SlashCommandContext,
 ): Promise<SlashCommandResult> {
   const rawLevel = args.trim();
 
@@ -222,7 +223,7 @@ async function executeThink(
       return {
         content: formatDirectiveOptions(
           `Current thinking level: ${resolveCurrentThinkingLevel(session, models)}.`,
-          formatThinkingLevels(session?.modelProvider),
+          formatThinkingLevels(session?.modelProvider, session?.model, models),
         ),
       };
     } catch (err) {
@@ -235,7 +236,7 @@ async function executeThink(
     try {
       const session = await loadCurrentSession(client, sessionKey);
       return {
-        content: `Unrecognized thinking level "${rawLevel}". Valid levels: ${formatThinkingLevels(session?.modelProvider)}.`,
+        content: `Unrecognized thinking level "${rawLevel}". Valid levels: ${formatThinkingLevels(session?.modelProvider, session?.model, context.chatModelCatalog)}.`,
       };
     } catch (err) {
       return { content: `Failed to validate thinking level: ${String(err)}` };

@@ -1,4 +1,3 @@
-import { normalizeConversationText } from "../../acp/conversation-id.js";
 import { resolveConversationBindingContext } from "../../channels/conversation-binding-context.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { getActivePluginChannelRegistry } from "../../plugins/runtime.js";
@@ -23,9 +22,14 @@ type BindingMsgContext = Pick<
   | "NativeChannelId"
 >;
 
+function trimText(value: unknown): string | undefined {
+  const raw = value == null ? undefined : String(value).trim();
+  return raw || undefined;
+}
+
 function resolveBindingChannel(ctx: BindingMsgContext, commandChannel?: string | null): string {
   const raw = ctx.OriginatingChannel ?? commandChannel ?? ctx.Surface ?? ctx.Provider;
-  return normalizeConversationText(raw).toLowerCase();
+  return (trimText(raw) ?? "").toLowerCase();
 }
 
 function resolveBindingAccountId(params: {
@@ -37,16 +41,16 @@ function resolveBindingAccountId(params: {
   const plugin = getActivePluginChannelRegistry()?.channels.find(
     (entry) => entry.plugin.id === channel,
   )?.plugin;
-  const accountId = normalizeConversationText(params.ctx.AccountId);
+  const accountId = trimText(params.ctx.AccountId);
   return (
     accountId ||
-    normalizeConversationText(plugin?.config.defaultAccountId?.(params.cfg)) ||
+    trimText(plugin?.config.defaultAccountId?.(params.cfg)) ||
     "default"
   );
 }
 
 function resolveBindingThreadId(threadId: string | number | null | undefined): string | undefined {
-  const normalized = threadId != null ? normalizeConversationText(String(threadId)) : undefined;
+  const normalized = threadId != null ? trimText(String(threadId)) : undefined;
   return normalized || undefined;
 }
 

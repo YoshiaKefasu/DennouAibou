@@ -1,5 +1,5 @@
-import type { Api, Model } from "@mariozechner/pi-ai";
-import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { AuthProfileStore } from "../../agents/auth-profiles.js";
 import { shouldSuppressBuiltInModel } from "../../agents/model-suppression.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -103,7 +103,7 @@ export async function loadModelRegistry(
 ) {
   const agentDir = resolveOpenClawAgentDir();
   const authStorage = discoverAuthStorage(agentDir);
-  const registry = discoverModels(authStorage, agentDir);
+  const registry = await discoverModels(authStorage, agentDir);
   const models = registry
     .getAll()
     .filter((model) => !shouldSuppressBuiltInModel({ provider: model.provider, id: model.id }));

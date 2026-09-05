@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 /**
  * DennouAibou Liveness Watchdog
  *
@@ -15,10 +16,9 @@
  * DENNOU_RULES.md Rule 1 (Encapsulation) に従い、上流コードは一切変更しない。
  */
 import * as fs from "node:fs";
-import { spawnSync } from "node:child_process";
 import * as path from "node:path";
-import { logDebug } from "../logger.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
+import { logDebug } from "../logger.js";
 
 // ============================================================
 // Constants
@@ -130,7 +130,7 @@ function watchdogTick(): void {
     if (intervalFactor >= CRITICAL_SKIP_FACTOR) {
       writeStderr(
         `CRITICAL: event loop timer stalled for ${elapsedMs}ms ` +
-        `(${intervalFactor.toFixed(1)}x interval). Restarting gateway.`,
+          `(${intervalFactor.toFixed(1)}x interval). Restarting gateway.`,
       );
       restartGateway();
       return;
@@ -139,8 +139,8 @@ function watchdogTick(): void {
     if (intervalFactor >= WARN_SKIP_FACTOR) {
       writeStderr(
         `WARNING: timer delay detected: ${elapsedMs}ms ` +
-        `(${intervalFactor.toFixed(1)}x interval). ` +
-        `Event loop may be partially blocked.`,
+          `(${intervalFactor.toFixed(1)}x interval). ` +
+          `Event loop may be partially blocked.`,
       );
     }
   }
@@ -152,7 +152,7 @@ function watchdogTick(): void {
   if (logAgeMs > LOG_STALE_THRESHOLD_MS) {
     writeStderr(
       `CRITICAL: log file stale for ${(logAgeMs / 1000).toFixed(0)}s ` +
-      `(threshold ${LOG_STALE_THRESHOLD_MS / 1000}s). Restarting gateway.`,
+        `(threshold ${LOG_STALE_THRESHOLD_MS / 1000}s). Restarting gateway.`,
     );
     restartGateway();
     return;
@@ -162,8 +162,8 @@ function watchdogTick(): void {
   // logDebug を使う（ファイルログにのみ書き込み、CLI出力なし）
   logDebug(
     `liveness marker tick=${tickCount} ` +
-    `logAge=${(logAgeMs / 1000).toFixed(0)}s ` +
-    `elapsed=${elapsedMs}ms`,
+      `logAge=${(logAgeMs / 1000).toFixed(0)}s ` +
+      `elapsed=${elapsedMs}ms`,
   );
 }
 
@@ -181,26 +181,20 @@ function restartGateway(): void {
   isRestarting = true;
   try {
     writeStderr(`Initiating gateway restart (PID=${process.pid})`);
-    const result = spawnSync("systemctl", [
-      "--user",
-      "restart",
-      "openclaw-gateway.service",
-    ], {
+    const result = spawnSync("systemctl", ["--user", "restart", "openclaw-gateway.service"], {
       timeout: 10_000,
       stdio: "pipe",
     });
     if (result.status !== 0) {
       writeStderr(
         `Gateway restart command failed: exit=${result.status} ` +
-        `stderr=${result.stderr?.toString().trim() || "(empty)"}`,
+          `stderr=${result.stderr?.toString().trim() || "(empty)"}`,
       );
     } else {
       writeStderr("Gateway restart command issued successfully");
     }
   } catch (err) {
-    writeStderr(
-      `Gateway restart error: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    writeStderr(`Gateway restart error: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
     isRestarting = false;
   }
@@ -230,7 +224,7 @@ export function startLivenessWatchdog(): () => void {
 
   logDebug(
     `[DennouAibou/liveness] Starting liveness watchdog (interval=${CHECK_INTERVAL_MS}ms, ` +
-    `logStaleThreshold=${LOG_STALE_THRESHOLD_MS / 1000}s)`,
+      `logStaleThreshold=${LOG_STALE_THRESHOLD_MS / 1000}s)`,
   );
 
   // 最初の tick を即座に実行

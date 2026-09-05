@@ -1,14 +1,14 @@
 ---
-summary: "Updating OpenClaw safely (global install or source), plus rollback strategy"
+summary: "Updating DennouAibou safely (global install or source), plus rollback strategy"
 read_when:
-  - Updating OpenClaw
+  - Updating DennouAibou
   - Something breaks after an update
 title: "Updating"
 ---
 
 # Updating
 
-Keep OpenClaw up to date.
+Keep DennouAibou up to date.
 
 ## Recommended: `openclaw update`
 

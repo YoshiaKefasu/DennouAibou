@@ -1,6 +1,5 @@
 import { EventEmitter } from "node:events";
 import { RateLimitError } from "@buape/carbon";
-import { AcpRuntimeError } from "openclaw/plugin-sdk/acp-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -22,13 +21,11 @@ const {
   createdBindingManagers,
   createNoopThreadBindingManagerMock,
   createThreadBindingManagerMock,
-  getAcpSessionStatusMock,
   getPluginCommandSpecsMock,
   isVerboseMock,
   listNativeCommandSpecsForConfigMock,
   listSkillCommandsForAgentsMock,
   monitorLifecycleMock,
-  reconcileAcpThreadBindingsOnStartupMock,
   resolveDiscordAllowlistConfigMock,
   resolveDiscordAccountMock,
   resolveNativeCommandsEnabledMock,
@@ -82,21 +79,6 @@ vi.mock("../voice/manager.runtime.js", () => {
   };
 });
 describe("monitorDiscordProvider", () => {
-  type ReconcileHealthProbeParams = {
-    cfg: OpenClawConfig;
-    accountId: string;
-    sessionKey: string;
-    binding: unknown;
-    session: unknown;
-  };
-
-  type ReconcileStartupParams = {
-    cfg: OpenClawConfig;
-    healthProbe?: (
-      params: ReconcileHealthProbeParams,
-    ) => Promise<{ status: string; reason?: string }>;
-  };
-
   const getConstructedEventQueue = (): { listenerTimeout?: number } | undefined => {
     expect(clientConstructorOptionsMock).toHaveBeenCalledTimes(1);
     const opts = clientConstructorOptionsMock.mock.calls[0]?.[0] as {
@@ -114,18 +96,6 @@ describe("monitorDiscordProvider", () => {
         eventQueue?: { listenerTimeout?: number };
       }) ?? {}
     );
-  };
-
-  const getHealthProbe = () => {
-    expect(reconcileAcpThreadBindingsOnStartupMock).toHaveBeenCalledTimes(1);
-    const firstCall = reconcileAcpThreadBindingsOnStartupMock.mock.calls.at(0) as
-      | [ReconcileStartupParams]
-      | undefined;
-    const reconcileParams = firstCall?.[0];
-    if (!reconcileParams?.healthProbe) {
-      throw new Error("healthProbe was not wired into ACP startup reconciliation");
-    }
-    return reconcileParams.healthProbe as NonNullable<ReconcileStartupParams["healthProbe"]>;
   };
 
   beforeAll(async () => {
@@ -180,18 +150,12 @@ describe("monitorDiscordProvider", () => {
     providerTesting.setLoadDiscordProviderSessionRuntime(
       (async () =>
         ({
-          getAcpSessionManager: () => ({
-            getSessionStatus: getAcpSessionStatusMock,
-          }),
-          isAcpRuntimeError: (error: unknown): error is { code: string } =>
-            error instanceof Error && "code" in error,
           resolveThreadBindingIdleTimeoutMs: () => 24 * 60 * 60 * 1000,
           resolveThreadBindingMaxAgeMs: () => 7 * 24 * 60 * 60 * 1000,
           resolveThreadBindingsEnabled: () => true,
           createDiscordMessageHandler: createDiscordMessageHandlerMock,
           createNoopThreadBindingManager: createNoopThreadBindingManagerMock,
           createThreadBindingManager: createThreadBindingManagerMock,
-          reconcileAcpThreadBindingsOnStartup: reconcileAcpThreadBindingsOnStartupMock,
         }) as never) as NonNullable<
         Parameters<typeof providerTesting.setLoadDiscordProviderSessionRuntime>[0]
       >,
@@ -284,7 +248,6 @@ describe("monitorDiscordProvider", () => {
     expect(monitorLifecycleMock).toHaveBeenCalledTimes(1);
     expect(createdBindingManagers).toHaveLength(1);
     expect(createdBindingManagers[0]?.stop).toHaveBeenCalledTimes(1);
-    expect(reconcileAcpThreadBindingsOnStartupMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not load the Discord voice runtime when voice is disabled", async () => {
@@ -314,164 +277,6 @@ describe("monitorDiscordProvider", () => {
     });
 
     expect(voiceRuntimeModuleLoadedMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("treats ACP error status as uncertain during startup thread-binding probes", async () => {
-    getAcpSessionStatusMock.mockResolvedValue({ state: "error" });
-
-    await monitorDiscordProvider({
-      config: baseConfig(),
-      runtime: baseRuntime(),
-    });
-
-    const probeResult = await getHealthProbe()({
-      cfg: baseConfig(),
-      accountId: "default",
-      sessionKey: "agent:codex:acp:error",
-      binding: {} as never,
-      session: {
-        acp: {
-          state: "error",
-          lastActivityAt: Date.now(),
-        },
-      } as never,
-    });
-
-    expect(probeResult).toEqual({
-      status: "uncertain",
-      reason: "status-error-state",
-    });
-  });
-
-  it("classifies typed ACP session init failures as stale", async () => {
-    getAcpSessionStatusMock.mockRejectedValue(
-      new AcpRuntimeError("ACP_SESSION_INIT_FAILED", "missing ACP metadata"),
-    );
-
-    await monitorDiscordProvider({
-      config: baseConfig(),
-      runtime: baseRuntime(),
-    });
-
-    const probeResult = await getHealthProbe()({
-      cfg: baseConfig(),
-      accountId: "default",
-      sessionKey: "agent:codex:acp:stale",
-      binding: {} as never,
-      session: {
-        acp: {
-          state: "idle",
-          lastActivityAt: Date.now(),
-        },
-      } as never,
-    });
-
-    expect(probeResult).toEqual({
-      status: "stale",
-      reason: "session-init-failed",
-    });
-  });
-
-  it("classifies typed non-init ACP errors as uncertain when not stale-running", async () => {
-    getAcpSessionStatusMock.mockRejectedValue(
-      new AcpRuntimeError("ACP_BACKEND_UNAVAILABLE", "runtime unavailable"),
-    );
-
-    await monitorDiscordProvider({
-      config: baseConfig(),
-      runtime: baseRuntime(),
-    });
-
-    const probeResult = await getHealthProbe()({
-      cfg: baseConfig(),
-      accountId: "default",
-      sessionKey: "agent:codex:acp:uncertain",
-      binding: {} as never,
-      session: {
-        acp: {
-          state: "idle",
-          lastActivityAt: Date.now(),
-        },
-      } as never,
-    });
-
-    expect(probeResult).toEqual({
-      status: "uncertain",
-      reason: "status-error",
-    });
-  });
-
-  it("aborts timed-out ACP status probes during startup thread-binding health checks", async () => {
-    vi.useFakeTimers();
-    try {
-      getAcpSessionStatusMock.mockImplementation(
-        ({ signal }: { signal?: AbortSignal }) =>
-          new Promise((_resolve, reject) => {
-            signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-          }),
-      );
-
-      await monitorDiscordProvider({
-        config: baseConfig(),
-        runtime: baseRuntime(),
-      });
-
-      const probePromise = getHealthProbe()({
-        cfg: baseConfig(),
-        accountId: "default",
-        sessionKey: "agent:codex:acp:timeout",
-        binding: {} as never,
-        session: {
-          acp: {
-            state: "idle",
-            lastActivityAt: Date.now(),
-          },
-        } as never,
-      });
-
-      await vi.advanceTimersByTimeAsync(8_100);
-      await expect(probePromise).resolves.toEqual({
-        status: "uncertain",
-        reason: "status-timeout",
-      });
-
-      const firstCall = getAcpSessionStatusMock.mock.calls[0]?.[0] as
-        | { signal?: AbortSignal }
-        | undefined;
-      if (!firstCall?.signal) {
-        throw new Error("ACP status check did not receive an abort signal");
-      }
-      expect(firstCall.signal.aborted).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("falls back to legacy missing-session message classification", async () => {
-    getAcpSessionStatusMock.mockRejectedValue(new Error("ACP session metadata missing"));
-
-    await monitorDiscordProvider({
-      config: baseConfig(),
-      runtime: baseRuntime(),
-    });
-
-    const probeResult = await getHealthProbe()({
-      cfg: baseConfig(),
-      accountId: "default",
-      sessionKey: "agent:codex:acp:legacy",
-      binding: {} as never,
-      session: {
-        acp: {
-          state: "idle",
-          lastActivityAt: Date.now(),
-        },
-      } as never,
-    });
-
-    expect(probeResult).toEqual({
-      status: "stale",
-      reason: "session-missing",
-    });
   });
 
   it("captures gateway errors emitted before lifecycle wait starts", async () => {

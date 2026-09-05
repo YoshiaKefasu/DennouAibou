@@ -1,11 +1,11 @@
 import {
-  streamSimple,
   type Api,
   type AssistantMessageEvent,
   type Message,
   type Model,
-} from "@mariozechner/pi-ai";
-import { SessionManager } from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import type { GetReplyOptions, ReplyPayload } from "../auto-reply/types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -133,7 +133,7 @@ async function resolveRuntimeModel(params: {
 }> {
   await ensureOpenClawModelsJson(params.cfg, params.agentDir);
   const authStorage = discoverAuthStorage(params.agentDir);
-  const modelRegistry = discoverModels(authStorage, params.agentDir);
+  const modelRegistry = await discoverModels(authStorage, params.agentDir);
   const model = resolveModelWithRegistry({
     provider: params.provider,
     modelId: params.model,

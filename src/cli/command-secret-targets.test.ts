@@ -12,7 +12,6 @@ const REGISTRY_IDS = [
   "gateway.remote.token",
   "gateway.remote.password",
   "models.providers.openai.apiKey",
-  "messages.tts.providers.openai.apiKey",
   "plugins.entries.firecrawl.config.webFetch.apiKey",
   "skills.entries.demo.apiKey",
   "tools.web.search.apiKey",

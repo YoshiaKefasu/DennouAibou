@@ -36,7 +36,7 @@ async function loadSubagentRegistryModules(): Promise<void> {
 }
 
 describe("subagent registry persistence resume", () => {
-  const envSnapshot = captureEnv(["OPENCLAW_STATE_DIR"]);
+  const envSnapshot = captureEnv(["DENNOU_STATE_DIR"]);
   let tempStateDir: string | null = null;
 
   const resolveSessionStorePath = (stateDir: string, agentId: string) =>
@@ -109,7 +109,7 @@ describe("subagent registry persistence resume", () => {
 
   it("persists runs to disk and resumes after restart", async () => {
     tempStateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-subagent-"));
-    process.env.OPENCLAW_STATE_DIR = tempStateDir;
+    process.env.DENNOU_STATE_DIR = tempStateDir;
 
     const { callGateway } = await import("../gateway/call.js");
     let releaseInitialWait:

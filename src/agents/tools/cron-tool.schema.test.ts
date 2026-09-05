@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CronToolSchema } from "./cron-tool.js";
+import { asSchemaJson } from "../schema/typebox.js";
 
 /** Walk a TypeBox schema by dot-separated property path and return sorted keys. */
 function keysAt(schema: Record<string, unknown>, path: string): string[] {
@@ -29,7 +30,7 @@ describe("CronToolSchema", () => {
   // If a field is removed from this list the test must be updated intentionally.
 
   it("job exposes the expected top-level fields", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "job")).toEqual(
       [
         "agentId",
         "deleteAfterRun",
@@ -48,7 +49,7 @@ describe("CronToolSchema", () => {
   });
 
   it("patch exposes the expected top-level fields", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "patch")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "patch")).toEqual(
       [
         "agentId",
         "deleteAfterRun",
@@ -67,18 +68,18 @@ describe("CronToolSchema", () => {
   });
 
   it("job.schedule exposes kind, at, everyMs, anchorMs, expr, tz, staggerMs", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job.schedule")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "job.schedule")).toEqual(
       ["anchorMs", "at", "everyMs", "expr", "kind", "staggerMs", "tz"].toSorted(),
     );
   });
 
   it("marks staggerMs as cron-only in both job and patch schedule schemas", () => {
     const jobStagger = propertyAt(
-      CronToolSchema as Record<string, unknown>,
+      asSchemaJson(CronToolSchema),
       "job.schedule.staggerMs",
     );
     const patchStagger = propertyAt(
-      CronToolSchema as Record<string, unknown>,
+      asSchemaJson(CronToolSchema),
       "patch.schedule.staggerMs",
     );
 
@@ -87,13 +88,13 @@ describe("CronToolSchema", () => {
   });
 
   it("job.delivery exposes mode, channel, to, bestEffort, accountId, failureDestination", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job.delivery")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "job.delivery")).toEqual(
       ["accountId", "bestEffort", "channel", "failureDestination", "mode", "to"].toSorted(),
     );
   });
 
   it("job.payload exposes kind, text, message, model, thinking and extras", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job.payload")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "job.payload")).toEqual(
       [
         "allowUnsafeExternalContent",
         "fallbacks",
@@ -110,11 +111,11 @@ describe("CronToolSchema", () => {
   });
 
   it("job.payload includes fallbacks", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job.payload")).toContain("fallbacks");
+    expect(keysAt(asSchemaJson(CronToolSchema), "job.payload")).toContain("fallbacks");
   });
 
   it("patch.payload exposes agentTurn fallback overrides", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "patch.payload")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "patch.payload")).toEqual(
       [
         "allowUnsafeExternalContent",
         "fallbacks",
@@ -131,13 +132,13 @@ describe("CronToolSchema", () => {
   });
 
   it("job.failureAlert exposes after, channel, to, cooldownMs, mode, accountId", () => {
-    expect(keysAt(CronToolSchema as Record<string, unknown>, "job.failureAlert")).toEqual(
+    expect(keysAt(asSchemaJson(CronToolSchema), "job.failureAlert")).toEqual(
       ["accountId", "after", "channel", "cooldownMs", "mode", "to"].toSorted(),
     );
   });
 
   it("job.failureAlert uses plain object type for OpenAPI 3.0 compat", () => {
-    const root = (CronToolSchema as Record<string, unknown>).properties as
+    const root = (asSchemaJson(CronToolSchema)).properties as
       | Record<string, { properties?: Record<string, unknown>; type?: unknown }>
       | undefined;
     const jobProps = root?.job?.properties as
@@ -152,7 +153,7 @@ describe("CronToolSchema", () => {
   });
 
   it("job.agentId and job.sessionKey use plain string type for OpenAPI 3.0 compat", () => {
-    const root = (CronToolSchema as Record<string, unknown>).properties as
+    const root = (asSchemaJson(CronToolSchema)).properties as
       | Record<string, { properties?: Record<string, unknown> }>
       | undefined;
     const jobProps = root?.job?.properties as Record<string, { type?: unknown }> | undefined;
@@ -164,7 +165,7 @@ describe("CronToolSchema", () => {
   });
 
   it("patch.payload.toolsAllow uses plain array type for OpenAPI 3.0 compat", () => {
-    const root = (CronToolSchema as Record<string, unknown>).properties as
+    const root = (asSchemaJson(CronToolSchema)).properties as
       | Record<string, { properties?: Record<string, unknown> }>
       | undefined;
     const patchProps = root?.patch?.properties as

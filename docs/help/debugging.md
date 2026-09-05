@@ -111,9 +111,9 @@ Tip: if a non‑dev gateway is already running (launchd/systemd), stop it first:
 openclaw gateway stop
 ```
 
-## Raw stream logging (OpenClaw)
+## Raw stream logging (DennouAibou)
 
-OpenClaw can log the **raw assistant stream** before any filtering/formatting.
+DennouAibou can log the **raw assistant stream** before any filtering/formatting.
 This is the best way to see whether reasoning is arriving as plain text deltas
 (or as separate thinking blocks).
 

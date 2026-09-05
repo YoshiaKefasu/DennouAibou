@@ -51,7 +51,7 @@ import {
   resolveSessionAuthProfileOverride,
   resolveThinkingDefault,
   setSessionRuntimeModel,
-  supportsXHighThinking,
+  isElevatedThinkingDenied,
 } from "./run.runtime.js";
 import { resolveCronAgentSessionKey } from "./session-key.js";
 import { resolveCronSession } from "./session.js";
@@ -344,9 +344,9 @@ async function prepareCronRunContext(params: {
       catalog: await loadCatalog(),
     });
   }
-  if (thinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) {
+  if (thinkLevel && isElevatedThinkingDenied(thinkLevel, provider, model)) {
     logWarn(
-      `[cron:${input.job.id}] Thinking level "xhigh" is not supported for ${provider}/${model}; downgrading to "high".`,
+      `[cron:${input.job.id}] Thinking level "${thinkLevel}" is not supported for ${provider}/${model}; downgrading to "high".`,
     );
     thinkLevel = "high";
   }
@@ -664,7 +664,7 @@ export async function runCronIsolatedAgentTurn(params: {
       ? reason.trim()
       : "cron: job execution timed out";
   };
-  const isFastTestEnv = process.env.OPENCLAW_TEST_FAST === "1";
+  const isFastTestEnv = process.env.DENNOU_TEST_FAST === "1";
   const prepared = await prepareCronRunContext({ input: params, isFastTestEnv });
   if (!prepared.ok) {
     return prepared.result;

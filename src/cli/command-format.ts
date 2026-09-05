@@ -14,8 +14,8 @@ export function formatCliCommand(
 ): string {
   const cliName = resolveCliName();
   const normalizedCommand = replaceCliName(command, cliName);
-  const container = env.OPENCLAW_CONTAINER_HINT?.trim();
-  const profile = normalizeProfileName(env.OPENCLAW_PROFILE);
+  const container = env.DENNOU_CONTAINER_HINT?.trim();
+  const profile = normalizeProfileName(env.DENNOU_PROFILE);
   if (!container && !profile) {
     return normalizedCommand;
   }

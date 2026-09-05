@@ -69,7 +69,7 @@ describe("cron service ops seam coverage", () => {
     const { storePath } = await makeStorePath();
     const now = Date.parse("2026-03-23T12:00:00.000Z");
     const enqueueSystemEvent = vi.fn();
-    const requestHeartbeatNow = vi.fn();
+    const requestWakeNow = vi.fn();
     const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
     await writeCronStoreSnapshot({
@@ -83,7 +83,7 @@ describe("cron service ops seam coverage", () => {
       log: logger,
       nowMs: () => now,
       enqueueSystemEvent,
-      requestHeartbeatNow,
+      requestWakeNow,
       runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })),
     });
 
@@ -95,7 +95,7 @@ describe("cron service ops seam coverage", () => {
     );
     // Interrupted recurring jobs are now replayed on first restart (#60495)
     expect(enqueueSystemEvent).toHaveBeenCalled();
-    expect(requestHeartbeatNow).toHaveBeenCalled();
+    expect(requestWakeNow).toHaveBeenCalled();
     expect(state.timer).not.toBeNull();
 
     const persisted = JSON.parse(await fs.readFile(storePath, "utf8")) as {
@@ -120,8 +120,8 @@ describe("cron service ops seam coverage", () => {
     const { storePath } = await makeStorePath();
     const stateRoot = path.dirname(path.dirname(storePath));
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const originalStateDir = process.env.OPENCLAW_STATE_DIR;
-    process.env.OPENCLAW_STATE_DIR = stateRoot;
+    const originalStateDir = process.env.DENNOU_STATE_DIR;
+    process.env.DENNOU_STATE_DIR = stateRoot;
     resetTaskRegistryForTests();
 
     await writeCronStoreSnapshot({
@@ -135,7 +135,7 @@ describe("cron service ops seam coverage", () => {
       log: logger,
       nowMs: () => now,
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
+      requestWakeNow: vi.fn(),
       runIsolatedAgentJob: vi.fn(async () => {
         throw new Error("cron: job execution timed out");
       }),
@@ -150,9 +150,9 @@ describe("cron service ops seam coverage", () => {
     });
 
     if (originalStateDir === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = originalStateDir;
+      process.env.DENNOU_STATE_DIR = originalStateDir;
     }
     resetTaskRegistryForTests();
   });
@@ -178,7 +178,7 @@ describe("cron service ops seam coverage", () => {
       log: logger,
       nowMs: () => now,
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
+      requestWakeNow: vi.fn(),
       runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const, summary: "done" })),
     });
 
@@ -201,8 +201,8 @@ describe("cron service ops seam coverage", () => {
     const { storePath } = await makeStorePath();
     const stateRoot = path.dirname(path.dirname(storePath));
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const originalStateDir = process.env.OPENCLAW_STATE_DIR;
-    process.env.OPENCLAW_STATE_DIR = stateRoot;
+    const originalStateDir = process.env.DENNOU_STATE_DIR;
+    process.env.DENNOU_STATE_DIR = stateRoot;
     resetTaskRegistryForTests();
 
     await writeCronStoreSnapshot({
@@ -222,7 +222,7 @@ describe("cron service ops seam coverage", () => {
       log: logger,
       nowMs: () => now,
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
+      requestWakeNow: vi.fn(),
       runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const, summary: "done" })),
     });
 
@@ -240,9 +240,9 @@ describe("cron service ops seam coverage", () => {
 
     updateTaskRecordSpy.mockRestore();
     if (originalStateDir === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = originalStateDir;
+      process.env.DENNOU_STATE_DIR = originalStateDir;
     }
     resetTaskRegistryForTests();
   });
@@ -251,8 +251,8 @@ describe("cron service ops seam coverage", () => {
     const { storePath } = await makeStorePath();
     const stateRoot = path.dirname(path.dirname(storePath));
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const originalStateDir = process.env.OPENCLAW_STATE_DIR;
-    process.env.OPENCLAW_STATE_DIR = stateRoot;
+    const originalStateDir = process.env.DENNOU_STATE_DIR;
+    process.env.DENNOU_STATE_DIR = stateRoot;
     resetTaskRegistryForTests();
 
     await writeCronStoreSnapshot({
@@ -266,7 +266,7 @@ describe("cron service ops seam coverage", () => {
       log: logger,
       nowMs: () => now,
       enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
+      requestWakeNow: vi.fn(),
       runIsolatedAgentJob: vi.fn(async () => {
         throw new Error("cron: job execution timed out");
       }),
@@ -281,9 +281,9 @@ describe("cron service ops seam coverage", () => {
     });
 
     if (originalStateDir === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = originalStateDir;
+      process.env.DENNOU_STATE_DIR = originalStateDir;
     }
     resetTaskRegistryForTests();
     stop(state);

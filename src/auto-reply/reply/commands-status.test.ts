@@ -282,7 +282,7 @@ describe("buildStatusReply subagent summary", () => {
 
   it("shows a recent failure when no active tasks remain", async () => {
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:status-task-failed",
       runId: "run-status-task-failed",
@@ -354,7 +354,7 @@ describe("buildStatusReply subagent summary", () => {
 
   it("prefers failure context over newer success context when showing recent failures", async () => {
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:status-task-failed-priority",
       runId: "run-status-task-failed-priority",

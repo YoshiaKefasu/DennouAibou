@@ -3,8 +3,7 @@ import type { ChatType } from "../channels/chat-type.js";
 export type ReplyMode = "text" | "command";
 export type TypingMode = "never" | "instant" | "thinking" | "message";
 export type SessionScope = "per-sender" | "global";
-export type DmScope =
-  "main" | "per-peer" | "per-channel-peer" | "per-account-channel-peer";
+export type DmScope = "main" | "per-peer" | "per-channel-peer" | "per-account-channel-peer";
 export type ReplyToMode = "off" | "first" | "all" | "batched";
 export type GroupPolicy = "open" | "disabled" | "allowlist";
 export type DmPolicy = "pairing" | "allowlist" | "open" | "disabled";
@@ -70,7 +69,18 @@ export type SessionSendPolicyConfig = {
   rules?: SessionSendPolicyRule[];
 };
 
+/**
+ * @deprecated Automatic session reset policies (idle / daily) have been
+ * removed. Sessions are never rotated automatically. The mode literal is
+ * preserved so legacy configs that reference it still type-check; the value
+ * is accepted but has no effect at runtime.
+ */
 export type SessionResetMode = "daily" | "idle" | "off";
+/**
+ * @deprecated Automatic session reset policies (idle / daily) have been
+ * removed. This type is preserved so legacy configs that reference the shape
+ * still type-check; the value is accepted but has no effect at runtime.
+ */
 export type SessionResetConfig = {
   mode?: SessionResetMode;
   /** Local hour (0-23) for the daily reset boundary. */
@@ -78,6 +88,11 @@ export type SessionResetConfig = {
   /** Sliding idle window (minutes). When set with daily mode, whichever expires first wins. */
   idleMinutes?: number;
 };
+/**
+ * @deprecated Per-type automatic reset overrides have been removed. This type
+ * is preserved so legacy configs that reference the shape still type-check;
+ * the value is accepted but has no effect at runtime.
+ */
 export type SessionResetByTypeConfig = {
   direct?: SessionResetConfig;
   /** @deprecated Use `direct` instead. Kept for backward compatibility. */
@@ -110,11 +125,38 @@ export type SessionConfig = {
   dmScope?: DmScope;
   /** Map platform-prefixed identities (e.g. "telegram:123") to canonical DM peers. */
   identityLinks?: Record<string, string[]>;
+  /**
+   * @deprecated Manual `/new` / `/reset` triggers remain supported, but the
+   * automatic session reset machinery (idle / daily / resetByType /
+   * resetByChannel / idleMinutes) has been removed. Accepted for backward
+   * compatibility with existing KASOU config files; new configurations
+   * should omit this.
+   */
   resetTriggers?: string[];
+  /**
+   * @deprecated The automatic idle reset window has been removed; sessions
+   * are never rotated based on inactivity. Accepted for backward
+   * compatibility with existing KASOU config files.
+   */
   idleMinutes?: number;
+  /**
+   * @deprecated Automatic session reset policies (idle / daily) have been
+   * removed. Sessions are never rotated automatically. Accepted for backward
+   * compatibility with existing KASOU config files.
+   */
   reset?: SessionResetConfig;
+  /**
+   * @deprecated Per-type automatic reset overrides have been removed.
+   * Sessions are never rotated automatically. Accepted for backward
+   * compatibility with existing KASOU config files.
+   */
   resetByType?: SessionResetByTypeConfig;
-  /** Channel-specific reset overrides (e.g. { discord: { mode: "idle", idleMinutes: 10080 } }). */
+  /**
+   * @deprecated Per-channel automatic reset overrides have been removed.
+   * Sessions are never rotated automatically. Accepted for backward
+   * compatibility with existing KASOU config files.
+   * @example { discord: { mode: "idle", idleMinutes: 10080 } }
+   */
   resetByChannel?: Record<string, SessionResetConfig>;
   store?: string;
   typingIntervalSeconds?: number;
@@ -180,8 +222,7 @@ export type LoggingConfig = {
   file?: string;
   /** Maximum size of a single log file in bytes before writes are suppressed. Default: 500 MB. */
   maxFileBytes?: number;
-  consoleLevel?:
-    "silent" | "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  consoleLevel?: "silent" | "fatal" | "error" | "warn" | "info" | "debug" | "trace";
   consoleStyle?: "pretty" | "compact" | "json";
   /** Redact sensitive tokens in tool summaries. Default: "tools". */
   redactSensitive?: "off" | "tools";
@@ -238,9 +279,7 @@ export type WebConfig = {
 };
 
 // Provider docking: allowlists keyed by provider id (and internal "webchat").
-export type AgentElevatedAllowFromConfig = Partial<
-  Record<string, Array<string | number>>
->;
+export type AgentElevatedAllowFromConfig = Partial<Record<string, Array<string | number>>>;
 
 export type IdentityConfig = {
   name?: string;

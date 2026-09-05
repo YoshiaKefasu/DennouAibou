@@ -79,7 +79,7 @@ describe("resolveSafeInstallDir", () => {
       }),
     ).toEqual({
       ok: true,
-      path: path.join("/tmp/plugins", "@openclaw__matrix"),
+      path: path.join("/tmp/plugins", "@DENNOU__matrix"),
     });
   });
 

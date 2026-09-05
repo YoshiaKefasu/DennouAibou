@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
-import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
-import type { TSchema } from "@sinclair/typebox";
+import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import type { TSchema } from "typebox";
 import { detectMime } from "../../media/mime.js";
 import { readSnakeCaseParamRaw } from "../../param-key.js";
 import type { ImageSanitizationLimits } from "../image-sanitization.js";
@@ -61,25 +61,21 @@ export function createActionGate<T extends Record<string, boolean | undefined>>(
   };
 }
 
-function readParamRaw(params: Record<string, unknown>, key: string): unknown {
+function readParamRaw(params: unknown, key: string): unknown {
   return readSnakeCaseParamRaw(params, key);
 }
 
 export function readStringParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options: StringParamOptions & { required: true },
 ): string;
 export function readStringParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options?: StringParamOptions,
 ): string | undefined;
-export function readStringParam(
-  params: Record<string, unknown>,
-  key: string,
-  options: StringParamOptions = {},
-) {
+export function readStringParam(params: unknown, key: string, options: StringParamOptions = {}) {
   const { required = false, trim = true, label = key, allowEmpty = false } = options;
   const raw = readParamRaw(params, key);
   if (typeof raw !== "string") {
@@ -99,7 +95,7 @@ export function readStringParam(
 }
 
 export function readStringOrNumberParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options: { required?: boolean; label?: string } = {},
 ): string | undefined {
@@ -121,7 +117,7 @@ export function readStringOrNumberParam(
 }
 
 export function readNumberParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options: { required?: boolean; label?: string; integer?: boolean; strict?: boolean } = {},
 ): number | undefined {
@@ -149,17 +145,17 @@ export function readNumberParam(
 }
 
 export function readStringArrayParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options: StringParamOptions & { required: true },
 ): string[];
 export function readStringArrayParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options?: StringParamOptions,
 ): string[] | undefined;
 export function readStringArrayParam(
-  params: Record<string, unknown>,
+  params: unknown,
   key: string,
   options: StringParamOptions = {},
 ) {
@@ -201,7 +197,7 @@ export type ReactionParams = {
 };
 
 export function readReactionParams(
-  params: Record<string, unknown>,
+  params: unknown,
   options: {
     emojiKey?: string;
     removeKey?: string;
@@ -210,7 +206,11 @@ export function readReactionParams(
 ): ReactionParams {
   const emojiKey = options.emojiKey ?? "emoji";
   const removeKey = options.removeKey ?? "remove";
-  const remove = typeof params[removeKey] === "boolean" ? params[removeKey] : false;
+  const record =
+    params && typeof params === "object" && !Array.isArray(params)
+      ? (params as Record<string, unknown>)
+      : {};
+  const remove = typeof record[removeKey] === "boolean" ? (record[removeKey] as boolean) : false;
   const emoji = readStringParam(params, emojiKey, {
     required: true,
     allowEmpty: true,

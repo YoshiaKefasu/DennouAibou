@@ -36,9 +36,9 @@ function hasDiagnosticSourceSuffix(
 
 function buildDiscoveryEnv(stateDir: string): NodeJS.ProcessEnv {
   return {
-    OPENCLAW_STATE_DIR: stateDir,
-    OPENCLAW_HOME: undefined,
-    OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
+    DENNOU_STATE_DIR: stateDir,
+    DENNOU_HOME: undefined,
+    DENNOU_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
   };
 }
 
@@ -48,7 +48,7 @@ function buildCachedDiscoveryEnv(
 ): NodeJS.ProcessEnv {
   return {
     ...buildDiscoveryEnv(stateDir),
-    OPENCLAW_PLUGIN_DISCOVERY_CACHE_MS: "5000",
+    DENNOU_PLUGIN_DISCOVERY_CACHE_MS: "5000",
     ...overrides,
   };
 }
@@ -374,7 +374,7 @@ describe("discoverOpenClawPlugins", () => {
     const { candidates, diagnostics } = discoverOpenClawPlugins({
       env: {
         ...buildDiscoveryEnv(stateDir),
-        OPENCLAW_BUNDLED_PLUGINS_DIR: bundledDir,
+        DENNOU_BUNDLED_PLUGINS_DIR: bundledDir,
       },
     });
 
@@ -793,9 +793,9 @@ describe("discoverOpenClawPlugins", () => {
       const result = discoverOpenClawPlugins({
         env: {
           ...process.env,
-          OPENCLAW_DISABLE_BUNDLED_PLUGINS: undefined,
-          OPENCLAW_STATE_DIR: stateDir,
-          OPENCLAW_BUNDLED_PLUGINS_DIR: bundledDir,
+          DENNOU_DISABLE_BUNDLED_PLUGINS: undefined,
+          DENNOU_STATE_DIR: stateDir,
+          DENNOU_BUNDLED_PLUGINS_DIR: bundledDir,
         },
       });
 

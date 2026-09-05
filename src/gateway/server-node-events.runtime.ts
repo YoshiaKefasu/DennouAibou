@@ -6,14 +6,18 @@ export { agentCommandFromIngress } from "../commands/agent.js";
 export { loadConfig } from "../config/config.js";
 export { updateSessionStore } from "../config/sessions.js";
 export { loadOrCreateDeviceIdentity } from "../infra/device-identity.js";
-export { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
+export { requestWakeNow } from "../infra/event-pump.js";
 export { deliverOutboundPayloads } from "../infra/outbound/deliver.js";
 export { buildOutboundSessionContext } from "../infra/outbound/session-context.js";
 export { resolveOutboundTarget } from "../infra/outbound/targets.js";
 export { registerApnsRegistration } from "../infra/push-apns.js";
 export { enqueueSystemEvent } from "../infra/system-events.js";
 export { deleteMediaBuffer } from "../media/store.js";
-export { normalizeMainKey, scopedHeartbeatWakeOptions } from "../routing/session-key.js";
+export {
+  normalizeMainKey,
+  scopedWakeOptions,
+  scopedHeartbeatWakeOptions,
+} from "../routing/session-key.js";
 export { defaultRuntime } from "../runtime.js";
 export { parseMessageWithAttachments } from "./chat-attachments.js";
 export { normalizeRpcAttachmentsToChatAttachments } from "./server-methods/attachment-normalize.js";

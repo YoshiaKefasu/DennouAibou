@@ -1,4 +1,12 @@
-export type ThinkLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+export type ThinkLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "adaptive";
 export type VerboseLevel = "off" | "on" | "full";
 export type NoticeLevel = "off" | "on" | "full";
 export type ElevatedLevel = "off" | "on" | "ask" | "full";
@@ -19,14 +27,11 @@ export function isBinaryThinkingProvider(provider?: string | null): boolean {
   return false;
 }
 
-export function supportsBuiltInXHighThinking(
-  provider?: string | null,
-  model?: string | null,
-): boolean {
-  void provider;
-  void model;
-  return false;
-}
+// Note: there is no `supportsBuiltInXHighThinking` anymore. Reasoning level
+// support is declared per-model via `compat.reasoningEffortMap` (PI agent
+// `models.json` design), and resolved through `src/auto-reply/thinking.ts`.
+// Removing the hook keeps a single source of truth and avoids drift between
+// choices/denial/wire layers.
 
 // Normalize user-provided thinking level strings to the canonical enum.
 export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined {
@@ -40,6 +45,9 @@ export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined
   }
   if (collapsed === "xhigh" || collapsed === "extrahigh") {
     return "xhigh";
+  }
+  if (collapsed === "max" || collapsed === "maximum") {
+    return "max";
   }
   if (["off"].includes(key)) {
     return "off";
@@ -56,9 +64,7 @@ export function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined
   if (["mid", "med", "medium", "thinkharder", "think-harder", "harder"].includes(key)) {
     return "medium";
   }
-  if (
-    ["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest", "max"].includes(key)
-  ) {
+  if (["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest"].includes(key)) {
     return "high";
   }
   if (["think"].includes(key)) {
@@ -90,7 +96,11 @@ export function formatThinkingLevels(
 }
 
 export function formatXHighModelHint(): string {
-  return "provider models that advertise xhigh reasoning";
+  return "models that declare xhigh in their reasoningEffortMap";
+}
+
+export function formatMaxModelHint(): string {
+  return "models that declare max in their reasoningEffortMap";
 }
 
 export function resolveThinkingDefaultForModel(params: {

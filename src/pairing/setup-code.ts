@@ -218,11 +218,11 @@ function pickTailnetIPv4(
 }
 
 function resolveGatewayTokenFromEnv(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENCLAW_GATEWAY_TOKEN?.trim() || undefined;
+  return env.DENNOU_GATEWAY_TOKEN?.trim() || undefined;
 }
 
 function resolveGatewayPasswordFromEnv(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENCLAW_GATEWAY_PASSWORD?.trim() || undefined;
+  return env.DENNOU_GATEWAY_PASSWORD?.trim() || undefined;
 }
 
 function resolvePairingSetupAuthLabel(
@@ -281,7 +281,7 @@ async function resolveGatewayTokenSecretRef(
     return cfg;
   }
   if (mode !== "token") {
-    const hasPasswordEnvCandidate = Boolean(env.OPENCLAW_GATEWAY_PASSWORD?.trim());
+    const hasPasswordEnvCandidate = Boolean(env.DENNOU_GATEWAY_PASSWORD?.trim());
     if (hasPasswordEnvCandidate) {
       return cfg;
     }

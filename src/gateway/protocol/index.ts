@@ -48,10 +48,6 @@ import {
   TalkConfigParamsSchema,
   type TalkConfigResult,
   TalkConfigResultSchema,
-  type TalkSpeakParams,
-  TalkSpeakParamsSchema,
-  type TalkSpeakResult,
-  TalkSpeakResultSchema,
   type ChannelsStatusParams,
   ChannelsStatusParamsSchema,
   type ChannelsStatusResult,
@@ -227,16 +223,8 @@ import {
   type SkillsBinsParams,
   SkillsBinsParamsSchema,
   type SkillsBinsResult,
-  type SkillsDetailParams,
-  SkillsDetailParamsSchema,
-  type SkillsDetailResult,
-  SkillsDetailResultSchema,
   type SkillsInstallParams,
   SkillsInstallParamsSchema,
-  type SkillsSearchParams,
-  SkillsSearchParamsSchema,
-  type SkillsSearchResult,
-  SkillsSearchResultSchema,
   type SkillsStatusParams,
   SkillsStatusParamsSchema,
   type SkillsUpdateParams,
@@ -255,8 +243,6 @@ import {
   TalkModeParamsSchema,
   type TickEvent,
   TickEventSchema,
-  type UpdateRunParams,
-  UpdateRunParamsSchema,
   type WakeParams,
   WakeParamsSchema,
   type WebLoginStartParams,
@@ -396,8 +382,6 @@ export const validateWizardStatusParams = ajv.compile<WizardStatusParams>(Wizard
 export const validateTalkModeParams = ajv.compile<TalkModeParams>(TalkModeParamsSchema);
 export const validateTalkConfigParams = ajv.compile<TalkConfigParams>(TalkConfigParamsSchema);
 export const validateTalkConfigResult = ajv.compile<TalkConfigResult>(TalkConfigResultSchema);
-export const validateTalkSpeakParams = ajv.compile<TalkSpeakParams>(TalkSpeakParamsSchema);
-export const validateTalkSpeakResult = ajv.compile<TalkSpeakResult>(TalkSpeakResultSchema);
 export const validateChannelsStatusParams = ajv.compile<ChannelsStatusParams>(
   ChannelsStatusParamsSchema,
 );
@@ -414,8 +398,6 @@ export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBins
 export const validateSkillsInstallParams =
   ajv.compile<SkillsInstallParams>(SkillsInstallParamsSchema);
 export const validateSkillsUpdateParams = ajv.compile<SkillsUpdateParams>(SkillsUpdateParamsSchema);
-export const validateSkillsSearchParams = ajv.compile<SkillsSearchParams>(SkillsSearchParamsSchema);
-export const validateSkillsDetailParams = ajv.compile<SkillsDetailParams>(SkillsDetailParamsSchema);
 export const validateCronListParams = ajv.compile<CronListParams>(CronListParamsSchema);
 export const validateCronStatusParams = ajv.compile<CronStatusParams>(CronStatusParamsSchema);
 export const validateCronAddParams = ajv.compile<CronAddParams>(CronAddParamsSchema);
@@ -474,7 +456,6 @@ export const validateChatSendParams = ajv.compile(ChatSendParamsSchema);
 export const validateChatAbortParams = ajv.compile<ChatAbortParams>(ChatAbortParamsSchema);
 export const validateChatInjectParams = ajv.compile<ChatInjectParams>(ChatInjectParamsSchema);
 export const validateChatEvent = ajv.compile(ChatEventSchema);
-export const validateUpdateRunParams = ajv.compile<UpdateRunParams>(UpdateRunParamsSchema);
 export const validateWebLoginStartParams =
   ajv.compile<WebLoginStartParams>(WebLoginStartParamsSchema);
 export const validateWebLoginWaitParams = ajv.compile<WebLoginWaitParams>(WebLoginWaitParamsSchema);
@@ -577,8 +558,6 @@ export {
   WizardStatusResultSchema,
   TalkConfigParamsSchema,
   TalkConfigResultSchema,
-  TalkSpeakParamsSchema,
-  TalkSpeakResultSchema,
   ChannelsStatusParamsSchema,
   ChannelsStatusResultSchema,
   ChannelsLogoutParamsSchema,
@@ -605,10 +584,6 @@ export {
   ToolsCatalogParamsSchema,
   ToolsEffectiveParamsSchema,
   SkillsInstallParamsSchema,
-  SkillsSearchParamsSchema,
-  SkillsSearchResultSchema,
-  SkillsDetailParamsSchema,
-  SkillsDetailResultSchema,
   SkillsUpdateParamsSchema,
   CronJobSchema,
   CronListParamsSchema,
@@ -628,7 +603,6 @@ export {
   ChatHistoryParamsSchema,
   ChatSendParamsSchema,
   ChatInjectParamsSchema,
-  UpdateRunParamsSchema,
   TickEventSchema,
   ShutdownEventSchema,
   ProtocolSchemas,
@@ -678,8 +652,6 @@ export type {
   WizardStatusResult,
   TalkConfigParams,
   TalkConfigResult,
-  TalkSpeakParams,
-  TalkSpeakResult,
   TalkModeParams,
   ChannelsStatusParams,
   ChannelsStatusResult,
@@ -709,10 +681,6 @@ export type {
   ToolsEffectiveResult,
   SkillsBinsParams,
   SkillsBinsResult,
-  SkillsSearchParams,
-  SkillsSearchResult,
-  SkillsDetailParams,
-  SkillsDetailResult,
   SkillsInstallParams,
   SkillsUpdateParams,
   NodePairRejectParams,
@@ -752,6 +720,5 @@ export type {
   LogsTailParams,
   LogsTailResult,
   PollParams,
-  UpdateRunParams,
   ChatInjectParams,
 };

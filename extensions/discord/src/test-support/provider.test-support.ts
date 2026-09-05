@@ -25,15 +25,7 @@ type ProviderMonitorTestMocks = {
   createDiscordMessageHandlerMock: Mock<() => unknown>;
   createNoopThreadBindingManagerMock: Mock<() => { stop: ReturnType<typeof vi.fn> }>;
   createThreadBindingManagerMock: Mock<() => { stop: ReturnType<typeof vi.fn> }>;
-  reconcileAcpThreadBindingsOnStartupMock: Mock<() => unknown>;
   createdBindingManagers: Array<{ stop: ReturnType<typeof vi.fn> }>;
-  getAcpSessionStatusMock: Mock<
-    (params: {
-      cfg: OpenClawConfig;
-      sessionKey: string;
-      signal?: AbortSignal;
-    }) => Promise<{ state: string }>
-  >;
   getPluginCommandSpecsMock: Mock<(provider?: string) => PluginCommandSpecMock[]>;
   listNativeCommandSpecsForConfigMock: Mock<
     (
@@ -103,17 +95,7 @@ const providerMonitorTestMocks: ProviderMonitorTestMocks = vi.hoisted(() => {
       createdBindingManagers.push(manager);
       return manager;
     }),
-    reconcileAcpThreadBindingsOnStartupMock: vi.fn(() => ({
-      checked: 0,
-      removed: 0,
-      staleSessionKeys: [],
-    })),
     createdBindingManagers,
-    getAcpSessionStatusMock: vi.fn(
-      async (_params: { cfg: OpenClawConfig; sessionKey: string; signal?: AbortSignal }) => ({
-        state: "idle",
-      }),
-    ),
     getPluginCommandSpecsMock: vi.fn<(provider?: string) => PluginCommandSpecMock[]>(() => []),
     listNativeCommandSpecsForConfigMock: vi.fn<
       (
@@ -158,9 +140,7 @@ const {
   createDiscordMessageHandlerMock,
   createNoopThreadBindingManagerMock,
   createThreadBindingManagerMock,
-  reconcileAcpThreadBindingsOnStartupMock,
   createdBindingManagers,
-  getAcpSessionStatusMock,
   getPluginCommandSpecsMock,
   listNativeCommandSpecsForConfigMock,
   listSkillCommandsForAgentsMock,
@@ -222,13 +202,7 @@ export function resetDiscordProviderMonitorMocks(params?: {
   );
   createNoopThreadBindingManagerMock.mockClear();
   createThreadBindingManagerMock.mockClear();
-  reconcileAcpThreadBindingsOnStartupMock.mockClear().mockReturnValue({
-    checked: 0,
-    removed: 0,
-    staleSessionKeys: [],
-  });
   createdBindingManagers.length = 0;
-  getAcpSessionStatusMock.mockClear().mockResolvedValue({ state: "idle" });
   getPluginCommandSpecsMock.mockClear().mockReturnValue([]);
   listNativeCommandSpecsForConfigMock
     .mockClear()
@@ -322,20 +296,6 @@ vi.mock("@buape/carbon/gateway", () => ({
 vi.mock("@buape/carbon/voice", () => ({
   VoicePlugin: class VoicePlugin {},
 }));
-
-vi.mock("openclaw/plugin-sdk/acp-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/acp-runtime")>(
-    "openclaw/plugin-sdk/acp-runtime",
-  );
-  return {
-    ...actual,
-    getAcpSessionManager: () => ({
-      getSessionStatus: getAcpSessionStatusMock,
-    }),
-    isAcpRuntimeError: (error: unknown): error is { code: string } =>
-      error instanceof Error && "code" in error,
-  };
-});
 
 vi.mock("openclaw/plugin-sdk/command-auth", async () => {
   const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/command-auth")>(
@@ -498,6 +458,5 @@ vi.mock(buildDiscordSourceModuleId("monitor/rest-fetch.js"), () => ({
 vi.mock(buildDiscordSourceModuleId("monitor/thread-bindings.js"), () => ({
   createNoopThreadBindingManager: createNoopThreadBindingManagerMock,
   createThreadBindingManager: createThreadBindingManagerMock,
-  reconcileAcpThreadBindingsOnStartup: reconcileAcpThreadBindingsOnStartupMock,
   resolveThreadBindingIdleTimeoutMs: vi.fn(() => 24 * 60 * 60 * 1000),
 }));

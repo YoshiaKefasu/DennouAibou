@@ -1,8 +1,6 @@
 import { beforeEach, describe, it, vi } from "vitest";
 import {
   expectAugmentedCodexCatalog,
-  expectCodexBuiltInSuppression,
-  expectCodexMissingAuthHint,
   importProviderRuntimeCatalogModule,
   loadBundledPluginPublicSurfaceSync,
 } from "../../../test/helpers/plugins/provider-catalog.js";
@@ -88,9 +86,7 @@ export function describeOpenAIProviderCatalogContract() {
         resolveOwningPluginIdsForProviderMock.mockReset();
         resolveOwningPluginIdsForProviderMock.mockImplementation((params) => {
           switch (params.provider) {
-            case "azure-openai-responses":
             case "openai":
-            case "openai-codex":
               return ["openai"];
             default:
               return undefined;
@@ -99,18 +95,6 @@ export function describeOpenAIProviderCatalogContract() {
 
         resolveCatalogHookProviderPluginIdsMock.mockReset();
         resolveCatalogHookProviderPluginIdsMock.mockReturnValue(["openai"]);
-      });
-
-      it("keeps codex-only missing-auth hints wired through the provider runtime", async () => {
-        const { openaiProvider } = await contractDepsPromise;
-        expectCodexMissingAuthHint(
-          (params) => openaiProvider.buildMissingAuthMessage?.(params.context) ?? undefined,
-        );
-      });
-
-      it("keeps built-in model suppression wired through the provider runtime", async () => {
-        const { resolveProviderBuiltInModelSuppression } = await contractDepsPromise;
-        expectCodexBuiltInSuppression(resolveProviderBuiltInModelSuppression);
       });
 
       it("keeps bundled model augmentation wired through the provider runtime", async () => {

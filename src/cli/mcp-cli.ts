@@ -1,5 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Command } from "commander";
-import { readSecretFromFile } from "../acp/secret-file.js";
 import { parseConfigValue } from "../auto-reply/reply/config-value.js";
 import {
   listConfiguredMcpServers,
@@ -32,7 +33,12 @@ function resolveSecretOption(params: {
     throw new Error(`Use either ${params.directFlag} or ${params.fileFlag} for ${params.label}.`);
   }
   if (file) {
-    return readSecretFromFile(file, params.label);
+    const raw = fs.readFileSync(path.resolve(file), "utf8");
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      throw new Error(`${params.label} file is empty.`);
+    }
+    return trimmed;
   }
   return direct || undefined;
 }

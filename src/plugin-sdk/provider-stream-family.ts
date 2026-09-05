@@ -1,20 +1,10 @@
-import {
-  createGoogleThinkingPayloadWrapper,
-  sanitizeGoogleThinkingPayload,
-} from "../agents/pi-embedded-runner/google-stream-wrappers.js";
 import { createMinimaxFastModeWrapper } from "../agents/pi-embedded-runner/minimax-stream-wrappers.js";
 import {
   createMoonshotThinkingWrapper,
   resolveMoonshotThinkingType,
 } from "../agents/pi-embedded-runner/moonshot-thinking-stream-wrappers.js";
 import {
-  createCodexNativeWebSearchWrapper,
   createOpenAIAttributionHeadersWrapper,
-  createOpenAIFastModeWrapper,
-  createOpenAIReasoningCompatibilityWrapper,
-  createOpenAIResponsesContextManagementWrapper,
-  createOpenAIServiceTierWrapper,
-  createOpenAITextVerbosityWrapper,
   resolveOpenAIFastMode,
   resolveOpenAIServiceTier,
   resolveOpenAITextVerbosity,
@@ -37,7 +27,6 @@ import type { ProviderPlugin } from "../plugins/types.js";
 import type { ProviderWrapStreamFnContext } from "./plugin-entry.js";
 
 export type ProviderStreamFamily =
-  | "google-thinking"
   | "kilocode-thinking"
   | "moonshot-thinking"
   | "minimax-fast-mode"
@@ -51,11 +40,6 @@ export function buildProviderStreamFamilyHooks(
   family: ProviderStreamFamily,
 ): ProviderStreamFamilyHooks {
   switch (family) {
-    case "google-thinking":
-      return {
-        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) =>
-          createGoogleThinkingPayloadWrapper(ctx.streamFn, ctx.thinkingLevel),
-      };
     case "moonshot-thinking":
       return {
         wrapStreamFn: (ctx: ProviderWrapStreamFnContext) => {
@@ -83,32 +67,8 @@ export function buildProviderStreamFamilyHooks(
       };
     case "openai-responses-defaults":
       return {
-        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) => {
-          let nextStreamFn = createOpenAIAttributionHeadersWrapper(ctx.streamFn);
-
-          if (resolveOpenAIFastMode(ctx.extraParams)) {
-            nextStreamFn = createOpenAIFastModeWrapper(nextStreamFn);
-          }
-
-          const serviceTier = resolveOpenAIServiceTier(ctx.extraParams);
-          if (serviceTier) {
-            nextStreamFn = createOpenAIServiceTierWrapper(nextStreamFn, serviceTier);
-          }
-
-          const textVerbosity = resolveOpenAITextVerbosity(ctx.extraParams);
-          if (textVerbosity) {
-            nextStreamFn = createOpenAITextVerbosityWrapper(nextStreamFn, textVerbosity);
-          }
-
-          nextStreamFn = createCodexNativeWebSearchWrapper(nextStreamFn, {
-            config: ctx.config,
-            agentDir: ctx.agentDir,
-          });
-          return createOpenAIResponsesContextManagementWrapper(
-            createOpenAIReasoningCompatibilityWrapper(nextStreamFn),
-            ctx.extraParams,
-          );
-        },
+        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) =>
+          createOpenAIAttributionHeadersWrapper(ctx.streamFn),
       };
     case "openrouter-thinking":
       return {
@@ -128,10 +88,6 @@ export function buildProviderStreamFamilyHooks(
   }
 }
 
-export {
-  createGoogleThinkingPayloadWrapper,
-  sanitizeGoogleThinkingPayload,
-} from "../agents/pi-embedded-runner/google-stream-wrappers.js";
 export { createMinimaxFastModeWrapper } from "../agents/pi-embedded-runner/minimax-stream-wrappers.js";
 export {
   createMoonshotThinkingWrapper,
@@ -139,13 +95,6 @@ export {
 } from "../agents/pi-embedded-runner/moonshot-thinking-stream-wrappers.js";
 export {
   createOpenAIAttributionHeadersWrapper,
-  createCodexNativeWebSearchWrapper,
-  createOpenAIDefaultTransportWrapper,
-  createOpenAIFastModeWrapper,
-  createOpenAIReasoningCompatibilityWrapper,
-  createOpenAIResponsesContextManagementWrapper,
-  createOpenAIServiceTierWrapper,
-  createOpenAITextVerbosityWrapper,
   resolveOpenAIFastMode,
   resolveOpenAIServiceTier,
   resolveOpenAITextVerbosity,

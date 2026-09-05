@@ -154,7 +154,7 @@ Example:
 | `npmSpec`                    | `string`             | Canonical npm spec for install/update flows.                                     |
 | `localPath`                  | `string`             | Local development or bundled install path.                                       |
 | `defaultChoice`              | `"npm"` \| `"local"` | Preferred install source when both are available.                                |
-| `minHostVersion`             | `string`             | Minimum supported OpenClaw version in the form `>=x.y.z`.                        |
+| `minHostVersion`             | `string`             | Minimum supported DennouAibou version in the form `>=x.y.z`.                     |
 | `allowInvalidConfigRecovery` | `boolean`            | Lets bundled-plugin reinstall flows recover from specific stale-config failures. |
 
 If `minHostVersion` is set, install and manifest-registry loading both enforce
@@ -182,7 +182,7 @@ Channel plugins can opt into deferred loading with:
 }
 ```
 
-When enabled, OpenClaw loads only `setupEntry` during the pre-listen startup
+When enabled, DennouAibou loads only `setupEntry` during the pre-listen startup
 phase, even for already-configured channels. The full entry loads after the
 gateway starts listening.
 
@@ -201,13 +201,13 @@ to `operator.admin`.
 ## Plugin manifest
 
 Every native plugin must ship an `openclaw.plugin.json` in the package root.
-OpenClaw uses this to validate config without executing plugin code.
+DennouAibou uses this to validate config without executing plugin code.
 
 ```json
 {
   "id": "my-plugin",
   "name": "My Plugin",
-  "description": "Adds My Plugin capabilities to OpenClaw",
+  "description": "Adds My Plugin capabilities to DennouAibou",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -265,7 +265,7 @@ always use `clawhub package publish`.
 ## Setup entry
 
 The `setup-entry.ts` file is a lightweight alternative to `index.ts` that
-OpenClaw loads when it only needs setup surfaces (onboarding, config repair,
+DennouAibou loads when it only needs setup surfaces (onboarding, config repair,
 disabled channel inspection).
 
 ```typescript
@@ -279,7 +279,7 @@ export default defineSetupPluginEntry(myChannelPlugin);
 This avoids loading heavy runtime code (crypto libraries, CLI registrations,
 background services) during setup flows.
 
-**When OpenClaw uses `setupEntry` instead of the full entry:**
+**When DennouAibou uses `setupEntry` instead of the full entry:**
 
 - The channel is disabled but needs setup/onboarding surfaces
 - The channel is enabled but unconfigured
@@ -380,7 +380,7 @@ For channel-specific config, use the channel config section instead:
 ### Building channel config schemas
 
 Use `buildChannelConfigSchema` from `openclaw/plugin-sdk/core` to convert a
-Zod schema into the `ChannelConfigSchema` wrapper that OpenClaw validates:
+Zod schema into the `ChannelConfigSchema` wrapper that DennouAibou validates:
 
 ```typescript
 import { z } from "zod";
@@ -494,7 +494,7 @@ copying the same binary/status glue into every channel:
 openclaw plugins install @myorg/openclaw-my-plugin
 ```
 
-OpenClaw tries ClawHub first and falls back to npm automatically. You can also
+DennouAibou tries ClawHub first and falls back to npm automatically. You can also
 force ClawHub explicitly:
 
 ```bash

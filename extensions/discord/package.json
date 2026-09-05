@@ -56,7 +56,6 @@
       "stageRuntimeDependencies": true
     },
     "release": {
-      "publishToClawHub": true,
       "publishToNpm": true
     }
   }

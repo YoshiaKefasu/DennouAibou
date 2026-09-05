@@ -1,6 +1,5 @@
 import { html, nothing } from "lit";
 import { t } from "../i18n/index.ts";
-import { getSafeLocalStorage } from "../local-storage.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import {
@@ -32,7 +31,6 @@ import {
   findAgentConfigEntryIndex,
   loadConfig,
   openConfigFile,
-  runUpdate,
   saveConfig,
   updateConfigFormValue,
   removeConfigFormValue,
@@ -65,11 +63,6 @@ import {
   rotateDeviceToken,
 } from "./controllers/devices.ts";
 import {
-  loadDreamDiary,
-  loadDreamingStatus,
-  updateDreamingEnabled,
-} from "./controllers/dreaming.ts";
-import {
   loadExecApprovals,
   removeExecApprovalsFormValue,
   saveExecApprovals,
@@ -80,14 +73,9 @@ import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { deleteSessionsAndRefresh, loadSessions, patchSession } from "./controllers/sessions.ts";
 import {
-  closeClawHubDetail,
-  installFromClawHub,
   installSkill,
-  loadClawHubDetail,
   loadSkills,
   saveSkillApiKey,
-  searchClawHub,
-  setClawHubSearchQuery,
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
@@ -148,57 +136,12 @@ const lazyLogs = createLazy(() => import("./views/logs.ts"));
 const lazyNodes = createLazy(() => import("./views/nodes.ts"));
 const lazySessions = createLazy(() => import("./views/sessions.ts"));
 const lazySkills = createLazy(() => import("./views/skills.ts"));
-const lazyDreamingView = createLazy(() => import("./views/dreaming.ts"));
-
-function resolveConfiguredDreaming(configValue: Record<string, unknown> | null): {
-  enabled: boolean;
-} {
-  if (!configValue) {
-    return {
-      enabled: false,
-    };
-  }
-  const plugins = configValue.plugins as Record<string, unknown> | undefined;
-  const entries = plugins?.entries as Record<string, unknown> | undefined;
-  const memoryCore = entries?.["memory-core"] as Record<string, unknown> | undefined;
-  const config = memoryCore?.config as Record<string, unknown> | undefined;
-  const dreaming = config?.dreaming as Record<string, unknown> | undefined;
-  return {
-    enabled: typeof dreaming?.enabled === "boolean" ? dreaming.enabled : false,
-  };
-}
-
-function formatDreamNextCycle(nextRunAtMs: number | undefined): string | null {
-  if (typeof nextRunAtMs !== "number" || !Number.isFinite(nextRunAtMs)) {
-    return null;
-  }
-  return new Date(nextRunAtMs).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function resolveDreamingNextCycle(
-  status: { phases: Record<string, { enabled: boolean; nextRunAtMs?: number }> } | null,
-): string | null {
-  if (!status) {
-    return null;
-  }
-  const nextRunAtMs = Object.values(status.phases)
-    .filter((phase) => phase.enabled && typeof phase.nextRunAtMs === "number")
-    .map((phase) => phase.nextRunAtMs as number)
-    .toSorted((a, b) => a - b)[0];
-  return formatDreamNextCycle(nextRunAtMs);
-}
-
-let clawhubSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
   const mod = getter();
   return mod ? render(mod) : nothing;
 }
 
-const UPDATE_BANNER_DISMISS_KEY = "openclaw:control-ui:update-banner-dismissed:v1";
 const CRON_THINKING_SUGGESTIONS = ["off", "minimal", "low", "medium", "high"];
 const CRON_TIMEZONE_SUGGESTIONS = [
   "UTC",
@@ -235,64 +178,6 @@ function uniquePreserveOrder(values: string[]): string[] {
     output.push(normalized);
   }
   return output;
-}
-
-type DismissedUpdateBanner = {
-  latestVersion: string;
-  channel: string | null;
-  dismissedAtMs: number;
-};
-
-function loadDismissedUpdateBanner(): DismissedUpdateBanner | null {
-  try {
-    const raw = getSafeLocalStorage()?.getItem(UPDATE_BANNER_DISMISS_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<DismissedUpdateBanner>;
-    if (!parsed || typeof parsed.latestVersion !== "string") {
-      return null;
-    }
-    return {
-      latestVersion: parsed.latestVersion,
-      channel: typeof parsed.channel === "string" ? parsed.channel : null,
-      dismissedAtMs: typeof parsed.dismissedAtMs === "number" ? parsed.dismissedAtMs : Date.now(),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isUpdateBannerDismissed(updateAvailable: unknown): boolean {
-  const dismissed = loadDismissedUpdateBanner();
-  if (!dismissed) {
-    return false;
-  }
-  const info = updateAvailable as { latestVersion?: unknown; channel?: unknown };
-  const latestVersion = info && typeof info.latestVersion === "string" ? info.latestVersion : null;
-  const channel = info && typeof info.channel === "string" ? info.channel : null;
-  return Boolean(
-    latestVersion && dismissed.latestVersion === latestVersion && dismissed.channel === channel,
-  );
-}
-
-function dismissUpdateBanner(updateAvailable: unknown) {
-  const info = updateAvailable as { latestVersion?: unknown; channel?: unknown };
-  const latestVersion = info && typeof info.latestVersion === "string" ? info.latestVersion : null;
-  if (!latestVersion) {
-    return;
-  }
-  const channel = info && typeof info.channel === "string" ? info.channel : null;
-  const payload: DismissedUpdateBanner = {
-    latestVersion,
-    channel,
-    dismissedAtMs: Date.now(),
-  };
-  try {
-    getSafeLocalStorage()?.setItem(UPDATE_BANNER_DISMISS_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
 }
 
 const AVATAR_DATA_RE = /^data:/i;
@@ -376,27 +261,6 @@ export function renderApp(state: AppViewState) {
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
     state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
-  const configuredDreaming = resolveConfiguredDreaming(configValue);
-  const dreamingOn = state.dreamingStatus?.enabled ?? configuredDreaming.enabled;
-  const dreamingNextCycle = resolveDreamingNextCycle(state.dreamingStatus);
-  const dreamingLoading = state.dreamingStatusLoading || state.dreamingModeSaving;
-  const dreamingRefreshLoading = state.dreamingStatusLoading || state.dreamDiaryLoading;
-  const refreshDreaming = () => {
-    void Promise.all([loadDreamingStatus(state), loadDreamDiary(state)]);
-  };
-  const applyDreamingEnabled = (enabled: boolean) => {
-    if (state.dreamingModeSaving || dreamingOn === enabled) {
-      return;
-    }
-    void (async () => {
-      const updated = await updateDreamingEnabled(state, enabled);
-      if (!updated) {
-        return;
-      }
-      await loadConfig(state);
-      await loadDreamingStatus(state);
-    })();
-  };
   const basePath = normalizeBasePath(state.basePath ?? "");
   const resolvedAgentId =
     state.agentsSelectedId ??
@@ -665,33 +529,6 @@ export function renderApp(state: AppViewState) {
                 ${isChat ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
               </div>
               <div class="page-meta">
-                ${state.tab === "dreams"
-                  ? html`
-                      <div class="dreaming-header-controls">
-                        <button
-                          class="btn btn--subtle btn--sm"
-                          ?disabled=${dreamingLoading || state.dreamDiaryLoading}
-                          @click=${refreshDreaming}
-                        >
-                          ${dreamingRefreshLoading
-                            ? t("dreaming.header.refreshing")
-                            : t("dreaming.header.refresh")}
-                        </button>
-                        <button
-                          class="dreams__phase-toggle ${dreamingOn
-                            ? "dreams__phase-toggle--on"
-                            : ""}"
-                          ?disabled=${dreamingLoading}
-                          @click=${() => applyDreamingEnabled(!dreamingOn)}
-                        >
-                          <span class="dreams__phase-toggle-dot"></span>
-                          <span class="dreams__phase-toggle-label">
-                            ${dreamingOn ? t("dreaming.header.on") : t("dreaming.header.off")}
-                          </span>
-                        </button>
-                      </div>
-                    `
-                  : nothing}
                 ${state.lastError
                   ? html`<div class="pill danger">${state.lastError}</div>`
                   : nothing}
@@ -1389,16 +1226,6 @@ export function renderApp(state: AppViewState) {
                 messages: state.skillMessages,
                 busyKey: state.skillsBusyKey,
                 detailKey: state.skillsDetailKey,
-                clawhubQuery: state.clawhubSearchQuery,
-                clawhubResults: state.clawhubSearchResults,
-                clawhubSearchLoading: state.clawhubSearchLoading,
-                clawhubSearchError: state.clawhubSearchError,
-                clawhubDetail: state.clawhubDetail,
-                clawhubDetailSlug: state.clawhubDetailSlug,
-                clawhubDetailLoading: state.clawhubDetailLoading,
-                clawhubDetailError: state.clawhubDetailError,
-                clawhubInstallSlug: state.clawhubInstallSlug,
-                clawhubInstallMessage: state.clawhubInstallMessage,
                 onFilterChange: (next) => (state.skillsFilter = next),
                 onStatusFilterChange: (next) => (state.skillsStatusFilter = next),
                 onRefresh: () => loadSkills(state, { clearMessages: true }),
@@ -1409,16 +1236,6 @@ export function renderApp(state: AppViewState) {
                   installSkill(state, skillKey, name, installId),
                 onDetailOpen: (key) => (state.skillsDetailKey = key),
                 onDetailClose: () => (state.skillsDetailKey = null),
-                onClawHubQueryChange: (query) => {
-                  setClawHubSearchQuery(state, query);
-                  if (clawhubSearchTimer) {
-                    clearTimeout(clawhubSearchTimer);
-                  }
-                  clawhubSearchTimer = setTimeout(() => searchClawHub(state, query), 300);
-                },
-                onClawHubDetailOpen: (slug) => loadClawHubDetail(state, slug),
-                onClawHubDetailClose: () => closeClawHubDetail(state),
-                onClawHubInstall: (slug) => installFromClawHub(state, slug),
               }),
             )
           : nothing}
@@ -1627,7 +1444,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1686,7 +1502,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1719,7 +1534,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1757,7 +1571,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1784,7 +1597,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1822,7 +1634,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1849,7 +1660,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1887,7 +1697,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1914,7 +1723,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1952,7 +1760,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1979,7 +1786,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -2013,7 +1819,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -2038,7 +1843,6 @@ export function renderApp(state: AppViewState) {
                 status: state.debugStatus,
                 health: state.debugHealth,
                 models: state.debugModels,
-                heartbeat: state.debugHeartbeat,
                 eventLog: state.eventLog,
                 methods: (state.hello?.features?.methods ?? []).toSorted(),
                 callMethod: state.debugCallMethod,
@@ -2071,31 +1875,6 @@ export function renderApp(state: AppViewState) {
                 onRefresh: () => loadLogs(state, { reset: true }),
                 onExport: (lines, label) => state.exportLogs(lines, label),
                 onScroll: (event) => state.handleLogsScroll(event),
-              }),
-            )
-          : nothing}
-        ${state.tab === "dreams"
-          ? lazyRender(lazyDreamingView, (m) =>
-              m.renderDreaming({
-                active: dreamingOn,
-                shortTermCount: state.dreamingStatus?.shortTermCount ?? 0,
-                totalSignalCount: state.dreamingStatus?.totalSignalCount ?? 0,
-                phaseSignalCount: state.dreamingStatus?.phaseSignalCount ?? 0,
-                promotedCount: state.dreamingStatus?.promotedToday ?? 0,
-                dreamingOf: null,
-                nextCycle: dreamingNextCycle,
-                timezone: state.dreamingStatus?.timezone ?? null,
-                statusLoading: state.dreamingStatusLoading,
-                statusError: state.dreamingStatusError,
-                modeSaving: state.dreamingModeSaving,
-                dreamDiaryLoading: state.dreamDiaryLoading,
-                dreamDiaryError: state.dreamDiaryError,
-                dreamDiaryPath: state.dreamDiaryPath,
-                dreamDiaryContent: state.dreamDiaryContent,
-                onRefresh: refreshDreaming,
-                onRefreshDiary: () => loadDreamDiary(state),
-                onToggleEnabled: applyDreamingEnabled,
-                onRequestUpdate: requestHostUpdate,
               }),
             )
           : nothing}

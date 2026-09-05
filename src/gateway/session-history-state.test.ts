@@ -8,7 +8,7 @@ describe("SessionHistorySseState", () => {
       {
         role: "assistant",
         content: [{ type: "text", text: "stale disk message" }],
-        __openclaw: { seq: 1 },
+        __dennou: { seq: 1 },
       },
     ]);
     try {
@@ -18,7 +18,7 @@ describe("SessionHistorySseState", () => {
           {
             role: "assistant",
             content: [{ type: "text", text: "fresh snapshot message" }],
-            __openclaw: { seq: 2 },
+            __dennou: { seq: 2 },
           },
         ],
       });
@@ -28,16 +28,16 @@ describe("SessionHistorySseState", () => {
         (
           state.snapshot().messages[0] as {
             content?: Array<{ text?: string }>;
-            __openclaw?: { seq?: number };
+            __dennou?: { seq?: number };
           }
         ).content?.[0]?.text,
       ).toBe("fresh snapshot message");
       expect(
         (
           state.snapshot().messages[0] as {
-            __openclaw?: { seq?: number };
+            __dennou?: { seq?: number };
           }
-        ).__openclaw?.seq,
+        ).__dennou?.seq,
       ).toBe(2);
 
       const appended = state.appendInlineMessage({

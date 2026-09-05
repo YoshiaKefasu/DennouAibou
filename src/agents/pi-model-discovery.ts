@@ -1,11 +1,30 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import * as PiCodingAgent from "@mariozechner/pi-coding-agent";
-import type {
-  AuthStorage as PiAuthStorage,
-  ModelRegistry as PiModelRegistry,
-} from "@mariozechner/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { Provider as PiProvider } from "@earendil-works/pi-ai";
+import type { ModelRegistry as PiModelRegistry } from "@earendil-works/pi-coding-agent";
+import {
+  ModelRegistry as PiModelRegistryImpl,
+  ModelRuntime as PiModelRuntimeImpl,
+} from "@earendil-works/pi-coding-agent";
+import {
+  type AuthStorage as PiAuthStorage,
+  AuthStorage as PiAuthStorageImpl,
+  InMemoryAuthStorageBackend,
+  // TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+} from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
+import {
+  // TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+  ModelConfig as PiModelConfigImpl,
+} from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-config.js";
+import {
+  // TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+  FileModelsStore as PiFileModelsStoreImpl,
+} from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/models-store.js";
+import {
+  // TODO(pi-sdk): deep path import — switch to a public pi-coding-agent export when available.
+  RuntimeCredentials as PiRuntimeCredentialsImpl,
+} from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/runtime-credentials.js";
 import { normalizeModelCompat } from "../plugins/provider-model-compat.js";
 import {
   applyProviderResolvedModelCompatWithPlugins,
@@ -16,10 +35,19 @@ import type { ProviderRuntimeModel } from "../plugins/types.js";
 import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { resolveProviderEnvApiKeyCandidates } from "./model-auth-env-vars.js";
 import { resolveEnvApiKey } from "./model-auth-env.js";
+import { detectOpenAICompletionsCompat } from "./openai-completions-compat.js";
 import { resolvePiCredentialMapFromStore, type PiCredentialMap } from "./pi-auth-credentials.js";
 
-const PiAuthStorageClass = PiCodingAgent.AuthStorage;
-const PiModelRegistryClass = PiCodingAgent.ModelRegistry;
+const PiAuthStorageClass = PiAuthStorageImpl;
+const PiModelRegistryClass = PiModelRegistryImpl;
+// `ModelRuntime.create()` always loads the SDK's `builtinProviderCatalog`
+// (30+ providers like openrouter/openai/anthropic) and seeds the runtime
+// with them. DennouAibou is a single-provider deployment: `~/.openclaw/agents/
+// main/agent/models.json` is the sole source of truth, and the
+// `/model` picker must not surface SDK builtins. `discoverModels` below
+// bypasses `create()` and invokes the (TS-private) constructor directly
+// with an empty `providers` array so only `models.json`-derived providers
+// end up in the snapshot.
 
 export { PiAuthStorageClass as AuthStorage, PiModelRegistryClass as ModelRegistry };
 
@@ -99,31 +127,32 @@ function normalizeRegistryModel<T>(value: T, agentDir: string): T {
         agentDir,
       },
     }) ?? compatNormalized;
-  return normalizeModelCompat(transportNormalized as Model<Api>) as T;
-}
-
-type PiModelRegistryClassLike = {
-  create?: (authStorage: PiAuthStorage, modelsJsonPath: string) => PiModelRegistry;
-  new (authStorage: PiAuthStorage, modelsJsonPath: string): PiModelRegistry;
-};
-
-function instantiatePiModelRegistry(
-  authStorage: PiAuthStorage,
-  modelsJsonPath: string,
-): PiModelRegistry {
-  const Registry = PiModelRegistryClass as unknown as PiModelRegistryClassLike;
-  if (typeof Registry.create === "function") {
-    return Registry.create(authStorage, modelsJsonPath);
+  // Detect openai-completions compat defaults BEFORE plugin transforms using
+  // pre-transform identity fields (provider, baseUrl, id). Note: this only
+  // applies when the model's api is still "openai-completions" after plugin
+  // normalization — models whose api gets promoted to "openai-responses" by a
+  // plugin do NOT receive these completions-specific defaults.
+  const compatDefaultsBeforePlugins =
+    model.api === "openai-completions"
+      ? detectOpenAICompletionsCompat(
+          model as Pick<Model<"openai-completions">, "provider" | "baseUrl" | "id" | "compat">,
+        ).defaults
+      : undefined;
+  const mergedModel = normalizeModelCompat(transportNormalized as Model<Api>) as Model<Api>;
+  if (compatDefaultsBeforePlugins && mergedModel.api === "openai-completions") {
+    const existing = (mergedModel.compat ?? {}) as Record<string, unknown>;
+    mergedModel.compat = {
+      ...compatDefaultsBeforePlugins,
+      ...existing,
+    } as typeof mergedModel.compat;
   }
-  return new Registry(authStorage, modelsJsonPath);
+  return mergedModel as T;
 }
 
-function createOpenClawModelRegistry(
-  authStorage: PiAuthStorage,
-  modelsJsonPath: string,
+function wrapRegistryWithNormalization(
+  registry: PiModelRegistry,
   agentDir: string,
 ): PiModelRegistry {
-  const registry = instantiatePiModelRegistry(authStorage, modelsJsonPath);
   const getAll = registry.getAll.bind(registry);
   const getAvailable = registry.getAvailable.bind(registry);
   const find = registry.find.bind(registry);
@@ -139,7 +168,7 @@ function createOpenClawModelRegistry(
 }
 
 function scrubLegacyStaticAuthJsonEntries(pathname: string): void {
-  if (process.env.OPENCLAW_AUTH_STORE_READONLY === "1") {
+  if (process.env.DENNOU_AUTH_STORE_READONLY === "1") {
     return;
   }
   if (!fs.existsSync(pathname)) {
@@ -191,9 +220,7 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
     fromStorage?: (storage: unknown) => unknown;
   };
   if (typeof withFromStorage.fromStorage === "function") {
-    const backendCtor = (
-      PiCodingAgent as { InMemoryAuthStorageBackend?: new () => InMemoryAuthStorageBackendLike }
-    ).InMemoryAuthStorageBackend;
+    const backendCtor = InMemoryAuthStorageBackend;
     const backend =
       typeof backendCtor === "function"
         ? new backendCtor()
@@ -215,12 +242,13 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
   };
   const hasRuntimeApiKeyOverride = typeof withRuntimeOverride.setRuntimeApiKey === "function"; // pragma: allowlist secret
   if (hasRuntimeApiKeyOverride) {
+    const setKey = withRuntimeOverride.setRuntimeApiKey!;
     for (const [provider, credential] of Object.entries(creds)) {
       if (credential.type === "api_key") {
-        withRuntimeOverride.setRuntimeApiKey(provider, credential.key);
+        setKey(provider, credential.key);
         continue;
       }
-      withRuntimeOverride.setRuntimeApiKey(provider, credential.access);
+      setKey(provider, credential.access);
     }
   }
   return withRuntimeOverride;
@@ -256,6 +284,53 @@ export function discoverAuthStorage(agentDir: string): PiAuthStorage {
   return createAuthStorage(PiAuthStorageClass, authPath, credentials);
 }
 
-export function discoverModels(authStorage: PiAuthStorage, agentDir: string): PiModelRegistry {
-  return createOpenClawModelRegistry(authStorage, path.join(agentDir, "models.json"), agentDir);
+export async function discoverModels(
+  authStorage: PiAuthStorage,
+  agentDir: string,
+): Promise<PiModelRegistry> {
+  const modelsJsonPath = path.join(agentDir, "models.json");
+  // Note: always pass the path — the SDK handles ENOENT gracefully, and an
+  // undefined modelsPath would silently fall back to the global
+  // ~/.pi/agent/models.json which is not what we want.
+  //
+  // Build a `ModelRuntime` with an empty builtin-provider list. Passing `[]`
+  // for the `providers` constructor argument keeps `defaultBuiltins` /
+  // `builtins` empty, so `rebuildProviders()` only sees providers that come
+  // from `models.json` via `ModelConfig`. `ModelRuntime.create()` would
+  // inject the SDK's 30+ builtin providers here, which we don't want.
+  const config = await PiModelConfigImpl.load(modelsJsonPath);
+  const modelsStore = new PiFileModelsStoreImpl(
+    path.join(path.dirname(modelsJsonPath), "models-store.json"),
+  );
+  // `RuntimeCredentials` (deep-imported from `runtime-credentials.js`) wraps
+  // a `CredentialStore`. `AuthStorage` implements `CredentialStore`, but the
+  // two types live behind different import paths in this project, so we
+  // bridge them through `unknown` to avoid pulling the public SDK surface
+  // for an internal-only relationship.
+  const credentials = new PiRuntimeCredentialsImpl(
+    authStorage as unknown as ConstructorParameters<typeof PiRuntimeCredentialsImpl>[0],
+  );
+  // The TypeScript declaration marks the constructor `private`, but the
+  // runtime accepts this signature (see the `create()` factory, which itself
+  // invokes the same constructor with identical positional args). The
+  // `@ts-expect-error` absorbs the TS-only access restriction; the JS call
+  // is real and behaves as documented.
+  const emptyProviders: readonly PiProvider[] = [];
+  // @ts-expect-error: ModelRuntime#constructor is TS-private; bypass to skip builtin provider catalog.
+  const runtime = new PiModelRuntimeImpl(
+    credentials,
+    config,
+    modelsJsonPath,
+    modelsStore,
+    emptyProviders,
+    false,
+  );
+  // `create()` triggers a `refresh()` to populate `snapshot.configuredProviders`
+  // and `snapshot.available`. Constructor-only builds skip that pass, so the
+  // snapshot stays empty and `getAvailable()` / `getAll()` return `[]`. Mirror
+  // `create()`'s post-construct refresh with `allowNetwork: false` to keep the
+  // contract callers (registry, plugin transforms, `loadModelCatalog`) depend on.
+  await runtime.refresh({ allowNetwork: false });
+  const registry = new PiModelRegistryClass(runtime);
+  return wrapRegistryWithNormalization(registry, agentDir);
 }

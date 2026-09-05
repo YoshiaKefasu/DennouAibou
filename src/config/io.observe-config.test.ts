@@ -31,7 +31,7 @@ describe("config io observe", () => {
         error,
       },
     });
-    const configPath = path.join(home, ".openclaw", "openclaw.json");
+    const configPath = path.join(home, ".openclaw", "dennou-aibou.json");
     const auditPath = path.join(home, ".openclaw", "logs", "config-audit.jsonl");
     return { io, configPath, auditPath, warn, error };
   }

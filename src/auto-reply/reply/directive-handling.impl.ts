@@ -7,7 +7,12 @@ import { updateSessionStore } from "../../config/sessions.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { applyVerboseOverride } from "../../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
-import { formatThinkingLevels, formatXHighModelHint, supportsXHighThinking } from "../thinking.js";
+import {
+  formatMaxModelHint,
+  formatThinkingLevels,
+  formatXHighModelHint,
+  isElevatedThinkingDenied,
+} from "../thinking.js";
 import type { ReplyPayload } from "../types.js";
 import { resolveModelSelectionFromDirective } from "./directive-handling.model-selection.js";
 import { maybeHandleModelDirectiveInfo } from "./directive-handling.model.js";
@@ -265,11 +270,12 @@ export async function handleDirectiveOnly(
 
   if (
     directives.hasThinkDirective &&
-    directives.thinkLevel === "xhigh" &&
-    !supportsXHighThinking(resolvedProvider, resolvedModel)
+    (directives.thinkLevel === "xhigh" || directives.thinkLevel === "max") &&
+    isElevatedThinkingDenied(directives.thinkLevel, resolvedProvider, resolvedModel)
   ) {
+    const hint = directives.thinkLevel === "max" ? formatMaxModelHint() : formatXHighModelHint();
     return {
-      text: `Thinking level "xhigh" is only supported for ${formatXHighModelHint()}.`,
+      text: `Thinking level "${directives.thinkLevel}" is only supported for ${hint}.`,
     };
   }
 
@@ -279,7 +285,12 @@ export async function handleDirectiveOnly(
   const shouldDowngradeXHigh =
     !directives.hasThinkDirective &&
     nextThinkLevel === "xhigh" &&
-    !supportsXHighThinking(resolvedProvider, resolvedModel);
+    isElevatedThinkingDenied("xhigh", resolvedProvider, resolvedModel);
+  const shouldDowngradeMax =
+    !directives.hasThinkDirective &&
+    nextThinkLevel === "max" &&
+    isElevatedThinkingDenied("max", resolvedProvider, resolvedModel);
+  const shouldDowngradeElevatedReasoning = shouldDowngradeXHigh || shouldDowngradeMax;
 
   const prevElevatedLevel =
     currentElevatedLevel ??
@@ -304,7 +315,7 @@ export async function handleDirectiveOnly(
     (directives.hasExecDirective && directives.hasExecOptions && allowInternalExecPersistence) ||
     Boolean(modelSelection) ||
     directives.hasQueueDirective ||
-    shouldDowngradeXHigh;
+    shouldDowngradeElevatedReasoning;
   const fastModeChanged =
     directives.hasFastDirective &&
     directives.fastMode !== undefined &&
@@ -318,7 +329,7 @@ export async function handleDirectiveOnly(
     if (directives.hasFastDirective && directives.fastMode !== undefined) {
       sessionEntry.fastMode = directives.fastMode;
     }
-    if (shouldDowngradeXHigh) {
+    if (shouldDowngradeXHigh || shouldDowngradeMax) {
       sessionEntry.thinkingLevel = "high";
     }
     if (
@@ -503,6 +514,11 @@ export async function handleDirectiveOnly(
   if (shouldDowngradeXHigh) {
     parts.push(
       `Thinking level set to high (xhigh not supported for ${resolvedProvider}/${resolvedModel}).`,
+    );
+  }
+  if (shouldDowngradeMax) {
+    parts.push(
+      `Thinking level set to high (max not supported for ${resolvedProvider}/${resolvedModel}).`,
     );
   }
   if (modelSelection) {

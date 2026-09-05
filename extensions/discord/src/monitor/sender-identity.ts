@@ -1,4 +1,5 @@
-import type { User } from "@buape/carbon";
+import type { GuildMember, User } from "@buape/carbon";
+import type { APIInteractionGuildMember } from "discord-api-types/v10";
 import type { PluralKitMessageInfo } from "../pluralkit.js";
 import { formatDiscordUserTag } from "./format.js";
 
@@ -21,6 +22,28 @@ type DiscordWebhookMessageLike = {
   webhook_id?: string | null;
 };
 
+/**
+ * Anything that exposes a guild-member nickname. In practice this is either
+ * the Carbon `GuildMember` instance or the raw `APIInteractionGuildMember`
+ * (which exposes the same nickname via `.nick`). Centralised here so
+ * callers can pass either without falling back to `any`.
+ */
+type DiscordSenderMemberLike = GuildMember<false, true> | APIInteractionGuildMember;
+
+function resolveMemberNickname(
+  member: DiscordSenderMemberLike | undefined,
+): string | null | undefined {
+  if (!member) {
+    return undefined;
+  }
+  // Carbon GuildMember exposes `nickname`; APIInteractionGuildMember exposes `nick`.
+  const nickname = (member as { nickname?: string | null }).nickname;
+  if (nickname !== undefined) {
+    return nickname;
+  }
+  return (member as { nick?: string | null }).nick ?? undefined;
+}
+
 export function resolveDiscordWebhookId(message: DiscordWebhookMessageLike): string | null {
   const candidate = message.webhookId ?? message.webhook_id;
   return typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
@@ -28,8 +51,7 @@ export function resolveDiscordWebhookId(message: DiscordWebhookMessageLike): str
 
 export function resolveDiscordSenderIdentity(params: {
   author: User;
-  // oxlint-disable-next-line typescript/no-explicit-any
-  member?: any;
+  member?: DiscordSenderMemberLike;
   pluralkitInfo?: PluralKitMessageInfo | null;
 }): DiscordSenderIdentity {
   const pkInfo = params.pluralkitInfo ?? null;
@@ -57,8 +79,8 @@ export function resolveDiscordSenderIdentity(params: {
   }
 
   const senderTag = formatDiscordUserTag(params.author);
-  const senderDisplay =
-    params.member?.nickname ?? params.author.globalName ?? params.author.username;
+  const memberNickname = resolveMemberNickname(params.member);
+  const senderDisplay = memberNickname ?? params.author.globalName ?? params.author.username;
   const senderLabel =
     senderDisplay && senderTag && senderDisplay !== senderTag
       ? `${senderDisplay} (${senderTag})`
@@ -74,8 +96,7 @@ export function resolveDiscordSenderIdentity(params: {
 
 export function resolveDiscordSenderLabel(params: {
   author: User;
-  // oxlint-disable-next-line typescript/no-explicit-any
-  member?: any;
+  member?: DiscordSenderMemberLike;
   pluralkitInfo?: PluralKitMessageInfo | null;
 }): string {
   return resolveDiscordSenderIdentity(params).label;

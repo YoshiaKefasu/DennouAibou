@@ -4,14 +4,14 @@ import { setupCronServiceSuite, writeCronStoreSnapshot } from "./service.test-ha
 import type { CronJob } from "./types.js";
 
 const { logger, makeStorePath } = setupCronServiceSuite({
-  prefix: "cron-main-heartbeat-target",
+  prefix: "cron-main-event-pump",
 });
 
-type RunHeartbeatOnce = NonNullable<
-  ConstructorParameters<typeof CronService>[0]["runHeartbeatOnce"]
+type RunEventPumpOnce = NonNullable<
+  ConstructorParameters<typeof CronService>[0]["runEventPumpOnce"]
 >;
 
-describe("cron main job passes heartbeat target=last", () => {
+describe("cron main job event pump routing", () => {
   function createMainCronJob(params: {
     now: number;
     id: string;
@@ -31,19 +31,19 @@ describe("cron main job passes heartbeat target=last", () => {
     };
   }
 
-  function createCronWithSpies(params: { storePath: string; runHeartbeatOnce: RunHeartbeatOnce }) {
+  function createCronWithSpies(params: { storePath: string; runEventPumpOnce: RunEventPumpOnce }) {
     const enqueueSystemEvent = vi.fn();
-    const requestHeartbeatNow = vi.fn();
+    const requestWakeNow = vi.fn();
     const cron = new CronService({
       storePath: params.storePath,
       cronEnabled: true,
       log: logger,
       enqueueSystemEvent,
-      requestHeartbeatNow,
-      runHeartbeatOnce: params.runHeartbeatOnce,
+      requestWakeNow,
+      runEventPumpOnce: params.runEventPumpOnce,
       runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })),
     });
-    return { cron, requestHeartbeatNow };
+    return { cron, requestWakeNow };
   }
 
   async function runSingleTick(cron: CronService) {
@@ -53,7 +53,7 @@ describe("cron main job passes heartbeat target=last", () => {
     cron.stop();
   }
 
-  it("should pass heartbeat.target=last to runHeartbeatOnce for wakeMode=now main jobs", async () => {
+  it("should invoke runEventPumpOnce for wakeMode=now main jobs", async () => {
     const { storePath } = await makeStorePath();
     const now = Date.now();
 
@@ -65,30 +65,29 @@ describe("cron main job passes heartbeat target=last", () => {
 
     await writeCronStoreSnapshot({ storePath, jobs: [job] });
 
-    const runHeartbeatOnce = vi.fn<RunHeartbeatOnce>(async () => ({
+    const runEventPumpOnce = vi.fn<RunEventPumpOnce>(async () => ({
       status: "ran" as const,
       durationMs: 50,
     }));
 
     const { cron } = createCronWithSpies({
       storePath,
-      runHeartbeatOnce,
+      runEventPumpOnce,
     });
 
     await runSingleTick(cron);
 
-    // runHeartbeatOnce should have been called
-    expect(runHeartbeatOnce).toHaveBeenCalled();
+    expect(runEventPumpOnce).toHaveBeenCalled();
 
-    // The heartbeat config passed should include target: "last" so the
-    // heartbeat runner delivers the response to the last active channel.
-    const callArgs = runHeartbeatOnce.mock.calls[0]?.[0];
+    // The options passed should include heartbeat.target = "last" so the
+    // event pump delivers the response to the last active channel.
+    const callArgs = runEventPumpOnce.mock.calls[0]?.[0];
     expect(callArgs).toBeDefined();
     expect(callArgs?.heartbeat).toBeDefined();
     expect(callArgs?.heartbeat?.target).toBe("last");
   });
 
-  it("should not pass heartbeat target for wakeMode=next-heartbeat main jobs", async () => {
+  it("should use requestWakeNow for wakeMode=next-heartbeat main jobs", async () => {
     const { storePath } = await makeStorePath();
     const now = Date.now();
 
@@ -100,21 +99,19 @@ describe("cron main job passes heartbeat target=last", () => {
 
     await writeCronStoreSnapshot({ storePath, jobs: [job] });
 
-    const runHeartbeatOnce = vi.fn<RunHeartbeatOnce>(async () => ({
+    const runEventPumpOnce = vi.fn<RunEventPumpOnce>(async () => ({
       status: "ran" as const,
       durationMs: 50,
     }));
 
-    const { cron, requestHeartbeatNow } = createCronWithSpies({
+    const { cron, requestWakeNow } = createCronWithSpies({
       storePath,
-      runHeartbeatOnce,
+      runEventPumpOnce,
     });
 
     await runSingleTick(cron);
 
-    // wakeMode=next-heartbeat uses requestHeartbeatNow, not runHeartbeatOnce
-    expect(requestHeartbeatNow).toHaveBeenCalled();
-    // runHeartbeatOnce should NOT have been called for next-heartbeat mode
-    expect(runHeartbeatOnce).not.toHaveBeenCalled();
+    expect(requestWakeNow).toHaveBeenCalled();
+    expect(runEventPumpOnce).not.toHaveBeenCalled();
   });
 });

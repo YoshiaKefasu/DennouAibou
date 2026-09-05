@@ -108,7 +108,6 @@ describe("scanStatusJsonFast", () => {
       },
     );
 
-    expect(mocks.getUpdateCheckResult).not.toHaveBeenCalled();
     expect(mocks.probeGateway).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,7 @@ import {
 import { withTempDir } from "../test-helpers/temp-dir.js";
 import { tasksAuditCommand, tasksMaintenanceCommand } from "./tasks.js";
 
-const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 
 function createRuntime(): RuntimeEnv {
   return {
@@ -24,7 +24,7 @@ function createRuntime(): RuntimeEnv {
 
 async function withTaskCommandStateDir(run: () => Promise<void>): Promise<void> {
   await withTempDir({ prefix: "openclaw-tasks-command-" }, async (root) => {
-    process.env.OPENCLAW_STATE_DIR = root;
+    process.env.DENNOU_STATE_DIR = root;
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryForTests();
     resetTaskFlowRegistryForTests();
@@ -46,9 +46,9 @@ describe("tasks commands", () => {
   afterEach(() => {
     vi.useRealTimers();
     if (ORIGINAL_STATE_DIR === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = ORIGINAL_STATE_DIR;
+      process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryForTests();

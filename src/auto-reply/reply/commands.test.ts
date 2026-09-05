@@ -2,10 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildTelegramModelsProviderChannelData,
-  whatsappCommandPolicy,
-} from "../../../test/helpers/channels/command-contract.js";
+import { getBuildTelegramModelsProviderChannelData } from "../../../test/helpers/channels/command-contract.js";
+import type { ChannelCommandAdapter } from "../../channels/plugins/types.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { updateSessionStore, type SessionEntry } from "../../config/sessions.js";
@@ -166,7 +164,7 @@ const whatsappCommandTestPlugin: ChannelPlugin = {
       nativeCommands: true,
     },
   }),
-  commands: whatsappCommandPolicy,
+  commands: {} satisfies ChannelCommandAdapter,
   allowlist: buildDmGroupAccountAllowlistAdapter({
     channelId: "whatsapp",
     resolveAccount: ({ cfg }) => cfg.channels?.whatsapp ?? {},
@@ -522,7 +520,7 @@ const telegramCommandTestPlugin: ChannelPlugin = {
     idLabel: "telegramUserId",
   },
   commands: {
-    buildModelsProviderChannelData: buildTelegramModelsProviderChannelData,
+    buildModelsProviderChannelData: getBuildTelegramModelsProviderChannelData(),
   },
   allowlist: buildDmGroupAccountAllowlistAdapter({
     channelId: "telegram",
@@ -616,7 +614,7 @@ beforeEach(() => {
   resetTaskRegistryForTests();
   setMinimalChannelPluginRegistryForTests();
   readConfigFileSnapshotMock.mockImplementation(async () => {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
       return { valid: false, parsed: null };
     }
@@ -628,7 +626,7 @@ beforeEach(() => {
     config,
   }));
   writeConfigFileMock.mockImplementation(async (config: unknown) => {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
       return;
     }
@@ -644,17 +642,17 @@ async function withTempConfigPath<T>(
   run: (configPath: string) => Promise<T>,
 ): Promise<T> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-commands-config-"));
-  const configPath = path.join(dir, "openclaw.json");
-  const previous = process.env.OPENCLAW_CONFIG_PATH;
-  process.env.OPENCLAW_CONFIG_PATH = configPath;
+  const configPath = path.join(dir, "dennou-aibou.json");
+  const previous = process.env.DENNOU_CONFIG_PATH;
+  process.env.DENNOU_CONFIG_PATH = configPath;
   await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2), "utf-8");
   try {
     return await run(configPath);
   } finally {
     if (previous === undefined) {
-      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.DENNOU_CONFIG_PATH;
     } else {
-      process.env.OPENCLAW_CONFIG_PATH = previous;
+      process.env.DENNOU_CONFIG_PATH = previous;
     }
     await fs.rm(dir, {
       recursive: true,
@@ -3347,19 +3345,5 @@ describe("handleCommands subagents", () => {
     expect(trackedRuns).toHaveLength(1);
     expect(trackedRuns[0].runId).toBe("run-1");
     expect(trackedRuns[0].suppressAnnounceReason).toBeUndefined();
-  });
-});
-
-describe("handleCommands /tts", () => {
-  it("returns status for bare /tts on text command surfaces", async () => {
-    const cfg = {
-      commands: { text: true },
-      channels: { whatsapp: { allowFrom: ["*"] } },
-      messages: { tts: { prefsPath: path.join(testWorkspaceDir, "tts.json") } },
-    } as OpenClawConfig;
-    const params = buildParams("/tts", cfg);
-    const result = await handleCommands(params);
-    expect(result.shouldContinue).toBe(false);
-    expect(result.reply?.text).toContain("TTS status");
   });
 });

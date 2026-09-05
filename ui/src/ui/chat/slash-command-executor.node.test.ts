@@ -464,8 +464,62 @@ describe("executeSlashCommand directives", () => {
       "",
     );
 
+    // gpt-4.1-mini has no reasoningEffortMap: choices fall back to the base
+    // levels, mirroring the backend contract (xhigh/max are denied without a
+    // map by `isElevatedThinkingDenied`).
     expect(result.content).toBe(
       "Current thinking level: low.\nOptions: off, minimal, low, medium, high, adaptive.",
+    );
+    expect(request).toHaveBeenNthCalledWith(1, "sessions.list", {});
+    expect(request).toHaveBeenNthCalledWith(2, "models.list", {});
+  });
+
+  it("lists model-specific thinking levels for bare /think when the catalog declares a reasoningEffortMap", async () => {
+    const request = vi.fn(async (method: string, _payload?: unknown) => {
+      if (method === "sessions.list") {
+        return {
+          sessions: [
+            row("agent:main:main", {
+              modelProvider: "cli-router",
+              model: "kimi-k3",
+            }),
+          ],
+        };
+      }
+      if (method === "models.list") {
+        return {
+          models: [
+            {
+              id: "kimi-k3",
+              provider: "cli-router",
+              name: "Kimi K3",
+              reasoning: true,
+              compat: {
+                reasoningEffortMap: {
+                  minimal: null,
+                  low: "low",
+                  medium: null,
+                  high: "high",
+                  xhigh: null,
+                  max: "max",
+                },
+              },
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected method: ${method}`);
+    });
+
+    const result = await executeSlashCommand(
+      { request } as unknown as GatewayBrowserClient,
+      "agent:main:main",
+      "think",
+      "",
+    );
+
+    expect(result.content).toBe(
+      "Current thinking level: low.\nOptions: off, low, high, max, adaptive.",
     );
     expect(request).toHaveBeenNthCalledWith(1, "sessions.list", {});
     expect(request).toHaveBeenNthCalledWith(2, "models.list", {});

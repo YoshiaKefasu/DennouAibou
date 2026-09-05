@@ -20,7 +20,7 @@ function createEmptyTaskStatusCounts(): TaskStatusCounts {
 function createEmptyTaskRuntimeCounts(): TaskRuntimeCounts {
   return {
     subagent: 0,
-    acp: 0,
+    
     cli: 0,
     cron: 0,
   };

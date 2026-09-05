@@ -1,5 +1,5 @@
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
-import { stripHeartbeatToken } from "../auto-reply/heartbeat.js";
+import { stripHeartbeatToken } from "../auto-reply/heartbeat-token.js";
 
 export type HeartbeatDeliveryPayload = {
   text?: string;

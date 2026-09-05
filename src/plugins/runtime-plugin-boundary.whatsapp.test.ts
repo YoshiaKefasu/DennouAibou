@@ -51,7 +51,7 @@ function createBundledWhatsAppRuntimeFixture() {
     [bundledDistPluginFile("whatsapp", "runtime-api.js")]:
       'export { getActiveWebListener, setActiveWebListener } from "../../active-listener.js";\n',
     "dist/active-listener.js": [
-      'const key = Symbol.for("openclaw.whatsapp.activeListenerState");',
+      'const key = Symbol.for("dennou.whatsapp.activeListenerState");',
       "const g = globalThis;",
       "if (!g[key]) {",
       "  g[key] = { listeners: new Map(), current: null };",

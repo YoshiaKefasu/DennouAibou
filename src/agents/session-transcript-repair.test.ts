@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "vitest";
 import {
   sanitizeToolCallInputs,
@@ -468,7 +468,7 @@ describe("sanitizeToolCallInputs", () => {
     expect((toolCalls[0] ?? {}).name).toBe("SESSIONS_SPAWN");
     const inputObj = (toolCalls[0]?.input ?? {}) as Record<string, unknown>;
     const attachments = (inputObj.attachments ?? []) as Array<Record<string, unknown>>;
-    expect(attachments[0]?.content).toBe("__OPENCLAW_REDACTED__");
+    expect(attachments[0]?.content).toBe("__DENNOU_REDACTED__");
   });
   it("preserves other block properties when trimming tool names", () => {
     const toolCalls = sanitizeAssistantToolCalls([

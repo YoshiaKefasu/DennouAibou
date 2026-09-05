@@ -1,6 +1,5 @@
 import { BUNDLED_PLUGIN_TEST_GLOB } from "./vitest.bundled-plugin-paths.ts";
 import { extensionExcludedChannelTestGlobs } from "./vitest.channel-paths.mjs";
-import { acpxExtensionTestRoots } from "./vitest.extension-acpx-paths.mjs";
 import { diffsExtensionTestRoots } from "./vitest.extension-diffs-paths.mjs";
 import { mattermostExtensionTestRoots } from "./vitest.extension-mattermost-paths.mjs";
 import { memoryExtensionTestRoots } from "./vitest.extension-memory-paths.mjs";
@@ -31,7 +30,6 @@ export function createExtensionsVitestConfig(
     // out of the shared extensions lane.
     exclude: [
       ...extensionExcludedChannelTestGlobs,
-      ...acpxExtensionTestRoots.map((root) => `${root.replace(/^extensions\//u, "")}/**`),
       ...diffsExtensionTestRoots.map((root) => `${root.replace(/^extensions\//u, "")}/**`),
       ...mattermostExtensionTestRoots.map((root) => `${root.replace(/^extensions\//u, "")}/**`),
       ...memoryExtensionTestRoots.map((root) => `${root.replace(/^extensions\//u, "")}/**`),

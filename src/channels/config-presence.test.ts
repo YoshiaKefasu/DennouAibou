@@ -46,7 +46,7 @@ describe("config presence", () => {
 
   it("ignores enabled-only matrix config when listing configured channels", () => {
     const stateDir = makeTempStateDir();
-    const env = { OPENCLAW_STATE_DIR: stateDir } as NodeJS.ProcessEnv;
+    const env = { DENNOU_STATE_DIR: stateDir } as NodeJS.ProcessEnv;
     const cfg = { channels: { matrix: { enabled: false } } };
 
     expectPotentialConfiguredChannelCase({
@@ -60,7 +60,7 @@ describe("config presence", () => {
   it("detects env-only channel config", () => {
     const stateDir = makeTempStateDir();
     const env = {
-      OPENCLAW_STATE_DIR: stateDir,
+      DENNOU_STATE_DIR: stateDir,
       MATRIX_ACCESS_TOKEN: "token",
     } as NodeJS.ProcessEnv;
 
@@ -84,7 +84,7 @@ describe("config presence", () => {
       }),
       "utf8",
     );
-    const env = { OPENCLAW_STATE_DIR: stateDir } as NodeJS.ProcessEnv;
+    const env = { DENNOU_STATE_DIR: stateDir } as NodeJS.ProcessEnv;
 
     expectPotentialConfiguredChannelCase({
       cfg: {},

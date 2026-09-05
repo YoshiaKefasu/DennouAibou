@@ -15,9 +15,9 @@ import {
 } from "./facade-runtime.js";
 
 const tempDirs: string[] = [];
-const originalBundledPluginsDir = process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
-const originalStateDir = process.env.OPENCLAW_STATE_DIR;
-const FACADE_RUNTIME_GLOBAL = "__openclawTestLoadBundledPluginPublicSurfaceModuleSync";
+const originalBundledPluginsDir = process.env.DENNOU_BUNDLED_PLUGINS_DIR;
+const originalStateDir = process.env.DENNOU_STATE_DIR;
+const FACADE_RUNTIME_GLOBAL = "__dennouTestLoadBundledPluginPublicSurfaceModuleSync";
 
 function createBundledPluginDir(prefix: string, marker: string): string {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -83,14 +83,14 @@ afterEach(() => {
   vi.doUnmock("../plugins/manifest-registry.js");
   delete (globalThis as typeof globalThis & Record<string, unknown>)[FACADE_RUNTIME_GLOBAL];
   if (originalBundledPluginsDir === undefined) {
-    delete process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
+    delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
   } else {
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = originalBundledPluginsDir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = originalBundledPluginsDir;
   }
   if (originalStateDir === undefined) {
-    delete process.env.OPENCLAW_STATE_DIR;
+    delete process.env.DENNOU_STATE_DIR;
   } else {
-    process.env.OPENCLAW_STATE_DIR = originalStateDir;
+    process.env.DENNOU_STATE_DIR = originalStateDir;
   }
   for (const dir of tempDirs.splice(0, tempDirs.length)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -102,14 +102,14 @@ describe("plugin-sdk facade runtime", () => {
     const overrideA = createBundledPluginDir("openclaw-facade-runtime-a-", "override-a");
     const overrideB = createBundledPluginDir("openclaw-facade-runtime-b-", "override-b");
 
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = overrideA;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = overrideA;
     const fromA = loadBundledPluginPublicSurfaceModuleSync<{ marker: string }>({
       dirName: "demo",
       artifactBasename: "api.js",
     });
     expect(fromA.marker).toBe("override-a");
 
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = overrideB;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = overrideB;
     const fromB = loadBundledPluginPublicSurfaceModuleSync<{ marker: string }>({
       dirName: "demo",
       artifactBasename: "api.js",
@@ -119,7 +119,7 @@ describe("plugin-sdk facade runtime", () => {
 
   it("returns the same object identity on repeated calls (sentinel consistency)", () => {
     const dir = createBundledPluginDir("openclaw-facade-identity-", "identity-check");
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = dir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = dir;
 
     const first = loadBundledPluginPublicSurfaceModuleSync<{ marker: string }>({
       dirName: "demo",
@@ -136,7 +136,7 @@ describe("plugin-sdk facade runtime", () => {
 
   it("breaks circular facade re-entry during module evaluation", () => {
     const dir = createCircularPluginDir("openclaw-facade-circular-");
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = dir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = dir;
     (globalThis as typeof globalThis & Record<string, unknown>)[FACADE_RUNTIME_GLOBAL] =
       loadBundledPluginPublicSurfaceModuleSync;
 
@@ -185,7 +185,7 @@ describe("plugin-sdk facade runtime", () => {
     });
 
     const facadeRuntime = await import("./facade-runtime.js");
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = dir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = dir;
     (globalThis as typeof globalThis & Record<string, unknown>)[FACADE_RUNTIME_GLOBAL] =
       facadeRuntime.loadBundledPluginPublicSurfaceModuleSync;
 
@@ -204,7 +204,7 @@ describe("plugin-sdk facade runtime", () => {
   });
   it("clears the cache on load failure so retries re-execute", () => {
     const dir = createThrowingPluginDir("openclaw-facade-throw-");
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = dir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = dir;
 
     expect(() =>
       loadBundledPluginPublicSurfaceModuleSync<{ marker: string }>({
@@ -301,8 +301,8 @@ describe("plugin-sdk facade runtime", () => {
       "utf8",
     );
 
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = emptyBundled;
-    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = emptyBundled;
+    process.env.DENNOU_STATE_DIR = stateDir;
 
     clearPluginDiscoveryCache();
     clearPluginManifestRegistryCache();
@@ -359,8 +359,8 @@ describe("plugin-sdk facade runtime", () => {
       "utf8",
     );
 
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = emptyBundled;
-    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = emptyBundled;
+    process.env.DENNOU_STATE_DIR = stateDir;
 
     clearPluginDiscoveryCache();
     clearPluginManifestRegistryCache();
@@ -377,29 +377,6 @@ describe("plugin-sdk facade runtime", () => {
     expect(
       canLoadActivatedBundledPluginPublicSurface({
         dirName: "line",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-  });
-
-  it("keeps shared runtime-core facades available without plugin activation", () => {
-    setRuntimeConfigSnapshot({});
-
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "speech-core",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "image-generation-core",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "media-understanding-core",
         artifactBasename: "runtime-api.js",
       }),
     ).toBe(true);

@@ -21,7 +21,7 @@ For model selection rules, see [/concepts/models](/concepts/models).
 - `models.providers.*.models[].contextWindow` is native model metadata;
   `models.providers.*.models[].contextTokens` is the effective runtime cap.
 - Provider plugins can inject model catalogs via `registerProvider({ catalog })`;
-  OpenClaw merges that output into `models.providers` before writing
+  DennouAibou merges that output into `models.providers` before writing
   `models.json`.
 - Provider manifests can declare `providerAuthEnvVars` so generic env-based
   auth probes do not need to load plugin runtime. The remaining core env-var
@@ -52,7 +52,7 @@ For model selection rules, see [/concepts/models](/concepts/models).
 
 ## Plugin-owned provider behavior
 
-Provider plugins can now own most provider-specific logic while OpenClaw keeps
+Provider plugins can now own most provider-specific logic while DennouAibou keeps
 the generic inference loop.
 
 Typical split:
@@ -65,11 +65,11 @@ Typical split:
 - `normalizeModelId`: provider normalizes legacy/preview model ids before
   lookup or canonicalization
 - `normalizeTransport`: provider normalizes transport-family `api` / `baseUrl`
-  before generic model assembly; OpenClaw checks the matched provider first,
+  before generic model assembly; DennouAibou checks the matched provider first,
   then other hook-capable provider plugins until one actually changes the
   transport
 - `normalizeConfig`: provider normalizes `models.providers.<id>` config before
-  runtime uses it; OpenClaw checks the matched provider first, then other
+  runtime uses it; DennouAibou checks the matched provider first, then other
   hook-capable provider plugins until one actually changes the config. If no
   provider hook rewrites the config, bundled Google-family helpers still
   normalize supported Google provider entries.
@@ -162,7 +162,7 @@ Current bundled examples:
 The bundled `openai` plugin now owns both provider ids: `openai` and
 `openai-codex`.
 
-That covers providers that still fit OpenClaw's normal transports. A provider
+That covers providers that still fit DennouAibou's normal transports. A provider
 that needs a totally custom request executor is a separate, deeper extension
 surface.
 
@@ -185,7 +185,7 @@ concurrent requests`, `ThrottlingException`, `concurrency limit reached`,
 
 ## Built-in providers (pi-ai catalog)
 
-OpenClaw ships with the pi‑ai catalog. These providers require **no**
+DennouAibou ships with the pi‑ai catalog. These providers require **no**
 `models.providers` config; just set auth + pick a model.
 
 ### OpenAI
@@ -201,12 +201,12 @@ OpenClaw ships with the pi‑ai catalog. These providers require **no**
 - OpenAI priority processing can be enabled via `agents.defaults.models["openai/<model>"].params.serviceTier`
 - `/fast` and `params.fastMode` map direct `openai/*` Responses requests to `service_tier=priority` on `api.openai.com`
 - Use `params.serviceTier` when you want an explicit tier instead of the shared `/fast` toggle
-- Hidden OpenClaw attribution headers (`originator`, `version`,
+- Hidden DennouAibou attribution headers (`originator`, `version`,
   `User-Agent`) apply only on native OpenAI traffic to `api.openai.com`, not
   generic OpenAI-compatible proxies
 - Native OpenAI routes also keep Responses `store`, prompt-cache hints, and
   OpenAI reasoning-compat payload shaping; proxy routes do not
-- `openai/gpt-5.3-codex-spark` is intentionally suppressed in OpenClaw because the live OpenAI API rejects it; Spark is treated as Codex-only
+- `openai/gpt-5.3-codex-spark` is intentionally suppressed in DennouAibou because the live OpenAI API rejects it; Spark is treated as Codex-only
 
 ```json5
 {
@@ -223,13 +223,13 @@ OpenClaw ships with the pi‑ai catalog. These providers require **no**
 - Default transport is `auto` (WebSocket-first, SSE fallback)
 - Override per model via `agents.defaults.models["openai-codex/<model>"].params.transport` (`"sse"`, `"websocket"`, or `"auto"`)
 - `params.serviceTier` is also forwarded on native Codex Responses requests (`chatgpt.com/backend-api`)
-- Hidden OpenClaw attribution headers (`originator`, `version`,
+- Hidden DennouAibou attribution headers (`originator`, `version`,
   `User-Agent`) are only attached on native Codex traffic to
   `chatgpt.com/backend-api`, not generic OpenAI-compatible proxies
-- Shares the same `/fast` toggle and `params.fastMode` config as direct `openai/*`; OpenClaw maps that to `service_tier=priority`
+- Shares the same `/fast` toggle and `params.fastMode` config as direct `openai/*`; DennouAibou maps that to `service_tier=priority`
 - `openai-codex/gpt-5.3-codex-spark` remains available when the Codex OAuth catalog exposes it; entitlement-dependent
 - `openai-codex/gpt-5.4` keeps native `contextWindow = 1050000` and a default runtime `contextTokens = 272000`; override the runtime cap with `models.providers.openai-codex.models[].contextTokens`
-- Policy note: OpenAI Codex OAuth is explicitly supported for external tools/workflows like OpenClaw.
+- Policy note: OpenAI Codex OAuth is explicitly supported for external tools/workflows like DennouAibou.
 
 ```json5
 {
@@ -255,18 +255,18 @@ OpenClaw ships with the pi‑ai catalog. These providers require **no**
 - Auth: `GEMINI_API_KEY`
 - Optional rotation: `GEMINI_API_KEYS`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `GOOGLE_API_KEY` fallback, and `OPENCLAW_LIVE_GEMINI_KEY` (single override)
 - Example models: `google/gemini-3.1-pro-preview`, `google/gemini-3-flash-preview`
-- Compatibility: legacy OpenClaw config using `google/gemini-3.1-flash-preview` is normalized to `google/gemini-3-flash-preview`
+- Compatibility: legacy DennouAibou config using `google/gemini-3.1-flash-preview` is normalized to `google/gemini-3-flash-preview`
 - CLI: `openclaw onboard --auth-choice gemini-api-key`
 - Direct Gemini runs also accept `agents.defaults.models["google/<model>"].params.cachedContent`
   (or legacy `cached_content`) to forward a provider-native
-  `cachedContents/...` handle; Gemini cache hits surface as OpenClaw `cacheRead`
+  `cachedContents/...` handle; Gemini cache hits surface as DennouAibou `cacheRead`
 
 ### Google Vertex
 
 - Provider: `google-vertex`
 - Auth: gcloud ADC
   - Gemini CLI JSON replies are parsed from `response`; usage falls back to
-    `stats`, with `stats.cached` normalized into OpenClaw `cacheRead`.
+    `stats`, with `stats.cached` normalized into DennouAibou `cacheRead`.
 
 ### Other bundled provider plugins
 
@@ -321,19 +321,19 @@ Example (OpenAI‑compatible):
 Notes:
 
 - For custom providers, `reasoning`, `input`, `cost`, `contextWindow`, and `maxTokens` are optional.
-  When omitted, OpenClaw defaults to:
+  When omitted, DennouAibou defaults to:
   - `reasoning: false`
   - `input: ["text"]`
   - `cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }`
   - `contextWindow: 200000`
   - `maxTokens: 8192`
 - Recommended: set explicit values that match your proxy/model limits.
-- For `api: "openai-completions"` on non-native endpoints (any non-empty `baseUrl` whose host is not `api.openai.com`), OpenClaw forces `compat.supportsDeveloperRole: false` to avoid provider 400 errors for unsupported `developer` roles.
+- For `api: "openai-completions"` on non-native endpoints (any non-empty `baseUrl` whose host is not `api.openai.com`), DennouAibou forces `compat.supportsDeveloperRole: false` to avoid provider 400 errors for unsupported `developer` roles.
 - Proxy-style OpenAI-compatible routes also skip native OpenAI-only request
   shaping: no `service_tier`, no Responses `store`, no prompt-cache hints, no
-  OpenAI reasoning-compat payload shaping, and no hidden OpenClaw attribution
+  OpenAI reasoning-compat payload shaping, and no hidden DennouAibou attribution
   headers.
-- If `baseUrl` is empty/omitted, OpenClaw keeps the default OpenAI behavior (which resolves to `api.openai.com`).
+- If `baseUrl` is empty/omitted, DennouAibou keeps the default OpenAI behavior (which resolves to `api.openai.com`).
 - For safety, an explicit `compat.supportsDeveloperRole: true` is still overridden on non-native `openai-completions` endpoints.
 
 ## CLI examples

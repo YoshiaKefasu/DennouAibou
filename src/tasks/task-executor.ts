@@ -44,7 +44,7 @@ function isOneTaskFlowEligible(task: TaskRecord): boolean {
   if (task.deliveryStatus === "not_applicable") {
     return false;
   }
-  return task.runtime === "acp" || task.runtime === "subagent";
+  return task.runtime === "subagent";
 }
 
 function ensureSingleTaskFlow(params: {

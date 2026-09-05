@@ -29,7 +29,6 @@ const TASK_STATUS_ICONS: Record<TaskRecord["status"], string> = {
 
 const TASK_RUNTIME_LABELS: Record<TaskRecord["runtime"], string> = {
   subagent: "Subagent",
-  acp: "ACP",
   cli: "CLI",
   cron: "Cron",
 };

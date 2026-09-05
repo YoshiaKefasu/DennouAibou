@@ -8,7 +8,7 @@ describe("image-ops temp dir", () => {
   let createdTempDir = "";
 
   beforeEach(() => {
-    process.env.OPENCLAW_IMAGE_BACKEND = "sips";
+    process.env.DENNOU_IMAGE_BACKEND = "sips";
     const originalMkdtemp = fs.mkdtemp.bind(fs);
     vi.spyOn(fs, "mkdtemp").mockImplementation(async (prefix) => {
       createdTempDir = await originalMkdtemp(prefix);
@@ -17,7 +17,7 @@ describe("image-ops temp dir", () => {
   });
 
   afterEach(() => {
-    delete process.env.OPENCLAW_IMAGE_BACKEND;
+    delete process.env.DENNOU_IMAGE_BACKEND;
     vi.restoreAllMocks();
   });
 

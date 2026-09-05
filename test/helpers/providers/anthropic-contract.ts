@@ -1,18 +1,47 @@
-// Anthropic stream contract helpers, ported from the removed anthropic
-// extension (git show HEAD:extensions/anthropic/stream-wrappers.ts, re-exported
-// by the deleted extensions/anthropic/contract-api.ts).
-//
-// The extension is gone, but the pi-embedded-runner extra-params tests still
-// exercise this contract behavior, so the implementations live here as a
-// test-only helper. Shared payload-policy helpers come from the kept
-// plugin-sdk (src/plugin-sdk/provider-stream-shared.ts).
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import { streamSimple } from "@mariozechner/pi-ai";
-import {
-  applyAnthropicPayloadPolicyToParams,
-  resolveAnthropicPayloadPolicy,
-  streamWithPayloadPatch,
-} from "../../../src/plugin-sdk/provider-stream-shared.js";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
+import { streamWithPayloadPatch } from "../../../src/plugin-sdk/provider-stream-shared.js";
+
+type AnthropicServiceTier = "auto" | "standard_only";
+
+type AnthropicPayloadPolicy = {
+  allowsServiceTier: boolean;
+  serviceTier: AnthropicServiceTier | undefined;
+};
+
+function resolveBaseUrlHostname(baseUrl: string): string | undefined {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveAnthropicPayloadPolicy(input: {
+  provider?: string;
+  api?: string;
+  baseUrl?: string;
+  serviceTier?: AnthropicServiceTier;
+}): AnthropicPayloadPolicy {
+  const isDirect = !input.baseUrl || resolveBaseUrlHostname(input.baseUrl) === "api.anthropic.com";
+  return {
+    allowsServiceTier: isDirect,
+    serviceTier: input.serviceTier,
+  };
+}
+
+function applyAnthropicPayloadPolicyToParams(
+  payloadObj: Record<string, unknown>,
+  policy: AnthropicPayloadPolicy,
+): void {
+  if (
+    policy.allowsServiceTier &&
+    policy.serviceTier !== undefined &&
+    payloadObj.service_tier === undefined
+  ) {
+    payloadObj.service_tier = policy.serviceTier;
+  }
+}
 
 const ANTHROPIC_CONTEXT_1M_BETA = "context-1m-2025-08-07";
 const ANTHROPIC_1M_MODEL_PREFIXES = ["claude-opus-4", "claude-sonnet-4"] as const;
@@ -26,11 +55,6 @@ const PI_AI_OAUTH_ANTHROPIC_BETAS = [
   ...PI_AI_DEFAULT_ANTHROPIC_BETAS,
 ] as const;
 
-type AnthropicServiceTier = "auto" | "standard_only";
-
-// The removed extension logged through createSubsystemLogger("anthropic-stream").
-// No test observes this logger, so keep a minimal sink instead of pulling the
-// runtime-env module graph into a test helper.
 const log = {
   warn: (...args: unknown[]) => {
     console.warn(...args);
@@ -53,10 +77,12 @@ function parseHeaderList(value: unknown): string[] {
 }
 
 function mergeAnthropicBetaHeader(
-  headers: Record<string, string> | undefined,
+  headers: Record<string, string | null> | undefined,
   betas: string[],
 ): Record<string, string> {
-  const merged = { ...headers };
+  const merged = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([, v]) => v !== null),
+  ) as Record<string, string>;
   const existingKey = Object.keys(merged).find((key) => key.toLowerCase() === "anthropic-beta");
   const existing = existingKey ? parseHeaderList(merged[existingKey]) : [];
   const values = Array.from(new Set([...existing, ...betas]));
@@ -73,21 +99,45 @@ function resolveAnthropicFastServiceTier(enabled: boolean): AnthropicServiceTier
   return enabled ? "auto" : "standard_only";
 }
 
-function normalizeFastMode(raw?: string | boolean | null): boolean | undefined {
-  if (typeof raw === "boolean") {
-    return raw;
+function normalizeAnthropicFastMode(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
   }
-  if (!raw) {
+  if (typeof value !== "string") {
     return undefined;
   }
-  const key = raw.toLowerCase();
-  if (["off", "false", "no", "0", "disable", "disabled", "normal"].includes(key)) {
-    return false;
-  }
-  if (["on", "true", "yes", "1", "enable", "enabled", "fast"].includes(key)) {
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "on" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "1" ||
+    normalized === "fast"
+  ) {
     return true;
   }
+  if (
+    normalized === "off" ||
+    normalized === "false" ||
+    normalized === "no" ||
+    normalized === "0" ||
+    normalized === "normal"
+  ) {
+    return false;
+  }
   return undefined;
+}
+
+export function resolveAnthropicFastMode(
+  extraParams: Record<string, unknown> | undefined,
+): boolean | undefined {
+  const raw = extraParams?.fastMode ?? extraParams?.fast_mode;
+  const normalized = normalizeAnthropicFastMode(raw);
+  if (raw !== undefined && normalized === undefined) {
+    const rawSummary = typeof raw === "string" ? raw : typeof raw;
+    log.warn(`ignoring invalid Anthropic fast mode param: ${rawSummary}`);
+  }
+  return normalized;
 }
 
 function normalizeAnthropicServiceTier(value: unknown): AnthropicServiceTier | undefined {
@@ -99,6 +149,18 @@ function normalizeAnthropicServiceTier(value: unknown): AnthropicServiceTier | u
     return normalized;
   }
   return undefined;
+}
+
+export function resolveAnthropicServiceTier(
+  extraParams: Record<string, unknown> | undefined,
+): AnthropicServiceTier | undefined {
+  const raw = extraParams?.serviceTier ?? extraParams?.service_tier;
+  const normalized = normalizeAnthropicServiceTier(raw);
+  if (raw !== undefined && normalized === undefined) {
+    const rawSummary = typeof raw === "string" ? raw : typeof raw;
+    log.warn(`ignoring invalid Anthropic service tier param: ${rawSummary}`);
+  }
+  return normalized;
 }
 
 export function resolveAnthropicBetas(
@@ -200,24 +262,4 @@ export function createAnthropicServiceTierWrapper(
       applyAnthropicPayloadPolicyToParams(payloadObj, payloadPolicy),
     );
   };
-}
-
-export function resolveAnthropicFastMode(
-  extraParams: Record<string, unknown> | undefined,
-): boolean | undefined {
-  return normalizeFastMode(
-    (extraParams?.fastMode ?? extraParams?.fast_mode) as string | boolean | null | undefined,
-  );
-}
-
-export function resolveAnthropicServiceTier(
-  extraParams: Record<string, unknown> | undefined,
-): AnthropicServiceTier | undefined {
-  const raw = extraParams?.serviceTier ?? extraParams?.service_tier;
-  const normalized = normalizeAnthropicServiceTier(raw);
-  if (raw !== undefined && normalized === undefined) {
-    const rawSummary = typeof raw === "string" ? raw : typeof raw;
-    log.warn(`ignoring invalid Anthropic service tier param: ${rawSummary}`);
-  }
-  return normalized;
 }

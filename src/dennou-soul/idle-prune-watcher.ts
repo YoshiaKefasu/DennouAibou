@@ -12,18 +12,15 @@
  * DENNOU_RULES.md Rule 1 (Encapsulation) に従い、上流コードは一切変更しない。
  */
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
-import {
-  onDiagnosticEvent,
-  type DiagnosticEventPayload,
-} from "../infra/diagnostic-events.js";
-import type { DennouPruneProtectionConfig } from "./types.js";
+import { loadConfig } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
+import { isProtectedSessionKey } from "../config/sessions/protected-session.js";
+import { onDiagnosticEvent, type DiagnosticEventPayload } from "../infra/diagnostic-events.js";
+import { logDebug } from "../logger.js";
 import { getDennouConfig } from "./config.js";
 import { pruneActiveSessionFile } from "./prune-active-session.js";
-import { logDebug } from "../logger.js";
-import { loadConfig } from "../config/config.js";
-import { isProtectedSessionKey } from "../config/sessions/protected-session.js";
+import type { DennouPruneProtectionConfig } from "./types.js";
 
 /**
  * セッションキー（`agent:{agentId}:{wsHash}`）→ タイマーID のマップ
@@ -59,9 +56,7 @@ function extractAgentId(sessionKey: string): string | undefined {
  */
 function buildSessionFilePath(agentId: string, sessionId: string): string {
   return path.join(
-    os.homedir(),
-    ".openclaw",
-    "agents",
+    path.join(resolveStateDir(), "agents"),
     agentId,
     "sessions",
     `${sessionId}.jsonl`,
@@ -72,7 +67,7 @@ function buildSessionFilePath(agentId: string, sessionId: string): string {
  * Idleイベントを受信した際の処理
  *
  * configは `getDennouConfig()` から都度読み込むため、
- * openclaw.json の変更 → config-reload → 次回idleイベント のタイミングで自動反映される。
+ * dennou-aibou.json の変更 → config-reload → 次回idleイベント のタイミングで自動反映される。
  */
 function handleIdleEvent(
   evt: DiagnosticEventPayload & { type: "session.state" },
@@ -84,9 +79,7 @@ function handleIdleEvent(
   // Skip idle prune for protected sessions (Phase 3).
   const openclawCfg = loadConfig();
   if (isProtectedSessionKey(sessionKey, openclawCfg)) {
-    logDebug(
-      `[DennouAibou] SKIP idle prune for protected session: sessionKey=${sessionKey}`,
-    );
+    logDebug(`[DennouAibou] SKIP idle prune for protected session: sessionKey=${sessionKey}`);
     return;
   }
 
@@ -139,13 +132,9 @@ function handleIdleEvent(
     );
 
     if (result === -1) {
-      console.warn(
-        `[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`,
-      );
+      console.warn(`[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`);
     } else if (result > 0) {
-      logDebug(
-        `[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`,
-      );
+      logDebug(`[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`);
     }
   }, delayMs);
 
@@ -164,15 +153,13 @@ function handleIdleEvent(
  * `onDiagnosticEvent()` で全 `session.state` イベントをlistenし、
  * `"idle"` に遷移したらタイマーを起動する。
  *
- * configは `getDennouConfig()` から都度読み込むため、openclaw.json の変更が
+ * configは `getDennouConfig()` から都度読み込むため、dennou-aibou.json の変更が
  * config-reload 経由で自動反映される。
  *
  * @param protection - 保護設定（ワークスペースパス自動解決済み）
  * @returns クリーンアップ関数（テストやシャットダウン時に呼び出す）
  */
-export function startIdlePruneWatcher(
-  protection?: DennouPruneProtectionConfig,
-): () => void {
+export function startIdlePruneWatcher(protection?: DennouPruneProtectionConfig): () => void {
   const dennocfg = getDennouConfig();
   const config = dennocfg.activeSessionToolsPrune;
   if (!config.enabled) {
@@ -193,10 +180,7 @@ export function startIdlePruneWatcher(
 
       if (stateEvt.state === "idle") {
         handleIdleEvent(stateEvt, protection);
-      } else if (
-        stateEvt.state === "processing" ||
-        stateEvt.state === "waiting"
-      ) {
+      } else if (stateEvt.state === "processing" || stateEvt.state === "waiting") {
         // セッションがアクティブに戻った → タイマーキャンセル
         const sessionKey = stateEvt.sessionKey;
         if (sessionKey && idleTimers.has(sessionKey)) {

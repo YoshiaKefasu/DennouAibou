@@ -1,15 +1,4 @@
-import { getAcpSessionManager } from "../acp/control-plane/manager.js";
-import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../acp/policy.js";
-import { toAcpRuntimeError } from "../acp/runtime/errors.js";
-import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
-import {
-  formatThinkingLevels,
-  formatXHighModelHint,
-  normalizeThinkLevel,
-  normalizeVerboseLevel,
-  supportsXHighThinking,
-  type VerboseLevel,
-} from "../auto-reply/thinking.js";
+import { formatMaxModelHint, formatThinkingLevels, formatXHighModelHint, isElevatedThinkingDenied, normalizeThinkLevel, normalizeVerboseLevel, type VerboseLevel, } from "../auto-reply/thinking.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveCommandSecretRefsViaGateway } from "../cli/command-secret-gateway.js";
 import { getAgentRuntimeCommandSecretTargetIds } from "../cli/command-secret-targets.js";
@@ -47,13 +36,6 @@ import {
 import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { clearSessionAuthProfileOverride } from "./auth-profiles/session-override.js";
 import {
-  buildAcpResult,
-  createAcpVisibleTextAccumulator,
-  emitAcpAssistantDelta,
-  emitAcpLifecycleEnd,
-  emitAcpLifecycleError,
-  emitAcpLifecycleStart,
-  persistAcpTurnTranscript,
   persistSessionEntry as persistSessionEntryBase,
   prependInternalEventContext,
   runAgentAttempt,
@@ -292,13 +274,6 @@ async function prepareAgentCommandExecution(
   });
   const workspaceDir = workspace.dir;
   const runId = opts.runId?.trim() || sessionId;
-  const acpManager = getAcpSessionManager();
-  const acpResolution = sessionKey
-    ? acpManager.resolveSession({
-        cfg,
-        sessionKey,
-      })
-    : null;
 
   return {
     body,
@@ -322,8 +297,6 @@ async function prepareAgentCommandExecution(
     workspaceDir,
     agentDir,
     runId,
-    acpManager,
-    acpResolution,
   };
 }
 
@@ -354,8 +327,6 @@ async function agentCommandInternal(
     workspaceDir,
     agentDir,
     runId,
-    acpManager,
-    acpResolution,
   } = prepared;
   let sessionEntry = prepared.sessionEntry;
 
@@ -371,120 +342,6 @@ async function agentCommandInternal(
       if (sendPolicy === "deny") {
         throw new Error("send blocked by session policy");
       }
-    }
-
-    if (acpResolution?.kind === "stale") {
-      throw acpResolution.error;
-    }
-
-    if (acpResolution?.kind === "ready" && sessionKey) {
-      const startedAt = Date.now();
-      registerAgentRunContext(runId, {
-        sessionKey,
-      });
-      emitAcpLifecycleStart({ runId, startedAt });
-
-      const visibleTextAccumulator = createAcpVisibleTextAccumulator();
-      let stopReason: string | undefined;
-      try {
-        const dispatchPolicyError = resolveAcpDispatchPolicyError(cfg);
-        if (dispatchPolicyError) {
-          throw dispatchPolicyError;
-        }
-        const acpAgent = normalizeAgentId(
-          acpResolution.meta.agent || resolveAgentIdFromSessionKey(sessionKey),
-        );
-        const agentPolicyError = resolveAcpAgentPolicyError(cfg, acpAgent);
-        if (agentPolicyError) {
-          throw agentPolicyError;
-        }
-
-        await acpManager.runTurn({
-          cfg,
-          sessionKey,
-          text: body,
-          mode: "prompt",
-          requestId: runId,
-          signal: opts.abortSignal,
-          onEvent: (event) => {
-            if (event.type === "done") {
-              stopReason = event.stopReason;
-              return;
-            }
-            if (event.type !== "text_delta") {
-              return;
-            }
-            if (event.stream && event.stream !== "output") {
-              return;
-            }
-            if (!event.text) {
-              return;
-            }
-            const visibleUpdate = visibleTextAccumulator.consume(event.text);
-            if (!visibleUpdate) {
-              return;
-            }
-            emitAcpAssistantDelta({
-              runId,
-              text: visibleUpdate.text,
-              delta: visibleUpdate.delta,
-            });
-          },
-        });
-      } catch (error) {
-        const acpError = toAcpRuntimeError({
-          error,
-          fallbackCode: "ACP_TURN_FAILED",
-          fallbackMessage: "ACP turn failed before completion.",
-        });
-        emitAcpLifecycleError({
-          runId,
-          message: acpError.message,
-        });
-        throw acpError;
-      }
-
-      emitAcpLifecycleEnd({ runId });
-
-      const finalTextRaw = visibleTextAccumulator.finalizeRaw();
-      const finalText = visibleTextAccumulator.finalize();
-      try {
-        sessionEntry = await persistAcpTurnTranscript({
-          body,
-          finalText: finalTextRaw,
-          sessionId,
-          sessionKey,
-          sessionEntry,
-          sessionStore,
-          storePath,
-          sessionAgentId,
-          threadId: opts.threadId,
-          sessionCwd: resolveAcpSessionCwd(acpResolution.meta) ?? workspaceDir,
-        });
-      } catch (error) {
-        log.warn(
-          `ACP transcript persistence failed for ${sessionKey}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      const result = buildAcpResult({
-        payloadText: finalText,
-        startedAt,
-        stopReason,
-        abortSignal: opts.abortSignal,
-      });
-      const payloads = result.payloads;
-
-      return await deliverAgentCommandResult({
-        cfg,
-        deps,
-        runtime,
-        opts,
-        outboundSession,
-        sessionEntry,
-        result,
-        payloads,
-      });
     }
 
     let resolvedThinkLevel = thinkOnce ?? thinkOverride ?? persistedThinking;
@@ -697,13 +554,22 @@ async function agentCommandInternal(
         catalog: catalogForThinking,
       });
     }
-    if (resolvedThinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) {
+    if (
+      (resolvedThinkLevel === "xhigh" || resolvedThinkLevel === "max") &&
+      isElevatedThinkingDenied(resolvedThinkLevel, provider, model)
+    ) {
       const explicitThink = Boolean(thinkOnce || thinkOverride);
       if (explicitThink) {
-        throw new Error(`Thinking level "xhigh" is only supported for ${formatXHighModelHint()}.`);
+        const hint = resolvedThinkLevel === "max" ? formatMaxModelHint() : formatXHighModelHint();
+        throw new Error(`Thinking level "${resolvedThinkLevel}" is only supported for ${hint}.`);
       }
       resolvedThinkLevel = "high";
-      if (sessionEntry && sessionStore && sessionKey && sessionEntry.thinkingLevel === "xhigh") {
+      if (
+        sessionEntry &&
+        sessionStore &&
+        sessionKey &&
+        (sessionEntry.thinkingLevel === "xhigh" || sessionEntry.thinkingLevel === "max")
+      ) {
         const entry = sessionEntry;
         entry.thinkingLevel = "high";
         entry.updatedAt = Date.now();

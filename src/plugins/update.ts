@@ -6,7 +6,6 @@ import {
 import type { UpdateChannel } from "../infra/update-channels.js";
 import { resolveUserPath } from "../utils.js";
 import { resolveBundledPluginSources } from "./bundled-sources.js";
-import { installPluginFromClawHub, resolveClawHubPluginVersion } from "./clawhub.js";
 import {
   installPluginFromNpmSpec,
   PLUGIN_INSTALL_ERROR_CODE,
@@ -83,74 +82,6 @@ function formatMarketplaceInstallFailure(params: {
     `Failed to ${params.phase} ${params.pluginId}: ` +
     `${params.error} (marketplace plugin ${params.marketplacePlugin} from ${params.marketplaceSource}).`
   );
-}
-
-function formatClawHubInstallFailure(params: {
-  pluginId: string;
-  spec: string;
-  phase: "check" | "update";
-  error: string;
-}): string {
-  return `Failed to ${params.phase} ${params.pluginId}: ${params.error} (ClawHub ${params.spec}).`;
-}
-
-type ClawHubUpdateMode = "legacy-exact-to-latest" | "explicit-clawhub-selector" | "unversioned-clawhub";
-
-type ClawHubUpdateSpecResult = {
-  installSpec: string;
-  recordSpec: string;
-  modeLabel: ClawHubUpdateMode;
-};
-
-/**
- * Resolve the effective ClawHub update spec for targeted id-based updates.
- *
- * Rules:
- * 1. Explicit spec override wins and is preserved exactly.
- * 2. Already-unversioned record stays unversioned.
- * 3. Legacy exact record with id-only update → latest-line intent (unversioned).
- * 4. Dist-tag selectors (e.g. @beta) remain pinned.
- */
-function resolveClawHubUpdateSpec(params: {
-  record: { spec: string; clawhubPackage?: string };
-  specOverride?: string;
-  invokedByIdOnly: boolean;
-}): ClawHubUpdateSpecResult {
-  const { record, specOverride, invokedByIdOnly } = params;
-  const recordSpec = record.spec;
-  const fallbackSpec = `clawhub:${record.clawhubPackage ?? ""}`;
-
-  // Rule 1: explicit spec override wins exactly.
-  if (specOverride) {
-    return { installSpec: specOverride, recordSpec, modeLabel: "explicit-clawhub-selector" };
-  }
-
-  // Parse the record spec to check version/tag presence.
-  const atIndex = recordSpec.lastIndexOf("@");
-  const hasVersionPart = atIndex > 0 && atIndex < recordSpec.length - 1;
-  const versionPart = hasVersionPart ? recordSpec.slice(atIndex + 1) : "";
-
-  // Rule 4: dist-tag selectors (non-semver tags like @beta) remain pinned.
-  // Distinguish tags from versions: tags are not valid semver (no dots).
-  const isDistTag = hasVersionPart && !/^\d+\.\d+\.\d+/.test(versionPart);
-  if (isDistTag) {
-    return { installSpec: recordSpec, recordSpec, modeLabel: "explicit-clawhub-selector" };
-  }
-
-  // Rule 2: already-unversioned record stays unversioned.
-  if (!hasVersionPart) {
-    return { installSpec: recordSpec || fallbackSpec, recordSpec, modeLabel: "unversioned-clawhub" };
-  }
-
-  // Rule 3: legacy exact record with id-only update → latest-line intent.
-  if (invokedByIdOnly) {
-    const pkgName = record.clawhubPackage ?? recordSpec.slice("clawhub:".length).replace(/@.*/, "");
-    const unversionedSpec = `clawhub:${pkgName}`;
-    return { installSpec: unversionedSpec, recordSpec, modeLabel: "legacy-exact-to-latest" };
-  }
-
-  // Fallback: keep the recorded spec as-is.
-  return { installSpec: recordSpec || fallbackSpec, recordSpec, modeLabel: "unversioned-clawhub" };
 }
 
 type InstallIntegrityDrift = {
@@ -348,7 +279,7 @@ export async function updateNpmInstalledPlugins(params: {
       continue;
     }
 
-    if (record.source !== "npm" && record.source !== "marketplace" && record.source !== "clawhub") {
+    if (record.source !== "npm" && record.source !== "marketplace") {
       outcomes.push({
         pluginId,
         status: "skipped",
@@ -360,21 +291,6 @@ export async function updateNpmInstalledPlugins(params: {
     const effectiveSpec =
       record.source === "npm" ? (params.specOverrides?.[pluginId] ?? record.spec) : record.spec;
 
-    // Resolve ClawHub update spec: id-only updates follow latest line,
-    // explicit selectors stay pinned.
-    let resolvedClawHubSpec: { installSpec: string; recordSpec: string; modeLabel: string } | null =
-      null;
-    if (record.source === "clawhub") {
-      resolvedClawHubSpec = resolveClawHubUpdateSpec({
-        record: { spec: record.spec, clawhubPackage: record.clawhubPackage },
-        specOverride: params.specOverrides?.[pluginId],
-        invokedByIdOnly: !params.specOverrides?.[pluginId],
-      });
-    }
-
-    const clawhubInstallSpec = resolvedClawHubSpec?.installSpec;
-    const clawhubRecordSpec = resolvedClawHubSpec?.recordSpec ?? record.spec;
-    const clawhubModeLabel = resolvedClawHubSpec?.modeLabel ?? "unversioned-clawhub";
     const expectedIntegrity =
       record.source === "npm" && effectiveSpec === record.spec
         ? expectedIntegrityForUpdate(record.spec, record.integrity)
@@ -385,15 +301,6 @@ export async function updateNpmInstalledPlugins(params: {
         pluginId,
         status: "skipped",
         message: `Skipping "${pluginId}" (missing npm spec).`,
-      });
-      continue;
-    }
-
-    if (record.source === "clawhub" && !record.clawhubPackage) {
-      outcomes.push({
-        pluginId,
-        status: "skipped",
-        message: `Skipping "${pluginId}" (missing ClawHub package metadata).`,
       });
       continue;
     }
@@ -426,7 +333,6 @@ export async function updateNpmInstalledPlugins(params: {
     if (params.dryRun) {
       let probe:
         | Awaited<ReturnType<typeof installPluginFromNpmSpec>>
-        | Awaited<ReturnType<typeof installPluginFromClawHub>>
         | Awaited<ReturnType<typeof installPluginFromMarketplace>>;
       try {
         probe =
@@ -446,25 +352,15 @@ export async function updateNpmInstalledPlugins(params: {
                 }),
                 logger,
               })
-            : record.source === "clawhub"
-              ? await installPluginFromClawHub({
-                  spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-                  baseUrl: record.clawhubUrl,
-                  mode: "update",
-                  dryRun: true,
-                  dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
-                  expectedPluginId: pluginId,
-                  logger,
-                })
-              : await installPluginFromMarketplace({
-                  marketplace: record.marketplaceSource!,
-                  plugin: record.marketplacePlugin!,
-                  mode: "update",
-                  dryRun: true,
-                  dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
-                  expectedPluginId: pluginId,
-                  logger,
-                });
+            : await installPluginFromMarketplace({
+                marketplace: record.marketplaceSource!,
+                plugin: record.marketplacePlugin!,
+                mode: "update",
+                dryRun: true,
+                dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
+                expectedPluginId: pluginId,
+                logger,
+              });
       } catch (err) {
         outcomes.push({
           pluginId,
@@ -485,20 +381,13 @@ export async function updateNpmInstalledPlugins(params: {
                   phase: "check",
                   result: probe,
                 })
-              : record.source === "clawhub"
-                ? formatClawHubInstallFailure({
-                    pluginId,
-                    spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-                    phase: "check",
-                    error: probe.error,
-                  })
-                : formatMarketplaceInstallFailure({
-                    pluginId,
-                    marketplaceSource: record.marketplaceSource!,
-                    marketplacePlugin: record.marketplacePlugin!,
-                    phase: "check",
-                    error: probe.error,
-                  }),
+              : formatMarketplaceInstallFailure({
+                  pluginId,
+                  marketplaceSource: record.marketplaceSource!,
+                  marketplacePlugin: record.marketplacePlugin!,
+                  phase: "check",
+                  error: probe.error,
+                }),
         });
         continue;
       }
@@ -527,48 +416,7 @@ export async function updateNpmInstalledPlugins(params: {
 
     let result:
       | Awaited<ReturnType<typeof installPluginFromNpmSpec>>
-      | Awaited<ReturnType<typeof installPluginFromClawHub>>
       | Awaited<ReturnType<typeof installPluginFromMarketplace>>;
-
-    // Phase 3: ClawHub unchanged early skip.
-    // Use metadata-only resolver to check if the target version matches the installed version.
-    // This avoids downloading the archive when no update is needed.
-    if (record.source === "clawhub") {
-      try {
-        const resolved = await resolveClawHubPluginVersion({
-          spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-          baseUrl: record.clawhubUrl,
-          logger,
-        });
-        if (!resolved.ok) {
-          // Metadata resolution failed — report the error directly.
-          outcomes.push({
-            pluginId,
-            status: "error",
-            message: formatClawHubInstallFailure({
-              pluginId,
-              spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-              phase: "check",
-              error: resolved.error,
-            }),
-          });
-          continue;
-        }
-        if (currentVersion && resolved.version === currentVersion) {
-          outcomes.push({
-            pluginId,
-            status: "unchanged",
-            currentVersion: currentVersion ?? undefined,
-            nextVersion: resolved.version ?? undefined,
-            message: `${pluginId} is up to date (${currentVersion}).`,
-          });
-          continue;
-        }
-      } catch {
-        // If metadata resolution fails unexpectedly, fall through to the live install
-        // which will report the error with full context.
-      }
-    }
 
     try {
       result =
@@ -587,23 +435,14 @@ export async function updateNpmInstalledPlugins(params: {
               }),
               logger,
             })
-          : record.source === "clawhub"
-            ? await installPluginFromClawHub({
-                spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-                baseUrl: record.clawhubUrl,
-                mode: "update",
-                dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
-                expectedPluginId: pluginId,
-                logger,
-              })
-            : await installPluginFromMarketplace({
-                marketplace: record.marketplaceSource!,
-                plugin: record.marketplacePlugin!,
-                mode: "update",
-                dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
-                expectedPluginId: pluginId,
-                logger,
-              });
+          : await installPluginFromMarketplace({
+              marketplace: record.marketplaceSource!,
+              plugin: record.marketplacePlugin!,
+              mode: "update",
+              dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
+              expectedPluginId: pluginId,
+              logger,
+            });
     } catch (err) {
       outcomes.push({
         pluginId,
@@ -624,20 +463,13 @@ export async function updateNpmInstalledPlugins(params: {
                 phase: "update",
                 result: result,
               })
-            : record.source === "clawhub"
-              ? formatClawHubInstallFailure({
-                  pluginId,
-                  spec: clawhubInstallSpec ?? effectiveSpec ?? `clawhub:${record.clawhubPackage!}`,
-                  phase: "update",
-                  error: result.error,
-                })
-              : formatMarketplaceInstallFailure({
-                  pluginId,
-                  marketplaceSource: record.marketplaceSource!,
-                  marketplacePlugin: record.marketplacePlugin!,
-                  phase: "update",
-                  error: result.error,
-                }),
+            : formatMarketplaceInstallFailure({
+                pluginId,
+                marketplaceSource: record.marketplaceSource!,
+                marketplacePlugin: record.marketplacePlugin!,
+                phase: "update",
+                error: result.error,
+              }),
       });
       continue;
     }
@@ -656,34 +488,6 @@ export async function updateNpmInstalledPlugins(params: {
         installPath: result.targetDir,
         version: nextVersion,
         ...buildNpmResolutionInstallFields(result.npmResolution),
-      });
-    } else if (record.source === "clawhub") {
-      const clawhubResult = result as Extract<
-        Awaited<ReturnType<typeof installPluginFromClawHub>>,
-        { ok: true }
-      >;
-      // Phase 4: Normalize legacy exact record after successful id-only update.
-      // If old record was exact clawhub:<pkg>@<version> and update succeeded via
-      // id-only latest-line path, save record spec as unversioned clawhub:<pkg>.
-      let savedSpec = clawhubInstallSpec ?? effectiveSpec ?? record.spec ?? `clawhub:${record.clawhubPackage!}`;
-      if (
-        resolvedClawHubSpec?.modeLabel === "legacy-exact-to-latest" &&
-        record.spec !== savedSpec
-      ) {
-        savedSpec = `clawhub:${record.clawhubPackage!}`;
-      }
-      next = recordPluginInstall(next, {
-        pluginId: resolvedPluginId,
-        source: "clawhub",
-        spec: savedSpec,
-        installPath: result.targetDir,
-        version: nextVersion,
-        integrity: clawhubResult.clawhub.integrity,
-        resolvedAt: clawhubResult.clawhub.resolvedAt,
-        clawhubUrl: clawhubResult.clawhub.clawhubUrl,
-        clawhubPackage: clawhubResult.clawhub.clawhubPackage,
-        clawhubFamily: clawhubResult.clawhub.clawhubFamily,
-        clawhubChannel: clawhubResult.clawhub.clawhubChannel,
       });
     } else {
       const marketplaceResult = result as Extract<

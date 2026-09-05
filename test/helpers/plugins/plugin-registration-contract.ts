@@ -4,7 +4,6 @@ import {
   mediaUnderstandingProviderContractRegistry,
   musicGenerationProviderContractRegistry,
   pluginRegistrationContractRegistry,
-  speechProviderContractRegistry,
   videoGenerationProviderContractRegistry,
 } from "../../../src/plugins/contracts/registry.js";
 import { loadPluginManifestRegistry } from "../../../src/plugins/manifest-registry.js";
@@ -14,7 +13,6 @@ type PluginRegistrationContractParams = {
   providerIds?: string[];
   webFetchProviderIds?: string[];
   webSearchProviderIds?: string[];
-  speechProviderIds?: string[];
   realtimeTranscriptionProviderIds?: string[];
   realtimeVoiceProviderIds?: string[];
   mediaUnderstandingProviderIds?: string[];
@@ -22,7 +20,6 @@ type PluginRegistrationContractParams = {
   videoGenerationProviderIds?: string[];
   musicGenerationProviderIds?: string[];
   toolNames?: string[];
-  requireSpeechVoices?: boolean;
   requireDescribeImages?: boolean;
   requireGenerateImage?: boolean;
   requireGenerateVideo?: boolean;
@@ -44,21 +41,6 @@ function findRegistration(pluginId: string) {
     throw new Error(`plugin registration contract missing for ${pluginId}`);
   }
   return entry;
-}
-
-function findSpeechProviderIds(pluginId: string) {
-  return speechProviderContractRegistry
-    .filter((entry) => entry.pluginId === pluginId)
-    .map((entry) => entry.provider.id)
-    .toSorted((left, right) => left.localeCompare(right));
-}
-
-function findSpeechProvider(pluginId: string) {
-  const entry = speechProviderContractRegistry.find((candidate) => candidate.pluginId === pluginId);
-  if (!entry) {
-    throw new Error(`speech provider contract missing for ${pluginId}`);
-  }
-  return entry.provider;
 }
 
 function findMediaUnderstandingProviderIds(pluginId: string) {
@@ -143,15 +125,6 @@ export function describePluginRegistrationContract(params: PluginRegistrationCon
       });
     }
 
-    if (params.speechProviderIds) {
-      it("keeps bundled speech ownership explicit", () => {
-        expect(findRegistration(params.pluginId).speechProviderIds).toEqual(
-          params.speechProviderIds,
-        );
-        expect(findSpeechProviderIds(params.pluginId)).toEqual(params.speechProviderIds);
-      });
-    }
-
     if (params.realtimeTranscriptionProviderIds) {
       it("keeps bundled realtime-transcription ownership explicit", () => {
         expect(findRegistration(params.pluginId).realtimeTranscriptionProviderIds).toEqual(
@@ -215,12 +188,6 @@ export function describePluginRegistrationContract(params: PluginRegistrationCon
     if (params.toolNames) {
       it("keeps bundled tool ownership explicit", () => {
         expect(findRegistration(params.pluginId).toolNames).toEqual(params.toolNames);
-      });
-    }
-
-    if (params.requireSpeechVoices) {
-      it("keeps bundled speech voice-list support explicit", () => {
-        expect(findSpeechProvider(params.pluginId).listVoices).toEqual(expect.any(Function));
       });
     }
 

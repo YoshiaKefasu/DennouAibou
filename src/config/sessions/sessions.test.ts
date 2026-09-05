@@ -2,17 +2,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
-import { upsertAcpSessionMeta } from "../../acp/runtime/session-meta.js";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as jsonFiles from "../../infra/json-files.js";
 import type { OpenClawConfig } from "../config.js";
 import type { SessionConfig } from "../types.base.js";
@@ -22,17 +12,8 @@ import {
   resolveSessionTranscriptPathInDir,
   validateSessionId,
 } from "./paths.js";
-import {
-  evaluateSessionFreshness,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-} from "./reset.js";
 import { resolveAndPersistSessionFile } from "./session-file.js";
-import {
-  clearSessionStoreCacheForTest,
-  loadSessionStore,
-  updateSessionStore,
-} from "./store.js";
+import { clearSessionStoreCacheForTest, loadSessionStore, updateSessionStore } from "./store.js";
 import { mergeSessionEntry, type SessionEntry } from "./types.js";
 
 function useTempSessionsFixture(prefix: string) {
@@ -61,23 +42,15 @@ describe("session path safety", () => {
   it("rejects unsafe session IDs", () => {
     const unsafeSessionIds = ["../etc/passwd", "a/b", "a\\b", "/abs"];
     for (const sessionId of unsafeSessionIds) {
-      expect(() => validateSessionId(sessionId), sessionId).toThrow(
-        /Invalid session ID/,
-      );
+      expect(() => validateSessionId(sessionId), sessionId).toThrow(/Invalid session ID/);
     }
   });
 
   it("resolves transcript path inside an explicit sessions dir", () => {
     const sessionsDir = "/tmp/openclaw/agents/main/sessions";
-    const resolved = resolveSessionTranscriptPathInDir(
-      "sess-1",
-      sessionsDir,
-      "topic/a+b",
-    );
+    const resolved = resolveSessionTranscriptPathInDir("sess-1", sessionsDir, "topic/a+b");
 
-    expect(resolved).toBe(
-      path.resolve(sessionsDir, "sess-1-topic-topic%2Fa%2Bb.jsonl"),
-    );
+    expect(resolved).toBe(path.resolve(sessionsDir, "sess-1-topic-topic%2Fa%2Bb.jsonl"));
   });
 
   it("falls back to derived path when sessionFile is outside known agent sessions dirs", () => {
@@ -100,37 +73,23 @@ describe("session path safety", () => {
     ).toEqual({
       agentId: "worker",
     });
-    expect(
-      resolveSessionFilePathOptions({ storePath: "(multiple)" }),
-    ).toBeUndefined();
+    expect(resolveSessionFilePathOptions({ storePath: "(multiple)" })).toBeUndefined();
   });
 
   it("accepts symlink-alias session paths that resolve under the sessions dir", () => {
     if (process.platform === "win32") {
       return;
     }
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "openclaw-symlink-session-"),
-    );
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-symlink-session-"));
     const realRoot = path.join(tmpDir, "real-state");
     const aliasRoot = path.join(tmpDir, "alias-state");
     try {
       const sessionsDir = path.join(realRoot, "agents", "main", "sessions");
       fs.mkdirSync(sessionsDir, { recursive: true });
       fs.symlinkSync(realRoot, aliasRoot, "dir");
-      const viaAlias = path.join(
-        aliasRoot,
-        "agents",
-        "main",
-        "sessions",
-        "sess-1.jsonl",
-      );
+      const viaAlias = path.join(aliasRoot, "agents", "main", "sessions", "sess-1.jsonl");
       fs.writeFileSync(path.join(sessionsDir, "sess-1.jsonl"), "");
-      const resolved = resolveSessionFilePath(
-        "sess-1",
-        { sessionFile: viaAlias },
-        { sessionsDir },
-      );
+      const resolved = resolveSessionFilePath("sess-1", { sessionFile: viaAlias }, { sessionsDir });
       expect(fs.realpathSync(resolved)).toBe(
         fs.realpathSync(path.join(sessionsDir, "sess-1.jsonl")),
       );
@@ -143,9 +102,7 @@ describe("session path safety", () => {
     if (process.platform === "win32") {
       return;
     }
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "openclaw-symlink-escape-"),
-    );
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-symlink-escape-"));
     const sessionsDir = path.join(tmpDir, "agents", "main", "sessions");
     const outsideDir = path.join(tmpDir, "outside");
     try {
@@ -161,9 +118,7 @@ describe("session path safety", () => {
         { sessionFile: symlinkPath },
         { sessionsDir },
       );
-      expect(fs.realpathSync(path.dirname(resolved))).toBe(
-        fs.realpathSync(sessionsDir),
-      );
+      expect(fs.realpathSync(path.dirname(resolved))).toBe(fs.realpathSync(sessionsDir));
       expect(path.basename(resolved)).toBe("sess-1.jsonl");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -171,196 +126,19 @@ describe("session path safety", () => {
   });
 });
 
-describe("resolveSessionResetPolicy", () => {
-  describe("backward compatibility: resetByType.dm -> direct", () => {
-    it("does not use dm fallback for group/thread types", () => {
-      const sessionCfg = {
-        resetByType: {
-          dm: { mode: "idle" as const, idleMinutes: 45 },
-        },
-      } as unknown as SessionConfig;
-
-      const groupPolicy = resolveSessionResetPolicy({
-        sessionCfg,
-        resetType: "group",
-      });
-
-      // dm alias only feeds the "direct" type; group/thread fall back to the
-      // default reset mode ("off"), never to the dm idle window.
-      expect(groupPolicy.mode).toBe("off");
-    });
-  });
-
-  it("uses the configured daily reset at 4am local time", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: { mode: "daily" },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toMatchObject({
-      mode: "daily",
-      atHour: 4,
-    });
-  });
-
-  it("treats idleMinutes=0 as never expiring by inactivity", () => {
-    const freshness = evaluateSessionFreshness({
-      updatedAt: 1_000,
-      now: 60 * 60 * 1_000,
-      policy: {
-        mode: "idle",
-        atHour: 4,
-        idleMinutes: 0,
-      },
-    });
-
-    expect(freshness).toEqual({
-      fresh: true,
-      dailyResetAt: undefined,
-      idleExpiresAt: undefined,
-    });
-  });
-
-  it("disables automatic resets when mode=off", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: {
-          mode: "off",
-          atHour: 9,
-          idleMinutes: 45,
-        },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toEqual({
-      mode: "off",
-      atHour: 9,
-      idleMinutes: undefined,
-    });
-
-    expect(
-      evaluateSessionFreshness({
-        updatedAt: 1_000,
-        now: 60 * 60 * 1_000,
-        policy,
-      }),
-    ).toEqual({
-      fresh: true,
-      dailyResetAt: undefined,
-      idleExpiresAt: undefined,
-    });
-  });
-
-  it("lets type-specific off override a daily base reset", () => {
-    const policy = resolveSessionResetPolicy({
-      sessionCfg: {
-        reset: {
-          mode: "daily",
-          atHour: 4,
-          idleMinutes: 120,
-        },
-        resetByType: {
-          direct: {
-            mode: "off",
-          },
-        },
-      },
-      resetType: "direct",
-    });
-
-    expect(policy).toEqual({
-      mode: "off",
-      atHour: 4,
-      idleMinutes: undefined,
-    });
-  });
-
-  describe("resolveProtectedSessionResetPolicy", () => {
-    it("forces mode off for the protected main session", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "daily" },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:main",
-      });
-
-      expect(policy).toEqual({
-        mode: "off",
-        atHour: 4,
-        idleMinutes: undefined,
-      });
-    });
-
-    it("recognizes main aliases when forcing the policy off", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "idle", idleMinutes: 45 },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "main",
-      });
-
-      expect(policy.mode).toBe("off");
-      expect(policy.idleMinutes).toBeUndefined();
-    });
-
-    it("forces off configured protected keys", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "daily" },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:telegram:direct:123",
-        cfg: {
-          session: { protectedKeys: ["agent:main:telegram:direct:123"] },
-        },
-      });
-
-      expect(policy.mode).toBe("off");
-    });
-
-    it("leaves non-protected sessions unchanged", () => {
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: resolveSessionResetPolicy({
-          sessionCfg: {
-            reset: { mode: "idle", idleMinutes: 45 },
-          },
-          resetType: "direct",
-        }),
-        sessionKey: "agent:main:telegram:direct:other",
-      });
-
-      expect(policy).toEqual({
-        mode: "idle",
-        atHour: 4,
-        idleMinutes: 45,
-      });
-    });
-
-    it("returns the policy unchanged when no session key is provided", () => {
-      const original = resolveSessionResetPolicy({
-        sessionCfg: {
-          reset: { mode: "daily" },
-        },
-        resetType: "direct",
-      });
-      const policy = resolveProtectedSessionResetPolicy({
-        policy: original,
-      });
-      expect(policy).toBe(original);
-    });
-  });
-});
+// Note: `describe("resolveSessionResetPolicy")` and its inner
+// `resolveProtectedSessionResetPolicy` suite have been removed because the
+// automatic session reset policy computation has been dismantled. Kasou's
+// master session is permanent; sessions are NEVER rotated based on idle
+// windows, daily boundaries, or per-type/per-channel overrides. The legacy
+// `session.reset`, `session.resetByType`, `session.resetByChannel`,
+// `session.resetTriggers`, and `session.idleMinutes` config keys remain
+// accepted by the zod schema for backward compatibility with existing KASOU
+// config files, but they have no effect at runtime. Manual reset triggers
+// (`/new`, `/reset`) remain in effect; their master session protection
+// guard is enforced in `auto-reply/reply/session.ts` via
+// `isProtectedSessionKey` and verified by the master-session immutability
+// architectural-invariant tests.
 
 describe("session store lock (Promise chain mutex)", () => {
   let lockFixtureRoot = "";
@@ -375,26 +153,18 @@ describe("session store lock (Promise chain mutex)", () => {
     lockTmpDirs.push(dir);
     const storePath = path.join(dir, "sessions.json");
     if (Object.keys(initial).length > 0) {
-      await fsPromises.writeFile(
-        storePath,
-        JSON.stringify(initial, null, 2),
-        "utf-8",
-      );
+      await fsPromises.writeFile(storePath, JSON.stringify(initial, null, 2), "utf-8");
     }
     return { dir, storePath };
   }
 
   beforeAll(async () => {
-    lockFixtureRoot = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), "openclaw-lock-test-"),
-    );
+    lockFixtureRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), "openclaw-lock-test-"));
   });
 
   afterAll(async () => {
     if (lockFixtureRoot) {
-      await fsPromises
-        .rm(lockFixtureRoot, { recursive: true, force: true })
-        .catch(() => undefined);
+      await fsPromises.rm(lockFixtureRoot, { recursive: true, force: true }).catch(() => undefined);
     }
   });
 
@@ -507,71 +277,6 @@ describe("session store lock (Promise chain mutex)", () => {
     expect(store[key]?.model).toBeUndefined();
   });
 
-  it("preserves ACP metadata when replacing a session entry wholesale", async () => {
-    const key = "agent:codex:acp:binding:discord:default:feedface";
-    const acp = {
-      backend: "acpx",
-      agent: "codex",
-      runtimeSessionName: "codex-discord",
-      mode: "persistent" as const,
-      state: "idle" as const,
-      lastActivityAt: 100,
-    };
-    const { storePath } = await makeTmpStore({
-      [key]: {
-        sessionId: "sess-acp",
-        updatedAt: 100,
-        acp,
-      },
-    });
-
-    await updateSessionStore(storePath, (store) => {
-      store[key] = {
-        sessionId: "sess-acp",
-        updatedAt: 200,
-        modelProvider: "openai-codex",
-        model: "gpt-5.4",
-      };
-    });
-
-    const store = loadSessionStore(storePath);
-    expect(store[key]?.acp).toEqual(acp);
-    expect(store[key]?.modelProvider).toBe("openai-codex");
-    expect(store[key]?.model).toBe("gpt-5.4");
-  });
-
-  it("allows explicit ACP metadata removal through the ACP session helper", async () => {
-    const key = "agent:codex:acp:binding:discord:default:deadbeef";
-    const { storePath } = await makeTmpStore({
-      [key]: {
-        sessionId: "sess-acp-clear",
-        updatedAt: 100,
-        acp: {
-          backend: "acpx",
-          agent: "codex",
-          runtimeSessionName: "codex-discord",
-          mode: "persistent",
-          state: "idle",
-          lastActivityAt: 100,
-        },
-      },
-    });
-    const cfg = {
-      session: {
-        store: storePath,
-      },
-    } as OpenClawConfig;
-
-    const result = await upsertAcpSessionMeta({
-      cfg,
-      sessionKey: key,
-      mutate: () => null,
-    });
-
-    expect(result?.acp).toBeUndefined();
-    const store = loadSessionStore(storePath);
-    expect(store[key]?.acp).toBeUndefined();
-  });
 });
 
 describe("resolveAndPersistSessionFile", () => {
@@ -618,10 +323,7 @@ describe("resolveAndPersistSessionFile", () => {
     const sessionStore = loadSessionStore(fixture.storePath(), {
       skipCache: true,
     });
-    const fallbackSessionFile = resolveSessionTranscriptPathInDir(
-      sessionId,
-      fixture.sessionsDir(),
-    );
+    const fallbackSessionFile = resolveSessionTranscriptPathInDir(sessionId, fixture.sessionsDir());
 
     const result = await resolveAndPersistSessionFile({
       sessionId,

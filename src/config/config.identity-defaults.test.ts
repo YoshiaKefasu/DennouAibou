@@ -36,7 +36,7 @@ describe("config identity defaults", () => {
     const configDir = path.join(home, ".openclaw");
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(
-      path.join(configDir, "openclaw.json"),
+      path.join(configDir, "dennou-aibou.json"),
       JSON.stringify(config, null, 2),
       "utf-8",
     );

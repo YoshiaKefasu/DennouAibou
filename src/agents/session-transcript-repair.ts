@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-id.js";
 
 const TOOL_CALL_NAME_MAX_CHARS = 64;
@@ -90,7 +90,7 @@ function redactSessionsSpawnAttachmentsArgs(value: unknown): unknown {
       return item;
     }
     const { content: _content, ...rest } = a;
-    return { ...rest, content: "__OPENCLAW_REDACTED__" };
+    return { ...rest, content: "__DENNOU_REDACTED__" };
   });
   return { ...rec, attachments: next };
 }

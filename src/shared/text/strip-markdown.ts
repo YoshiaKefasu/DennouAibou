@@ -1,6 +1,6 @@
 /**
  * Strip lightweight markdown formatting from text while preserving readable
- * plain-text structure for TTS and channel fallbacks.
+ * plain-text structure for channel fallbacks.
  */
 export function stripMarkdown(text: string): string {
   let result = text;

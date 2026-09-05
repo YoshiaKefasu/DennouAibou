@@ -19,9 +19,9 @@ fi
 
 package_version="$(node -p "require('./package.json').version")"
 mapfile -t publish_plan < <(
-  PACKAGE_VERSION="${package_version}" REQUESTED_PUBLISH_TAG="${OPENCLAW_NPM_PUBLISH_TAG:-}" \
+  PACKAGE_VERSION="${package_version}" REQUESTED_PUBLISH_TAG="${DENNOU_NPM_PUBLISH_TAG:-}" \
     node --import tsx --input-type=module <<'EOF'
-import { resolveNpmPublishPlan } from "./scripts/openclaw-npm-release-check.ts";
+import { resolveNpmPublishPlan } from "./scripts/dennou-aibou-npm-release-check.ts";
 
 const requestedPublishTag =
   process.env.REQUESTED_PUBLISH_TAG === "latest" ? "latest" : "beta";

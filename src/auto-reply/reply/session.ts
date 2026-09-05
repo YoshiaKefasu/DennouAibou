@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { normalizeConversationText } from "../../acp/conversation-id.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { clearBootstrapSnapshotOnSessionRollover } from "../../agents/bootstrap-cache.js";
 import { disposeSessionMcpRuntime } from "../../agents/pi-bundle-mcp-tools.js";
@@ -9,33 +8,18 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { resolveGroupSessionKey } from "../../config/sessions/group.js";
 import { canonicalizeMainSessionAlias } from "../../config/sessions/main-session.js";
 import { deriveSessionMetaPatch } from "../../config/sessions/metadata.js";
-import {
-  resolveSessionTranscriptPath,
-  resolveStorePath,
-} from "../../config/sessions/paths.js";
+import { resolveSessionTranscriptPath, resolveStorePath } from "../../config/sessions/paths.js";
 import { isProtectedSessionKey } from "../../config/sessions/protected-session.js";
-import {
-  evaluateSessionFreshness,
-  resolveChannelResetConfig,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-  resolveSessionResetType,
-  resolveThreadFlag,
-  type SessionFreshness,
-} from "../../config/sessions/reset.js";
+import { resolveThreadFlag } from "../../config/sessions/reset.js";
 import { resolveAndPersistSessionFile } from "../../config/sessions/session-file.js";
 import { resolveSessionKey } from "../../config/sessions/session-key.js";
-import {
-  loadSessionStore,
-  updateSessionStore,
-} from "../../config/sessions/store.js";
+import { loadSessionStore, updateSessionStore } from "../../config/sessions/store.js";
 import {
   DEFAULT_RESET_TRIGGERS,
   type GroupKeyResolution,
   type SessionEntry,
   type SessionScope,
 } from "../../config/sessions/types.js";
-import type { TtsAutoMode } from "../../config/types.tts.js";
 import { getSessionBindingService } from "../../infra/outbound/session-binding-service.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
@@ -46,7 +30,6 @@ import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js"
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
-import { resolveEffectiveResetTargetSessionKey } from "./acp-reset-target.js";
 import { resolveConversationBindingContextFromMessage } from "./conversation-binding-input.js";
 import { normalizeInboundTextNewlines } from "./inbound-text.js";
 import { stripMentions, stripStructuralPrefixes } from "./mentions.js";
@@ -55,14 +38,8 @@ import {
   resolveLastChannelRaw,
   resolveLastToRaw,
 } from "./session-delivery.js";
-import {
-  forkSessionFromParent,
-  resolveParentForkMaxTokens,
-} from "./session-fork.js";
-import {
-  buildSessionEndHookPayload,
-  buildSessionStartHookPayload,
-} from "./session-hooks.js";
+import { forkSessionFromParent, resolveParentForkMaxTokens } from "./session-fork.js";
+import { buildSessionEndHookPayload, buildSessionStartHookPayload } from "./session-hooks.js";
 
 const log = createSubsystemLogger("session-init");
 let sessionArchiveRuntimePromise: Promise<
@@ -70,15 +47,8 @@ let sessionArchiveRuntimePromise: Promise<
 > | null = null;
 
 function loadSessionArchiveRuntime() {
-  sessionArchiveRuntimePromise ??=
-    import("../../gateway/session-archive.runtime.js");
+  sessionArchiveRuntimePromise ??= import("../../gateway/session-archive.runtime.js");
   return sessionArchiveRuntimePromise;
-}
-
-function resolveExplicitSessionEndReason(
-  matchedResetTriggerLower?: string,
-): PluginHookSessionEndReason {
-  return matchedResetTriggerLower === "/reset" ? "reset" : "new";
 }
 
 function resolveSessionDefaultAccountId(params: {
@@ -99,37 +69,17 @@ function resolveSessionDefaultAccountId(params: {
   if (!channel) {
     return undefined;
   }
-  const channels = params.cfg.channels as Record<
-    string,
-    { defaultAccount?: unknown } | undefined
-  >;
+  const channels = params.cfg.channels as Record<string, { defaultAccount?: unknown } | undefined>;
   const configuredDefault = channels?.[channel]?.defaultAccount;
   return typeof configuredDefault === "string" && configuredDefault.trim()
     ? configuredDefault.trim()
     : undefined;
 }
 
-function resolveStaleSessionEndReason(params: {
-  entry: SessionEntry | undefined;
-  freshness?: SessionFreshness;
-  now: number;
-}): PluginHookSessionEndReason | undefined {
-  if (!params.entry || !params.freshness) {
-    return undefined;
-  }
-  const staleDaily =
-    params.freshness.dailyResetAt != null &&
-    params.entry.updatedAt < params.freshness.dailyResetAt;
-  const staleIdle =
-    params.freshness.idleExpiresAt != null &&
-    params.now > params.freshness.idleExpiresAt;
-  if (staleIdle) {
-    return "idle";
-  }
-  if (staleDaily) {
-    return "daily";
-  }
-  return undefined;
+function resolveExplicitSessionEndReason(
+  matchedResetTriggerLower?: string,
+): PluginHookSessionEndReason {
+  return matchedResetTriggerLower === "/reset" ? "reset" : "new";
 }
 
 export type SessionInitResult = {
@@ -200,33 +150,6 @@ function resolveSessionConversationBindingContext(
   };
 }
 
-function resolveBoundAcpSessionForReset(params: {
-  cfg: OpenClawConfig;
-  ctx: MsgContext;
-  bindingContext?: {
-    channel: string;
-    accountId: string;
-    conversationId: string;
-    parentConversationId?: string;
-  } | null;
-}): string | undefined {
-  const activeSessionKey = normalizeConversationText(params.ctx.SessionKey);
-  const bindingContext =
-    params.bindingContext ??
-    resolveSessionConversationBindingContext(params.cfg, params.ctx);
-  return resolveEffectiveResetTargetSessionKey({
-    cfg: params.cfg,
-    channel: bindingContext?.channel,
-    accountId: bindingContext?.accountId,
-    conversationId: bindingContext?.conversationId,
-    parentConversationId: bindingContext?.parentConversationId,
-    activeSessionKey,
-    allowNonAcpBindingSessionKey: false,
-    skipConfiguredFallbackWhenActiveSessionNonAcp: true,
-    fallbackToActiveAcpWhenUnbound: false,
-  });
-}
-
 function resolveBoundConversationSessionKey(params: {
   cfg: OpenClawConfig;
   ctx: MsgContext;
@@ -238,8 +161,7 @@ function resolveBoundConversationSessionKey(params: {
   } | null;
 }): string | undefined {
   const bindingContext =
-    params.bindingContext ??
-    resolveSessionConversationBindingContext(params.cfg, params.ctx);
+    params.bindingContext ?? resolveSessionConversationBindingContext(params.cfg, params.ctx);
   if (!bindingContext) {
     return undefined;
   }
@@ -264,16 +186,11 @@ export async function initSessionState(params: {
   commandAuthorized: boolean;
 }): Promise<SessionInitResult> {
   const { ctx, cfg, commandAuthorized } = params;
-  const conversationBindingContext = resolveSessionConversationBindingContext(
-    cfg,
-    ctx,
-  );
+  const conversationBindingContext = resolveSessionConversationBindingContext(cfg, ctx);
   // Native slash commands (Telegram/Discord/Slack) are delivered on a separate
   // "slash session" key, but should mutate the target chat session.
   const commandTargetSessionKey =
-    ctx.CommandSource === "native"
-      ? ctx.CommandTargetSessionKey?.trim()
-      : undefined;
+    ctx.CommandSource === "native" ? ctx.CommandTargetSessionKey?.trim() : undefined;
   const targetSessionKey =
     resolveBoundConversationSessionKey({
       cfg,
@@ -290,28 +207,23 @@ export async function initSessionState(params: {
     sessionKey: sessionCtxForState.SessionKey,
     config: cfg,
   });
-  const groupResolution =
-    resolveGroupSessionKey(sessionCtxForState) ?? undefined;
+  const groupResolution = resolveGroupSessionKey(sessionCtxForState) ?? undefined;
   const resetTriggers = sessionCfg?.resetTriggers?.length
     ? sessionCfg.resetTriggers
     : DEFAULT_RESET_TRIGGERS;
   const parentForkMaxTokens = resolveParentForkMaxTokens(cfg);
   const sessionScope = sessionCfg?.scope ?? "per-sender";
   const storePath = resolveStorePath(sessionCfg?.store, { agentId });
-  const ingressTimingEnabled =
-    process.env.OPENCLAW_DEBUG_INGRESS_TIMING === "1";
+  const ingressTimingEnabled = process.env.DENNOU_DEBUG_INGRESS_TIMING === "1";
 
   // CRITICAL: Skip cache to ensure fresh data when resolving session identity.
   // Stale cache (especially with multiple gateway processes or on Windows where
   // mtime granularity may miss rapid writes) can cause incorrect sessionId
   // generation, leading to orphaned transcript files. See #17971.
   const sessionStoreLoadStartMs = ingressTimingEnabled ? Date.now() : 0;
-  const sessionStore: Record<string, SessionEntry> = loadSessionStore(
-    storePath,
-    {
-      skipCache: true,
-    },
-  );
+  const sessionStore: Record<string, SessionEntry> = loadSessionStore(storePath, {
+    skipCache: true,
+  });
   if (ingressTimingEnabled) {
     log.info(
       `session-init store-load agent=${agentId} session=${sessionCtxForState.SessionKey ?? "(no-session)"} ` +
@@ -331,7 +243,6 @@ export async function initSessionState(params: {
   let persistedThinking: string | undefined;
   let persistedVerbose: string | undefined;
   let persistedReasoning: string | undefined;
-  let persistedTtsAuto: TtsAutoMode | undefined;
   let persistedModelOverride: string | undefined;
   let persistedProviderOverride: string | undefined;
   let persistedAuthProfileOverride: string | undefined;
@@ -349,13 +260,10 @@ export async function initSessionState(params: {
 
   const normalizedChatType = normalizeChatType(ctx.ChatType);
   const isGroup =
-    normalizedChatType != null && normalizedChatType !== "direct"
-      ? true
-      : Boolean(groupResolution);
+    normalizedChatType != null && normalizedChatType !== "direct" ? true : Boolean(groupResolution);
   // Prefer CommandBody/RawBody (clean message) for command detection; fall back
   // to Body which may contain structural context (history, sender labels).
-  const commandSource =
-    ctx.BodyForCommands ?? ctx.CommandBody ?? ctx.RawBody ?? ctx.Body ?? "";
+  const commandSource = ctx.BodyForCommands ?? ctx.CommandBody ?? ctx.RawBody ?? ctx.Body ?? "";
   // IMPORTANT: do NOT lowercase the entire command body.
   // Users often pass case-sensitive arguments (e.g. filesystem paths on Linux).
   // Command parsing downstream lowercases only the command token for matching.
@@ -375,18 +283,6 @@ export async function initSessionState(params: {
   const strippedForReset = isGroup
     ? stripMentions(triggerBodyNormalized, ctx, cfg, agentId)
     : triggerBodyNormalized;
-  const shouldUseAcpInPlaceReset = Boolean(
-    resolveBoundAcpSessionForReset({
-      cfg,
-      ctx: sessionCtxForState,
-      bindingContext: conversationBindingContext,
-    }),
-  );
-  const shouldBypassAcpResetForTrigger = (triggerLower: string): boolean =>
-    shouldUseAcpInPlaceReset &&
-    DEFAULT_RESET_TRIGGERS.some(
-      (defaultTrigger) => defaultTrigger.toLowerCase() === triggerLower,
-    );
 
   // Reset triggers are configured as lowercased commands (e.g. "/new"), but users may type
   // "/NEW" etc. Match case-insensitively while keeping the original casing for any stripped body.
@@ -402,16 +298,7 @@ export async function initSessionState(params: {
       break;
     }
     const triggerLower = trigger.toLowerCase();
-    if (
-      trimmedBodyLower === triggerLower ||
-      strippedForResetLower === triggerLower
-    ) {
-      if (shouldBypassAcpResetForTrigger(triggerLower)) {
-        // ACP-bound conversations handle /new and /reset in command handling
-        // so the bound ACP runtime can be reset in place without rotating the
-        // normal OpenClaw session/transcript.
-        break;
-      }
+    if (trimmedBodyLower === triggerLower || strippedForResetLower === triggerLower) {
       isNewSession = true;
       bodyStripped = "";
       resetTriggered = true;
@@ -423,9 +310,6 @@ export async function initSessionState(params: {
       trimmedBodyLower.startsWith(triggerPrefixLower) ||
       strippedForResetLower.startsWith(triggerPrefixLower)
     ) {
-      if (shouldBypassAcpResetForTrigger(triggerLower)) {
-        break;
-      }
       isNewSession = true;
       bodyStripped = strippedForReset.slice(trigger.length).trimStart();
       resetTriggered = true;
@@ -480,11 +364,9 @@ export async function initSessionState(params: {
     ctx,
   });
   if (retiredLegacyMainDelivery) {
-    sessionStore[retiredLegacyMainDelivery.key] =
-      retiredLegacyMainDelivery.entry;
+    sessionStore[retiredLegacyMainDelivery.key] = retiredLegacyMainDelivery.entry;
   }
   const entry = sessionStore[sessionKey];
-  const now = Date.now();
   const isThread = resolveThreadFlag({
     sessionKey,
     messageThreadId: ctx.MessageThreadId,
@@ -492,55 +374,17 @@ export async function initSessionState(params: {
     threadStarterBody: ctx.ThreadStarterBody,
     parentSessionKey: ctx.ParentSessionKey,
   });
-  const resetType = resolveSessionResetType({ sessionKey, isGroup, isThread });
-  const channelReset = resolveChannelResetConfig({
-    sessionCfg,
-    channel:
-      groupResolution?.channel ??
-      (ctx.OriginatingChannel as string | undefined) ??
-      ctx.Surface ??
-      ctx.Provider,
-  });
-  const resetPolicy = resolveProtectedSessionResetPolicy({
-    policy: resolveSessionResetPolicy({
-      sessionCfg,
-      resetType,
-      resetOverride: channelReset,
-    }),
-    sessionKey,
-    cfg,
-  });
-  // Heartbeat, cron-event, and exec-event runs should NEVER trigger session resets.
-  // These are automated system events, not user interactions that should affect
-  // session continuity. Forcing freshEntry=true prevents accidental data loss.
-  // See #58409 for details on silent session reset bug.
-  const isSystemEvent =
-    ctx.Provider === "heartbeat" ||
-    ctx.Provider === "cron-event" ||
-    ctx.Provider === "exec-event";
-  const entryFreshness = entry
-    ? isSystemEvent
-      ? ({ fresh: true } satisfies SessionFreshness)
-      : evaluateSessionFreshness({
-          updatedAt: entry.updatedAt,
-          now,
-          policy: resetPolicy,
-        })
-    : undefined;
-  const freshEntry = entryFreshness?.fresh ?? false;
+  // Kasou's master session is permanent: no automatic idle/daily reset ever
+  // rotates a session. Existing entries are always reused, so `freshEntry` is
+  // unconditionally true when an entry is present and only flips to false for
+  // brand-new (no-entry) sessions. This makes `previousSessionEntry` capture
+  // only explicit `/new` / `/reset` triggers — automatic rotation is gone.
+  const freshEntry = entry != null;
   // Capture the current session entry before any reset so its transcript can be
-  // archived afterward.  We need to do this for both explicit resets (/new, /reset)
-  // and for scheduled/daily resets where the session has become stale (!freshEntry).
-  // Without this, daily-reset transcripts are left as orphaned files on disk (#35481).
-  const previousSessionEntry =
-    (resetTriggered || !freshEntry) && entry ? { ...entry } : undefined;
-  const previousSessionEndReason = resetTriggered
-    ? resolveExplicitSessionEndReason(matchedResetTriggerLower)
-    : resolveStaleSessionEndReason({
-        entry,
-        freshness: entryFreshness,
-        now,
-      });
+  // archived afterward. With automatic resets removed, this is only relevant
+  // for explicit `/new` / `/reset` triggers.
+  const previousSessionEntry = resetTriggered && entry ? { ...entry } : undefined;
+  const previousSessionEndReason = resolveExplicitSessionEndReason(matchedResetTriggerLower);
   clearBootstrapSnapshotOnSessionRollover({
     sessionKey,
     previousSessionId: previousSessionEntry?.sessionId,
@@ -553,13 +397,11 @@ export async function initSessionState(params: {
     persistedThinking = entry.thinkingLevel;
     persistedVerbose = entry.verboseLevel;
     persistedReasoning = entry.reasoningLevel;
-    persistedTtsAuto = entry.ttsAuto;
     persistedModelOverride = entry.modelOverride;
     persistedProviderOverride = entry.providerOverride;
     persistedAuthProfileOverride = entry.authProfileOverride;
     persistedAuthProfileOverrideSource = entry.authProfileOverrideSource;
-    persistedAuthProfileOverrideCompactionCount =
-      entry.authProfileOverrideCompactionCount;
+    persistedAuthProfileOverrideCompactionCount = entry.authProfileOverrideCompactionCount;
     persistedLabel = entry.label;
   } else {
     sessionId = crypto.randomUUID();
@@ -567,19 +409,17 @@ export async function initSessionState(params: {
     systemSent = false;
     abortedLastRun = false;
     // When a reset trigger (/new, /reset) starts a new session, carry over
-    // user-set behavior overrides (verbose, thinking, reasoning, ttsAuto)
+    // user-set behavior overrides (verbose, thinking, reasoning)
     // so the user doesn't have to re-enable them every time.
     if (resetTriggered && entry) {
       persistedThinking = entry.thinkingLevel;
       persistedVerbose = entry.verboseLevel;
       persistedReasoning = entry.reasoningLevel;
-      persistedTtsAuto = entry.ttsAuto;
       persistedModelOverride = entry.modelOverride;
       persistedProviderOverride = entry.providerOverride;
       persistedAuthProfileOverride = entry.authProfileOverride;
       persistedAuthProfileOverrideSource = entry.authProfileOverrideSource;
-      persistedAuthProfileOverrideCompactionCount =
-        entry.authProfileOverrideCompactionCount;
+      persistedAuthProfileOverrideCompactionCount = entry.authProfileOverrideCompactionCount;
       // Explicit /new and /reset should rotate the underlying CLI conversation too.
       // Keep the model/auth choice, but force the next turn to mint a fresh CLI binding.
       persistedLabel = entry.label;
@@ -619,8 +459,7 @@ export async function initSessionState(params: {
   // Only fall back to persisted threadId for thread sessions.  Non-thread
   // sessions (e.g. DM without topics) must not inherit a stale threadId from a
   // previous interaction that happened inside a topic/thread.
-  const lastThreadIdRaw =
-    ctx.MessageThreadId || (isThread ? baseEntry?.lastThreadId : undefined);
+  const lastThreadIdRaw = ctx.MessageThreadId || (isThread ? baseEntry?.lastThreadId : undefined);
   const deliveryFields = normalizeSessionDeliveryFields({
     deliveryContext: {
       channel: lastChannelRaw,
@@ -643,28 +482,22 @@ export async function initSessionState(params: {
     thinkingLevel: persistedThinking ?? baseEntry?.thinkingLevel,
     verboseLevel: persistedVerbose ?? baseEntry?.verboseLevel,
     reasoningLevel: persistedReasoning ?? baseEntry?.reasoningLevel,
-    ttsAuto: persistedTtsAuto ?? baseEntry?.ttsAuto,
     responseUsage: baseEntry?.responseUsage,
     modelOverride: persistedModelOverride ?? baseEntry?.modelOverride,
     providerOverride: persistedProviderOverride ?? baseEntry?.providerOverride,
-    authProfileOverride:
-      persistedAuthProfileOverride ?? baseEntry?.authProfileOverride,
+    authProfileOverride: persistedAuthProfileOverride ?? baseEntry?.authProfileOverride,
     authProfileOverrideSource:
-      persistedAuthProfileOverrideSource ??
-      baseEntry?.authProfileOverrideSource,
+      persistedAuthProfileOverrideSource ?? baseEntry?.authProfileOverrideSource,
     authProfileOverrideCompactionCount:
-      persistedAuthProfileOverrideCompactionCount ??
-      baseEntry?.authProfileOverrideCompactionCount,
+      persistedAuthProfileOverrideCompactionCount ?? baseEntry?.authProfileOverrideCompactionCount,
     label: persistedLabel ?? baseEntry?.label,
     spawnedBy: persistedSpawnedBy ?? baseEntry?.spawnedBy,
-    spawnedWorkspaceDir:
-      persistedSpawnedWorkspaceDir ?? baseEntry?.spawnedWorkspaceDir,
+    spawnedWorkspaceDir: persistedSpawnedWorkspaceDir ?? baseEntry?.spawnedWorkspaceDir,
     parentSessionKey: persistedParentSessionKey ?? baseEntry?.parentSessionKey,
     forkedFromParent: persistedForkedFromParent ?? baseEntry?.forkedFromParent,
     spawnDepth: persistedSpawnDepth ?? baseEntry?.spawnDepth,
     subagentRole: persistedSubagentRole ?? baseEntry?.subagentRole,
-    subagentControlScope:
-      persistedSubagentControlScope ?? baseEntry?.subagentControlScope,
+    subagentControlScope: persistedSubagentControlScope ?? baseEntry?.subagentControlScope,
     sendPolicy: baseEntry?.sendPolicy,
     queueMode: baseEntry?.queueMode,
     queueDebounceMs: baseEntry?.queueDebounceMs,
@@ -738,11 +571,7 @@ export async function initSessionState(params: {
     }
   }
   const fallbackSessionFile = !sessionEntry.sessionFile
-    ? resolveSessionTranscriptPath(
-        sessionEntry.sessionId,
-        agentId,
-        ctx.MessageThreadId,
-      )
+    ? resolveSessionTranscriptPath(sessionEntry.sessionId, agentId, ctx.MessageThreadId)
     : undefined;
   const resolvedSessionFile = await resolveAndPersistSessionFile({
     sessionId: sessionEntry.sessionId,
@@ -800,10 +629,8 @@ export async function initSessionState(params: {
     transcriptArchived?: boolean;
   } = {};
   if (previousSessionEntry?.sessionId) {
-    const {
-      archiveSessionTranscriptsDetailed,
-      resolveStableSessionEndTranscript,
-    } = await loadSessionArchiveRuntime();
+    const { archiveSessionTranscriptsDetailed, resolveStableSessionEndTranscript } =
+      await loadSessionArchiveRuntime();
     const archivedTranscripts = archiveSessionTranscriptsDetailed({
       sessionId: previousSessionEntry.sessionId,
       storePath,
@@ -818,16 +645,14 @@ export async function initSessionState(params: {
       agentId,
       archivedTranscripts,
     });
-    await disposeSessionMcpRuntime(previousSessionEntry.sessionId).catch(
-      (error) => {
-        log.warn(
-          `failed to dispose bundle MCP runtime for session ${previousSessionEntry.sessionId}`,
-          {
-            error: String(error),
-          },
-        );
-      },
-    );
+    await disposeSessionMcpRuntime(previousSessionEntry.sessionId).catch((error) => {
+      log.warn(
+        `failed to dispose bundle MCP runtime for session ${previousSessionEntry.sessionId}`,
+        {
+          error: String(error),
+        },
+      );
+    });
   }
 
   const sessionCtx: TemplateContext = {
@@ -853,10 +678,7 @@ export async function initSessionState(params: {
     const effectiveSessionId = sessionId ?? "";
 
     // If replacing an existing session, fire session_end for the old one
-    if (
-      previousSessionEntry?.sessionId &&
-      previousSessionEntry.sessionId !== effectiveSessionId
-    ) {
+    if (previousSessionEntry?.sessionId && previousSessionEntry.sessionId !== effectiveSessionId) {
       if (hookRunner.hasHooks("session_end")) {
         const payload = buildSessionEndHookPayload({
           sessionId: previousSessionEntry.sessionId,
@@ -867,9 +689,7 @@ export async function initSessionState(params: {
           transcriptArchived: previousSessionTranscript.transcriptArchived,
           nextSessionId: effectiveSessionId,
         });
-        void hookRunner
-          .runSessionEnd(payload.event, payload.context)
-          .catch(() => {});
+        void hookRunner.runSessionEnd(payload.event, payload.context).catch(() => {});
       }
     }
 
@@ -881,9 +701,7 @@ export async function initSessionState(params: {
         cfg,
         resumedFrom: previousSessionEntry?.sessionId,
       });
-      void hookRunner
-        .runSessionStart(payload.event, payload.context)
-        .catch(() => {});
+      void hookRunner.runSessionStart(payload.event, payload.context).catch(() => {});
     }
   }
 

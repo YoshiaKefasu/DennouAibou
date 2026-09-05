@@ -83,9 +83,9 @@ vi.mock("../acp/runtime/session-identifiers.js", () => ({
 vi.mock("../auto-reply/thinking.js", () => ({
   formatThinkingLevels: () => "low, medium, high",
   formatXHighModelHint: () => "model-x",
+  formatMaxModelHint: () => "model-x-max",
   normalizeThinkLevel: (v?: string) => v || undefined,
   normalizeVerboseLevel: (v?: string) => v || undefined,
-  supportsXHighThinking: () => false,
 }));
 
 vi.mock("../cli/command-format.js", () => ({

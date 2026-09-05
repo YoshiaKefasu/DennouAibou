@@ -7,7 +7,7 @@ title: "OpenAI Chat Completions"
 
 # OpenAI Chat Completions (HTTP)
 
-OpenClaw’s Gateway can serve a small OpenAI-compatible Chat Completions endpoint.
+DennouAibou’s Gateway can serve a small OpenAI-compatible Chat Completions endpoint.
 
 This endpoint is **disabled by default**. Enable it in config first.
 
@@ -53,7 +53,7 @@ Treat this endpoint as a **full operator-access** surface for the gateway instan
 - HTTP bearer auth here is not a narrow per-user scope model.
 - A valid Gateway token/password for this endpoint should be treated like an owner/operator credential.
 - Requests run through the same control-plane agent path as trusted operator actions.
-- There is no separate non-owner/per-user tool boundary on this endpoint; once a caller passes Gateway auth here, OpenClaw treats that caller as a trusted operator for this gateway.
+- There is no separate non-owner/per-user tool boundary on this endpoint; once a caller passes Gateway auth here, DennouAibou treats that caller as a trusted operator for this gateway.
 - For shared-secret auth modes (`token` and `password`), the endpoint restores the normal full operator defaults even if the caller sends a narrower `x-openclaw-scopes` header.
 - Trusted identity-bearing HTTP modes (for example trusted proxy auth or `gateway.auth.mode="none"`) honor `x-openclaw-scopes` when present and otherwise fall back to the normal operator default scope set.
 - If the target agent policy allows sensitive tools, this endpoint can use them.
@@ -78,7 +78,7 @@ See [Security](/gateway/security) and [Remote access](/gateway/remote).
 
 ## Agent-first model contract
 
-OpenClaw treats the OpenAI `model` field as an **agent target**, not a raw provider model id.
+DennouAibou treats the OpenAI `model` field as an **agent target**, not a raw provider model id.
 
 - `model: "openclaw"` routes to the configured default agent.
 - `model: "openclaw/default"` also routes to the configured default agent.
@@ -147,7 +147,7 @@ This is the highest-leverage compatibility set for self-hosted frontends and too
 
 <AccordionGroup>
   <Accordion title="What does `/v1/models` return?">
-    An OpenClaw agent-target list.
+    An DennouAibou agent-target list.
 
     The returned ids are `openclaw`, `openclaw/default`, and `openclaw/<agentId>` entries.
     Use them directly as OpenAI `model` values.
@@ -274,7 +274,7 @@ curl -sS http://127.0.0.1:18789/v1/embeddings \
 
 Notes:
 
-- `/v1/models` returns OpenClaw agent targets, not raw provider catalogs.
+- `/v1/models` returns DennouAibou agent targets, not raw provider catalogs.
 - `openclaw/default` is always present so one stable id works across environments.
 - Backend provider/model overrides belong in `x-openclaw-model`, not the OpenAI `model` field.
 - `/v1/embeddings` supports `input` as a string or array of strings.

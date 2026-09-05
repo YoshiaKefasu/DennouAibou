@@ -1,5 +1,5 @@
 ---
-summary: "Get OpenClaw installed and run your first chat in minutes."
+summary: "Get DennouAibou installed and run your first chat in minutes."
 read_when:
   - First time setup from zero
   - You want the fastest path to a working chat
@@ -8,7 +8,7 @@ title: "Getting Started"
 
 # Getting Started
 
-Install OpenClaw, run onboarding, and chat with your AI assistant — all in
+Install DennouAibou, run onboarding, and chat with your AI assistant — all in
 about 5 minutes. By the end you will have a running Gateway, configured auth,
 and a working chat session.
 
@@ -27,7 +27,7 @@ Need to install Node? See [Node setup](/install/node).
 ## Quick setup
 
 <Steps>
-  <Step title="Install OpenClaw">
+  <Step title="Install DennouAibou">
     <Tabs>
       <Tab title="macOS / Linux">
         ```bash
@@ -138,7 +138,7 @@ openclaw dashboard
 </Columns>
 
 <Accordion title="Advanced: environment variables">
-  If you run OpenClaw as a service account or want custom paths:
+  If you run DennouAibou as a service account or want custom paths:
 
 - `OPENCLAW_HOME` — home directory for internal path resolution
 - `OPENCLAW_STATE_DIR` — override the state directory

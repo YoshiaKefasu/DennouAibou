@@ -6,11 +6,7 @@ import { createEmbeddingProvider, DEFAULT_LOCAL_MODEL } from "./embeddings.js";
 import * as nodeLlamaModule from "./node-llama.js";
 import { mockPublicPinnedHostname } from "./test-helpers/ssrf.js";
 
-const {
-  bedrockSendMock,
-  defaultProviderMock,
-  resolveCredentialsMock,
-} = vi.hoisted(() => ({
+const { bedrockSendMock, defaultProviderMock, resolveCredentialsMock } = vi.hoisted(() => ({
   bedrockSendMock: vi.fn(),
   defaultProviderMock: vi.fn(),
   resolveCredentialsMock: vi.fn(),

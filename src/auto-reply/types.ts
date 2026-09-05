@@ -1,4 +1,4 @@
-import type { ImageContent } from "@mariozechner/pi-ai";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import type { InteractiveReply } from "../interactive/payload.js";
 import type { PromptImageOrderEntry } from "../media/prompt-image-order.js";
 import type { TypingController } from "./reply/typing.js";
@@ -167,8 +167,8 @@ export type ReplyPayload = {
    *  have a dedicated reasoning lane (e.g. WhatsApp, web) should suppress it. */
   isReasoning?: boolean;
   /** Marks this payload as a compaction status notice (start/end).
-   *  Should be excluded from TTS transcript accumulation so compaction
-   *  status lines are not synthesised into the spoken assistant reply. */
+   *  Compaction status lines are informational UI signals and must not be
+   *  synthesised into any spoken assistant reply. */
   isCompactionNotice?: boolean;
   /** Channel-specific payload data (per-channel envelope). */
   channelData?: Record<string, unknown>;

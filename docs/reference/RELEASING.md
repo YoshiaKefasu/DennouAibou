@@ -8,7 +8,7 @@ read_when:
 
 # Release Policy
 
-OpenClaw has three public release lanes:
+DennouAibou has three public release lanes:
 
 - stable: tagged releases that publish to npm `beta` by default, or to npm `latest` when explicitly requested
 - beta: prerelease tags that publish to npm `beta`
@@ -26,7 +26,7 @@ OpenClaw has three public release lanes:
 - `latest` means the current promoted stable npm release
 - `beta` means the current beta install target
 - Stable and stable correction releases publish to npm `beta` by default; release operators can target `latest` explicitly, or promote a vetted beta build later
-- Every OpenClaw release ships the npm package and macOS app together
+- Every DennouAibou release ships the npm package and macOS app together
 
 ## Release cadence
 
@@ -55,7 +55,7 @@ OpenClaw has three public release lanes:
   - real npm publish must pass a successful npm `preflight_run_id`
   - stable npm releases default to `beta`
   - stable npm publish can target `latest` explicitly via workflow input
-  - stable npm promotion from `beta` to `latest` is still available as an explicit manual mode on the trusted `OpenClaw NPM Release` workflow
+  - stable npm promotion from `beta` to `latest` is still available as an explicit manual mode on the trusted `DennouAibou NPM Release` workflow
   - that promotion mode still needs a valid `NPM_TOKEN` in the `npm-release` environment because npm `dist-tag` management is separate from trusted publishing
   - public `macOS Release` is validation-only
   - real private mac publish must pass successful private mac
@@ -82,7 +82,7 @@ OpenClaw has three public release lanes:
 
 ## NPM workflow inputs
 
-`OpenClaw NPM Release` accepts these operator-controlled inputs:
+`DennouAibou NPM Release` accepts these operator-controlled inputs:
 
 - `tag`: required release tag such as `v2026.4.2`, `v2026.4.2-1`, or
   `v2026.4.2-beta.1`
@@ -109,13 +109,13 @@ Rules:
 
 When cutting a stable npm release:
 
-1. Run `OpenClaw NPM Release` with `preflight_only=true`
+1. Run `DennouAibou NPM Release` with `preflight_only=true`
 2. Choose `npm_dist_tag=beta` for the normal beta-first flow, or `latest` only
    when you intentionally want a direct stable publish
 3. Save the successful `preflight_run_id`
-4. Run `OpenClaw NPM Release` again with `preflight_only=false`, the same
+4. Run `DennouAibou NPM Release` again with `preflight_only=false`, the same
    `tag`, the same `npm_dist_tag`, and the saved `preflight_run_id`
-5. If the release landed on `beta`, run `OpenClaw NPM Release` later with the
+5. If the release landed on `beta`, run `DennouAibou NPM Release` later with the
    same stable `tag`, `promote_beta_to_latest=true`, `preflight_only=false`,
    `preflight_run_id` empty, and `npm_dist_tag=beta` when you want to move that
    published build to `latest`

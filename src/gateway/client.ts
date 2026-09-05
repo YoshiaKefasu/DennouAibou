@@ -190,7 +190,7 @@ export class GatewayClient {
     this.requestTimeoutMs =
       typeof opts.requestTimeoutMs === "number" && Number.isFinite(opts.requestTimeoutMs)
         ? Math.max(1, Math.min(Math.floor(opts.requestTimeoutMs), 2_147_483_647))
-        : 30_000;
+        : 60_000;
   }
 
   start() {
@@ -203,7 +203,7 @@ export class GatewayClient {
       return;
     }
 
-    const allowPrivateWs = process.env.OPENCLAW_ALLOW_INSECURE_PRIVATE_WS === "1";
+    const allowPrivateWs = process.env.DENNOU_ALLOW_INSECURE_PRIVATE_WS === "1";
     // Security check: block ALL plaintext ws:// to non-loopback addresses (CWE-319, CVSS 9.8)
     // This protects both credentials AND chat/conversation data from MITM attacks.
     // Device tokens may be loaded later in sendConnect(), so we block regardless of hasCredentials.
@@ -222,7 +222,7 @@ export class GatewayClient {
           "(ssh -N -L 18789:127.0.0.1:18789 user@gateway-host), or use Tailscale Serve/Funnel. " +
           (allowPrivateWs
             ? ""
-            : "Break-glass (trusted private networks only): set OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=1. ") +
+            : "Break-glass (trusted private networks only): set DENNOU_ALLOW_INSECURE_PRIVATE_WS=1. ") +
           "Run `openclaw doctor --fix` for guidance.",
       );
       this.opts.onConnectError?.(error);
@@ -253,8 +253,7 @@ export class GatewayClient {
           return new Error("gateway tls fingerprint mismatch");
         }
         return undefined;
-        // oxlint-disable-next-line typescript/no-explicit-any
-      }) as any;
+      }) as unknown as NonNullable<ClientOptions["checkServerIdentity"]>;
     }
     const ws = new WebSocket(url, wsOptions);
     this.ws = ws;

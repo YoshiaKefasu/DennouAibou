@@ -8,9 +8,7 @@ import {
   normalizeConfigDocBaselineHelpPath,
 } from "./doc-baseline.js";
 import { FIELD_HELP } from "./schema.help.js";
-import {
-  describeTalkSilenceTimeoutDefaults,
-} from "./talk-defaults.js";
+import { describeTalkSilenceTimeoutDefaults } from "./talk-defaults.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 

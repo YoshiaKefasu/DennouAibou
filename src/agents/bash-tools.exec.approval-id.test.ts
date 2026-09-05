@@ -42,7 +42,7 @@ function buildPreparedSystemRunPayload(rawInvokeParams: unknown) {
 }
 
 function getTestConfigPath() {
-  return path.join(process.env.HOME ?? "", ".openclaw", "openclaw.json");
+  return path.join(process.env.HOME ?? "", ".openclaw", "dennou-aibou.json");
 }
 
 async function writeOpenClawConfig(config: Record<string, unknown>, pretty = false) {
@@ -244,14 +244,14 @@ describe("exec approvals", () => {
   beforeEach(async () => {
     previousHome = process.env.HOME;
     previousUserProfile = process.env.USERPROFILE;
-    previousBundledPluginsDir = process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
-    previousDisableBundledPlugins = process.env.OPENCLAW_DISABLE_BUNDLED_PLUGINS;
+    previousBundledPluginsDir = process.env.DENNOU_BUNDLED_PLUGINS_DIR;
+    previousDisableBundledPlugins = process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-test-"));
     process.env.HOME = tempDir;
     // Windows uses USERPROFILE for os.homedir()
     process.env.USERPROFILE = tempDir;
-    delete process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
-    process.env.OPENCLAW_DISABLE_BUNDLED_PLUGINS = "1";
+    delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
+    process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = "1";
     vi.mocked(callGatewayTool).mockReset();
     vi.mocked(sendMessage).mockClear();
   });
@@ -271,14 +271,14 @@ describe("exec approvals", () => {
       process.env.USERPROFILE = previousUserProfile;
     }
     if (previousBundledPluginsDir === undefined) {
-      delete process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
+      delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
     } else {
-      process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = previousBundledPluginsDir;
+      process.env.DENNOU_BUNDLED_PLUGINS_DIR = previousBundledPluginsDir;
     }
     if (previousDisableBundledPlugins === undefined) {
-      delete process.env.OPENCLAW_DISABLE_BUNDLED_PLUGINS;
+      delete process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
     } else {
-      process.env.OPENCLAW_DISABLE_BUNDLED_PLUGINS = previousDisableBundledPlugins;
+      process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = previousDisableBundledPlugins;
     }
   });
 

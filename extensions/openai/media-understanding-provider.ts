@@ -30,11 +30,3 @@ export const openaiMediaUnderstandingProvider: MediaUnderstandingProvider = {
   describeImages: describeImagesWithModel,
   transcribeAudio: transcribeOpenAiAudio,
 };
-
-export const openaiCodexMediaUnderstandingProvider: MediaUnderstandingProvider = {
-  id: "openai-codex",
-  capabilities: ["image"],
-  defaultModels: { image: "gpt-5.4" },
-  describeImage: describeImageWithModel,
-  describeImages: describeImagesWithModel,
-};

@@ -1,10 +1,10 @@
 import { html } from "lit";
+import { t } from "../../i18n/index.ts";
 import {
   buildUsageAggregateTail,
   mergeUsageDailyLatency,
   mergeUsageLatency,
-} from "../../../../src/shared/usage-aggregates.js";
-import { t } from "../../i18n/index.ts";
+} from "../_shared/usage-aggregates.ts";
 import { UsageSessionEntry, UsageTotals, UsageAggregates } from "./usageTypes.ts";
 
 const CHARS_PER_TOKEN = 4;

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { normalizeConversationText } from "../../acp/conversation-id.js";
 import { normalizeAnyChannelId } from "../../channels/registry.js";
 import { resolveStateDir } from "../../config/paths.js";
 import { loadJsonFile } from "../../infra/json-file.js";
@@ -119,8 +118,7 @@ function pruneExpiredBinding(key: string): SessionBindingRecord | null {
 }
 
 function resolveChannelSupportsCurrentConversationBinding(channel: string): boolean {
-  const normalized =
-    normalizeAnyChannelId(channel) ?? normalizeConversationText(channel)?.trim().toLowerCase();
+  const normalized = normalizeAnyChannelId(channel) ?? channel.trim().toLowerCase();
   if (!normalized) {
     return false;
   }

@@ -152,7 +152,7 @@ let cachedTailscaleBinary: string | null = null;
 export function getTestTailscaleBinaryOverride(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
-  const forcedBinary = env.OPENCLAW_TEST_TAILSCALE_BINARY?.trim();
+  const forcedBinary = env.DENNOU_TEST_TAILSCALE_BINARY?.trim();
   if (!forcedBinary) {
     return null;
   }

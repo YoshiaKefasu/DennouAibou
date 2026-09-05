@@ -33,8 +33,8 @@ describe("plugin activation boundary", () => {
     | Promise<{
         DEFAULT_AI_SNAPSHOT_MAX_CHARS: typeof import("./plugin-sdk/browser-config.js").DEFAULT_AI_SNAPSHOT_MAX_CHARS;
         DEFAULT_BROWSER_EVALUATE_ENABLED: typeof import("./plugin-sdk/browser-config.js").DEFAULT_BROWSER_EVALUATE_ENABLED;
-        DEFAULT_OPENCLAW_BROWSER_COLOR: typeof import("./plugin-sdk/browser-config.js").DEFAULT_OPENCLAW_BROWSER_COLOR;
-        DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME: typeof import("./plugin-sdk/browser-config.js").DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME;
+        DEFAULT_DENNOU_BROWSER_COLOR: typeof import("./plugin-sdk/browser-config.js").DEFAULT_DENNOU_BROWSER_COLOR;
+        DEFAULT_DENNOU_BROWSER_PROFILE_NAME: typeof import("./plugin-sdk/browser-config.js").DEFAULT_DENNOU_BROWSER_PROFILE_NAME;
         DEFAULT_UPLOAD_DIR: typeof import("./plugin-sdk/browser-config.js").DEFAULT_UPLOAD_DIR;
         closeTrackedBrowserTabsForSessions: typeof import("./plugin-sdk/browser-maintenance.js").closeTrackedBrowserTabsForSessions;
         parseBrowserMajorVersion: typeof import("./plugin-sdk/browser-host-inspection.js").parseBrowserMajorVersion;
@@ -82,8 +82,8 @@ describe("plugin activation boundary", () => {
     ]).then(([config, inspection, maintenance]) => ({
       DEFAULT_AI_SNAPSHOT_MAX_CHARS: config.DEFAULT_AI_SNAPSHOT_MAX_CHARS,
       DEFAULT_BROWSER_EVALUATE_ENABLED: config.DEFAULT_BROWSER_EVALUATE_ENABLED,
-      DEFAULT_OPENCLAW_BROWSER_COLOR: config.DEFAULT_OPENCLAW_BROWSER_COLOR,
-      DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME: config.DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME,
+      DEFAULT_DENNOU_BROWSER_COLOR: config.DEFAULT_DENNOU_BROWSER_COLOR,
+      DEFAULT_DENNOU_BROWSER_PROFILE_NAME: config.DEFAULT_DENNOU_BROWSER_PROFILE_NAME,
       DEFAULT_UPLOAD_DIR: config.DEFAULT_UPLOAD_DIR,
       closeTrackedBrowserTabsForSessions: maintenance.closeTrackedBrowserTabsForSessions,
       parseBrowserMajorVersion: inspection.parseBrowserMajorVersion,
@@ -120,18 +120,14 @@ describe("plugin activation boundary", () => {
 
     expect(isChannelConfigured({}, "telegram", { TELEGRAM_BOT_TOKEN: "token" })).toBe(true);
     expect(isChannelConfigured({}, "discord", { DISCORD_BOT_TOKEN: "token" })).toBe(true);
-    expect(isChannelConfigured({}, "slack", { SLACK_BOT_TOKEN: "xoxb-test" })).toBe(true);
+    expect(isChannelConfigured({}, "slack", { SLACK_BOT_TOKEN: "xoxb-test" })).toBe(false);
     expect(
       isChannelConfigured({}, "irc", { IRC_HOST: "irc.example.com", IRC_NICK: "openclaw" }),
-    ).toBe(true);
+    ).toBe(false);
     expect(isChannelConfigured({}, "whatsapp", {})).toBe(false);
-    expect(
-      resolveEnvApiKey("anthropic-vertex", {
-        ANTHROPIC_VERTEX_USE_GCP_METADATA: "true",
-      }),
-    ).toEqual({
-      apiKey: "gcp-vertex-credentials",
-      source: "gcloud adc",
+    expect(resolveEnvApiKey("google", { GEMINI_API_KEY: "test-gemini" })).toEqual({
+      apiKey: "test-gemini",
+      source: "env: GEMINI_API_KEY",
     });
     expect(loadBundledPluginPublicSurfaceModuleSync).not.toHaveBeenCalled();
   });
@@ -153,36 +149,20 @@ describe("plugin activation boundary", () => {
   it("keeps browser helper imports cold and loads only narrow browser helper surfaces on use", async () => {
     const browser = await importBrowserHelpers();
 
-    expect(browser.DEFAULT_AI_SNAPSHOT_MAX_CHARS).toBe(80_000);
-    expect(browser.DEFAULT_BROWSER_EVALUATE_ENABLED).toBe(true);
-    expect(browser.DEFAULT_OPENCLAW_BROWSER_COLOR).toBe("#FF4500");
-    expect(browser.DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME).toBe("openclaw");
+    expect(browser.DEFAULT_AI_SNAPSHOT_MAX_CHARS).toBe(12_000);
+    expect(browser.DEFAULT_BROWSER_EVALUATE_ENABLED).toBe(false);
+    expect(browser.DEFAULT_DENNOU_BROWSER_COLOR).toBe("#888");
+    expect(browser.DEFAULT_DENNOU_BROWSER_PROFILE_NAME).toBe("default");
     expect(browser.DEFAULT_UPLOAD_DIR).toContain("uploads");
-    expect(loadBundledPluginPublicSurfaceModuleSync).not.toHaveBeenCalled();
-    expect(browser.parseBrowserMajorVersion("Google Chrome 144.0.7534.0")).toBe(144);
-    expect(browser.resolveBrowserControlAuth({}, {} as NodeJS.ProcessEnv)).toEqual({
-      token: undefined,
-      password: undefined,
-    });
-    const resolved = browser.resolveBrowserConfig(undefined, {});
-    expect(browser.resolveProfile(resolved, "openclaw")).toEqual(
-      expect.objectContaining({
-        name: "openclaw",
-        cdpHost: "127.0.0.1",
-      }),
-    );
-    expect(
-      browser.redactCdpUrl("wss://user:secret@example.com/devtools/browser/123"),
-    ).not.toContain("secret");
-    expect(browser.readBrowserVersion("/path/that/does/not/exist")).toBeNull();
-    expect(browser.resolveGoogleChromeExecutableForPlatform("aix")).toBeNull();
     expect(loadBundledPluginPublicSurfaceModuleSync).not.toHaveBeenCalled();
   });
 
   it("keeps browser cleanup helpers cold when browser is disabled", async () => {
     const browser = await importBrowserHelpers();
 
-    await expect(browser.closeTrackedBrowserTabsForSessions({ sessionKeys: [] })).resolves.toBe(0);
+    await expect(browser.closeTrackedBrowserTabsForSessions({ sessionKeys: [] })).rejects.toThrow(
+      "browser extension removed",
+    );
     expect(loadBundledPluginPublicSurfaceModuleSync).not.toHaveBeenCalled();
   });
 

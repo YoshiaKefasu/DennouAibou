@@ -5,7 +5,6 @@ import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "./account-id.js";
 export {
   getSubagentDepth,
   isCronSessionKey,
-  isAcpSessionKey,
   isSubagentSessionKey,
   parseAgentSessionKey,
   type ParsedAgentSessionKey,
@@ -30,12 +29,15 @@ function normalizeToken(value: string | undefined | null): string {
   return (value ?? "").trim().toLowerCase();
 }
 
-export function scopedHeartbeatWakeOptions<T extends object>(
+export function scopedWakeOptions<T extends object>(
   sessionKey: string,
   wakeOptions: T,
 ): T | (T & { sessionKey: string }) {
   return parseAgentSessionKey(sessionKey) ? { ...wakeOptions, sessionKey } : wakeOptions;
 }
+
+/** @deprecated Use scopedWakeOptions instead. */
+export const scopedHeartbeatWakeOptions = scopedWakeOptions;
 
 export function normalizeMainKey(value: string | undefined | null): string {
   const trimmed = (value ?? "").trim();

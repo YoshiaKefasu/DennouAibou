@@ -99,8 +99,7 @@ export function createDiscordPluginBase(params: {
     commands: {
       nativeCommandsAutoEnabled: true,
       nativeSkillsAutoEnabled: true,
-      resolveNativeCommandName: ({ commandKey, defaultName }) =>
-        commandKey === "tts" ? "voice" : defaultName,
+      resolveNativeCommandName: ({ commandKey, defaultName }) => defaultName,
     },
     doctor: discordDoctor,
     streaming: {
@@ -132,20 +131,5 @@ export function createDiscordPluginBase(params: {
       collectRuntimeConfigAssignments,
     },
     setup: params.setup,
-  } as Pick<
-    ChannelPlugin<ResolvedDiscordAccount>,
-    | "id"
-    | "meta"
-    | "setupWizard"
-    | "capabilities"
-    | "commands"
-    | "doctor"
-    | "streaming"
-    | "reload"
-    | "configSchema"
-    | "config"
-    | "setup"
-    | "messaging"
-    | "secrets"
-  >;
+  };
 }

@@ -1,22 +1,22 @@
 ---
-summary: "Run OpenClaw Gateway 24/7 on an Azure Linux VM with durable state"
+summary: "Run DennouAibou Gateway 24/7 on an Azure Linux VM with durable state"
 read_when:
-  - You want OpenClaw running 24/7 on Azure with Network Security Group hardening
-  - You want a production-grade, always-on OpenClaw Gateway on your own Azure Linux VM
+  - You want DennouAibou running 24/7 on Azure with Network Security Group hardening
+  - You want a production-grade, always-on DennouAibou Gateway on your own Azure Linux VM
   - You want secure administration with Azure Bastion SSH
 title: "Azure"
 ---
 
-# OpenClaw on Azure Linux VM
+# DennouAibou on Azure Linux VM
 
-This guide sets up an Azure Linux VM with the Azure CLI, applies Network Security Group (NSG) hardening, configures Azure Bastion for SSH access, and installs OpenClaw.
+This guide sets up an Azure Linux VM with the Azure CLI, applies Network Security Group (NSG) hardening, configures Azure Bastion for SSH access, and installs DennouAibou.
 
 ## What you will do
 
 - Create Azure networking (VNet, subnets, NSG) and compute resources with the Azure CLI
 - Apply Network Security Group rules so VM SSH is allowed only from Azure Bastion
 - Use Azure Bastion for SSH access (no public IP on the VM)
-- Install OpenClaw with the installer script
+- Install DennouAibou with the installer script
 - Verify the Gateway
 
 ## What you need
@@ -236,7 +236,7 @@ This guide sets up an Azure Linux VM with the Azure CLI, applies Network Securit
   </Step>
 </Steps>
 
-## Install OpenClaw
+## Install DennouAibou
 
 <Steps>
   <Step title="SSH into the VM through Azure Bastion">
@@ -254,14 +254,14 @@ This guide sets up an Azure Linux VM with the Azure CLI, applies Network Securit
 
   </Step>
 
-  <Step title="Install OpenClaw (in the VM shell)">
+  <Step title="Install DennouAibou (in the VM shell)">
     ```bash
     curl -fsSL https://openclaw.ai/install.sh -o /tmp/install.sh
     bash /tmp/install.sh
     rm -f /tmp/install.sh
     ```
 
-    The installer installs Node LTS and dependencies if not already present, installs OpenClaw, and launches the onboarding wizard. See [Install](/install) for details.
+    The installer installs Node LTS and dependencies if not already present, installs DennouAibou, and launches the onboarding wizard. See [Install](/install) for details.
 
   </Step>
 
@@ -272,7 +272,7 @@ This guide sets up an Azure Linux VM with the Azure CLI, applies Network Securit
     openclaw gateway status
     ```
 
-    Most enterprise Azure teams already have GitHub Copilot licenses, but the Copilot provider is no longer bundled with OpenClaw. We recommend configuring an OpenAI or Google API key in the OpenClaw onboarding wizard. See [Model providers](/concepts/model-providers).
+    Most enterprise Azure teams already have GitHub Copilot licenses, but the Copilot provider is no longer bundled with DennouAibou. We recommend configuring an OpenAI or Google API key in the DennouAibou onboarding wizard. See [Model providers](/concepts/model-providers).
 
   </Step>
 </Steps>
@@ -283,7 +283,7 @@ Azure Bastion Standard SKU runs approximately **\$140/month** and the VM (Standa
 
 To reduce costs:
 
-- **Deallocate the VM** when not in use (stops compute billing; disk charges remain). The OpenClaw Gateway will not be reachable while the VM is deallocated — restart it when you need it live again:
+- **Deallocate the VM** when not in use (stops compute billing; disk charges remain). The DennouAibou Gateway will not be reachable while the VM is deallocated — restart it when you need it live again:
 
   ```bash
   az vm deallocate -g "${RG}" -n "${VM_NAME}"
@@ -308,4 +308,4 @@ This removes the resource group and everything inside it (VM, VNet, NSG, Bastion
 - Set up messaging channels: [Channels](/channels)
 - Pair local devices as nodes: [Nodes](/nodes)
 - Configure the Gateway: [Gateway configuration](/gateway/configuration)
-- For more details on OpenClaw Azure deployment with the GitHub Copilot model provider: [OpenClaw on Azure with GitHub Copilot](https://github.com/johnsonshi/openclaw-azure-github-copilot)
+- For more details on DennouAibou Azure deployment with the GitHub Copilot model provider: [DennouAibou on Azure with GitHub Copilot](https://github.com/johnsonshi/openclaw-azure-github-copilot)

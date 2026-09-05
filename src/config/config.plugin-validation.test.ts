@@ -106,12 +106,12 @@ describe("config plugin validation", () => {
   const suiteEnv = () =>
     ({
       HOME: suiteHome,
-      OPENCLAW_HOME: undefined,
-      OPENCLAW_STATE_DIR: path.join(suiteHome, ".openclaw"),
-      OPENCLAW_PLUGIN_MANIFEST_CACHE_MS: "10000",
-      OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
-      OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
-      OPENCLAW_VERSION: undefined,
+      DENNOU_HOME: undefined,
+      DENNOU_STATE_DIR: path.join(suiteHome, ".openclaw"),
+      DENNOU_PLUGIN_MANIFEST_CACHE_MS: "10000",
+      DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
+      DENNOU_BUNDLED_PLUGINS_DIR: undefined,
+      DENNOU_VERSION: undefined,
       VITEST: "true",
     }) satisfies NodeJS.ProcessEnv;
 
@@ -289,7 +289,7 @@ describe("config plugin validation", () => {
       {
         env: {
           ...suiteEnv(),
-          OPENCLAW_BUNDLED_PLUGINS_DIR: path.join(suiteHome, "missing-bundled-plugins"),
+          DENNOU_BUNDLED_PLUGINS_DIR: path.join(suiteHome, "missing-bundled-plugins"),
         },
       },
     );

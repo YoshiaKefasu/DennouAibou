@@ -127,7 +127,7 @@ describe("runtime TaskFlow", () => {
 
     const child = ownerTaskFlow.runTask({
       flowId: created.flowId,
-      runtime: "acp",
+      runtime: "subagent",
       childSessionKey: "agent:main:subagent:child",
       runId: "runtime-taskflow-child",
       task: "Inspect PR 1",

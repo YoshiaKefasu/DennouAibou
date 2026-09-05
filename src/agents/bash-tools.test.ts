@@ -1,9 +1,6 @@
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  resetHeartbeatWakeStateForTests,
-  setHeartbeatWakeHandler,
-} from "../infra/heartbeat-wake.js";
+import { resetWakeStateForTests, setWakeHandler } from "../infra/event-pump.js";
 import { applyPathPrepend, findPathKey } from "../infra/path-prepend.js";
 import { peekSystemEvents, resetSystemEventsForTest } from "../infra/system-events.js";
 import { captureEnv } from "../test-utils/env.js";
@@ -14,7 +11,7 @@ import { resolveShellFromPath, sanitizeBinaryOutput } from "./shell-utils.js";
 const isWin = process.platform === "win32";
 const defaultShell = isWin
   ? undefined
-  : process.env.OPENCLAW_TEST_SHELL || resolveShellFromPath("bash") || process.env.SHELL || "sh";
+  : process.env.DENNOU_TEST_SHELL || resolveShellFromPath("bash") || process.env.SHELL || "sh";
 // PowerShell: Start-Sleep for delays, ; for command separation, $null for null device
 const shortDelayCmd = isWin ? "Start-Sleep -Milliseconds 4" : "sleep 0.004";
 const yieldDelayCmd = isWin ? "Start-Sleep -Milliseconds 16" : "sleep 0.016";
@@ -538,11 +535,11 @@ describe("exec exit codes", () => {
 
 describe("exec notifyOnExit", () => {
   beforeEach(() => {
-    resetHeartbeatWakeStateForTests();
+    resetWakeStateForTests();
   });
 
   afterEach(() => {
-    resetHeartbeatWakeStateForTests();
+    resetWakeStateForTests();
   });
 
   it("enqueues a system event when a backgrounded exec exits", async () => {
@@ -559,9 +556,7 @@ describe("exec notifyOnExit", () => {
   it("scopes notifyOnExit heartbeat wake to the exec session key", async () => {
     const tool = createNotifyOnExitExecTool();
     const wakeHandler = vi.fn().mockResolvedValue({ status: "skipped", reason: "disabled" });
-    const dispose = setHeartbeatWakeHandler(
-      wakeHandler as unknown as Parameters<typeof setHeartbeatWakeHandler>[0],
-    );
+    const dispose = setWakeHandler(wakeHandler as unknown as Parameters<typeof setWakeHandler>[0]);
     try {
       const _sessionId = await startBackgroundCommand(tool, echoAfterDelay("notify"));
 
@@ -579,9 +574,7 @@ describe("exec notifyOnExit", () => {
   it("keeps notifyOnExit heartbeat wake unscoped for non-agent session keys", async () => {
     const tool = createNotifyOnExitExecTool({ sessionKey: "global" });
     const wakeHandler = vi.fn().mockResolvedValue({ status: "skipped", reason: "disabled" });
-    const dispose = setHeartbeatWakeHandler(
-      wakeHandler as unknown as Parameters<typeof setHeartbeatWakeHandler>[0],
-    );
+    const dispose = setWakeHandler(wakeHandler as unknown as Parameters<typeof setWakeHandler>[0]);
     try {
       const _sessionId = await startBackgroundCommand(tool, echoAfterDelay("notify"));
 

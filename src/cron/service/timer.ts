@@ -1,6 +1,6 @@
 import { resolveFailoverReasonFromError } from "../../agents/failover-error.js";
 import type { CronConfig, CronRetryOn } from "../../config/types.cron.js";
-import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
+import type { WakeRunResult } from "../../infra/event-pump.js";
 import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
 import {
   completeTaskRunByRunId,
@@ -373,7 +373,9 @@ function emitFailureAlert(
 
   state.deps.enqueueSystemEvent(text, { agentId: params.job.agentId });
   if (params.job.wakeMode === "now") {
-    state.deps.requestHeartbeatNow({ reason: `cron:${params.job.id}:failure-alert` });
+    state.deps.requestWakeNow({
+      reason: `cron:${params.job.id}:failure-alert`,
+    });
   }
 }
 
@@ -1178,32 +1180,34 @@ async function executeMainSessionCronJob(
     sessionKey: targetMainSessionKey,
     contextKey: `cron:${job.id}`,
   });
-  if (job.wakeMode === "now" && state.deps.runHeartbeatOnce) {
+  const runner = state.deps.runEventPumpOnce;
+  const wakeNow = state.deps.requestWakeNow;
+  if (job.wakeMode === "now" && runner) {
     const reason = `cron:${job.id}`;
     const isRecurringJob = job.schedule.kind !== "at";
-    const maxWaitMs = state.deps.wakeNowHeartbeatBusyMaxWaitMs ?? 2 * 60_000;
-    const retryDelayMs = state.deps.wakeNowHeartbeatBusyRetryDelayMs ?? 250;
+    const maxWaitMs = state.deps.wakeNowBusyMaxWaitMs ?? 2 * 60_000;
+    const retryDelayMs = state.deps.wakeNowBusyRetryDelayMs ?? 250;
     const waitStartedAt = state.deps.nowMs();
 
-    let heartbeatResult: HeartbeatRunResult;
+    let pumpResult: WakeRunResult;
     for (;;) {
       if (abortSignal?.aborted) {
         return { status: "error", error: timeoutErrorMessage() };
       }
-      heartbeatResult = await state.deps.runHeartbeatOnce({
+      pumpResult = await runner({
         reason,
         agentId: job.agentId,
         sessionKey: targetMainSessionKey,
         heartbeat: { target: "last" },
       });
-      if (heartbeatResult.status !== "skipped" || heartbeatResult.reason !== "requests-in-flight") {
+      if (pumpResult.status !== "skipped" || pumpResult.reason !== "requests-in-flight") {
         break;
       }
       if (isRecurringJob) {
         // Recurring main-session cron jobs should not hold the cron lane open
         // while the main lane is busy, or their measured duration starts to
         // reflect queue wait instead of cron bookkeeping (#58833).
-        state.deps.requestHeartbeatNow({
+        wakeNow({
           reason,
           agentId: job.agentId,
           sessionKey: targetMainSessionKey,
@@ -1217,7 +1221,7 @@ async function executeMainSessionCronJob(
         if (abortSignal?.aborted) {
           return { status: "error", error: timeoutErrorMessage() };
         }
-        state.deps.requestHeartbeatNow({
+        wakeNow({
           reason,
           agentId: job.agentId,
           sessionKey: targetMainSessionKey,
@@ -1227,19 +1231,19 @@ async function executeMainSessionCronJob(
       await waitWithAbort(retryDelayMs);
     }
 
-    if (heartbeatResult.status === "ran") {
+    if (pumpResult.status === "ran") {
       return { status: "ok", summary: text };
     }
-    if (heartbeatResult.status === "skipped") {
-      return { status: "skipped", error: heartbeatResult.reason, summary: text };
+    if (pumpResult.status === "skipped") {
+      return { status: "skipped", error: pumpResult.reason, summary: text };
     }
-    return { status: "error", error: heartbeatResult.reason, summary: text };
+    return { status: "error", error: pumpResult.reason, summary: text };
   }
 
   if (abortSignal?.aborted) {
     return { status: "error", error: timeoutErrorMessage() };
   }
-  state.deps.requestHeartbeatNow({
+  wakeNow({
     reason: `cron:${job.id}`,
     agentId: job.agentId,
     sessionKey: targetMainSessionKey,
@@ -1374,7 +1378,7 @@ export function wake(
   }
   state.deps.enqueueSystemEvent(text);
   if (opts.mode === "now") {
-    state.deps.requestHeartbeatNow({ reason: "wake" });
+    state.deps.requestWakeNow({ reason: "wake" });
   }
   return { ok: true } as const;
 }

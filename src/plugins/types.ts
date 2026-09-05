@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { Command } from "commander";
 import type {
   ApiKeyCredential,
@@ -24,7 +24,6 @@ import type { ChannelId, ChannelPlugin } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelProviderAuthMode, ModelProviderConfig } from "../config/types.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
-import type { TtsAutoMode } from "../config/types.tts.js";
 import type { OperatorScope } from "../gateway/method-scopes.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import type { InternalHookHandler } from "../hooks/internal-hooks.js";
@@ -55,22 +54,6 @@ import type {
   RuntimeWebSearchMetadata,
 } from "../secrets/runtime-web-tools.types.js";
 import type { SecurityAuditFinding } from "../security/audit.js";
-import type {
-  SpeechDirectiveTokenParseContext,
-  SpeechDirectiveTokenParseResult,
-  SpeechProviderConfiguredContext,
-  SpeechProviderConfig,
-  SpeechProviderResolveConfigContext,
-  SpeechProviderResolveTalkConfigContext,
-  SpeechProviderResolveTalkOverridesContext,
-  SpeechListVoicesRequest,
-  SpeechProviderId,
-  SpeechSynthesisRequest,
-  SpeechSynthesisResult,
-  SpeechTelephonySynthesisRequest,
-  SpeechTelephonySynthesisResult,
-  SpeechVoiceOption,
-} from "../tts/provider-types.js";
 import type { DeliveryContext } from "../utils/delivery-context.js";
 import type { VideoGenerationProvider } from "../video-generation/types.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
@@ -1402,12 +1385,6 @@ export type ProviderPlugin = {
    */
   isBinaryThinking?: (ctx: ProviderThinkingPolicyContext) => boolean | undefined;
   /**
-   * Provider-owned xhigh reasoning support.
-   *
-   * Return true only for models that should expose the `xhigh` thinking level.
-   */
-  supportsXHighThinking?: (ctx: ProviderThinkingPolicyContext) => boolean | undefined;
-  /**
    * Provider-owned default thinking level.
    *
    * Use this to keep model-family defaults (for example Claude 4.6 =>
@@ -1664,32 +1641,6 @@ export type PluginWebFetchProviderEntry = WebFetchProviderPlugin & {
   pluginId: string;
 };
 
-/** Speech capability registered by a plugin. */
-export type SpeechProviderPlugin = {
-  id: SpeechProviderId;
-  label: string;
-  aliases?: string[];
-  autoSelectOrder?: number;
-  models?: readonly string[];
-  voices?: readonly string[];
-  resolveConfig?: (ctx: SpeechProviderResolveConfigContext) => SpeechProviderConfig;
-  parseDirectiveToken?: (ctx: SpeechDirectiveTokenParseContext) => SpeechDirectiveTokenParseResult;
-  resolveTalkConfig?: (ctx: SpeechProviderResolveTalkConfigContext) => SpeechProviderConfig;
-  resolveTalkOverrides?: (
-    ctx: SpeechProviderResolveTalkOverridesContext,
-  ) => SpeechProviderConfig | undefined;
-  isConfigured: (ctx: SpeechProviderConfiguredContext) => boolean;
-  synthesize: (req: SpeechSynthesisRequest) => Promise<SpeechSynthesisResult>;
-  synthesizeTelephony?: (
-    req: SpeechTelephonySynthesisRequest,
-  ) => Promise<SpeechTelephonySynthesisResult>;
-  listVoices?: (req: SpeechListVoicesRequest) => Promise<SpeechVoiceOption[]>;
-};
-
-export type PluginSpeechProviderEntry = SpeechProviderPlugin & {
-  pluginId: string;
-};
-
 /** Realtime transcription capability registered by a plugin. */
 export type RealtimeTranscriptionProviderPlugin = {
   id: RealtimeTranscriptionProviderId;
@@ -1848,7 +1799,7 @@ export type PluginCommandHandler = (
  * Definition for a plugin-registered command.
  */
 export type OpenClawPluginCommandDefinition = {
-  /** Command name without leading slash (e.g., "tts") */
+  /** Command name without leading slash (e.g., "echo") */
   name: string;
   /**
    * Optional native-command aliases for slash/menu surfaces.
@@ -2080,8 +2031,6 @@ export type OpenClawPluginApi = {
   registerAutoEnableProbe: (probe: PluginSetupAutoEnableProbe) => void;
   /** Register a native model/provider plugin (text inference capability). */
   registerProvider: (provider: ProviderPlugin) => void;
-  /** Register a speech synthesis provider (speech capability). */
-  registerSpeechProvider: (provider: SpeechProviderPlugin) => void;
   /** Register a realtime transcription provider (streaming STT capability). */
   registerRealtimeTranscriptionProvider: (provider: RealtimeTranscriptionProviderPlugin) => void;
   /** Register a realtime voice provider (duplex voice capability). */
@@ -2496,8 +2445,6 @@ export type PluginHookReplyDispatchEvent = {
   runId?: string;
   sessionKey?: string;
   inboundAudio: boolean;
-  sessionTtsAuto?: TtsAutoMode;
-  ttsChannel?: string;
   suppressUserDelivery?: boolean;
   shouldRouteToOriginating: boolean;
   originatingChannel?: string;

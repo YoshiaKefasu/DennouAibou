@@ -19,7 +19,7 @@ type SubCliEntry = SubCliDescriptor & {
 };
 
 const shouldRegisterPrimaryOnly = (argv: string[]) => {
-  if (isTruthyEnvValue(process.env.OPENCLAW_DISABLE_LAZY_SUBCOMMANDS)) {
+  if (isTruthyEnvValue(process.env.DENNOU_DISABLE_LAZY_SUBCOMMANDS)) {
     return false;
   }
   if (hasHelpOrVersion(argv)) {
@@ -29,7 +29,7 @@ const shouldRegisterPrimaryOnly = (argv: string[]) => {
 };
 
 const shouldEagerRegisterSubcommands = (_argv: string[]) => {
-  return isTruthyEnvValue(process.env.OPENCLAW_DISABLE_LAZY_SUBCOMMANDS);
+  return isTruthyEnvValue(process.env.DENNOU_DISABLE_LAZY_SUBCOMMANDS);
 };
 
 export const loadValidatedConfigForPluginRegistration =
@@ -46,15 +46,6 @@ export const loadValidatedConfigForPluginRegistration =
 // If you update the list of commands, also check whether they have subcommands
 // and set the flag accordingly.
 const entries: SubCliEntry[] = [
-  {
-    name: "acp",
-    description: "Agent Control Protocol tools",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../acp-cli.js");
-      mod.registerAcpCli(program);
-    },
-  },
   {
     name: "gateway",
     description: "Run, inspect, and query the WebSocket Gateway",
@@ -300,15 +291,6 @@ const entries: SubCliEntry[] = [
     register: async (program) => {
       const mod = await import("../skills-cli.js");
       mod.registerSkillsCli(program);
-    },
-  },
-  {
-    name: "update",
-    description: "Update OpenClaw and inspect update channel status",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../update-cli.js");
-      mod.registerUpdateCli(program);
     },
   },
   {

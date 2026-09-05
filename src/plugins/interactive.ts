@@ -33,18 +33,15 @@ type InteractiveState = {
   callbackDedupe: ReturnType<typeof createDedupeCache>;
 };
 
-const PLUGIN_INTERACTIVE_STATE_KEY = Symbol.for("openclaw.pluginInteractiveState");
+const PLUGIN_INTERACTIVE_STATE_KEY = Symbol.for("dennou.pluginInteractiveState");
 
 const getState = () =>
   resolveGlobalSingleton<InteractiveState>(PLUGIN_INTERACTIVE_STATE_KEY, () => ({
     interactiveHandlers: new Map<string, RegisteredInteractiveHandler>(),
-    callbackDedupe: resolveGlobalDedupeCache(
-      Symbol.for("openclaw.pluginInteractiveCallbackDedupe"),
-      {
-        ttlMs: 5 * 60_000,
-        maxSize: 4096,
-      },
-    ),
+    callbackDedupe: resolveGlobalDedupeCache(Symbol.for("dennou.pluginInteractiveCallbackDedupe"), {
+      ttlMs: 5 * 60_000,
+      maxSize: 4096,
+    }),
   }));
 
 const getInteractiveHandlers = () => getState().interactiveHandlers;

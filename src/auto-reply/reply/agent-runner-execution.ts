@@ -36,7 +36,7 @@ import {
   resolveMessageChannel,
 } from "../../utils/message-channel.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
-import { stripHeartbeatToken } from "../heartbeat.js";
+import { stripHeartbeatToken } from "../heartbeat-token.js";
 import type { TemplateContext } from "../templating.js";
 import type { VerboseLevel } from "../thinking.js";
 import {
@@ -677,9 +677,11 @@ export async function runAgentTurnWithFallback(params: {
         ...resolveModelFallbackOptions(params.followupRun.run),
         runId,
         run: async (provider, model, runOptions) => {
-const suppressQueuedUserPersistenceForCandidate =
-  ((params.followupRun.run as { suppressNextUserMessagePersistence?: boolean }).suppressNextUserMessagePersistence ?? false) ||
-  queuedUserMessagePersistedAcrossFallback;
+          const suppressQueuedUserPersistenceForCandidate =
+            ((params.followupRun.run as { suppressNextUserMessagePersistence?: boolean })
+              .suppressNextUserMessagePersistence ??
+              false) ||
+            queuedUserMessagePersistedAcrossFallback;
           const suppressAssistantErrorPersistenceForCandidate =
             assistantErrorPersistedAcrossFallback;
           // Notify that model selection is complete (including after fallback).
@@ -747,7 +749,7 @@ const suppressQueuedUserPersistenceForCandidate =
                 })(),
                 suppressToolErrorWarnings: params.opts?.suppressToolErrorWarnings,
                 bootstrapContextMode: params.opts?.bootstrapContextMode,
-                bootstrapContextRunKind: params.opts?.isHeartbeat ? "heartbeat" : "default",
+                bootstrapContextRunKind: "default",
                 images: params.opts?.images,
                 imageOrder: params.opts?.imageOrder,
                 abortSignal: params.replyOperation?.abortSignal ?? params.opts?.abortSignal,

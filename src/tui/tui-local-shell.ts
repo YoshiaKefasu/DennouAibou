@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { Component, SelectItem } from "@mariozechner/pi-tui";
+import type { Component, SelectItem } from "@earendil-works/pi-tui";
 import { createSearchableSelectList } from "./components/selectors.js";
 
 type LocalShellDeps = {
@@ -111,7 +111,7 @@ export function createLocalShellRunner(deps: LocalShellDeps) {
         // and is gated behind an explicit in-session approval prompt.
         shell: true,
         cwd: getCwd(),
-        env: { ...env, OPENCLAW_SHELL: "tui-local" },
+        env: { ...env, DENNOU_SHELL: "tui-local" },
       });
 
       let stdout = "";

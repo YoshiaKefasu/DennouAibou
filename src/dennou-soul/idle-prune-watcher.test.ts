@@ -62,9 +62,7 @@ describe("startIdlePruneWatcher", () => {
     expect(warnSpy).not.toHaveBeenCalledWith(
       expect.stringContaining("missing agentId or sessionId"),
     );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("session-for-prune.jsonl"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("session-for-prune.jsonl"));
   });
 
   it("replaces an existing timer when a newer idle event has a different sessionId", async () => {
@@ -99,8 +97,6 @@ describe("startIdlePruneWatcher", () => {
 
     await vi.advanceTimersByTimeAsync(configMocks.delayMs);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("missing agentId or sessionId"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("missing agentId or sessionId"));
   });
 });

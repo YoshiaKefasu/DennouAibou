@@ -9,7 +9,7 @@ title: "Android App"
 
 # Android App (Node)
 
-> **Note:** The Android app has not been publicly released yet. The source code is available in the [OpenClaw repository](https://github.com/openclaw/openclaw) under `apps/android`. You can build it yourself using Java 17 and the Android SDK (`./gradlew :app:assemblePlayDebug`). See [apps/android/README.md](https://github.com/openclaw/openclaw/blob/main/apps/android/README.md) for build instructions.
+> **Note:** The Android app has not been publicly released yet. The source code is available in the [DennouAibou repository](https://github.com/openclaw/openclaw) under `apps/android`. You can build it yourself using Java 17 and the Android SDK (`./gradlew :app:assemblePlayDebug`). See [apps/android/README.md](https://github.com/openclaw/openclaw/blob/main/apps/android/README.md) for build instructions.
 
 ## Support snapshot
 
@@ -182,7 +182,7 @@ See [Camera node](/nodes/camera) for parameters and CLI helpers.
 
 ### 8) Voice + expanded Android command surface
 
-- Voice: Android uses a single mic on/off flow in the Voice tab with transcript capture and `talk.speak` playback. Local system TTS is used only when `talk.speak` is unavailable. Voice stops when the app leaves the foreground.
+- Voice: Android uses a single mic on/off flow in the Voice tab with transcript capture. Playback uses local system TTS. Voice stops when the app leaves the foreground.
 - Voice wake/talk-mode toggles are currently removed from Android UX/runtime.
 - Additional Android command families (availability depends on device + permissions):
   - `device.status`, `device.info`, `device.permissions`, `device.health`
@@ -196,9 +196,9 @@ See [Camera node](/nodes/camera) for parameters and CLI helpers.
 
 ## Assistant entrypoints
 
-Android supports launching OpenClaw from the system assistant trigger (Google
+Android supports launching DennouAibou from the system assistant trigger (Google
 Assistant). When configured, holding the home button or saying "Hey Google, ask
-OpenClaw..." opens the app and hands the prompt into the chat composer.
+DennouAibou..." opens the app and hands the prompt into the chat composer.
 
 This uses Android **App Actions** metadata declared in the app manifest. No
 extra configuration is needed on the gateway side -- the assistant intent is
@@ -206,7 +206,7 @@ handled entirely by the Android app and forwarded as a normal chat message.
 
 <Note>
 App Actions availability depends on the device, Google Play Services version,
-and whether the user has set OpenClaw as the default assistant app.
+and whether the user has set DennouAibou as the default assistant app.
 </Note>
 
 ## Notification forwarding

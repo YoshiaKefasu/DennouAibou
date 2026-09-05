@@ -53,18 +53,14 @@ export const FIELD_HELP: Record<string, string> = {
     'Controls tagline style in the CLI startup banner: "random" (default) picks from the rotating tagline pool, "default" always shows the neutral default tagline, and "off" hides tagline text while keeping the banner version line.',
   update:
     "Update-channel and startup-check behavior for keeping OpenClaw runtime versions current. Use conservative channels in production and more experimental channels only in controlled environments.",
-  "update.channel":
-    'Update channel for git + npm installs ("stable", "beta", or "dev").',
-  "update.checkOnStart":
-    "Check for npm updates when the gateway starts (default: true).",
-  "update.auto.enabled":
-    "Enable background auto-update for package installs (default: false).",
+  "update.channel": 'Update channel for git + npm installs ("stable", "beta", or "dev").',
+  "update.checkOnStart": "Check for npm updates when the gateway starts (default: true).",
+  "update.auto.enabled": "Enable background auto-update for package installs (default: false).",
   "update.auto.stableDelayHours":
     "Minimum delay before stable-channel auto-apply starts (default: 6).",
   "update.auto.stableJitterHours":
     "Extra stable-channel rollout spread window in hours (default: 12).",
-  "update.auto.betaCheckIntervalHours":
-    "How often beta-channel checks run in hours (default: 1).",
+  "update.auto.betaCheckIntervalHours": "How often beta-channel checks run in hours (default: 1).",
   dennou:
     "DennouAibou memory-prune controls. Think of this as a cleanup policy for long chat logs: what to trim, what to always keep, and when cleanup is only a rehearsal.",
   "dennou.toolsPrune":
@@ -87,12 +83,10 @@ export const FIELD_HELP: Record<string, string> = {
     "Closed-session override for how many latest tool outputs are always preserved.",
   "dennou.sessionToolsPrune.placeholder":
     "Closed-session override for replacement text after pruning.",
-  "dennou.sessionToolsPrune.dryRun":
-    "Closed-session override for dry-run behavior.",
+  "dennou.sessionToolsPrune.dryRun": "Closed-session override for dry-run behavior.",
   "dennou.activeSessionToolsPrune":
     "Prune policy for active sessions after idle time. This is for long-running chats that pause, then resume later.",
-  "dennou.activeSessionToolsPrune.enabled":
-    "Master switch for active-session idle pruning.",
+  "dennou.activeSessionToolsPrune.enabled": "Master switch for active-session idle pruning.",
   "dennou.activeSessionToolsPrune.idleDelayMinutes":
     "How long the session must stay idle before active prune runs. Start with 30 minutes; lower for faster cleanup, higher to preserve more near-term context.",
   "dennou.activeSessionToolsPrune.minPrunableToolChars":
@@ -101,18 +95,16 @@ export const FIELD_HELP: Record<string, string> = {
     "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
   "dennou.activeSessionToolsPrune.placeholder":
     "Active-session override for replacement text after pruning.",
-  "dennou.activeSessionToolsPrune.dryRun":
-    "Active-session override for dry-run behavior.",
+  "dennou.activeSessionToolsPrune.dryRun": "Active-session override for dry-run behavior.",
   "dennou.pruneProtection":
     "Safety rules that prevent pruning when protected files/keywords are involved.",
   "dennou.pruneProtection.protectedContentKeywords":
     "If tool output contains any keyword in this list (case-insensitive), prune is skipped for that entry.",
   "dennou.rawChat":
-    "Raw chat permanent DB settings for Go-backed indexing and search of session transcripts.",
-  "dennou.rawChat.indexing":
-    "Controls for raw chat message indexing into the Go-sidecar SQLite DB.",
+    "Raw chat permanent DB settings for SQLite-backed indexing and search of session transcripts.",
+  "dennou.rawChat.indexing": "Controls for raw chat message indexing into the SQLite DB.",
   "dennou.rawChat.indexing.enabled":
-    "Master switch for raw chat indexing. When false, the Go sidecar does not index new transcript updates and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
+    "Master switch for raw chat indexing. When false, new transcript updates are not indexed and chat_search returns empty results. Changing this flag at runtime requires a gateway restart to take effect.",
   gateway:
     "Gateway runtime surface for bind mode, auth, control UI, remote transport, and operational safety controls. Keep conservative defaults unless you intentionally expose the gateway beyond trusted local interfaces.",
   "gateway.port":
@@ -194,13 +186,11 @@ export const FIELD_HELP: Record<string, string> = {
     "Expected sha256 TLS fingerprint for the remote gateway (pin to avoid MITM).",
   "gateway.remote.sshTarget":
     "Remote gateway over SSH (tunnels the gateway port to localhost). Format: user@host or user@host:port.",
-  "gateway.remote.sshIdentity":
-    "Optional SSH identity file path (passed to ssh -i).",
+  "gateway.remote.sshIdentity": "Optional SSH identity file path (passed to ssh -i).",
   "talk.provider": 'Active Talk provider id (for example "acme-speech").',
   "talk.providers":
     "Provider-specific Talk settings keyed by provider id. During migration, prefer this over legacy talk.* keys.",
-  "talk.providers.*":
-    "Provider-owned Talk config fields for the matching provider id.",
+  "talk.providers.*": "Provider-owned Talk config fields for the matching provider id.",
   "talk.providers.*.apiKey": "Provider API key for Talk mode.", // pragma: allowlist secret
   "talk.interruptOnSpeech":
     "If true (default), stop assistant speech when the user starts speaking in Talk mode. Keep enabled for conversational turn-taking.",
@@ -417,8 +407,7 @@ export const FIELD_HELP: Record<string, string> = {
   "gateway.auth.password": "Required for Tailscale funnel.",
   "agents.defaults.sandbox.browser.network":
     "Docker network for sandbox browser containers (default: openclaw-sandbox-browser). Avoid bridge if you need stricter isolation.",
-  "agents.list[].sandbox.browser.network":
-    "Per-agent override for sandbox browser Docker network.",
+  "agents.list[].sandbox.browser.network": "Per-agent override for sandbox browser Docker network.",
   "agents.defaults.sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
     "DANGEROUS break-glass override that allows sandbox Docker network mode container:<id>. This joins another container namespace and weakens sandbox isolation.",
   "agents.list[].sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
@@ -473,14 +462,12 @@ export const FIELD_HELP: Record<string, string> = {
     "Timeout in milliseconds for `image_url` URL fetches (default: 10000).",
   "gateway.reload.mode":
     'Controls how config edits are applied: "off" ignores live edits, "restart" always restarts, "hot" applies in-process, and "hybrid" tries hot then restarts if required. Keep "hybrid" for safest routine updates.',
-  "gateway.reload.debounceMs":
-    "Debounce window (ms) before applying config changes.",
+  "gateway.reload.debounceMs": "Debounce window (ms) before applying config changes.",
   "gateway.reload.deferralTimeoutMs":
     "Maximum time (ms) to wait for in-flight operations to complete before forcing a SIGUSR1 restart. Default: 300000 (5 minutes). Lower values risk aborting active subagent LLM calls.",
   "gateway.nodes.browser.mode":
     'Node browser routing ("auto" = pick single connected browser node, "manual" = require node param, "off" = disable).',
-  "gateway.nodes.browser.node":
-    "Pin browser routing to a specific node id or name (optional).",
+  "gateway.nodes.browser.node": "Pin browser routing to a specific node id or name (optional).",
   "gateway.nodes.allowCommands":
     "Extra node.invoke commands to allow beyond the gateway defaults (array of command strings). Enabling dangerous commands here is a security-sensitive override and is flagged by `openclaw security audit`.",
   "gateway.nodes.denyCommands":
@@ -535,12 +522,10 @@ export const FIELD_HELP: Record<string, string> = {
     "Optional role-based filter list used by providers that attach roles to chat context. Use this to route privileged or operational role traffic to specialized agents.",
   "bindings[].acp":
     "Optional per-binding ACP overrides for bindings[].type=acp. This layer overrides agents.list[].runtime.acp defaults for the matched conversation.",
-  "bindings[].acp.mode":
-    "ACP session mode override for this binding (persistent or oneshot).",
+  "bindings[].acp.mode": "ACP session mode override for this binding (persistent or oneshot).",
   "bindings[].acp.label":
     "Human-friendly label for ACP status/diagnostics in this bound conversation.",
-  "bindings[].acp.cwd":
-    "Working directory override for ACP sessions created from this binding.",
+  "bindings[].acp.cwd": "Working directory override for ACP sessions created from this binding.",
   "bindings[].acp.backend":
     "ACP backend override for this binding (falls back to agent runtime ACP backend, then global acp.backend).",
   broadcast:
@@ -578,13 +563,11 @@ export const FIELD_HELP: Record<string, string> = {
   "diagnostics.cacheTrace.enabled":
     "Log cache trace snapshots for embedded agent runs (default: false).",
   "diagnostics.cacheTrace.filePath":
-    "JSONL output path for cache trace logs (default: $OPENCLAW_STATE_DIR/logs/cache-trace.jsonl).",
+    "JSONL output path for cache trace logs (default: $DENNOU_STATE_DIR/logs/cache-trace.jsonl).",
   "diagnostics.cacheTrace.includeMessages":
     "Include full message payloads in trace output (default: true).",
-  "diagnostics.cacheTrace.includePrompt":
-    "Include prompt text in trace output (default: true).",
-  "diagnostics.cacheTrace.includeSystem":
-    "Include system prompt in trace output (default: true).",
+  "diagnostics.cacheTrace.includePrompt": "Include prompt text in trace output (default: true).",
+  "diagnostics.cacheTrace.includeSystem": "Include system prompt in trace output (default: true).",
   "tools.exec.applyPatch.enabled":
     "Enable or disable apply_patch for OpenAI and OpenAI Codex models when allowed by tool policy (default: true).",
   "tools.exec.applyPatch.workspaceOnly":
@@ -593,8 +576,7 @@ export const FIELD_HELP: Record<string, string> = {
     'Optional allowlist of model ids (e.g. "gpt-5.4" or "openai/gpt-5.4").',
   "tools.loopDetection.enabled":
     "Enable repetitive tool-call loop detection and backoff safety checks (default: false).",
-  "tools.loopDetection.historySize":
-    "Tool history window size for loop detection (default: 30).",
+  "tools.loopDetection.historySize": "Tool history window size for loop detection (default: 30).",
   "tools.loopDetection.warningThreshold":
     "Warning threshold for repetitive patterns when detector is enabled (default: 10).",
   "tools.loopDetection.criticalThreshold":
@@ -605,14 +587,12 @@ export const FIELD_HELP: Record<string, string> = {
     "Enable generic repeated same-tool/same-params loop detection (default: true).",
   "tools.loopDetection.detectors.knownPollNoProgress":
     "Enable known poll tool no-progress loop detection (default: true).",
-  "tools.loopDetection.detectors.pingPong":
-    "Enable ping-pong loop detection (default: true).",
+  "tools.loopDetection.detectors.pingPong": "Enable ping-pong loop detection (default: true).",
   "tools.exec.notifyOnExit":
     "When true (default), backgrounded exec sessions on exit and node exec lifecycle events enqueue a system event and request a heartbeat.",
   "tools.exec.notifyOnExitEmptySuccess":
     "When true, successful backgrounded exec exits with empty output still enqueue a completion system event (default: false).",
-  "tools.exec.pathPrepend":
-    "Directories to prepend to PATH for exec runs (gateway/sandbox).",
+  "tools.exec.pathPrepend": "Directories to prepend to PATH for exec runs (gateway/sandbox).",
   "tools.exec.safeBins":
     "Allow stdin-only safe binaries to run without explicit allowlist entries.",
   "tools.exec.strictInlineEval":
@@ -752,10 +732,8 @@ export const FIELD_HELP: Record<string, string> = {
   "tools.web.search.provider":
     "Search provider id. Auto-detected from available API keys if omitted.",
   "tools.web.search.maxResults": "Number of results to return (1-10).",
-  "tools.web.search.timeoutSeconds":
-    "Timeout in seconds for web_search requests.",
-  "tools.web.search.cacheTtlMinutes":
-    "Cache TTL in minutes for web_search results.",
+  "tools.web.search.timeoutSeconds": "Timeout in seconds for web_search requests.",
+  "tools.web.search.cacheTtlMinutes": "Cache TTL in minutes for web_search results.",
   "tools.web.search.openaiCodex.enabled":
     "Enable native Codex web search for Codex-capable models.",
   "tools.web.search.openaiCodex.mode":
@@ -774,22 +752,16 @@ export const FIELD_HELP: Record<string, string> = {
     "Approximate timezone sent to native Codex web search.",
   "tools.web.search.brave.mode":
     'Brave Search mode: "web" (URL results) or "llm-context" (pre-extracted page content for LLM grounding).',
-  "tools.web.fetch.enabled":
-    "Enable the web_fetch tool (lightweight HTTP fetch).",
-  "tools.web.fetch.maxChars":
-    "Max characters returned by web_fetch (truncated).",
+  "tools.web.fetch.enabled": "Enable the web_fetch tool (lightweight HTTP fetch).",
+  "tools.web.fetch.maxChars": "Max characters returned by web_fetch (truncated).",
   "tools.web.fetch.maxCharsCap":
     "Hard cap for web_fetch maxChars (applies to config and tool calls).",
   "tools.web.fetch.maxResponseBytes": "Max download size before truncation.",
   "tools.web.fetch.provider": "Web fetch fallback provider id.",
-  "tools.web.fetch.timeoutSeconds":
-    "Timeout in seconds for web_fetch requests.",
-  "tools.web.fetch.cacheTtlMinutes":
-    "Cache TTL in minutes for web_fetch results.",
-  "tools.web.fetch.maxRedirects":
-    "Maximum redirects allowed for web_fetch (default: 3).",
-  "tools.web.fetch.userAgent":
-    "Override User-Agent header for web_fetch requests.",
+  "tools.web.fetch.timeoutSeconds": "Timeout in seconds for web_fetch requests.",
+  "tools.web.fetch.cacheTtlMinutes": "Cache TTL in minutes for web_fetch results.",
+  "tools.web.fetch.maxRedirects": "Maximum redirects allowed for web_fetch (default: 3).",
+  "tools.web.fetch.userAgent": "Override User-Agent header for web_fetch requests.",
   "tools.web.fetch.readability":
     "Use Readability to extract main content from HTML (fallbacks to basic HTML cleanup).",
   models:
@@ -873,27 +845,23 @@ export const FIELD_HELP: Record<string, string> = {
     "Base URL for your Mattermost server (e.g., https://chat.example.com).",
   "channels.mattermost.chatmode":
     'Reply to channel messages on mention ("oncall"), on trigger chars (">" or "!") ("onchar"), or on every message ("onmessage").',
-  "channels.mattermost.oncharPrefixes":
-    'Trigger prefixes for onchar mode (default: [">", "!"]).',
+  "channels.mattermost.oncharPrefixes": 'Trigger prefixes for onchar mode (default: [">", "!"]).',
   "channels.mattermost.requireMention":
     "Require @mention in channels before responding (default: true).",
   "auth.profiles": "Named auth profiles (provider + mode + optional email).",
-  "auth.order":
-    "Ordered auth profile IDs per provider (used for automatic failover).",
+  "auth.order": "Ordered auth profile IDs per provider (used for automatic failover).",
   "auth.cooldowns":
     "Cooldown/backoff controls for temporary profile suppression after billing-related failures and retry windows. Use these to prevent rapid re-selection of profiles that are still blocked.",
   "auth.cooldowns.billingBackoffHours":
     "Base backoff (hours) when a profile fails due to billing/insufficient credits (default: 5).",
   "auth.cooldowns.billingBackoffHoursByProvider":
     "Optional per-provider overrides for billing backoff (hours).",
-  "auth.cooldowns.billingMaxHours":
-    "Cap (hours) for billing backoff (default: 24).",
+  "auth.cooldowns.billingMaxHours": "Cap (hours) for billing backoff (default: 24).",
   "auth.cooldowns.authPermanentBackoffMinutes":
     "Base backoff (minutes) for high-confidence auth_permanent failures (default: 10). Keep this shorter than billing so providers recover automatically after transient upstream auth incidents.",
   "auth.cooldowns.authPermanentMaxMinutes":
     "Cap (minutes) for auth_permanent backoff (default: 60).",
-  "auth.cooldowns.failureWindowHours":
-    "Failure window (hours) for backoff counters (default: 24).",
+  "auth.cooldowns.failureWindowHours": "Failure window (hours) for backoff counters (default: 24).",
   "auth.cooldowns.overloadedProfileRotations":
     "Maximum same-provider auth-profile rotations allowed for overloaded errors before switching to model fallback (default: 1).",
   "auth.cooldowns.overloadedBackoffMs":
@@ -914,10 +882,8 @@ export const FIELD_HELP: Record<string, string> = {
     'Timezone for message envelopes ("utc", "local", "user", or an IANA timezone string).',
   "agents.defaults.envelopeTimestamp":
     'Include absolute timestamps in message envelopes ("on" or "off").',
-  "agents.defaults.envelopeElapsed":
-    'Include elapsed time in message envelopes ("on" or "off").',
-  "agents.defaults.models":
-    "Configured model catalog (keys are full provider/model IDs).",
+  "agents.defaults.envelopeElapsed": 'Include elapsed time in message envelopes ("on" or "off").',
+  "agents.defaults.models": "Configured model catalog (keys are full provider/model IDs).",
   "agents.defaults.memorySearch":
     "Vector search over MEMORY.md and memory/*.md (per-agent overrides supported).",
   "agents.defaults.memorySearch.enabled":
@@ -973,7 +939,7 @@ export const FIELD_HELP: Record<string, string> = {
   "agents.defaults.memorySearch.fallback":
     'Backup provider used when primary embeddings fail: "openai", "gemini", "voyage", "mistral", "ollama", "local", or "none". Set a real fallback for production reliability; use "none" only if you prefer explicit failures.',
   "agents.defaults.memorySearch.store.path":
-    "Sets where the SQLite memory index is stored on disk for each agent. Keep the default `~/.openclaw/memory/{agentId}.sqlite` unless you need custom storage placement or backup policy alignment.",
+    "Sets where the SQLite memory index is stored on disk for each agent. Keep the default `~/.dennou-aibou/memory/{agentId}.sqlite` unless you need custom storage placement or backup policy alignment.",
   "agents.defaults.memorySearch.store.vector.enabled":
     "Enables the sqlite-vec extension used for vector similarity queries in memory search (default: true). Keep this enabled for normal semantic recall; disable only for debugging or fallback-only operation.",
   "agents.defaults.memorySearch.store.vector.extensionPath":
@@ -1131,16 +1097,11 @@ export const FIELD_HELP: Record<string, string> = {
   "plugins.installs":
     "CLI-managed install metadata (used by `openclaw plugins update` to locate install sources).",
   "plugins.installs.*.source": 'Install source ("npm", "archive", or "path").',
-  "plugins.installs.*.spec":
-    "Original npm spec used for install (if source is npm).",
-  "plugins.installs.*.sourcePath":
-    "Original archive/path used for install (if any).",
-  "plugins.installs.*.installPath":
-    "Resolved install directory for the installed plugin bundle.",
-  "plugins.installs.*.version":
-    "Version recorded at install time (if available).",
-  "plugins.installs.*.resolvedName":
-    "Resolved npm package name from the fetched artifact.",
+  "plugins.installs.*.spec": "Original npm spec used for install (if source is npm).",
+  "plugins.installs.*.sourcePath": "Original archive/path used for install (if any).",
+  "plugins.installs.*.installPath": "Resolved install directory for the installed plugin bundle.",
+  "plugins.installs.*.version": "Version recorded at install time (if available).",
+  "plugins.installs.*.resolvedName": "Resolved npm package name from the fetched artifact.",
   "plugins.installs.*.resolvedVersion":
     "Resolved npm package version from the fetched artifact (useful for non-pinned specs).",
   "plugins.installs.*.resolvedSpec":
@@ -1165,8 +1126,7 @@ export const FIELD_HELP: Record<string, string> = {
     "Ordered fallback models (provider/model). Used when the primary model fails.",
   "agents.defaults.imageModel.primary":
     "Optional image model (provider/model) used when the primary model lacks image input.",
-  "agents.defaults.imageModel.fallbacks":
-    "Ordered fallback image models (provider/model).",
+  "agents.defaults.imageModel.fallbacks": "Ordered fallback image models (provider/model).",
   "agents.defaults.imageGenerationModel.primary":
     "Optional image-generation model (provider/model) used by the shared image generation capability.",
   "agents.defaults.imageGenerationModel.fallbacks":
@@ -1181,8 +1141,7 @@ export const FIELD_HELP: Record<string, string> = {
     "Ordered fallback music-generation models (provider/model).",
   "agents.defaults.pdfModel.primary":
     "Optional PDF model (provider/model) for the PDF analysis tool. Defaults to imageModel, then session model.",
-  "agents.defaults.pdfModel.fallbacks":
-    "Ordered fallback PDF models (provider/model).",
+  "agents.defaults.pdfModel.fallbacks": "Ordered fallback PDF models (provider/model).",
   "agents.defaults.pdfMaxBytesMb":
     "Maximum PDF file size in megabytes for the PDF tool (default: 10).",
   "agents.defaults.pdfMaxPages":
@@ -1241,12 +1200,9 @@ export const FIELD_HELP: Record<string, string> = {
     "Embedded Pi runner hardening controls for how workspace-local Pi settings are trusted and applied in OpenClaw sessions.",
   "agents.defaults.embeddedPi.projectSettingsPolicy":
     'How embedded Pi handles workspace-local `.pi/config/settings.json`: "sanitize" (default) strips shellPath/shellCommandPrefix, "ignore" disables project settings entirely, and "trusted" applies project settings as-is.',
-  "agents.defaults.humanDelay.mode":
-    'Delay style for block replies ("off", "natural", "custom").',
-  "agents.defaults.humanDelay.minMs":
-    "Minimum delay in ms for custom humanDelay (default: 800).",
-  "agents.defaults.humanDelay.maxMs":
-    "Maximum delay in ms for custom humanDelay (default: 2500).",
+  "agents.defaults.humanDelay.mode": 'Delay style for block replies ("off", "natural", "custom").',
+  "agents.defaults.humanDelay.minMs": "Minimum delay in ms for custom humanDelay (default: 800).",
+  "agents.defaults.humanDelay.maxMs": "Maximum delay in ms for custom humanDelay (default: 2500).",
   commands:
     "Controls chat command surfaces, owner gating, and elevated command access behavior across providers. Keep defaults unless you need stricter operator controls or broader command availability.",
   "commands.native":
@@ -1259,18 +1215,14 @@ export const FIELD_HELP: Record<string, string> = {
     "Allow bash chat command (`!`; `/bash` alias) to run host shell commands (default: false; requires tools.elevated).",
   "commands.bashForegroundMs":
     "How long bash waits before backgrounding (default: 2000; 0 backgrounds immediately).",
-  "commands.config":
-    "Allow /config chat command to read/write config on disk (default: false).",
+  "commands.config": "Allow /config chat command to read/write config on disk (default: false).",
   "commands.mcp":
     "Allow /mcp chat command to manage OpenClaw MCP server config under mcp.servers (default: false).",
   "commands.plugins":
     "Allow /plugins chat command to list discovered plugins and toggle plugin enablement in config (default: false).",
-  "commands.debug":
-    "Allow /debug chat command for runtime-only overrides (default: false).",
-  "commands.restart":
-    "Allow /restart and gateway restart tool actions (default: true).",
-  "commands.useAccessGroups":
-    "Enforce access-group allowlists/policies for commands.",
+  "commands.debug": "Allow /debug chat command for runtime-only overrides (default: false).",
+  "commands.restart": "Allow /restart and gateway restart tool actions (default: true).",
+  "commands.useAccessGroups": "Enforce access-group allowlists/policies for commands.",
   "commands.ownerAllowFrom":
     "Explicit owner allowlist for owner-only tools/commands. Use channel-native IDs (optionally prefixed like \"whatsapp:+15551234567\"). '*' is ignored.",
   "commands.ownerDisplay":
@@ -1291,29 +1243,29 @@ export const FIELD_HELP: Record<string, string> = {
   "session.identityLinks":
     "Maps canonical identities to provider-prefixed peer IDs so equivalent users resolve to one DM thread (example: telegram:123456). Use this when the same human appears across multiple channels or accounts.",
   "session.resetTriggers":
-    "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation.",
+    "Lists message triggers that force a session reset when matched in inbound content. Use sparingly for explicit reset phrases so context is not dropped unexpectedly during normal conversation. @deprecated Accepted for backward compatibility; automatic session reset machinery has been removed and this field has no effect at runtime.",
   "session.idleMinutes":
-    "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType.",
+    "Applies a legacy idle reset window in minutes for session reuse behavior across inactivity gaps. Use this only for compatibility and prefer structured reset policies under session.reset/session.resetByType. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
   "session.reset":
-    "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ.",
+    "Defines the default reset policy object used when no type-specific or channel-specific override applies. Set this first, then layer resetByType or resetByChannel only where behavior must differ. @deprecated Accepted for backward compatibility; automatic session reset policies (idle / daily) have been removed.",
   "session.reset.mode":
-    'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns.',
+    'Selects reset strategy: "daily" resets at a configured hour, "idle" resets after inactivity windows, and "off" disables automatic resets. Keep one clear mode per policy to avoid surprising context turnover patterns. @deprecated Accepted for backward compatibility; the value has no effect at runtime.',
   "session.reset.atHour":
-    "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior.",
+    "Sets local-hour boundary (0-23) for daily reset mode so sessions roll over at predictable times. Use with mode=daily and align to operator timezone expectations for human-readable behavior. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.reset.idleMinutes":
-    "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads.",
+    "Sets inactivity window before reset for idle mode and can also act as secondary guard with daily mode. Use larger values to preserve continuity or smaller values for fresher short-lived threads. @deprecated Accepted for backward compatibility; sessions are never rotated based on inactivity.",
   "session.resetByType":
-    "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages.",
+    "Overrides reset behavior by chat type (direct, group, thread) when defaults are not sufficient. Use this when group/thread traffic needs different reset cadence than direct messages. @deprecated Accepted for backward compatibility; per-type automatic reset overrides have been removed.",
   "session.resetByType.direct":
-    "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias.",
+    "Defines reset policy for direct chats and supersedes the base session.reset configuration for that type. Use this as the canonical direct-message override instead of the legacy dm alias. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.dm":
-    "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent.",
+    "Deprecated alias for direct reset behavior kept for backward compatibility with older configs. Use session.resetByType.direct instead so future tooling and validation remain consistent. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.group":
-    "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem.",
+    "Defines reset policy for group chat sessions where continuity and noise patterns differ from DMs. Use shorter idle windows for busy groups if context drift becomes a problem. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByType.thread":
-    "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types.",
+    "Defines reset policy for thread-scoped sessions, including focused channel thread workflows. Use this when thread sessions should expire faster or slower than other chat types. @deprecated Accepted for backward compatibility; the value has no effect at runtime.",
   "session.resetByChannel":
-    "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies.",
+    "Provides channel-specific reset overrides keyed by provider/channel id for fine-grained behavior control. Use this only when one channel needs exceptional reset behavior beyond type-level policies. @deprecated Accepted for backward compatibility; per-channel automatic reset overrides have been removed.",
   "session.store":
     "Sets the session storage file path used to persist session records across restarts. Use an explicit path only when you need custom disk layout, backup routing, or mounted-volume storage.",
   "session.typingIntervalSeconds":
@@ -1593,8 +1545,7 @@ export const FIELD_HELP: Record<string, string> = {
     "Map provider -> channel id -> model override (values are provider/model or aliases).",
   "messages.suppressToolErrors":
     "When true, suppress ⚠️ tool-error warnings from being shown to the user. The agent already sees errors in context and can retry. Default: false.",
-  "messages.ackReaction":
-    "Emoji reaction used to acknowledge inbound messages (empty disables).",
+  "messages.ackReaction": "Emoji reaction used to acknowledge inbound messages (empty disables).",
   "messages.ackReactionScope":
     'When to send ack reactions ("group-mentions", "group-all", "direct", "all", "off", "none"). "off"/"none" disables ack reactions entirely.',
   "messages.statusReactions":

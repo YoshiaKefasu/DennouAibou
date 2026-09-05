@@ -13,11 +13,11 @@ import {
   resetTaskRegistryForTests,
 } from "./task-registry.js";
 
-const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 
 async function withTaskFlowAuditStateDir(run: (root: string) => Promise<void>): Promise<void> {
   await withTempDir({ prefix: "openclaw-task-flow-audit-" }, async (root) => {
-    process.env.OPENCLAW_STATE_DIR = root;
+    process.env.DENNOU_STATE_DIR = root;
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryForTests();
     resetTaskFlowRegistryForTests();
@@ -34,9 +34,9 @@ async function withTaskFlowAuditStateDir(run: (root: string) => Promise<void>): 
 describe("task-flow-registry audit", () => {
   afterEach(() => {
     if (ORIGINAL_STATE_DIR === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.DENNOU_STATE_DIR;
     } else {
-      process.env.OPENCLAW_STATE_DIR = ORIGINAL_STATE_DIR;
+      process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryForTests();
@@ -146,7 +146,7 @@ describe("task-flow-registry audit", () => {
       });
 
       createRunningTaskRun({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         parentFlowId: flow.flowId,

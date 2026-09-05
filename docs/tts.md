@@ -9,8 +9,8 @@ title: "Text-to-Speech (legacy path)"
 
 # Text-to-speech (TTS)
 
-OpenClaw can convert outbound replies into audio using OpenAI.
-It works anywhere OpenClaw can send audio.
+DennouAibou can convert outbound replies into audio using OpenAI.
+It works anywhere DennouAibou can send audio.
 
 ## Supported services
 
@@ -39,7 +39,7 @@ so that provider must also be authenticated if you enable summaries.
 No. Auto‑TTS is **off** by default. Enable it in config with
 `messages.tts.auto` or per session with `/tts always` (alias: `/tts on`).
 
-When `messages.tts.provider` is unset, OpenClaw picks the first configured
+When `messages.tts.provider` is unset, DennouAibou picks the first configured
 speech provider in registry auto-select order.
 
 ## Config
@@ -138,7 +138,7 @@ Then run:
 - `enabled`: legacy toggle (doctor migrates this to `auto`).
 - `mode`: `"final"` (default) or `"all"` (includes tool/block replies).
 - `provider`: speech provider id such as `"openai"` (fallback is automatic).
-- If `provider` is **unset**, OpenClaw uses the first configured speech provider in registry auto-select order.
+- If `provider` is **unset**, DennouAibou uses the first configured speech provider in registry auto-select order.
 - `summaryModel`: optional cheap model for auto-summary; defaults to `agents.defaults.model.primary`.
   - Accepts `provider/model` or a configured model alias.
 - `modelOverrides`: allow the model to emit TTS directives (on by default).
@@ -235,7 +235,7 @@ OpenAI output formats are fixed per channel (see above).
 
 ## Auto-TTS behavior
 
-When enabled, OpenClaw:
+When enabled, DennouAibou:
 
 - skips TTS if the reply already contains media or a `MEDIA:` directive.
 - skips very short replies (< 10 chars).
@@ -266,7 +266,7 @@ Reply -> TTS enabled?
 There is a single command: `/tts`.
 See [Slash commands](/tools/slash-commands) for enablement details.
 
-Discord note: `/tts` is a built-in Discord command, so OpenClaw registers
+Discord note: `/tts` is a built-in Discord command, so DennouAibou registers
 `/voice` as the native command there. Text `/tts ...` still works.
 
 ```
@@ -278,7 +278,7 @@ Discord note: `/tts` is a built-in Discord command, so OpenClaw registers
 /tts provider openai
 /tts limit 2000
 /tts summary off
-/tts audio Hello from OpenClaw
+/tts audio Hello from DennouAibou
 ```
 
 Notes:

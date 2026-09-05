@@ -1,10 +1,11 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { SessionManager } from "@mariozechner/pi-coding-agent";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import {
   applyInputProvenanceToUserMessage,
   type InputProvenance,
 } from "../sessions/input-provenance.js";
+import { installSessionIntegrityGuard } from "./session-integrity-guard.js";
 import { installSessionToolResultGuard } from "./session-tool-result-guard.js";
 
 export type GuardedSessionManager = SessionManager & {
@@ -41,9 +42,14 @@ export function guardSessionManager(
     return sessionManager as GuardedSessionManager;
   }
 
+  // Install the integrity guard as the outermost wrapper so the resulting call
+  // chain is `sm.appendMessage -> integrityWrapper -> toolResultWrapper -> rawAppend`,
+  // keeping post-append verification inside the tool-result wrapper (see
+  // DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §3.2). The integrity guard installs
+  // AFTER the tool-result guard so its wrapper sits on the outer call path.
   const hookRunner = getGlobalHookRunner();
   const beforeMessageWrite = hookRunner?.hasHooks("before_message_write")
-    ? (event: { message: import("@mariozechner/pi-agent-core").AgentMessage }) => {
+    ? (event: { message: import("@earendil-works/pi-agent-core").AgentMessage }) => {
         return hookRunner.runBeforeMessageWrite(event, {
           agentId: opts?.agentId,
           sessionKey: opts?.sessionKey,
@@ -88,5 +94,8 @@ export function guardSessionManager(
   });
   (sessionManager as GuardedSessionManager).flushPendingToolResults = guard.flushPendingToolResults;
   (sessionManager as GuardedSessionManager).clearPendingToolResults = guard.clearPendingToolResults;
+  // Install after tool-result guard so this wrapper sits on the outermost
+  // call path.
+  installSessionIntegrityGuard(sessionManager);
   return sessionManager as GuardedSessionManager;
 }

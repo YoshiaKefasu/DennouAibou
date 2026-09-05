@@ -5,25 +5,9 @@ import type { HumanDelayConfig, IdentityConfig } from "./types.base.js";
 import type { GroupChatConfig } from "./types.messages.js";
 import type { AgentToolsConfig, MemorySearchConfig } from "./types.tools.js";
 
-export type AgentRuntimeAcpConfig = {
-  /** ACP harness adapter id (for example codex, claude). */
-  agent?: string;
-  /** Optional ACP backend override for this agent runtime. */
-  backend?: string;
-  /** Optional ACP session mode override. */
-  mode?: "persistent" | "oneshot";
-  /** Optional runtime working directory override. */
-  cwd?: string;
+export type AgentRuntimeConfig = {
+  type: "embedded";
 };
-
-export type AgentRuntimeConfig =
-  | {
-      type: "embedded";
-    }
-  | {
-      type: "acp";
-      acp?: AgentRuntimeAcpConfig;
-    };
 
 export type AgentBindingMatch = {
   channel: string;
@@ -43,20 +27,7 @@ export type AgentRouteBinding = {
   match: AgentBindingMatch;
 };
 
-export type AgentAcpBinding = {
-  type: "acp";
-  agentId: string;
-  comment?: string;
-  match: AgentBindingMatch;
-  acp?: {
-    mode?: "persistent" | "oneshot";
-    label?: string;
-    cwd?: string;
-    backend?: string;
-  };
-};
-
-export type AgentBinding = AgentRouteBinding | AgentAcpBinding;
+export type AgentBinding = AgentRouteBinding;
 
 export type AgentConfig = {
   id: string;
@@ -68,7 +39,7 @@ export type AgentConfig = {
   systemPromptOverride?: AgentDefaultsConfig["systemPromptOverride"];
   model?: AgentModelConfig;
   /** Optional per-agent default thinking level (overrides agents.defaults.thinkingDefault). */
-  thinkingDefault?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+  thinkingDefault?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "adaptive";
   /** Optional per-agent default verbosity level. */
   verboseDefault?: "off" | "on" | "full";
   /** Optional per-agent default reasoning visibility. */

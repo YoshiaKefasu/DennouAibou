@@ -72,8 +72,10 @@ vi.mock("./pi-bundle-mcp-tools.js", () => ({
   }),
 }));
 
-vi.mock("@mariozechner/pi-ai", async () => {
-  const actual = await vi.importActual<typeof import("@mariozechner/pi-ai")>("@mariozechner/pi-ai");
+const createPiAiBundleMcpMock = async (
+  specifier: "@earendil-works/pi-ai" | "@earendil-works/pi-ai/compat",
+) => {
+  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai")>(specifier);
 
   const buildToolUseMessage = (model: { api: string; provider: string; id: string }) => ({
     role: "assistant" as const,
@@ -168,7 +170,12 @@ vi.mock("@mariozechner/pi-ai", async () => {
       return stream;
     },
   };
-});
+};
+
+vi.mock("@earendil-works/pi-ai", () => createPiAiBundleMcpMock("@earendil-works/pi-ai"));
+vi.mock("@earendil-works/pi-ai/compat", () =>
+  createPiAiBundleMcpMock("@earendil-works/pi-ai/compat"),
+);
 
 let runEmbeddedPiAgent: typeof import("./pi-embedded-runner/run.js").runEmbeddedPiAgent;
 let e2eWorkspace: EmbeddedPiRunnerTestWorkspace | undefined;

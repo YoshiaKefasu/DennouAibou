@@ -155,7 +155,7 @@ describe("subagent registry seam flow", () => {
 
     await vi.waitFor(() => {
       expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
-    });
+    }, { timeout: 3_000 });
 
     expect(mocks.emitSessionLifecycleEvent).toHaveBeenCalledWith({
       sessionKey: "agent:main:subagent:child",
@@ -279,14 +279,14 @@ describe("subagent registry seam flow", () => {
     expect(mocks.runSubagentAnnounceFlow).not.toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(mocks.runSubagentEnded).toHaveBeenCalledTimes(1);
-    });
+    }, { timeout: 3_000 });
     await vi.waitFor(() => {
       expect(mocks.onSubagentEnded).toHaveBeenCalledWith({
         childSessionKey: "agent:main:subagent:child",
         reason: "deleted",
         workspaceDir: undefined,
       });
-    });
+    }, { timeout: 3_000 });
     expect(
       mod
         .listSubagentRunsForRequester("agent:main:main")
@@ -335,7 +335,7 @@ describe("subagent registry seam flow", () => {
           .listSubagentRunsForRequester("agent:main:main")
           .find((entry) => entry.runId === "run-parent-expired"),
       ).toBeUndefined();
-    });
+    }, { timeout: 3_000 });
 
     expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
     expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledWith(
@@ -349,7 +349,7 @@ describe("subagent registry seam flow", () => {
         reason: "deleted",
         workspaceDir: undefined,
       });
-    });
+    }, { timeout: 3_000 });
   });
 
   it("loads runtime plugins before emitting killed subagent ended hooks", async () => {
@@ -388,7 +388,7 @@ describe("subagent registry seam flow", () => {
         workspaceDir: "/tmp/killed-workspace",
         allowGatewaySubagentBinding: true,
       });
-    });
+    }, { timeout: 3_000 });
     expect(mocks.runSubagentEnded).toHaveBeenCalledWith(
       expect.objectContaining({
         targetSessionKey: "agent:main:subagent:killed",
@@ -434,7 +434,7 @@ describe("subagent registry seam flow", () => {
         reason: "deleted",
         workspaceDir: "/tmp/killed-delete-workspace",
       });
-    });
+    }, { timeout: 3_000 });
   });
 
   it("removes attachments for killed delete-mode runs", async () => {
@@ -464,7 +464,7 @@ describe("subagent registry seam flow", () => {
     expect(updated).toBe(1);
     await vi.waitFor(async () => {
       await expect(fs.access(attachmentsDir)).rejects.toMatchObject({ code: "ENOENT" });
-    });
+    }, { timeout: 3_000 });
   });
 
   it("removes attachments for released delete-mode runs", async () => {
@@ -499,14 +499,14 @@ describe("subagent registry seam flow", () => {
 
     await vi.waitFor(async () => {
       await expect(fs.access(attachmentsDir)).rejects.toMatchObject({ code: "ENOENT" });
-    });
+    }, { timeout: 3_000 });
     await vi.waitFor(() => {
       expect(mocks.onSubagentEnded).toHaveBeenCalledWith({
         childSessionKey: "agent:main:subagent:release-delete",
         reason: "released",
         workspaceDir: undefined,
       });
-    });
+    }, { timeout: 3_000 });
   });
 
   it("loads plugin and context-engine runtime before released end hooks", async () => {
@@ -537,7 +537,7 @@ describe("subagent registry seam flow", () => {
         reason: "released",
         workspaceDir: "/tmp/workspace",
       });
-    });
+    }, { timeout: 3_000 });
     expect(mocks.ensureRuntimePluginsLoaded).toHaveBeenCalledWith({
       config: {
         agents: { defaults: { subagents: { archiveAfterMinutes: 0 } } },

@@ -63,6 +63,7 @@ import { resolveTimeoutCompactionPromptUsageThreshold } from "../pi-settings.js"
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
 import { derivePromptTokens, normalizeUsage, type UsageLike } from "../usage.js";
 import { redactRunIdentifier, resolveRunWorkspaceDir } from "../workspace-run.js";
+import { createLegacyAuthStorageAdapter } from "./auth-storage-adapter.js";
 import { runPostCompactionSideEffects } from "./compact.js";
 import { buildEmbeddedCompactionRuntimeContext } from "./compaction-runtime-context.js";
 import { runContextEngineMaintenance } from "./context-engine-maintenance.js";
@@ -256,12 +257,13 @@ export async function runEmbeddedPiAgent(
       modelId = hookSelection.modelId;
       const legacyBeforeAgentStartResult = hookSelection.legacyBeforeAgentStartResult;
 
-      const { model, error, authStorage, modelRegistry } = await resolveModelAsync(
-        provider,
-        modelId,
-        agentDir,
-        params.config,
-      );
+      const {
+        model,
+        error,
+        authStorage: rawAuthStorage,
+        modelRegistry,
+      } = await resolveModelAsync(provider, modelId, agentDir, params.config);
+      const authStorage = await createLegacyAuthStorageAdapter(rawAuthStorage);
       if (!model) {
         throw new FailoverError(error ?? `Unknown model: ${provider}/${modelId}`, {
           reason: "model_not_found",
@@ -279,12 +281,11 @@ export async function runEmbeddedPiAgent(
       });
       const ctxInfo = resolvedRuntimeModel.ctxInfo;
       let effectiveModel = resolvedRuntimeModel.effectiveModel;
-      const timeoutCompactionPromptUsageThreshold =
-        resolveTimeoutCompactionPromptUsageThreshold({
-          cfg: params.config,
-          contextTokenBudget: ctxInfo.tokens,
-          fallbackRatio: 0.65,
-        });
+      const timeoutCompactionPromptUsageThreshold = resolveTimeoutCompactionPromptUsageThreshold({
+        cfg: params.config,
+        contextTokenBudget: ctxInfo.tokens,
+        fallbackRatio: 0.65,
+      });
 
       const authStore = ensureAuthProfileStore(agentDir, {
         allowKeychainPrompt: false,
@@ -641,7 +642,7 @@ export async function runEmbeddedPiAgent(
             resolvedApiKey: resolvedStreamApiKey,
             authProfileId: lastProfileId,
             authProfileIdSource: lockedProfileId ? "user" : "auto",
-            authStorage,
+            authStorage: rawAuthStorage,
             modelRegistry,
             agentId: workspaceResolution.agentId,
             legacyBeforeAgentStartResult,

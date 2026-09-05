@@ -1,9 +1,6 @@
 import path from "node:path";
 import type { OpenClawConfig } from "../config/types.js";
-import {
-  POSIX_OPENCLAW_TMP_DIR,
-  resolvePreferredOpenClawTmpDir,
-} from "../infra/tmp-openclaw-dir.js";
+import { POSIX_DENNOU_TMP_DIR, resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 
 const LOG_PREFIX = "openclaw";
 const LOG_SUFFIX = ".log";
@@ -32,7 +29,7 @@ function formatLocalDate(date: Date): string {
 }
 
 export function resolveDefaultRollingLogFile(date = new Date()): string {
-  const logDir = canUseNodeFs() ? resolvePreferredOpenClawTmpDir() : POSIX_OPENCLAW_TMP_DIR;
+  const logDir = canUseNodeFs() ? resolvePreferredOpenClawTmpDir() : POSIX_DENNOU_TMP_DIR;
   return path.join(logDir, `${LOG_PREFIX}-${formatLocalDate(date)}${LOG_SUFFIX}`);
 }
 

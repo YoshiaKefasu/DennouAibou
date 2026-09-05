@@ -23,7 +23,7 @@ vi.mock("../config/config.js", () => ({
 }));
 
 vi.mock("./onboard-helpers.js", () => ({
-  DEFAULT_WORKSPACE: "~/.openclaw/workspace",
+  DEFAULT_WORKSPACE: "~/.dennou-aibou/workspace",
   handleReset: mocks.handleReset,
 }));
 

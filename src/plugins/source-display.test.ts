@@ -76,8 +76,8 @@ describe("formatPluginSourceForTable", () => {
     expectResolvedSourceRoots({
       homeDir,
       env: {
-        OPENCLAW_BUNDLED_PLUGINS_DIR: "~/bundled",
-        OPENCLAW_STATE_DIR: "~/state",
+        DENNOU_BUNDLED_PLUGINS_DIR: "~/bundled",
+        DENNOU_STATE_DIR: "~/state",
       } as NodeJS.ProcessEnv,
       workspaceDir: "~/ws",
       expected: {

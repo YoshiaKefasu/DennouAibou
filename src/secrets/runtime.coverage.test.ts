@@ -339,12 +339,12 @@ describe("secrets runtime target coverage", () => {
     clearSecretsRuntimeSnapshot();
   });
 
-  it("handles every openclaw.json registry target when configured as active", async () => {
+  it("handles every dennou-aibou.json registry target when configured as active", async () => {
     const entries = listSecretTargetRegistryEntries().filter(
-      (entry) => entry.configFile === "openclaw.json",
+      (entry) => entry.configFile === "dennou-aibou.json",
     );
     for (const [index, entry] of entries.entries()) {
-      const envId = `OPENCLAW_SECRET_TARGET_${index}`;
+      const envId = `DENNOU_SECRET_TARGET_${index}`;
       const runtimeEnvId = resolveCoverageEnvId(entry, envId);
       const expectedValue = `resolved-${entry.id}`;
       const snapshot = await prepareSecretsRuntimeSnapshot({
@@ -372,7 +372,7 @@ describe("secrets runtime target coverage", () => {
       (entry) => entry.configFile === "auth-profiles.json",
     );
     for (const [index, entry] of entries.entries()) {
-      const envId = `OPENCLAW_AUTH_SECRET_TARGET_${index}`;
+      const envId = `DENNOU_AUTH_SECRET_TARGET_${index}`;
       const expectedValue = `resolved-${entry.id}`;
       const snapshot = await prepareSecretsRuntimeSnapshot({
         config: {} as OpenClawConfig,

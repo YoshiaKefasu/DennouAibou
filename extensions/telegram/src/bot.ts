@@ -329,7 +329,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBotInstance
   };
 
   bot.use(async (ctx, next) => {
-    const updateId = resolveTelegramUpdateId(ctx);
+    const updateId = resolveTelegramUpdateId(ctx as TelegramUpdateKeyContext);
     if (typeof updateId === "number") {
       pendingUpdateIds.add(updateId);
     }
@@ -346,7 +346,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBotInstance
     }
   });
 
-  bot.use(botRuntime.sequentialize(getTelegramSequentialKey));
+  bot.use(
+    botRuntime.sequentialize((ctx: import("grammy").Context) => getTelegramSequentialKey(ctx)),
+  );
 
   const rawUpdateLogger = createSubsystemLogger("gateway/channels/telegram/raw-update");
   const MAX_RAW_UPDATE_CHARS = 8000;

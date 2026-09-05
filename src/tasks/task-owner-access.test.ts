@@ -8,30 +8,30 @@ import {
 } from "./task-owner-access.js";
 import { createTaskRecord, resetTaskRegistryForTests } from "./task-registry.js";
 
-const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 
 afterEach(() => {
   resetTaskRegistryForTests({ persist: false });
   if (ORIGINAL_STATE_DIR == null) {
-    delete process.env.OPENCLAW_STATE_DIR;
+    delete process.env.DENNOU_STATE_DIR;
   } else {
-    process.env.OPENCLAW_STATE_DIR = ORIGINAL_STATE_DIR;
+    process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
   }
 });
 
 async function withTaskRegistryTempDir<T>(run: () => Promise<T> | T): Promise<T> {
   return await withTempDir({ prefix: "openclaw-task-owner-access-" }, async (root) => {
-    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
-    process.env.OPENCLAW_STATE_DIR = root;
+    const previousStateDir = process.env.DENNOU_STATE_DIR;
+    process.env.DENNOU_STATE_DIR = root;
     resetTaskRegistryForTests({ persist: false });
     try {
       return await run();
     } finally {
       resetTaskRegistryForTests({ persist: false });
       if (previousStateDir == null) {
-        delete process.env.OPENCLAW_STATE_DIR;
+        delete process.env.DENNOU_STATE_DIR;
       } else {
-        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+        process.env.DENNOU_STATE_DIR = previousStateDir;
       }
     }
   });
@@ -68,7 +68,7 @@ describe("task owner access", () => {
   it("denies cross-owner task reads", async () => {
     await withTaskRegistryTempDir(() => {
       const task = createTaskRecord({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
         childSessionKey: "agent:main:acp:child-1",
@@ -101,7 +101,7 @@ describe("task owner access", () => {
   it("requires an exact owner-key match", async () => {
     await withTaskRegistryTempDir(() => {
       const task = createTaskRecord({
-        runtime: "acp",
+        runtime: "subagent",
         ownerKey: "agent:main:MixedCase",
         scopeKind: "session",
         runId: "case-sensitive-owner-run",

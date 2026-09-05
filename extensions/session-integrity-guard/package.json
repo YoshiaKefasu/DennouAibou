@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/session-integrity-guard",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "Periodic health check + auto-repair + Discord/Telegram notify for session JSONL integrity (Phase 3 plugin)",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.6"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -1,8 +1,5 @@
-import { buildBuiltinChatCommands } from "../../../../src/auto-reply/commands-registry.shared.js";
-import type {
-  ChatCommandDefinition,
-  CommandArgChoice,
-} from "../../../../src/auto-reply/commands-registry.types.js";
+import { buildBuiltinChatCommands } from "../_shared/chat-commands.ts";
+import type { ChatCommandDefinition, CommandArgChoice } from "../_shared/chat-command-types.ts";
 import type { IconName } from "../icons.ts";
 
 export type SlashCommandCategory = "session" | "model" | "agents" | "tools";
@@ -48,7 +45,6 @@ const COMMAND_ICON_OVERRIDES: Partial<Record<string, IconName>> = {
   subagents: "folder",
   kill: "x",
   steer: "send",
-  tts: "volume2",
 };
 
 const LOCAL_COMMANDS = new Set([
@@ -98,7 +94,7 @@ const CATEGORY_OVERRIDES: Partial<Record<string, SlashCommandCategory>> = {
   status: "tools",
   export_session: "tools",
   usage: "tools",
-  tts: "tools",
+
   agents: "agents",
   subagents: "agents",
   kill: "agents",

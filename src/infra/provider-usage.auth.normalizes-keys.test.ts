@@ -152,7 +152,6 @@ const providerRuntimeMocks = vi.hoisted(() => ({
     resolveProviderRuntimePlugin: vi.fn(() => undefined),
     resolveProviderStreamFn: vi.fn(() => undefined),
     resolveProviderSyntheticAuthWithPlugin: vi.fn(() => undefined),
-    resolveProviderXHighThinking: vi.fn(() => undefined),
     runProviderDynamicModel: vi.fn(() => undefined),
     wrapProviderStreamFn: vi.fn(() => undefined),
   },
@@ -257,7 +256,7 @@ describe("resolveProviderAuths key normalization", () => {
       ...EMPTY_PROVIDER_ENV,
       HOME: home,
       USERPROFILE: home,
-      OPENCLAW_STATE_DIR: path.join(home, ".openclaw"),
+      DENNOU_STATE_DIR: path.join(home, ".openclaw"),
       ...env,
     };
     const match = home.match(/^([A-Za-z]:)(.*)$/);
@@ -282,7 +281,7 @@ describe("resolveProviderAuths key normalization", () => {
     const stateDir = path.join(home, ".openclaw");
     await fs.mkdir(stateDir, { recursive: true });
     await fs.writeFile(
-      path.join(stateDir, "openclaw.json"),
+      path.join(stateDir, "dennou-aibou.json"),
       `${JSON.stringify(config, null, 2)}\n`,
       "utf8",
     );

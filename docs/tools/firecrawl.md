@@ -10,7 +10,7 @@ title: "Firecrawl"
 
 # Firecrawl
 
-OpenClaw can use **Firecrawl** in three ways:
+DennouAibou can use **Firecrawl** in three ways:
 
 - as the `web_search` provider
 - as explicit plugin tools: `firecrawl_search` and `firecrawl_scrape`
@@ -124,7 +124,7 @@ Core parameters:
 ## Stealth / bot circumvention
 
 Firecrawl exposes a **proxy mode** parameter for bot circumvention (`basic`, `stealth`, or `auto`).
-OpenClaw always uses `proxy: "auto"` plus `storeInCache: true` for Firecrawl requests.
+DennouAibou always uses `proxy: "auto"` plus `storeInCache: true` for Firecrawl requests.
 If proxy is omitted, Firecrawl defaults to `auto`. `auto` retries with stealth proxies if a basic attempt fails, which may use more credits
 than basic-only scraping.
 
@@ -136,7 +136,7 @@ than basic-only scraping.
 2. Firecrawl (if selected or auto-detected as the active web-fetch fallback)
 3. Basic HTML cleanup (last fallback)
 
-The selection knob is `tools.web.fetch.provider`. If you omit it, OpenClaw
+The selection knob is `tools.web.fetch.provider`. If you omit it, DennouAibou
 auto-detects the first ready web-fetch provider from available credentials.
 Today the bundled provider is Firecrawl.
 

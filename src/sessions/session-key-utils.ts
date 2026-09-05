@@ -77,19 +77,6 @@ export function getSubagentDepth(sessionKey: string | undefined | null): number 
   return raw.split(":subagent:").length - 1;
 }
 
-export function isAcpSessionKey(sessionKey: string | undefined | null): boolean {
-  const raw = (sessionKey ?? "").trim();
-  if (!raw) {
-    return false;
-  }
-  const normalized = raw.toLowerCase();
-  if (normalized.startsWith("acp:")) {
-    return true;
-  }
-  const parsed = parseAgentSessionKey(raw);
-  return Boolean((parsed?.rest ?? "").toLowerCase().startsWith("acp:"));
-}
-
 function normalizeSessionConversationChannel(value: string | undefined | null): string | undefined {
   const trimmed = (value ?? "").trim().toLowerCase();
   return trimmed || undefined;

@@ -1,5 +1,6 @@
-import { type Context, complete } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { type Context } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
+import { Type } from "typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   providerSupportsNativePdfDocument,
@@ -9,6 +10,7 @@ import {
 import { extractPdfContent, type PdfExtractedContent } from "../../media/pdf-extract.js";
 import { loadWebMediaRaw } from "../../media/web-media.js";
 import { resolveUserPath } from "../../utils.js";
+import { createLegacyAuthStorageAdapter } from "../pi-embedded-runner/auth-storage-adapter.js";
 import {
   coerceImageModelConfig,
   type ImageModelConfig,
@@ -213,8 +215,9 @@ async function runPdfPrompt(params: {
   const effectiveCfg = applyImageModelConfigDefaults(params.cfg, params.pdfModelConfig);
 
   await ensureOpenClawModelsJson(effectiveCfg, params.agentDir);
-  const authStorage = discoverAuthStorage(params.agentDir);
-  const modelRegistry = discoverModels(authStorage, params.agentDir);
+  const rawAuthStorage = discoverAuthStorage(params.agentDir);
+  const authStorage = await createLegacyAuthStorageAdapter(rawAuthStorage);
+  const modelRegistry = await discoverModels(rawAuthStorage, params.agentDir);
 
   let extractionCache: PdfExtractedContent[] | null = null;
   const getExtractions = async (): Promise<PdfExtractedContent[]> => {

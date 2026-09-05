@@ -242,11 +242,11 @@ describe("extractToolResultMediaPaths", () => {
       content: [
         {
           type: "text",
-          text: "<media:audio> was transcribed\nMEDIA:/tmp/tts-output.opus\nDone",
+          text: "<media:audio> was transcribed\nMEDIA:/tmp/reply.opus\nDone",
         },
       ],
     };
-    expect(extractToolResultMediaPaths(result)).toEqual(["/tmp/tts-output.opus"]);
+    expect(extractToolResultMediaPaths(result)).toEqual(["/tmp/reply.opus"]);
   });
 
   it("extracts multiple MEDIA: lines from a single text block", () => {

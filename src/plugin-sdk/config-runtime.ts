@@ -46,11 +46,7 @@ export {
 } from "./telegram-command-config.js";
 export { resolveActiveTalkProviderConfig } from "../config/talk.js";
 export { resolveAgentMaxConcurrent } from "../config/agent-limits.js";
-export {
-  loadCronStore,
-  resolveCronStorePath,
-  saveCronStore,
-} from "../cron/store.js";
+export { loadCronStore, resolveCronStorePath, saveCronStore } from "../cron/store.js";
 export { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js";
 export { coerceSecretRef } from "../config/types.secrets.js";
 export {
@@ -108,19 +104,12 @@ export {
   resolveStorePath,
   updateLastRoute,
   updateSessionStore,
-  type SessionResetMode,
   type SessionScope,
 } from "../config/sessions.js";
+export type { SessionResetMode } from "../config/types.base.js";
 export { resolveGroupSessionKey } from "../config/sessions/group.js";
 export { canonicalizeMainSessionAlias } from "../config/sessions/main-session.js";
-export {
-  evaluateSessionFreshness,
-  resolveChannelResetConfig,
-  resolveProtectedSessionResetPolicy,
-  resolveSessionResetPolicy,
-  resolveSessionResetType,
-  resolveThreadFlag,
-} from "../config/sessions/reset.js";
+export { resolveThreadFlag } from "../config/sessions/reset.js";
 export { resolveSessionStoreEntry } from "../config/sessions/store.js";
 export {
   isDangerousNameMatchingEnabled,

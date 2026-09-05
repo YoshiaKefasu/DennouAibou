@@ -32,13 +32,6 @@ const hoisted = vi.hoisted(() => {
     }
   }
 
-  const heartbeatStop = vi.fn();
-  const heartbeatUpdateConfig = vi.fn();
-  const startHeartbeatRunner = vi.fn(() => ({
-    stop: heartbeatStop,
-    updateConfig: heartbeatUpdateConfig,
-  }));
-
   const startGmailWatcher = vi.fn(async () => ({ started: true }));
   const stopGmailWatcher = vi.fn(async () => {});
 
@@ -132,9 +125,6 @@ const hoisted = vi.hoisted(() => {
   return {
     CronService: CronServiceMock,
     cronInstances,
-    heartbeatStop,
-    heartbeatUpdateConfig,
-    startHeartbeatRunner,
     startGmailWatcher,
     stopGmailWatcher,
     providerManager,
@@ -148,10 +138,6 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock("../cron/service.js", () => ({
   CronService: hoisted.CronService,
-}));
-
-vi.mock("../infra/heartbeat-runner.js", () => ({
-  startHeartbeatRunner: hoisted.startHeartbeatRunner,
 }));
 
 vi.mock("../hooks/gmail-watcher.js", () => ({
@@ -177,31 +163,31 @@ describe("gateway hot reload", () => {
   let prevGeminiApiKey: string | undefined;
 
   beforeEach(() => {
-    prevSkipChannels = process.env.OPENCLAW_SKIP_CHANNELS;
-    prevSkipGmail = process.env.OPENCLAW_SKIP_GMAIL_WATCHER;
-    prevSkipProviders = process.env.OPENCLAW_SKIP_PROVIDERS;
+    prevSkipChannels = process.env.DENNOU_SKIP_CHANNELS;
+    prevSkipGmail = process.env.DENNOU_SKIP_GMAIL_WATCHER;
+    prevSkipProviders = process.env.DENNOU_SKIP_PROVIDERS;
     prevOpenAiApiKey = process.env.OPENAI_API_KEY;
     prevGeminiApiKey = process.env.GEMINI_API_KEY;
-    process.env.OPENCLAW_SKIP_CHANNELS = "0";
-    delete process.env.OPENCLAW_SKIP_GMAIL_WATCHER;
-    delete process.env.OPENCLAW_SKIP_PROVIDERS;
+    process.env.DENNOU_SKIP_CHANNELS = "0";
+    delete process.env.DENNOU_SKIP_GMAIL_WATCHER;
+    delete process.env.DENNOU_SKIP_PROVIDERS;
   });
 
   afterEach(() => {
     if (prevSkipChannels === undefined) {
-      delete process.env.OPENCLAW_SKIP_CHANNELS;
+      delete process.env.DENNOU_SKIP_CHANNELS;
     } else {
-      process.env.OPENCLAW_SKIP_CHANNELS = prevSkipChannels;
+      process.env.DENNOU_SKIP_CHANNELS = prevSkipChannels;
     }
     if (prevSkipGmail === undefined) {
-      delete process.env.OPENCLAW_SKIP_GMAIL_WATCHER;
+      delete process.env.DENNOU_SKIP_GMAIL_WATCHER;
     } else {
-      process.env.OPENCLAW_SKIP_GMAIL_WATCHER = prevSkipGmail;
+      process.env.DENNOU_SKIP_GMAIL_WATCHER = prevSkipGmail;
     }
     if (prevSkipProviders === undefined) {
-      delete process.env.OPENCLAW_SKIP_PROVIDERS;
+      delete process.env.DENNOU_SKIP_PROVIDERS;
     } else {
-      process.env.OPENCLAW_SKIP_PROVIDERS = prevSkipProviders;
+      process.env.DENNOU_SKIP_PROVIDERS = prevSkipProviders;
     }
     if (prevOpenAiApiKey === undefined) {
       delete process.env.OPENAI_API_KEY;
@@ -240,9 +226,9 @@ describe("gateway hot reload", () => {
   }
 
   async function writeConfigFile(config: unknown) {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
-      throw new Error("OPENCLAW_CONFIG_PATH is not set");
+      throw new Error("DENNOU_CONFIG_PATH is not set");
     }
     await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
   }
@@ -304,9 +290,9 @@ describe("gateway hot reload", () => {
   }
 
   async function writeDisabledSurfaceRefConfig() {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
-      throw new Error("OPENCLAW_CONFIG_PATH is not set");
+      throw new Error("DENNOU_CONFIG_PATH is not set");
     }
     await fs.writeFile(
       configPath,
@@ -339,9 +325,9 @@ describe("gateway hot reload", () => {
   }
 
   async function writeGatewayTokenRefConfig() {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
-      throw new Error("OPENCLAW_CONFIG_PATH is not set");
+      throw new Error("DENNOU_CONFIG_PATH is not set");
     }
     await fs.writeFile(
       configPath,
@@ -367,9 +353,9 @@ describe("gateway hot reload", () => {
   }
 
   async function writeAuthProfileEnvRefStore() {
-    const stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = process.env.DENNOU_STATE_DIR;
     if (!stateDir) {
-      throw new Error("OPENCLAW_STATE_DIR is not set");
+      throw new Error("DENNOU_STATE_DIR is not set");
     }
     const authStorePath = path.join(stateDir, "agents", "main", "agent", "auth-profiles.json");
     await fs.mkdir(path.dirname(authStorePath), { recursive: true });
@@ -382,7 +368,7 @@ describe("gateway hot reload", () => {
             missing: {
               type: "api_key",
               provider: "openai",
-              keyRef: { source: "env", provider: "default", id: "MISSING_OPENCLAW_AUTH_REF" },
+              keyRef: { source: "env", provider: "default", id: "MISSING_DENNOU_AUTH_REF" },
             },
           },
           selectedProfileId: "missing",
@@ -397,9 +383,9 @@ describe("gateway hot reload", () => {
   }
 
   async function writeWebSearchGeminiRefConfig() {
-    const configPath = process.env.OPENCLAW_CONFIG_PATH;
+    const configPath = process.env.DENNOU_CONFIG_PATH;
     if (!configPath) {
-      throw new Error("OPENCLAW_CONFIG_PATH is not set");
+      throw new Error("DENNOU_CONFIG_PATH is not set");
     }
     await fs.writeFile(
       configPath,
@@ -434,7 +420,7 @@ describe("gateway hot reload", () => {
   }
 
   async function removeMainAuthProfileStore() {
-    const stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = process.env.DENNOU_STATE_DIR;
     if (!stateDir) {
       return;
     }
@@ -495,7 +481,6 @@ describe("gateway hot reload", () => {
           changedPaths: [
             "hooks.gmail.account",
             "cron.enabled",
-            "agents.defaults.heartbeat.every",
             "web.enabled",
             "channels.telegram.botToken",
             "channels.discord.token",
@@ -508,7 +493,7 @@ describe("gateway hot reload", () => {
           reloadHooks: true,
           restartGmailWatcher: true,
           restartCron: true,
-          restartHeartbeat: true,
+          restartHealthMonitor: false,
           restartChannels: new Set(["whatsapp", "telegram", "discord", "signal", "imessage"]),
           noopPaths: [],
         },
@@ -517,12 +502,6 @@ describe("gateway hot reload", () => {
 
       expect(hoisted.stopGmailWatcher).toHaveBeenCalled();
       expect(hoisted.startGmailWatcher).toHaveBeenCalledWith(expect.objectContaining(nextConfig));
-
-      expect(hoisted.startHeartbeatRunner).toHaveBeenCalledTimes(1);
-      expect(hoisted.heartbeatUpdateConfig).toHaveBeenCalledTimes(1);
-      expect(hoisted.heartbeatUpdateConfig).toHaveBeenCalledWith(
-        expect.objectContaining(nextConfig),
-      );
 
       expect(hoisted.cronInstances.length).toBe(2);
       expect(hoisted.cronInstances[0].stop).toHaveBeenCalledTimes(1);
@@ -579,16 +558,16 @@ describe("gateway hot reload", () => {
   it("allows startup when unresolved channel refs exist but channels are skipped", async () => {
     await writeChannelEnvRefConfig();
     delete process.env.TELEGRAM_BOT_TOKEN;
-    process.env.OPENCLAW_SKIP_CHANNELS = "1";
+    process.env.DENNOU_SKIP_CHANNELS = "1";
     await expect(withGatewayServer(async () => {})).resolves.toBeUndefined();
   });
 
   it("fails startup when an active exec ref id contains traversal segments", async () => {
     await writeGatewayTraversalExecRefConfig();
     const previousGatewayAuth = testState.gatewayAuth;
-    const previousGatewayTokenEnv = process.env.OPENCLAW_GATEWAY_TOKEN;
+    const previousGatewayTokenEnv = process.env.DENNOU_GATEWAY_TOKEN;
     testState.gatewayAuth = undefined;
-    delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    delete process.env.DENNOU_GATEWAY_TOKEN;
     try {
       await expect(withGatewayServer(async () => {})).rejects.toThrow(
         /must not include "\." or "\.\." path segments/i,
@@ -596,9 +575,9 @@ describe("gateway hot reload", () => {
     } finally {
       testState.gatewayAuth = previousGatewayAuth;
       if (previousGatewayTokenEnv === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = previousGatewayTokenEnv;
+        process.env.DENNOU_GATEWAY_TOKEN = previousGatewayTokenEnv;
       }
     }
   });
@@ -627,10 +606,10 @@ describe("gateway hot reload", () => {
 
   it("fails startup when auth-profile secret refs are unresolved", async () => {
     await writeAuthProfileEnvRefStore();
-    delete process.env.MISSING_OPENCLAW_AUTH_REF;
+    delete process.env.MISSING_DENNOU_AUTH_REF;
     try {
       await expect(withGatewayServer(async () => {})).rejects.toThrow(
-        'Environment variable "MISSING_OPENCLAW_AUTH_REF" is missing or empty.',
+        'Environment variable "MISSING_DENNOU_AUTH_REF" is missing or empty.',
       );
     } finally {
       await removeMainAuthProfileStore();
@@ -721,7 +700,7 @@ describe("gateway hot reload", () => {
                   apiKey: {
                     source: "env",
                     provider: "default",
-                    id: "OPENCLAW_TEST_MISSING_GEMINI_API_KEY",
+                    id: "DENNOU_TEST_MISSING_GEMINI_API_KEY",
                   },
                 },
               },
@@ -746,7 +725,7 @@ describe("gateway hot reload", () => {
       };
 
       delete process.env.GEMINI_API_KEY;
-      delete process.env.OPENCLAW_TEST_MISSING_GEMINI_API_KEY;
+      delete process.env.DENNOU_TEST_MISSING_GEMINI_API_KEY;
       expect(drainSystemEvents(sessionKey)).toEqual([]);
       await expect(onHotReload?.(plan, degradedConfig)).resolves.toBeUndefined();
       expect(drainSystemEvents(sessionKey)).toEqual([]);
@@ -820,9 +799,9 @@ describe("gateway hot reload", () => {
   });
 
   it("keeps last-known-good auth snapshot active when gateway auth token exec reload fails", async () => {
-    const stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = process.env.DENNOU_STATE_DIR;
     if (!stateDir) {
-      throw new Error("OPENCLAW_STATE_DIR is not set");
+      throw new Error("DENNOU_STATE_DIR is not set");
     }
     const resolverScriptPath = path.join(stateDir, "gateway-auth-token-resolver.cjs");
     const modePath = path.join(stateDir, "gateway-auth-token-resolver.mode");
@@ -874,11 +853,11 @@ process.stdin.on("end", () => {
     });
 
     const previousGatewayAuth = testState.gatewayAuth;
-    const previousGatewayTokenEnv = process.env.OPENCLAW_GATEWAY_TOKEN;
+    const previousGatewayTokenEnv = process.env.DENNOU_GATEWAY_TOKEN;
     let started: Awaited<ReturnType<typeof startServerWithClient>> | undefined;
     try {
       testState.gatewayAuth = undefined;
-      delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      delete process.env.DENNOU_GATEWAY_TOKEN;
 
       started = await startServerWithClient();
       const { ws } = started;
@@ -913,9 +892,9 @@ process.stdin.on("end", () => {
     } finally {
       testState.gatewayAuth = previousGatewayAuth;
       if (previousGatewayTokenEnv === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = previousGatewayTokenEnv;
+        process.env.DENNOU_GATEWAY_TOKEN = previousGatewayTokenEnv;
       }
       started?.envSnapshot.restore();
       started?.ws.close();
@@ -924,9 +903,9 @@ process.stdin.on("end", () => {
   });
 
   it("uses refreshed gateway auth for new websocket connects after secrets reload", async () => {
-    const stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = process.env.DENNOU_STATE_DIR;
     if (!stateDir) {
-      throw new Error("OPENCLAW_STATE_DIR is not set");
+      throw new Error("DENNOU_STATE_DIR is not set");
     }
     const resolverScriptPath = path.join(stateDir, "gateway-auth-refresh-resolver.cjs");
     const tokenPath = path.join(stateDir, "gateway-auth-refresh-token.txt");
@@ -980,11 +959,11 @@ process.stdin.on("end", () => {
     });
 
     const previousGatewayAuth = testState.gatewayAuth;
-    const previousGatewayTokenEnv = process.env.OPENCLAW_GATEWAY_TOKEN;
+    const previousGatewayTokenEnv = process.env.DENNOU_GATEWAY_TOKEN;
     let started: Awaited<ReturnType<typeof startServerWithClient>> | undefined;
     try {
       testState.gatewayAuth = undefined;
-      delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      delete process.env.DENNOU_GATEWAY_TOKEN;
 
       started = await startServerWithClient();
       const { ws, port } = started;
@@ -1018,9 +997,9 @@ process.stdin.on("end", () => {
     } finally {
       testState.gatewayAuth = previousGatewayAuth;
       if (previousGatewayTokenEnv === undefined) {
-        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+        delete process.env.DENNOU_GATEWAY_TOKEN;
       } else {
-        process.env.OPENCLAW_GATEWAY_TOKEN = previousGatewayTokenEnv;
+        process.env.DENNOU_GATEWAY_TOKEN = previousGatewayTokenEnv;
       }
       started?.envSnapshot.restore();
       started?.ws.close();

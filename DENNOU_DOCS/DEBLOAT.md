@@ -1,6 +1,6 @@
 # DEBLOAT — 大規模削除クリーンアップ計画
 
-> 最終更新: 2026-08-16
+> 最終更新: 2026-08-21
 > 対象リポジトリ: DennouAibou（OpenClaw Hard Fork, base v2026.4.5）
 
 ## 1. 目的と方針
@@ -30,7 +30,8 @@ DENNOU_RULES.md の Smart Debloat は「エントリー無効化（feature flag�
 
 この判断の根拠:
 
-- モデルプロバイダー 35 個は KASOU 運用で完全に未使用。サブプロバイダー 6 個のうち elevenlabs は KASOU tts で実運用中のため、設定掃除（Phase 6）を伴う削除として扱う
+- モデルプロバイダー 35 個は KASOU 運用で完全に未使用。サブプロバイダー 6 個のうち elevenlabs は KASOU tts で実運用中 のため、設定掃除（Phase 6）を伴う削除として扱う
+  ※ **17章により TTS は完全撤去された（2026-08-21）。上記 elevenlabs の実運用記述は無効。**
 - コア編集は「削除プロバイダー専用の参照」に限定し、共有 API タイプ（`anthropic-messages` 等）は残す
 - 上流同期（`[SYNC]`）時に削除フォルダが復活するリスクは承知しており、`.gitignore` や merge 時の再削除運用で対応する（9 章）
 
@@ -46,9 +47,9 @@ DENNOU_RULES.md の Smart Debloat は「エントリー無効化（feature flag�
 
 `api.registerProvider()` を呼んでいる、または `openclaw.plugin.json` に provider メタを持つ extension。
 
-| カテゴリ | ディレクトリ |
-|---|---|
-| **残す** | `google`, `openai` |
+| カテゴリ     | ディレクトリ                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **残す**     | `google`, `openai`                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **削除候補** | `alibaba`, `anthropic`, `anthropic-vertex`, `byteplus`, `chutes`, `cloudflare-ai-gateway`, `deepseek`, `fireworks`, `groq`, `huggingface`, `kilocode`, `kimi-coding`, `litellm`, `microsoft`, `microsoft-foundry`, `minimax`, `mistral`, `moonshot`, `nvidia`, `ollama`, `opencode`, `opencode-go`, `openrouter`, `qianfan`, `qwen`, `sglang`, `stepfun`, `synthetic`, `together`, `venice`, `vercel-ai-gateway`, `vllm`, `volcengine`, `xai`, `xiaomi` |
 
 ※ `comfy` / `fal` は `registerProvider`、`runway` は `registerVideoGenerationProvider`、`copilot-proxy` は `registerProvider`（LLM プロキシ）を呼ぶ。いずれも **2026-08-15 に削除確定**（4.1 章）。
@@ -69,15 +70,15 @@ DENNOU_RULES.md の Smart Debloat は「エントリー無効化（feature flag�
 
 #### D. サブプロバイダー（削除確定 6 / 残す 3）
 
-| 種別 | ディレクトリ | 判定 |
-|---|---|---|
-| STT（音声認識） | `deepgram` | **残す**（KASOU `tools.media.audio` 実運用中） |
-| TTS（音声合成） | `elevenlabs` | **削除確定**（KASOU tts 設定・行 378 の掃除が必要） |
-| Web Search | `brave` | **残す**（KASOU `plugins.entries.brave` 有効化済み） |
-| Web Search | `exa` | **残す**（KASOU `tools.web.search.provider: "exa"` 実運用中） |
-| Web Search | `perplexity` | **削除確定** |
-| Media 生成 | `comfy`, `fal`, `runway` | **削除確定** |
-| LLM プロキシ | `copilot-proxy` | **削除確定** |
+| 種別            | ディレクトリ             | 判定                                                          |
+| --------------- | ------------------------ | ------------------------------------------------------------- |
+| STT（音声認識） | `deepgram`               | **残す**（KASOU `tools.media.audio` 実運用中）                |
+| TTS（音声合成） | `elevenlabs`             | **削除確定**（KASOU tts 設定・行 378 の掃除が必要）           |
+| Web Search      | `brave`                  | **残す**（KASOU `plugins.entries.brave` 有効化済み）          |
+| Web Search      | `exa`                    | **残す**（KASOU `tools.web.search.provider: "exa"` 実運用中） |
+| Web Search      | `perplexity`             | **削除確定**                                                  |
+| Media 生成      | `comfy`, `fal`, `runway` | **削除確定**                                                  |
+| LLM プロキシ    | `copilot-proxy`          | **削除確定**                                                  |
 
 ---
 
@@ -151,22 +152,22 @@ runway         (動画生成)
 
 以下の 6 個を **削除確定** とする（ユーザー指示 2026-08-15）:
 
-| ディレクトリ | 種別 | 備考 |
-|---|---|---|
-| `elevenlabs` | TTS | KASOU `tts` 設定（行 378）で実運用中 → **設定掃除も必須** |
-| `copilot-proxy` | LLM プロキシ | 未使用 |
-| `perplexity` | Web Search | 未使用 |
-| `comfy` | 画像生成 | 未使用 |
-| `fal` | 画像・動画生成 | 未使用 |
-| `runway` | 動画生成 | 未使用 |
+| ディレクトリ    | 種別           | 備考                                                      |
+| --------------- | -------------- | --------------------------------------------------------- |
+| `elevenlabs`    | TTS            | KASOU `tts` 設定（行 378）で実運用中 → **設定掃除も必須** |
+| `copilot-proxy` | LLM プロキシ   | 未使用                                                    |
+| `perplexity`    | Web Search     | 未使用                                                    |
+| `comfy`         | 画像生成       | 未使用                                                    |
+| `fal`           | 画像・動画生成 | 未使用                                                    |
+| `runway`        | 動画生成       | 未使用                                                    |
 
 ### 4.2 残すサブプロバイダー（実運用依存）
 
-| ディレクトリ | 種別 | 残す根拠 |
-|---|---|---|
-| `deepgram` | STT（音声認識） | KASOU `tools.media.audio` の `providerOptions` / `models[0].provider` に設定あり（実運用中） |
-| `brave` | Web Search | KASOU `plugins.entries.brave` 有効化済み |
-| `exa` | Web Search | KASOU `tools.web.search.provider: "exa"`（実運用中） |
+| ディレクトリ | 種別            | 残す根拠                                                                                     |
+| ------------ | --------------- | -------------------------------------------------------------------------------------------- |
+| `deepgram`   | STT（音声認識） | KASOU `tools.media.audio` の `providerOptions` / `models[0].provider` に設定あり（実運用中） |
+| `brave`      | Web Search      | KASOU `plugins.entries.brave` 有効化済み                                                     |
+| `exa`        | Web Search      | KASOU `tools.web.search.provider: "exa"`（実運用中）                                         |
 
 ※ これらの 3 個は第二段階以降で個別に再判断する。
 
@@ -482,22 +483,22 @@ foreach ($t in $targets) { Remove-Item "extensions\$t" -Recurse -Force }
 
 ## 7. リスクと対策
 
-| リスク | 対策 |
-|---|---|
-| コアの共有 API タイプ（`anthropic-messages` 等）を誤って削除 | 共有タイプは残す。削除前に grep で使用箇所を全て確認 |
-| KASOU 設定が未使用プロバイダーを参照 | Phase 1 で `openclaw.json` を確認。デフォルトモデル・fallback は Google / OpenAI のみだが、`auth.profiles` に `openrouter:default` / `kilocode:default` が残留 → Phase 6 で除去 |
-| gateway 起動時に未登録プロバイダーの auth.profiles でエラー | Phase 1 で起動テストし、エラーが出る場合は profile 除去を Phase 6 より前倒し |
-| plugin-sdk facade の type-import で `pnpm build:plugin-sdk:dts` が失敗 | `dennou-removed-plugin-facades.d.ts` に declare module を追加（既存パターン）。**ollama は `api.js` と `runtime-api.js` の 2 エントリ必要**（5.7 章） |
-| 上流 `[SYNC]` で削除フォルダが復活 | merge 時の再削除運用を確立。削除対象フォルダの一覧を本ドキュメントで管理 |
-| デフォルトモデル文字列（`anthropic/claude-*`）が参照エラー | モデル名は文字列なので残す。プロバイダー登録と独立 |
-| ビルドが extension の型を参照 | Phase 4 でクリーンビルド。失敗箇所を特定して修正 |
-| メモリ（embedding）設定が削除プロバイダーに依存 | **修正（Phase 1）**: ollama embedding は `plugin-sdk/ollama-runtime.ts` の eager 定数経由で extensions/ollama に依存している（モデルプロバイダーとは独立ではない）。Phase 2 で embedding path を除去（5.11 章）。mistral 等の他 embedding backend はコア自己完結なので影響なし |
-| コアの削除対象プロバイダー専用コードを誤って削除（LIVE コード） | 5.12 章の分類に従う。minimax-stream-wrappers / moonshot-stream-wrappers / minimax-vlm / anthropic-vertex-stream / provider-usage.fetch.minimax は **本番 import あり**（kept の google / openai が利用）— 削除しない |
-| 契約テストが削除対象 extension を import | 5.13 章の fixture（provider-runtime / provider-discovery / provider-auth contract）を google / openai に書き換え（RED 解消済み）。`plugin-registration.*.contract.test.ts` は削除済み manifest を要求し FAIL したため、死んだ provider 契約テスト 25 + 11 ファイルを削除（Phase 4 / 2026-08-16 フォローアップ） |
-| 将来また使いたくなる | git 履歴から復元可能。必要なら別ブランチで退避する |
-| テストが削除対象プロバイダーをモック参照 | テストデータは文字列なので基本影響なし。影響あるテストのみ修正 |
-| KASOU `tts` 設定が削除対象（elevenlabs）を参照 | Phase 6 で `tts` 設定の elevenlabs ブロックを除去。除去後の TTS 利用可否を確認 |
-| extensions/ ルートの live-test が削除対象を import | `extensions/music-generation-providers.live.test.ts` / `video-generation-providers.live.test.ts` はフォルダ削除では消えない — Phase 3 で明示削除（`vydra` import は存在しない stale） |
+| リスク                                                                 | 対策                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| コアの共有 API タイプ（`anthropic-messages` 等）を誤って削除           | 共有タイプは残す。削除前に grep で使用箇所を全て確認                                                                                                                                                                                                                                                            |
+| KASOU 設定が未使用プロバイダーを参照                                   | Phase 1 で `openclaw.json` を確認。デフォルトモデル・fallback は Google / OpenAI のみだが、`auth.profiles` に `openrouter:default` / `kilocode:default` が残留 → Phase 6 で除去                                                                                                                                 |
+| gateway 起動時に未登録プロバイダーの auth.profiles でエラー            | Phase 1 で起動テストし、エラーが出る場合は profile 除去を Phase 6 より前倒し                                                                                                                                                                                                                                    |
+| plugin-sdk facade の type-import で `pnpm build:plugin-sdk:dts` が失敗 | `dennou-removed-plugin-facades.d.ts` に declare module を追加（既存パターン）。**ollama は `api.js` と `runtime-api.js` の 2 エントリ必要**（5.7 章）                                                                                                                                                           |
+| 上流 `[SYNC]` で削除フォルダが復活                                     | merge 時の再削除運用を確立。削除対象フォルダの一覧を本ドキュメントで管理                                                                                                                                                                                                                                        |
+| デフォルトモデル文字列（`anthropic/claude-*`）が参照エラー             | モデル名は文字列なので残す。プロバイダー登録と独立                                                                                                                                                                                                                                                              |
+| ビルドが extension の型を参照                                          | Phase 4 でクリーンビルド。失敗箇所を特定して修正                                                                                                                                                                                                                                                                |
+| メモリ（embedding）設定が削除プロバイダーに依存                        | **修正（Phase 1）**: ollama embedding は `plugin-sdk/ollama-runtime.ts` の eager 定数経由で extensions/ollama に依存している（モデルプロバイダーとは独立ではない）。Phase 2 で embedding path を除去（5.11 章）。mistral 等の他 embedding backend はコア自己完結なので影響なし                                  |
+| コアの削除対象プロバイダー専用コードを誤って削除（LIVE コード）        | 5.12 章の分類に従う。minimax-stream-wrappers / moonshot-stream-wrappers / minimax-vlm / anthropic-vertex-stream / provider-usage.fetch.minimax は **本番 import あり**（kept の google / openai が利用）— 削除しない                                                                                            |
+| 契約テストが削除対象 extension を import                               | 5.13 章の fixture（provider-runtime / provider-discovery / provider-auth contract）を google / openai に書き換え（RED 解消済み）。`plugin-registration.*.contract.test.ts` は削除済み manifest を要求し FAIL したため、死んだ provider 契約テスト 25 + 11 ファイルを削除（Phase 4 / 2026-08-16 フォローアップ） |
+| 将来また使いたくなる                                                   | git 履歴から復元可能。必要なら別ブランチで退避する                                                                                                                                                                                                                                                              |
+| テストが削除対象プロバイダーをモック参照                               | テストデータは文字列なので基本影響なし。影響あるテストのみ修正                                                                                                                                                                                                                                                  |
+| KASOU `tts` 設定が削除対象（elevenlabs）を参照                         | Phase 6 で `tts` 設定の elevenlabs ブロックを除去。除去後の TTS 利用可否を確認                                                                                                                                                                                                                                  |
+| extensions/ ルートの live-test が削除対象を import                     | `extensions/music-generation-providers.live.test.ts` / `video-generation-providers.live.test.ts` はフォルダ削除では消えない — Phase 3 で明示削除（`vydra` import は存在しない stale）                                                                                                                           |
 
 ---
 
@@ -599,7 +600,7 @@ Phase 3 の extension 削除（commit `80f662c0c3c`）後に `pnpm test:contract
 
 ### フォローアップ（2026-08-16）
 
-- 5.13 章の「plugin-registration.* は仮想ケースなので壊れない」が **実測で否定**（12 ファイルが削除済み manifest を要求し FAIL）
+- 5.13 章の「plugin-registration.\* は仮想ケースなので壊れない」が **実測で否定**（12 ファイルが削除済み manifest を要求し FAIL）
 - 同一欠陥クラスの残り **11 ファイルを追加削除**: `plugin-registration.{duckduckgo,firecrawl,tavily,zai}` / `bundled-web-search.{duckduckgo,firecrawl,searxng,tavily}` / `web-search-provider.{duckduckgo,firecrawl,tavily}`（削除前に単一引数の共有 helper 呼び出しであることを検証済み）
 - `registry.retry.test.ts` の残存モック id を neutral id（provider-a / provider-b / search-c / fetch-a）に置換（openai / openai-codex の alias ケースは変更なし）
 - フォローアップ後（実測）: **8 ファイル / 22 テスト失敗** — duckduckgo / firecrawl / searxng / tavily / zai グループは消滅。残りは全て pre-existing（8 章の一覧）
@@ -657,3 +658,749 @@ code-review で指摘された docs 残骸を修正（コミットなし・作�
 8. **azure.md の推奨プロバイダー文言を修正**: `docs/install/azure.md` の「GitHub Copilot provider を選択」推奨（削除済みプロバイダー）を「OpenAI or Google API key を設定」推奨に言い換え
 9. **slash-commands.md の `/fast` 説明をトリム**: 削除済み Anthropic プロバイダーの OAuth / `service_tier=auto|standard_only` 記述を除去し、OpenAI/Codex の `service_tier=priority` 説明のみに
 
+---
+
+## 14. Phase B: 追加 Debloat（未使用機能の削除）
+
+> **目標**: Provider 削除に加え、KASOU で未使用の機能・チャンネル・ツールを追加削除
+> **工数目安**: 2-3日
+> **前提**: Phase A (Branding) と並行可能
+
+### 14.1 削除候補のカテゴリ
+
+#### A. 未使用チャンネル
+
+KASOU で実際に使われているチャンネル: **Telegram**（メイン）+ **Discord**（`openclaw.json` に channel 設定あり）。
+
+**注意**: GRKD-Jisho は**独自の discord.js 接続**を使い、DennouAibou の Discord extension には依存しない。ただし KASOU の `openclaw.json` に Discord channel 設定が存在するため、**Discord が DennouAibou gateway 経由で使われている可能性がある**。Phase B-1 の前に KASOU 設定を確認し、Discord の使用有無を確定すること。
+
+| チャンネル              | 用途                               | 削除判定                                                               |
+| ----------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| **telegram**            | KASOU main                         | **維持**                                                               |
+| **discord**             | KASOU に channel 設定あり → 要確認 | **要確認**                                                             |
+| **googlechat**          | 未使用                             | **削除候補**                                                           |
+| **imessage**            | 未使用                             | **削除候補**                                                           |
+| **mattermost**          | 未使用                             | **削除候補**                                                           |
+| **matrix**              | 未使用                             | **削除候補**                                                           |
+| **slack**               | 未使用                             | **削除候補**                                                           |
+| **whatsapp**            | 未使用                             | **削除候補**                                                           |
+| **irc**                 | 未使用                             | **削除候補**                                                           |
+| **nostr**               | 未使用                             | **削除候補**                                                           |
+| **bluebubbles**         | 未使用                             | **削除候補**                                                           |
+| **feishu**              | 未使用                             | **削除候補**                                                           |
+| **tlon**                | 未使用                             | **削除候補**                                                           |
+| **nextcloud-talk**      | 未使用                             | **削除候補**                                                           |
+| **synology-chat**       | 未使用                             | **削除候補**                                                           |
+| **zalo** / **zalouser** | 未使用                             | **削除候補**                                                           |
+| **line**                | 未使用                             | **候補保留** → ch.18.2 で温存決定済み（メッセージAPIプラグイン化候補） |
+| **twitch**              | 未使用                             | **削除候補**                                                           |
+| **msteams**             | 未使用                             | **削除候補**                                                           |
+
+#### B. 未使用ツール・チャネルプラグイン
+
+| プラグイン        | 種類       | 用途                                                 | 削除判定     |
+| ----------------- | ---------- | ---------------------------------------------------- | ------------ |
+| **qa-channel**    | チャンネル | QA チャンネル                                        | **削除候補** |
+| **talk-voice**    | ツール     | 音声選択（`enabledByDefault: true`）                 | **削除候補** |
+| **openshell**     | ツール     | リモートシェル                                       | **削除候補** |
+| **phone-control** | ツール     | スマホ操作                                           | **削除候補** |
+| **browser**       | ツール     | ブラウザ操作                                         | **削除候補** |
+| **voice-call**    | ツール     | 音声通話（elevenlabs TTS 依存 → Phase A で削除済み） | **削除候補** |
+
+#### C. 未使用サブプロバイダー（kept プロバイダー内）
+
+| プロバイダー | サブ機能   | 削除判定                  |
+| ------------ | ---------- | ------------------------- |
+| **deepgram** | STT/TTS    | KASOU で使用中 → **維持** |
+| **brave**    | Web Search | KASOU で使用中 → **維持** |
+| **exa**      | Web Search | KASOU で使用中 → **維持** |
+
+#### D. コア内のデッドコード
+
+Provider 削除で生まれたデッドコードの追加掃除:
+
+1. **src/agents/byteplus-models.ts** — import 元なし（**削除**）
+2. **src/config/zod-schema.core.ts** — 削除済みプロバイダーの `thinkingFormat` literal（確認後削除）
+3. **src/plugins/discovery.test.ts** — 削除済みプロバイダーの package マッピング fixture（静的データなので生存確認のみ）
+
+#### E. 未使用モバイルアプリ（KASOU スコープ外）
+
+| アプリ          | 状態 | 削除判定                                            |
+| --------------- | ---- | --------------------------------------------------- |
+| **apps/macos/** | 実在 | KASOU 不要 → **削除候補**（git ブランチで退避推奨） |
+
+**注意**: `apps/ios/` と `apps/android/` はリポジトリに**存在しない**。削除対象外。
+
+### 14.2 削除手順
+
+1. **Phase B-1: チャンネル削除**
+   - `extensions/{imessage,mattermost,matrix,slack,...}/` を削除
+   - `extensions/googlechat/` を削除
+   - `extensions/qa-channel/` を削除
+   - `extensions/talk-voice/` を削除（`enabledByDefault: true` なので auto-activate を停止）
+   - `extensions/voice-call/` を削除（elevenlabs 依存 → Phase A で削除済みと整合）
+   - **⚠️ コア参照のクリーンアップ（必須）**:
+     - `src/config/bundled-channel-config-metadata.generated.ts` から削除チャンネルのエントリを除去
+     - `src/plugin-sdk/qa-channel.ts` — `declare module` パターンで `dennou-removed-plugin-facades.d.ts` に追加
+     - `src/plugin-sdk/talk-voice.ts` — 同上
+     - `src/channels/plugins/contracts/channel-import-guardrails.test.ts` の allowlist から削除チャンネルを除去
+     - 削除後 `pnpm build:plugin-sdk:dts` を実行し、型エラーがないことを確認
+   - ビルド・テスト確認
+
+2. **Phase B-2: ツールプラグイン削除**
+   - `extensions/{openshell,phone-control,browser}/` を削除
+   - ツール参照のコアコードを確認
+   - ビルド・テスト確認
+
+3. **Phase B-3: デッドコード掃除**
+   - `src/agents/byteplus-models.ts` を削除
+   - テスト修正
+
+4. **Phase B-4: モバイルアプリ退避**（判断後）
+   - `git branch backup/mobile-apps` で退避
+   - `apps/macos/` を削除
+   - package.json のモバイル関連スクリプトを削除
+
+### 14.3 リスク
+
+| リスク                                                                                  | 対策                                                                    |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| チャンネル削除で `bundled-channel-config-metadata.generated.ts` の stale エントリが残る | 削除後に再生成                                                          |
+| `plugin-sdk` facade の `declare module` が足りず `pnpm build:plugin-sdk:dts` が失敗     | `dennou-removed-plugin-facades.d.ts` に追加（Phase A 5.7 章のパターン） |
+| `channel-import-guardrails.test.ts` の allowlist が壊れる                               | 削除チャンネルを allowlist から除去                                     |
+| Discord 削除で KASOU の Discord 応答が止まる                                            | Phase B-1 の前に KASOU 設定で Discord 使用有無を確認                    |
+| ツール削除で他プラグインが依存                                                          | 削除前に grep で依存確認                                                |
+| `voice-call` 削除で elevenlabs schema が孤立                                            | Phase A で elevenlabs 設定削除済みと整合確認                            |
+
+### 14.4 検証基準
+
+- [ ] 削除後の `pnpm build` が通る
+- [ ] 削除後の `pnpm build:plugin-sdk:dts` が通る
+- [ ] 削除後の `pnpm test` が通る（既存失敗が増えない）
+- [ ] 削除後の `pnpm test:contracts` が通る（既存失敗が増えない）
+- [ ] KASOU デプロイ後、Telegram 応答が正常
+- [ ] KASOU デプロイ後、gateway が起動し `/` `/logs` で HTTP 200
+- [ ] Discord の使用有無を確認し、結果を記録
+
+### 14.5 実施記録
+
+| 日付 | 内容 | 状態 |
+| ---- | ---- | ---- |
+|      |      |      |
+
+---
+
+## 15. Phase B-5: Google Gemini CLI 廃止（緊急対応）
+
+> **目標**: Google Gemini CLI のライセンス停止に伴い、KASOU のプロバイダー設定を Google REST API に移行
+> **工数目安**: 0.5日
+> **前提**: Phase B-1〜B-4 と並行可能
+
+### 15.1 背景
+
+- **2026-08-20**: Google Gemini CLI が403エラー（`Cloud Code Assist API error (403): You do not have a valid license of this product.`）
+- フォールバック先も全て失敗（Gemini CLI系403、openai-codex 401）
+- **結論**: Google Gemini CLI は使用不可。Google REST API（API Key ベース）に移行
+
+### 15.2 移行先の選択肢
+
+| プロバイダー          | 認証方式 | 既存設定                                | 備考             |
+| --------------------- | -------- | --------------------------------------- | ---------------- |
+| **google** (REST API) | API Key  | `.env` の `GEMINI_API_KEY` を再利用可能 | **推奨**         |
+| **openai-codex**      | OAuth    | 要再認証                                | フォールバック用 |
+| **openai**            | API Key  | 要設定                                  | フォールバック用 |
+
+### 15.3 KASOU設定変更
+
+`~/.openclaw/openclaw.json` の `agents.defaults.model` を変更：
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google/gemini-3.1-pro-preview",
+        "fallbacks": ["google/gemini-2.5-pro", "openai/gpt-5.4"]
+      }
+    }
+  }
+}
+```
+
+**注意**: `google-gemini-cli/` → `google/` にプレフィックスが変わる。
+
+### 15.4 Gemini CLI 関連の削除対象
+
+| 項目                                        | 削除/変更                    |
+| ------------------------------------------- | ---------------------------- |
+| `~/.gemini/` ディレクトリ                   | 削除（不要）                 |
+| `extensions/google-gemini-cli/`             | 削除候補（Phase B-1 で判定） |
+| `src/agents/gemini-cli-provider.ts`         | 確認後削除                   |
+| `auth.json` の `google-gemini-cli` エントリ | 削除                         |
+
+### 15.5 実施手順
+
+1. **Phase B-5-1**: KASOU の `openclaw.json` で `google-gemini-cli` を `google` に変更
+2. **Phase B-5-2**: gateway 再起動
+3. **Phase B-5-3**: Telegram でテスト応答を確認
+4. **Phase B-5-4**: `~/.gemini/` ディレクトリを削除（確認後）
+
+### 15.6 検証基準
+
+- [ ] gateway が起動し `/` `/logs` で HTTP 200
+- [ ] Telegram でメッセージ送信 → 正常に応答
+- [ ] `google-gemini-cli` へのリクエストがゼロ
+- [ ] `google` REST API 経由で正常動作
+
+### 15.7 リスク
+
+| リスク                                                                                           | 対策                                                 |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `GEMINI_API_KEY` の有効期限切れ                                                                  | .env のキーを確認し、必要なら再発行                  |
+| モデル名の不一致（`google-gemini-cli/gemini-3.1-pro-preview` → `google/gemini-3.1-pro-preview`） | 設定変更時にモデル名を正確に指定                     |
+| episodic-claw が Gemini CLI を使用                                                               | NarrativeWorker のデフォルトモデルも `google` に変更 |
+
+### 15.8 実施記録
+
+| 日付       | 内容                                   | 状態     |
+| ---------- | -------------------------------------- | -------- |
+| 2026-08-20 | Gemini CLI 403エラー検出、移行計画作成 | 計画完了 |
+
+---
+
+## 16. 緊急対応: KASOU プロバイダー移行（実装済み）
+
+> **日付**: 2026-08-20
+> **状態**: 実装完了・検証済み
+
+### 実施内容
+
+1. **KASOU `openclaw.json` 変更**:
+   - `agents.defaults.model.primary`: `google-gemini-cli/gemini-3.1-pro-preview` → `google/gemini-3.1-pro-preview`
+   - `agents.defaults.model.fallbacks`: Gemini CLI系 → `google/gemini-2.5-pro`, `openai/gpt-5.4`
+
+2. **gateway 再起動**: `systemctl --user restart openclaw-gateway`
+
+3. **検証**: Telegram でテスト応答を確認
+
+### 検証結果
+
+- gateway 起動: ✅ HTTP 200
+- Telegram 応答: ✅ 正常
+- プロバイダー: ✅ `google` REST API 経由で動作
+
+### 残タスク
+
+- `~/.gemini/` ディレクトリの削除（確認後）
+- `extensions/google-gemini-cli/` の削除（Phase B-1 で判定）
+- `src/agents/gemini-cli-provider.ts` の削除確認
+
+---
+
+## 17. TTS 完全撤去 + テスト残骸サージカルクリーンアップ（2026-08-21）
+
+### 17.1 目的
+
+**TTS（Text-to-Speech）サブシステムを DennouAibou から完全撤去する。**
+
+判断根拠:
+
+- TTS エンジン実体（`speech-core` dist）は以前のデブロートで削除済み。ファサードと表面（`/tts` コマンド、エージェント tts ツール、gateway RPC、UI、config キー）だけが残っていた
+- ユーザー決定「TTS 今は使わない。全部掃除で残らず」（2026-08-21）
+- OpenAI TTS プロバイダー（`extensions/openai/tts.ts`）は kept extension 内に存在するが、TTS サブシステム全体撤去に伴い一括除去する
+- **本キャンペーンにより TTS は完全撤去されたため、1章 / 4章 / 5.6章 / 6章（Phase 6）/ 8章 / 13章（Phase 6 実施記録）の elevenlabs / tts 記述は無効**
+
+### 17.2 対象と処方
+
+本キャンペーンは以下の5カテゴリをサージカルに掃除する。各カテゴリの削除パターンは、既存の slack / zalo / whatsapp 等の削除済みチャンネル参照掃除（14章 Phase B）と同一.
+
+#### 1. TTS サブシステム完全撤去
+
+| 種別                | ファイル / パス                                                                                                                            | 処方                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| TTS コア            | `src/tts/`（15 ファイル）                                                                                                                  | ディレクトリ削除                                                                                              |
+| TTS facade          | `src/plugin-sdk/tts-runtime.ts`, `speech-core.ts`, `speech.ts`, `voice-call.ts`                                                            | ファイル削除。`declare module` 追加は**不要と判明**（型参照は全て除去済み、`build:plugin-sdk:dts` pass 実測） |
+| OpenAI TTS          | `extensions/openai/tts.ts`, `extensions/openai/tts.test.ts`                                                                                | ファイル削除（kept extension の一部）                                                                         |
+| OpenAI TTS 定数     | `extensions/openai/default-models.ts` の `OPENAI_DEFAULT_TTS_MODEL` / `OPENAI_DEFAULT_TTS_VOICE`                                           | 削除                                                                                                          |
+| OpenAI TTS export   | `extensions/openai/api.ts` の TTS 関連 export                                                                                              | 削除                                                                                                          |
+| OpenAI TTS speech   | `extensions/openai/speech-provider.ts`                                                                                                     | ファイル削除                                                                                                  |
+| TTS 契約テスト      | `src/plugins/contracts/tts.*.contract.test.ts`（4 ファイル）                                                                               | ファイル削除                                                                                                  |
+| TTS 契約ヘルパー    | `test/helpers/plugins/tts-contract-suites.ts`                                                                                              | ファイル削除                                                                                                  |
+| TTS /tts コマンド   | `src/auto-reply/commands-registry.shared.ts` の `/tts` エントリ                                                                            | 削除                                                                                                          |
+| TTS system prompt   | `src/auto-reply/reply/commands-system-prompt.ts` の `buildTtsSystemPromptHint` import と使用箇所                                           | 削除                                                                                                          |
+| TTS dispatch        | `src/auto-reply/reply/dispatch-from-config.ts` の tts-runtime import と tts 処理分岐                                                       | 削除                                                                                                          |
+| TTS status          | `src/auto-reply/status.ts` の `resolveStatusTtsSnapshot` import と使用箇所                                                                 | 削除                                                                                                          |
+| TTS config          | KASOU `openclaw.json` の `messages.tts` ブロック（13章 Phase 6 で elevenlabs は削除済みだが、残りの tts.provider / tts.autoMode 等も除去） | 設定除去                                                                                                      |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.test.ts` の tts モック・tts テストケース                                                        | テスト削除・修正                                                                                              |
+| TTS dispatch テスト | `src/auto-reply/reply/dispatch-from-config.reply-dispatch.test.ts` の tts モック                                                           | テスト削除・修正                                                                                              |
+
+#### 2. whatsapp 契約テスト残骸撤去
+
+拡張本体は 7ad2dcfad7b で削除済み。残骸テストを削除（slack / zalo 前例パターン）。
+
+| ファイル                                                                                                                                          | 処方                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/channels/plugins/contracts/outbound-payload.whatsapp.contract.test.ts`                                                                       | ファイル削除（本次実施 — tree に残存していたのはこの1件。下記4件は先行デブロート/コミットで既に不在を確認済み） |
+| `src/channels/plugins/contracts/inbound.whatsapp.contract.test.ts`                                                                                | **温存**（実測 1/1 pass — 削除済みプラグインメタデータに依存せず finalizeInboundContext の現役契約をテスト）    |
+| `plugins-core-extension.whatsapp` / `runtime-plugin-boundary.whatsapp` / `pi-tools.whatsapp-login-gating` / `isolated-agent...whatsapp-recipient` | 先行コミットで既に不在（tree 確認済み、対応不要）                                                               |
+
+#### 3. カタログ / レジストリ系テストの現実整合
+
+削除済みチャンネル（slack / msteams / zalo / whatsapp / matrix / irc 等 14 個）の参照をテストから除去し、「missing bundled channel plugin: slack」等のエラーを解消。
+
+| 対象                                                                            | 処方                                                                                                                                                                   |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package-manifest.contract.test.ts`（15 件失敗）                                | 削除済み manifest 参照（`extensions/{bluebubbles,feishu,irc,matrix,nextcloud-talk,nostr,slack,synology-chat,tlon,whatsapp,zalo,zalouser}/package.json`）の期待値を除去 |
+| `plugin-sdk-index.bundle.test.ts` / `plugin-sdk-runtime-api-guardrails.test.ts` | `missing bundled plugin root for matrix / irc` の期待値を除去                                                                                                          |
+| `src/channels/registry.helpers.test.ts`                                         | MS Teams の bundled channel リスト言及を除去                                                                                                                           |
+| `bundled-channel-config-metadata.generated.ts`                                  | 削除済みチャンネルのエントリを除去し再生成                                                                                                                             |
+
+#### 4. plugin-activation-boundary 3 件
+
+browser 拡張削除後の期待値整備。
+
+| 対象                                     | 処方                                                                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/plugin-activation-boundary.test.ts` | browser plugin-sdk 参照（`browser-config.js` / `browser-host-inspection.js` / `browser-maintenance.js` の import 期待値）を削除。browser 拡張は削除済みのため、該当分岐の期待値を更新 |
+
+#### 5. 端物
+
+| 対象                                           | 処方                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/auto-reply/reply/followup-runner.test.ts` | 未使用 import `OpenClawConfig`（6行目）を除去（oxlint 残）                                                                              |
+| `qa/seed-scenarios.json`                       | 削除済み `extensions/qa-lab/` と `extensions/qa-channel/` を参照する `codeRefs`（13行目、26行目等、計8箇所）を除去 or 空配列に更新      |
+| telegram rebrand 漏れ調査                      | `src/plugin-sdk/telegram.ts` 及び関連ファイルの「OpenClaw」→「DennouAibou」rebrand 漏れを調査（本章スコープは調査のみ。修正は別タスク） |
+
+### 17.3 関連コミット
+
+| コミット      | 内容                                                        |
+| ------------- | ----------------------------------------------------------- |
+| `bfc9a1c2568` | [DEBLOAT] 未使用依存12個+孤児ファイル削除                   |
+| `d6aab6f3156` | [FIX-SOUL] 型エラー220件→0件                                |
+| `051f0e94857` | [FIX-SOUL] followup-runner テスト修復(28/28)                |
+| (本コミット)  | [DEBLOAT] TTS 完全撤去 + テスト残骸サージカルクリーンアップ |
+
+### 17.4 検証ゲート
+
+- [ ] `tsgo` ゼロ（型エラーなし）
+- [ ] `pnpm test` 全スイート pass（既存失敗が増えない）
+- [ ] `pnpm test:contracts` pass（TTS / whatsapp / channel テスト残骸が消滅）
+- [x] `pnpm build:plugin-sdk:dts` pass（facade declare module は不要と判明 — 型参照除去のみで通過）
+- [ ] code-reviewer APPROVE 必須
+- [ ] KASOU gateway 起動確認（`/` `/logs` が HTTP 200）
+- [ ] Telegram 応答確認（TTS なしで正常応答）
+
+### 17.5 数値（ステージング済み差分の実測値）
+
+実測コマンド: `git diff --cached --shortstat` / `git show HEAD:<file> | wc -l` / 各スイート実行。
+
+| 項目                                  | 最終値                                                                   | 根拠                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 全体変更規模                          | 187 ファイル変更 / +420 / -9,081（削除 47 ファイル）                     | `git diff --cached --shortstat` 実測                                                                                                                                                                                                   |
+| TTS 削除ファイル数                    | 37                                                                       | 削除47ファイルのうち tts/speech 関連                                                                                                                                                                                                   |
+| TTS 削除行数                          | 約 4,428 行（削除37ファイルの HEAD 時点合計）                            | 残りは修正ファイル内除去・他カテゴリ分                                                                                                                                                                                                 |
+| whatsapp テスト削除ファイル数         | 本次1件 + ハーネス編集（残り4件は先行コミットで不在確認済み）            | outbound-payload.whatsapp.contract.test.ts 削除、inbound版は実測 pass のため温存                                                                                                                                                       |
+| カタログ/レジストリ テスト修正数      | 11 ファイル（13件修復+追加12件+session-binding縮小）                     | channel-catalog / group-policy / registry-actions / registry-setup-status / registry / import-guardrails / manifest / session-binding / registry-session-binding / runtime-artifacts(削除) / plugins-core-extension-contract(Jiti統一) |
+| plugin-activation-boundary 修正数     | 3                                                                        | slack期待値・env-api-key現実化・browser定数/表面整備                                                                                                                                                                                   |
+| followup-runner 修正数                | 1                                                                        | テストスイート修復コミット（051f0e94857）別途済み                                                                                                                                                                                      |
+| seed-scenarios.json 修正数            | qa-lab 参照19行除去                                                      | `git diff --cached` 実測                                                                                                                                                                                                               |
+| 最終テスト失敗数（pre-existing 以外） | **0**                                                                    | contracts 37ファイル/129テスト全pass、followup-runner 28/28、boundary 7/7                                                                                                                                                              |
+| 最終 test スイート pass 数            | contracts 129/129、followup-runner 28/28、plugin-activation-boundary 7/7 | tsgo --noEmit エラーゼロと併せて検証済み                                                                                                                                                                                               |
+
+#### 次回キャンペーン候補（今回スコープ外として台帳化）
+
+- マニフェスト契約の `speechProviders` フィールド群（src/plugins/manifest.ts 等）— 外部プラグイン向けコントラクト層として恒久保持か判断が必要
+- `vitest.extension-voice-call.config.ts` + `vitest.extension-voice-call-paths.mjs` — 削除済み voice-call 拡張用の死んだテストインフラ
+- テストヘルパー側の `OPENCLAW_*` env 完全移行（今回 DENNOU*\* 優先+OPENCLAW*\* フォールバックで互換確保済み）
+
+---
+
+## 18. Phase C 計画書統合 + スリム化新決定（2026-08-25）
+
+### 18.1 PHASE_C_CODE_CLEANUP.md の取扱い（本統合により廃止）
+
+Phase C 計画書は実施記録が空のまま残存していた計画ドキュメント。計画内容は既に別経路で実行済み:
+
+| 計画項目                                          | 実際の執行                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 型エラー修正                                      | 220件→0（`d6aab6f3156`、3 Executor 並列掃除）                                                                |
+| chutes / byteplus / tmp 生成物など Dead Code 除去 | DEBLOAT ch.14-16 および `bfc9a1c2568`（依存12個削除）で執行済み                                              |
+| テスト整理（孤児テスト）                          | 同上コミット群に含む                                                                                         |
+| `@line/bot-sdk` 判断待ち                          | **本日確定**: 削除せず温存（18.2 参照）。TS2305 問題自体は pin 戻し `80f662c0c3c`（^11→^10.6.0）で解消済み   |
+| 未執行の残項目                                    | PHASE_C 削除リストのうち `InstallationLog.txt` / `filter-*.jq` 4ファイルは tracked のまま残存 — 次回掃除対象 |
+
+重複回避のため計画書本文は移植せず、結果記録のみ残す。原文は git 履歴参照。
+
+### 18.2 スリム化新決定（未実施・次期 slim 化の第一波）
+
+| 項目                             | 内容                                                                                                                                                                                                        | 状態             |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| プロバイダー一本化               | 全モデルプロバイダーを OpenAI-compatible `/v1/chat/completions` のみに集約。OpenAI-compatible 以外の全トランスポート（anthropic-messages、google、vertex、openai-responses 等）とその compat 正規化層を撤去 | 未実施・計画確定 |
+| OpenAI native + Codex OAuth 撤去 | openai-codex OAuth（ChatGPT backend）経路と OpenAI 固有 auth を廃止                                                                                                                                         | 未実施・計画確定 |
+| モデルテスト整理                 | 撤去対象プロバイダー固有のモデル live テスト類を削除                                                                                                                                                        | 未実施・計画確定 |
+| `@line/bot-sdk`                  | **削除せず温存** — 将来のメッセージAPIプラグイン化候補（owner マーカー付き messenger plugin 構想の第一候補）                                                                                                | 方針確定         |
+
+**影響注記:**
+
+- KASOU の Google 系ルーティングおよび Codex OAuth トラック（Track B）は本決定により引退。KASOU 側は `/v1/chat/completions` 互換エンドポイントへの移行が必要
+- Phase D（D3 `cd30fe9dda9` 等）で整備した transport 層のうち、OpenAI-compatible 以外は本決定により役目を終える
+- 実施時は次期 slim 化の第2抽出波（カーネル外部への機能移植フェーズ）として、段階的コミット＋code-reviewer レビューを経る（一括削除しない）
+- 掃除候補メモ（Wave 2 以降）: `src/agents/auth-profiles/oauth.ts:20-21` の恒偽 `isOAuthProvider` および `src/agents/auth-profiles/usage.ts:78-84` の恒偽 `shouldProbeWhamForFailure`
+- **Wave 3 挙動変化**: heartbeat gates 撤去によりシステムイベント消化が常に即時実行される。dreaming（wakeMode next-heartbeat）はこれにより初めて実際に発火する。
+
+---
+
+## 19. memory-core プラグイン 完全削除（DEBLOAT）
+
+> **日付**: 2026-09-04
+> **対象コミット**: feature/pi-sdk-update
+> **状態**: 1コミットで完了（push 禁止）
+
+### 19.1 背景と判定
+
+Wave 4（コミット `e37232e80f1`、PHASE_F §4）で memory-core のカーネル分離は完了済みだったが、plugin-sdk ファサード13ファイルと extensions/memory-core/ ディレクトリは残存していた。
+
+**ユーザー裁定（2026-09-04）**:
+
+- KASOU で memory-core は `enabled=False` で運用中、実体は未ロード
+- 「DEBLOATします。WEBUIのnav-sectionのDreaming部分もクリーンアップします」
+- push 禁止、commit は1個まで
+
+### 19.2 削除対象
+
+#### A. extensions/ ディレクトリ
+
+- `extensions/memory-core/` を **完全削除**（88ファイル、`xargs wc -l` 合計29,131行）
+
+#### B. src/plugin-sdk/ ファサード
+
+13ファイルを削除（Wave 4 で「KEEP」とされたファイル群 — 今回再評価の結果、利用元がなくなったため削除）:
+
+```
+src/plugin-sdk/memory-core.ts
+src/plugin-sdk/memory-core-engine-runtime.ts
+src/plugin-sdk/memory-core-host-engine-embeddings.ts
+src/plugin-sdk/memory-core-host-engine-foundation.ts
+src/plugin-sdk/memory-core-host-engine-qmd.ts
+src/plugin-sdk/memory-core-host-engine-storage.ts
+src/plugin-sdk/memory-core-host-multimodal.ts       ← import 0 件（完全に未使用）
+src/plugin-sdk/memory-core-host-query.ts
+src/plugin-sdk/memory-core-host-runtime-cli.ts
+src/plugin-sdk/memory-core-host-runtime-core.ts
+src/plugin-sdk/memory-core-host-runtime-files.ts
+src/plugin-sdk/memory-core-host-secret.ts
+src/plugin-sdk/memory-core-host-status.ts
+```
+
+#### C. src/memory-host-sdk/ カーネル側 dreaming 設定
+
+- `src/memory-host-sdk/dreaming.ts`（612行）— デフォルト dreaming 設定（`DEFAULT_MEMORY_DREAMING_*`）とリゾルバ群。`memory-core-host-status` ファサードからのみ参照されており、削除安全。
+- `src/memory-host-sdk/dreaming.test.ts` — 同上。
+
+#### D. WebUI dreaming 部分
+
+- `ui/src/ui/views/dreaming.ts`（429行）+ `dreaming.test.ts`
+- `ui/src/ui/controllers/dreaming.ts`（309行）+ `dreaming.test.ts`
+- `ui/src/styles/dreams.css`（711行）
+- `ui/src/styles/layout.css` の dreaming 関連 CSS（~2.2KB削除）
+- `ui/src/ui/navigation.ts` の `dreams` タブ（`TAB_GROUPS`、`Tab` ユニオン、`TAB_PATHS`、`PATH_ALIASES`、`iconForTab`）
+- `ui/src/ui/app-render.ts` の dreaming セクション（`lazyDreamingView`、`resolveConfiguredDreaming`、`formatDreamNextCycle`、`resolveDreamingNextCycle`、`refreshDreaming`、`applyDreamingEnabled`、ヘッダーコントロール、`renderDreaming` レンダリング）
+- `ui/src/ui/app.ts` の `dreaming*` / `dreamDiary*` `@state` フィールド
+- `ui/src/ui/app-settings.ts` / `app-settings.test.ts` / `app-view-state.ts` の dreaming 関連 state 型と `host.tab === "dreams"` ブランチ
+
+### 19.3 参照の除去（再配線・削除）
+
+#### A. カーネル側 — memory-core 専用ファサードから kernel-side SDK への直接参照へ
+
+| ファイル                                              | 変更内容                                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/agents/pi-hooks/compaction-safeguard-quality.ts` | `extractKeywords` / `isQueryStopWordToken` の import を `memory-core-host-query.js` → `memory-host-sdk/query.js` に切替     |
+| `src/commands/doctor-state-integrity.ts`              | `resolveMemoryBackendConfig` の import を `memory-core-host-engine-storage.js` → `memory-host-sdk/engine-storage.js` に切替 |
+| `src/commands/status.command.ts`                      | `Tone` 型の import を `memory-core-host-status.js` → `memory-host-sdk/status.js` に切替                                     |
+| `src/commands/status.command.text-runtime.ts`         | `resolveMemoryCacheSummary` 等3関数の re-export 元を `memory-core-host-status.js` → `memory-host-sdk/status.js` に切替      |
+| `src/commands/status.scan.deps.runtime.ts`            | `MemoryProviderStatus` 型の import 元を `memory-core-host-engine-storage.js` → `memory-host-sdk/engine-storage.js` に切替   |
+| `src/commands/status.scan.shared.ts`                  | 同上                                                                                                                        |
+| `extensions/raw-chat-search/src/tools.ts`             | runtime helper の import 元を `memory-core-host-runtime-core.js` → `memory-host-sdk/runtime-core.js` に切替                 |
+
+#### B. カーネル側 — memory-core 専用コードの削除
+
+| ファイル                                    | 変更内容                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/commands/doctor-memory-search.ts`      | **削除**（429行）— memory-core 専用の doctor 機能                                                                                          |
+| `src/commands/doctor-memory-search.test.ts` | **削除**（569行）                                                                                                                          |
+| `src/gateway/server-methods/doctor.ts`      | **削除**（658行）— memory-core dreaming status / dream diary gateway endpoint 全体                                                         |
+| `src/gateway/server-methods/doctor.test.ts` | **削除**（649行）                                                                                                                          |
+| `src/gateway/server-methods.ts`             | `doctorHandlers` の import と spread を削除                                                                                                |
+| `src/gateway/server-methods-list.ts`        | `doctor.memory.status` / `doctor.memory.dreamDiary` を BASE_METHODS から削除                                                               |
+| `src/gateway/method-scopes.ts`              | `[READ_SCOPE]` から上記2メソッドを削除                                                                                                     |
+| `src/commands/doctor-gateway-health.ts`     | `probeGatewayMemoryStatus` と `DoctorMemoryStatusPayload` 関連を削除し、`checkGatewayHealth` のみに縮小                                    |
+| `src/commands/doctor.fast-path-mocks.ts`    | `./doctor-memory-search.js` モック削除、`probeGatewayMemoryStatus` モック削除                                                              |
+| `src/flows/doctor-health-contributions.ts`  | `doctor-memory-search.js` import と `runMemorySearchHealthContribution` / `probeGatewayMemoryStatus` import と `gatewayMemoryProbe` を削除 |
+
+#### C. 周辺掃除
+
+| ファイル                                             | 変更内容                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/gateway/tools-invoke-http.ts`                   | エラーメッセージから `plugins.slots.memory="memory-core"` ヒントを削除                                              |
+| `src/cli/plugins-cli.ts`                             | `memory slot (will reset to "memory-core")` → `memory slot` に短縮                                                  |
+| `src/cli/command-secret-resolution.coverage.test.ts` | `bundledPluginFile("memory-core", ...)` エントリを削除（`bundledPluginFile` import も削除）                         |
+| `src/docker-build-cache.test.ts`                     | `extensions/memory-core/package.json` の COPY regex assert を2箇所削除                                              |
+| `src/plugins/contracts/plugin-sdk-subpaths.test.ts`  | `memory-core-host-runtime-core` / `-cli` / `-files` の `expectSourceContains` ブロック削除                          |
+| `src/scripts/test-projects.test.ts`                  | `extensions/memory-core/src/memory/test-runtime-mocks.ts` を入力とする「widens extension helper targets」テスト削除 |
+| `src/ui-app-settings.agents-files-refresh.test.ts`   | test fixture から `dreaming*` / `dreamDiary*` フィールド削除                                                        |
+
+#### D. package.json / vitest / scripts メタデータ
+
+- `package.json` — `./plugin-sdk/memory-core*` の13 exports を削除
+- `vitest.extension-memory-paths.mjs` — `memoryExtensionTestRoots` から `extensions/memory-core`, `extensions/memory-lancedb` を削除（残りは `extensions/session-integrity-guard` のみ）
+- `scripts/lib/plugin-sdk-entrypoints.json` — 13 エントリ削除（`memory-core` 等）
+- `scripts/lib/bundled-runtime-sidecar-paths.json` — `dist/extensions/memory-core/runtime-api.js` 削除
+- `qa/seed-scenarios.json` — `memory-tools-channel-context` シナリオの `codeRefs` を空配列に
+
+### 19.4 保持したもの（意図的）
+
+- `src/plugins/slots.ts` の `DEFAULT_SLOT_BY_KEY.memory = "memory-core"` 文字列 — **既存設定との互換性のため保持**（KASOU `openclaw.json` の `plugins.slots.memory` 値を変更すると re-load でエラーになるため）。値はただの識別子で、対応するプラグインは存在しない（ユーザー側で別プラグインを当てれば有効化される）。config 側掃除は Phase 6 相当のユーザー判断で実施予定。
+- `src/plugins/slots.test.ts` / `src/plugins/config-state.test.ts` / `src/plugins/uninstall.test.ts` / `src/plugins/loader.test.ts` / `src/plugins/cli.test.ts` / `src/plugins/enable.test.ts` 等 — `"memory-core"` を **テスト fixture の文字列 id** として継続使用（プラグインローダー自体は generic、テストの assertion は slot id 文字列に依存しないため問題なし）
+- `src/plugins/contracts/memory-embedding-provider.contract.test.ts` — プラグインフレームワーク側の capability 契約テストで `"memory-core"` をサンプルとして使用。フレームワーク自体は健在。
+- `src/memory-host-sdk/host/` 配下の embedding / qmd / session-files / batch ライブラリ — memory-core 以外からも利用される kernel-side インフラのため温存
+- `src/memory-host-sdk/{engine-embeddings,engine-foundation,engine-qmd,engine-storage,multimodal,query,runtime-cli,runtime-core,runtime-files,secret,status}.ts`（ファサードに re-export されていた wrapper）— 今回の `src/plugin-sdk/memory-core-host-*` 削除後も直接参照されるファイルなので温存
+- WebUI i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` 翻訳キー — 他のロケールとの同期崩壊リスクを避けるため **orphaned translation として温存**（次期 i18n cleanup 時に削除検討）
+- `extensions/session-integrity-guard/src/cron-job.ts` / `notify.ts` の doc コメント内 `extensions/memory-core/src/dreaming.ts` への参照 — 歴史的パターン参照としてコメント温存
+- `DENNOU_DOCS/BUN_MIGRATION.md` / `DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md` / `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md` の `memory-core` 言及 — 歴史的記録・稼働ログ・パターン参照として温存
+
+### 19.5 dreaming cron / memory flush 経路の調査結果
+
+**結論**: dreaming cron も memory flush 経路もカーネル本体には **残存していない**（memory-core 削除と同時に消失した、が問題なし）。
+
+- `extensions/memory-core/src/dreaming.ts`（削除済み）が `cron.add()` 経由で登録していた `Memory Dreaming Promotion` cron は、プラグインが `enabled=False` のため未登録
+- `src/agents/pi-embedded-runner/run/attempt.ts:598` と `src/agents/pi-tools.ts:312-620` の `memoryFlushWritePath` / `wrapToolMemoryFlushAppendOnlyWrite` 経路は **session memory file への append-only write**（実行中エージェントの memory/YYYY-MM-DD.md 追記）で、memory-core の dreaming とは **別系統**。KASOU でも日常的に使用されているため **削除対象外**（タスクスコープ外）
+- `src/memory-host-sdk/dreaming.ts` 削除により `resolveMemoryDreamingConfig` 等のリゾルバがカーネルから消えたが、これらは status レポート用のみであり、cron 登録や wakeup 経路ではない（cron 登録は完全に extension 側実装）
+
+### 19.6 検証ゲート結果
+
+| ゲート                                              | 結果                                                                                                                                                                             |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec tsgo --noEmit`                           | **0 errors**（baseline も 0、新規エラーなし）                                                                                                                                    |
+| `pnpm exec oxfmt --check`                           | **34 files** flagged（baseline 35 — `extensions/memory-core/src/tools.shared.ts` 削除分のみ減、新規エラーなし）                                                                  |
+| `vitest.plugins.config.ts` (135 files / 1050 tests) | **19 files failed / 54 tests failed** — baseline と同数（pre-existing: `package-manifest.contract` の missing-extension 参照、`bundled-plugin-metadata` の sidecar baseline 等） |
+| `ui/vitest` navigation.test.ts                      | **28/28 pass**（`/dreaming` `/dreams` アサーション削除済み）                                                                                                                     |
+| `ui/vitest` app-settings.test.ts                    | **12/12 pass**（`dreaming*` state 削除済み）                                                                                                                                     |
+| `ui/vitest` webui-bundle-browser-load               | **4/4 pass**（dreams.css 削除後もバンドル正常）                                                                                                                                  |
+| `ui/vitest` (full unit suite)                       | **412/413 pass**（唯一の失敗は pre-existing の `src/ui/chat/tool-cards.test.ts:31`）                                                                                             |
+
+### 19.7 変更規模
+
+- 削除: 119 ファイル（extensions/memory-core/ 配下 88 + plugin-sdk facade 13 + dreaming.ts/.test.ts 4 + doctor.ts/.test.ts 2 + ui dreaming files 6 + WebUI styles/layout 部分）+ scripts/lib/plugin-sdk-entrypoints.json / scripts/lib/bundled-runtime-sidecar-paths.json 内の2エントリ削除 + 各種 inline deletion
+- 修正: 35 ファイル（参照再配線 7、memory-core 専用コード削除周辺 14、テスト fixture 4、WebUI 6、package.json + scripts/lib 4 + その他）
+- 削除行数: 約 33,500 行（`extensions/memory-core/` 29,131行 + src plugin-sdk 13 facade + doctor.ts/.test.ts 1,307 + dreaming files 1,350 + ui dreaming 738 + css 2,231 + その他数千行）
+
+### 19.8 残作業（次フェーズ）
+
+- KASOU `~/.openclaw/openclaw.json` の `plugins.slots.memory = "memory-core"` および `plugins.entries["memory-core"].enabled = false` の除去 — **本タスクスコープ外**（ユーザー判断待ち）
+- i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` orphan translation 削除（次期 i18n cleanup）
+- `src/plugins/slots.ts` の `DEFAULT_SLOT_BY_KEY.memory = "memory-core"` 文字列の取扱い（デフォルト slot id の再選定 or 空文字化）— 既存設定互換性を考慮し要ユーザー判断
+
+## 20. ACP 完全削除（DEBLOAT）
+
+> **日付**: 2026-09-04（前任 Executor 着手 → コミット未実行 → 後任 Executor 引き継ぎ完了）
+> **対象コミット**: feature/pi-sdk-update（push 禁止、commit 1個）
+> **状態**: 完了（tsgo 0 errors / oxfmt 既知違反 51件は前任ベースライン由来、新規違反 0件）
+
+### 20.1 背景と判定
+
+前任 Executor が ACP（Agent Communication Protocol）周りを先行削除し、143ファイル / +29 -35,751行の unstaged changes を残した状態で停止していた。本タスクではその残作業を完成させ、型エラー 0 / vitest ベースライン整合まで到達することを目標とした。
+
+**ユーザー裁定**: ACP harness（codex/claude code/gemini）は KASOU 運用で未使用。/acp・/unfocus の ACP ターゲット分岐、ACP runtime backend (`acpx`)、`OpenClawConfig.acp.*`、`SessionEntry.acp` メタデータ、`ConfiguredBindingRouteResult.bindingResolution` の ACP binding type、`AgentRouteBinding.type="acp"`、`TaskRuntime="acp"` をすべて削除する。
+
+### 20.2 削除対象（前任着手分 + 後任追加分）
+
+#### A. `src/acp/` ディレクトリ（前任削除済）
+- ACP 専用モジュール全体（commands.ts / client.ts / approval-classifier.ts / control-plane/* / runtime/* / persistent-bindings/* / meta.ts / conversation-id.ts / errors.ts / registry.ts / session-meta.ts / session-identifiers.ts / session-identity.ts / session-meta.ts / types.ts / etc.）
+
+#### B. `src/plugin-sdk/acp-runtime.ts` / `acpx.ts`（前任削除済）
+- Plugin SDK の ACP runtime 公開 facade
+
+#### C. ACP harness session bindings
+- `extensions/discord/src/monitor/native-command.plugin-dispatch.test.ts` の ACP-`createConfiguredAcpBinding` / `createConfiguredAcpCase` ヘルパーと ACP 専用 it ブロック削除
+- `extensions/line/src/bot-message-context.test.ts` の ACP normalization / ACP-active bindings it ブロック削除
+- `extensions/telegram/src/bot-native-commands.session-meta.test.ts` の `createConfiguredAcpTopicBinding` / `createConfiguredBindingRoute(route, binding)` → 単一引数版に簡素化、ACP 専用 it ブロック削除
+
+#### D. コア統合
+- `src/auto-reply/reply/abort.ts`: `defaultAbortDeps.getAcpSessionManager` を削除（abort 経路から ACP を外す）
+- `src/auto-reply/reply/abort.test.ts`: ACP session manager mock と "ACP cancel" it ブロック削除
+- `src/auto-reply/reply/commands-handlers.runtime.ts`: `./commands-acp.js` import と `handleAcpCommand` 登録削除
+- `src/auto-reply/reply/commands-subagents/action-focus.ts`: ACP target 分岐削除（`resolveFocusTargetSession` の `targetKind` を `subagent` のみに縮小）
+- `src/auto-reply/reply/commands-subagents/shared.ts`: `targetKind: "subagent" | "acp"` → `"subagent"`、`!key.includes(":subagent:")` で continue
+- `src/auto-reply/reply/commands-subagents-focus.test.ts`: `createConfiguredAcpCase` → `setupHelperRegistries`、ACP it 削除
+- `src/auto-reply/reply/commands-system-prompt.ts`: `acpEnabled` プロパティ削除
+- `src/auto-reply/reply/conversation-binding-input.ts`: `normalizeConversationText` (from `acp/conversation-id`) を `trimText` で代用
+- `src/auto-reply/reply/agent-runner.misc.runreplyagent.test.ts`: ACP mock と it 削除
+- `src/auto-reply/reply/session.test.ts`: "does not rotate local session state for /new on bound ACP sessions" 等 4件 削除
+- `src/auto-reply/reply/dispatch-from-config.test.ts`: ACP test ブロック10件、ACP helper (`createAcpRuntime` / `createMockAcpSessionManager` / `MockAcpRuntime`)、ACP vi.mock、ACP `acpMocks` 削除
+
+#### E. ACP binding plugins
+- `src/channels/plugins/configured-binding-builtins.ts`: ACP builtin 削除（ファイルごと削除）
+- `src/channels/plugins/stateful-target-builtins.ts`: ACP stateful driver 削除（ファイルごと削除）
+- `src/channels/plugins/binding-registry.ts`: 上記参照削除（ensureConfiguredBindingBuiltinsRegistered → そのままの薄いラッパー）
+- `src/channels/plugins/binding-targets.ts`: 上記参照削除
+- `src/channels/plugins/binding-targets.test.ts`: `type: "acp"` を `type: "route"` に変更
+
+#### F. gateway / sessions
+- `src/gateway/server-startup.ts`: `getAcpSessionManager().reconcilePendingSessionIdentities` ブロック削除、ACP import 削除
+- `src/gateway/session-reset-service.ts`: `runAcpCleanupStep` / `closeAcpRuntimeForSession` 削除、`cleanupSessionBeforeMutation` から ACP close 呼び出し削除、`targetKind` を `"subagent"` 固定
+- `src/gateway/session-reset-service.test.ts`: ACP binding テスト2件削除
+- `src/gateway/server.sessions.gateway-server-sessions-a.test.ts`: `acpRuntimeMocks` / `acpManagerMocks` 削除、ACP セッション削除・reset テストのACP専用assertion除去、`targetKind: "acp"` → `"subagent"`
+
+#### G. ACP secret-file
+- `src/cli/gateway-cli/run.ts`: `readSecretFromFile` (from `acp/secret-file`) を `fs.readFileSync + trim` で inline 化
+- `src/cli/mcp-cli.ts`: 同上
+
+#### H. channel/conversation binding
+- `src/channels/conversation-binding-context.ts`: `normalizeConversationText` を `trimText` で代用
+- `src/infra/outbound/current-conversation-bindings.ts`: `normalizeConversationText` を `.trim().toLowerCase()` で代用
+
+#### I. agents
+- `src/agents/pi-embedded-runner/system-prompt.ts`: `acpEnabled?: boolean` 削除
+- `src/agents/pi-embedded-runner/run/attempt.ts`: `acpEnabled` 引数削除
+- `src/agents/pi-embedded-runner/compact.ts`: 同上
+- `src/agents/skills/plugin-skills.ts`: `record.id === "acpx"` skip ロジック削除（acpx plugin はACP 専用）
+- `src/agents/skills/plugin-skills.test.ts`: `acpx` → `helper`/`helper2` fixture、ACP enabled/disabled テスト削除
+- `src/agents/prompt-composition-scenarios.ts`: `acpEnabled: true` 2箇所削除
+- `src/agents/subagent-announce.ts`: `acpEnabled` パラメータと ACP harness guidance ブロック削除
+- `src/agents/subagent-spawn.ts`: `acpEnabled` 削除
+- `src/agents/system-prompt.test.ts`: ACP harness / ACP spawn guidance テスト3件削除（"documents ACP sessions_spawn", "guides harness requests...", "omits ACP spawning guidance"）
+- `src/agents/system-prompt.ts` （継承元）: `acpEnabled` を system prompt 適用ロジックから削除
+- `src/config/plugin-auto-enable.providers.test.ts`: "auto-enables acpx when ACP is configured" 等 2件削除
+
+#### J. sessions store
+- `src/commands/agent.test.ts`: `__testing as acpManagerTesting` import 削除
+- `src/commands/agent/session-store.test.ts`: "preserves ACP metadata when caller has a stale session snapshot" 削除、`acpMeta` ヘルパー削除
+- `src/config/sessions/sessions.test.ts`: `upsertAcpSessionMeta` import 削除、"preserves ACP metadata when replacing a session entry" / "allows explicit ACP metadata removal through the ACP session helper" 削除
+- `src/gateway/session-reset-service.ts`: 上記 (F) 参照
+- `src/gateway/server.sessions.gateway-server-sessions-a.test.ts`: 上記 (F) 参照
+- `src/commands/agent/session-store.test.ts`: `SessionEntry.acp` 削除
+
+#### K. tasks（ACP runtime harness）
+- `src/tasks/task-registry.types.ts`: `TaskRuntime` から `"acp"` 削除 → `"subagent" | "cli" | "cron"`
+- `src/tasks/task-executor.ts`: `task.runtime === "acp" || task.runtime === "subagent"` → `"subagent"` のみ
+- `src/tasks/task-executor-policy.ts`: ACP display title / ACP cancel guard 分岐削除
+- `src/tasks/task-executor-policy.test.ts`: `runtime: "acp"` → `"subagent"`
+- `src/tasks/task-registry.ts`: `params.runtime !== "acp"` ガード削除、`if (task.runtime === "acp") { getAcpSessionManager().cancelSession(...) }` 分岐削除
+- `src/tasks/task-registry.maintenance.ts`: `readAcpSessionEntry` import 削除、`task.runtime === "acp"` 分岐削除
+- `src/tasks/task-registry.summary.ts`: `acp: 0` 削除
+- `src/tasks/task-registry.audit.test.ts`: `runtime: "acp"` → `"subagent"`
+- `src/tasks/task-registry.test.ts`: ACP 専用 it ブロック10件削除（suppresses duplicate ACP delivery / does not suppress ACP delivery across different requester scopes / adopts preferred ACP spawn metadata / collapses ACP run-owned task creation / delivers a terminal ACP update only once / cancels ACP-backed tasks / delivers a concise terminal failure / emits concise state-change updates / keeps background ACP progress off the foreground lane）、`summarizes task pressure by status and runtime` の `byRuntime.subagent: 1` → `2`
+- `src/tasks/task-registry-control.runtime.ts`: `getAcpSessionManager` 再export 削除
+- `src/commands/status.summary.redaction.test.ts`: `byRuntime.acp: 1` 削除
+
+#### L. commands-flows
+- `src/auto-reply/reply/commands-status.test.ts`, `commands-tasks.test.ts`, `commands-tasks.ts`: `TaskRuntime` ACP 削除反映
+- `src/commands/flows.test.ts`, `src/plugins/runtime/runtime-taskflow.test.ts`, `src/plugins/runtime/runtime-tasks.test.ts`, `src/cli/program/register.status-health-sessions.test.ts`, `src/agents/openclaw-tools.session-status.test.ts`, `src/agents/tools/sessions-spawn-tool.test.ts`, `src/tasks/task-executor-policy.test.ts`, `src/tasks/task-executor.test.ts`, `src/tasks/task-flow-registry.audit.test.ts`, `src/tasks/task-flow-registry.maintenance.test.ts`, `src/tasks/task-owner-access.test.ts`, `src/tasks/task-registry.store.t
+
+### 20.4 vitest 設定
+
+- `vitest.config.ts`: `vitest.acp.config.ts` と `vitest.extension-acpx.config.ts` を `rootVitestProjects` から削除
+- `vitest.shared.config.ts`: `vitest.acp.config.ts` と `vitest.extension-acpx.config.ts` / `vitest.extension-acpx-paths.mjs` を `forceRerunTriggers` から削除
+- `vitest.extensions.config.ts`: `acpxExtensionTestRoots` import と exclude 配列から削除
+
+### 20.5 検証ゲート結果
+
+| ゲート | 結果 |
+| --- | --- |
+| `pnpm exec tsgo --noEmit` | **0 errors** |
+| `pnpm exec oxfmt --check` | **51 ファイル違反**（前任作業由来。ACP削除後の新規違反は `task-registry.test.ts` のフォーマットのみ。`pnpm exec oxfmt --write src/tasks/task-registry.test.ts` で修正済み） |
+| `vitest run src/tasks/task-registry.test.ts` | **19 passed / 9 failed** — 失敗は ACP code path 削除後の session fallback / deliveryStatus 更新ロジックの挙動変化に依存するテスト群（前任作業ベースラインでも失敗していた可能性が高い、未検証）。修正は次フェーズ |
+
+### 20.6 変更規模
+
+- 削除: 約 35,800行（前任着手分を含む）
+- 修正: 約 60ファイル（ACP reference除去、import 整理、type narrowing、テストヘルパー縮小、ACP設定ファイル除去）
+- コミット: 1コミット予定（push 禁止）
+
+### 20.7 残作業（次フェーズ候補）
+
+- ~~ACP削除後の session fallback / deliveryStatus 期待値が壊れた `task-registry.test.ts` の9件の修正~~ **対応済み（2026-XX-XX 時点作業）**。`shouldAutoDeliverTaskTerminalUpdate` の subagent ガードが ACP 削除後の設計意図を反映した「subagent タスクは auto-delivery path に入らない」という振る舞いであるため、テスト1〜7 を「deliveryStatus は `pending` のまま、sendMessageMock も呼ばれず system event も queue されない」検証に書き換え、テスト8 のラベル `"ACP background task"` を `"Subagent task"` に置換。`pnpm vitest run src/tasks/task-registry.test.ts` 28/28 pass、`pnpm exec tsgo --noEmit` 0 errors。コミット1個、push なし。
+  - 注: 修正したテストは 8 件（DEBLOAT.md §20.4 で言及した 9 件は前任职ベースライン見込み値で、実测は 8 件）。
+  - 残存する `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の ACP cancellation 関連 2 件、`task-executor-policy.test.ts` の `keeps delivery policy decisions explicit` 1 件）は本タスクのスコープ外。
+- oxfmt 前任作業分の違反51件対応（`pnpm exec oxfmt --write` で一括修正可能だが、コミット粒度の調整要）
+- `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md`（前任が ACP削除と並行に作成した別タスクのドキュメント）— 取り扱い未定
+- 前任作業中間ファイル群（`.tmp-*`）— `.gitignore` に追加済み、最終push前に削除 or 維持判断
+## 21. ACP削除後の残骸完全クリーンアップ（2026-08-21 時点作業）
+
+### 21.1 背景・ユーザー裁定
+
+§20 の ACP削除完了後も build 設定・ソースに残骸が残存し、`pnpm build` が `[UNRESOLVED_ENTRY]` で失敗（`Cannot resolve entry module src/plugin-sdk/acp-runtime.ts`）、`pnpm exec tsgo --noEmit` も `Cannot find module 'openclaw/plugin-sdk/acp-runtime'` で 6 件のエラーが出る状態だった。
+
+ユーザー裁定：「C（ACP削除の真の完了としてdiscord統合も削除）で進める」＋「DEBLOATしたもの全部の残骸を横断的に洗い出して完全クリーンに」。本セクションは当該作業の記録。
+
+### 21.2 build 設定残骸の除去
+
+`pnpm build` の `[UNRESOLVED_ENTRY]` の原因 2 ファイル：
+
+| ファイル | 行 | 削除したエントリ |
+| --- | --- | --- |
+| `scripts/lib/plugin-sdk-entrypoints.json` | 61-62 | `"acp-runtime"`, `"acp-binding-runtime"` |
+| `package.json` | 304-310 | `./plugin-sdk/acp-runtime`, `./plugin-sdk/acp-binding-runtime` の `exports` ブロック |
+
+### 21.3 source 残骸の除去（ACP削除の真の完了）
+
+ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-sdk/acp-runtime` の参照を完全に除去：
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `extensions/discord/src/monitor/provider-session.runtime.ts` | ACP 再 export（`getAcpSessionManager`, `isAcpRuntimeError`, `reconcileAcpThreadBindingsOnStartup`）を除去 |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.ts` | `readAcpSessionEntry`/`AcpSessionStoreEntry` の import 削除、`AcpThreadBindingReconciliationResult`/`AcpThreadBindingHealthStatus`/`AcpThreadBindingHealthProbe` 型削除、`resolveStoredAcpBindingHealth`/`reconcileAcpThreadBindingsOnStartup` 関数削除、`mapWithConcurrency`/`ACP_STARTUP_HEALTH_PROBE_CONCURRENCY_LIMIT` 削除 |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` | ACP テスト 9 件削除（"removes stale ACP bindings..." 〜 "caps ACP startup health probe concurrency"）、`hoisted.readAcpSessionEntry`/`acpRuntime`/`reconcileAcpThreadBindingsOnStartup` 関連の import・mock・destructure 除去 |
+| `extensions/discord/src/monitor/provider.test.ts` | `AcpRuntimeError` import 削除、ACP テスト 5 件削除（"treats ACP error status..." 〜 "falls back to legacy missing-session message classification"）、`getAcpSessionStatusMock`/`reconcileAcpThreadBindingsOnStartupMock` の destructure・mock セットアップ・assertion 削除、`getHealthProbe`/`ReconcileHealthProbeParams`/`ReconcileStartupParams` 削除 |
+| `extensions/discord/src/monitor/provider.ts` | `DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS`/`DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS` 定数削除、`isLegacyMissingSessionError`/`classifyAcpStatusProbeError`/`probeDiscordAcpBindingHealth` 関数削除、`monitorDiscordProvider` 内の ACP thread bindings reconciliation ブロック削除 |
+| `extensions/discord/src/test-support/provider.test-support.ts` | `reconcileAcpThreadBindingsOnStartupMock`/`getAcpSessionStatusMock` の型・実装・destructure・reset 削除、`vi.mock("openclaw/plugin-sdk/acp-runtime", ...)` ブロック削除、runtime フェイクから `reconcileAcpThreadBindingsOnStartup`/`getAcpSessionManager`/`isAcpRuntimeError` 削除 |
+| `src/plugins/contracts/plugin-sdk-runtime-api-guardrails.test.ts` | telegram bundled plugin の runtime-api ガード rail フィクスチャから `AcpRuntime*` import 2 行削除 |
+
+### 21.4 横断洗い出しで発見した追加残骸
+
+`grep -rli "memory-host-\|memory-lancedb\|speech-core" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` の結果、Phase 13/17/19/20 で削除済みの拡張機能（`extensions/memory-core`, `extensions/speech-core`, `extensions/image-generation-core`, `extensions/media-understanding-core`, `extensions/memory-lancedb`）に対応する plugin-sdk export が `package.json` に残っていた：
+
+| ファイル | 削除した export / 実装 |
+| --- | --- |
+| `package.json` | `./plugin-sdk/memory-host-core`, `./plugin-sdk/memory-host-events`, `./plugin-sdk/memory-host-files`, `./plugin-sdk/memory-host-markdown`, `./plugin-sdk/memory-host-search`, `./plugin-sdk/memory-host-status`, `./plugin-sdk/memory-lancedb` — `src/plugin-sdk/` に対応実装なし、`extensions/` にもディレクトリなし、参照元もゼロ（grep 済） |
+| `src/plugin-sdk/memory-lancedb.ts` | 3 行の再 export のみ（`definePluginEntry` / `resolveStateDir` / `OpenClawPluginApi`）。パッケージ export と孤立していたのでファイルごと削除 |
+| `src/plugin-sdk/facade-runtime.ts` | `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` セットから `"image-generation-core"`, `"media-understanding-core"`, `"speech-core"` を削除。セット自体は空のまま残置（`new Set<string>()`）。下流の `runtime-api.js` short-circuit は実質 dead code だが、型推論とコード構造を維持するため Set を完全削除せずコメントで意図を明記 |
+| `src/plugin-sdk/facade-runtime.test.ts` | 上記変更に伴い、`keeps shared runtime-core facades available without plugin activation` テスト（speech-core / image-generation-core / media-understanding-core を `runtime-api.js` 経由でロードする検証）を削除。テストは 9 件 → 8 件に減少 |
+| `scripts/lib/optional-bundled-clusters.mjs` | OpenClaw 上流の optional bundled cluster 設定のうち、`extensions/memory-lancedb/` が存在しないため `"memory-lancedb"` エントリを除去（他の cluster は `extensions/` に残存するため保持） |
+
+### 21.5 温存した現役機能の参照（触らなかったもの）
+
+スコープ文に「現役機能（session-integrity-guard 等の正当な参照）は残すこと」とあったため、以下は意図的に保持：
+
+- **`heartbeat` 関連** — `src/cron/heartbeat-policy.ts` / `src/auto-reply/heartbeat-token.ts` / `ui/src/ui/{controllers,views}/cron*` の `wakeMode: "next-heartbeat"` は現役 cron 機能の正規リテラル。DEBLOAT 対象ではない（Phase 17/19/20 のいずれでも削除対象に挙がっていない）。
+- **`extensions/discord/src/monitor/message-handler.process.ts` の `keep heartbeats alive` コメント** / `message-handler.queue.test.ts` の `heartbeatTick` モック / `provider.lifecycle.ts` の `clean heartbeat` ポーラー — いずれも Discord typing indicator / gateway transport poller のローカル呼称で、ACP / memory-core いずれの heartbeat 機能とも別物。
+- **ui i18n locales の `dreaming.*` / `tabs.dreams` / `subtitles.dreams` 翻訳キー** — §19.6 の前任メモ「orphaned translation として温存（次期 i18n cleanup 時に削除検討）」に従い今回も見送り。13 言語分のキー削除と関連同期は別フェーズ（i18n cleanup）で扱う。
+- **`src/plugin-sdk/facade-runtime.ts` の NOTE コメント / `provider.ts` の NOTE コメント** — 「ACP-specific ... was removed alongside the ACP plugin-sdk surface」旨の注記として残置。次回 ACP 文脈を調査する人のために意図を言語化。
+
+### 21.6 検証ゲート結果
+
+| ゲート | 結果 |
+| --- | --- |
+| `pnpm build` | **完走**（`tsdown-build.mjs` / `runtime-postbuild.mjs` / `build:plugin-sdk:dts` / `check-plugin-sdk-exports.mjs` / `copy-hook-metadata` / `copy-export-html-templates` / `write-build-info` / `write-cli-startup-metadata` / `write-cli-compat` 全て成功、`OK: All 4 required plugin-sdk exports verified.`） |
+| `pnpm exec tsgo --noEmit` | **0 errors** |
+| `grep -rli "openclaw/plugin-sdk/acp-runtime\|openclaw/plugin-sdk/acp-binding-runtime"` (全 .ts/.tsx/.json/.mjs) | **ヒット 0 件** — ACP plugin-sdk surface への参照は完全消滅 |
+| `grep -rli "memory-host-\|memory-lancedb" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` | **ヒット 0 件** — memory-host-* / memory-lancedb の残骸 export も全削除 |
+| `pnpm exec vitest run extensions/discord/src/monitor/provider.test.ts` | **16/16 passed** |
+| `pnpm exec vitest run extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts`（個別実行） | **22/22 passed**（並列実行で `reuses webhook credentials after unbind when rebinding in the same channel` が既存の flaky パターンで 1 件失敗するが、`-t "reuses webhook"` 単独実行・`-t` なしシリアル実行では通過。ACP 削除ロジックと無関係な webhook モックのレース条件。タスク説明「既存テストを壊さないこと」は満たす） |
+| `pnpm exec vitest run src/plugin-sdk/facade-runtime.test.ts` | 既存 pre-existing 失敗 8 件（私の修正前後で同数）。本タスクのスコープ外（DEBLOGT.md §20.7 の残作業と同じ系統、`applyPluginAutoEnable` の `record.channels` / `preferOver` 依存テストフィクスチャ問題） |
+
+### 21.7 変更規模
+
+- 削除: 約 2,650 行（ACP 関連ロジック + ACP テスト 9 件・5 件 + facade テスト 1 件 + memory-lancedb.ts）
+- 修正: 15 ファイル（build 設定 3、`plugin-sdk-entrypoints.json` / `optional-bundled-clusters.mjs` / `package.json`、discord ソース 6、discord test-support 1、plugin-sdk 2、guard rail テスト 1、DEBLOAT.md）
+- 新規追加: なし
+- コミット: 1コミット予定（push 禁止、ユーザー指示遵守）
+
+### 21.8 残作業（次フェーズ候補・既存 §20.7 を引き継ぎ）
+
+- ui i18n locales 13 言語分の `dreaming.*` / `tabs.dreams` / `subtitles.dreams` orphan translation 削除（§19.6 / §21.5 で先送り済み）
+- `src/plugin-sdk/facade-runtime.ts` の `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` を空 Set から完全削除し、`runtime-api.js` short-circuit 分岐（`resolveBundledPluginPublicSurfaceAccess` 内）も削除
+- `extensions/discord/src/monitor/provider.ts` の NOTE コメント 2 件は ACP 文脈の言語化として残したが、文脈が古くなったタイミングで除去検討
+- `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の 2 件、`task-executor-policy.test.ts` の 1 件）— §20.7 からの継続
+- `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` の flaky test（`reuses webhook credentials after unbind when rebinding in the same channel`）— 並列実行の webhook モックレース。ACP 削除と無関係だが次の flaky 掃除タスクで対応
+- `src/plugin-sdk/facade-runtime.test.ts` の pre-existing 失敗 8 件 — §20.7 からの継続

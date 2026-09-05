@@ -50,7 +50,7 @@ describe("buildTasksReply", () => {
       task: "queued background task",
     });
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:tasks-failed",
       runId: "run-tasks-failed",
@@ -74,7 +74,7 @@ describe("buildTasksReply", () => {
 
   it("sanitizes leaked internal runtime context from visible task details", async () => {
     createRunningTaskRun({
-      runtime: "acp",
+      runtime: "subagent",
       requesterSessionKey: "agent:main:main",
       childSessionKey: "agent:main:acp:tasks-sanitized-failed",
       runId: "run-tasks-sanitized-failed",
@@ -109,7 +109,7 @@ describe("buildTasksReply", () => {
       childSessionKey: "agent:main:main",
       runId: "run-tasks-inline-fence",
       task: [
-        "[Mon 2026-04-06 02:42 GMT+1] <<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>>",
+        "[Mon 2026-04-06 02:42 GMT+1] <<<BEGIN_DENNOU_INTERNAL_CONTEXT>>>",
         "OpenClaw runtime context (internal):",
         "This context is runtime-generated, not user-authored. Keep internal details private.",
       ].join("\n"),
@@ -124,7 +124,7 @@ describe("buildTasksReply", () => {
     const reply = await buildTasksReplyForTest();
 
     expect(reply.text).toContain("[Mon 2026-04-06 02:42 GMT+1]");
-    expect(reply.text).not.toContain("BEGIN_OPENCLAW_INTERNAL_CONTEXT");
+    expect(reply.text).not.toContain("BEGIN_DENNOU_INTERNAL_CONTEXT");
     expect(reply.text).not.toContain("OpenClaw runtime context (internal):");
   });
 

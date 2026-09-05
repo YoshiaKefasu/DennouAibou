@@ -51,12 +51,11 @@ type ImplicitProviderContext = ImplicitProviderParams & {
 };
 
 function resolveLiveProviderCatalogTimeoutMs(env: NodeJS.ProcessEnv): number | null {
-  const live =
-    env.OPENCLAW_LIVE_TEST === "1" || env.OPENCLAW_LIVE_GATEWAY === "1" || env.LIVE === "1";
+  const live = env.DENNOU_LIVE_TEST === "1" || env.DENNOU_LIVE_GATEWAY === "1" || env.LIVE === "1";
   if (!live) {
     return null;
   }
-  const raw = env.OPENCLAW_LIVE_PROVIDER_DISCOVERY_TIMEOUT_MS?.trim();
+  const raw = env.DENNOU_LIVE_PROVIDER_DISCOVERY_TIMEOUT_MS?.trim();
   if (!raw) {
     return 15_000;
   }
@@ -65,7 +64,7 @@ function resolveLiveProviderCatalogTimeoutMs(env: NodeJS.ProcessEnv): number | n
 }
 
 function resolveProviderDiscoveryFilter(env: NodeJS.ProcessEnv): string[] | undefined {
-  const testRaw = env.OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS?.trim();
+  const testRaw = env.DENNOU_TEST_ONLY_PROVIDER_PLUGIN_IDS?.trim();
   if (testRaw) {
     const ids = testRaw
       .split(",")
@@ -73,12 +72,11 @@ function resolveProviderDiscoveryFilter(env: NodeJS.ProcessEnv): string[] | unde
       .filter(Boolean);
     return ids.length > 0 ? [...new Set(ids)] : undefined;
   }
-  const live =
-    env.OPENCLAW_LIVE_TEST === "1" || env.OPENCLAW_LIVE_GATEWAY === "1" || env.LIVE === "1";
+  const live = env.DENNOU_LIVE_TEST === "1" || env.DENNOU_LIVE_GATEWAY === "1" || env.LIVE === "1";
   if (!live) {
     return undefined;
   }
-  const raw = env.OPENCLAW_LIVE_PROVIDERS?.trim();
+  const raw = env.DENNOU_LIVE_PROVIDERS?.trim();
   if (!raw || raw === "all") {
     return undefined;
   }

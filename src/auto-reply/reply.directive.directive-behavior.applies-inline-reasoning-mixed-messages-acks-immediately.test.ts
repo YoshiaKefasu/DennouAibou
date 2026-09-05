@@ -265,7 +265,9 @@ describe("directive behavior", () => {
 
       const unsupportedModelTexts = await runThinkingDirective(home, "openai/gpt-4.1-mini");
       expect(unsupportedModelTexts[0]).toContain('Thinking level "xhigh" is only supported for');
-      expect(unsupportedModelTexts[0]).toContain("provider models that advertise xhigh reasoning");
+      expect(unsupportedModelTexts[0]).toContain(
+        "models that declare xhigh in their reasoningEffortMap",
+      );
       expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     });
   });

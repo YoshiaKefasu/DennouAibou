@@ -105,24 +105,9 @@ describe("resolveBootstrapContextForRun", () => {
     expect(extra?.content).toBe("extra");
   });
 
-  it("uses heartbeat-only bootstrap files in lightweight heartbeat mode", async () => {
-    const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
-    await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
-    await fs.writeFile(path.join(workspaceDir, "SOUL.md"), "persona", "utf8");
-
-    const files = await resolveBootstrapFilesForRun({
-      workspaceDir,
-      contextMode: "lightweight",
-      runKind: "heartbeat",
-    });
-
-    expect(files.length).toBeGreaterThan(0);
-    expect(files.every((file) => file.name === "HEARTBEAT.md")).toBe(true);
-  });
-
   it("keeps bootstrap context empty in lightweight cron mode", async () => {
     const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
-    await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
+    await fs.writeFile(path.join(workspaceDir, "SOUL.md"), "check inbox", "utf8");
 
     const files = await resolveBootstrapFilesForRun({
       workspaceDir,
@@ -131,51 +116,6 @@ describe("resolveBootstrapContextForRun", () => {
     });
 
     expect(files).toEqual([]);
-  });
-
-  it("drops HEARTBEAT.md for non-heartbeat runs when the heartbeat prompt section is disabled", async () => {
-    const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
-    await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
-    await fs.writeFile(path.join(workspaceDir, "AGENTS.md"), "repo rules", "utf8");
-
-    const files = await resolveBootstrapFilesForRun({
-      workspaceDir,
-      config: {
-        agents: {
-          defaults: {
-            heartbeat: {
-              includeSystemPromptSection: false,
-            },
-          },
-          list: [{ id: "main" }],
-        },
-      },
-    });
-
-    expect(files.some((file) => file.name === "HEARTBEAT.md")).toBe(false);
-    expect(files.some((file) => file.name === "AGENTS.md")).toBe(true);
-  });
-
-  it("keeps HEARTBEAT.md for actual heartbeat runs even when the prompt section is disabled", async () => {
-    const workspaceDir = await makeTempWorkspace("openclaw-bootstrap-");
-    await fs.writeFile(path.join(workspaceDir, "HEARTBEAT.md"), "check inbox", "utf8");
-
-    const files = await resolveBootstrapFilesForRun({
-      workspaceDir,
-      runKind: "heartbeat",
-      config: {
-        agents: {
-          defaults: {
-            heartbeat: {
-              includeSystemPromptSection: false,
-            },
-          },
-          list: [{ id: "main" }],
-        },
-      },
-    });
-
-    expect(files.some((file) => file.name === "HEARTBEAT.md")).toBe(true);
   });
 });
 

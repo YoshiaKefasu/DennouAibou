@@ -417,19 +417,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("widens extension helper targets to sibling extension tests", () => {
-    expect(
-      buildVitestRunPlans(["extensions/memory-core/src/memory/test-runtime-mocks.ts"]),
-    ).toEqual([
-      {
-        config: "vitest.extension-memory.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/memory-core/src/memory/**/*.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes msteams extension tests to the msteams config", () => {
     expect(buildVitestRunPlans(["extensions/msteams/src/config.test.ts"])).toEqual([
       {
@@ -452,17 +439,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it.skip("routes whatsapp extension tests to the whatsapp config (extensions/whatsapp削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/whatsapp/src/send.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-whatsapp.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/whatsapp/src/send.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes voice-call extension tests to the voice-call config", () => {
     expect(buildVitestRunPlans(["extensions/voice-call/src/runtime.test.ts"])).toEqual([
       {
@@ -480,61 +456,6 @@ describe("test-projects args", () => {
         config: "vitest.extension-mattermost.config.ts",
         forwardedArgs: [],
         includePatterns: ["extensions/mattermost/src/channel.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("routes zalo extension tests to the zalo config (extensions/zalo削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/zalo/src/channel.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-zalo.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/zalo/src/channel.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("routes matrix extension tests to the matrix config (extensions/matrix削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/matrix/src/channel.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-matrix.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/matrix/src/channel.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("routes bluebubbles extension tests to the bluebubbles config (extensions/bluebubbles削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/bluebubbles/src/monitor.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-bluebubbles.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/bluebubbles/src/monitor.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("routes feishu extension tests to the feishu config (extensions/feishu削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/feishu/src/channel.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-feishu.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/feishu/src/channel.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("routes irc extension tests to the irc config (extensions/irc削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/irc/src/channel.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-irc.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/irc/src/channel.test.ts"],
         watchMode: false,
       },
     ]);
@@ -641,34 +562,12 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it.skip("routes matrix extension file targets to the matrix config (extensions/matrix deleted)", () => {
-    expect(buildVitestRunPlans(["extensions/matrix/src/channel.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-matrix.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/matrix/src/channel.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes direct provider extension file targets to the extension providers config", () => {
     expect(buildVitestRunPlans(["extensions/openai/openai-codex-provider.test.ts"])).toEqual([
       {
         config: "vitest.extension-providers.config.ts",
         forwardedArgs: [],
         includePatterns: ["extensions/openai/openai-codex-provider.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
-  it.skip("keeps non-provider extension file targets on the shared extensions config (extensions/firecrawl削除済み)", () => {
-    expect(buildVitestRunPlans(["extensions/firecrawl/index.test.ts"])).toEqual([
-      {
-        config: "vitest.extensions.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/firecrawl/index.test.ts"],
         watchMode: false,
       },
     ]);
@@ -714,7 +613,7 @@ describe("test-projects args", () => {
       "extensions/discord/src/monitor/message-handler.preflight.test.ts",
     ]);
     expect(spec?.includeFilePath).toContain("openclaw-vitest-include-");
-    expect(spec?.env.OPENCLAW_VITEST_INCLUDE_FILE).toBe(spec?.includeFilePath);
+    expect(spec?.env.DENNOU_VITEST_INCLUDE_FILE).toBe(spec?.includeFilePath);
   });
 
   it("rejects watch mode when a command spans multiple suites", () => {

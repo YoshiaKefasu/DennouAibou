@@ -1,4 +1,3 @@
-import { readAcpSessionEntry } from "../acp/runtime/session-meta.js";
 import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { isCronJobActive } from "../cron/active-jobs.js";
 import { getAgentRunContext } from "../infra/agent-events.js";
@@ -90,15 +89,6 @@ function hasBackingSession(task: TaskRecord): boolean {
   const childSessionKey = task.childSessionKey?.trim();
   if (!childSessionKey) {
     return true;
-  }
-  if (task.runtime === "acp") {
-    const acpEntry = readAcpSessionEntry({
-      sessionKey: childSessionKey,
-    });
-    if (!acpEntry || acpEntry.storeReadFailed) {
-      return true;
-    }
-    return Boolean(acpEntry.entry);
   }
   if (task.runtime === "subagent" || task.runtime === "cli") {
     if (task.runtime === "cli") {

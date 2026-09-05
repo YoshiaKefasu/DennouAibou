@@ -12,7 +12,7 @@ title: "Music Generation"
 The `music_generate` tool lets the agent create music or audio through the
 shared music-generation capability with the bundled Google provider.
 
-For shared provider-backed agent sessions, OpenClaw starts music generation as a
+For shared provider-backed agent sessions, DennouAibou starts music generation as a
 background task, tracks it in the task ledger, then wakes the agent again when
 the track is ready so the agent can post the finished audio back into the
 original channel.
@@ -61,18 +61,18 @@ Generate an energetic chiptune loop about launching a rocket at sunrise.
 
 ## Shared bundled provider support
 
-| Provider | Default model          | Reference inputs | Supported controls                                        | API key                                |
-| -------- | ---------------------- | ---------------- | --------------------------------------------------------- | -------------------------------------- |
-| Google   | `lyria-3-clip-preview` | Up to 10 images  | `lyrics`, `instrumental`, `format`                        | `GEMINI_API_KEY`, `GOOGLE_API_KEY`     |
+| Provider | Default model          | Reference inputs | Supported controls                 | API key                            |
+| -------- | ---------------------- | ---------------- | ---------------------------------- | ---------------------------------- |
+| Google   | `lyria-3-clip-preview` | Up to 10 images  | `lyrics`, `instrumental`, `format` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 
 ### Declared capability matrix
 
 This is the explicit mode contract used by `music_generate`, contract tests,
 and the shared live sweep.
 
-| Provider | `generate` | `edit` | Edit limit | Shared live lanes                                                         |
-| -------- | ---------- | ------ | ---------- | ------------------------------------------------------------------------- |
-| Google   | Yes        | Yes    | 10 images  | `generate`, `edit`                                                        |
+| Provider | `generate` | `edit` | Edit limit | Shared live lanes  |
+| -------- | ---------- | ------ | ---------- | ------------------ |
+| Google   | Yes        | Yes    | 10 images  | `generate`, `edit` |
 
 Use `action: "list"` to inspect available shared providers and models at
 runtime:
@@ -99,7 +99,7 @@ Direct generation example:
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `prompt`          | string   | Music generation prompt (required for `action: "generate"`)                                       |
 | `action`          | string   | `"generate"` (default), `"status"` for the current session task, or `"list"` to inspect providers |
-| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview`                                         |
+| `model`           | string   | Provider/model override, e.g. `google/lyria-3-pro-preview`                                        |
 | `lyrics`          | string   | Optional lyrics when the provider supports explicit lyric input                                   |
 | `instrumental`    | boolean  | Request instrumental-only output when the provider supports it                                    |
 | `image`           | string   | Single reference image path or URL                                                                |
@@ -108,7 +108,7 @@ Direct generation example:
 | `format`          | string   | Output format hint (`mp3` or `wav`) when the provider supports it                                 |
 | `filename`        | string   | Output filename hint                                                                              |
 
-Not all providers support all parameters. OpenClaw still validates hard limits
+Not all providers support all parameters. DennouAibou still validates hard limits
 such as input counts before submission, but unsupported optional hints are
 ignored with a warning when the selected provider or model cannot honor them.
 
@@ -118,7 +118,7 @@ ignored with a warning when the selected provider or model cannot honor them.
 - Duplicate prevention: while that background task is still `queued` or `running`, later `music_generate` calls in the same session return task status instead of starting another generation.
 - Status lookup: use `action: "status"` to inspect the active session-backed music task without starting a new one.
 - Task tracking: use `openclaw tasks list` or `openclaw tasks show <taskId>` to inspect queued, running, and terminal status for the generation.
-- Completion wake: OpenClaw injects an internal completion event back into the same session so the model can write the user-facing follow-up itself.
+- Completion wake: DennouAibou injects an internal completion event back into the same session so the model can write the user-facing follow-up itself.
 - Prompt hint: later user/manual turns in the same session get a small runtime hint when a music task is already in flight so the model does not blindly call `music_generate` again.
 - No-session fallback: direct/local contexts without a real agent session still run inline and return the final audio result in the same turn.
 
@@ -140,7 +140,7 @@ ignored with a warning when the selected provider or model cannot honor them.
 
 ### Provider selection order
 
-When generating music, OpenClaw tries providers in this order:
+When generating music, DennouAibou tries providers in this order:
 
 1. `model` parameter from the tool call, if the agent specifies one
 2. `musicGenerationModel.primary` from config

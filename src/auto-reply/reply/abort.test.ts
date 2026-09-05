@@ -51,26 +51,6 @@ vi.mock("../../agents/subagent-registry.js", () => ({
   markSubagentRunTerminated: subagentRegistryMocks.markSubagentRunTerminated,
 }));
 
-const acpManagerMocks = vi.hoisted(() => ({
-  resolveSession: vi.fn<
-    () =>
-      | { kind: "none" }
-      | {
-          kind: "ready";
-          sessionKey: string;
-          meta: unknown;
-        }
-  >(() => ({ kind: "none" })),
-  cancelSession: vi.fn(async () => {}),
-}));
-
-vi.mock("../../acp/control-plane/manager.js", () => ({
-  getAcpSessionManager: () => ({
-    resolveSession: acpManagerMocks.resolveSession,
-    cancelSession: acpManagerMocks.cancelSession,
-  }),
-}));
-
 describe("abort detection", () => {
   async function writeSessionStore(
     storePath: string,
@@ -171,11 +151,6 @@ describe("abort detection", () => {
 
   beforeEach(() => {
     abortTesting.setDepsForTests({
-      getAcpSessionManager: (() =>
-        ({
-          resolveSession: acpManagerMocks.resolveSession,
-          cancelSession: acpManagerMocks.cancelSession,
-        }) as never) as never,
       abortEmbeddedPiRun: () => true,
       getLatestSubagentRunByChildSessionKey:
         subagentRegistryMocks.getLatestSubagentRunByChildSessionKey,
@@ -194,8 +169,6 @@ describe("abort detection", () => {
     abortTesting.resetDepsForTests();
     queueCleanupTesting.resetDepsForTests();
     commandQueueMocks.clearCommandLane.mockClear().mockReturnValue(1);
-    acpManagerMocks.resolveSession.mockReset().mockReturnValue({ kind: "none" });
-    acpManagerMocks.cancelSession.mockReset().mockResolvedValue(undefined);
     subagentRegistryMocks.getLatestSubagentRunByChildSessionKey.mockReset().mockReturnValue(null);
   });
 
@@ -271,8 +244,8 @@ describe("abort detection", () => {
     expect(isAbortRequestText("stopp")).toBe(true);
     expect(isAbortRequestText("pare")).toBe(true);
     expect(isAbortRequestText(" توقف ")).toBe(true);
-    expect(isAbortRequestText("/stop@openclaw_bot", { botUsername: "openclaw_bot" })).toBe(true);
-    expect(isAbortRequestText("/Stop@openclaw_bot", { botUsername: "openclaw_bot" })).toBe(true);
+    expect(isAbortRequestText("/stop@DENNOU_bot", { botUsername: "DENNOU_bot" })).toBe(true);
+    expect(isAbortRequestText("/Stop@DENNOU_bot", { botUsername: "DENNOU_bot" })).toBe(true);
 
     expect(isAbortRequestText("/status")).toBe(false);
     expect(isAbortRequestText("do not do that")).toBe(true);
@@ -407,61 +380,6 @@ describe("abort detection", () => {
       sessionKey,
       from: "telegram:123",
       to: "telegram:123",
-    });
-
-    expect(result.handled).toBe(true);
-    expect(getFollowupQueueDepth(sessionKey)).toBe(0);
-    expectSessionLaneCleared(sessionKey);
-  });
-
-  it("plain-language stop on ACP-bound session triggers ACP cancel", async () => {
-    const sessionKey = "agent:codex:acp:test-1";
-    const sessionId = "session-123";
-    const { cfg } = await createAbortConfig({
-      sessionIdsByKey: { [sessionKey]: sessionId },
-    });
-    acpManagerMocks.resolveSession.mockReturnValue({
-      kind: "ready",
-      sessionKey,
-      meta: {} as never,
-    });
-
-    const result = await runStopCommand({
-      cfg,
-      sessionKey,
-      from: "telegram:123",
-      to: "telegram:123",
-      targetSessionKey: sessionKey,
-    });
-
-    expect(result.handled).toBe(true);
-    expect(acpManagerMocks.cancelSession).toHaveBeenCalledWith({
-      cfg,
-      sessionKey,
-      reason: "fast-abort",
-    });
-  });
-
-  it("ACP cancel failures do not skip queue and lane cleanup", async () => {
-    const sessionKey = "agent:codex:acp:test-2";
-    const sessionId = "session-456";
-    const { root, cfg } = await createAbortConfig({
-      sessionIdsByKey: { [sessionKey]: sessionId },
-    });
-    enqueueQueuedFollowupRun({ root, cfg, sessionId, sessionKey });
-    acpManagerMocks.resolveSession.mockReturnValue({
-      kind: "ready",
-      sessionKey,
-      meta: {} as never,
-    });
-    acpManagerMocks.cancelSession.mockRejectedValueOnce(new Error("cancel failed"));
-
-    const result = await runStopCommand({
-      cfg,
-      sessionKey,
-      from: "telegram:123",
-      to: "telegram:123",
-      targetSessionKey: sessionKey,
     });
 
     expect(result.handled).toBe(true);

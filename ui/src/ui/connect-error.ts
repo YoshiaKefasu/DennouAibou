@@ -1,4 +1,4 @@
-import { ConnectErrorDetailCodes } from "../../../src/gateway/protocol/connect-error-details.js";
+import { ConnectErrorDetailCodes } from "./_shared/connect-error-details.ts";
 import { resolveGatewayErrorDetailCode } from "./gateway.ts";
 
 type ErrorWithMessageAndDetails = {

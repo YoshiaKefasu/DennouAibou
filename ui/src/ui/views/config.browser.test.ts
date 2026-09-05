@@ -12,7 +12,6 @@ describe("config view", () => {
     loading: false,
     saving: false,
     applying: false,
-    updating: false,
     connected: true,
     schema: {
       type: "object",
@@ -35,7 +34,6 @@ describe("config view", () => {
     onReload: vi.fn(),
     onSave: vi.fn(),
     onApply: vi.fn(),
-    onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
     version: "2026.3.11",
     theme: "claw" as ThemeName,

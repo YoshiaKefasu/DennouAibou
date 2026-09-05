@@ -137,7 +137,7 @@ export function resolveConfigDir(
   env: NodeJS.ProcessEnv = process.env,
   homedir: () => string = os.homedir,
 ): string {
-  const override = env.OPENCLAW_STATE_DIR?.trim();
+  const override = env.DENNOU_STATE_DIR?.trim() || env.OPENCLAW_STATE_DIR?.trim();
   if (override) {
     return resolveUserPath(override, env, homedir);
   }
@@ -162,9 +162,9 @@ function resolveHomeDisplayPrefix(): { home: string; prefix: string } | undefine
   if (!home) {
     return undefined;
   }
-  const explicitHome = process.env.OPENCLAW_HOME?.trim();
+  const explicitHome = process.env.DENNOU_HOME?.trim();
   if (explicitHome) {
-    return { home, prefix: "$OPENCLAW_HOME" };
+    return { home, prefix: "$DENNOU_HOME" };
   }
   return { home, prefix: "~" };
 }
@@ -206,5 +206,20 @@ export function displayString(input: string): string {
   return shortenHomeInString(input);
 }
 
-// Configuration root; can be overridden via OPENCLAW_STATE_DIR.
-export const CONFIG_DIR = resolveConfigDir();
+// Configuration root; can be overridden via DENNOU_STATE_DIR.
+// Lazy + safe: do not resolve on module load. `src/utils.ts` is reachable from
+// the ui bundle via shared command/thinking imports (ui/src/ui/chat/slash-commands.ts
+// -> src/auto-reply/commands-registry.shared.ts -> src/auto-reply/thinking.ts ->
+// src/plugins/provider-thinking.ts -> src/plugins/runtime.ts -> src/plugins/registry.ts
+// -> src/utils.ts). Resolving eagerly would evaluate `process.env`/`fs.existsSync`
+// at ui bundle load time, crashing the browser with "process is not defined".
+// The fallback sentinel is fine for ui consumers (none of which actually read
+// CONFIG_DIR); Node-only callers will trigger the real resolution on first use.
+export function getConfigDir(): string {
+  try {
+    return resolveConfigDir();
+  } catch {
+    return "";
+  }
+}
+export const CONFIG_DIR: string = getConfigDir();

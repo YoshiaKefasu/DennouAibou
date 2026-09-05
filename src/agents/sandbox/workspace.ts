@@ -6,7 +6,6 @@ import { resolveUserPath } from "../../utils.js";
 import {
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_BOOTSTRAP_FILENAME,
-  DEFAULT_HEARTBEAT_FILENAME,
   DEFAULT_IDENTITY_FILENAME,
   DEFAULT_SOUL_FILENAME,
   DEFAULT_TOOLS_FILENAME,
@@ -29,7 +28,6 @@ export async function ensureSandboxWorkspace(
       DEFAULT_IDENTITY_FILENAME,
       DEFAULT_USER_FILENAME,
       DEFAULT_BOOTSTRAP_FILENAME,
-      DEFAULT_HEARTBEAT_FILENAME,
     ];
     for (const name of files) {
       const src = path.join(seed, name);

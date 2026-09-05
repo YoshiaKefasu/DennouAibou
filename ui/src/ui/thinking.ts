@@ -2,7 +2,11 @@ export type ThinkingCatalogEntry = {
   provider: string;
   id: string;
   reasoning?: boolean;
+  compat?: { reasoningEffortMap?: Record<string, string | null> };
 };
+
+/** PI-style canonical order for map-driven thinking levels (mirrors backend `src/auto-reply/thinking.ts`). */
+const PI_ORDERED_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 const BASE_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "adaptive"] as const;
 const BINARY_THINKING_LEVELS = ["off", "on"] as const;
@@ -39,6 +43,9 @@ export function normalizeThinkLevel(raw?: string | null): string | undefined {
   if (collapsed === "xhigh" || collapsed === "extrahigh") {
     return "xhigh";
   }
+  if (collapsed === "max" || collapsed === "maximum") {
+    return "max";
+  }
   if (key === "off") {
     return "off";
   }
@@ -54,9 +61,7 @@ export function normalizeThinkLevel(raw?: string | null): string | undefined {
   if (["mid", "med", "medium", "thinkharder", "think-harder", "harder"].includes(key)) {
     return "medium";
   }
-  if (
-    ["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest", "max"].includes(key)
-  ) {
+  if (["high", "ultra", "ultrathink", "think-hard", "thinkhardest", "highest"].includes(key)) {
     return "high";
   }
   if (key === "think") {
@@ -65,12 +70,43 @@ export function normalizeThinkLevel(raw?: string | null): string | undefined {
   return undefined;
 }
 
-export function listThinkingLevelLabels(provider?: string | null): readonly string[] {
-  return isBinaryThinkingProvider(provider) ? BINARY_THINKING_LEVELS : BASE_THINKING_LEVELS;
+export function listThinkingLevelLabels(
+  provider?: string | null,
+  model?: string | null,
+  catalog?: ThinkingCatalogEntry[] | null,
+): readonly string[] {
+  if (isBinaryThinkingProvider(provider)) {
+    return BINARY_THINKING_LEVELS;
+  }
+  const trimmedProvider = provider?.trim();
+  const trimmedModel = model?.trim();
+  if (trimmedProvider && trimmedModel && catalog) {
+    const target = trimmedModel.toLowerCase();
+    const entry = catalog.find(
+      (candidate) =>
+        candidate.provider.toLowerCase() === trimmedProvider.toLowerCase() &&
+        candidate.id.toLowerCase() === target,
+    );
+    const map = entry?.compat?.reasoningEffortMap;
+    if (map) {
+      const present = PI_ORDERED_LEVELS.filter(
+        (level) => Object.prototype.hasOwnProperty.call(map, level) && map[level] != null,
+      );
+      // Backend parity: an all-null/empty map yields `["off", "adaptive"]`
+      // (backend `resolveMapLevels` returns `[]`, which is truthy), not a
+      // fallback to the base levels.
+      return ["off", ...present, "adaptive"];
+    }
+  }
+  return BASE_THINKING_LEVELS;
 }
 
-export function formatThinkingLevels(provider?: string | null): string {
-  return listThinkingLevelLabels(provider).join(", ");
+export function formatThinkingLevels(
+  provider?: string | null,
+  model?: string | null,
+  catalog?: ThinkingCatalogEntry[] | null,
+): string {
+  return listThinkingLevelLabels(provider, model, catalog).join(", ");
 }
 
 export function resolveThinkingDefaultForModel(params: {

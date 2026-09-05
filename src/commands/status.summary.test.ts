@@ -45,14 +45,6 @@ vi.mock("../infra/channel-summary.js", () => ({
   buildChannelSummary: statusSummaryMocks.buildChannelSummary,
 }));
 
-vi.mock("../infra/heartbeat-summary.js", () => ({
-  resolveHeartbeatSummaryForAgent: vi.fn(() => ({
-    enabled: true,
-    every: "5m",
-    everyMs: 300_000,
-  })),
-}));
-
 vi.mock("../infra/system-events.js", () => ({
   peekSystemEvents: vi.fn(() => []),
 }));

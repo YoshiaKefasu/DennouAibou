@@ -4,15 +4,9 @@ import { parseByteSize } from "../../cli/parse-bytes.js";
 import { parseDurationMs } from "../../cli/parse-duration.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { loadConfig } from "../config.js";
-import type {
-  SessionMaintenanceConfig,
-  SessionMaintenanceMode,
-} from "../types.base.js";
+import type { SessionMaintenanceConfig, SessionMaintenanceMode } from "../types.base.js";
+import { isProtectedSessionKey, type ProtectedSessionConfig } from "./protected-session.js";
 import type { SessionEntry } from "./types.js";
-import {
-  isProtectedSessionKey,
-  type ProtectedSessionConfig,
-} from "./protected-session.js";
 
 const log = createSubsystemLogger("sessions/store");
 
@@ -84,9 +78,7 @@ function resolveResetArchiveRetentionMs(
   }
 }
 
-function resolveMaxDiskBytes(
-  maintenance?: SessionMaintenanceConfig,
-): number | null {
+function resolveMaxDiskBytes(maintenance?: SessionMaintenanceConfig): number | null {
   const raw = maintenance?.maxDiskBytes;
   if (raw === undefined || raw === null || raw === "") {
     return null;
@@ -133,7 +125,7 @@ function resolveHighWaterBytes(
 }
 
 /**
- * Resolve maintenance settings from openclaw.json (`session.maintenance`).
+ * Resolve maintenance settings from dennou-aibou.json (`session.maintenance`).
  * Falls back to built-in defaults when config is missing or unset.
  */
 export function resolveMaintenanceConfig(): ResolvedSessionMaintenanceConfig {
@@ -150,10 +142,7 @@ export function resolveMaintenanceConfig(): ResolvedSessionMaintenanceConfig {
     pruneAfterMs,
     maxEntries: maintenance?.maxEntries ?? DEFAULT_SESSION_MAX_ENTRIES,
     rotateBytes: resolveRotateBytes(maintenance),
-    resetArchiveRetentionMs: resolveResetArchiveRetentionMs(
-      maintenance,
-      pruneAfterMs,
-    ),
+    resetArchiveRetentionMs: resolveResetArchiveRetentionMs(maintenance, pruneAfterMs),
     maxDiskBytes,
     highWaterBytes: resolveHighWaterBytes(maintenance, maxDiskBytes),
   };
@@ -215,17 +204,12 @@ export function getActiveSessionMaintenanceWarning(params: {
   }
   const now = params.nowMs ?? Date.now();
   const cutoffMs = now - params.pruneAfterMs;
-  const wouldPrune =
-    activeEntry.updatedAt != null ? activeEntry.updatedAt < cutoffMs : false;
+  const wouldPrune = activeEntry.updatedAt != null ? activeEntry.updatedAt < cutoffMs : false;
   const keys = Object.keys(params.store);
   const wouldCap =
     keys.length > params.maxEntries &&
     keys
-      .toSorted(
-        (a, b) =>
-          getEntryUpdatedAt(params.store[b]) -
-          getEntryUpdatedAt(params.store[a]),
-      )
+      .toSorted((a, b) => getEntryUpdatedAt(params.store[b]) - getEntryUpdatedAt(params.store[a]))
       .slice(params.maxEntries)
       .includes(activeSessionKey);
 

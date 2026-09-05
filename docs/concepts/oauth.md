@@ -1,7 +1,7 @@
 ---
-summary: "OAuth in OpenClaw: token exchange, storage, and multi-account patterns"
+summary: "OAuth in DennouAibou: token exchange, storage, and multi-account patterns"
 read_when:
-  - You want to understand OpenClaw OAuth end-to-end
+  - You want to understand DennouAibou OAuth end-to-end
   - You hit token invalidation / logout issues
   - You want Claude CLI or OAuth auth flows
   - You want multiple accounts or profile routing
@@ -10,17 +10,17 @@ title: "OAuth"
 
 # OAuth
 
-OpenClaw supports “subscription auth” via OAuth for providers that offer it
+DennouAibou supports “subscription auth” via OAuth for providers that offer it
 (notably **OpenAI Codex (ChatGPT OAuth)**). For Anthropic, the practical split
 is now:
 
 - **Anthropic API key**: normal Anthropic API billing
-- **Anthropic subscription auth inside OpenClaw**: Anthropic notified OpenClaw
+- **Anthropic subscription auth inside DennouAibou**: Anthropic notified DennouAibou
   users on **April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that this now
   requires **Extra Usage**
 
 OpenAI Codex OAuth is explicitly supported for use in external tools like
-OpenClaw. This page explains:
+DennouAibou. This page explains:
 
 For Anthropic in production, API key auth is the safer recommended path.
 
@@ -28,7 +28,7 @@ For Anthropic in production, API key auth is the safer recommended path.
 - where tokens are **stored** (and why)
 - how to handle **multiple accounts** (profiles + per-session overrides)
 
-OpenClaw also supports **provider plugins** that ship their own OAuth or API‑key
+DennouAibou also supports **provider plugins** that ship their own OAuth or API‑key
 flows. Run them via:
 
 ```bash
@@ -41,13 +41,13 @@ OAuth providers commonly mint a **new refresh token** during login/refresh flows
 
 Practical symptom:
 
-- you log in via OpenClaw _and_ via Claude Code / Codex CLI → one of them randomly gets “logged out” later
+- you log in via DennouAibou _and_ via Claude Code / Codex CLI → one of them randomly gets “logged out” later
 
-To reduce that, OpenClaw treats `auth-profiles.json` as a **token sink**:
+To reduce that, DennouAibou treats `auth-profiles.json` as a **token sink**:
 
 - the runtime reads credentials from **one place**
 - we can keep multiple profiles and route them deterministically
-- when credentials are reused from an external CLI like Codex CLI, OpenClaw
+- when credentials are reused from an external CLI like Codex CLI, DennouAibou
   mirrors them with provenance and re-reads that external source instead of
   rotating the refresh token itself
 
@@ -71,10 +71,10 @@ For static secret refs and runtime snapshot activation behavior, see [Secrets Ma
 
 <Warning>
 Anthropic's public Claude Code docs say direct Claude Code use stays within
-Claude subscription limits. Separately, Anthropic told OpenClaw users on
-**April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that **OpenClaw counts as a
+Claude subscription limits. Separately, Anthropic told DennouAibou users on
+**April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that **DennouAibou counts as a
 third-party harness**. Existing Anthropic token profiles remain technically
-usable in OpenClaw, but Anthropic says the OpenClaw path now requires **Extra
+usable in DennouAibou, but Anthropic says the DennouAibou path now requires **Extra
 Usage** (pay-as-you-go billed separately from the subscription) for that
 traffic.
 
@@ -84,38 +84,38 @@ plan](https://support.claude.com/en/articles/11145838-using-claude-code-with-you
 and [Using Claude Code with your Team or Enterprise
 plan](https://support.anthropic.com/en/articles/11845131-using-claude-code-with-your-team-or-enterprise-plan/).
 
-If you want other subscription-style options in OpenClaw, see [OpenAI
+If you want other subscription-style options in DennouAibou, see [OpenAI
 Codex](/providers/openai).
 </Warning>
 
-OpenClaw now exposes Anthropic setup-token again as a legacy/manual path.
-Anthropic's OpenClaw-specific billing notice still applies to that path, so
+DennouAibou now exposes Anthropic setup-token again as a legacy/manual path.
+Anthropic's DennouAibou-specific billing notice still applies to that path, so
 use it with the expectation that Anthropic requires **Extra Usage** for
-OpenClaw-driven Claude-login traffic.
+DennouAibou-driven Claude-login traffic.
 
 ## Anthropic Claude CLI migration
 
 Anthropic no longer has a supported local Claude CLI migration path in
-OpenClaw. Use Anthropic API keys for Anthropic traffic, or keep legacy
+DennouAibou. Use Anthropic API keys for Anthropic traffic, or keep legacy
 token-based auth only where it is already configured and with the expectation
-that Anthropic treats that OpenClaw path as **Extra Usage**.
+that Anthropic treats that DennouAibou path as **Extra Usage**.
 
 ## OAuth exchange (how login works)
 
-OpenClaw’s interactive login flows are implemented in `@mariozechner/pi-ai` and wired into the wizards/commands.
+DennouAibou’s interactive login flows are implemented in `@mariozechner/pi-ai` and wired into the wizards/commands.
 
 ### Anthropic setup-token
 
 Flow shape:
 
-1. start Anthropic setup-token or paste-token from OpenClaw
-2. OpenClaw stores the resulting Anthropic credential in an auth profile
+1. start Anthropic setup-token or paste-token from DennouAibou
+2. DennouAibou stores the resulting Anthropic credential in an auth profile
 3. model selection stays on `anthropic/...`
 4. existing Anthropic auth profiles remain available for rollback/order control
 
 ### OpenAI Codex (ChatGPT OAuth)
 
-OpenAI Codex OAuth is explicitly supported for use outside the Codex CLI, including OpenClaw workflows.
+OpenAI Codex OAuth is explicitly supported for use outside the Codex CLI, including DennouAibou workflows.
 
 Flow shape (PKCE):
 
@@ -136,7 +136,7 @@ At runtime:
 
 - if `expires` is in the future → use the stored access token
 - if expired → refresh (under a file lock) and overwrite the stored credentials
-- exception: reused external CLI credentials stay externally managed; OpenClaw
+- exception: reused external CLI credentials stay externally managed; DennouAibou
   re-reads the CLI auth store and never spends the copied refresh token itself
 
 The refresh flow is automatic; you generally don't need to manage tokens manually.

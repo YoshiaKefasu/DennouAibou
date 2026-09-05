@@ -17,7 +17,7 @@ function resetRuntimeConfigState(): void {
 }
 
 async function writeConfig(home: string, config: OpenClawConfig): Promise<string> {
-  const configPath = path.join(home, ".openclaw", "openclaw.json");
+  const configPath = path.join(home, ".openclaw", "dennou-aibou.json");
   await fs.mkdir(path.dirname(configPath), { recursive: true });
   await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
   return configPath;

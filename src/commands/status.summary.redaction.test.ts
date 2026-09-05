@@ -45,7 +45,6 @@ describe("redactSensitiveStatusSummary", () => {
         },
         byRuntime: {
           subagent: 0,
-          acp: 1,
           cli: 0,
           cron: 1,
         },

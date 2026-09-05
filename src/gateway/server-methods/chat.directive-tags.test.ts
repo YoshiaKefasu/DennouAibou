@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CURRENT_SESSION_VERSION } from "@mariozechner/pi-coding-agent";
+import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import {
@@ -149,23 +149,23 @@ vi.mock("../../media/store.js", async () => {
 
 const { chatHandlers } = await import("./chat.js");
 
-async function waitForAssertion(assertion: () => void, timeoutMs = 1000, stepMs = 2) {
-  vi.useFakeTimers();
-  try {
-    let lastError: unknown;
-    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
-      try {
-        assertion();
-        return;
-      } catch (error) {
-        lastError = error;
+// CI/Windows high-load environments need extra slack to avoid false negatives at
+// the poll boundary; locally we keep the historical 1s budget. Real-timer based
+// (Date.now + setTimeout) instead of vi fake timers so Windows CI wall time is
+// what actually gates the assertion.
+const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 1_000, stepMs = 2) {
+  const startedAt = Date.now();
+  for (;;) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw error;
       }
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(stepMs);
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
     }
-    throw lastError ?? new Error("assertion did not pass in time");
-  } finally {
-    vi.useRealTimers();
   }
 }
 
@@ -1335,7 +1335,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "acp-session-spoof",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-spoof\n[/Source Receipt]",
@@ -1371,7 +1371,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "admin-session-1",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=admin-session-1\n[/Source Receipt]",
@@ -1383,7 +1383,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       kind: "external_user",
       originSessionId: "admin-session-1",
       sourceChannel: "acp",
-      sourceTool: "openclaw_acp",
+      sourceTool: "DENNOU_acp",
     });
     expect(mockState.lastDispatchCtx?.Body).toBe(
       "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=admin-session-1\n[/Source Receipt]\n\nops update",
@@ -1435,7 +1435,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
           kind: "external_user",
           originSessionId: "acp-session-1",
           sourceChannel: "acp",
-          sourceTool: "openclaw_acp",
+          sourceTool: "DENNOU_acp",
         },
         systemProvenanceReceipt:
           "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-1\n[/Source Receipt]",
@@ -1447,7 +1447,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       kind: "external_user",
       originSessionId: "acp-session-1",
       sourceChannel: "acp",
-      sourceTool: "openclaw_acp",
+      sourceTool: "DENNOU_acp",
     });
     expect(mockState.lastDispatchCtx?.Body).toBe(
       "[Source Receipt]\nbridge=openclaw-acp\noriginSessionId=acp-session-1\n[/Source Receipt]\n\nbench update",

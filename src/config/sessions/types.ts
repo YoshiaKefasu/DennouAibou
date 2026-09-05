@@ -1,9 +1,8 @@
 import crypto from "node:crypto";
-import type { Skill } from "@mariozechner/pi-coding-agent";
+import type { Skill } from "@earendil-works/pi-coding-agent";
 import type { ChatType } from "../../channels/chat-type.js";
 import type { ChannelId } from "../../channels/plugins/types.js";
 import type { DeliveryContext } from "../../utils/delivery-context.js";
-import type { TtsAutoMode } from "../types.tts.js";
 
 export type SessionScope = "per-sender" | "global";
 
@@ -22,49 +21,6 @@ export type SessionOrigin = {
   nativeDirectUserId?: string;
   accountId?: string;
   threadId?: string | number;
-};
-
-export type SessionAcpIdentitySource = "ensure" | "status" | "event";
-
-export type SessionAcpIdentityState = "pending" | "resolved";
-
-export type SessionAcpIdentity = {
-  state: SessionAcpIdentityState;
-  acpxRecordId?: string;
-  acpxSessionId?: string;
-  agentSessionId?: string;
-  source: SessionAcpIdentitySource;
-  lastUpdatedAt: number;
-};
-
-export type SessionAcpMeta = {
-  backend: string;
-  agent: string;
-  runtimeSessionName: string;
-  identity?: SessionAcpIdentity;
-  mode: "persistent" | "oneshot";
-  runtimeOptions?: AcpSessionRuntimeOptions;
-  cwd?: string;
-  state: "idle" | "running" | "error";
-  lastActivityAt: number;
-  lastError?: string;
-};
-
-export type AcpSessionRuntimeOptions = {
-  /**
-   * ACP runtime mode set via session/set_mode (for example: "plan", "normal", "auto").
-   */
-  runtimeMode?: string;
-  /** ACP runtime config option: model id. */
-  model?: string;
-  /** Working directory override for ACP session turns. */
-  cwd?: string;
-  /** ACP runtime config option: permission profile id. */
-  permissionProfile?: string;
-  /** ACP runtime config option: per-turn timeout in seconds. */
-  timeoutSeconds?: number;
-  /** Backend-specific option bag mapped through session/set_config_option. */
-  backendExtras?: Record<string, string>;
 };
 
 export type SessionEntry = {
@@ -118,7 +74,6 @@ export type SessionEntry = {
   verboseLevel?: string;
   reasoningLevel?: string;
   elevatedLevel?: string;
-  ttsAuto?: TtsAutoMode;
   execHost?: string;
   execSecurity?: string;
   execAsk?: string;
@@ -192,7 +147,6 @@ export type SessionEntry = {
   lastThreadId?: string | number;
   skillsSnapshot?: SessionSkillSnapshot;
   systemPromptReport?: SessionSystemPromptReport;
-  acp?: SessionAcpMeta;
 };
 
 function normalizeRuntimeField(value: string | undefined): string | undefined {
@@ -401,4 +355,3 @@ export type SessionSystemPromptReport = {
 
 export const DEFAULT_RESET_TRIGGER = "/new";
 export const DEFAULT_RESET_TRIGGERS = ["/new", "/reset"];
-export const DEFAULT_IDLE_MINUTES = 0;

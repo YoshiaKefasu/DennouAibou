@@ -1,5 +1,4 @@
 import { withProgress } from "../cli/progress.js";
-import type { HeartbeatEventPayload } from "../infra/heartbeat-events.js";
 import { normalizeUpdateChannel, resolveUpdateChannelDisplay } from "../infra/update-channels.js";
 import type { Tone } from "../memory-host-sdk/status.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
@@ -137,7 +136,6 @@ export async function statusCommand(
     tailscaleMode,
     tailscaleDns,
     tailscaleHttpsUrl,
-    update,
     gatewayConnection,
     remoteUrlMissing,
     gatewayMode,
@@ -187,26 +185,10 @@ export async function statusCommand(
         },
       )
     : undefined;
-  const lastHeartbeat =
-    opts.deep && gatewayReachable
-      ? await loadGatewayCallModule()
-          .then(({ callGateway }) =>
-            callGateway<HeartbeatEventPayload | null>({
-              method: "last-heartbeat",
-              params: {},
-              timeoutMs: opts.timeoutMs,
-              config: scan.cfg,
-            }),
-          )
-          .catch(() => null)
-      : null;
-
   const configChannel = normalizeUpdateChannel(cfg.update?.channel);
   const channelInfo = resolveUpdateChannelDisplay({
     configChannel,
-    installKind: update.installKind,
-    gitTag: update.git?.tag ?? null,
-    gitBranch: update.git?.branch ?? null,
+    installKind: "unknown",
   });
 
   if (opts.json) {
@@ -217,7 +199,6 @@ export async function statusCommand(
     writeRuntimeJson(runtime, {
       ...summary,
       os: osSummary,
-      update,
       updateChannel: channelInfo.channel,
       updateChannelSource: channelInfo.source,
       memory,
@@ -242,7 +223,7 @@ export async function statusCommand(
         count: pluginCompatibility.length,
         warnings: pluginCompatibility,
       },
-      ...(health || usage || lastHeartbeat ? { health, usage, lastHeartbeat } : {}),
+      ...(health || usage ? { health, usage } : {}),
     });
     return;
   }
@@ -252,15 +233,12 @@ export async function statusCommand(
     formatCliCommand,
     formatDuration,
     formatGatewayAuthUsed,
-    formatGitInstallLabel,
     formatHealthChannelLines,
     formatKTokens,
     formatPromptCacheCompact,
     formatPluginCompatibilityNotice,
     formatTimeAgo,
     formatTokensCompact,
-    formatUpdateAvailableHint,
-    formatUpdateOneLiner,
     getTerminalTableWidth,
     groupChannelIssuesByChannel,
     info,
@@ -270,7 +248,6 @@ export async function statusCommand(
     resolveMemoryCacheSummary,
     resolveMemoryFtsState,
     resolveMemoryVectorState,
-    resolveUpdateAvailability,
     shortenText,
     summarizePluginCompatibility,
     theme,
@@ -408,34 +385,6 @@ export async function statusCommand(
 
   const probesValue = health ? ok("enabled") : muted("skipped (use --deep)");
 
-  const heartbeatValue = (() => {
-    const parts = summary.heartbeat.agents
-      .map((agent) => {
-        if (!agent.enabled || !agent.everyMs) {
-          return `disabled (${agent.agentId})`;
-        }
-        const everyLabel = agent.every;
-        return `${everyLabel} (${agent.agentId})`;
-      })
-      .filter(Boolean);
-    return parts.length > 0 ? parts.join(", ") : "disabled";
-  })();
-  const lastHeartbeatValue = (() => {
-    if (!opts.deep) {
-      return null;
-    }
-    if (!gatewayReachable) {
-      return warn("unavailable");
-    }
-    if (!lastHeartbeat) {
-      return muted("none");
-    }
-    const age = formatTimeAgo(Date.now() - lastHeartbeat.ts);
-    const channel = lastHeartbeat.channel ?? "unknown";
-    const accountLabel = lastHeartbeat.accountId ? `account ${lastHeartbeat.accountId}` : null;
-    return [lastHeartbeat.status, `${age} ago`, channel, accountLabel].filter(Boolean).join(" · ");
-  })();
-
   const storeLabel =
     summary.sessions.paths.length > 1
       ? `${summary.sessions.paths.length} stores`
@@ -481,10 +430,7 @@ export async function statusCommand(
     return parts.join(" · ");
   })();
 
-  const updateAvailability = resolveUpdateAvailability(update);
-  const updateLine = formatUpdateOneLiner(update).replace(/^Update:\s*/i, "");
   const channelLabel = channelInfo.label;
-  const gitLabel = formatGitInstallLabel(update);
   const pluginCompatibilitySummary = summarizePluginCompatibility(pluginCompatibility);
   const pluginCompatibilityValue =
     pluginCompatibilitySummary.noticeCount === 0
@@ -506,11 +452,6 @@ export async function statusCommand(
             : warn(`${tailscaleMode} · magicdns unknown`),
     },
     { Item: "Channel", Value: channelLabel },
-    ...(gitLabel ? [{ Item: "Git", Value: gitLabel }] : []),
-    {
-      Item: "Update",
-      Value: updateAvailability.available ? warn(`available · ${updateLine}`) : updateLine,
-    },
     { Item: "Gateway", Value: gatewayValue },
     ...(gatewayProbeAuthWarning
       ? [{ Item: "Gateway auth warning", Value: warn(gatewayProbeAuthWarning) }]
@@ -523,8 +464,6 @@ export async function statusCommand(
     { Item: "Probes", Value: probesValue },
     { Item: "Events", Value: eventsValue },
     { Item: "Tasks", Value: tasksValue },
-    { Item: "Heartbeat", Value: heartbeatValue },
-    ...(lastHeartbeatValue ? [{ Item: "Last heartbeat", Value: lastHeartbeatValue }] : []),
     {
       Item: "Sessions",
       Value: `${summary.sessions.count} active · default ${defaults.model ?? "unknown"}${defaultCtx} · ${storeLabel}`,
@@ -780,11 +719,6 @@ export async function statusCommand(
   runtime.log("FAQ: https://docs.openclaw.ai/faq");
   runtime.log("Troubleshooting: https://docs.openclaw.ai/troubleshooting");
   runtime.log("");
-  const updateHint = formatUpdateAvailableHint(update);
-  if (updateHint) {
-    runtime.log(theme.warn(updateHint));
-    runtime.log("");
-  }
   runtime.log("Next steps:");
   runtime.log(`  Need to share?      ${formatCliCommand("openclaw status --all")}`);
   runtime.log(`  Need to debug live? ${formatCliCommand("openclaw logs --follow")}`);

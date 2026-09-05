@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  collectDiscordSecurityAuditFindings,
-  collectTelegramSecurityAuditFindings,
+  getCollectDiscordSecurityAuditFindings,
+  getCollectTelegramSecurityAuditFindings,
 } from "../../test/helpers/channels/security-audit-contract.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -25,9 +25,9 @@ const pathResolutionEnvKeys = [
   "USERPROFILE",
   "HOMEDRIVE",
   "HOMEPATH",
-  "OPENCLAW_HOME",
-  "OPENCLAW_STATE_DIR",
-  "OPENCLAW_BUNDLED_PLUGINS_DIR",
+  "DENNOU_HOME",
+  "DENNOU_STATE_DIR",
+  "DENNOU_BUNDLED_PLUGINS_DIR",
 ] as const;
 const execDockerRawUnavailable: NonNullable<SecurityAuditOptions["execDockerRawFn"]> = async () => {
   return {
@@ -53,14 +53,14 @@ function stubChannelPlugin(params: {
   const defaultCollectAuditFindings =
     params.collectAuditFindings ??
     (params.id === "discord"
-      ? (collectDiscordSecurityAuditFindings as NonNullable<
+      ? (getCollectDiscordSecurityAuditFindings() as NonNullable<
           ChannelPlugin["security"]
         >["collectAuditFindings"])
       : params.id === "telegram"
-            ? (collectTelegramSecurityAuditFindings as NonNullable<
-                ChannelPlugin["security"]
-              >["collectAuditFindings"])
-            : undefined);
+        ? (getCollectTelegramSecurityAuditFindings() as NonNullable<
+            ChannelPlugin["security"]
+          >["collectAuditFindings"])
+        : undefined);
   const defaultCommands =
     params.commands ??
     (params.id === "discord" || params.id === "telegram"
@@ -396,7 +396,7 @@ async function runInstallMetadataAudit(
     includeFilesystem: true,
     includeChannelSecurity: false,
     stateDir,
-    configPath: path.join(stateDir, "openclaw.json"),
+    configPath: path.join(stateDir, "dennou-aibou.json"),
     execDockerRawFn: execDockerRawUnavailable,
   });
 }
@@ -423,7 +423,7 @@ describe("security audit", () => {
     const tmp = await makeTmpDir(label);
     const stateDir = path.join(tmp, "state");
     await fs.mkdir(stateDir, { recursive: true, mode: 0o700 });
-    const configPath = path.join(stateDir, "openclaw.json");
+    const configPath = path.join(stateDir, "dennou-aibou.json");
     await fs.writeFile(configPath, "{}\n", "utf-8");
     if (!isWindows) {
       await fs.chmod(configPath, 0o600);
@@ -435,7 +435,7 @@ describe("security audit", () => {
     const credentialsDir = path.join(sharedChannelSecurityStateDir, "credentials");
     await fs.rm(credentialsDir, { recursive: true, force: true }).catch(() => undefined);
     await fs.mkdir(credentialsDir, { recursive: true, mode: 0o700 });
-    await withEnvAsync({ OPENCLAW_STATE_DIR: sharedChannelSecurityStateDir }, () =>
+    await withEnvAsync({ DENNOU_STATE_DIR: sharedChannelSecurityStateDir }, () =>
       fn(sharedChannelSecurityStateDir),
     );
   };
@@ -455,14 +455,14 @@ describe("security audit", () => {
       includeFilesystem: true,
       includeChannelSecurity: false,
       stateDir: sharedExtensionsStateDir,
-      configPath: path.join(sharedExtensionsStateDir, "openclaw.json"),
+      configPath: path.join(sharedExtensionsStateDir, "dennou-aibou.json"),
       execDockerRawFn: execDockerRawUnavailable,
     });
   };
   beforeAll(async () => {
     fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-security-audit-"));
     isolatedHome = path.join(fixtureRoot, "home");
-    const isolatedEnv = createPathResolutionEnv(isolatedHome, { OPENCLAW_HOME: isolatedHome });
+    const isolatedEnv = createPathResolutionEnv(isolatedHome, { DENNOU_HOME: isolatedHome });
     for (const key of pathResolutionEnvKeys) {
       previousPathResolutionEnv[key] = process.env[key];
       const value = isolatedEnv[key];
@@ -532,8 +532,8 @@ describe("security audit", () => {
         run: async () =>
           withEnvAsync(
             {
-              OPENCLAW_GATEWAY_TOKEN: undefined,
-              OPENCLAW_GATEWAY_PASSWORD: undefined,
+              DENNOU_GATEWAY_TOKEN: undefined,
+              DENNOU_GATEWAY_PASSWORD: undefined,
             },
             async () =>
               audit({
@@ -558,7 +558,7 @@ describe("security audit", () => {
                   password: {
                     source: "env",
                     provider: "default",
-                    id: "OPENCLAW_GATEWAY_PASSWORD",
+                    id: "DENNOU_GATEWAY_PASSWORD",
                   },
                 },
               },
@@ -579,7 +579,7 @@ describe("security audit", () => {
                 token: {
                   source: "env",
                   provider: "default",
-                  id: "OPENCLAW_GATEWAY_TOKEN",
+                  id: "DENNOU_GATEWAY_TOKEN",
                 },
               },
             },
@@ -1135,7 +1135,7 @@ describe("security audit", () => {
           const tmp = await makeTmpDir(testCase.label);
           const stateDir = path.join(tmp, "state");
           await fs.mkdir(stateDir, { recursive: true });
-          const configPath = path.join(stateDir, "openclaw.json");
+          const configPath = path.join(stateDir, "dennou-aibou.json");
           await fs.writeFile(configPath, "{}\n", "utf-8");
 
           return runSecurityAudit({
@@ -1333,11 +1333,11 @@ describe("security audit", () => {
     const stateDir = path.join(tmp, "state");
     await fs.mkdir(stateDir, { recursive: true, mode: 0o700 });
 
-    const targetConfigPath = path.join(tmp, "managed-openclaw.json");
+    const targetConfigPath = path.join(tmp, "managed-dennou-aibou.json");
     await fs.writeFile(targetConfigPath, "{}\n", "utf-8");
     await fs.chmod(targetConfigPath, 0o444);
 
-    const configPath = path.join(stateDir, "openclaw.json");
+    const configPath = path.join(stateDir, "dennou-aibou.json");
     await fs.symlink(targetConfigPath, configPath);
 
     const res = await runSecurityAudit({
@@ -1415,7 +1415,7 @@ describe("security audit", () => {
         .map((testCase) => ({
           run: async () => {
             const fixture = await testCase.setup();
-            const configPath = path.join(fixture.stateDir, "openclaw.json");
+            const configPath = path.join(fixture.stateDir, "dennou-aibou.json");
             await fs.writeFile(configPath, "{}\n", "utf-8");
             if (!isWindows) {
               await fs.chmod(configPath, 0o600);
@@ -1785,7 +1785,7 @@ describe("security audit", () => {
             password: {
               source: "env",
               provider: "default",
-              id: "OPENCLAW_GATEWAY_PASSWORD",
+              id: "DENNOU_GATEWAY_PASSWORD",
             },
           },
         },
@@ -2661,7 +2661,7 @@ describe("security audit", () => {
         "channels.discord.allowFrom:Alice#1234",
         "channels.discord.guilds.123.users:trusted.operator",
         "channels.discord.guilds.123.channels.general.users:security-team",
-        "~/.openclaw/credentials/discord-allowFrom.json:team.owner",
+        "~/.dennou-aibou/credentials/discord-allowFrom.json:team.owner",
       ],
       detailExcludes: ["<@123456789012345678>"],
     },
@@ -3188,7 +3188,7 @@ describe("security audit", () => {
           hooks: { enabled: true, token: "shared-gateway-token-1234567890" },
         } satisfies OpenClawConfig,
         env: {
-          OPENCLAW_GATEWAY_TOKEN: "shared-gateway-token-1234567890",
+          DENNOU_GATEWAY_TOKEN: "shared-gateway-token-1234567890",
         },
         expectedFinding: "hooks.token_reuse_gateway_token",
         expectedSeverity: "critical" as const,
@@ -3349,7 +3349,7 @@ describe("security audit", () => {
 
     const res = await audit(cfg, {
       stateDir: "/Users/test/Dropbox/.openclaw",
-      configPath: "/Users/test/Dropbox/.openclaw/openclaw.json",
+      configPath: "/Users/test/Dropbox/.openclaw/dennou-aibou.json",
     });
 
     expectFinding(res, "fs.synced_dir", "warn");
@@ -3370,7 +3370,7 @@ describe("security audit", () => {
       await fs.chmod(includePath, 0o644);
     }
 
-    const configPath = path.join(stateDir, "openclaw.json");
+    const configPath = path.join(stateDir, "dennou-aibou.json");
     await fs.writeFile(configPath, `{ "$include": "./extra.json5" }\n`, "utf-8");
     await fs.chmod(configPath, 0o600);
 
@@ -3838,10 +3838,10 @@ describe("security audit", () => {
     const makeProbeEnv = (env?: { token?: string; password?: string }) => {
       const probeEnv: NodeJS.ProcessEnv = {};
       if (env?.token !== undefined) {
-        probeEnv.OPENCLAW_GATEWAY_TOKEN = env.token;
+        probeEnv.DENNOU_GATEWAY_TOKEN = env.token;
       }
       if (env?.password !== undefined) {
-        probeEnv.OPENCLAW_GATEWAY_PASSWORD = env.password;
+        probeEnv.DENNOU_GATEWAY_PASSWORD = env.password;
       }
       return probeEnv;
     };

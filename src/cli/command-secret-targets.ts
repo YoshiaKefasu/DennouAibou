@@ -45,7 +45,6 @@ function buildCommandSecretTargets(): CommandSecretTargets {
       "agents.defaults.memorySearch.remote.",
       "agents.list[].memorySearch.remote.",
       "skills.entries.",
-      "messages.tts.",
       "tools.web.search",
     ]).concat(webPluginSecretTargets),
     status: idsByPrefix([

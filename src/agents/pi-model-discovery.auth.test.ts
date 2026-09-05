@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { saveAuthProfileStore } from "./auth-profiles.js";
+import { createLegacyAuthStorageAdapter } from "./pi-embedded-runner/auth-storage-adapter.js";
 import { discoverAuthStorage, discoverModels } from "./pi-model-discovery.js";
 
 async function createAgentDir(): Promise<string> {
@@ -90,7 +91,7 @@ describe("discoverAuthStorage", () => {
         agentDir,
       );
 
-      const authStorage = discoverAuthStorage(agentDir);
+      const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
 
       expect(authStorage.hasAuth("openrouter")).toBe(true);
       expect(authStorage.hasAuth("anthropic")).toBe(true);
@@ -132,8 +133,8 @@ describe("discoverAuthStorage", () => {
 
   it("preserves legacy auth.json when auth store is forced read-only", async () => {
     await withAgentDir(async (agentDir) => {
-      const previous = process.env.OPENCLAW_AUTH_STORE_READONLY;
-      process.env.OPENCLAW_AUTH_STORE_READONLY = "1";
+      const previous = process.env.DENNOU_AUTH_STORE_READONLY;
+      process.env.DENNOU_AUTH_STORE_READONLY = "1";
       try {
         writeRuntimeOpenRouterProfile(agentDir);
         await writeLegacyAuthJson(agentDir, {
@@ -146,9 +147,9 @@ describe("discoverAuthStorage", () => {
         expect(parsed.openrouter).toMatchObject({ type: "api_key", key: "legacy-static-key" });
       } finally {
         if (previous === undefined) {
-          delete process.env.OPENCLAW_AUTH_STORE_READONLY;
+          delete process.env.DENNOU_AUTH_STORE_READONLY;
         } else {
-          process.env.OPENCLAW_AUTH_STORE_READONLY = previous;
+          process.env.DENNOU_AUTH_STORE_READONLY = previous;
         }
       }
     });
@@ -167,7 +168,7 @@ describe("discoverAuthStorage", () => {
           agentDir,
         );
 
-        const authStorage = discoverAuthStorage(agentDir);
+        const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
 
         expect(authStorage.hasAuth("mistral")).toBe(true);
         await expect(authStorage.getApiKey("mistral")).resolves.toBe("mistral-env-test-key");
@@ -214,8 +215,8 @@ describe("discoverAuthStorage", () => {
           },
         });
 
-        const authStorage = discoverAuthStorage(agentDir);
-        const modelRegistry = discoverModels(authStorage, agentDir);
+        const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
+        const modelRegistry = await discoverModels(authStorage.authStorage, agentDir);
         expect(modelRegistry.getError?.()).toBeUndefined();
         const model = modelRegistry.find("mistral", "mistral-large-latest") as {
           api?: string;
@@ -310,8 +311,8 @@ describe("discoverAuthStorage", () => {
         },
       });
 
-      const authStorage = discoverAuthStorage(agentDir);
-      const modelRegistry = discoverModels(authStorage, agentDir);
+      const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
+      const modelRegistry = await discoverModels(authStorage.authStorage, agentDir);
       const model = modelRegistry.find("custom-api-mistral-ai", "mistral-small-latest") as {
         compat?: {
           supportsStore?: boolean;
@@ -362,8 +363,8 @@ describe("discoverAuthStorage", () => {
         },
       });
 
-      const authStorage = discoverAuthStorage(agentDir);
-      const modelRegistry = discoverModels(authStorage, agentDir);
+      const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
+      const modelRegistry = await discoverModels(authStorage.authStorage, agentDir);
       const model = modelRegistry.find(
         "openrouter",
         "mistralai/mistral-small-3.2-24b-instruct",
@@ -417,8 +418,8 @@ describe("discoverAuthStorage", () => {
         },
       });
 
-      const authStorage = discoverAuthStorage(agentDir);
-      const modelRegistry = discoverModels(authStorage, agentDir);
+      const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
+      const modelRegistry = await discoverModels(authStorage.authStorage, agentDir);
       const model = modelRegistry.find("openrouter", "x-ai/grok-4.1-fast") as {
         compat?: {
           toolSchemaProfile?: string;
@@ -456,8 +457,8 @@ describe("discoverAuthStorage", () => {
         },
       });
 
-      const authStorage = discoverAuthStorage(agentDir);
-      const modelRegistry = discoverModels(authStorage, agentDir);
+      const authStorage = await createLegacyAuthStorageAdapter(discoverAuthStorage(agentDir));
+      const modelRegistry = await discoverModels(authStorage.authStorage, agentDir);
       const model = modelRegistry
         .getAll()
         .find((entry) => entry.provider === "custom-xai" && entry.id === "grok-4.1-fast") as

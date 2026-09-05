@@ -129,10 +129,6 @@ export const discordChannelConfigUiHints = {
     label: "Discord Voice Decrypt Failure Tolerance",
     help: "Consecutive decrypt failures before DAVE attempts session recovery (passed to @discordjs/voice; default: 24).",
   },
-  "voice.tts": {
-    label: "Discord Voice Text-to-Speech",
-    help: "Optional TTS overrides for Discord voice playback (merged with messages.tts).",
-  },
   "pluralkit.enabled": {
     label: "Discord PluralKit Enabled",
     help: "Resolve PluralKit proxied messages and treat system members as distinct senders.",

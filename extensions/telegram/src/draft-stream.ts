@@ -38,7 +38,7 @@ function hasNumericMessageThreadId(
  * Keep draft-id allocation shared across bundled chunks so concurrent preview
  * lanes do not accidentally reuse draft ids when code-split entries coexist.
  */
-const TELEGRAM_DRAFT_STREAM_STATE_KEY = Symbol.for("openclaw.telegramDraftStreamState");
+const TELEGRAM_DRAFT_STREAM_STATE_KEY = Symbol.for("dennou.telegramDraftStreamState");
 let draftStreamState: { nextDraftId: number } | undefined;
 
 function getDraftStreamState(): { nextDraftId: number } {

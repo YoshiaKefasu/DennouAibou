@@ -20,8 +20,8 @@ import { sendGatewayAuthFailure } from "./http-common.js";
 import { ADMIN_SCOPE, CLI_DEFAULT_OPERATOR_SCOPES } from "./method-scopes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 
-export const OPENCLAW_MODEL_ID = "openclaw";
-export const OPENCLAW_DEFAULT_MODEL_ID = "openclaw/default";
+export const DENNOU_MODEL_ID = "openclaw";
+export const DENNOU_DEFAULT_MODEL_ID = "openclaw/default";
 
 export function getHeader(req: IncomingMessage, name: string): string | undefined {
   const raw = req.headers[name.toLowerCase()];
@@ -135,7 +135,7 @@ export function resolveTrustedHttpOperatorScopes(
     return [];
   }
 
-  const headerValue = getHeader(req, "x-openclaw-scopes");
+  const headerValue = getHeader(req, "x-dennou-scopes");
   if (headerValue === undefined) {
     // No scope header present — trusted clients without an explicit header
     // get the default operator scopes (matching pre-#57783 behavior).
@@ -190,9 +190,7 @@ export function resolveOpenAiCompatibleHttpSenderIsOwner(
 
 export function resolveAgentIdFromHeader(req: IncomingMessage): string | undefined {
   const raw =
-    getHeader(req, "x-openclaw-agent-id")?.trim() ||
-    getHeader(req, "x-openclaw-agent")?.trim() ||
-    "";
+    getHeader(req, "x-dennou-agent-id")?.trim() || getHeader(req, "x-dennou-agent")?.trim() || "";
   if (!raw) {
     return undefined;
   }
@@ -208,7 +206,7 @@ export function resolveAgentIdFromModel(
     return undefined;
   }
   const lowered = raw.toLowerCase();
-  if (lowered === OPENCLAW_MODEL_ID || lowered === OPENCLAW_DEFAULT_MODEL_ID) {
+  if (lowered === DENNOU_MODEL_ID || lowered === DENNOU_DEFAULT_MODEL_ID) {
     return resolveDefaultAgentId(cfg);
   }
 
@@ -234,7 +232,7 @@ export async function resolveOpenAiCompatModelOverride(params: {
     };
   }
 
-  const raw = getHeader(params.req, "x-openclaw-model")?.trim();
+  const raw = getHeader(params.req, "x-dennou-model")?.trim();
   if (!raw) {
     return {};
   }
@@ -244,7 +242,7 @@ export async function resolveOpenAiCompatModelOverride(params: {
   const defaultProvider = defaultModelRef.provider;
   const parsed = parseModelRef(raw, defaultProvider);
   if (!parsed) {
-    return { errorMessage: "Invalid `x-openclaw-model`." };
+    return { errorMessage: "Invalid `x-dennou-model`." };
   }
 
   const catalog = await loadGatewayModelCatalog();
@@ -284,7 +282,7 @@ export function resolveSessionKey(params: {
   user?: string | undefined;
   prefix: string;
 }): string {
-  const explicit = getHeader(params.req, "x-openclaw-session-key")?.trim();
+  const explicit = getHeader(params.req, "x-dennou-session-key")?.trim();
   if (explicit) {
     return explicit;
   }
@@ -311,7 +309,7 @@ export function resolveGatewayRequestContext(params: {
   });
 
   const messageChannel = params.useMessageChannelHeader
-    ? (normalizeMessageChannel(getHeader(params.req, "x-openclaw-message-channel")) ??
+    ? (normalizeMessageChannel(getHeader(params.req, "x-dennou-message-channel")) ??
       params.defaultMessageChannel)
     : params.defaultMessageChannel;
 

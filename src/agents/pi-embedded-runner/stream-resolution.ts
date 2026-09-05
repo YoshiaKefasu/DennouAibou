@@ -1,7 +1,5 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import { streamSimple } from "@mariozechner/pi-ai";
-import { createAnthropicVertexStreamFnForModel } from "../anthropic-vertex-stream.js";
-import { createOpenAIWebSocketStreamFn } from "../openai-ws-stream.js";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { streamSimple } from "@earendil-works/pi-ai/compat";
 import { createBoundaryAwareStreamFnForModel } from "../provider-transport-stream.js";
 import { stripSystemPromptCacheBoundary } from "../system-prompt-cache-boundary.js";
 import type { EmbeddedRunAttemptParams } from "./run/types.js";
@@ -9,13 +7,13 @@ import type { EmbeddedRunAttemptParams } from "./run/types.js";
 let embeddedAgentBaseStreamFnCache = new WeakMap<object, StreamFn | undefined>();
 
 export function resolveEmbeddedAgentBaseStreamFn(params: {
-  session: { agent: { streamFn?: StreamFn } };
+  session: { agent: { streamFunction?: StreamFn } };
 }): StreamFn | undefined {
   const cached = embeddedAgentBaseStreamFnCache.get(params.session);
   if (cached !== undefined || embeddedAgentBaseStreamFnCache.has(params.session)) {
     return cached;
   }
-  const baseStreamFn = params.session.agent.streamFn;
+  const baseStreamFn = params.session.agent.streamFunction;
   embeddedAgentBaseStreamFnCache.set(params.session, baseStreamFn);
   return baseStreamFn;
 }
@@ -27,18 +25,10 @@ export function resetEmbeddedAgentBaseStreamFnCacheForTest(): void {
 export function describeEmbeddedAgentStreamStrategy(params: {
   currentStreamFn: StreamFn | undefined;
   providerStreamFn?: StreamFn;
-  shouldUseWebSocketTransport: boolean;
-  wsApiKey?: string;
   model: EmbeddedRunAttemptParams["model"];
 }): string {
   if (params.providerStreamFn) {
     return "provider";
-  }
-  if (params.shouldUseWebSocketTransport) {
-    return params.wsApiKey ? "openai-websocket" : "session-http-fallback";
-  }
-  if (params.model.provider === "anthropic-vertex") {
-    return "anthropic-vertex";
   }
   if (params.currentStreamFn === undefined || params.currentStreamFn === streamSimple) {
     return createBoundaryAwareStreamFnForModel(params.model)
@@ -63,8 +53,6 @@ export async function resolveEmbeddedAgentApiKey(params: {
 export function resolveEmbeddedAgentStreamFn(params: {
   currentStreamFn: StreamFn | undefined;
   providerStreamFn?: StreamFn;
-  shouldUseWebSocketTransport: boolean;
-  wsApiKey?: string;
   sessionId: string;
   signal?: AbortSignal;
   model: EmbeddedRunAttemptParams["model"];
@@ -101,17 +89,6 @@ export function resolveEmbeddedAgentStreamFn(params: {
   }
 
   const currentStreamFn = params.currentStreamFn ?? streamSimple;
-  if (params.shouldUseWebSocketTransport) {
-    return params.wsApiKey
-      ? createOpenAIWebSocketStreamFn(params.wsApiKey, params.sessionId, {
-          signal: params.signal,
-        })
-      : currentStreamFn;
-  }
-
-  if (params.model.provider === "anthropic-vertex") {
-    return createAnthropicVertexStreamFnForModel(params.model);
-  }
 
   if (params.currentStreamFn === undefined || params.currentStreamFn === streamSimple) {
     const boundaryAwareStreamFn = createBoundaryAwareStreamFnForModel(params.model);

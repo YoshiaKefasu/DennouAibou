@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type, type TSchema } from "typebox";
 import {
   CHANNEL_TARGET_DESCRIPTION,
   CHANNEL_TARGETS_DESCRIPTION,
@@ -45,4 +45,13 @@ export function channelTargetsSchema(options?: { description?: string }) {
   return Type.Array(
     channelTargetSchema({ description: options?.description ?? CHANNEL_TARGETS_DESCRIPTION }),
   );
+}
+
+/**
+ * Safely widen a TypeBox TSchema to Record<string, unknown> for use as tool
+ * parameter definitions. TypeBox 1.3+ removed the implicit index signature
+ * from TSchema, so direct assignment to Record<string, unknown> fails in tsgo.
+ */
+export function asSchemaJson(schema: TSchema): Record<string, unknown> {
+  return schema as Record<string, unknown>;
 }

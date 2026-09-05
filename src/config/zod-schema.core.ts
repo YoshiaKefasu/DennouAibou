@@ -186,6 +186,18 @@ export const ModelCompatSchema = z
     supportsStore: z.boolean().optional(),
     supportsDeveloperRole: z.boolean().optional(),
     supportsReasoningEffort: z.boolean().optional(),
+    /**
+     * Per-model reasoning effort map (PI agent `models.json` design).
+     *
+     * The single source of truth for which thinking levels a model exposes
+     * (`choices` list) and which wire value (`reasoning_effort`) each level
+     * translates to. Keys are the abstract ThinkLevel names; values are the
+     * wire string the provider accepts, or `null` to declare that the level
+     * is *not* supported (the level is then hidden from choices and denied
+     * by `isElevatedThinkingDenied`). Models without this map fall back to
+     * the legacy plugin/compat-flag resolution.
+     */
+    reasoningEffortMap: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
     supportsUsageInStreaming: z.boolean().optional(),
     supportsTools: z.boolean().optional(),
     supportsStrictMode: z.boolean().optional(),
@@ -195,6 +207,10 @@ export const ModelCompatSchema = z
     thinkingFormat: z
       .union([
         z.literal("openai"),
+        z.literal("baseten"),
+        z.literal("chat-template"),
+        z.literal("string-thinking"),
+        z.literal("ant-ling"),
       ])
       .optional(),
     requiresToolResultName: z.boolean().optional(),

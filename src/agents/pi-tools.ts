@@ -1,8 +1,8 @@
-import { codingTools, createReadTool, readTool } from "@mariozechner/pi-coding-agent";
+import { createCodingTools, createReadTool } from "@earendil-works/pi-coding-agent";
 import type { OpenClawConfig } from "../config/config.js";
-import { createChatSearchTool } from "../dennou-soul/raw-chat/tool.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
+import { createChatSearchTool } from "../dennou-soul/raw-chat/tool.js";
 import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runtime-policy.js";
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
@@ -19,7 +19,6 @@ import {
   type ProcessToolDefaults,
 } from "./bash-tools.js";
 import { listChannelAgentTools } from "./channel-tools.js";
-import { shouldSuppressManagedWebSearchTool } from "./codex-native-web-search.js";
 import { resolveImageSanitizationLimits } from "./image-sanitization.js";
 import type { ModelAuthMode } from "./model-auth.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
@@ -66,11 +65,9 @@ function isOpenAIProvider(provider?: string) {
   return normalized === "openai" || normalized === "openai-codex";
 }
 
-const TOOL_DENY_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {
-  voice: ["tts"],
-};
+const TOOL_DENY_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {};
 const TOOL_ALLOW_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {
-  node: ["canvas", "image", "pdf", "tts", "web_fetch", "web_search"],
+  node: ["canvas", "image", "pdf", "web_fetch", "web_search"],
 };
 const MEMORY_FLUSH_ALLOWED_TOOL_NAMES = new Set(["read", "write"]);
 
@@ -102,7 +99,7 @@ function applyMessageProviderToolPolicy(
 
 function applyModelProviderToolPolicy(
   tools: AnyAgentTool[],
-  params?: {
+  _params?: {
     config?: OpenClawConfig;
     modelProvider?: string;
     modelApi?: string;
@@ -111,17 +108,6 @@ function applyModelProviderToolPolicy(
     modelCompat?: ModelCompatConfig;
   },
 ): AnyAgentTool[] {
-  if (
-    shouldSuppressManagedWebSearchTool({
-      config: params?.config,
-      modelProvider: params?.modelProvider,
-      modelApi: params?.modelApi,
-      agentDir: params?.agentDir,
-    })
-  ) {
-    return tools.filter((tool) => tool.name !== "web_search");
-  }
-
   return tools;
 }
 
@@ -418,8 +404,8 @@ export function createOpenClawCodingTools(options?: {
   }
   const imageSanitization = resolveImageSanitizationLimits(options?.config);
 
-  const base = (codingTools as unknown as AnyAgentTool[]).flatMap((tool) => {
-    if (tool.name === readTool.name) {
+  const base = createCodingTools(workspaceRoot).flatMap((tool) => {
+    if (tool.name === "read") {
       if (sandboxRoot) {
         const sandboxed = createSandboxedReadTool({
           root: sandboxRoot,
@@ -600,10 +586,12 @@ export function createOpenClawCodingTools(options?: {
       config: options?.config,
       agentSessionKey: options?.sessionKey,
     })
-      ? [createChatSearchTool({
-          config: options?.config,
-          agentSessionKey: options?.sessionKey,
-        })!]
+      ? [
+          createChatSearchTool({
+            config: options?.config,
+            agentSessionKey: options?.sessionKey,
+          })!,
+        ]
       : []),
   ];
   const toolsForMemoryFlush =

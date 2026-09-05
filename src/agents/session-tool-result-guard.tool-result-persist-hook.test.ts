@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { SessionManager } from "@mariozechner/pi-coding-agent";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, afterEach } from "vitest";
 import {
   initializeGlobalHookRunner,
@@ -78,7 +78,7 @@ describe("tool_result_persist hook", () => {
 
   it("loads tool_result_persist hooks without breaking persistence", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-toolpersist-"));
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
 
     const pluginA = writeTempPlugin({
       dir: tmp,
@@ -135,7 +135,7 @@ describe("tool_result_persist hook", () => {
 describe("before_message_write hook", () => {
   it("continues persistence when a before_message_write hook throws", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-before-write-"));
-    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    process.env.DENNOU_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
 
     const plugin = writeTempPlugin({
       dir: tmp,

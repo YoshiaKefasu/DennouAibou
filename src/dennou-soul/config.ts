@@ -1,7 +1,7 @@
 /**
  * DennouAibou設定の読み込み
  *
- * `openclaw.json` の `dennou` 名前空間から設定を読み込み、デフォルト値とマージする。
+ * `dennou-aibou.json` の `dennou` 名前空間から設定を読み込み、デフォルト値とマージする。
  * 上流OpenClawの型を変更せず、`getRuntimeConfig()` の戻り値から型アサーションで取得する。
  *
  * DENNOU_RULES.md Rule 1 (Encapsulation) に従い、上流型は一切変更しない。
@@ -10,11 +10,7 @@
  * 都度 `getDennouConfig()` を呼ぶ設計。config-reloadによるhot-reloadが自動で効く。
  */
 import { getRuntimeConfig } from "../config/config.js";
-import {
-  type DennouConfig,
-  type DennouToolsPruneConfig,
-  DENNOU_CONFIG_DEFAULTS,
-} from "./types.js";
+import { type DennouConfig, type DennouToolsPruneConfig, DENNOU_CONFIG_DEFAULTS } from "./types.js";
 
 /** 型ガード: raw値が部分的なDennouConfigかどうかを判定 */
 function isDennouConfigObject(raw: unknown): raw is Partial<DennouConfig> {
@@ -31,7 +27,7 @@ function mergeToolsPruneConfig(
 }
 
 /**
- * openclaw.json の `dennou` セクションを読み込んでDennouConfigを返す。
+ * dennou-aibou.json の `dennou` セクションを読み込んでDennouConfigを返す。
  *
  * セクションが存在しない、パースできない、またはエラーが発生した場合は
  * デフォルト値を返す（クラッシュしない）。

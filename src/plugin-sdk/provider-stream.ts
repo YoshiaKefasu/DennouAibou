@@ -1,21 +1,11 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
-import {
-  createGoogleThinkingPayloadWrapper,
-  sanitizeGoogleThinkingPayload,
-} from "../agents/pi-embedded-runner/google-stream-wrappers.js";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { createMinimaxFastModeWrapper } from "../agents/pi-embedded-runner/minimax-stream-wrappers.js";
 import {
   createMoonshotThinkingWrapper,
   resolveMoonshotThinkingType,
 } from "../agents/pi-embedded-runner/moonshot-thinking-stream-wrappers.js";
 import {
-  createCodexNativeWebSearchWrapper,
   createOpenAIAttributionHeadersWrapper,
-  createOpenAIFastModeWrapper,
-  createOpenAIReasoningCompatibilityWrapper,
-  createOpenAIResponsesContextManagementWrapper,
-  createOpenAIServiceTierWrapper,
-  createOpenAITextVerbosityWrapper,
   resolveOpenAIFastMode,
   resolveOpenAIServiceTier,
   resolveOpenAITextVerbosity,
@@ -50,7 +40,6 @@ export function composeProviderStreamWrappers(
 }
 
 export type ProviderStreamFamily =
-  | "google-thinking"
   | "kilocode-thinking"
   | "moonshot-thinking"
   | "minimax-fast-mode"
@@ -64,11 +53,6 @@ export function buildProviderStreamFamilyHooks(
   family: ProviderStreamFamily,
 ): ProviderStreamFamilyHooks {
   switch (family) {
-    case "google-thinking":
-      return {
-        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) =>
-          createGoogleThinkingPayloadWrapper(ctx.streamFn, ctx.thinkingLevel),
-      };
     case "moonshot-thinking":
       return {
         wrapStreamFn: (ctx: ProviderWrapStreamFnContext) => {
@@ -96,32 +80,8 @@ export function buildProviderStreamFamilyHooks(
       };
     case "openai-responses-defaults":
       return {
-        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) => {
-          let nextStreamFn = createOpenAIAttributionHeadersWrapper(ctx.streamFn);
-
-          if (resolveOpenAIFastMode(ctx.extraParams)) {
-            nextStreamFn = createOpenAIFastModeWrapper(nextStreamFn);
-          }
-
-          const serviceTier = resolveOpenAIServiceTier(ctx.extraParams);
-          if (serviceTier) {
-            nextStreamFn = createOpenAIServiceTierWrapper(nextStreamFn, serviceTier);
-          }
-
-          const textVerbosity = resolveOpenAITextVerbosity(ctx.extraParams);
-          if (textVerbosity) {
-            nextStreamFn = createOpenAITextVerbosityWrapper(nextStreamFn, textVerbosity);
-          }
-
-          nextStreamFn = createCodexNativeWebSearchWrapper(nextStreamFn, {
-            config: ctx.config,
-            agentDir: ctx.agentDir,
-          });
-          return createOpenAIResponsesContextManagementWrapper(
-            createOpenAIReasoningCompatibilityWrapper(nextStreamFn),
-            ctx.extraParams,
-          );
-        },
+        wrapStreamFn: (ctx: ProviderWrapStreamFnContext) =>
+          createOpenAIAttributionHeadersWrapper(ctx.streamFn),
       };
     case "openrouter-thinking":
       return {
@@ -144,26 +104,13 @@ export function buildProviderStreamFamilyHooks(
 // Public stream-wrapper helpers for provider plugins.
 
 export {
-  applyAnthropicPayloadPolicyToParams,
-  resolveAnthropicPayloadPolicy,
-} from "../agents/anthropic-payload-policy.js";
-export {
   buildCopilotDynamicHeaders,
   hasCopilotVisionInput,
 } from "../agents/copilot-dynamic-headers.js";
-export { applyAnthropicEphemeralCacheControlMarkers } from "../agents/pi-embedded-runner/anthropic-cache-control-payload.js";
-export {
-  createAnthropicToolPayloadCompatibilityWrapper,
-  createOpenAIAnthropicToolPayloadCompatibilityWrapper,
-} from "../agents/pi-embedded-runner/anthropic-family-tool-payload-compat.js";
 export {
   createBedrockNoCacheWrapper,
   isAnthropicBedrockModel,
 } from "../agents/pi-embedded-runner/bedrock-stream-wrappers.js";
-export {
-  createGoogleThinkingPayloadWrapper,
-  sanitizeGoogleThinkingPayload,
-} from "../agents/pi-embedded-runner/google-stream-wrappers.js";
 export {
   createKilocodeWrapper,
   createOpenRouterSystemCacheWrapper,
@@ -177,13 +124,6 @@ export {
 } from "../agents/pi-embedded-runner/moonshot-thinking-stream-wrappers.js";
 export {
   createOpenAIAttributionHeadersWrapper,
-  createCodexNativeWebSearchWrapper,
-  createOpenAIDefaultTransportWrapper,
-  createOpenAIFastModeWrapper,
-  createOpenAIReasoningCompatibilityWrapper,
-  createOpenAIResponsesContextManagementWrapper,
-  createOpenAIServiceTierWrapper,
-  createOpenAITextVerbosityWrapper,
   resolveOpenAIFastMode,
   resolveOpenAIServiceTier,
   resolveOpenAITextVerbosity,

@@ -1,5 +1,5 @@
-import { completeSimple, getModel, streamSimple } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { completeSimple, getModel, streamSimple } from "@earendil-works/pi-ai/compat";
+import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 import {
   createSingleUserPromptMessage,
@@ -26,7 +26,7 @@ type AssistantLikeMessage = {
 };
 
 function resolveLiveXaiModel() {
-  return getModel("xai", "grok-4-1-fast-reasoning" as never) ?? getModel("xai", "grok-4");
+  return getModel("xai", "grok-4-1-fast-reasoning" as never) ?? getModel("xai", "grok-4.3");
 }
 
 async function collectDoneMessage(
@@ -69,7 +69,7 @@ describeLive("xai live", () => {
   it("applies xAI tool wrappers on live tool calls", async () => {
     const model = resolveLiveXaiModel();
     expect(model).toBeDefined();
-    const agent = { streamFn: streamSimple };
+    const agent = { streamFunction: streamSimple };
     applyExtraParamsToAgent(agent, undefined, "xai", model.id);
 
     const noopTool = {
@@ -89,7 +89,7 @@ describeLive("xai live", () => {
 
     for (const prompt of prompts) {
       capturedPayload = undefined;
-      const stream = agent.streamFn(
+      const stream = agent.streamFunction(
         model,
         {
           messages: createSingleUserPromptMessage(prompt),

@@ -41,9 +41,9 @@ describe("secrets runtime snapshot auth integration", () => {
   it("activates runtime snapshots for loadConfig and ensureAuthProfileStore", async () => {
     await withEnvAsync(
       {
-        OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
-        OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
-        OPENCLAW_VERSION: undefined,
+        DENNOU_BUNDLED_PLUGINS_DIR: undefined,
+        DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
+        DENNOU_VERSION: undefined,
       },
       async () => {
         const prepared = await prepareSecretsRuntimeSnapshot({

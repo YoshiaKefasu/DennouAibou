@@ -94,9 +94,9 @@ describe("media store redirects", () => {
   let envSnapshot: ReturnType<typeof captureEnv>;
 
   beforeAll(async () => {
-    envSnapshot = captureEnv(["OPENCLAW_STATE_DIR"]);
+    envSnapshot = captureEnv(["DENNOU_STATE_DIR"]);
     await fs.rm(HOME, { recursive: true, force: true });
-    process.env.OPENCLAW_STATE_DIR = HOME;
+    process.env.DENNOU_STATE_DIR = HOME;
   });
 
   beforeEach(() => {

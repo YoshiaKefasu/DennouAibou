@@ -9,12 +9,12 @@ export async function withTempConfig(params: {
   run: () => Promise<void>;
   prefix?: string;
 }): Promise<void> {
-  const prevConfigPath = process.env.OPENCLAW_CONFIG_PATH;
+  const prevConfigPath = process.env.DENNOU_CONFIG_PATH;
 
   const dir = await mkdtemp(path.join(os.tmpdir(), params.prefix ?? "openclaw-test-config-"));
-  const configPath = path.join(dir, "openclaw.json");
+  const configPath = path.join(dir, "dennou-aibou.json");
 
-  process.env.OPENCLAW_CONFIG_PATH = configPath;
+  process.env.DENNOU_CONFIG_PATH = configPath;
 
   try {
     await writeFile(configPath, JSON.stringify(params.cfg, null, 2), "utf-8");
@@ -24,9 +24,9 @@ export async function withTempConfig(params: {
     await params.run();
   } finally {
     if (prevConfigPath === undefined) {
-      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.DENNOU_CONFIG_PATH;
     } else {
-      process.env.OPENCLAW_CONFIG_PATH = prevConfigPath;
+      process.env.DENNOU_CONFIG_PATH = prevConfigPath;
     }
     clearConfigCache();
     resetConfigRuntimeState();

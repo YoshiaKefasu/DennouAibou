@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { buildStatusText } from "../../auto-reply/reply/commands-status.js";
 import type {
   ElevatedLevel,

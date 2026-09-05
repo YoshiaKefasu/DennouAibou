@@ -339,7 +339,7 @@ describe("doctor config flow", () => {
         const stateDir = path.join(home, ".openclaw");
         await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -384,10 +384,10 @@ describe("doctor config flow", () => {
           homeserver: "https://matrix.example.org",
           userId: "@bot:example.org",
           accessToken: "tok-123",
-        });
+        }) as { rootDir: string };
         await fs.mkdir(path.join(accountRoot, "crypto"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -427,7 +427,7 @@ describe("doctor config flow", () => {
         const stateDir = path.join(home, ".openclaw");
         await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
         await fs.writeFile(
-          path.join(stateDir, "openclaw.json"),
+          path.join(stateDir, "dennou-aibou.json"),
           JSON.stringify({
             channels: {
               matrix: {
@@ -487,7 +487,7 @@ describe("doctor config flow", () => {
       const stateDir = path.join(home, ".openclaw");
       await fs.mkdir(path.join(stateDir, "matrix"), { recursive: true });
       await fs.writeFile(
-        path.join(stateDir, "openclaw.json"),
+        path.join(stateDir, "dennou-aibou.json"),
         JSON.stringify({
           channels: {
             matrix: {
@@ -995,7 +995,7 @@ describe("doctor config flow", () => {
       const configDir = path.join(home, ".openclaw");
       await fs.mkdir(configDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             channels: {
@@ -1240,7 +1240,7 @@ describe("doctor config flow", () => {
       const credentialsDir = path.join(configDir, "credentials");
       await fs.mkdir(credentialsDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             channels: {
@@ -1753,103 +1753,6 @@ describe("doctor config flow", () => {
     expect(cfg.channels?.discord?.accounts?.alpha?.threadBindings?.ttlHours).toBeUndefined();
   });
 
-  it("warns clearly about legacy tts provider config and points to doctor --fix", async () => {
-    const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
-    try {
-      await runDoctorConfigWithInput({
-        config: {
-          messages: {
-            tts: {
-              elevenlabs: {
-                voiceId: "voice-1",
-              },
-            },
-          },
-          channels: {
-            discord: {
-              voice: {
-                tts: {
-                  openai: {
-                    voice: "alloy",
-                  },
-                },
-              },
-              accounts: {
-                main: {
-                  voice: {
-                    tts: {
-                      edge: {
-                        voice: "en-US-AvaNeural",
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          plugins: {
-            entries: {
-              "voice-call": {
-                config: {
-                  tts: {
-                    openai: {
-                      voice: "alloy",
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        run: loadAndMaybeMigrateDoctorConfig,
-      });
-
-      expect(
-        noteSpy.mock.calls.some(
-          ([message, title]) =>
-            title === "Legacy config keys detected" &&
-            String(message).includes("messages.tts:") &&
-            String(message).includes("messages.tts.providers.<provider>"),
-        ),
-      ).toBe(true);
-      expect(
-        noteSpy.mock.calls.some(
-          ([message, title]) =>
-            title === "Legacy config keys detected" &&
-            String(message).includes("channels.discord.voice.tts:") &&
-            String(message).includes("channels.discord.voice.tts.providers.<provider>"),
-        ),
-      ).toBe(true);
-      expect(
-        noteSpy.mock.calls.some(
-          ([message, title]) =>
-            title === "Legacy config keys detected" &&
-            String(message).includes("channels.discord.accounts:") &&
-            String(message).includes(
-              "channels.discord.accounts.<id>.voice.tts.providers.<provider>",
-            ),
-        ),
-      ).toBe(true);
-      expect(
-        noteSpy.mock.calls.some(
-          ([message, title]) =>
-            title === "Legacy config keys detected" &&
-            String(message).includes("plugins.entries:") &&
-            String(message).includes("plugins.entries.voice-call.config.tts.providers.<provider>"),
-        ),
-      ).toBe(true);
-      expect(
-        noteSpy.mock.calls.some(
-          ([message, title]) =>
-            title === "Doctor" &&
-            String(message).includes('Run "openclaw doctor --fix" to migrate legacy config keys.'),
-        ),
-      ).toBe(true);
-    } finally {
-      noteSpy.mockRestore();
-    }
-  });
-
   it("warns clearly about legacy talk config and points to doctor --fix", async () => {
     const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
     try {
@@ -2024,7 +1927,7 @@ describe("doctor config flow", () => {
       const configDir = path.join(home, ".openclaw");
       await fs.mkdir(configDir, { recursive: true });
       await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
+        path.join(configDir, "dennou-aibou.json"),
         JSON.stringify(
           {
             talk: {

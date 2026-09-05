@@ -1,0 +1,14 @@
+{
+  "id": "raw-chat-search",
+  "name": "Raw Chat Search",
+  "description": "Permanent raw chat SQLite index and FTS5 search",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      }
+    }
+  }
+}

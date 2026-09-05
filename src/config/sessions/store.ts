@@ -15,10 +15,8 @@ import {
   type DeliveryContext,
 } from "../../utils/delivery-context.js";
 import { getFileStatSnapshot } from "../cache-utils.js";
-import {
-  enforceSessionDiskBudget,
-  type SessionDiskBudgetSweepResult,
-} from "./disk-budget.js";
+import { loadConfig } from "../io.js";
+import { enforceSessionDiskBudget, type SessionDiskBudgetSweepResult } from "./disk-budget.js";
 import { deriveSessionMetaPatch } from "./metadata.js";
 import type { ProtectedSessionConfig } from "./protected-session.js";
 import {
@@ -80,18 +78,14 @@ const log = createSubsystemLogger("sessions/store");
 let sessionArchiveRuntimePromise: Promise<
   typeof import("../../gateway/session-archive.runtime.js")
 > | null = null;
-let sessionWriteLockAcquirerForTests: typeof acquireSessionWriteLock | null =
-  null;
+let sessionWriteLockAcquirerForTests: typeof acquireSessionWriteLock | null = null;
 
 function loadSessionArchiveRuntime() {
-  sessionArchiveRuntimePromise ??=
-    import("../../gateway/session-archive.runtime.js");
+  sessionArchiveRuntimePromise ??= import("../../gateway/session-archive.runtime.js");
   return sessionArchiveRuntimePromise;
 }
 
-function removeThreadFromDeliveryContext(
-  context?: DeliveryContext,
-): DeliveryContext | undefined {
+function removeThreadFromDeliveryContext(context?: DeliveryContext): DeliveryContext | undefined {
   if (!context || context.threadId == null) {
     return context;
   }
@@ -122,8 +116,7 @@ export function resolveSessionStoreEntry(params: {
     legacyKeySet.add(trimmedKey);
   }
   let existing =
-    params.store[normalizedKey] ??
-    (legacyKeySet.size > 0 ? params.store[trimmedKey] : undefined);
+    params.store[normalizedKey] ?? (legacyKeySet.size > 0 ? params.store[trimmedKey] : undefined);
   let existingUpdatedAt = existing?.updatedAt ?? 0;
   for (const [candidateKey, candidateEntry] of Object.entries(params.store)) {
     if (candidateKey === normalizedKey) {
@@ -207,18 +200,10 @@ type SaveSessionStoreOptions = {
   skipMaintenance?: boolean;
   /** Active session key for warn-only maintenance. */
   activeSessionKey?: string;
-  /**
-   * Session keys that are allowed to drop persisted ACP metadata during this update.
-   * All other updates preserve existing `entry.acp` blocks when callers replace the
-   * whole session entry without carrying ACP state forward.
-   */
-  allowDropAcpMetaSessionKeys?: string[];
   /** Optional callback for warn-only maintenance. */
   onWarn?: (warning: SessionMaintenanceWarning) => void | Promise<void>;
   /** Optional callback with maintenance stats after a save. */
-  onMaintenanceApplied?: (
-    report: SessionMaintenanceApplyReport,
-  ) => void | Promise<void>;
+  onMaintenanceApplied?: (report: SessionMaintenanceApplyReport) => void | Promise<void>;
   /** Optional overrides used by maintenance commands. */
   maintenanceOverride?: Partial<ResolvedSessionMaintenanceConfig>;
   /**
@@ -263,55 +248,10 @@ function resolveMutableSessionStoreKey(
   if (Object.prototype.hasOwnProperty.call(store, normalized)) {
     return normalized;
   }
-  return Object.keys(store).find(
-    (key) => normalizeStoreSessionKey(key) === normalized,
-  );
+  return Object.keys(store).find((key) => normalizeStoreSessionKey(key) === normalized);
 }
 
-function collectAcpMetadataSnapshot(
-  store: Record<string, SessionEntry>,
-): Map<string, NonNullable<SessionEntry["acp"]>> {
-  const snapshot = new Map<string, NonNullable<SessionEntry["acp"]>>();
-  for (const [sessionKey, entry] of Object.entries(store)) {
-    if (entry?.acp) {
-      snapshot.set(sessionKey, entry.acp);
-    }
-  }
-  return snapshot;
-}
 
-function preserveExistingAcpMetadata(params: {
-  previousAcpByKey: Map<string, NonNullable<SessionEntry["acp"]>>;
-  nextStore: Record<string, SessionEntry>;
-  allowDropSessionKeys?: string[];
-}): void {
-  const allowDrop = new Set(
-    (params.allowDropSessionKeys ?? []).map((key) =>
-      normalizeStoreSessionKey(key),
-    ),
-  );
-  for (const [previousKey, previousAcp] of params.previousAcpByKey.entries()) {
-    const normalizedKey = normalizeStoreSessionKey(previousKey);
-    if (allowDrop.has(normalizedKey)) {
-      continue;
-    }
-    const nextKey = resolveMutableSessionStoreKey(
-      params.nextStore,
-      previousKey,
-    );
-    if (!nextKey) {
-      continue;
-    }
-    const nextEntry = params.nextStore[nextKey];
-    if (!nextEntry || nextEntry.acp) {
-      continue;
-    }
-    params.nextStore[nextKey] = {
-      ...nextEntry,
-      acp: previousAcp,
-    };
-  }
-}
 
 async function saveSessionStoreUnlocked(
   storePath: string,
@@ -342,16 +282,13 @@ async function saveSessionStoreUnlocked(
           maxEntries: maintenance.maxEntries,
         });
         if (warning) {
-          log.warn(
-            "session maintenance would evict active session; skipping enforcement",
-            {
-              activeSessionKey: warning.activeSessionKey,
-              wouldPrune: warning.wouldPrune,
-              wouldCap: warning.wouldCap,
-              pruneAfterMs: warning.pruneAfterMs,
-              maxEntries: warning.maxEntries,
-            },
-          );
+          log.warn("session maintenance would evict active session; skipping enforcement", {
+            activeSessionKey: warning.activeSessionKey,
+            wouldPrune: warning.wouldPrune,
+            wouldCap: warning.wouldCap,
+            pruneAfterMs: warning.pruneAfterMs,
+            maxEntries: warning.maxEntries,
+          });
           await opts?.onWarn?.(warning);
         }
       }
@@ -393,28 +330,20 @@ async function saveSessionStoreUnlocked(
           .map((entry) => entry?.sessionId)
           .filter((id): id is string => Boolean(id)),
       );
-      const archivedForDeletedSessions = await archiveRemovedSessionTranscripts(
-        {
-          removedSessionFiles,
-          referencedSessionIds,
-          storePath,
-          reason: "deleted",
-          restrictToStoreDir: true,
-        },
-      );
+      const archivedForDeletedSessions = await archiveRemovedSessionTranscripts({
+        removedSessionFiles,
+        referencedSessionIds,
+        storePath,
+        reason: "deleted",
+        restrictToStoreDir: true,
+      });
       for (const archivedDir of archivedForDeletedSessions) {
         archivedDirs.add(archivedDir);
       }
-      if (
-        archivedDirs.size > 0 ||
-        maintenance.resetArchiveRetentionMs != null
-      ) {
-        const { cleanupArchivedSessionTranscripts } =
-          await loadSessionArchiveRuntime();
+      if (archivedDirs.size > 0 || maintenance.resetArchiveRetentionMs != null) {
+        const { cleanupArchivedSessionTranscripts } = await loadSessionArchiveRuntime();
         const targetDirs =
-          archivedDirs.size > 0
-            ? [...archivedDirs]
-            : [path.dirname(path.resolve(storePath))];
+          archivedDirs.size > 0 ? [...archivedDirs] : [path.dirname(path.resolve(storePath))];
         await cleanupArchivedSessionTranscripts({
           directories: targetDirs,
           olderThanMs: maintenance.pruneAfterMs,
@@ -528,13 +457,7 @@ export async function updateSessionStore<T>(
   return await withSessionStoreLock(storePath, async () => {
     // Always re-read inside the lock to avoid clobbering concurrent writers.
     const store = loadSessionStore(storePath, { skipCache: true });
-    const previousAcpByKey = collectAcpMetadataSnapshot(store);
     const result = await mutator(store);
-    preserveExistingAcpMetadata({
-      previousAcpByKey,
-      nextStore: store,
-      allowDropSessionKeys: opts?.allowDropAcpMetaSessionKeys,
-    });
     await saveSessionStoreUnlocked(storePath, store, opts);
     return result;
   });
@@ -625,9 +548,7 @@ function lockTimeoutError(storePath: string): Error {
   return new Error(`timeout waiting for session store lock: ${storePath}`);
 }
 
-function resolveSessionStoreLockMaxHoldMs(
-  timeoutMs: number | undefined,
-): number | undefined {
+function resolveSessionStoreLockMaxHoldMs(timeoutMs: number | undefined): number | undefined {
   if (timeoutMs == null || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return undefined;
   }
@@ -681,9 +602,7 @@ async function drainSessionStoreLockQueue(storePath: string): Promise<void> {
         let failed: unknown;
         let hasFailure = false;
         try {
-          lock = await (
-            sessionWriteLockAcquirerForTests ?? acquireSessionWriteLock
-          )({
+          lock = await (sessionWriteLockAcquirerForTests ?? acquireSessionWriteLock)({
             sessionFile: storePath,
             timeoutMs: remainingTimeoutMs,
             staleMs: task.staleMs,
@@ -836,8 +755,7 @@ export async function updateLastRoute(params: {
   ctx?: MsgContext;
   groupResolution?: import("./types.js").GroupKeyResolution | null;
 }) {
-  const { storePath, sessionKey, channel, to, accountId, threadId, ctx } =
-    params;
+  const { storePath, sessionKey, channel, to, accountId, threadId, ctx } = params;
   return await withSessionStoreLock(storePath, async () => {
     const store = loadSessionStore(storePath);
     const resolved = resolveSessionStoreEntry({ store, sessionKey });
@@ -866,8 +784,7 @@ export async function updateLastRoute(params: {
       inlineContext?.channel ||
       inlineContext?.to,
     );
-    const clearThreadFromFallback =
-      explicitRouteProvided && explicitThreadValue == null;
+    const clearThreadFromFallback = explicitRouteProvided && explicitThreadValue == null;
     const fallbackContext = clearThreadFromFallback
       ? removeThreadFromDeliveryContext(deliveryContextFromSession(existing))
       : deliveryContextFromSession(existing);

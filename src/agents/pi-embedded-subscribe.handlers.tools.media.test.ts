@@ -200,7 +200,7 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "tts",
+      toolName: "image_generate",
       toolCallId: "tc-1",
       isError: false,
       result: {
@@ -362,7 +362,7 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "tts",
+      toolName: "image_generate",
       toolCallId: "tc-1",
       isError: false,
       result: {
@@ -424,12 +424,12 @@ describe("handleToolExecutionEnd media emission", () => {
     expect(ctx.state.pendingToolMediaUrls).toEqual(["/tmp/canvas-output.png"]);
   });
 
-  it("queues structured details.media and voice metadata", async () => {
+  it("queues structured details.media and audio-as-voice metadata", async () => {
     const ctx = createMockContext({ shouldEmitToolOutput: false, onToolResult: vi.fn() });
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "tts",
+      toolName: "image_generate",
       toolCallId: "tc-1",
       isError: false,
       result: {

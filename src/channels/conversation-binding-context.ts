@@ -1,4 +1,3 @@
-import { normalizeConversationText } from "../acp/conversation-id.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveConversationIdFromTargets } from "../infra/outbound/conversation-id.js";
 import { getActivePluginChannelRegistry } from "../plugins/runtime.js";
@@ -42,8 +41,8 @@ const CANONICAL_TARGET_PREFIXES = [
 ] as const;
 
 function normalizeText(value: unknown): string | undefined {
-  const normalized = normalizeConversationText(value);
-  return normalized || undefined;
+  const raw = value == null ? undefined : String(value).trim();
+  return raw || undefined;
 }
 
 function getLoadedChannelPlugin(rawChannel: string): ChannelPlugin | undefined {

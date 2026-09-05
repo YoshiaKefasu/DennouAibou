@@ -100,37 +100,34 @@ describe("gateway tool", () => {
     const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-test-"));
 
     try {
-      await withEnvAsync(
-        { OPENCLAW_STATE_DIR: stateDir, OPENCLAW_PROFILE: "isolated" },
-        async () => {
-          const tool = requireGatewayTool();
+      await withEnvAsync({ DENNOU_STATE_DIR: stateDir, DENNOU_PROFILE: "isolated" }, async () => {
+        const tool = requireGatewayTool();
 
-          const result = await tool.execute("call1", {
-            action: "restart",
-            delayMs: 0,
-          });
-          expect(result.details).toMatchObject({
-            ok: true,
-            pid: process.pid,
-            signal: "SIGUSR1",
-            delayMs: 0,
-          });
+        const result = await tool.execute("call1", {
+          action: "restart",
+          delayMs: 0,
+        });
+        expect(result.details).toMatchObject({
+          ok: true,
+          pid: process.pid,
+          signal: "SIGUSR1",
+          delayMs: 0,
+        });
 
-          const sentinelPath = path.join(stateDir, "restart-sentinel.json");
-          const raw = await fs.readFile(sentinelPath, "utf-8");
-          const parsed = JSON.parse(raw) as {
-            payload?: { kind?: string; doctorHint?: string | null };
-          };
-          expect(parsed.payload?.kind).toBe("restart");
-          expect(parsed.payload?.doctorHint).toBe(
-            "Run: openclaw --profile isolated doctor --non-interactive",
-          );
+        const sentinelPath = path.join(stateDir, "restart-sentinel.json");
+        const raw = await fs.readFile(sentinelPath, "utf-8");
+        const parsed = JSON.parse(raw) as {
+          payload?: { kind?: string; doctorHint?: string | null };
+        };
+        expect(parsed.payload?.kind).toBe("restart");
+        expect(parsed.payload?.doctorHint).toBe(
+          "Run: openclaw --profile isolated doctor --non-interactive",
+        );
 
-          expect(kill).not.toHaveBeenCalled();
-          await vi.runAllTimersAsync();
-          expect(kill).toHaveBeenCalledWith(process.pid, "SIGUSR1");
-        },
-      );
+        expect(kill).not.toHaveBeenCalled();
+        await vi.runAllTimersAsync();
+        expect(kill).toHaveBeenCalledWith(process.pid, "SIGUSR1");
+      });
     } finally {
       kill.mockRestore();
       vi.useRealTimers();
@@ -253,34 +250,6 @@ describe("gateway tool", () => {
       expect.any(Object),
       expect.anything(),
     );
-  });
-
-  it("passes update.run through gateway call", async () => {
-    const sessionKey = "agent:main:whatsapp:dm:+15555550123";
-    const tool = requireGatewayTool(sessionKey);
-
-    await tool.execute("call3", {
-      action: "update.run",
-      note: "test update",
-    });
-
-    expect(callGatewayTool).toHaveBeenCalledWith(
-      "update.run",
-      expect.any(Object),
-      expect.objectContaining({
-        note: "test update",
-        sessionKey,
-      }),
-    );
-    const updateCall = vi
-      .mocked(callGatewayTool)
-      .mock.calls.find((call) => call[0] === "update.run");
-    expect(updateCall).toBeDefined();
-    if (updateCall) {
-      const [, opts, params] = updateCall;
-      expect(opts).toMatchObject({ timeoutMs: 20 * 60_000 });
-      expect(params).toMatchObject({ timeoutMs: 20 * 60_000 });
-    }
   });
 
   it("returns a path-scoped schema lookup result", async () => {

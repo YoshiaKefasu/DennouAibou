@@ -27,7 +27,7 @@ const resolveExecHostApprovalContextMock = vi.hoisted(() =>
   })),
 );
 const createAndRegisterDefaultExecApprovalRequestMock = vi.hoisted(() => vi.fn());
-const resolveApprovalDecisionOrUndefinedMock = vi.hoisted(() => vi.fn(async () => "allow-once"));
+const resolveApprovalDecisionOrUndefinedMock = vi.hoisted(() => vi.fn<() => Promise<string | null>>(async () => "allow-once"));
 const createExecApprovalDecisionStateMock = vi.hoisted(() =>
   vi.fn(() => ({
     baseDecision: { timedOut: false },
@@ -43,7 +43,7 @@ const enforceStrictInlineEvalApprovalBoundaryMock = vi.hoisted(() =>
 const registerExecApprovalRequestForHostOrThrowMock = vi.hoisted(() =>
   vi.fn(async () => undefined),
 );
-const detectInterpreterInlineEvalArgvMock = vi.hoisted(() => vi.fn(() => null));
+const detectInterpreterInlineEvalArgvMock = vi.hoisted(() => vi.fn<() => { kind: string } | null>(() => null));
 
 vi.mock("../infra/exec-approvals.js", () => ({
   evaluateShellAllowlist: vi.fn(() => ({

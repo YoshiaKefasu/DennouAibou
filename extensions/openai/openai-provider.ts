@@ -6,22 +6,13 @@ import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-aut
 import {
   DEFAULT_CONTEXT_TOKENS,
   normalizeModelCompat,
-  normalizeProviderId,
   type ProviderPlugin,
 } from "openclaw/plugin-sdk/provider-model-shared";
 import { buildProviderStreamFamilyHooks } from "openclaw/plugin-sdk/provider-stream-family";
 import { applyOpenAIConfig, OPENAI_DEFAULT_MODEL } from "./default-models.js";
 import { buildOpenAIReplayPolicy } from "./replay-policy.js";
-import {
-  cloneFirstTemplateModel,
-  findCatalogTemplate,
-  isOpenAIApiBaseUrl,
-  matchesExactOrPrefix,
-} from "./shared.js";
-import {
-  resolveOpenAITransportTurnState,
-  resolveOpenAIWebSocketSessionPolicy,
-} from "./transport-policy.js";
+import { cloneFirstTemplateModel, findCatalogTemplate, matchesExactOrPrefix } from "./shared.js";
+import { resolveOpenAITransportTurnState } from "./transport-policy.js";
 
 const PROVIDER_ID = "openai";
 const OPENAI_GPT_54_MODEL_ID = "gpt-5.4";
@@ -51,13 +42,25 @@ const OPENAI_GPT_54_TEMPLATE_MODEL_IDS = ["gpt-5.2"] as const;
 const OPENAI_GPT_54_PRO_TEMPLATE_MODEL_IDS = ["gpt-5.2-pro", "gpt-5.2"] as const;
 const OPENAI_GPT_54_MINI_TEMPLATE_MODEL_IDS = ["gpt-5-mini"] as const;
 const OPENAI_GPT_54_NANO_TEMPLATE_MODEL_IDS = ["gpt-5-nano", "gpt-5-mini"] as const;
-const OPENAI_XHIGH_MODEL_IDS = [
-  "gpt-5.4",
-  "gpt-5.4-pro",
-  "gpt-5.4-mini",
-  "gpt-5.4-nano",
-  "gpt-5.2",
-] as const;
+
+/**
+ * PI `models.json` reasoning-effort map for OpenAI native synthetic models.
+ *
+ * - `xhigh` is supported (carried over from the old `supportsXHighThinking`
+ *   hook).
+ * - `max` is **not** supported — OpenAI's native `reasoning_effort` enum
+ *   does not include `max`, so we declare it explicitly as `null` to
+ *   prevent the level from being offered in choices or sent on the wire.
+ * - `minimal` is supported for gpt-5.4 (matches upstream behavior).
+ */
+const OPENAI_REASONING_EFFORT_MAP: Readonly<Record<string, string | null>> = {
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: null,
+};
 const OPENAI_MODERN_MODEL_IDS = [
   "gpt-5.4",
   "gpt-5.4-pro",
@@ -65,41 +68,7 @@ const OPENAI_MODERN_MODEL_IDS = [
   "gpt-5.4-nano",
   "gpt-5.2",
 ] as const;
-const OPENAI_DIRECT_SPARK_MODEL_ID = "gpt-5.3-codex-spark";
-const SUPPRESSED_SPARK_PROVIDERS = new Set(["openai", "azure-openai-responses"]);
 const OPENAI_RESPONSES_STREAM_HOOKS = buildProviderStreamFamilyHooks("openai-responses-defaults");
-
-function shouldUseOpenAIResponsesTransport(params: {
-  provider: string;
-  api?: string | null;
-  baseUrl?: string;
-}): boolean {
-  if (params.api !== "openai-completions") {
-    return false;
-  }
-  const isOwnerProvider = normalizeProviderId(params.provider) === PROVIDER_ID;
-  if (isOwnerProvider) {
-    return !params.baseUrl || isOpenAIApiBaseUrl(params.baseUrl);
-  }
-  return typeof params.baseUrl === "string" && isOpenAIApiBaseUrl(params.baseUrl);
-}
-
-function normalizeOpenAITransport(model: ProviderRuntimeModel): ProviderRuntimeModel {
-  const useResponsesTransport = shouldUseOpenAIResponsesTransport({
-    provider: model.provider,
-    api: model.api,
-    baseUrl: model.baseUrl,
-  });
-
-  if (!useResponsesTransport) {
-    return model;
-  }
-
-  return {
-    ...model,
-    api: "openai-responses",
-  };
-}
 
 function resolveOpenAIGpt54ForwardCompatModel(
   ctx: ProviderResolveDynamicModelContext,
@@ -111,7 +80,7 @@ function resolveOpenAIGpt54ForwardCompatModel(
   if (lower === OPENAI_GPT_54_MODEL_ID) {
     templateIds = OPENAI_GPT_54_TEMPLATE_MODEL_IDS;
     patch = {
-      api: "openai-responses",
+      api: "openai-completions",
       provider: PROVIDER_ID,
       baseUrl: "https://api.openai.com/v1",
       reasoning: true,
@@ -123,7 +92,7 @@ function resolveOpenAIGpt54ForwardCompatModel(
   } else if (lower === OPENAI_GPT_54_PRO_MODEL_ID) {
     templateIds = OPENAI_GPT_54_PRO_TEMPLATE_MODEL_IDS;
     patch = {
-      api: "openai-responses",
+      api: "openai-completions",
       provider: PROVIDER_ID,
       baseUrl: "https://api.openai.com/v1",
       reasoning: true,
@@ -135,7 +104,7 @@ function resolveOpenAIGpt54ForwardCompatModel(
   } else if (lower === OPENAI_GPT_54_MINI_MODEL_ID) {
     templateIds = OPENAI_GPT_54_MINI_TEMPLATE_MODEL_IDS;
     patch = {
-      api: "openai-responses",
+      api: "openai-completions",
       provider: PROVIDER_ID,
       baseUrl: "https://api.openai.com/v1",
       reasoning: true,
@@ -147,7 +116,7 @@ function resolveOpenAIGpt54ForwardCompatModel(
   } else if (lower === OPENAI_GPT_54_NANO_MODEL_ID) {
     templateIds = OPENAI_GPT_54_NANO_TEMPLATE_MODEL_IDS;
     patch = {
-      api: "openai-responses",
+      api: "openai-completions",
       provider: PROVIDER_ID,
       baseUrl: "https://api.openai.com/v1",
       reasoning: true,
@@ -160,18 +129,31 @@ function resolveOpenAIGpt54ForwardCompatModel(
     return undefined;
   }
 
+  // The pi-ai `Model<Api>.compat` union does not yet know about
+  // `reasoningEffortMap` (the PI `models.json` design landed upstream after
+  // the type was frozen). Cast through `unknown` to attach the map without
+  // changing the upstream surface.
+  const compatWithMap = {
+    ...(patch.compat ?? {}),
+    reasoningEffortMap: { ...OPENAI_REASONING_EFFORT_MAP },
+  } as unknown as ProviderRuntimeModel["compat"];
+  const patchWithMap: Partial<ProviderRuntimeModel> = {
+    ...patch,
+    compat: compatWithMap,
+  };
+
   return (
     cloneFirstTemplateModel({
       providerId: PROVIDER_ID,
       modelId: trimmedModelId,
       templateIds,
       ctx,
-      patch,
+      patch: patchWithMap,
     }) ??
     normalizeModelCompat({
       id: trimmedModelId,
       name: trimmedModelId,
-      ...patch,
+      ...patchWithMap,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: patch.contextWindow ?? DEFAULT_CONTEXT_TOKENS,
       maxTokens: patch.maxTokens ?? DEFAULT_CONTEXT_TOKENS,
@@ -191,6 +173,12 @@ function buildSyntheticCatalogEntry(
   if (!template) {
     return undefined;
   }
+  // `compat` is not part of `ModelCatalogEntry` directly, but `thinking.ts`
+  // walks `entry.compat?.reasoningEffortMap` for map-driven level support.
+  // We attach the map onto the supplemental entry here so that the runtime
+  // catalog (consumed by `getCachedModelCatalogSync`) carries the same
+  // single source of truth that `resolveOpenAIGpt54ForwardCompatModel`
+  // writes onto the dynamic-model path.
   return {
     ...template,
     id: entry.id,
@@ -198,6 +186,7 @@ function buildSyntheticCatalogEntry(
     reasoning: entry.reasoning,
     input: [...entry.input],
     contextWindow: entry.contextWindow,
+    compat: { reasoningEffortMap: { ...OPENAI_REASONING_EFFORT_MAP } },
   };
 }
 
@@ -205,7 +194,6 @@ export function buildOpenAIProvider(): ProviderPlugin {
   return {
     id: PROVIDER_ID,
     label: "OpenAI",
-    hookAliases: ["azure-openai", "azure-openai-responses"],
     docsPath: "/providers/models",
     envVars: ["OPENAI_API_KEY"],
     auth: [
@@ -226,62 +214,22 @@ export function buildOpenAIProvider(): ProviderPlugin {
           choiceLabel: "OpenAI API key",
           groupId: "openai",
           groupLabel: "OpenAI",
-          groupHint: "Codex OAuth + API key",
+          groupHint: "API key",
         },
       }),
     ],
     resolveDynamicModel: (ctx) => resolveOpenAIGpt54ForwardCompatModel(ctx),
-    normalizeResolvedModel: (ctx) => {
-      if (normalizeProviderId(ctx.provider) !== PROVIDER_ID) {
-        return undefined;
-      }
-      return normalizeOpenAITransport(ctx.model);
-    },
-    normalizeTransport: ({ provider, api, baseUrl }) =>
-      shouldUseOpenAIResponsesTransport({ provider, api, baseUrl })
-        ? { api: "openai-responses", baseUrl }
-        : undefined,
     buildReplayPolicy: buildOpenAIReplayPolicy,
-    prepareExtraParams: (ctx) => {
-      const transport = ctx.extraParams?.transport;
-      const hasSupportedTransport =
-        transport === "auto" || transport === "sse" || transport === "websocket";
-      const hasExplicitWarmup = typeof ctx.extraParams?.openaiWsWarmup === "boolean";
-      if (hasSupportedTransport && hasExplicitWarmup) {
-        return ctx.extraParams;
-      }
-      return {
-        ...ctx.extraParams,
-        ...(hasSupportedTransport ? {} : { transport: "auto" }),
-        ...(hasExplicitWarmup ? {} : { openaiWsWarmup: true }),
-      };
-    },
     ...OPENAI_RESPONSES_STREAM_HOOKS,
     matchesContextOverflowError: ({ errorMessage }) =>
       /content_filter.*(?:prompt|input).*(?:too long|exceed)/i.test(errorMessage),
     resolveTransportTurnState: (ctx) => resolveOpenAITransportTurnState(ctx),
-    resolveWebSocketSessionPolicy: (ctx) => resolveOpenAIWebSocketSessionPolicy(ctx),
     resolveReasoningOutputMode: () => "native",
-    supportsXHighThinking: ({ modelId }) => matchesExactOrPrefix(modelId, OPENAI_XHIGH_MODEL_IDS),
+    // Elevated-reasoning support (`xhigh`, `max`) is no longer declared via
+    // provider hooks. The openai synthetic models advertise their level set
+    // in `compat.reasoningEffortMap`, which is wired up in
+    // `resolveOpenAIGpt54ForwardCompatModel` / `augmentModelCatalog`.
     isModernModelRef: ({ modelId }) => matchesExactOrPrefix(modelId, OPENAI_MODERN_MODEL_IDS),
-    buildMissingAuthMessage: (ctx) => {
-      if (ctx.provider !== PROVIDER_ID || ctx.listProfileIds("openai-codex").length === 0) {
-        return undefined;
-      }
-      return 'No API key found for provider "openai". You are authenticated with OpenAI Codex OAuth. Use openai-codex/gpt-5.4 (OAuth) or set OPENAI_API_KEY to use openai/gpt-5.4.';
-    },
-    suppressBuiltInModel: (ctx) => {
-      if (
-        !SUPPRESSED_SPARK_PROVIDERS.has(normalizeProviderId(ctx.provider)) ||
-        ctx.modelId.toLowerCase() !== OPENAI_DIRECT_SPARK_MODEL_ID
-      ) {
-        return undefined;
-      }
-      return {
-        suppress: true,
-        errorMessage: `Unknown model: ${ctx.provider}/${OPENAI_DIRECT_SPARK_MODEL_ID}. ${OPENAI_DIRECT_SPARK_MODEL_ID} is only supported via openai-codex OAuth. Use openai-codex/${OPENAI_DIRECT_SPARK_MODEL_ID}.`,
-      };
-    },
     augmentModelCatalog: (ctx) => {
       const openAiGpt54Template = findCatalogTemplate({
         entries: ctx.entries,

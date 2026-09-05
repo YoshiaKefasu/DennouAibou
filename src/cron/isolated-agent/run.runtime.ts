@@ -25,7 +25,7 @@ export { runSubagentAnnounceFlow } from "../../agents/subagent-announce.js";
 export { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 export { deriveSessionTotalTokens, hasNonzeroUsage } from "../../agents/usage.js";
 export { DEFAULT_IDENTITY_FILENAME, ensureAgentWorkspace } from "../../agents/workspace.js";
-export { normalizeThinkLevel, supportsXHighThinking } from "../../auto-reply/thinking.js";
+export { isElevatedThinkingDenied, normalizeThinkLevel } from "../../auto-reply/thinking.js";
 export { createOutboundSendDeps } from "../../cli/outbound-send-deps.js";
 export {
   resolveAgentMainSessionKey,

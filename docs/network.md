@@ -9,7 +9,7 @@ title: "Network"
 
 # Network hub
 
-This hub links the core docs for how OpenClaw connects, pairs, and secures
+This hub links the core docs for how DennouAibou connects, pairs, and secures
 devices across localhost, LAN, and tailnet.
 
 ## Core model
@@ -42,7 +42,7 @@ Local trust:
 
 - Direct local loopback connects can be auto-approved for pairing to keep
   same-host UX smooth.
-- OpenClaw also has a narrow backend/container-local self-connect path for
+- DennouAibou also has a narrow backend/container-local self-connect path for
   trusted shared-secret helper flows.
 - Tailnet and LAN clients, including same-host tailnet binds, still require
   explicit pairing approval.

@@ -34,7 +34,6 @@ const PROVIDER_BOUNDARY_TEST_SIGNALS = [
 const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContract> = {
   google: {
     replayFamilies: ["google-gemini"],
-    streamFamilies: ["google-thinking"],
     toolCompatFamilies: ["gemini"],
   },
   openai: {

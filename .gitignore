@@ -150,6 +150,27 @@ changelog/fragments/
 
 # Local scratch workspace
 .tmp/
+.tmp-*
+.tmp-build.log
+.tmp-count-markers.cjs
+.tmp-esbuild-normalize-input.mjs
+.tmp-impl-plan.md
+.tmp-out.json
+.tmp-oxfmt-baseline-files.txt
+.tmp-probe-review.mjs
+.tmp-review-agents.log
+.tmp-review-model-test.log
+.tmp-run1.log
+.tmp-run2.log
+.tmp-run3.log
+.tmp-run4.log
+.tmp-run5.log
+.tmp-sdk-test.log
+.tmp-test1.log
+.tmp-test2.log
+.tmp-test3.log
+.tmp-tsgo.log
+.tmp-ui-build.log
 
 # DennouAibou deploy script (personal KASOU host config)
 scripts/deploy-kasou.ps1
@@ -159,3 +180,14 @@ analysis/
 .artifacts/qa-e2e/
 extensions/qa-lab/web/dist/
 *.exe
+
+# Bun B2 soak test artifacts
+.bun-soak-tmp/
+
+# WebUI bundle browser-load test scratch artefacts
+.tmp-webui-bundle-probe.mjs
+.tmp-webui-bundle-probe.out
+.tmp-webui-bundle-fixture/
+# webui-bundle-browser-load: per-chunk esbuild normalise scratch files
+.tmp-esbuild-normalize-*.mjs
+.tmp-esbuild-normalize.mjs

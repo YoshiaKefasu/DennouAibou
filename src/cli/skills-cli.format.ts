@@ -19,13 +19,6 @@ export type SkillsCheckOptions = {
   json?: boolean;
 };
 
-function appendClawHubHint(output: string, json?: boolean): string {
-  if (json) {
-    return output;
-  }
-  return `${output}\n\nTip: use \`openclaw skills search\`, \`openclaw skills install\`, and \`openclaw skills update\` for ClawHub-backed skills.`;
-}
-
 function formatSkillStatus(skill: SkillStatusEntry): string {
   if (skill.eligible) {
     return theme.success("✓ ready");
@@ -122,7 +115,7 @@ export function formatSkillsList(report: SkillStatusReport, opts: SkillsListOpti
     const message = opts.eligible
       ? `No eligible skills found. Run \`${formatCliCommand("openclaw skills list")}\` to see all skills.`
       : "No skills found.";
-    return appendClawHubHint(message, opts.json);
+    return message;
   }
 
   const eligible = skills.filter((s) => s.eligible);
@@ -160,7 +153,7 @@ export function formatSkillsList(report: SkillStatusReport, opts: SkillsListOpti
     }).trimEnd(),
   );
 
-  return appendClawHubHint(lines.join("\n"), opts.json);
+  return lines.join("\n");
 }
 
 export function formatSkillInfo(
@@ -174,10 +167,7 @@ export function formatSkillInfo(
     if (opts.json) {
       return JSON.stringify({ error: "not found", skill: skillName }, null, 2);
     }
-    return appendClawHubHint(
-      `Skill "${skillName}" not found. Run \`${formatCliCommand("openclaw skills list")}\` to see available skills.`,
-      opts.json,
-    );
+    return `Skill "${skillName}" not found. Run \`${formatCliCommand("openclaw skills list")}\` to see available skills.`;
   }
 
   if (opts.json) {
@@ -282,11 +272,11 @@ export function formatSkillInfo(
       `  Save via CLI: ${formatCliCommand(`openclaw config set skills.entries.${safeSkillKey}.apiKey YOUR_KEY`)}`,
     );
     lines.push(
-      `  Stored in: ${theme.muted("$OPENCLAW_CONFIG_PATH")} ${theme.muted("(default: ~/.openclaw/openclaw.json)")}`,
+      `  Stored in: ${theme.muted("$DENNOU_CONFIG_PATH")} ${theme.muted("(default: ~/.dennou-aibou/dennou-aibou.json)")}`,
     );
   }
 
-  return appendClawHubHint(lines.join("\n"), opts.json);
+  return lines.join("\n");
 }
 
 export function formatSkillsCheck(report: SkillStatusReport, opts: SkillsCheckOptions): string {
@@ -349,5 +339,5 @@ export function formatSkillsCheck(report: SkillStatusReport, opts: SkillsCheckOp
     }
   }
 
-  return appendClawHubHint(lines.join("\n"), opts.json);
+  return lines.join("\n");
 }

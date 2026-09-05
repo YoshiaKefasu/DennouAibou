@@ -2,8 +2,10 @@ import os from "node:os";
 import path from "node:path";
 import { expect } from "vitest";
 import { WebSocket } from "ws";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { withEnvAsync } from "../test-utils/env.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
+import type { ResolvedGatewayAuth } from "./auth.js";
 import { buildDeviceAuthPayload } from "./device-auth.js";
 import { PROTOCOL_VERSION } from "./protocol/index.js";
 import {
@@ -92,9 +94,9 @@ const originForPort = (port: number) => `http://127.0.0.1:${port}`;
 
 function restoreGatewayToken(prevToken: string | undefined) {
   if (prevToken === undefined) {
-    delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    delete process.env.DENNOU_GATEWAY_TOKEN;
   } else {
-    process.env.OPENCLAW_GATEWAY_TOKEN = prevToken;
+    process.env.DENNOU_GATEWAY_TOKEN = prevToken;
   }
 }
 
@@ -201,7 +203,7 @@ function resolveGatewayTokenOrEnv(): string {
   const token =
     typeof (testState.gatewayAuth as { token?: unknown } | undefined)?.token === "string"
       ? ((testState.gatewayAuth as { token?: string }).token ?? undefined)
-      : process.env.OPENCLAW_GATEWAY_TOKEN;
+      : process.env.DENNOU_GATEWAY_TOKEN;
   expect(typeof token).toBe("string");
   return String(token ?? "");
 }
@@ -252,8 +254,7 @@ async function writeTrustedProxyControlUiConfig(params?: { allowInsecureAuth?: b
         ...(params?.allowInsecureAuth ? { allowInsecureAuth: true } : {}),
       },
     },
-    // oxlint-disable-next-line typescript/no-explicit-any
-  } as any);
+  } as Partial<OpenClawConfig>);
 }
 
 function isConnectResMessage(id: string) {
@@ -325,8 +326,7 @@ async function startRateLimitedTokenServerWithPairedDeviceToken() {
     mode: "token",
     token: "secret",
     rateLimit: { maxAttempts: 1, windowMs: 60_000, lockoutMs: 60_000, exemptLoopback: false },
-    // oxlint-disable-next-line typescript/no-explicit-any
-  } as any;
+  } as unknown as ResolvedGatewayAuth;
 
   const { server, ws, port, prevToken } = await startServerWithClient(undefined, {
     controlUiEnabled: true,

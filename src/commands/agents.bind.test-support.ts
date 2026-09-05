@@ -16,7 +16,7 @@ export const replaceConfigFileMock: Mock<(...args: unknown[]) => Promise<unknown
   async (params: { nextConfig: OpenClawConfig }): Promise<ReplaceConfigFileResult> => {
     await writeConfigFileMock(params.nextConfig);
     return {
-      path: "/tmp/openclaw.json",
+      path: "/tmp/dennou-aibou.json",
       previousHash: null,
       snapshot: {} as never,
       nextConfig: params.nextConfig,

@@ -6,8 +6,8 @@ import {
   matchesKey,
   ProcessTerminal,
   Text,
-  TUI,
-} from "@mariozechner/pi-tui";
+  TuiMainScreen,
+} from "@earendil-works/pi-tui";
 import { resolveAgentIdByWorkspacePath, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { loadConfig, type OpenClawConfig } from "../config/config.js";
 import {
@@ -401,7 +401,7 @@ export async function runTui(opts: TuiOptions) {
     password: opts.password,
   });
 
-  const tui = new TUI(new ProcessTerminal());
+  const tui = new TuiMainScreen(new ProcessTerminal());
   const dedupeBackspace = createBackspaceDeduper();
   tui.addInputListener((data) => {
     const next = dedupeBackspace(data);

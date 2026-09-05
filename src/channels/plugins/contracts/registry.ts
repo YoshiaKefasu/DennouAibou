@@ -1,12 +1,8 @@
-import { vi } from "vitest";
 import type { OpenClawConfig } from "../../../config/config.js";
+import { loadBundledPluginPublicSurfaceSync } from "../../../test-utils/bundled-plugin-public-surface.js";
 import { listBundledChannelPlugins, setBundledChannelRuntime } from "../bundled.js";
 import type { ChannelPlugin } from "../types.js";
 import { channelPluginSurfaceKeys, type ChannelPluginSurface } from "./manifest.js";
-import {
-  importBundledChannelContractArtifact,
-  resolveBundledChannelContractArtifactUrl,
-} from "./runtime-artifacts.js";
 
 type SurfaceContractEntry = {
   id: string;
@@ -38,18 +34,21 @@ type DirectoryContractEntry = {
   accountId?: string;
 };
 
-const sendMessageMatrixMock = vi.hoisted(() =>
-  vi.fn(async (to: string, _message: string, opts?: { threadId?: string }) => ({
-    messageId: opts?.threadId ? "$matrix-thread" : "$matrix-root",
-    roomId: to.replace(/^room:/, ""),
-  })),
-);
-
-const lineContractApi = await importBundledChannelContractArtifact<{
+type LineContractApi = {
   listLineAccountIds: () => string[];
   resolveDefaultLineAccountId: (cfg: OpenClawConfig) => string | undefined;
   resolveLineAccount: (params: { cfg: OpenClawConfig; accountId?: string }) => unknown;
-}>("line", "contract-api");
+};
+
+// Register the bundled LINE channel's contract surface so registry-backed
+// contract suites resolve its runtime adapters. Loaded through the same Jiti
+// (require-path) loader as every other extension artifact in this directory —
+// mixing this with a native import() would trip Node's dual-module-graph check
+// under the non-isolated vitest runner.
+const lineContractApi = loadBundledPluginPublicSurfaceSync<LineContractApi>({
+  pluginId: "line",
+  artifactBasename: "contract-api.js",
+});
 
 setBundledChannelRuntime("line", {
   channel: {
@@ -61,18 +60,6 @@ setBundledChannelRuntime("line", {
     },
   },
 } as never);
-
-vi.mock(resolveBundledChannelContractArtifactUrl("matrix", "runtime-api"), async () => {
-  const matrixRuntimeApiModuleId = resolveBundledChannelContractArtifactUrl(
-    "matrix",
-    "runtime-api",
-  );
-  const actual = await vi.importActual(matrixRuntimeApiModuleId);
-  return {
-    ...actual,
-    sendMessageMatrix: sendMessageMatrixMock,
-  };
-});
 
 let surfaceContractRegistryCache: SurfaceContractEntry[] | undefined;
 let threadingContractRegistryCache: ThreadingContractEntry[] | undefined;
@@ -97,7 +84,7 @@ export function getThreadingContractRegistry(): ThreadingContractEntry[] {
   return threadingContractRegistryCache;
 }
 
-const directoryPresenceOnlyIds = new Set(["whatsapp", "zalouser"]);
+const directoryPresenceOnlyIds = new Set<string>();
 
 export function getDirectoryContractRegistry(): DirectoryContractEntry[] {
   directoryContractRegistryCache ??= getSurfaceContractRegistry()

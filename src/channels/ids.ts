@@ -37,7 +37,24 @@ function listBundledChatChannelEntries(): BundledChatChannelEntry[] {
     );
 }
 
-const BUNDLED_CHAT_CHANNEL_ENTRIES = Object.freeze(listBundledChatChannelEntries());
+// Safe: the bundled channel catalog walks `src/plugins/discovery.ts` at module
+// load to enumerate known channels. That walks `roots.ts` -> `utils.ts`
+// `resolveConfigDir` -> `infra/home-dir.ts` `resolveRequiredHomeDir`, both of
+// which call `path.resolve(process.cwd())` and read env vars eagerly. On a
+// browser tab those throw `ReferenceError: process is not defined` before any
+// UI code runs. Wrapping the eager evaluation in a try/catch falls back to
+// `[]` so the chain still resolves cleanly. Node-only callers get the real
+// catalog on first use; ui consumers do not actually read this list, so the
+// fallback sentinel is safe.
+const BUNDLED_CHAT_CHANNEL_ENTRIES: readonly BundledChatChannelEntry[] = Object.freeze(
+  (() => {
+    try {
+      return listBundledChatChannelEntries();
+    } catch {
+      return [] as BundledChatChannelEntry[];
+    }
+  })(),
+);
 const CHAT_CHANNEL_ID_SET = new Set(BUNDLED_CHAT_CHANNEL_ENTRIES.map((entry) => entry.id));
 
 export const CHAT_CHANNEL_ORDER = Object.freeze(

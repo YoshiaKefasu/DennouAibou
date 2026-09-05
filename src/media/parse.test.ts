@@ -47,7 +47,10 @@ describe("splitMediaFromOutput", () => {
     ["media/inbound/image.png", "MEDIA:media/inbound/image.png"],
     ["./screenshot.png", "  MEDIA:./screenshot.png"],
     ["C:\\Users\\pete\\Pictures\\snap.png", "MEDIA:C:\\Users\\pete\\Pictures\\snap.png"],
-    ["/tmp/tts-fAJy8C/voice-1770246885083.opus", "MEDIA:/tmp/tts-fAJy8C/voice-1770246885083.opus"],
+    [
+      "/tmp/voice-fAJy8C/voice-1770246885083.opus",
+      "MEDIA:/tmp/voice-fAJy8C/voice-1770246885083.opus",
+    ],
     ["image.png", "MEDIA:image.png"],
   ] as const)("accepts supported media path variant: %s", (expectedPath, input) => {
     expectAcceptedMediaPathCase(expectedPath, input);

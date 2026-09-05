@@ -10,7 +10,7 @@ title: "Bridge Protocol"
 # Bridge protocol (legacy node transport)
 
 <Warning>
-The TCP bridge has been **removed**. Current OpenClaw builds do not ship the bridge listener and `bridge.*` config keys are no longer in the schema. This page is kept for historical reference only. Use the [Gateway Protocol](/gateway/protocol) for all node/operator clients.
+The TCP bridge has been **removed**. Current DennouAibou builds do not ship the bridge listener and `bridge.*` config keys are no longer in the schema. This page is kept for historical reference only. Use the [Gateway Protocol](/gateway/protocol) for all node/operator clients.
 </Warning>
 
 ## Why it existed

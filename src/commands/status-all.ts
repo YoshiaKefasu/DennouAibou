@@ -25,7 +25,6 @@ import { readRestartSentinel } from "../infra/restart-sentinel.js";
 import { getRemoteSkillEligibility } from "../infra/skills-remote.js";
 import { readTailscaleStatusJson } from "../infra/tailscale.js";
 import { normalizeUpdateChannel, resolveUpdateChannelDisplay } from "../infra/update-channels.js";
-import { checkUpdateStatus, formatGitInstallLabel } from "../infra/update-check.js";
 import { buildPluginCompatibilityNotices } from "../plugins/status.js";
 import { runExec } from "../process/exec.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -38,7 +37,6 @@ import { pickGatewaySelfPresence } from "./status-all/gateway.js";
 import { buildStatusAllReportLines } from "./status-all/report-lines.js";
 import { resolveNodeOnlyGatewayInfo } from "./status.node-mode.js";
 import { readServiceStatusSummary } from "./status.service-summary.js";
-import { formatUpdateOneLiner } from "./status.update.js";
 
 export async function statusAllCommand(
   runtime: RuntimeEnv,
@@ -95,27 +93,12 @@ export async function statusAllCommand(
         : null;
     progress.tick();
 
-    progress.setLabel("Checking for updates…");
-    const root = await resolveOpenClawPackageRoot({
-      moduleUrl: import.meta.url,
-      argv1: process.argv[1],
-      cwd: process.cwd(),
-    });
-    const update = await checkUpdateStatus({
-      root,
-      timeoutMs: 6500,
-      fetchGit: true,
-      includeRegistry: true,
-    });
     const configChannel = normalizeUpdateChannel(cfg.update?.channel);
     const channelInfo = resolveUpdateChannelDisplay({
       configChannel,
-      installKind: update.installKind,
-      gitTag: update.git?.tag ?? null,
-      gitBranch: update.git?.branch ?? null,
+      installKind: "unknown",
     });
     const channelLabel = channelInfo.label;
-    const gitLabel = formatGitInstallLabel(update);
     progress.tick();
 
     progress.setLabel("Probing gateway…");
@@ -274,8 +257,6 @@ export async function statusAllCommand(
         }).httpUrl
       : null;
 
-    const updateLine = formatUpdateOneLiner(update).replace(/^Update:\s*/i, "");
-
     const gatewayTarget = remoteUrlMissing ? `fallback ${connection.url}` : connection.url;
     const gatewayStatus = gatewayReachable
       ? `reachable ${formatDurationPrecise(gatewayProbe?.connectLatencyMs ?? 0)}`
@@ -324,8 +305,6 @@ export async function statusAllCommand(
               : `${tailscaleMode} · ${tailscale.backendState ?? "unknown"} · magicdns unknown`,
       },
       { Item: "Channel", Value: channelLabel },
-      ...(gitLabel ? [{ Item: "Git", Value: gitLabel }] : []),
-      { Item: "Update", Value: updateLine },
       {
         Item: "Gateway",
         Value: gatewayValue,

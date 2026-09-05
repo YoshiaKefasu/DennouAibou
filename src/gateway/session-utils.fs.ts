@@ -77,12 +77,12 @@ export function attachOpenClawTranscriptMeta(
   }
   const record = message as Record<string, unknown>;
   const existing =
-    record.__openclaw && typeof record.__openclaw === "object" && !Array.isArray(record.__openclaw)
-      ? (record.__openclaw as Record<string, unknown>)
+    record.__dennou && typeof record.__dennou === "object" && !Array.isArray(record.__dennou)
+      ? (record.__dennou as Record<string, unknown>)
       : {};
   return {
     ...record,
-    __openclaw: {
+    __dennou: {
       ...existing,
       ...meta,
     },
@@ -131,7 +131,7 @@ export function readSessionMessages(
           role: "system",
           content: [{ type: "text", text: "Compaction" }],
           timestamp,
-          __openclaw: {
+          __dennou: {
             kind: "compaction",
             id: typeof parsed.id === "string" ? parsed.id : undefined,
             seq: messageSeq,

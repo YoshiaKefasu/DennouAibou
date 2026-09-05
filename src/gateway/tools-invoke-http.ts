@@ -4,6 +4,7 @@ import { resolveToolLoopDetectionConfig } from "../agents/pi-tools.js";
 import { isKnownCoreToolId } from "../agents/tool-catalog.js";
 import { applyOwnerOnlyToolPolicy } from "../agents/tool-policy.js";
 import { ToolInputError } from "../agents/tools/common.js";
+import type { AnyAgentTool } from "../agents/tools/common.js";
 import { loadConfig } from "../config/config.js";
 import { resolveMainSessionKey } from "../config/sessions.js";
 import { logWarn } from "../logger.js";
@@ -200,9 +201,7 @@ export async function handleToolsInvokeHttpRequest(
         ok: false,
         error: {
           type: "invalid_request",
-          message:
-            `memory tools are disabled in tests${suffix}. ` +
-            'Enable by setting plugins.slots.memory="memory-core" (and ensure plugins.enabled is not false).',
+          message: `memory tools are disabled in tests${suffix}.`,
         },
       });
       return true;
@@ -222,12 +221,10 @@ export async function handleToolsInvokeHttpRequest(
     !rawSessionKey || rawSessionKey === "main" ? resolveMainSessionKey(cfg) : rawSessionKey;
 
   // Resolve message channel/account hints (optional headers) for policy inheritance.
-  const messageChannel = normalizeMessageChannel(
-    getHeader(req, "x-openclaw-message-channel") ?? "",
-  );
-  const accountId = getHeader(req, "x-openclaw-account-id")?.trim() || undefined;
-  const agentTo = getHeader(req, "x-openclaw-message-to")?.trim() || undefined;
-  const agentThreadId = getHeader(req, "x-openclaw-thread-id")?.trim() || undefined;
+  const messageChannel = normalizeMessageChannel(getHeader(req, "x-dennou-message-channel") ?? "");
+  const accountId = getHeader(req, "x-dennou-account-id")?.trim() || undefined;
+  const agentTo = getHeader(req, "x-dennou-message-to")?.trim() || undefined;
+  const agentThreadId = getHeader(req, "x-dennou-thread-id")?.trim() || undefined;
   const { agentId, tools } = resolveGatewayScopedTools({
     cfg,
     sessionKey,
@@ -256,8 +253,7 @@ export async function handleToolsInvokeHttpRequest(
   try {
     const toolCallId = `http-${Date.now()}`;
     const toolArgs = mergeActionIntoArgsIfSupported({
-      // oxlint-disable-next-line typescript/no-explicit-any
-      toolSchema: (tool as any).parameters,
+      toolSchema: (tool as AnyAgentTool).parameters,
       action,
       args,
     });
@@ -278,8 +274,7 @@ export async function handleToolsInvokeHttpRequest(
       });
       return true;
     }
-    // oxlint-disable-next-line typescript/no-explicit-any
-    const result = await (tool as any).execute?.(toolCallId, hookResult.params);
+    const result = await (tool as AnyAgentTool).execute?.(toolCallId, hookResult.params);
     sendJson(res, 200, { ok: true, result });
   } catch (err) {
     const inputStatus = resolveToolInputErrorStatus(err);

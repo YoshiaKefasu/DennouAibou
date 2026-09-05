@@ -1,4 +1,4 @@
-import type { OpenAICompletionsCompat } from "@mariozechner/pi-ai";
+import type { OpenAICompletionsCompat } from "@earendil-works/pi-ai";
 import type { ConfiguredModelProviderRequest } from "./types.provider-request.js";
 import type { SecretInput } from "./types.secrets.js";
 
@@ -29,6 +29,12 @@ type SupportedOpenAICompatFields = Pick<
   | "requiresThinkingAsText"
 >;
 
+/**
+ * Per-model reasoning effort map (PI agent `models.json` design).
+ * See `ModelCompatSchema.reasoningEffortMap` for the full contract.
+ */
+export type ReasoningEffortMap = Record<string, string | null>;
+
 // TODO(debloat): once "openrouter" / "zai" are removed from pi-ai compat
 // (upstream), drop this Exclude and the cast sites in
 // pi-embedded-runner/{compact,attempt}.ts. The type/runtime divergence is
@@ -36,10 +42,11 @@ type SupportedOpenAICompatFields = Pick<
 // config surface only accepts what remains after the debloat (openai).
 type SupportedThinkingFormat = Exclude<
   NonNullable<OpenAICompletionsCompat["thinkingFormat"]>,
-  "openrouter" | "zai" | "qwen" | "qwen-chat-template"
+  "openrouter" | "deepseek" | "together" | "zai" | "qwen" | "qwen-chat-template"
 >;
 
 export type ModelCompatConfig = SupportedOpenAICompatFields & {
+  reasoningEffortMap?: ReasoningEffortMap;
   thinkingFormat?: SupportedThinkingFormat;
   supportsTools?: boolean;
   toolSchemaProfile?: string;

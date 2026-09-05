@@ -97,6 +97,11 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     });
 
     const sessionFile = resolveSessionTranscriptPathInDir(sessionId, fixture.sessionsDir());
+    // Regression guard (Phase 1 BLOCKER fix): the tool-result guard inside
+    // guardSessionManager already emits on each persisted message, so the
+    // delivery-mirror caller must not emit a second time. Exactly one emit
+    // per appendMessage is the contract.
+    expect(emitSpy).toHaveBeenCalledTimes(1);
     expect(emitSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionFile,

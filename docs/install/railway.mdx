@@ -1,12 +1,12 @@
 ---
-summary: "Deploy OpenClaw on Railway with one-click template"
+summary: "Deploy DennouAibou on Railway with one-click template"
 read_when:
-  - Deploying OpenClaw to Railway
+  - Deploying DennouAibou to Railway
   - You want a one-click cloud deploy with browser-based Control UI
 title: "Railway"
 ---
 
-Deploy OpenClaw on Railway with a one-click template and access it through the web Control UI.
+Deploy DennouAibou on Railway with a one-click template and access it through the web Control UI.
 This is the easiest "no terminal on the server" path: Railway runs the Gateway for you.
 
 ## Quick checklist (new users)
@@ -36,7 +36,7 @@ Then open:
 
 ## What you get
 
-- Hosted OpenClaw Gateway + Control UI
+- Hosted DennouAibou Gateway + Control UI
 - Persistent storage via Railway Volume (`/data`) so `openclaw.json`,
   per-agent `auth-profiles.json`, channel/provider state, sessions, and
   workspace survive redeploys
@@ -80,11 +80,11 @@ Export your state, config, auth profiles, and workspace:
 openclaw backup create
 ```
 
-This creates a portable backup archive with OpenClaw state plus any configured
+This creates a portable backup archive with DennouAibou state plus any configured
 workspace. See [Backup](/cli/backup) for details.
 
 ## Next steps
 
 - Set up messaging channels: [Channels](/channels)
 - Configure the Gateway: [Gateway configuration](/gateway/configuration)
-- Keep OpenClaw up to date: [Updating](/install/updating)
+- Keep DennouAibou up to date: [Updating](/install/updating)

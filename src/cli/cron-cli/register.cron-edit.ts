@@ -49,7 +49,7 @@ export function registerCronEditCommand(cron: Command) {
       .option("--message <text>", "Set agentTurn payload message")
       .option(
         "--thinking <level>",
-        "Thinking level for agent jobs (off|minimal|low|medium|high|xhigh)",
+        "Thinking level for agent jobs (off|minimal|low|medium|high|xhigh|max)",
       )
       .option("--model <model>", "Model override for agent jobs")
       .option("--timeout-seconds <n>", "Timeout seconds for agent jobs")

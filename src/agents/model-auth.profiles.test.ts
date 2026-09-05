@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Api, Model } from "@mariozechner/pi-ai";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withEnvAsync } from "../test-utils/env.js";
 import { clearRuntimeAuthProfileStoreSnapshots, ensureAuthProfileStore } from "./auth-profiles.js";
@@ -122,8 +122,8 @@ describe("getApiKeyForModel", () => {
       const agentDir = path.join(tempDir, "agent");
       await withEnvAsync(
         {
-          OPENCLAW_STATE_DIR: tempDir,
-          OPENCLAW_AGENT_DIR: agentDir,
+          DENNOU_STATE_DIR: tempDir,
+          DENNOU_AGENT_DIR: agentDir,
           PI_CODING_AGENT_DIR: agentDir,
         },
         async () => {
@@ -154,14 +154,14 @@ describe("getApiKeyForModel", () => {
             api: "openai-codex-responses",
           } as Model<Api>;
 
-          const store = ensureAuthProfileStore(process.env.OPENCLAW_AGENT_DIR, {
+          const store = ensureAuthProfileStore(process.env.DENNOU_AGENT_DIR, {
             allowKeychainPrompt: false,
           });
           const apiKey = await getApiKeyForModel({
             model,
             profileId: "openai-codex:default",
             store,
-            agentDir: process.env.OPENCLAW_AGENT_DIR,
+            agentDir: process.env.DENNOU_AGENT_DIR,
           });
           expect(apiKey.apiKey).toBe(oauthFixture.access);
         },
@@ -179,8 +179,8 @@ describe("getApiKeyForModel", () => {
       await withEnvAsync(
         {
           OPENAI_API_KEY: undefined,
-          OPENCLAW_STATE_DIR: tempDir,
-          OPENCLAW_AGENT_DIR: agentDir,
+          DENNOU_STATE_DIR: tempDir,
+          DENNOU_AGENT_DIR: agentDir,
           PI_CODING_AGENT_DIR: agentDir,
         },
         async () => {
@@ -793,5 +793,109 @@ describe("getApiKeyForModel", () => {
 
     expect(resolved?.apiKey).toBe("gcp-vertex-credentials");
     expect(resolved?.source).toBe("gcloud adc");
+  });
+});
+
+describe("cli-router (.env / models.json env-marker auth)", () => {
+  it("resolveEnvApiKey('cli-router') returns CLI_ROUTER_API_KEY when set", () => {
+    const resolved = resolveEnvApiKey("cli-router", {
+      CLI_ROUTER_API_KEY: "kasou-yoshia-key", // pragma: allowlist secret
+    } as NodeJS.ProcessEnv);
+    expect(resolved?.apiKey).toBe("kasou-yoshia-key");
+    expect(resolved?.source).toContain("CLI_ROUTER_API_KEY");
+  });
+
+  it("resolveEnvApiKey('cli-router') returns null when env is unset", () => {
+    expect(resolveEnvApiKey("cli-router", {} as NodeJS.ProcessEnv)).toBeNull();
+  });
+
+  it("resolves cli-router API key via .env when no cfg.models.providers block exists", async () => {
+    await withEnvAsync(
+      { [envVar("CLI_ROUTER", "API", "KEY")]: "kasou-yoshia-env-key" }, // pragma: allowlist secret
+      async () => {
+        const resolved = await resolveApiKeyForProvider({
+          provider: "cli-router",
+          // cfg intentionally omits models.providers.cli-router — KASOU stores
+          // the provider metadata exclusively in models.json (single source of truth).
+          store: { version: 1, profiles: {} },
+        });
+        expect(resolved.apiKey).toBe("kasou-yoshia-env-key");
+        expect(resolved.source).toContain("CLI_ROUTER_API_KEY");
+        expect(resolved.mode).toBe("api-key");
+        expect(resolved.profileId).toBeUndefined();
+      },
+    );
+  });
+
+  it("hasAvailableAuthForProvider('cli-router') is true when only CLI_ROUTER_API_KEY is set", async () => {
+    await withEnvAsync(
+      { [envVar("CLI_ROUTER", "API", "KEY")]: "kasou-yoshia-env-key" }, // pragma: allowlist secret
+      async () => {
+        await expect(
+          hasAvailableAuthForProvider({
+            provider: "cli-router",
+            store: { version: 1, profiles: {} },
+          }),
+        ).resolves.toBe(true);
+      },
+    );
+  });
+
+  it("prefers cfg.models.providers.cli-router.apiKey (literal) over .env (config > env precedence)", async () => {
+    await withEnvAsync(
+      { [envVar("CLI_ROUTER", "API", "KEY")]: "kasou-yoshia-env-key" }, // pragma: allowlist secret
+      async () => {
+        const resolved = await resolveApiKeyForProvider({
+          provider: "cli-router",
+          store: { version: 1, profiles: {} },
+          cfg: {
+            models: {
+              providers: {
+                "cli-router": {
+                  baseUrl: "http://127.0.0.1:8317/v1",
+                  apiKey: "kasou-config-literal-key", // pragma: allowlist secret
+                  api: "openai-completions",
+                  auth: "api-key",
+                  models: [],
+                },
+              },
+            },
+          },
+        });
+        expect(resolved.apiKey).toBe("kasou-config-literal-key");
+        expect(resolved.source).toBe("models.json");
+      },
+    );
+  });
+
+  it("resolves cli-router via cfg.models.providers.cli-router.apiKey set to 'CLI_ROUTER_API_KEY' env marker", async () => {
+    await withEnvAsync(
+      { [envVar("CLI_ROUTER", "API", "KEY")]: "kasou-yoshia-env-key" }, // pragma: allowlist secret
+      async () => {
+        // Mirrors the KASOU wiring after migration: dennou-aibou.json no longer
+        // defines models.providers.cli-router, models.json holds the metadata
+        // and stores apiKey as the env-var marker string. The SDK resolves the
+        // marker at compose time; auth resolution must also resolve via env.
+        const resolved = await resolveApiKeyForProvider({
+          provider: "cli-router",
+          store: { version: 1, profiles: {} },
+          cfg: {
+            models: {
+              providers: {
+                "cli-router": {
+                  baseUrl: "http://127.0.0.1:8317/v1",
+                  apiKey: "CLI_ROUTER_API_KEY",
+                  api: "openai-completions",
+                  auth: "api-key",
+                  models: [],
+                },
+              },
+            },
+          },
+        });
+        expect(resolved.apiKey).toBe("kasou-yoshia-env-key");
+        expect(resolved.source).toContain("CLI_ROUTER_API_KEY");
+      },
+    );
   });
 });

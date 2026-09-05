@@ -102,7 +102,7 @@ export function installMaybePersistResolvedTelegramTargetTests(params?: {
             },
           },
         },
-        writeOptions: { expectedConfigPath: "/tmp/openclaw.json" },
+        writeOptions: { expectedConfigPath: "/tmp/dennou-aibou.json" },
       });
       loadCronStore.mockResolvedValue({
         version: 1,
@@ -134,7 +134,7 @@ export function installMaybePersistResolvedTelegramTargetTests(params?: {
             },
           },
         }),
-        expect.objectContaining({ expectedConfigPath: "/tmp/openclaw.json" }),
+        expect.objectContaining({ expectedConfigPath: "/tmp/dennou-aibou.json" }),
       );
       expect(saveCronStore).toHaveBeenCalledTimes(1);
       expect(saveCronStore).toHaveBeenCalledWith(

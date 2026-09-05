@@ -15,7 +15,7 @@ import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
-import { stripHeartbeatToken } from "../heartbeat.js";
+import { stripHeartbeatToken } from "../heartbeat-token.js";
 import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
@@ -196,7 +196,9 @@ export function createFollowupRunner(params: {
           }),
           run: async (provider, model, runOptions) => {
             const suppressQueuedUserPersistenceForCandidate =
-              ((queued.run as { suppressNextUserMessagePersistence?: boolean }).suppressNextUserMessagePersistence ?? false) ||
+              ((queued.run as { suppressNextUserMessagePersistence?: boolean })
+                .suppressNextUserMessagePersistence ??
+                false) ||
               queuedUserMessagePersistedAcrossFallback;
             const suppressAssistantErrorPersistenceForCandidate =
               assistantErrorPersistedAcrossFallback;

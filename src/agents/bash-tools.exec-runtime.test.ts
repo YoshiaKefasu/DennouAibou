@@ -1,10 +1,10 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const requestHeartbeatNowMock = vi.hoisted(() => vi.fn());
+const requestWakeNowMock = vi.hoisted(() => vi.fn());
 const enqueueSystemEventMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../infra/heartbeat-wake.js", () => ({
-  requestHeartbeatNow: requestHeartbeatNowMock,
+vi.mock("../infra/event-pump.js", () => ({
+  requestWakeNow: requestWakeNowMock,
 }));
 
 vi.mock("../infra/system-events.js", () => ({
@@ -271,7 +271,7 @@ describe("resolveExecTarget", () => {
 
 describe("emitExecSystemEvent", () => {
   beforeEach(() => {
-    requestHeartbeatNowMock.mockClear();
+    requestWakeNowMock.mockClear();
     enqueueSystemEventMock.mockClear();
   });
 
@@ -285,7 +285,7 @@ describe("emitExecSystemEvent", () => {
       sessionKey: "agent:ops:main",
       contextKey: "exec:run-1",
     });
-    expect(requestHeartbeatNowMock).toHaveBeenCalledWith({
+    expect(requestWakeNowMock).toHaveBeenCalledWith({
       reason: "exec-event",
       sessionKey: "agent:ops:main",
     });
@@ -301,7 +301,7 @@ describe("emitExecSystemEvent", () => {
       sessionKey: "global",
       contextKey: "exec:run-global",
     });
-    expect(requestHeartbeatNowMock).toHaveBeenCalledWith({
+    expect(requestWakeNowMock).toHaveBeenCalledWith({
       reason: "exec-event",
     });
   });
@@ -313,7 +313,7 @@ describe("emitExecSystemEvent", () => {
     });
 
     expect(enqueueSystemEventMock).not.toHaveBeenCalled();
-    expect(requestHeartbeatNowMock).not.toHaveBeenCalled();
+    expect(requestWakeNowMock).not.toHaveBeenCalled();
   });
 });
 

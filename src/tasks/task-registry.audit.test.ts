@@ -5,7 +5,7 @@ import type { TaskRecord } from "./task-registry.types.js";
 function createTask(partial: Partial<TaskRecord>): TaskRecord {
   return {
     taskId: partial.taskId ?? "task-1",
-    runtime: partial.runtime ?? "acp",
+    runtime: partial.runtime ?? "subagent",
     requesterSessionKey: partial.requesterSessionKey ?? partial.ownerKey ?? "agent:main:main",
     ownerKey: partial.ownerKey ?? partial.requesterSessionKey ?? "agent:main:main",
     scopeKind: partial.scopeKind ?? "session",

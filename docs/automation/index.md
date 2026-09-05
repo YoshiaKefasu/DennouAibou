@@ -1,7 +1,7 @@
 ---
 summary: "Overview of automation mechanisms: tasks, cron, hooks, standing orders, and Task Flow"
 read_when:
-  - Deciding how to automate work with OpenClaw
+  - Deciding how to automate work with DennouAibou
   - Choosing between heartbeat, cron, hooks, and standing orders
   - Looking for the right automation entry point
 title: "Automation & Tasks"
@@ -9,7 +9,7 @@ title: "Automation & Tasks"
 
 # Automation & Tasks
 
-OpenClaw runs work in the background through tasks, scheduled jobs, event hooks, and standing instructions. This page helps you choose the right mechanism and understand how they fit together.
+DennouAibou runs work in the background through tasks, scheduled jobs, event hooks, and standing instructions. This page helps you choose the right mechanism and understand how they fit together.
 
 ## Quick decision guide
 

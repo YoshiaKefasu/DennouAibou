@@ -2,7 +2,6 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { HookInstallRecord } from "../config/types.hooks.js";
 import type { PluginInstallRecord } from "../config/types.plugins.js";
 import { parseRegistryNpmSpec } from "../infra/npm-registry-spec.js";
-import { CLAWHUB_INSTALL_ERROR_CODE } from "../plugins/clawhub.js";
 import { applyExclusiveSlotSelection } from "../plugins/slots.js";
 import { buildPluginDiagnosticsReport } from "../plugins/status.js";
 import { defaultRuntime } from "../runtime.js";
@@ -143,32 +142,4 @@ export function logSlotWarnings(warnings: string[]) {
   for (const warning of warnings) {
     defaultRuntime.log(theme.warn(warning));
   }
-}
-
-export function buildPreferredClawHubSpec(raw: string): string | null {
-  const parsed = parseRegistryNpmSpec(raw);
-  if (!parsed) {
-    return null;
-  }
-  return `clawhub:${parsed.name}${parsed.selector ? `@${parsed.selector}` : ""}`;
-}
-
-export const PREFERRED_CLAWHUB_FALLBACK_DECISION = {
-  FALLBACK_TO_NPM: "fallback_to_npm",
-  STOP: "stop",
-} as const;
-
-export type PreferredClawHubFallbackDecision =
-  (typeof PREFERRED_CLAWHUB_FALLBACK_DECISION)[keyof typeof PREFERRED_CLAWHUB_FALLBACK_DECISION];
-
-export function decidePreferredClawHubFallback(params: {
-  code?: string;
-}): PreferredClawHubFallbackDecision {
-  if (
-    params.code === CLAWHUB_INSTALL_ERROR_CODE.PACKAGE_NOT_FOUND ||
-    params.code === CLAWHUB_INSTALL_ERROR_CODE.VERSION_NOT_FOUND
-  ) {
-    return PREFERRED_CLAWHUB_FALLBACK_DECISION.FALLBACK_TO_NPM;
-  }
-  return PREFERRED_CLAWHUB_FALLBACK_DECISION.STOP;
 }

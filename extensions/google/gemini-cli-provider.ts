@@ -23,7 +23,6 @@ const ENV_VARS = [
 
 const GOOGLE_GEMINI_CLI_PROVIDER_HOOKS = {
   ...buildProviderReplayFamilyHooks({ family: "google-gemini" }),
-  ...buildProviderStreamFamilyHooks("google-thinking"),
   ...buildProviderToolCompatFamilyHooks("gemini"),
 };
 

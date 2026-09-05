@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
-import { normalizeToolName } from "../../../../src/agents/tool-policy-shared.js";
 import { t } from "../../i18n/index.ts";
+import { normalizeToolName } from "../_shared/tool-policy.ts";
 import type {
   SkillStatusEntry,
   SkillStatusReport,

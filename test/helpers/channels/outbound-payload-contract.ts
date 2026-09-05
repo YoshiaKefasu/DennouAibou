@@ -6,7 +6,6 @@ import type { ChannelOutboundAdapter } from "../../../src/channels/plugins/types
 import { loadBundledPluginTestApiSync } from "../../../src/test-utils/bundled-plugin-public-surface.js";
 
 let discordOutboundCache: ChannelOutboundAdapter | undefined;
-let whatsappOutboundCache: ChannelOutboundAdapter | undefined;
 
 function getDiscordOutbound(): ChannelOutboundAdapter {
   if (!discordOutboundCache) {
@@ -15,15 +14,6 @@ function getDiscordOutbound(): ChannelOutboundAdapter {
     }>("discord"));
   }
   return discordOutboundCache;
-}
-
-function getWhatsAppOutbound(): ChannelOutboundAdapter {
-  if (!whatsappOutboundCache) {
-    ({ whatsappOutbound: whatsappOutboundCache } = loadBundledPluginTestApiSync<{
-      whatsappOutbound: ChannelOutboundAdapter;
-    }>("whatsapp"));
-  }
-  return whatsappOutboundCache;
 }
 
 type PayloadHarnessParams = {
@@ -183,25 +173,6 @@ function createDiscordHarness(params: PayloadHarnessParams) {
   };
 }
 
-function createWhatsAppHarness(params: PayloadHarnessParams) {
-  const sendWhatsApp = vi.fn();
-  primeChannelOutboundSendMock(sendWhatsApp, { messageId: "wa-1" }, params.sendResults);
-  const ctx = {
-    cfg: {},
-    to: "5511999999999@c.us",
-    text: "",
-    payload: params.payload,
-    deps: {
-      whatsapp: sendWhatsApp,
-    },
-  };
-  return {
-    run: async () => await getWhatsAppOutbound().sendPayload!(ctx),
-    sendMock: sendWhatsApp,
-    to: ctx.to,
-  };
-}
-
 function createDirectTextMediaHarness(params: PayloadHarnessParams) {
   const sendFn = vi.fn();
   primeChannelOutboundSendMock(sendFn, { messageId: "m1" }, params.sendResults);
@@ -227,28 +198,16 @@ function createDirectTextMediaHarness(params: PayloadHarnessParams) {
 
 // Note: zalo and zalouser extensions have been removed (DennouAibou debloat).
 // Their harness functions are removed intentionally.
-
-export function installSlackOutboundPayloadContractSuite() {
-  installChannelOutboundPayloadContractSuite({
-    channel: "slack",
-    chunking: { mode: "passthrough", longTextLength: 5000 },
-    createHarness: createSlackOutboundPayloadHarness,
-  });
-}
+// Note: slack extension was also removed in DEBLOAT.
+// Its harness and contract suite are removed intentionally (same as zalo above).
+// Note: whatsapp extension was also removed in DEBLOAT.
+// Its harness and contract suite are removed intentionally (same as slack/zalo above).
 
 export function installDiscordOutboundPayloadContractSuite() {
   installChannelOutboundPayloadContractSuite({
     channel: "discord",
     chunking: { mode: "passthrough", longTextLength: 3000 },
     createHarness: createDiscordHarness,
-  });
-}
-
-export function installWhatsAppOutboundPayloadContractSuite() {
-  installChannelOutboundPayloadContractSuite({
-    channel: "whatsapp",
-    chunking: { mode: "split", longTextLength: 5000, maxChunkLength: 4000 },
-    createHarness: createWhatsAppHarness,
   });
 }
 

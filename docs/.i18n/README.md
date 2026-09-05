@@ -1,4 +1,4 @@
-# OpenClaw docs i18n assets
+# DennouAibou docs i18n assets
 
 This folder stores translation config for the source docs repo.
 

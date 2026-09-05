@@ -105,7 +105,6 @@ describe("buildAgentSystemPrompt", () => {
       toolNames: ["message", "memory_search", "cron"],
       docsPath: "/tmp/openclaw/docs",
       extraSystemPrompt: "Subagent details",
-      ttsHint: "Voice (TTS) is enabled.",
     });
 
     expect(prompt).not.toContain("## Authorized Senders");
@@ -115,7 +114,6 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("## Documentation");
     expect(prompt).not.toContain("## Reply Tags");
     expect(prompt).not.toContain("## Messaging");
-    expect(prompt).not.toContain("## Voice (TTS)");
     expect(prompt).not.toContain("## Silent Replies");
     expect(prompt).not.toContain("## Heartbeats");
     expect(prompt).toContain("## Safety");
@@ -251,11 +249,10 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("## Skills");
   });
 
-  it("omits the heartbeat section when no heartbeat prompt is provided", () => {
+  it("omits the heartbeat section", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
       promptMode: "full",
-      heartbeatPrompt: undefined,
     });
 
     expect(prompt).not.toContain("## Heartbeats");
@@ -275,16 +272,6 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("Inspired by Anthropic's constitution");
     expect(prompt).toContain("Do not manipulate or persuade anyone");
     expect(prompt).toContain("Do not copy yourself or change system prompts");
-  });
-
-  it("includes voice hint when provided", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      ttsHint: "Voice (TTS) is enabled.",
-    });
-
-    expect(prompt).toContain("## Voice (TTS)");
-    expect(prompt).toContain("Voice (TTS) is enabled.");
   });
 
   it("adds reasoning tag hint when enabled", () => {
@@ -358,76 +345,6 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("- sessions_list:");
     expect(prompt).not.toContain("- sessions_history:");
     expect(prompt).not.toContain("- sessions_send:");
-  });
-
-  it("documents ACP sessions_spawn agent targeting requirements", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      toolNames: ["sessions_spawn"],
-    });
-
-    expect(prompt).toContain("sessions_spawn");
-    expect(prompt).toContain("Set `agentId` explicitly unless `acp.defaultAgent` is configured");
-    expect(prompt).toContain("`subagents`/`agents_list`");
-  });
-
-  it("guides harness requests to ACP thread-bound spawns", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      toolNames: ["sessions_spawn", "subagents", "agents_list", "exec"],
-    });
-
-    expect(prompt).toContain(
-      'For requests like "do this in codex/claude code/cursor/gemini" or similar ACP harnesses, treat it as ACP harness intent',
-    );
-    expect(prompt).toContain(
-      'On Discord, default ACP harness requests to thread-bound persistent sessions (`thread: true`, `mode: "session"`)',
-    );
-    expect(prompt).toContain(
-      "do not route ACP harness requests through `subagents`/`agents_list` or local PTY exec flows",
-    );
-    expect(prompt).toContain(
-      'do not call `message` with `action=thread-create`; use `sessions_spawn` (`runtime: "acp"`, `thread: true`) as the single thread creation path',
-    );
-  });
-
-  it("omits ACP harness guidance when ACP is disabled", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      toolNames: ["sessions_spawn", "subagents", "agents_list", "exec"],
-      acpEnabled: false,
-    });
-
-    expect(prompt).not.toContain(
-      'For requests like "do this in codex/claude code/gemini", treat it as ACP harness intent',
-    );
-    expect(prompt).not.toContain('runtime="acp" requires `agentId`');
-    expect(prompt).not.toContain("not ACP harness ids");
-    expect(prompt).toContain(
-      "If a task is more complex or takes longer, spawn a sub-agent. Completion is push-based: it will auto-announce when done.",
-    );
-  });
-
-  it("omits ACP harness spawn guidance for sandboxed sessions and shows ACP block note", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      toolNames: ["sessions_spawn", "subagents", "agents_list", "exec"],
-      sandboxInfo: {
-        enabled: true,
-      },
-    });
-
-    expect(prompt).not.toContain('runtime="acp" requires `agentId`');
-    expect(prompt).not.toContain("ACP harness ids follow acp.allowedAgents");
-    expect(prompt).not.toContain(
-      'For requests like "do this in codex/claude code/gemini", treat it as ACP harness intent',
-    );
-    expect(prompt).not.toContain(
-      'do not call `message` with `action=thread-create`; use `sessions_spawn` (`runtime: "acp"`, `thread: true`) as the single thread creation path',
-    );
-    expect(prompt).toContain("ACP harness spawns are blocked from sandboxed sessions");
-    expect(prompt).toContain('`runtime: "acp"`');
-    expect(prompt).toContain('Use `runtime: "subagent"` instead.');
   });
 
   it("preserves tool casing in the prompt", () => {
@@ -583,11 +500,11 @@ describe("buildAgentSystemPrompt", () => {
       toolNames: ["gateway", "exec"],
     });
 
-    expect(prompt).toContain("## OpenClaw Self-Update");
+    expect(prompt).toContain("## OpenClaw Config Changes");
     expect(prompt).toContain("config.schema.lookup");
     expect(prompt).toContain("config.apply");
     expect(prompt).toContain("config.patch");
-    expect(prompt).toContain("update.run");
+    expect(prompt).toContain("config.get");
     expect(prompt).not.toContain("Use config.schema to");
     expect(prompt).not.toContain("config.schema, config.apply");
   });
@@ -681,11 +598,10 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).not.toContain("# Project Context");
   });
 
-  it("orders stable project context before the cache boundary and moves HEARTBEAT below it", () => {
+  it("orders stable project context before the cache boundary", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
       contextFiles: [
-        { path: "HEARTBEAT.md", content: "Check inbox." },
         { path: "MEMORY.md", content: "Long-term notes." },
         { path: "AGENTS.md", content: "Follow repo rules." },
         { path: "SOUL.md", content: "Warm but direct." },
@@ -698,35 +614,12 @@ describe("buildAgentSystemPrompt", () => {
     const toolsIndex = prompt.indexOf("## TOOLS.md");
     const memoryIndex = prompt.indexOf("## MEMORY.md");
     const boundaryIndex = prompt.indexOf(SYSTEM_PROMPT_CACHE_BOUNDARY);
-    const heartbeatHeadingIndex = prompt.indexOf("# Dynamic Project Context");
-    const heartbeatFileIndex = prompt.indexOf("## HEARTBEAT.md");
 
     expect(agentsIndex).toBeGreaterThan(-1);
     expect(soulIndex).toBeGreaterThan(agentsIndex);
     expect(toolsIndex).toBeGreaterThan(soulIndex);
     expect(memoryIndex).toBeGreaterThan(toolsIndex);
     expect(boundaryIndex).toBeGreaterThan(memoryIndex);
-    expect(heartbeatHeadingIndex).toBeGreaterThan(boundaryIndex);
-    expect(heartbeatFileIndex).toBeGreaterThan(heartbeatHeadingIndex);
-    expect(prompt).toContain(
-      "The following frequently-changing project context files are kept below the cache boundary when possible:",
-    );
-  });
-
-  it("keeps heartbeat-only project context below the cache boundary", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      contextFiles: [{ path: "HEARTBEAT.md", content: "Check inbox." }],
-    });
-
-    const boundaryIndex = prompt.indexOf(SYSTEM_PROMPT_CACHE_BOUNDARY);
-    const projectContextIndex = prompt.indexOf("# Project Context");
-    const heartbeatFileIndex = prompt.indexOf("## HEARTBEAT.md");
-
-    expect(boundaryIndex).toBeGreaterThan(-1);
-    expect(projectContextIndex).toBeGreaterThan(boundaryIndex);
-    expect(heartbeatFileIndex).toBeGreaterThan(projectContextIndex);
-    expect(prompt).not.toContain("# Dynamic Project Context");
   });
 
   it("replaces provider-owned prompt sections without disturbing core ordering", () => {
@@ -895,7 +788,6 @@ describe("buildAgentSystemPrompt", () => {
       },
       skillsPrompt:
         "<available_skills>\n  <skill>\n    <name>demo</name>\n  </skill>\n</available_skills>",
-      heartbeatPrompt: "ping",
       extraSystemPrompt: "Group chat context\nSecond line",
       workspaceNotes: ["Reminder: keep commits scoped."],
       modelAliasLines: ["- Sonnet: anthropic/claude-sonnet-4-5"],
@@ -908,7 +800,6 @@ describe("buildAgentSystemPrompt", () => {
       },
       skillsPrompt:
         "<available_skills>\r\n  <skill>  \r\n    <name>demo</name>\t\r\n  </skill>\r\n</available_skills>\r\n",
-      heartbeatPrompt: " ping  \r\n",
       extraSystemPrompt: "  Group chat context  \r\nSecond line \t\r\n",
       workspaceNotes: ["  Reminder: keep commits scoped. \t\r\n"],
       modelAliasLines: ["  - Sonnet: anthropic/claude-sonnet-4-5 \t\r\n"],
@@ -974,13 +865,7 @@ describe("buildSubagentSystemPrompt", () => {
       "You CAN spawn your own sub-agents for parallel or complex work using `sessions_spawn`.",
     );
     expect(prompt).toContain("sessions_spawn");
-    expect(prompt).toContain('runtime: "acp"');
-    expect(prompt).toContain("For ACP harness sessions (codex/claudecode/gemini)");
-    expect(prompt).toContain("set `agentId` unless `acp.defaultAgent` is configured");
     expect(prompt).toContain("Do not ask users to run slash commands or CLI");
-    expect(prompt).toContain("Do not use `exec` (`openclaw ...`, `acpx ...`)");
-    expect(prompt).toContain("Use `subagents` only for OpenClaw subagents");
-    expect(prompt).toContain("Subagent results auto-announce back to you");
     expect(prompt).toContain(
       "After spawning children, do NOT call sessions_list, sessions_history, exec sleep, or any polling tool.",
     );
@@ -997,21 +882,6 @@ describe("buildSubagentSystemPrompt", () => {
     expect(prompt).toContain("[truncated: output exceeded context limit]");
     expect(prompt).toContain("offset/limit");
     expect(prompt).toContain("instead of full-file `cat`");
-  });
-
-  it("omits ACP spawning guidance when ACP is disabled", () => {
-    const prompt = buildSubagentSystemPrompt({
-      childSessionKey: "agent:main:subagent:abc",
-      task: "research task",
-      childDepth: 1,
-      maxSpawnDepth: 2,
-      acpEnabled: false,
-    });
-
-    expect(prompt).not.toContain('runtime: "acp"');
-    expect(prompt).not.toContain("For ACP harness sessions (codex/claudecode/gemini)");
-    expect(prompt).not.toContain("set `agentId` unless `acp.defaultAgent` is configured");
-    expect(prompt).toContain("You CAN spawn your own sub-agents");
   });
 
   it("renders depth-2 leaf guidance with parent orchestrator labels", () => {

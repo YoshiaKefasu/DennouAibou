@@ -2,8 +2,8 @@ import { resolveGlobalMap } from "openclaw/plugin-sdk/global-singleton";
 import type { DiscordComponentEntry, DiscordModalEntry } from "./components.js";
 
 const DEFAULT_COMPONENT_TTL_MS = 30 * 60 * 1000;
-const DISCORD_COMPONENT_ENTRIES_KEY = Symbol.for("openclaw.discord.componentEntries");
-const DISCORD_MODAL_ENTRIES_KEY = Symbol.for("openclaw.discord.modalEntries");
+const DISCORD_COMPONENT_ENTRIES_KEY = Symbol.for("dennou.discord.componentEntries");
+const DISCORD_MODAL_ENTRIES_KEY = Symbol.for("dennou.discord.modalEntries");
 
 let componentEntries: Map<string, DiscordComponentEntry> | undefined;
 let modalEntries: Map<string, DiscordModalEntry> | undefined;

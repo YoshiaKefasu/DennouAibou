@@ -98,13 +98,6 @@ vi.mock("../../cron/store.js", () => {
   };
 });
 
-vi.mock("../../acp/control-plane/manager.js", () => ({
-  getAcpSessionManager: () => ({
-    resolveSession: () => ({ kind: "none" }),
-    cancelSession: async () => {},
-  }),
-}));
-
 vi.mock("../../agents/subagent-registry.js", () => ({
   getLatestSubagentRunByChildSessionKey: () => null,
   listSubagentRunsForController: () => [],
@@ -586,11 +579,6 @@ describe("runReplyAgent auto-compaction token update", () => {
     });
 
     abortTesting.setDepsForTests({
-      getAcpSessionManager: (() =>
-        ({
-          resolveSession: () => ({ kind: "none" }),
-          cancelSession: async () => {},
-        }) as never) as never,
       getLatestSubagentRunByChildSessionKey: () => null,
       listSubagentRunsForController: () => [],
       markSubagentRunTerminated: () => 0,

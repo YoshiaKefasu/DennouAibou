@@ -285,7 +285,7 @@ export function resolveSubagentsAction(params: {
 }
 
 export type FocusTargetResolution = {
-  targetKind: "subagent" | "acp";
+  targetKind: "subagent";
   targetSessionKey: string;
   agentId: string;
   label?: string;
@@ -330,8 +330,11 @@ export async function resolveFocusTargetSession(params: {
         continue;
       }
       const parsed = parseAgentSessionKey(key);
+      if (!key.includes(":subagent:")) {
+        continue;
+      }
       return {
-        targetKind: key.includes(":subagent:") ? "subagent" : "acp",
+        targetKind: "subagent",
         targetSessionKey: key,
         agentId: parsed?.agentId ?? "main",
         label: token,

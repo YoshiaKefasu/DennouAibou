@@ -23,7 +23,7 @@ export type SendWhatsAppFn = (...args: unknown[]) => Promise<{ messageId: string
 export type RunBtwSideQuestionFn = (...args: unknown[]) => Promise<unknown>;
 export type DispatchInboundMessageFn = (...args: unknown[]) => Promise<unknown>;
 
-const GATEWAY_TEST_CONFIG_ROOT_KEY = Symbol.for("openclaw.gatewayTestHelpers.configRoot");
+const GATEWAY_TEST_CONFIG_ROOT_KEY = Symbol.for("dennou.gatewayTestHelpers.configRoot");
 
 export type GatewayTestHoistedState = {
   testTailnetIPv4: { value: string | undefined };
@@ -76,7 +76,7 @@ export type GatewayTestHoistedState = {
 };
 
 const gatewayTestHoisted = vi.hoisted(() => {
-  const key = Symbol.for("openclaw.gatewayTestHelpers.hoisted");
+  const key = Symbol.for("dennou.gatewayTestHelpers.hoisted");
   const store = globalThis as Record<PropertyKey, unknown>;
   if (Object.prototype.hasOwnProperty.call(store, key)) {
     return store[key] as GatewayTestHoistedState;
@@ -155,5 +155,5 @@ export const testConfigRoot = resolveGlobalSingleton(GATEWAY_TEST_CONFIG_ROOT_KE
 
 export function setTestConfigRoot(root: string): void {
   testConfigRoot.value = root;
-  process.env.OPENCLAW_CONFIG_PATH = path.join(root, "openclaw.json");
+  process.env.DENNOU_CONFIG_PATH = path.join(root, "dennou-aibou.json");
 }

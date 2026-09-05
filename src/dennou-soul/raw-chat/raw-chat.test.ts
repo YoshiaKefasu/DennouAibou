@@ -1,149 +1,72 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createChatSearchTool, ChatSearchSchema } from "./tool.js";
-import { setRawChatClient, getRawChatClient } from "./client-ref.js";
-import type { RawChatClient } from "./sidecar-client.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ChatSearchSchema, createChatSearchTool, RawChatDatabase } from "./index.js";
 
-/**
- * Tests for the raw chat TS boundary: tool registration, RPC call formatting,
- * sidecar unavailable handling, and error propagation.
- *
- * ponytail: These tests mock the RPC boundary. They do NOT test production
- * SQLite/indexing/search behavior — that lives in Go tests.
- */
+describe("chat_search TS SQLite implementation", () => {
+  let db: RawChatDatabase;
+  const mockConfig = {} as any;
 
-// Mock the config types.
-const mockConfig = {} as any;
-
-describe("chat_search tool", () => {
   beforeEach(() => {
-    setRawChatClient(null as any);
+    db = new RawChatDatabase(":memory:");
+  });
+
+  afterEach(() => {
+    db.close();
   });
 
   it("returns null when config is missing", () => {
-    const tool = createChatSearchTool({ config: undefined });
+    const tool = createChatSearchTool({ config: undefined, db });
     expect(tool).toBeNull();
   });
 
   it("creates tool when config is provided", () => {
-    const tool = createChatSearchTool({ config: mockConfig });
+    const tool = createChatSearchTool({ config: mockConfig, db });
     expect(tool).not.toBeNull();
     expect(tool!.name).toBe("chat_search");
     expect(tool!.label).toBe("Chat Search");
   });
 
-  it("returns error when sidecar is unavailable", async () => {
-    setRawChatClient(null as any);
-    const tool = createChatSearchTool({ config: mockConfig })!;
-    const result = await tool.execute!("call-1", { query: "test" });
-    const text = (result as any).content[0].text;
-    const parsed = JSON.parse(text);
-    expect(parsed.error).toContain("not available");
-  });
+  it("executes search and returns results correctly", async () => {
+    db.insertMessage({
+      stable_key: "s1:m1",
+      session_id: "s1",
+      agent_id: "main",
+      message_id: "msg-1",
+      role: "user",
+      timestamp_ms: 1718452800000,
+      timestamp_iso: "2026-07-01T10:00:00.000Z",
+      date_key: "2026-07-01",
+      text: "Hello world and EJU preparation",
+      raw_json: "{}",
+      source_file: "s1.jsonl",
+      source_line: 1,
+      indexed_at_ms: Date.now(),
+    });
 
-  it("calls sidecar RPC with correct params", async () => {
-    const mockClient = {
-      search: vi.fn().mockResolvedValue({
-        results: [
-          {
-            message_id: "msg-1",
-            role: "user",
-            timestamp: "2026-07-01T10:00:00Z",
-            snippet: "Hello world",
-          },
-        ],
-        count: 1,
-      }),
-    } as unknown as RawChatClient;
-
-    setRawChatClient(mockClient);
-    const tool = createChatSearchTool({ config: mockConfig })!;
+    const tool = createChatSearchTool({ config: mockConfig, db })!;
     const result = await tool.execute!("call-1", {
       query: "EJU",
       date: "2026-07-01",
       limit: 10,
     });
 
-    expect(mockClient.search).toHaveBeenCalledWith({
-      query: "EJU",
-      date: "2026-07-01",
-      limit: 10,
-      agent_id: expect.any(String),
-    });
-
     const text = (result as any).content[0].text;
     const parsed = JSON.parse(text);
     expect(parsed.count).toBe(1);
-    expect(parsed.results[0].snippet).toBe("Hello world");
+    expect(parsed.results[0].snippet).toContain("Hello world");
   });
 
-  it("returns error when sidecar RPC fails", async () => {
-    const mockClient = {
-      search: vi.fn().mockRejectedValue(new Error("RPC timeout")),
-    } as unknown as RawChatClient;
-
-    setRawChatClient(mockClient);
-    const tool = createChatSearchTool({ config: mockConfig })!;
+  it("handles error gracefully when DB query fails", async () => {
+    db.close();
+    const tool = createChatSearchTool({ config: mockConfig, db })!;
     const result = await tool.execute!("call-1", { query: "test" });
 
     const text = (result as any).content[0].text;
     const parsed = JSON.parse(text);
-    expect(parsed.error).toContain("RPC timeout");
+    expect(parsed.results).toEqual([]);
+    expect(parsed.error).toBeDefined();
   });
 
-  it("maps all parameter names correctly", async () => {
-    const mockClient = {
-      search: vi.fn().mockResolvedValue({ results: [], count: 0 }),
-    } as unknown as RawChatClient;
-
-    setRawChatClient(mockClient);
-    const tool = createChatSearchTool({ config: mockConfig })!;
-    await tool.execute!("call-1", {
-      query: "test",
-      from: "2026-07-01T00:00:00Z",
-      to: "2026-07-01T23:59:59Z",
-      date: "2026-07-01",
-      messageId: "msg-123",
-      role: "user",
-      channel: "telegram",
-      limit: 50,
-      contextBefore: 3,
-      contextAfter: 3,
-    });
-
-    expect(mockClient.search).toHaveBeenCalledWith({
-      query: "test",
-      from: "2026-07-01T00:00:00Z",
-      to: "2026-07-01T23:59:59Z",
-      date: "2026-07-01",
-      message_id: "msg-123",
-      role: "user",
-      channel: "telegram",
-      agent_id: expect.any(String),
-      limit: 50,
-      context_before: 3,
-      context_after: 3,
-    });
-  });
-});
-
-describe("client-ref module", () => {
-  beforeEach(() => {
-    setRawChatClient(null as any);
-  });
-
-  it("starts with null client", () => {
-    expect(getRawChatClient()).toBeNull();
-  });
-
-  it("sets and gets client", () => {
-    const mockClient = {} as RawChatClient;
-    setRawChatClient(mockClient);
-    expect(getRawChatClient()).toBe(mockClient);
-  });
-});
-
-describe("ChatSearchSchema", () => {
-  it("defines all expected parameters", () => {
+  it("ChatSearchSchema defines all expected parameters", () => {
     const schema = ChatSearchSchema as any;
     expect(schema.properties.query).toBeDefined();
     expect(schema.properties.from).toBeDefined();

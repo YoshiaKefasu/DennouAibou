@@ -40,65 +40,6 @@ let statusContractRegistryCache: StatusContractEntry[] | undefined;
 export function getSetupContractRegistry(): SetupContractEntry[] {
   setupContractRegistryCache ??= [
     {
-      id: "slack",
-      plugin: requireBundledChannelPlugin("slack"),
-      cases: [
-        {
-          name: "default account stores tokens and enables the channel",
-          cfg: {} as OpenClawConfig,
-          input: {
-            botToken: "xoxb-test",
-            appToken: "xapp-test",
-          },
-          expectedAccountId: "default",
-          assertPatchedConfig: (cfg) => {
-            expect(cfg.channels?.slack?.enabled).toBe(true);
-            expect(cfg.channels?.slack?.botToken).toBe("xoxb-test");
-            expect(cfg.channels?.slack?.appToken).toBe("xapp-test");
-          },
-        },
-        {
-          name: "non-default env setup is rejected",
-          cfg: {} as OpenClawConfig,
-          accountId: "ops",
-          input: {
-            useEnv: true,
-          },
-          expectedAccountId: "ops",
-          expectedValidation: "Slack env tokens can only be used for the default account.",
-        },
-      ],
-    },
-    {
-      id: "mattermost",
-      plugin: requireBundledChannelPlugin("mattermost"),
-      cases: [
-        {
-          name: "default account stores token and normalized base URL",
-          cfg: {} as OpenClawConfig,
-          input: {
-            botToken: "test-token",
-            httpUrl: "https://chat.example.com/",
-          },
-          expectedAccountId: "default",
-          assertPatchedConfig: (cfg) => {
-            expect(cfg.channels?.mattermost?.enabled).toBe(true);
-            expect(cfg.channels?.mattermost?.botToken).toBe("test-token");
-            expect(cfg.channels?.mattermost?.baseUrl).toBe("https://chat.example.com");
-          },
-        },
-        {
-          name: "missing credentials are rejected",
-          cfg: {} as OpenClawConfig,
-          input: {
-            httpUrl: "",
-          },
-          expectedAccountId: "default",
-          expectedValidation: "Mattermost requires --bot-token and --http-url (or --use-env).",
-        },
-      ],
-    },
-    {
       id: "line",
       plugin: requireBundledChannelPlugin("line"),
       cases: [
@@ -134,65 +75,6 @@ export function getSetupContractRegistry(): SetupContractEntry[] {
 
 export function getStatusContractRegistry(): StatusContractEntry[] {
   statusContractRegistryCache ??= [
-    {
-      id: "slack",
-      plugin: requireBundledChannelPlugin("slack"),
-      cases: [
-        {
-          name: "configured account produces a configured status snapshot",
-          cfg: {
-            channels: {
-              slack: {
-                botToken: "xoxb-test",
-                appToken: "xapp-test",
-              },
-            },
-          } as OpenClawConfig,
-          runtime: {
-            accountId: "default",
-            connected: true,
-            running: true,
-          },
-          probe: { ok: true },
-          assertSnapshot: (snapshot) => {
-            expect(snapshot.accountId).toBe("default");
-            expect(snapshot.enabled).toBe(true);
-            expect(snapshot.configured).toBe(true);
-          },
-        },
-      ],
-    },
-    {
-      id: "mattermost",
-      plugin: requireBundledChannelPlugin("mattermost"),
-      cases: [
-        {
-          name: "configured account preserves connectivity details in the snapshot",
-          cfg: {
-            channels: {
-              mattermost: {
-                enabled: true,
-                botToken: "test-token",
-                baseUrl: "https://chat.example.com",
-              },
-            },
-          } as OpenClawConfig,
-          runtime: {
-            accountId: "default",
-            connected: true,
-            lastConnectedAt: 1234,
-          },
-          probe: { ok: true },
-          assertSnapshot: (snapshot) => {
-            expect(snapshot.accountId).toBe("default");
-            expect(snapshot.enabled).toBe(true);
-            expect(snapshot.configured).toBe(true);
-            expect(snapshot.connected).toBe(true);
-            expect(snapshot.baseUrl).toBe("https://chat.example.com");
-          },
-        },
-      ],
-    },
     {
       id: "line",
       plugin: requireBundledChannelPlugin("line"),

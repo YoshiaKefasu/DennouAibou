@@ -380,9 +380,9 @@ describe("applyPluginAutoEnable core", () => {
       },
       env: {
         ...makeIsolatedEnv(),
-        OPENCLAW_HOME: undefined,
-        OPENCLAW_STATE_DIR: stateDir,
-        OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
+        DENNOU_HOME: undefined,
+        DENNOU_STATE_DIR: stateDir,
+        DENNOU_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
       },
     });
 

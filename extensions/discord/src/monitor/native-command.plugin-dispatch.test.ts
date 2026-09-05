@@ -73,78 +73,7 @@ function createConfig(): OpenClawConfig {
   } as OpenClawConfig;
 }
 
-function createConfiguredAcpBinding(params: {
-  channelId: string;
-  peerKind: "channel" | "direct";
-  agentId?: string;
-}) {
-  return {
-    type: "acp",
-    agentId: params.agentId ?? "codex",
-    match: {
-      channel: "discord",
-      accountId: "default",
-      peer: { kind: params.peerKind, id: params.channelId },
-    },
-    acp: {
-      mode: "persistent",
-    },
-  } as const;
-}
 
-function createConfiguredAcpCase(params: {
-  channelType: ChannelType;
-  channelId: string;
-  peerKind: "channel" | "direct";
-  guildId?: string;
-  guildName?: string;
-  includeChannelAccess?: boolean;
-  agentId?: string;
-}) {
-  return {
-    cfg: {
-      commands: {
-        useAccessGroups: false,
-      },
-      ...(params.includeChannelAccess === false
-        ? {}
-        : params.channelType === ChannelType.DM
-          ? {
-              channels: {
-                discord: {
-                  dm: { enabled: true, policy: "open" },
-                },
-              },
-            }
-          : {
-              channels: {
-                discord: {
-                  guilds: {
-                    [params.guildId!]: {
-                      channels: {
-                        [params.channelId]: { enabled: true, requireMention: false },
-                      },
-                    },
-                  },
-                },
-              },
-            }),
-      bindings: [
-        createConfiguredAcpBinding({
-          channelId: params.channelId,
-          peerKind: params.peerKind,
-          agentId: params.agentId,
-        }),
-      ],
-    } as OpenClawConfig,
-    interaction: createInteraction({
-      channelType: params.channelType,
-      channelId: params.channelId,
-      guildId: params.guildId,
-      guildName: params.guildName,
-    }),
-  };
-}
 
 async function createNativeCommand(cfg: OpenClawConfig, commandSpec: NativeCommandSpec) {
   return createDiscordNativeCommand({
@@ -613,28 +542,6 @@ describe("Discord native plugin command dispatch", () => {
     );
   });
 
-  it("routes native slash commands through configured ACP Discord channel bindings", async () => {
-    const { cfg, interaction } = createConfiguredAcpCase({
-      channelType: ChannelType.GuildText,
-      channelId: "1478836151241412759",
-      peerKind: "channel",
-      guildId: "1459246755253325866",
-      guildName: "Ops",
-    });
-    discordNativeCommandTesting.setResolveDiscordNativeInteractionRouteState(async () =>
-      createConfiguredRouteState({
-        sessionKey: "agent:codex:acp:binding:discord:default:guild-channel",
-        agentId: "codex",
-      }),
-    );
-
-    await expectBoundStatusCommandDispatch({
-      cfg,
-      interaction,
-      expectedPattern: /^agent:codex:acp:binding:discord:default:/,
-    });
-  });
-
   it("falls back to the routed slash and channel session keys when no bound session exists", async () => {
     const guildId = "1459246755253325866";
     const channelId = "1478836151241412759";
@@ -718,63 +625,5 @@ describe("Discord native plugin command dispatch", () => {
     );
   });
 
-  it("routes Discord DM native slash commands through configured ACP bindings", async () => {
-    const { cfg, interaction } = createConfiguredAcpCase({
-      channelType: ChannelType.DM,
-      channelId: "dm-1",
-      peerKind: "direct",
-    });
-    discordNativeCommandTesting.setResolveDiscordNativeInteractionRouteState(async () =>
-      createConfiguredRouteState({
-        sessionKey: "agent:codex:acp:binding:discord:default:dm",
-        agentId: "codex",
-      }),
-    );
-
-    await expectBoundStatusCommandDispatch({
-      cfg,
-      interaction,
-      expectedPattern: /^agent:codex:acp:binding:discord:default:/,
-    });
-  });
-
-  it("allows recovery commands through configured ACP bindings even when ensure fails", async () => {
-    const { cfg, interaction } = createConfiguredAcpCase({
-      channelType: ChannelType.GuildText,
-      channelId: "1479098716916023408",
-      peerKind: "channel",
-      guildId: "1459246755253325866",
-      guildName: "Ops",
-      includeChannelAccess: false,
-    });
-    discordNativeCommandTesting.setResolveDiscordNativeInteractionRouteState(async () =>
-      createConfiguredRouteState({
-        sessionKey: "agent:codex:acp:binding:discord:default:recovery",
-        agentId: "codex",
-      }),
-    );
-    runtimeModuleMocks.matchPluginCommand.mockReturnValue(null);
-    const dispatchSpy = createDispatchSpy();
-    const command = await createNativeCommand(cfg, {
-      name: "new",
-      description: "Start a new session.",
-      acceptsArgs: true,
-    });
-
-    await (command as { run: (interaction: unknown) => Promise<void> }).run(interaction as unknown);
-
-    expect(dispatchSpy).toHaveBeenCalledTimes(1);
-    const dispatchCall = dispatchSpy.mock.calls[0]?.[0] as {
-      ctx?: { SessionKey?: string; CommandTargetSessionKey?: string };
-    };
-    expect(dispatchCall.ctx?.SessionKey).toMatch(/^agent:codex:acp:binding:discord:default:/);
-    expect(dispatchCall.ctx?.CommandTargetSessionKey).toMatch(
-      /^agent:codex:acp:binding:discord:default:/,
-    );
-    expect(interaction.reply).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: "Configured ACP binding is unavailable right now. Please try again.",
-      }),
-    );
-  });
+  
 });

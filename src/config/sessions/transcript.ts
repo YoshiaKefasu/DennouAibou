@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { CURRENT_SESSION_VERSION, SessionManager } from "@mariozechner/pi-coding-agent";
-import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
+import { CURRENT_SESSION_VERSION, SessionManager } from "@earendil-works/pi-coding-agent";
+import { guardSessionManager } from "../../agents/session-tool-result-guard-wrapper.js";
 import {
   resolveDefaultSessionStorePath,
   resolveSessionFilePath,
@@ -162,10 +162,16 @@ export async function appendAssistantMessageToSessionTranscript(params: {
     timestamp: Date.now(),
     ...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
   } as Parameters<SessionManager["appendMessage"]>[0];
-  const sessionManager = SessionManager.open(sessionFile);
+  const sessionManager = guardSessionManager(SessionManager.open(sessionFile), {
+    agentId: params.agentId,
+    sessionKey: params.sessionKey,
+  });
   const messageId = sessionManager.appendMessage(message);
-
-  emitSessionTranscriptUpdate({ sessionFile, sessionKey, message, messageId });
+  if (typeof messageId !== "string") {
+    // before_message_write hook blocked the write; the tool-result guard has
+    // already swallowed the message and no transcript update was emitted.
+    return { ok: false, reason: "blocked by before_message_write hook" };
+  }
   return { ok: true, sessionFile, messageId };
 }
 

@@ -10,9 +10,9 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
-import { pruneToolOutputLines } from "./prune-engine.js";
 import { logDebug } from "../logger.js";
+import { pruneToolOutputLines } from "./prune-engine.js";
+import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 
 /** 安全なatomic renameのための一時ファイル拡張子 */
 const TMP_EXT = ".prune-tmp";
@@ -62,9 +62,14 @@ export function pruneActiveSessionFile(
   }
 
   // 共通エンジンでPrune判定
-  const { resultLines, prunedCount } = pruneToolOutputLines(lines, config, (msg) => {
-    logger(`[DennouAibou] ${filePath} ${msg}`);
-  }, protection);
+  const { resultLines, prunedCount } = pruneToolOutputLines(
+    lines,
+    config,
+    (msg) => {
+      logger(`[DennouAibou] ${filePath} ${msg}`);
+    },
+    protection,
+  );
 
   if (prunedCount === 0) return 0;
 

@@ -12,6 +12,7 @@ import {
 } from "./zod-schema.core.js";
 import { sensitive } from "./zod-schema.sensitive.js";
 
+/** @deprecated Heartbeat configuration has been retired. Preserved for strict-parse schema compatibility. */
 export const HeartbeatSchema = z
   .object({
     every: z.string().optional(),
@@ -745,30 +746,11 @@ export const MemorySearchSchema = z
   .optional();
 export { AgentModelSchema };
 
-const AgentRuntimeAcpSchema = z
+const AgentRuntimeSchema = z
   .object({
-    agent: z.string().optional(),
-    backend: z.string().optional(),
-    mode: z.enum(["persistent", "oneshot"]).optional(),
-    cwd: z.string().optional(),
+    type: z.literal("embedded"),
   })
   .strict()
-  .optional();
-
-const AgentRuntimeSchema = z
-  .union([
-    z
-      .object({
-        type: z.literal("embedded"),
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal("acp"),
-        acp: AgentRuntimeAcpSchema,
-      })
-      .strict(),
-  ])
   .optional();
 
 export const AgentEntrySchema = z
@@ -781,7 +763,7 @@ export const AgentEntrySchema = z
     systemPromptOverride: z.string().optional(),
     model: AgentModelSchema.optional(),
     thinkingDefault: z
-      .enum(["off", "minimal", "low", "medium", "high", "xhigh", "adaptive"])
+      .enum(["off", "minimal", "low", "medium", "high", "xhigh", "max", "adaptive"])
       .optional(),
     reasoningDefault: z.enum(["on", "off", "stream"]).optional(),
     fastModeDefault: z.boolean().optional(),

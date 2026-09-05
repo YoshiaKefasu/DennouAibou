@@ -4,13 +4,7 @@ import path from "node:path";
 import { captureEnv } from "./env.js";
 import { cleanupSessionStateForTest } from "./session-state-cleanup.js";
 
-const HOME_ENV_KEYS = [
-  "HOME",
-  "USERPROFILE",
-  "HOMEDRIVE",
-  "HOMEPATH",
-  "OPENCLAW_STATE_DIR",
-] as const;
+const HOME_ENV_KEYS = ["HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "DENNOU_STATE_DIR"] as const;
 
 export type TempHomeEnv = {
   home: string;
@@ -24,7 +18,7 @@ export async function createTempHomeEnv(prefix: string): Promise<TempHomeEnv> {
   const snapshot = captureEnv([...HOME_ENV_KEYS]);
   process.env.HOME = home;
   process.env.USERPROFILE = home;
-  process.env.OPENCLAW_STATE_DIR = path.join(home, ".openclaw");
+  process.env.DENNOU_STATE_DIR = path.join(home, ".openclaw");
 
   if (process.platform === "win32") {
     const match = home.match(/^([A-Za-z]:)(.*)$/);

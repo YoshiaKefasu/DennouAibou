@@ -1,22 +1,20 @@
-import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
+import type { WakeRunResult } from "../../infra/event-pump.js";
 import type { LogLevel } from "../../logging/levels.js";
 
-export type { HeartbeatRunResult };
+export type { WakeRunResult };
 
 /** Structured logger surface injected into runtime-backed plugin helpers. */
 export type RuntimeLogger = {
   debug?: (message: string, meta?: Record<string, unknown>) => void;
-  info: (message: string, meta?: Record<string, unknown>) => void;
-  warn: (message: string, meta?: Record<string, unknown>) => void;
-  error: (message: string, meta?: Record<string, unknown>) => void;
+  info?: (message: string, meta?: Record<string, unknown>) => void;
+  warn?: (message: string, meta?: Record<string, unknown>) => void;
+  error?: (message: string, meta?: Record<string, unknown>) => void;
 };
 
-export type RunHeartbeatOnceOptions = {
+export type RunEventPumpOnceOptions = {
   reason?: string;
   agentId?: string;
   sessionKey?: string;
-  /** Override heartbeat config (e.g. `{ target: "last" }` to deliver to the last active channel). */
-  heartbeat?: { target?: string };
 };
 
 /** Core runtime helpers exposed to trusted native plugins. */
@@ -47,14 +45,11 @@ export type PluginRuntimeCore = {
   };
   system: {
     enqueueSystemEvent: typeof import("../../infra/system-events.js").enqueueSystemEvent;
-    requestHeartbeatNow: typeof import("../../infra/heartbeat-wake.js").requestHeartbeatNow;
+    requestWakeNow: typeof import("../../infra/event-pump.js").requestWakeNow;
     /**
-     * Run a single heartbeat cycle immediately (bypassing the coalesce timer).
-     * Accepts an optional `heartbeat` config override so callers can force
-     * delivery to the last active channel — the same pattern the cron service
-     * uses to avoid the default `target: "none"` suppression.
+     * Run a single event pump cycle immediately.
      */
-    runHeartbeatOnce: (opts?: RunHeartbeatOnceOptions) => Promise<HeartbeatRunResult>;
+    runEventPumpOnce: (opts?: RunEventPumpOnceOptions) => Promise<WakeRunResult>;
     runCommandWithTimeout: typeof import("../../process/exec.js").runCommandWithTimeout;
     formatNativeDependencyHint: typeof import("./native-deps.js").formatNativeDependencyHint;
   };
@@ -65,11 +60,6 @@ export type PluginRuntimeCore = {
     isVoiceCompatibleAudio: typeof import("../../media/audio.js").isVoiceCompatibleAudio;
     getImageMetadata: typeof import("../../media/image-ops.js").getImageMetadata;
     resizeToJpeg: typeof import("../../media/image-ops.js").resizeToJpeg;
-  };
-  tts: {
-    textToSpeech: typeof import("../../tts/tts.js").textToSpeech;
-    textToSpeechTelephony: typeof import("../../tts/tts.js").textToSpeechTelephony;
-    listVoices: typeof import("../../tts/tts.js").listSpeechVoices;
   };
   mediaUnderstanding: {
     runFile: typeof import("../../media-understanding/runtime.js").runMediaUnderstandingFile;
@@ -122,7 +112,7 @@ export type PluginRuntimeCore = {
   modelAuth: {
     /** Resolve auth for a model. Only provider/model and optional cfg are used. */
     getApiKeyForModel: (params: {
-      model: import("@mariozechner/pi-ai").Model<import("@mariozechner/pi-ai").Api>;
+      model: import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>;
       cfg?: import("../../config/config.js").OpenClawConfig;
     }) => Promise<import("../../agents/model-auth.js").ResolvedProviderAuth>;
     /** Resolve auth for a provider by name. Only provider and optional cfg are used. */
