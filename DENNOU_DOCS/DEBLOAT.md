@@ -1319,7 +1319,9 @@ src/plugin-sdk/memory-core-host-status.ts
 
 ### 20.7 残作業（次フェーズ候補）
 
-- ACP削除後の session fallback / deliveryStatus 期待値が壊れた `task-registry.test.ts` の9件の修正
+- ~~ACP削除後の session fallback / deliveryStatus 期待値が壊れた `task-registry.test.ts` の9件の修正~~ **対応済み（2026-XX-XX 時点作業）**。`shouldAutoDeliverTaskTerminalUpdate` の subagent ガードが ACP 削除後の設計意図を反映した「subagent タスクは auto-delivery path に入らない」という振る舞いであるため、テスト1〜7 を「deliveryStatus は `pending` のまま、sendMessageMock も呼ばれず system event も queue されない」検証に書き換え、テスト8 のラベル `"ACP background task"` を `"Subagent task"` に置換。`pnpm vitest run src/tasks/task-registry.test.ts` 28/28 pass、`pnpm exec tsgo --noEmit` 0 errors。コミット1個、push なし。
+  - 注: 修正したテストは 8 件（DEBLOAT.md §20.4 で言及した 9 件は前任职ベースライン見込み値で、実测は 8 件）。
+  - 残存する `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の ACP cancellation 関連 2 件、`task-executor-policy.test.ts` の `keeps delivery policy decisions explicit` 1 件）は本タスクのスコープ外。
 - oxfmt 前任作業分の違反51件対応（`pnpm exec oxfmt --write` で一括修正可能だが、コミット粒度の調整要）
 - `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md`（前任が ACP削除と並行に作成した別タスクのドキュメント）— 取り扱い未定
 - 前任作業中間ファイル群（`.tmp-*`）— `.gitignore` に追加済み、最終push前に削除 or 維持判断

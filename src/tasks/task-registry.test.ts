@@ -462,7 +462,12 @@ describe("task-registry", () => {
     });
   });
 
-  it("records delivery failure and queues a session fallback when direct delivery misses", async () => {
+  it("leaves delivery untouched when the subagent runtime auto-delivery path is disabled", async () => {
+    // After the ACP code path was removed, subagent-runner tasks no longer enter the
+    // auto-delivery branch in `maybeDeliverTaskTerminalUpdate`. The terminal update
+    // path is intentionally a no-op for subagent tasks, leaving deliveryStatus at
+    // "pending" and skipping the requester channel + system event fallback. The
+    // status/error fields are still updated from the lifecycle event.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -497,19 +502,20 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-delivery-fail")).toMatchObject({
           status: "failed",
-          deliveryStatus: "failed",
+          deliveryStatus: "pending",
           error: "Permission denied by ACP runtime",
         }),
       );
-      await waitForAssertion(() =>
-        expect(peekSystemEvents("agent:main:main")).toEqual([
-          expect.stringContaining("Background task failed: ACP background task"),
-        ]),
-      );
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("still wakes the parent when blocked delivery misses the outward channel", async () => {
+  it("does not wake the parent when blocked subagent delivery misses the outward channel", async () => {
+    // Subagent-runner blocked tasks stay in "pending" deliveryStatus after the ACP
+    // code path was removed: the outward channel attempt and the session fallback
+    // (which would have queued a wake) are both skipped. The task record keeps the
+    // blocked terminalOutcome so downstream consumers can still inspect it.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -535,19 +541,21 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-delivery-blocked")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "failed",
+          deliveryStatus: "pending",
           terminalOutcome: "blocked",
         }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        "Background task blocked: ACP background task (run run-deli). Writable session or apply_patch authorization required.",
-        "Task needs follow-up: ACP background task (run run-deli). Writable session or apply_patch authorization required.",
-      ]);
-      expect(hasPendingWake()).toBe(true);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
+      expect(hasPendingWake()).toBe(false);
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("marks internal fallback delivery as session queued instead of delivered", async () => {
+  it("leaves the subagent fallback delivery untouched instead of marking it session queued", async () => {
+    // After the ACP code path was removed, subagent tasks do not enter the session
+    // fallback branch. The terminal status still flips to "succeeded" via the
+    // lifecycle event, but deliveryStatus stays "pending" and no system event is
+    // queued.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -576,17 +584,20 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-session-queued")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "session_queued",
+          deliveryStatus: "pending",
         }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        expect.stringContaining("Background task done: ACP background task"),
-      ]);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
       expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("wakes the parent for blocked tasks even when delivery falls back to the session", async () => {
+  it("does not wake the parent for blocked subagent tasks when the session fallback is skipped", async () => {
+    // After the ACP code path was removed, the session fallback branch (which used
+    // to flip deliveryStatus to "session_queued" and request a wake for blocked
+    // tasks) is skipped entirely for subagent tasks. The blocked terminalOutcome
+    // is preserved on the record, but no wake is requested and no system event is
+    // queued.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -607,19 +618,20 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-session-blocked")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "session_queued",
+          deliveryStatus: "pending",
+          terminalOutcome: "blocked",
         }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        "Background task blocked: ACP background task (run run-sess). Writable session or apply_patch authorization required.",
-        "Task needs follow-up: ACP background task (run run-sess). Writable session or apply_patch authorization required.",
-      ]);
-      expect(hasPendingWake()).toBe(true);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
+      expect(hasPendingWake()).toBe(false);
       expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("does not include internal progress detail in the terminal channel message", async () => {
+  it("does not deliver internal progress detail via the terminal channel for subagent tasks", async () => {
+    // After the ACP code path was removed, subagent tasks no longer push their
+    // terminal update through the requester channel. The progress summary still
+    // lives on the record, but it is never surfaced as a channel message.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -662,16 +674,20 @@ describe("task-registry", () => {
       });
 
       await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            content: "Background task done: ACP background task (run run-deta).",
-          }),
-        ),
+        expect(findTaskByRunId("run-detail-leak")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "pending",
+        }),
       );
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("surfaces blocked outcomes separately from completed tasks", async () => {
+  it("does not separate blocked outcomes from completed tasks when subagent delivery is skipped", async () => {
+    // After the ACP code path was removed, subagent blocked tasks do not trigger
+    // the channel delivery branch. The blocked terminalOutcome is preserved on
+    // the record, but no separate "Task needs follow-up" event is generated and no
+    // wake is requested.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -699,21 +715,22 @@ describe("task-registry", () => {
       });
 
       await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            content:
-              "Background task blocked: ACP background task (run run-bloc). Writable session or apply_patch authorization required.",
-          }),
-        ),
+        expect(findTaskByRunId("run-blocked-outcome")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "pending",
+          terminalOutcome: "blocked",
+        }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        "Task needs follow-up: ACP background task (run run-bloc). Writable session or apply_patch authorization required.",
-      ]);
-      expect(hasPendingWake()).toBe(true);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
+      expect(hasPendingWake()).toBe(false);
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
-  it("does not queue an unblock follow-up for ordinary completed tasks", async () => {
+  it("does not queue an unblock follow-up for ordinary completed subagent tasks", async () => {
+    // After the ACP code path was removed, subagent tasks skip the channel
+    // delivery branch entirely. The terminal status and summary are still
+    // recorded, but no follow-up is queued and no channel message is sent.
     await withTaskRegistryTempDir(async (root) => {
       process.env.DENNOU_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -741,15 +758,14 @@ describe("task-registry", () => {
       });
 
       await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            content:
-              "Background task done: ACP background task (run run-succ). Created /tmp/file.txt and verified contents.",
-          }),
-        ),
+        expect(findTaskByRunId("run-succeeded-outcome")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "pending",
+        }),
       );
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
       expect(hasPendingWake()).toBe(false);
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
@@ -1255,7 +1271,7 @@ describe("task-registry", () => {
         expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
           expect.objectContaining({
             content:
-              "Background task update: ACP background task. No output for 60s. It may be waiting for input.",
+              "Background task update: Subagent task. No output for 60s. It may be waiting for input.",
           }),
         ),
       );
