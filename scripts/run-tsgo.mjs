@@ -15,7 +15,12 @@ const releaseLock = acquireLocalHeavyCheckLockSync({
 });
 
 try {
-  const result = spawnSync(tsgoPath, finalArgs, {
+  // Note: On Windows, `shell: true` makes Node invoke `cmd.exe /d /s /c "<command>"`.
+  // Node does not escape spaces inside `command`, so paths containing spaces
+  // (e.g. `D:\GitHub\OpenClaw Related Repos\...`) must be quoted manually to
+  // prevent cmd.exe from splitting the path on the first space.
+  const command = process.platform === "win32" ? `"${tsgoPath}"` : tsgoPath;
+  const result = spawnSync(command, finalArgs, {
     stdio: "inherit",
     env,
     shell: process.platform === "win32",
