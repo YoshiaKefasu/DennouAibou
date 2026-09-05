@@ -265,15 +265,11 @@ T+21.66s liveness marker tick=1
 
 **B3 での対処**: B3 スコープ外。再設計は別タスク (`OPTIMIZATION.md` に記録予定)。
 
-### 7.3 軽微: `boundary-invariants.test.ts` の glob 型エラー 12 件
+### 7.3 解消済み: `boundary-invariants.test.ts` の glob 型エラー 12 件
 
-`@types/glob` 未導入で `import("glob")` が `any` として推論される。Bun 移行とは無関係の pre-existing issue。
+`@types/glob` は deprecated stub (`This is a stub types definition. glob provides its own type definitions, so you do not need this installed.`) で、`glob` v13 が自前で TypeScript 型定義を持っている。MED-1 で `package.json` の `@types/glob ^9.0.0` を削除し `glob ^13.0.6` を直接 devDependency に置いた (コミット `1a505b567c8 [SOUL] Declare glob as direct devDependency (replace deprecated @types/glob stub)`, 2026-09-01)。`boundary-invariants.test.ts` は `import("glob")` 経由で `globSync` を取得し、結果は Windows バックスラッシュ path を POSIX に正規化してから比較する形に統一済み (`c228579ce2a` でコメント追加)。Bun 移行とは無関係の pre-existing issue だったが、MED-1 対応で解消された。
 
-**B3 での対処**:
-```bash
-pnpm add -D @types/glob
-# or rewrite test using fast-glob with explicit types
-```
+**B3 での対処**: なし (解消済み)。
 
 ### 7.4 重要: KASOU での 24 時間 soak 計画
 
