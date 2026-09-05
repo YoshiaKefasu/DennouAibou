@@ -123,6 +123,7 @@ describe("task-executor-policy", () => {
     expect(
       shouldAutoDeliverTaskTerminalUpdate(
         createTask({
+          runtime: "cli",
           status: "succeeded",
           deliveryStatus: "pending",
           notifyPolicy: "done_only",

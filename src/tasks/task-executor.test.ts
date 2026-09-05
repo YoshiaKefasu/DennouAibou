@@ -336,9 +336,12 @@ describe("task-executor", () => {
     });
   });
 
-  it("cancels active tasks linked to a managed TaskFlow", async () => {
+  it("cancels active subagent tasks linked to a managed TaskFlow", async () => {
     await withTaskExecutorStateDir(async () => {
-      hoisted.cancelSessionMock.mockResolvedValue(undefined);
+      hoisted.killSubagentRunAdminMock.mockResolvedValue({
+        found: true,
+        killed: true,
+      });
 
       const flow = createManagedTaskFlow({
         ownerKey: "agent:main:main",
@@ -354,7 +357,7 @@ describe("task-executor", () => {
         ownerKey: "agent:main:main",
         scopeKind: "session",
         parentFlowId: flow.flowId,
-        childSessionKey: "agent:codex:acp:child",
+        childSessionKey: "agent:codex:subagent:child",
         runId: "run-linear-cancel",
         task: "Inspect a PR",
         startedAt: 10,
@@ -566,15 +569,18 @@ describe("task-executor", () => {
     });
   });
 
-  it("cancels active ACP child tasks", async () => {
+  it("cancels active detached subagent tasks outside a managed TaskFlow", async () => {
     await withTaskExecutorStateDir(async () => {
-      hoisted.cancelSessionMock.mockResolvedValue(undefined);
+      hoisted.killSubagentRunAdminMock.mockResolvedValue({
+        found: true,
+        killed: true,
+      });
 
       const child = createRunningTaskRun({
         runtime: "subagent",
         ownerKey: "agent:main:main",
         scopeKind: "session",
-        childSessionKey: "agent:codex:acp:child",
+        childSessionKey: "agent:codex:subagent:detached",
         runId: "run-linear-cancel",
         task: "Inspect a PR",
         startedAt: 10,
@@ -594,10 +600,9 @@ describe("task-executor", () => {
         taskId: child.taskId,
         status: "cancelled",
       });
-      expect(hoisted.cancelSessionMock).toHaveBeenCalledWith({
+      expect(hoisted.killSubagentRunAdminMock).toHaveBeenCalledWith({
         cfg: {} as never,
-        sessionKey: "agent:codex:acp:child",
-        reason: "task-cancel",
+        sessionKey: "agent:codex:subagent:detached",
       });
     });
   });
