@@ -381,27 +381,4 @@ describe("plugin-sdk facade runtime", () => {
       }),
     ).toBe(true);
   });
-
-  it("keeps shared runtime-core facades available without plugin activation", () => {
-    setRuntimeConfigSnapshot({});
-
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "speech-core",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "image-generation-core",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-    expect(
-      canLoadActivatedBundledPluginPublicSurface({
-        dirName: "media-understanding-core",
-        artifactBasename: "runtime-api.js",
-      }),
-    ).toBe(true);
-  });
 });

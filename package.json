@@ -301,14 +301,6 @@
       "types": "./dist/plugin-sdk/windows-spawn.d.ts",
       "default": "./dist/plugin-sdk/windows-spawn.js"
     },
-    "./plugin-sdk/acp-runtime": {
-      "types": "./dist/plugin-sdk/acp-runtime.d.ts",
-      "default": "./dist/plugin-sdk/acp-runtime.js"
-    },
-    "./plugin-sdk/acp-binding-runtime": {
-      "types": "./dist/plugin-sdk/acp-binding-runtime.d.ts",
-      "default": "./dist/plugin-sdk/acp-binding-runtime.js"
-    },
     "./plugin-sdk/lazy-runtime": {
       "types": "./dist/plugin-sdk/lazy-runtime.d.ts",
       "default": "./dist/plugin-sdk/lazy-runtime.js"
@@ -704,34 +696,6 @@
     "./plugin-sdk/mattermost-policy": {
       "types": "./dist/plugin-sdk/mattermost-policy.d.ts",
       "default": "./dist/plugin-sdk/mattermost-policy.js"
-    },
-    "./plugin-sdk/memory-host-core": {
-      "types": "./dist/plugin-sdk/memory-host-core.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-core.js"
-    },
-    "./plugin-sdk/memory-host-events": {
-      "types": "./dist/plugin-sdk/memory-host-events.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-events.js"
-    },
-    "./plugin-sdk/memory-host-files": {
-      "types": "./dist/plugin-sdk/memory-host-files.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-files.js"
-    },
-    "./plugin-sdk/memory-host-markdown": {
-      "types": "./dist/plugin-sdk/memory-host-markdown.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-markdown.js"
-    },
-    "./plugin-sdk/memory-host-search": {
-      "types": "./dist/plugin-sdk/memory-host-search.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-search.js"
-    },
-    "./plugin-sdk/memory-host-status": {
-      "types": "./dist/plugin-sdk/memory-host-status.d.ts",
-      "default": "./dist/plugin-sdk/memory-host-status.js"
-    },
-    "./plugin-sdk/memory-lancedb": {
-      "types": "./dist/plugin-sdk/memory-lancedb.d.ts",
-      "default": "./dist/plugin-sdk/memory-lancedb.js"
     },
     "./plugin-sdk/msteams": {
       "types": "./dist/plugin-sdk/msteams.d.ts",

@@ -201,97 +201,10 @@ function appendPluginCommandSpecs(params: {
   return merged;
 }
 
-const DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS = 8_000;
-const DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS = 2 * 60 * 1000;
-
-function isLegacyMissingSessionError(message: string): boolean {
-  return (
-    message.includes("Session is not ACP-enabled") ||
-    message.includes("ACP session metadata missing")
-  );
-}
-
-function classifyAcpStatusProbeError(params: {
-  error: unknown;
-  isStaleRunning: boolean;
-  isAcpRuntimeError: DiscordProviderSessionRuntimeModule["isAcpRuntimeError"];
-}): {
-  status: "stale" | "uncertain";
-  reason: string;
-} {
-  if (params.isAcpRuntimeError(params.error) && params.error.code === "ACP_SESSION_INIT_FAILED") {
-    return { status: "stale", reason: "session-init-failed" };
-  }
-
-  const message = params.error instanceof Error ? params.error.message : String(params.error);
-  if (isLegacyMissingSessionError(message)) {
-    return { status: "stale", reason: "session-missing" };
-  }
-
-  return params.isStaleRunning
-    ? { status: "stale", reason: "status-error-running-stale" }
-    : { status: "uncertain", reason: "status-error" };
-}
-
-async function probeDiscordAcpBindingHealth(params: {
-  cfg: OpenClawConfig;
-  sessionKey: string;
-  storedState?: "idle" | "running" | "error";
-  lastActivityAt?: number;
-}): Promise<{ status: "healthy" | "stale" | "uncertain"; reason?: string }> {
-  const { getAcpSessionManager, isAcpRuntimeError } = await loadDiscordProviderSessionRuntime();
-  const manager = getAcpSessionManager();
-  const statusProbeAbortController = new AbortController();
-  const statusPromise = manager
-    .getSessionStatus({
-      cfg: params.cfg,
-      sessionKey: params.sessionKey,
-      signal: statusProbeAbortController.signal,
-    })
-    .then((status) => ({ kind: "status" as const, status }))
-    .catch((error: unknown) => ({ kind: "error" as const, error }));
-
-  let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<{ kind: "timeout" }>((resolve) => {
-    timeoutTimer = setTimeout(
-      () => resolve({ kind: "timeout" }),
-      DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS,
-    );
-    timeoutTimer.unref?.();
-  });
-  const result = await Promise.race([statusPromise, timeoutPromise]);
-  if (timeoutTimer) {
-    clearTimeout(timeoutTimer);
-  }
-  if (result.kind === "timeout") {
-    statusProbeAbortController.abort();
-  }
-  const runningForMs =
-    params.storedState === "running" && Number.isFinite(params.lastActivityAt)
-      ? Date.now() - Math.max(0, Math.floor(params.lastActivityAt ?? 0))
-      : 0;
-  const isStaleRunning =
-    params.storedState === "running" && runningForMs >= DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS;
-
-  if (result.kind === "timeout") {
-    return isStaleRunning
-      ? { status: "stale", reason: "status-timeout-running-stale" }
-      : { status: "uncertain", reason: "status-timeout" };
-  }
-  if (result.kind === "error") {
-    return classifyAcpStatusProbeError({
-      error: result.error,
-      isStaleRunning,
-      isAcpRuntimeError,
-    });
-  }
-  if (result.status.state === "error") {
-    // ACP error state is recoverable (next turn can clear it), so keep the
-    // binding unless stronger stale signals exist.
-    return { status: "uncertain", reason: "status-error-state" };
-  }
-  return { status: "healthy" };
-}
+// NOTE: ACP-specific session status probing (probeDiscordAcpBindingHealth / classifyAcpStatusProbeError /
+// isLegacyMissingSessionError / DISCORD_ACP_* constants) was removed alongside the ACP plugin-sdk surface.
+// Discord thread binding startup no longer performs ACP probe reconciliation; the per-binding startup path
+// in monitorDiscordProvider only creates the binding manager without an ACP session manager round-trip.
 
 async function deployDiscordCommands(params: {
   client: Client;
@@ -763,36 +676,8 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
         maxAgeMs: threadBindingMaxAgeMs,
       })
     : discordProviderSessionRuntime.createNoopThreadBindingManager(account.accountId);
-  if (threadBindingsEnabled) {
-    const uncertainProbeKeys = new Set<string>();
-    const reconciliation = await discordProviderSessionRuntime.reconcileAcpThreadBindingsOnStartup({
-      cfg,
-      accountId: account.accountId,
-      sendFarewell: false,
-      healthProbe: async ({ sessionKey, session }) => {
-        const probe = await probeDiscordAcpBindingHealth({
-          cfg,
-          sessionKey,
-          storedState: session.acp?.state,
-          lastActivityAt: session.acp?.lastActivityAt,
-        });
-        if (probe.status === "uncertain") {
-          uncertainProbeKeys.add(`${sessionKey}${probe.reason ? ` (${probe.reason})` : ""}`);
-        }
-        return probe;
-      },
-    });
-    if (reconciliation.removed > 0) {
-      logVerbose(
-        `discord: removed ${reconciliation.removed}/${reconciliation.checked} stale ACP thread bindings on startup for account ${account.accountId}: ${reconciliation.staleSessionKeys.join(", ")}`,
-      );
-    }
-    if (uncertainProbeKeys.size > 0) {
-      logVerbose(
-        `discord: ACP thread-binding health probe uncertain for account ${account.accountId}: ${[...uncertainProbeKeys].join(", ")}`,
-      );
-    }
-  }
+  // NOTE: ACP startup reconciliation was removed alongside the ACP plugin-sdk surface; the
+  // thread bindings manager above handles binding persistence without an ACP session probe.
   let lifecycleStarted = false;
   let gatewaySupervisor: ReturnType<typeof createDiscordGatewaySupervisor> | undefined;
   let deactivateMessageHandler: (() => void) | undefined;

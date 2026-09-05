@@ -1325,3 +1325,82 @@ src/plugin-sdk/memory-core-host-status.ts
 - oxfmt 前任作業分の違反51件対応（`pnpm exec oxfmt --write` で一括修正可能だが、コミット粒度の調整要）
 - `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md`（前任が ACP削除と並行に作成した別タスクのドキュメント）— 取り扱い未定
 - 前任作業中間ファイル群（`.tmp-*`）— `.gitignore` に追加済み、最終push前に削除 or 維持判断
+## 21. ACP削除後の残骸完全クリーンアップ（2026-08-21 時点作業）
+
+### 21.1 背景・ユーザー裁定
+
+§20 の ACP削除完了後も build 設定・ソースに残骸が残存し、`pnpm build` が `[UNRESOLVED_ENTRY]` で失敗（`Cannot resolve entry module src/plugin-sdk/acp-runtime.ts`）、`pnpm exec tsgo --noEmit` も `Cannot find module 'openclaw/plugin-sdk/acp-runtime'` で 6 件のエラーが出る状態だった。
+
+ユーザー裁定：「C（ACP削除の真の完了としてdiscord統合も削除）で進める」＋「DEBLOATしたもの全部の残骸を横断的に洗い出して完全クリーンに」。本セクションは当該作業の記録。
+
+### 21.2 build 設定残骸の除去
+
+`pnpm build` の `[UNRESOLVED_ENTRY]` の原因 2 ファイル：
+
+| ファイル | 行 | 削除したエントリ |
+| --- | --- | --- |
+| `scripts/lib/plugin-sdk-entrypoints.json` | 61-62 | `"acp-runtime"`, `"acp-binding-runtime"` |
+| `package.json` | 304-310 | `./plugin-sdk/acp-runtime`, `./plugin-sdk/acp-binding-runtime` の `exports` ブロック |
+
+### 21.3 source 残骸の除去（ACP削除の真の完了）
+
+ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-sdk/acp-runtime` の参照を完全に除去：
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `extensions/discord/src/monitor/provider-session.runtime.ts` | ACP 再 export（`getAcpSessionManager`, `isAcpRuntimeError`, `reconcileAcpThreadBindingsOnStartup`）を除去 |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.ts` | `readAcpSessionEntry`/`AcpSessionStoreEntry` の import 削除、`AcpThreadBindingReconciliationResult`/`AcpThreadBindingHealthStatus`/`AcpThreadBindingHealthProbe` 型削除、`resolveStoredAcpBindingHealth`/`reconcileAcpThreadBindingsOnStartup` 関数削除、`mapWithConcurrency`/`ACP_STARTUP_HEALTH_PROBE_CONCURRENCY_LIMIT` 削除 |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` | ACP テスト 9 件削除（"removes stale ACP bindings..." 〜 "caps ACP startup health probe concurrency"）、`hoisted.readAcpSessionEntry`/`acpRuntime`/`reconcileAcpThreadBindingsOnStartup` 関連の import・mock・destructure 除去 |
+| `extensions/discord/src/monitor/provider.test.ts` | `AcpRuntimeError` import 削除、ACP テスト 5 件削除（"treats ACP error status..." 〜 "falls back to legacy missing-session message classification"）、`getAcpSessionStatusMock`/`reconcileAcpThreadBindingsOnStartupMock` の destructure・mock セットアップ・assertion 削除、`getHealthProbe`/`ReconcileHealthProbeParams`/`ReconcileStartupParams` 削除 |
+| `extensions/discord/src/monitor/provider.ts` | `DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS`/`DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS` 定数削除、`isLegacyMissingSessionError`/`classifyAcpStatusProbeError`/`probeDiscordAcpBindingHealth` 関数削除、`monitorDiscordProvider` 内の ACP thread bindings reconciliation ブロック削除 |
+| `extensions/discord/src/test-support/provider.test-support.ts` | `reconcileAcpThreadBindingsOnStartupMock`/`getAcpSessionStatusMock` の型・実装・destructure・reset 削除、`vi.mock("openclaw/plugin-sdk/acp-runtime", ...)` ブロック削除、runtime フェイクから `reconcileAcpThreadBindingsOnStartup`/`getAcpSessionManager`/`isAcpRuntimeError` 削除 |
+| `src/plugins/contracts/plugin-sdk-runtime-api-guardrails.test.ts` | telegram bundled plugin の runtime-api ガード rail フィクスチャから `AcpRuntime*` import 2 行削除 |
+
+### 21.4 横断洗い出しで発見した追加残骸
+
+`grep -rli "memory-host-\|memory-lancedb\|speech-core" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` の結果、Phase 13/17/19/20 で削除済みの拡張機能（`extensions/memory-core`, `extensions/speech-core`, `extensions/image-generation-core`, `extensions/media-understanding-core`, `extensions/memory-lancedb`）に対応する plugin-sdk export が `package.json` に残っていた：
+
+| ファイル | 削除した export / 実装 |
+| --- | --- |
+| `package.json` | `./plugin-sdk/memory-host-core`, `./plugin-sdk/memory-host-events`, `./plugin-sdk/memory-host-files`, `./plugin-sdk/memory-host-markdown`, `./plugin-sdk/memory-host-search`, `./plugin-sdk/memory-host-status`, `./plugin-sdk/memory-lancedb` — `src/plugin-sdk/` に対応実装なし、`extensions/` にもディレクトリなし、参照元もゼロ（grep 済） |
+| `src/plugin-sdk/memory-lancedb.ts` | 3 行の再 export のみ（`definePluginEntry` / `resolveStateDir` / `OpenClawPluginApi`）。パッケージ export と孤立していたのでファイルごと削除 |
+| `src/plugin-sdk/facade-runtime.ts` | `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` セットから `"image-generation-core"`, `"media-understanding-core"`, `"speech-core"` を削除。セット自体は空のまま残置（`new Set<string>()`）。下流の `runtime-api.js` short-circuit は実質 dead code だが、型推論とコード構造を維持するため Set を完全削除せずコメントで意図を明記 |
+| `src/plugin-sdk/facade-runtime.test.ts` | 上記変更に伴い、`keeps shared runtime-core facades available without plugin activation` テスト（speech-core / image-generation-core / media-understanding-core を `runtime-api.js` 経由でロードする検証）を削除。テストは 9 件 → 8 件に減少 |
+| `scripts/lib/optional-bundled-clusters.mjs` | OpenClaw 上流の optional bundled cluster 設定のうち、`extensions/memory-lancedb/` が存在しないため `"memory-lancedb"` エントリを除去（他の cluster は `extensions/` に残存するため保持） |
+
+### 21.5 温存した現役機能の参照（触らなかったもの）
+
+スコープ文に「現役機能（session-integrity-guard 等の正当な参照）は残すこと」とあったため、以下は意図的に保持：
+
+- **`heartbeat` 関連** — `src/cron/heartbeat-policy.ts` / `src/auto-reply/heartbeat-token.ts` / `ui/src/ui/{controllers,views}/cron*` の `wakeMode: "next-heartbeat"` は現役 cron 機能の正規リテラル。DEBLOAT 対象ではない（Phase 17/19/20 のいずれでも削除対象に挙がっていない）。
+- **`extensions/discord/src/monitor/message-handler.process.ts` の `keep heartbeats alive` コメント** / `message-handler.queue.test.ts` の `heartbeatTick` モック / `provider.lifecycle.ts` の `clean heartbeat` ポーラー — いずれも Discord typing indicator / gateway transport poller のローカル呼称で、ACP / memory-core いずれの heartbeat 機能とも別物。
+- **ui i18n locales の `dreaming.*` / `tabs.dreams` / `subtitles.dreams` 翻訳キー** — §19.6 の前任メモ「orphaned translation として温存（次期 i18n cleanup 時に削除検討）」に従い今回も見送り。13 言語分のキー削除と関連同期は別フェーズ（i18n cleanup）で扱う。
+- **`src/plugin-sdk/facade-runtime.ts` の NOTE コメント / `provider.ts` の NOTE コメント** — 「ACP-specific ... was removed alongside the ACP plugin-sdk surface」旨の注記として残置。次回 ACP 文脈を調査する人のために意図を言語化。
+
+### 21.6 検証ゲート結果
+
+| ゲート | 結果 |
+| --- | --- |
+| `pnpm build` | **完走**（`tsdown-build.mjs` / `runtime-postbuild.mjs` / `build:plugin-sdk:dts` / `check-plugin-sdk-exports.mjs` / `copy-hook-metadata` / `copy-export-html-templates` / `write-build-info` / `write-cli-startup-metadata` / `write-cli-compat` 全て成功、`OK: All 4 required plugin-sdk exports verified.`） |
+| `pnpm exec tsgo --noEmit` | **0 errors** |
+| `grep -rli "openclaw/plugin-sdk/acp-runtime\|openclaw/plugin-sdk/acp-binding-runtime"` (全 .ts/.tsx/.json/.mjs) | **ヒット 0 件** — ACP plugin-sdk surface への参照は完全消滅 |
+| `grep -rli "memory-host-\|memory-lancedb" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` | **ヒット 0 件** — memory-host-* / memory-lancedb の残骸 export も全削除 |
+| `pnpm exec vitest run extensions/discord/src/monitor/provider.test.ts` | **16/16 passed** |
+| `pnpm exec vitest run extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts`（個別実行） | **22/22 passed**（並列実行で `reuses webhook credentials after unbind when rebinding in the same channel` が既存の flaky パターンで 1 件失敗するが、`-t "reuses webhook"` 単独実行・`-t` なしシリアル実行では通過。ACP 削除ロジックと無関係な webhook モックのレース条件。タスク説明「既存テストを壊さないこと」は満たす） |
+| `pnpm exec vitest run src/plugin-sdk/facade-runtime.test.ts` | 既存 pre-existing 失敗 8 件（私の修正前後で同数）。本タスクのスコープ外（DEBLOGT.md §20.7 の残作業と同じ系統、`applyPluginAutoEnable` の `record.channels` / `preferOver` 依存テストフィクスチャ問題） |
+
+### 21.7 変更規模
+
+- 削除: 約 2,650 行（ACP 関連ロジック + ACP テスト 9 件・5 件 + facade テスト 1 件 + memory-lancedb.ts）
+- 修正: 15 ファイル（build 設定 3、`plugin-sdk-entrypoints.json` / `optional-bundled-clusters.mjs` / `package.json`、discord ソース 6、discord test-support 1、plugin-sdk 2、guard rail テスト 1、DEBLOAT.md）
+- 新規追加: なし
+- コミット: 1コミット予定（push 禁止、ユーザー指示遵守）
+
+### 21.8 残作業（次フェーズ候補・既存 §20.7 を引き継ぎ）
+
+- ui i18n locales 13 言語分の `dreaming.*` / `tabs.dreams` / `subtitles.dreams` orphan translation 削除（§19.6 / §21.5 で先送り済み）
+- `src/plugin-sdk/facade-runtime.ts` の `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` を空 Set から完全削除し、`runtime-api.js` short-circuit 分岐（`resolveBundledPluginPublicSurfaceAccess` 内）も削除
+- `extensions/discord/src/monitor/provider.ts` の NOTE コメント 2 件は ACP 文脈の言語化として残したが、文脈が古くなったタイミングで除去検討
+- `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の 2 件、`task-executor-policy.test.ts` の 1 件）— §20.7 からの継続
+- `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` の flaky test（`reuses webhook credentials after unbind when rebinding in the same channel`）— 並列実行の webhook モックレース。ACP 削除と無関係だが次の flaky 掃除タスクで対応
+- `src/plugin-sdk/facade-runtime.test.ts` の pre-existing 失敗 8 件 — §20.7 からの継続

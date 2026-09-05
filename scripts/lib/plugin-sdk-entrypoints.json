@@ -58,8 +58,6 @@
   "host-runtime",
   "process-runtime",
   "windows-spawn",
-  "acp-runtime",
-  "acp-binding-runtime",
   "lazy-runtime",
   "testing",
   "temp-path",

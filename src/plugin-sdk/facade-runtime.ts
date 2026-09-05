@@ -33,11 +33,11 @@ const DENNOU_PACKAGE_ROOT =
   }) ?? fileURLToPath(new URL("../..", import.meta.url));
 const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
 const PUBLIC_SURFACE_SOURCE_EXTENSIONS = [".ts", ".mts", ".js", ".mjs", ".cts", ".cjs"] as const;
-const ALWAYS_ALLOWED_RUNTIME_DIR_NAMES = new Set([
-  "image-generation-core",
-  "media-understanding-core",
-  "speech-core",
-]);
+// NOTE: image-generation-core / media-understanding-core / speech-core extensions were removed by DEBLOAT.
+// ALWAYS_ALLOWED_RUNTIME_DIR_NAMES used to whitelist these for runtime-api.js access, but every
+// referenced directory is gone, so the runtime-api.js short-circuit is now dead. Keep the const
+// shape (empty Set) so downstream conditions remain well-typed without behaviour change.
+const ALWAYS_ALLOWED_RUNTIME_DIR_NAMES = new Set<string>();
 const EMPTY_FACADE_BOUNDARY_CONFIG: OpenClawConfig = {};
 const jitiLoaders = new Map<string, ReturnType<typeof createJiti>>();
 const loadedFacadeModules = new Map<string, unknown>();
