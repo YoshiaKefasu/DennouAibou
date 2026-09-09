@@ -9,7 +9,7 @@ describe("buildInboundMediaNote", () => {
       MediaType: "image/png",
       MediaUrl: "/tmp/a.png",
     });
-    expect(note).toBe("[media attached: /tmp/a.png (image/png) | /tmp/a.png]");
+    expect(note).toBe("[media attached: /tmp/a.png]");
   });
 
   it("formats multiple MediaPaths as numbered media notes", () => {
@@ -20,9 +20,9 @@ describe("buildInboundMediaNote", () => {
     expect(note).toBe(
       [
         "[media attached: 3 files]",
-        "[media attached 1/3: /tmp/a.png | /tmp/a.png]",
-        "[media attached 2/3: /tmp/b.png | /tmp/b.png]",
-        "[media attached 3/3: /tmp/c.png | /tmp/c.png]",
+        "[media attached 1/3: /tmp/a.png]",
+        "[media attached 2/3: /tmp/b.png]",
+        "[media attached 3/3: /tmp/c.png]",
       ].join("\n"),
     );
   });
@@ -40,7 +40,7 @@ describe("buildInboundMediaNote", () => {
         },
       ],
     });
-    expect(note).toBe("[media attached: /tmp/b.png | https://example.com/b.png]");
+    expect(note).toBe("[media attached: /tmp/b.png]");
   });
 
   it("only suppresses attachments when media understanding succeeded", () => {
@@ -85,7 +85,7 @@ describe("buildInboundMediaNote", () => {
         >[number],
       ],
     });
-    expect(note).toBe("[media attached: /tmp/b.png | https://example.com/b.png]");
+    expect(note).toBe("[media attached: /tmp/b.png]");
   });
 
   it("strips audio attachments when transcription succeeded via MediaUnderstanding (issue #4197)", () => {
@@ -103,9 +103,7 @@ describe("buildInboundMediaNote", () => {
       ],
     });
     // Audio attachment should be stripped (already transcribed), image should remain
-    expect(note).toBe(
-      "[media attached: /tmp/image.png (image/png) | https://example.com/image.png]",
-    );
+    expect(note).toBe("[media attached: /tmp/image.png]");
   });
 
   it("only strips audio attachments that were transcribed", () => {
@@ -122,9 +120,7 @@ describe("buildInboundMediaNote", () => {
         },
       ],
     });
-    expect(note).toBe(
-      "[media attached: /tmp/voice-2.ogg (audio/ogg) | https://example.com/voice-2.ogg]",
-    );
+    expect(note).toBe("[media attached: /tmp/voice-2.ogg]");
   });
 
   it("strips audio attachments when Transcript is present (issue #4197)", () => {
@@ -174,6 +170,6 @@ describe("buildInboundMediaNote", () => {
       MediaTypes: ["audio/ogg"],
     });
     // No transcription = keep audio attachment as fallback
-    expect(note).toBe("[media attached: /tmp/voice.ogg (audio/ogg)]");
+    expect(note).toBe("[media attached: /tmp/voice.ogg]");
   });
 });

@@ -338,10 +338,10 @@ export async function runPreparedReply(
     const prefixedBody = [threadContextNote, prefixedBodyWithEvents].filter(Boolean).join("\n\n");
     const queueBodyBase = [threadContextNote, bodyWithEvents].filter(Boolean).join("\n\n");
     const queuedBody = mediaNote
-      ? [mediaNote, mediaReplyHint, queueBodyBase].filter(Boolean).join("\n").trim()
+      ? [mediaNote, queueBodyBase].filter(Boolean).join("\n").trim()
       : queueBodyBase;
     const prefixedCommandBody = mediaNote
-      ? [mediaNote, mediaReplyHint, prefixedBody || ""].filter(Boolean).join("\n").trim()
+      ? [mediaNote, prefixedBody || ""].filter(Boolean).join("\n").trim()
       : prefixedBody;
     return { prefixedCommandBody, queuedBody };
   };
@@ -370,9 +370,6 @@ export async function runPreparedReply(
   currentSystemSent = skillResult.systemSent;
   const skillsSnapshot = skillResult.skillsSnapshot;
   const mediaNote = buildInboundMediaNote(ctx);
-  const mediaReplyHint = mediaNote
-    ? "To send an image back, prefer the message tool (media/path/filePath). If you must inline, use MEDIA:https://example.com/image.jpg (spaces ok, quote if needed) or a safe relative path like MEDIA:./image.jpg. Avoid absolute paths (MEDIA:/...) and ~ paths - they are blocked for security. Keep caption in the text body."
-    : undefined;
   let { prefixedCommandBody, queuedBody } = await rebuildPromptBodies();
   if (!resolvedThinkLevel) {
     resolvedThinkLevel = await modelState.resolveDefaultThinkingLevel();

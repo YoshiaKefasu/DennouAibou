@@ -247,16 +247,7 @@ function buildDocsSection(params: { docsPath?: string; isMinimal: boolean; readT
   if (!docsPath || params.isMinimal) {
     return [];
   }
-  return [
-    "## Documentation",
-    `OpenClaw docs: ${docsPath}`,
-    "Mirror: https://docs.openclaw.ai",
-    "Source: https://github.com/openclaw/openclaw",
-    "Community: https://discord.com/invite/clawd",
-    "For OpenClaw behavior, commands, config, or architecture: consult local docs first.",
-    "When diagnosing issues, run `openclaw status` yourself when possible; only ask the user if you lack access (e.g., sandboxed).",
-    "",
-  ];
+  return ["## Documentation", `Documentation: ${docsPath}`, ""];
 }
 
 function buildExecutionBiasSection(params: { isMinimal: boolean }) {

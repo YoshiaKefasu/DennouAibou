@@ -7,13 +7,18 @@ function formatMediaAttachedLine(params: {
   index?: number;
   total?: number;
 }): string {
-  const prefix =
-    typeof params.index === "number" && typeof params.total === "number"
-      ? `[media attached ${params.index}/${params.total}: `
-      : "[media attached: ";
+  const isNumbered = typeof params.index === "number" && typeof params.total === "number";
+  const prefix = isNumbered
+    ? `[media attached ${params.index}/${params.total}: `
+    : "[media attached: ";
+  if (!isNumbered) {
+    // Single-file note: plain path only (no MIME type or duplicate URL noise).
+    return `${prefix}${params.path}]`;
+  }
   const typePart = params.type?.trim() ? ` (${params.type.trim()})` : "";
   const urlRaw = params.url?.trim();
-  const urlPart = urlRaw ? ` | ${urlRaw}` : "";
+  // Skip the URL when it duplicates the path (channels often mirror the path).
+  const urlPart = urlRaw && urlRaw !== params.path ? ` | ${urlRaw}` : "";
   return `${prefix}${params.path}${typePart}${urlPart}]`;
 }
 

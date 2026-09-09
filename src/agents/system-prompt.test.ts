@@ -365,10 +365,7 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain(
       "- If exactly one skill clearly applies: read its SKILL.md at <location> with `Read`, then follow it.",
     );
-    expect(prompt).toContain("OpenClaw docs: /tmp/openclaw/docs");
-    expect(prompt).toContain(
-      "For OpenClaw behavior, commands, config, or architecture: consult local docs first.",
-    );
+    expect(prompt).toContain("Documentation: /tmp/openclaw/docs");
   });
 
   it("adds update_plan guidance only when the tool is available", () => {
@@ -397,10 +394,13 @@ describe("buildAgentSystemPrompt", () => {
     });
 
     expect(prompt).toContain("## Documentation");
-    expect(prompt).toContain("OpenClaw docs: /tmp/openclaw/docs");
-    expect(prompt).toContain(
-      "For OpenClaw behavior, commands, config, or architecture: consult local docs first.",
-    );
+    expect(prompt).toContain("Documentation: /tmp/openclaw/docs");
+    // Old external OpenClaw doc links are gone; only the local path is advertised.
+    expect(prompt).not.toContain("docs.openclaw.ai");
+    expect(prompt).not.toContain("github.com/openclaw/openclaw");
+    expect(prompt).not.toContain("discord.com/invite/clawd");
+    expect(prompt).not.toContain("consult local docs first");
+    expect(prompt).not.toContain("openclaw status");
   });
 
   it("includes workspace notes when provided", () => {
