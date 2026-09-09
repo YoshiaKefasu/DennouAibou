@@ -740,7 +740,7 @@ export async function compactEmbeddedPiSessionDirect(
         cfg: params.config,
         contextTokenBudget: ctxInfo.tokens,
       });
-      // Sets compaction/pruning runtime state and returns extension factories
+      // Sets compaction runtime state and returns extension factories
       // that must be passed to the resource loader for the safeguard to be active.
       const extensionFactories = buildEmbeddedExtensionFactories({
         cfg: params.config,

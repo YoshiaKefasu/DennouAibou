@@ -41,7 +41,7 @@ function writeActiveSessionFile(dir: string, name: string, lines: string[]): str
 const defaultConfig: DennouSessionToolsPruneConfig = {
   enabled: true,
   minPrunableToolChars: 100,
-  keepLastTools: 2,
+  keepLastAssistants: 2,
   placeholder: "[tool output pruned by DennouAibou]",
   dryRun: false,
 };
@@ -157,16 +157,16 @@ describe("pruneClosedSessionFile", () => {
   });
 
   it("prunes large toolResult entries but keeps small ones", () => {
-    // totalLines=7, keepLastTools=2 → 末尾2行は保護（index 5,6）
-    // index 4 の large toolResult は保護範囲外 → prune対象
+    // keepLastAssistants=2, アシスタント境界 = index 3（a1）
+    // → index 2 の large toolResult のみが境界より前 → prune対象
     const lines = [
       makeSessionHeader(),
       makeUserMessage("msg 1"),
-      makeAssistantMessage("msg 2"),
-      makeUserMessage("msg 3"), // index 3, posFromEnd=4 → 保護外
-      makeLargeToolResult("x".repeat(150)), // index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(), // index 5, posFromEnd=2 → 保護
-      makeSmallToolResult(), // index 6, posFromEnd=1 → 保護
+      makeLargeToolResult("x".repeat(150)), // index 2 → prune!
+      makeAssistantMessage("a1"), // index 3 → カットオフ
+      makeUserMessage("msg 3"), // index 4
+      makeSmallToolResult(), // index 5 → 直近2ターン → 保護
+      makeAssistantMessage("a2"), // index 6
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -182,26 +182,30 @@ describe("pruneClosedSessionFile", () => {
     const content = fs.readFileSync(filePath, "utf8");
     const resultLines = content.trim().split("\n");
 
-    // 1-4行目: そのまま
+    // 1-3行目: そのまま
     expect(resultLines[0]).toBe(lines[0]);
     expect(resultLines[1]).toBe(lines[1]);
-    expect(resultLines[2]).toBe(lines[2]);
+    // index 2 は JSON構造を保ったまま content のみプレースホルダに置換される
+    expect(JSON.parse(resultLines[2]).message.content[0].text).toBe(
+      "[tool output pruned by DennouAibou]",
+    );
+    // 4行目以降: 保護範囲 → そのまま
     expect(resultLines[3]).toBe(lines[3]);
-    // 5行目: 大きなtoolResult → プレースホルダ
-    expect(resultLines[4]).toBe("[tool output pruned by DennouAibou]");
-    // 6-7行目: 保護範囲 → そのまま
+    expect(resultLines[4]).toBe(lines[4]);
     expect(resultLines[5]).toBe(lines[5]);
     expect(resultLines[6]).toBe(lines[6]);
   });
 
-  it("keeps entries within keepLastTools range even if large", () => {
-    // totalLines=4, keepLastTools=2 → 末尾2行は保護
-    // 末尾から2行目以内のtoolResultはpruneされない
+  it("keeps entries within the assistant-protected tail even if large", () => {
+    // keepLastAssistants=2, アシスタント境界 = index 2（a1）
+    // → index 1 の large のみが境界より前 → prune
     const lines = [
       makeSessionHeader(),
-      makeLargeToolResult("x".repeat(200)), // 200 chars > 100, 位置=2/4
-      makeLargeToolResult("x".repeat(200)), // 位置=3/4 → keepLastTools=2で保護
-      makeLargeToolResult("x".repeat(200)), // 位置=4/4 → 保護
+      makeLargeToolResult("x".repeat(200)), // 位置=1 → prune!
+      makeAssistantMessage("a1"),
+      makeLargeToolResult("x".repeat(200)), // 直近2ターン → 保護
+      makeLargeToolResult("x".repeat(200)), // 直近2ターン → 保護
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -211,7 +215,7 @@ describe("pruneClosedSessionFile", () => {
 
     const pruned = pruneClosedSessionFile(filePath, defaultConfig, testLogger);
 
-    // 末尾2行は保護されるため、pruneされるのは位置2の1行のみ
+    // 直近2ターンは保護されるため、pruneされるのは位置1の1行のみ
     expect(pruned).toBe(1);
   });
 
@@ -264,22 +268,15 @@ describe("pruneClosedSessionFile", () => {
   });
 
   it("handles malformed JSON lines gracefully", () => {
-    // totalLines=5, keepLastTools=2 → index 2が保護範囲外
-    const lines = [
-      makeSessionHeader(),
-      "this is not json at all", // index 1, malformed
-      makeUserMessage("padding"), // index 2, posFromEnd=3 → 保護外
-      makeLargeToolResult("x".repeat(150)), // index 3, posFromEnd=2 → …微妙。index 2にしよう
-    ];
-    // ※総行数が少ないので書き直し: 7行で構築
+    // keepLastAssistants=2: アシスタント発言 = index 4（a1）, index 6（a2）→ 境界 = index 4
     const lines2 = [
       makeSessionHeader(), // 0
-      makeUserMessage("filler"), // 1, posFromEnd=6
-      "this is not json at all", // 2, posFromEnd=5, malformed
-      makeUserMessage("padding"), // 3, posFromEnd=4
-      makeLargeToolResult("x".repeat(150)), // 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(), // 5, posFromEnd=2 → 保護
-      makeAssistantMessage("end"), // 6, posFromEnd=1 → 保護
+      "this is not json at all", // 1, malformed
+      makeUserMessage("padding"), // 2
+      makeLargeToolResult("x".repeat(150)), // 3, 境界より前 → prune!
+      makeAssistantMessage("a1"), // 4, カットオフ
+      makeSmallToolResult(), // 5, 直近2ターン → 保護
+      makeAssistantMessage("a2"), // 6
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -302,15 +299,15 @@ describe("pruneClosedSessionFile", () => {
   });
 
   it("counts multi-content text length correctly", () => {
-    // totalLines=7, keepLastTools=2 → index 4が保護範囲外
+    // keepLastAssistants=2, アシスタント境界 = index 3（a1）→ index 2 の multicontent が対象
     const lines = [
       makeSessionHeader(), // 0
       makeUserMessage("one"), // 1
-      makeAssistantMessage("two"), // 2
-      makeUserMessage("three"), // 3
-      makeMultiContentToolResult(["x".repeat(60), "y".repeat(60)]), // 120 chars, index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(), // 5, posFromEnd=2 → 保護
-      makeAssistantMessage("end"), // 6, posFromEnd=1 → 保護
+      makeMultiContentToolResult(["x".repeat(60), "y".repeat(60)]), // 120 chars, index 2 → prune!
+      makeAssistantMessage("a1"), // 3, カットオフ
+      makeUserMessage("three"), // 4
+      makeSmallToolResult(), // 5, 直近2ターン → 保護
+      makeAssistantMessage("a2"), // 6
     ];
     const filePath = writeClosedSessionFile(
       tempDir,
@@ -343,19 +340,21 @@ describe("pruneAllClosedSessions", () => {
   });
 
   it("walks directory and prunes all closed session files", () => {
-    // 各ファイルに4行以上配置し、toolResultを保護範囲外に置く
-    // keepLastTools=2 なので、index 3以降は保護範囲
+    // 各ファイルともアシスタント境界を置き、toolResult を保護範囲外に置く
     const lines1 = [
       makeSessionHeader(), // index 0
-      makeLargeToolResult("x".repeat(150)), // index 1, posFromEnd=4 → 保護外 → prune!
-      makeAssistantMessage("filler"), // index 2, posFromEnd=3 → 保護外
-      makeSmallToolResult(), // index 3, posFromEnd=2 → 保護
+      makeLargeToolResult("x".repeat(150)), // index 1 → prune!
+      makeAssistantMessage("filler"), // index 2
+      makeSmallToolResult(), // index 3, 直近2ターン → 保護
+      makeAssistantMessage("end"),
     ];
     const lines2 = [
       makeSessionHeader(), // index 0
-      makeLargeToolResult("y".repeat(200)), // index 1, posFromEnd=4 → 保護外 → prune!
-      makeSmallToolResult(), // index 2, posFromEnd=3 → 保護外
-      makeSmallToolResult(), // index 3, posFromEnd=2 → 保護
+      makeLargeToolResult("y".repeat(200)), // index 1 → prune!
+      makeAssistantMessage("filler2"),
+      makeSmallToolResult(), // 直近2ターン → 保護
+      makeSmallToolResult(), // 直近2ターン → 保護
+      makeAssistantMessage("end2"),
     ];
 
     writeClosedSessionFile(tempDir, "s1.jsonl.deleted.2026-01-01T00-00-00.000Z", lines1);

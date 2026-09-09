@@ -53,7 +53,7 @@ export function getDennouConfig(): DennouConfig {
       ...DENNOU_CONFIG_DEFAULTS.toolsPrune,
       enabled: DENNOU_CONFIG_DEFAULTS.activeSessionToolsPrune.enabled,
       idleDelayMinutes: DENNOU_CONFIG_DEFAULTS.activeSessionToolsPrune.idleDelayMinutes,
-      keepLastTools: DENNOU_CONFIG_DEFAULTS.activeSessionToolsPrune.keepLastTools,
+      keepLastAssistants: DENNOU_CONFIG_DEFAULTS.activeSessionToolsPrune.keepLastAssistants,
       placeholder: DENNOU_CONFIG_DEFAULTS.activeSessionToolsPrune.placeholder,
       // Apply shared user settings after mode defaults so toolsPrune really works
       // as the common override. Mode-specific values still win below.

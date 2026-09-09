@@ -332,10 +332,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
       attemptOverrides: {
         config: {
-          agents: {
-            defaults: {
-              contextPruning: {
-                mode: "cache-ttl",
+          plugins: {
+            entries: {
+              "context-pruner": {
+                enabled: true,
               },
             },
           },
@@ -401,10 +401,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
       attemptOverrides: {
         config: {
-          agents: {
-            defaults: {
-              contextPruning: {
-                mode: "cache-ttl",
+          plugins: {
+            entries: {
+              "context-pruner": {
+                enabled: true,
               },
             },
           },

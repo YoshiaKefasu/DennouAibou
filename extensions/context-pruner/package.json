@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/context-pruner",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "Write-time tool-result compaction plugin: placeholder-izes oversized tool outputs in session JSONL without breaking JSON structure (Phase 1 of COMPACTION_FEATURE.md)",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.6"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -8,7 +8,7 @@ describe("OpenClawSchema DennouAibou config", () => {
         dennou: {
           toolsPrune: {
             minPrunableToolChars: 1200,
-            keepLastTools: 5,
+            keepLastAssistants: 3,
             placeholder: "[tool output pruned]",
             dryRun: true,
           },
@@ -18,7 +18,7 @@ describe("OpenClawSchema DennouAibou config", () => {
           activeSessionToolsPrune: {
             enabled: true,
             idleDelayMinutes: 30,
-            keepLastTools: 10,
+            keepLastAssistants: 3,
           },
           pruneProtection: {
             protectedContentKeywords: ["AGENTS.md", "SOUL.md", "DENNOU_RULES"],
@@ -35,7 +35,7 @@ describe("OpenClawSchema DennouAibou config", () => {
           sessionToolsPrune: {
             enabled: true,
             minPrunableToolChars: 1500,
-            keepLastTools: 6,
+            keepLastAssistants: 2,
             placeholder: "[closed pruned]",
             dryRun: false,
           },
@@ -43,7 +43,7 @@ describe("OpenClawSchema DennouAibou config", () => {
             enabled: true,
             idleDelayMinutes: 15,
             minPrunableToolChars: 2000,
-            keepLastTools: 12,
+            keepLastAssistants: 4,
             placeholder: "[active pruned]",
             dryRun: true,
           },
@@ -60,5 +60,17 @@ describe("OpenClawSchema DennouAibou config", () => {
         },
       }),
     ).toThrow(/nope|unrecognized/i);
+  });
+
+  it("accepts deprecated keepLastTools for backward compatibility", () => {
+    expect(() =>
+      OpenClawSchema.parse({
+        dennou: {
+          toolsPrune: {
+            keepLastTools: 5,
+          },
+        },
+      }),
+    ).not.toThrow();
   });
 });

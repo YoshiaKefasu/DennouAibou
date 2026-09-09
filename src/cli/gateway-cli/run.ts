@@ -96,23 +96,12 @@ async function startDennouRuntimeHooksOnce(): Promise<void> {
       await import("../../dennou-soul/session-maintenance-hook.js");
     initSessionMaintenanceHook();
 
-    const { startIdlePruneWatcher } = await import("../../dennou-soul/idle-prune-watcher.js");
-    let protection: import("../../dennou-soul/types.js").DennouPruneProtectionConfig | undefined;
-    try {
-      const { getDennouConfig } = await import("../../dennou-soul/config.js");
-      protection = getDennouConfig().pruneProtection;
-      const { resolveAgentWorkspaceDir, listAgentIds } =
-        await import("../../agents/agent-scope.js");
-      const { getRuntimeConfig } = await import("../../config/config.js");
-      const cfg = getRuntimeConfig();
-      const wsPaths = listAgentIds(cfg).map((id) => resolveAgentWorkspaceDir(cfg, id));
-      if (wsPaths.length > 0) {
-        protection = { ...protection, resolvedWorkspacePaths: wsPaths };
-      }
-    } catch {
-      // Best-effort: workspace path resolution failure is non-fatal.
-    }
-    startIdlePruneWatcher(protection);
+    // COMPACTION_FEATURE.md Phase 1: アクティブセッションの事後Prune（idle-prune-watcher）は
+    // 新プラグイン extensions/context-pruner（tool_result_persist 書き込み時介入）に一本化した。
+    // 独立スケジュールを起動しないことで、プラグインとの二重書き込みを防止する。
+    gatewayLog.debug(
+      "[DennouAibou] idle-prune-watcher scheduling delegated to extensions/context-pruner plugin",
+    );
 
     const { startLivenessWatchdog } = await import("../../dennou-soul/liveness-watchdog.js");
     startLivenessWatchdog();

@@ -37,6 +37,19 @@ export function resolveAttemptSpawnWorkspaceDir(params: {
     : undefined;
 }
 
+/**
+ * context-pruner プラグインが有効かどうかを返す。
+ *
+ * COMPACTION_FEATURE.md §4.3 により、従来の `agents.defaults.contextPruning.mode ===
+ * "cache-ttl"` 判定は廃止し、「本プラグインが有効（plugins.entries["context-pruner"]
+ * .enabled: true）であればキャッシュ最適化を有効にする」仕様へ簡素化した。
+ *
+ * 旧 `contextPruning` 設定（mode/ttl 等）は後方互換のためスキーマ上は受容・無視される。
+ */
+export function isContextPrunerPluginEnabled(config?: OpenClawConfig): boolean {
+  return config?.plugins?.entries?.["context-pruner"]?.enabled === true;
+}
+
 export function shouldAppendAttemptCacheTtl(params: {
   timedOutDuringCompaction: boolean;
   compactionOccurredThisAttempt: boolean;
@@ -50,7 +63,7 @@ export function shouldAppendAttemptCacheTtl(params: {
     return false;
   }
   return (
-    params.config?.agents?.defaults?.contextPruning?.mode === "cache-ttl" &&
+    isContextPrunerPluginEnabled(params.config) &&
     params.isCacheTtlEligibleProvider(params.provider, params.modelId, params.modelApi)
   );
 }

@@ -56,6 +56,14 @@ export const AgentDefaultsSchema = z
     envelopeElapsed: z.union([z.literal("on"), z.literal("off")]).optional(),
     contextTokens: z.number().int().positive().optional(),
     memorySearch: MemorySearchSchema,
+    /**
+     * 旧 context-pruning 設定（レガシー・後方互換）.
+     *
+     * COMPACTION_FEATURE.md Phase 1 により、ツール出力の削減は統合プラグイン
+     * `plugins.entries["context-pruner"]` に一本化された。ここは後方互換のため
+     * 既存キー（mode / ttl / softTrimRatio / hardClearRatio 等）を警告なしで受容・
+     * 無視する。`.strict()` を外し、未知キーはサイレントに破棄する。
+     */
     contextPruning: z
       .object({
         mode: z.union([z.literal("off"), z.literal("cache-ttl")]).optional(),
@@ -69,7 +77,6 @@ export const AgentDefaultsSchema = z
             allow: z.array(z.string()).optional(),
             deny: z.array(z.string()).optional(),
           })
-          .strict()
           .optional(),
         softTrim: z
           .object({
@@ -77,17 +84,14 @@ export const AgentDefaultsSchema = z
             headChars: z.number().int().nonnegative().optional(),
             tailChars: z.number().int().nonnegative().optional(),
           })
-          .strict()
           .optional(),
         hardClear: z
           .object({
             enabled: z.boolean().optional(),
             placeholder: z.string().optional(),
           })
-          .strict()
           .optional(),
       })
-      .strict()
       .optional(),
     llm: z
       .object({

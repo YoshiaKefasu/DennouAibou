@@ -44,6 +44,9 @@ const NodeHostSchema = z
 const DennouToolsPruneSchema = z
   .object({
     minPrunableToolChars: z.number().int().positive().optional(),
+    /** 直近 N ターン保護（アシスタント発言境界ベース、COMPACTION_FEATURE.md §4.3） */
+    keepLastAssistants: z.number().int().min(0).optional(),
+    /** @deprecated 旧・行数ベース設定。新エンジンでは使用しない（受容・無視して後方互換維持） */
     keepLastTools: z.number().int().min(0).optional(),
     placeholder: z.string().optional(),
     dryRun: z.boolean().optional(),

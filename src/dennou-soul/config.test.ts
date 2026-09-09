@@ -20,11 +20,11 @@ describe("getDennouConfig", () => {
 
     const config = getDennouConfig();
 
-    expect(config.toolsPrune.keepLastTools).toBe(5);
+    expect(config.toolsPrune.keepLastAssistants).toBe(3);
     expect(config.sessionToolsPrune.enabled).toBe(false);
     expect(config.activeSessionToolsPrune.enabled).toBe(true);
     expect(config.activeSessionToolsPrune.minPrunableToolChars).toBe(1200);
-    expect(config.activeSessionToolsPrune.keepLastTools).toBe(10);
+    expect(config.activeSessionToolsPrune.keepLastAssistants).toBe(3);
     expect(config.activeSessionToolsPrune.dryRun).toBe(true);
   });
 
@@ -33,7 +33,7 @@ describe("getDennouConfig", () => {
       dennou: {
         toolsPrune: {
           minPrunableToolChars: 2400,
-          keepLastTools: 7,
+          keepLastAssistants: 7,
           dryRun: false,
         },
       },
@@ -42,10 +42,10 @@ describe("getDennouConfig", () => {
     const config = getDennouConfig();
 
     expect(config.sessionToolsPrune.minPrunableToolChars).toBe(2400);
-    expect(config.sessionToolsPrune.keepLastTools).toBe(7);
+    expect(config.sessionToolsPrune.keepLastAssistants).toBe(7);
     expect(config.sessionToolsPrune.dryRun).toBe(false);
     expect(config.activeSessionToolsPrune.minPrunableToolChars).toBe(2400);
-    expect(config.activeSessionToolsPrune.keepLastTools).toBe(7);
+    expect(config.activeSessionToolsPrune.keepLastAssistants).toBe(7);
     expect(config.activeSessionToolsPrune.dryRun).toBe(false);
   });
 
@@ -53,11 +53,11 @@ describe("getDennouConfig", () => {
     mocks.getRuntimeConfig.mockReturnValue({
       dennou: {
         toolsPrune: {
-          keepLastTools: 7,
+          keepLastAssistants: 7,
           dryRun: false,
         },
         activeSessionToolsPrune: {
-          keepLastTools: 12,
+          keepLastAssistants: 12,
           dryRun: true,
         },
       },
@@ -65,9 +65,9 @@ describe("getDennouConfig", () => {
 
     const config = getDennouConfig();
 
-    expect(config.sessionToolsPrune.keepLastTools).toBe(7);
+    expect(config.sessionToolsPrune.keepLastAssistants).toBe(7);
     expect(config.sessionToolsPrune.dryRun).toBe(false);
-    expect(config.activeSessionToolsPrune.keepLastTools).toBe(12);
+    expect(config.activeSessionToolsPrune.keepLastAssistants).toBe(12);
     expect(config.activeSessionToolsPrune.dryRun).toBe(true);
   });
 

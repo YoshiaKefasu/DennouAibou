@@ -67,8 +67,10 @@ export const FIELD_HELP: Record<string, string> = {
     "Shared defaults used by both closed-session prune and active-session prune. Set values here first, then override only when one mode needs different behavior.",
   "dennou.toolsPrune.minPrunableToolChars":
     "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
+  "dennou.toolsPrune.keepLastAssistants":
+    "Keep tool results of the most recent assistant speeches untouched (assistant-boundary protection). Typical safe range is 3; use 0 only when you are aggressively shrinking history.",
   "dennou.toolsPrune.keepLastTools":
-    "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+    "Deprecated legacy key (line-count based). Accepted and ignored for backward compatibility; use keepLastAssistants instead.",
   "dennou.toolsPrune.placeholder":
     "Text inserted where large tool output was pruned. Keep it short and recognizable so you can tell pruning happened without losing context.",
   "dennou.toolsPrune.dryRun":
@@ -79,8 +81,10 @@ export const FIELD_HELP: Record<string, string> = {
     "Master switch for closed-session pruning. Off = no pruning for closed sessions.",
   "dennou.sessionToolsPrune.minPrunableToolChars":
     "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
+  "dennou.sessionToolsPrune.keepLastAssistants":
+    "Closed-session override for how many of the most recent assistant turns are always preserved.",
   "dennou.sessionToolsPrune.keepLastTools":
-    "Closed-session override for how many latest tool outputs are always preserved.",
+    "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
   "dennou.sessionToolsPrune.placeholder":
     "Closed-session override for replacement text after pruning.",
   "dennou.sessionToolsPrune.dryRun": "Closed-session override for dry-run behavior.",
@@ -91,8 +95,10 @@ export const FIELD_HELP: Record<string, string> = {
     "How long the session must stay idle before active prune runs. Start with 30 minutes; lower for faster cleanup, higher to preserve more near-term context.",
   "dennou.activeSessionToolsPrune.minPrunableToolChars":
     "Active-session override for min prunable size.",
+  "dennou.activeSessionToolsPrune.keepLastAssistants":
+    "Active-session override for how many most-recent assistant turns are protected. 3 is a practical default for ongoing chats.",
   "dennou.activeSessionToolsPrune.keepLastTools":
-    "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+    "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
   "dennou.activeSessionToolsPrune.placeholder":
     "Active-session override for replacement text after pruning.",
   "dennou.activeSessionToolsPrune.dryRun": "Active-session override for dry-run behavior.",

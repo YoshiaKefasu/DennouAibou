@@ -12,6 +12,11 @@ import {
   pruneToolOutputLines,
   isProtectedByKeyword,
   isProtectedByWorkspacePath,
+  findAssistantCutoffIndex,
+  isAlreadyPlaceholderized,
+  pruneToolResultEntry,
+  buildCanonicalPlaceholder,
+  formatPrunableSizeLabel,
 } from "./prune-engine.js";
 import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from "./types.js";
 
@@ -82,6 +87,20 @@ function makeUserMessage(text: string): string {
   });
 }
 
+/** アシスタントメッセージ（アシスタント発言境界の判定に使う） */
+function makeAssistantMessage(text: string): string {
+  return JSON.stringify({
+    type: "message",
+    id: "msg-a",
+    parentId: "msg-1",
+    timestamp: "2026-01-01T00:00:02.000Z",
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text }],
+    },
+  });
+}
+
 function makeSessionHeader(): string {
   return JSON.stringify({
     type: "session",
@@ -95,7 +114,7 @@ function makeSessionHeader(): string {
 const defaultConfig: DennouSessionToolsPruneConfig = {
   enabled: true,
   minPrunableToolChars: 10,
-  keepLastTools: 2,
+  keepLastAssistants: 2,
   placeholder: "[pruned]",
   dryRun: false,
 };
@@ -205,6 +224,85 @@ describe("isProtectedByWorkspacePath", () => {
   });
 });
 
+// ── findAssistantCutoffIndex ──────────────────────────────
+
+describe("findAssistantCutoffIndex", () => {
+  it("finds the keepLastAssistants-th assistant from the end", () => {
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      makeAssistantMessage("a1"),
+      makeUserMessage("again"),
+      makeAssistantMessage("a2"),
+      makeAssistantMessage("a3"),
+    ];
+    // 末尾から2回目のアシスタント = index 4（a2）
+    expect(findAssistantCutoffIndex(lines, 2)).toBe(4);
+    // 末尾から3回目のアシスタント = index 2（a1）
+    expect(findAssistantCutoffIndex(lines, 3)).toBe(2);
+  });
+
+  it("returns null when fewer assistants than keepLastAssistants exist", () => {
+    const lines = [makeSessionHeader(), makeUserMessage("hello"), makeAssistantMessage("a1")];
+    expect(findAssistantCutoffIndex(lines, 2)).toBeNull();
+  });
+
+  it("returns lines.length when keepLastAssistants is 0 (everything prunable)", () => {
+    const lines = [makeSessionHeader(), makeUserMessage("hello")];
+    expect(findAssistantCutoffIndex(lines, 0)).toBe(lines.length);
+  });
+
+  it("skips malformed lines and non-assistant entries while scanning", () => {
+    const lines = [
+      makeSessionHeader(),
+      "not json",
+      makeUserMessage("hello"),
+      makeLargeToolResult("x"),
+      makeAssistantMessage("a1"),
+      makeAssistantMessage("a2"),
+    ];
+    expect(findAssistantCutoffIndex(lines, 2)).toBe(4);
+  });
+});
+
+// ── 冪等性（二重置換防止）──────────────────────────────
+
+describe("placeholder idempotency", () => {
+  it("isAlreadyPlaceholderized detects canonical and legacy markers", () => {
+    const canonical = parseLine(makeLargeToolResult("[出力省略: 120行 / 3.4KB 正常終了]"))!;
+    const legacy = parseLine(makeLargeToolResult("[Old tool output cleared — re-run if needed]"))!;
+    const raw = parseLine(makeLargeToolResult("x".repeat(200)))!;
+    expect(isAlreadyPlaceholderized(canonical)).toBe(true);
+    expect(isAlreadyPlaceholderized(legacy)).toBe(true);
+    expect(isAlreadyPlaceholderized(raw)).toBe(false);
+  });
+
+  it("pruneToolResultEntry returns the raw line for already-placeholderized entries", () => {
+    const line = makeLargeToolResult("[出力省略: 120行 / 3.4KB 正常終了]");
+    const entry = parseLine(line)!;
+    expect(pruneToolResultEntry(entry, "[pruned]")).toBe(line);
+  });
+
+  it("pruneToolOutputLines never double-prunes placeholderized entries", () => {
+    const already = makeLargeToolResult("[出力省略: 500行 / 15KB 正常終了]");
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      already, // プレースホルダー済み（keyboard以外にも「置換済み」で判定）
+      makeAssistantMessage("a1"),
+      makeAssistantMessage("a2"),
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      minPrunableToolChars: 1,
+      keepLastAssistants: 0,
+    };
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, () => {});
+    expect(prunedCount).toBe(0);
+    expect(resultLines[2]).toBe(already);
+  });
+});
+
 // ── pruneToolOutputLines: 保護ルール統合テスト ────────────
 
 describe("pruneToolOutputLines with protection", () => {
@@ -219,14 +317,15 @@ describe("pruneToolOutputLines with protection", () => {
   });
 
   it("protects toolResult containing AGENTS.md keyword from pruning", () => {
-    // keepLastTools=2, totalLines=5
-    // index 2 should be pruned unless protected by keyword
+    // keepLastAssistants=2, アシスタント境界は index 3（a1）。
+    // index 2 は境界より前で本来prune対象だが、キーワード保護により保持される。
     const lines = [
       makeSessionHeader(), // 0
       makeUserMessage("hello"), // 1
       makeLargeToolResult("AGENTS.md: some rules"), // 2, protected by keyword!
-      makeSmallToolResult(), // 3, posFromEnd=2 → keepLastTools保護
-      makeSmallToolResult(), // 4, posFromEnd=1 → 保護
+      makeAssistantMessage("a1"), // 3
+      makeSmallToolResult(), // 4, 境界以降 → 保護
+      makeAssistantMessage("a2"), // 5
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md"],
@@ -249,8 +348,9 @@ describe("pruneToolOutputLines with protection", () => {
       makeSessionHeader(), // 0
       makeUserMessage("hello"), // 1
       makeWorkspaceFileResult("Reading from /home/user/project/SOUL.md"), // 2, protected!
-      makeSmallToolResult(), // 3, posFromEnd=2
-      makeSmallToolResult(), // 4, posFromEnd=1
+      makeAssistantMessage("a1"), // 3
+      makeSmallToolResult(), // 4
+      makeAssistantMessage("a2"), // 5
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: [],
@@ -273,8 +373,10 @@ describe("pruneToolOutputLines with protection", () => {
       makeSessionHeader(), // 0
       makeUserMessage("hello"), // 1
       makeLargeToolResult("x".repeat(100)), // 2, no keyword → prune!
-      makeSmallToolResult(), // 3, posFromEnd=2
-      makeSmallToolResult(), // 4, posFromEnd=1
+      makeAssistantMessage("a1"), // 3 → カットオフ
+      makeSmallToolResult(), // 4, 境界以降 → 保護
+      makeSmallToolResult(), // 5, 境界以降 → 保護
+      makeAssistantMessage("a2"), // 6
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md", "SOUL.md"],
@@ -309,6 +411,8 @@ describe("pruneToolOutputLines with protection", () => {
       makeLargeToolResult("plain output"), // 2, neither → prune
       makeWorkspaceFileResult("AGENTS.md updated"), // 3, keyword match
       makeWorkspaceFileResult("/home/user/project/README"), // 4, path match
+      makeAssistantMessage("a1"), // 5
+      makeAssistantMessage("a2"), // 6
     ];
     const protection: DennouPruneProtectionConfig = {
       protectedContentKeywords: ["AGENTS.md"],
@@ -343,7 +447,7 @@ describe("pruneToolOutputLines with protection", () => {
 
     const cfg: DennouSessionToolsPruneConfig = {
       ...defaultConfig,
-      keepLastTools: 0,
+      keepLastAssistants: 0,
       minPrunableToolChars: 50,
     };
 
@@ -382,7 +486,7 @@ describe("pruneToolOutputLines with protection", () => {
 
     const cfg: DennouSessionToolsPruneConfig = {
       ...defaultConfig,
-      keepLastTools: 0,
+      keepLastAssistants: 0,
       minPrunableToolChars: 50,
     };
 
@@ -405,14 +509,13 @@ describe("pruneToolOutputLines with protection", () => {
       makeUserMessage("hello"), // 1
       makeUserMessage("msg 2"), // 2
       makeUserMessage("msg 3"), // 3
-      makeLargeToolResult("x".repeat(100)), // 4, posFromEnd=2, keepLastTools=2 で保護範囲内 → 保護
-      makeSmallToolResult(), // 5, posFromEnd=1 → 保護
+      makeLargeToolResult("x".repeat(100)), // 4
+      makeSmallToolResult(), // 5
     ];
 
-    // minPrunableToolCharsを50にすることでlarge toolが対象になるが、
-    // keepLastTools=2 で末尾2行は保護される
-    // ただしこのテストは「protectionがなくても動くこと」だけ確認すればいい
-    const cfg = { ...defaultConfig, keepLastTools: 0, minPrunableToolChars: 50 };
+    // keepLastAssistants=0 → 保護なし（全行がPrune対象）
+    // minPrunableToolChars=50 で large tool のみ対象（small は 5文字 < 50）
+    const cfg = { ...defaultConfig, keepLastAssistants: 0, minPrunableToolChars: 50 };
     const { prunedCount } = pruneToolOutputLines(lines, cfg, testLogger);
 
     expect(prunedCount).toBe(1);
@@ -430,7 +533,7 @@ describe("pruneToolOutputLines with protection", () => {
     const dryCfg: DennouSessionToolsPruneConfig = {
       ...defaultConfig,
       dryRun: true,
-      keepLastTools: 0,
+      keepLastAssistants: 0,
       minPrunableToolChars: 50,
     };
 
@@ -439,5 +542,73 @@ describe("pruneToolOutputLines with protection", () => {
     expect(prunedCount).toBe(1);
     expect(logs).toEqual([]);
     expect(resultLines[2]).toBe(lines[2]);
+  });
+
+  it("protects tool results of the last keepLastAssistants turns (直近3ターン保護)", () => {
+    // アシスタント発言 = a1(2), a2(4), a3(6)。keepLastAssistants=2 → カットオフ = index 4。
+    // bigTR(3) のみが境界より前 → pruned。bigTR2(5) / bigTR3(7) は直近2ターン → 保護。
+    const lines = [
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
+      makeAssistantMessage("a1"), // 2
+      makeLargeToolResult("x".repeat(500)), // 3, 4回目以前 → prune対象
+      makeAssistantMessage("a2"), // 4 ← カットオフ
+      makeLargeToolResult("y".repeat(500)), // 5, 直近2ターン → 保護
+      makeAssistantMessage("a3"), // 6
+      makeLargeToolResult("z".repeat(500)), // 7, 直近2ターン → 保護
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastAssistants: 2,
+      minPrunableToolChars: 100,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, testLogger);
+
+    expect(prunedCount).toBe(1);
+    expect(resultLines[2]).toBe(lines[2]);
+    expect(JSON.parse(resultLines[3]).message.content[0].text).toBe("[pruned]");
+    // 直近2ターンのツール結果は生データのまま
+    expect(resultLines[5]).toBe(lines[5]);
+    expect(resultLines[7]).toBe(lines[7]);
+  });
+
+  it("protects everything when the transcript has fewer assistants than keepLastAssistants", () => {
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      makeLargeToolResult("x".repeat(500)),
+      makeAssistantMessage("a1"),
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastAssistants: 3,
+      minPrunableToolChars: 100,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, testLogger);
+
+    expect(prunedCount).toBe(0);
+    expect(resultLines[2]).toBe(lines[2]);
+  });
+});
+
+// ── 正準プレースホルダー ──────────────────────────────
+
+describe("canonical placeholder helpers", () => {
+  it("buildCanonicalPlaceholder follows the canonical format", () => {
+    expect(buildCanonicalPlaceholder({ lineCount: 120, sizeLabel: "3.4KB" })).toBe(
+      "[出力省略: 120行 / 3.4KB 正常終了]",
+    );
+    expect(buildCanonicalPlaceholder({ lineCount: 1, sizeLabel: "500B", status: "エラー" })).toBe(
+      "[出力省略: 1行 / 500B エラー]",
+    );
+  });
+
+  it("formatPrunableSizeLabel renders human-readable sizes", () => {
+    expect(formatPrunableSizeLabel(120)).toBe("120B");
+    expect(formatPrunableSizeLabel(3_481)).toBe("3.4KB");
+    expect(formatPrunableSizeLabel(15_360)).toBe("15KB");
+    expect(formatPrunableSizeLabel(3_400_000)).toBe("3.2MB");
   });
 });

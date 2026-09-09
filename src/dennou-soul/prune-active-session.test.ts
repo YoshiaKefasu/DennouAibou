@@ -28,7 +28,7 @@ function writeSessionFile(dir: string, name: string, lines: string[]): string {
 const defaultConfig: DennouSessionToolsPruneConfig = {
   enabled: true,
   minPrunableToolChars: 100,
-  keepLastTools: 2,
+  keepLastAssistants: 2,
   placeholder: "[tool output pruned by DennouAibou]",
   dryRun: false,
 };
@@ -132,15 +132,16 @@ describe("pruneActiveSessionFile", () => {
   });
 
   it("prunes large toolResult entries but keeps small / protected ones", () => {
-    // totalLines=7, keepLastTools=2 → 末尾2行は保護
+    // keepLastAssistants=2, アシスタント境界 = index 3（a1）
+    // → index 2 の big だけが境界より前で prune 対象。index 4/5 は直近2ターン保護。
     const lines = [
       makeSessionHeader(),
       makeUserMessage("msg 1"),
-      makeAssistantMessage("msg 2"),
-      makeUserMessage("msg 3"), // index 3, posFromEnd=4 → 保護外
-      makeLargeToolResult("x".repeat(150)), // index 4, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(), // index 5, posFromEnd=2 → 保護
-      makeSmallToolResult(), // index 6, posFromEnd=1 → 保護
+      makeLargeToolResult("x".repeat(150)), // index 2 → prune!
+      makeAssistantMessage("a1"), // index 3 → カットオフ
+      makeSmallToolResult(), // index 4 → 保護
+      makeSmallToolResult(), // index 5 → 保護
+      makeAssistantMessage("a2"), // index 6
     ];
     const filePath = writeSessionFile(tempDir, "active-session.jsonl", lines);
 
@@ -152,18 +153,25 @@ describe("pruneActiveSessionFile", () => {
     const content = fs.readFileSync(filePath, "utf8");
     const resultLines = content.trim().split("\n");
     expect(resultLines.length).toBe(7);
-    expect(resultLines[4]).toBe("[tool output pruned by DennouAibou]");
+    // index 2 は JSON構造を保ったまま content のみプレースホルダに置換される
+    expect(JSON.parse(resultLines[2]).message.content[0].text).toBe(
+      "[tool output pruned by DennouAibou]",
+    );
     // 保護範囲はそのまま
+    expect(resultLines[3]).toBe(lines[3]);
+    expect(resultLines[4]).toBe(lines[4]);
     expect(resultLines[5]).toBe(lines[5]);
     expect(resultLines[6]).toBe(lines[6]);
   });
 
-  it("keeps entries within keepLastTools range even if large", () => {
+  it("keeps entries within the assistant-protected tail even if large", () => {
     const lines = [
       makeSessionHeader(),
-      makeLargeToolResult("x".repeat(200)), // 保護外（posFromEnd=3）
-      makeLargeToolResult("x".repeat(200)), // 保護（keepLastTools=2）
-      makeLargeToolResult("x".repeat(200)), // 保護（末尾）
+      makeLargeToolResult("x".repeat(200)), // 保護外（境界より前）→ prune!
+      makeAssistantMessage("a1"),
+      makeLargeToolResult("x".repeat(200)), // 直近2ターン → 保護
+      makeLargeToolResult("x".repeat(200)), // 直近2ターン → 保護
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -181,14 +189,14 @@ describe("pruneActiveSessionFile", () => {
   });
 
   it("does not modify file in dryRun mode", () => {
-    // totalLines=6, keepLastTools=2 → 末尾2行は保護（index 4,5）→ index 3が保護外
+    // keepLastAssistants=2, アシスタント境界 = index 3（a1）→ index 2 が prune 対象
     const lines = [
       makeSessionHeader(),
       makeUserMessage("msg 1"),
-      makeAssistantMessage("msg 2"),
       makeLargeToolResult("x".repeat(150)), // 保護外 → prune対象
-      makeSmallToolResult(), // 保護
-      makeAssistantMessage("end"), // 保護
+      makeAssistantMessage("a1"),
+      makeSmallToolResult(), // 直近2ターン → 保護
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -206,10 +214,11 @@ describe("pruneActiveSessionFile", () => {
     const lines = [
       makeSessionHeader(),
       "this is not json",
+      makeLargeToolResult("x".repeat(150)), // index 2, 境界より前 → prune!
       makeUserMessage("padding"),
-      makeLargeToolResult("x".repeat(150)), // index 3, posFromEnd=3 → 保護外 → prune!
-      makeSmallToolResult(), // 保護
-      makeAssistantMessage("end"), // 保護
+      makeAssistantMessage("a1"), // カットオフ
+      makeSmallToolResult(), // 直近2ターン → 保護
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -231,8 +240,9 @@ describe("pruneActiveSessionFile", () => {
       makeSessionHeader(),
       makeUserMessage("one"),
       makeMultiContentToolResult(["x".repeat(60), "y".repeat(60)]), // 120 chars > 100 → prune!
+      makeAssistantMessage("a1"),
       makeSmallToolResult(),
-      makeAssistantMessage("end"),
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -268,11 +278,11 @@ describe("pruneActiveSessionFile", () => {
     const lines = [
       makeSessionHeader(),
       makeUserMessage("filler"),
-      makeAssistantMessage("pad"),
+      makeLargeToolResult("x".repeat(150)), // 境界より前（index 2）→ 保護外
+      makeAssistantMessage("a1"),
       makeUserMessage("pad2"),
-      makeLargeToolResult("x".repeat(150)), // 保護外（totalLines=5, keepLastTools=2）
-      makeSmallToolResult(), // 保護
-      makeAssistantMessage("end"), // 保護
+      makeSmallToolResult(), // 直近2ターン → 保護
+      makeAssistantMessage("a2"),
     ];
     const filePath = writeSessionFile(tempDir, "session.jsonl", lines);
 
@@ -322,9 +332,10 @@ describe("pruneActiveSessionById", () => {
     const lines = [
       makeSessionHeader("session-123"),
       makeUserMessage("msg 1"),
-      makeLargeToolResult("x".repeat(150)),
+      makeLargeToolResult("x".repeat(150)), // 境界より前 → prune!
+      makeAssistantMessage("a1"),
       makeSmallToolResult(),
-      makeAssistantMessage("end"),
+      makeAssistantMessage("a2"),
     ];
     writeSessionFile(tempDir, "session-123.jsonl", lines);
 

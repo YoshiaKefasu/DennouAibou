@@ -5,12 +5,17 @@
  * DENNOU_RULES.md Rule 1 (Encapsulation) に従い、コア型を汚染しない。
  */
 
-/** Closed/Active の両方で共有するツール出力Prune設定 */
+/**
+ * Closed/Active の両方で共有するツール出力Prune設定
+ *
+ * COMPACTION_FEATURE.md §4.3 により、従来の行数ベース `keepLastTools` は廃止し、
+ * アシスタント発言境界ベースの `keepLastAssistants`（直近 N ターン保護）に一本化した。
+ */
 export interface DennouToolsPruneConfig {
   /** この文字数以上のツール出力のみPrune対象 */
   minPrunableToolChars: number;
-  /** セッション末尾から保護するツール出力エントリ数 */
-  keepLastTools: number;
+  /** セッション末尾から保護する直近アシスタント発言数（直近 N ターン保護） */
+  keepLastAssistants: number;
   /** Prune後のプレースホルダテキスト */
   placeholder: string;
   /** Dry-runモード。trueの場合、ログ出力のみで実際の削除は行わない */
@@ -54,7 +59,7 @@ export interface DennouConfig {
 /** Closed/Active共通のデフォルト設定 */
 export const DENNOU_TOOLS_PRUNE_DEFAULTS: DennouToolsPruneConfig = {
   minPrunableToolChars: 1200,
-  keepLastTools: 5,
+  keepLastAssistants: 3,
   placeholder: "[tool output pruned by DennouAibou]",
   dryRun: true,
 };
@@ -70,7 +75,6 @@ export const DENNOU_CONFIG_DEFAULTS: DennouConfig = {
     ...DENNOU_TOOLS_PRUNE_DEFAULTS,
     enabled: true,
     idleDelayMinutes: 30,
-    keepLastTools: 10,
     placeholder: "[tool output pruned by DennouAibou — idle prune]",
   },
   pruneProtection: {

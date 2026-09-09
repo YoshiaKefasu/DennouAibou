@@ -778,13 +778,21 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 description:
                   "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
               },
+              keepLastAssistants: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Shared: Keep Last Assistant Turns",
+                description:
+                  "Keep tool results of the most recent assistant speeches untouched (assistant-boundary protection). Typical safe range is 3; use 0 only when you are aggressively shrinking history.",
+              },
               keepLastTools: {
                 type: "integer",
                 minimum: 0,
                 maximum: 9007199254740991,
-                title: "Shared: Keep Last Tools",
+                title: "Shared: Keep Last Tools (deprecated)",
                 description:
-                  "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+                  "Deprecated legacy key (line-count based). Accepted and ignored for backward compatibility; use keepLastAssistants instead.",
               },
               placeholder: {
                 type: "string",
@@ -815,13 +823,21 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 description:
                   "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
               },
+              keepLastAssistants: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Session: Keep Last Assistant Turns",
+                description:
+                  "Closed-session override for how many of the most recent assistant turns are always preserved.",
+              },
               keepLastTools: {
                 type: "integer",
                 minimum: 0,
                 maximum: 9007199254740991,
-                title: "Session: Keep Last Tools",
+                title: "Session: Keep Last Tools (deprecated)",
                 description:
-                  "Closed-session override for how many latest tool outputs are always preserved.",
+                  "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
               },
               placeholder: {
                 type: "string",
@@ -855,13 +871,21 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 title: "Active: Min Prunable Tool Chars",
                 description: "Active-session override for min prunable size.",
               },
+              keepLastAssistants: {
+                type: "integer",
+                minimum: 0,
+                maximum: 9007199254740991,
+                title: "Active: Keep Last Assistant Turns",
+                description:
+                  "Active-session override for how many most-recent assistant turns are protected. 3 is a practical default for ongoing chats.",
+              },
               keepLastTools: {
                 type: "integer",
                 minimum: 0,
                 maximum: 9007199254740991,
-                title: "Active: Keep Last Tools",
+                title: "Active: Keep Last Tools (deprecated)",
                 description:
-                  "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+                  "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
               },
               placeholder: {
                 type: "string",
@@ -1259,178 +1283,6 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
         title: "Auth",
         description:
           "Authentication profile root used for multi-profile provider credentials and cooldown-based failover ordering. Keep profiles minimal and explicit so automatic failover behavior stays auditable.",
-      },
-      acp: {
-        type: "object",
-        properties: {
-          enabled: {
-            type: "boolean",
-            title: "ACP Enabled",
-            description:
-              "Global ACP feature gate. Keep disabled unless ACP runtime + policy are configured.",
-          },
-          dispatch: {
-            type: "object",
-            properties: {
-              enabled: {
-                type: "boolean",
-                title: "ACP Dispatch Enabled",
-                description:
-                  "Independent dispatch gate for ACP session turns (default: true). Set false to keep ACP commands available while blocking ACP turn execution.",
-              },
-            },
-            additionalProperties: false,
-          },
-          backend: {
-            type: "string",
-            title: "ACP Backend",
-            description:
-              "Default ACP runtime backend id (for example: acpx). Must match a registered ACP runtime plugin backend.",
-          },
-          defaultAgent: {
-            type: "string",
-            title: "ACP Default Agent",
-            description:
-              "Fallback ACP target agent id used when ACP spawns do not specify an explicit target.",
-          },
-          allowedAgents: {
-            type: "array",
-            items: {
-              type: "string",
-            },
-            title: "ACP Allowed Agents",
-            description:
-              "Allowlist of ACP target agent ids permitted for ACP runtime sessions. Empty means no additional allowlist restriction.",
-          },
-          maxConcurrentSessions: {
-            type: "integer",
-            exclusiveMinimum: 0,
-            maximum: 9007199254740991,
-            title: "ACP Max Concurrent Sessions",
-            description: "Maximum concurrently active ACP sessions across this gateway process.",
-          },
-          stream: {
-            type: "object",
-            properties: {
-              coalesceIdleMs: {
-                type: "integer",
-                minimum: 0,
-                maximum: 9007199254740991,
-                title: "ACP Stream Coalesce Idle (ms)",
-                description:
-                  "Coalescer idle flush window in milliseconds for ACP streamed text before block replies are emitted.",
-              },
-              maxChunkChars: {
-                type: "integer",
-                exclusiveMinimum: 0,
-                maximum: 9007199254740991,
-                title: "ACP Stream Max Chunk Chars",
-                description:
-                  "Maximum chunk size for ACP streamed block projection before splitting into multiple block replies.",
-              },
-              repeatSuppression: {
-                type: "boolean",
-                title: "ACP Stream Repeat Suppression",
-                description:
-                  "When true (default), suppress repeated ACP status/tool projection lines in a turn while keeping raw ACP events unchanged.",
-              },
-              deliveryMode: {
-                anyOf: [
-                  {
-                    type: "string",
-                    const: "live",
-                  },
-                  {
-                    type: "string",
-                    const: "final_only",
-                  },
-                ],
-                title: "ACP Stream Delivery Mode",
-                description:
-                  "ACP delivery style: live streams projected output incrementally, final_only buffers all projected ACP output until terminal turn events.",
-              },
-              hiddenBoundarySeparator: {
-                anyOf: [
-                  {
-                    type: "string",
-                    const: "none",
-                  },
-                  {
-                    type: "string",
-                    const: "space",
-                  },
-                  {
-                    type: "string",
-                    const: "newline",
-                  },
-                  {
-                    type: "string",
-                    const: "paragraph",
-                  },
-                ],
-                title: "ACP Stream Hidden Boundary Separator",
-                description:
-                  "Separator inserted before next visible assistant text when hidden ACP tool lifecycle events occurred (none|space|newline|paragraph). Default: paragraph.",
-              },
-              maxOutputChars: {
-                type: "integer",
-                exclusiveMinimum: 0,
-                maximum: 9007199254740991,
-                title: "ACP Stream Max Output Chars",
-                description:
-                  "Maximum assistant output characters projected per ACP turn before truncation notice is emitted.",
-              },
-              maxSessionUpdateChars: {
-                type: "integer",
-                exclusiveMinimum: 0,
-                maximum: 9007199254740991,
-                title: "ACP Stream Max Session Update Chars",
-                description:
-                  "Maximum characters for projected ACP session/update lines (tool/status updates).",
-              },
-              tagVisibility: {
-                type: "object",
-                propertyNames: {
-                  type: "string",
-                },
-                additionalProperties: {
-                  type: "boolean",
-                },
-                title: "ACP Stream Tag Visibility",
-                description:
-                  "Per-sessionUpdate visibility overrides for ACP projection (for example usage_update, available_commands_update).",
-              },
-            },
-            additionalProperties: false,
-            title: "ACP Stream",
-            description:
-              "ACP streaming projection controls for chunk sizing, metadata visibility, and deduped delivery behavior.",
-          },
-          runtime: {
-            type: "object",
-            properties: {
-              ttlMinutes: {
-                type: "integer",
-                exclusiveMinimum: 0,
-                maximum: 9007199254740991,
-                title: "ACP Runtime TTL (minutes)",
-                description:
-                  "Idle runtime TTL in minutes for ACP session workers before eligible cleanup.",
-              },
-              installCommand: {
-                type: "string",
-                title: "ACP Runtime Install Command",
-                description:
-                  "Optional operator install/setup command shown by `/acp install` and `/acp doctor` when ACP backend wiring is missing.",
-              },
-            },
-            additionalProperties: false,
-          },
-        },
-        additionalProperties: false,
-        title: "ACP",
-        description:
-          "ACP runtime controls for enabling dispatch, selecting backends, constraining allowed agent targets, and tuning streamed turn projection behavior.",
       },
       models: {
         type: "object",
@@ -6839,70 +6691,18 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   additionalProperties: false,
                 },
                 runtime: {
-                  anyOf: [
-                    {
-                      type: "object",
-                      properties: {
-                        type: {
-                          type: "string",
-                          const: "embedded",
-                          title: "Agent Runtime Type",
-                          description:
-                            'Runtime type for this agent: "embedded" (default OpenClaw runtime) or "acp" (ACP harness defaults).',
-                        },
-                      },
-                      required: ["type"],
-                      additionalProperties: false,
+                  type: "object",
+                  properties: {
+                    type: {
+                      type: "string",
+                      const: "embedded",
+                      title: "Agent Runtime Type",
+                      description:
+                        'Runtime type for this agent: "embedded" (default OpenClaw runtime) or "acp" (ACP harness defaults).',
                     },
-                    {
-                      type: "object",
-                      properties: {
-                        type: {
-                          type: "string",
-                          const: "acp",
-                          title: "Agent Runtime Type",
-                          description:
-                            'Runtime type for this agent: "embedded" (default OpenClaw runtime) or "acp" (ACP harness defaults).',
-                        },
-                        acp: {
-                          type: "object",
-                          properties: {
-                            agent: {
-                              type: "string",
-                              title: "Agent ACP Harness Agent",
-                              description:
-                                "Optional ACP harness agent id to use for this OpenClaw agent (for example codex, claude, cursor, gemini, openclaw).",
-                            },
-                            backend: {
-                              type: "string",
-                              title: "Agent ACP Backend",
-                              description:
-                                "Optional ACP backend override for this agent's ACP sessions (falls back to global acp.backend).",
-                            },
-                            mode: {
-                              type: "string",
-                              enum: ["persistent", "oneshot"],
-                              title: "Agent ACP Mode",
-                              description:
-                                "Optional ACP session mode default for this agent (persistent or oneshot).",
-                            },
-                            cwd: {
-                              type: "string",
-                              title: "Agent ACP Working Directory",
-                              description:
-                                "Optional default working directory for this agent's ACP sessions.",
-                            },
-                          },
-                          additionalProperties: false,
-                          title: "Agent ACP Runtime",
-                          description:
-                            "ACP runtime defaults for this agent when runtime.type=acp. Binding-level ACP overrides still take precedence per conversation.",
-                        },
-                      },
-                      required: ["type"],
-                      additionalProperties: false,
-                    },
-                  ],
+                  },
+                  required: ["type"],
+                  additionalProperties: false,
                   title: "Agent Runtime",
                   description:
                     "Optional runtime descriptor for this agent. Use embedded for default OpenClaw execution or acp for external ACP harness defaults.",
@@ -17100,252 +16900,109 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       bindings: {
         type: "array",
         items: {
-          anyOf: [
-            {
+          type: "object",
+          properties: {
+            type: {
+              type: "string",
+              const: "route",
+              title: "Binding Type",
+              description:
+                'Binding kind. Use "route" (or omit for legacy route entries) for normal routing, and "acp" for persistent ACP conversation bindings.',
+            },
+            agentId: {
+              type: "string",
+              title: "Binding Agent ID",
+              description:
+                "Target agent ID that receives traffic when the corresponding binding match rule is satisfied. Use valid configured agent IDs only so routing does not fail at runtime.",
+            },
+            comment: {
+              type: "string",
+            },
+            match: {
               type: "object",
               properties: {
-                type: {
+                channel: {
                   type: "string",
-                  const: "route",
-                  title: "Binding Type",
+                  title: "Binding Channel",
                   description:
-                    'Binding kind. Use "route" (or omit for legacy route entries) for normal routing, and "acp" for persistent ACP conversation bindings.',
+                    "Channel/provider identifier this binding applies to, such as `telegram`, `discord`, or a plugin channel ID. Use the configured channel key exactly so binding evaluation works reliably.",
                 },
-                agentId: {
+                accountId: {
                   type: "string",
-                  title: "Binding Agent ID",
+                  title: "Binding Account ID",
                   description:
-                    "Target agent ID that receives traffic when the corresponding binding match rule is satisfied. Use valid configured agent IDs only so routing does not fail at runtime.",
+                    "Optional account selector for multi-account channel setups so the binding applies only to one identity. Use this when account scoping is required for the route and leave unset otherwise.",
                 },
-                comment: {
-                  type: "string",
-                },
-                match: {
+                peer: {
                   type: "object",
                   properties: {
-                    channel: {
-                      type: "string",
-                      title: "Binding Channel",
-                      description:
-                        "Channel/provider identifier this binding applies to, such as `telegram`, `discord`, or a plugin channel ID. Use the configured channel key exactly so binding evaluation works reliably.",
-                    },
-                    accountId: {
-                      type: "string",
-                      title: "Binding Account ID",
-                      description:
-                        "Optional account selector for multi-account channel setups so the binding applies only to one identity. Use this when account scoping is required for the route and leave unset otherwise.",
-                    },
-                    peer: {
-                      type: "object",
-                      properties: {
-                        kind: {
-                          anyOf: [
-                            {
-                              type: "string",
-                              const: "direct",
-                            },
-                            {
-                              type: "string",
-                              const: "group",
-                            },
-                            {
-                              type: "string",
-                              const: "channel",
-                            },
-                            {
-                              type: "string",
-                              const: "dm",
-                            },
-                          ],
-                          title: "Binding Peer Kind",
-                          description:
-                            'Peer conversation type: "direct", "group", "channel", or legacy "dm" (deprecated alias for direct). Prefer "direct" for new configs and keep kind aligned with channel semantics.',
-                        },
-                        id: {
+                    kind: {
+                      anyOf: [
+                        {
                           type: "string",
-                          title: "Binding Peer ID",
-                          description:
-                            "Conversation identifier used with peer matching, such as a chat ID, channel ID, or group ID from the provider. Keep this exact to avoid silent non-matches.",
+                          const: "direct",
                         },
-                      },
-                      required: ["kind", "id"],
-                      additionalProperties: false,
-                      title: "Binding Peer Match",
+                        {
+                          type: "string",
+                          const: "group",
+                        },
+                        {
+                          type: "string",
+                          const: "channel",
+                        },
+                        {
+                          type: "string",
+                          const: "dm",
+                        },
+                      ],
+                      title: "Binding Peer Kind",
                       description:
-                        "Optional peer matcher for specific conversations including peer kind and peer id. Use this when only one direct/group/channel target should be pinned to an agent.",
+                        'Peer conversation type: "direct", "group", "channel", or legacy "dm" (deprecated alias for direct). Prefer "direct" for new configs and keep kind aligned with channel semantics.',
                     },
-                    guildId: {
+                    id: {
                       type: "string",
-                      title: "Binding Guild ID",
+                      title: "Binding Peer ID",
                       description:
-                        "Optional Discord-style guild/server ID constraint for binding evaluation in multi-server deployments. Use this when the same peer identifiers can appear across different guilds.",
-                    },
-                    teamId: {
-                      type: "string",
-                      title: "Binding Team ID",
-                      description:
-                        "Optional team/workspace ID constraint used by providers that scope chats under teams. Add this when you need bindings isolated to one workspace context.",
-                    },
-                    roles: {
-                      type: "array",
-                      items: {
-                        type: "string",
-                      },
-                      title: "Binding Roles",
-                      description:
-                        "Optional role-based filter list used by providers that attach roles to chat context. Use this to route privileged or operational role traffic to specialized agents.",
+                        "Conversation identifier used with peer matching, such as a chat ID, channel ID, or group ID from the provider. Keep this exact to avoid silent non-matches.",
                     },
                   },
-                  required: ["channel"],
+                  required: ["kind", "id"],
                   additionalProperties: false,
-                  title: "Binding Match Rule",
+                  title: "Binding Peer Match",
                   description:
-                    "Match rule object for deciding when a binding applies, including channel and optional account/peer constraints. Keep rules narrow to avoid accidental agent takeover across contexts.",
+                    "Optional peer matcher for specific conversations including peer kind and peer id. Use this when only one direct/group/channel target should be pinned to an agent.",
+                },
+                guildId: {
+                  type: "string",
+                  title: "Binding Guild ID",
+                  description:
+                    "Optional Discord-style guild/server ID constraint for binding evaluation in multi-server deployments. Use this when the same peer identifiers can appear across different guilds.",
+                },
+                teamId: {
+                  type: "string",
+                  title: "Binding Team ID",
+                  description:
+                    "Optional team/workspace ID constraint used by providers that scope chats under teams. Add this when you need bindings isolated to one workspace context.",
+                },
+                roles: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                  title: "Binding Roles",
+                  description:
+                    "Optional role-based filter list used by providers that attach roles to chat context. Use this to route privileged or operational role traffic to specialized agents.",
                 },
               },
-              required: ["agentId", "match"],
+              required: ["channel"],
               additionalProperties: false,
+              title: "Binding Match Rule",
+              description:
+                "Match rule object for deciding when a binding applies, including channel and optional account/peer constraints. Keep rules narrow to avoid accidental agent takeover across contexts.",
             },
-            {
-              type: "object",
-              properties: {
-                type: {
-                  type: "string",
-                  const: "acp",
-                  title: "Binding Type",
-                  description:
-                    'Binding kind. Use "route" (or omit for legacy route entries) for normal routing, and "acp" for persistent ACP conversation bindings.',
-                },
-                agentId: {
-                  type: "string",
-                  title: "Binding Agent ID",
-                  description:
-                    "Target agent ID that receives traffic when the corresponding binding match rule is satisfied. Use valid configured agent IDs only so routing does not fail at runtime.",
-                },
-                comment: {
-                  type: "string",
-                },
-                match: {
-                  type: "object",
-                  properties: {
-                    channel: {
-                      type: "string",
-                      title: "Binding Channel",
-                      description:
-                        "Channel/provider identifier this binding applies to, such as `telegram`, `discord`, or a plugin channel ID. Use the configured channel key exactly so binding evaluation works reliably.",
-                    },
-                    accountId: {
-                      type: "string",
-                      title: "Binding Account ID",
-                      description:
-                        "Optional account selector for multi-account channel setups so the binding applies only to one identity. Use this when account scoping is required for the route and leave unset otherwise.",
-                    },
-                    peer: {
-                      type: "object",
-                      properties: {
-                        kind: {
-                          anyOf: [
-                            {
-                              type: "string",
-                              const: "direct",
-                            },
-                            {
-                              type: "string",
-                              const: "group",
-                            },
-                            {
-                              type: "string",
-                              const: "channel",
-                            },
-                            {
-                              type: "string",
-                              const: "dm",
-                            },
-                          ],
-                          title: "Binding Peer Kind",
-                          description:
-                            'Peer conversation type: "direct", "group", "channel", or legacy "dm" (deprecated alias for direct). Prefer "direct" for new configs and keep kind aligned with channel semantics.',
-                        },
-                        id: {
-                          type: "string",
-                          title: "Binding Peer ID",
-                          description:
-                            "Conversation identifier used with peer matching, such as a chat ID, channel ID, or group ID from the provider. Keep this exact to avoid silent non-matches.",
-                        },
-                      },
-                      required: ["kind", "id"],
-                      additionalProperties: false,
-                      title: "Binding Peer Match",
-                      description:
-                        "Optional peer matcher for specific conversations including peer kind and peer id. Use this when only one direct/group/channel target should be pinned to an agent.",
-                    },
-                    guildId: {
-                      type: "string",
-                      title: "Binding Guild ID",
-                      description:
-                        "Optional Discord-style guild/server ID constraint for binding evaluation in multi-server deployments. Use this when the same peer identifiers can appear across different guilds.",
-                    },
-                    teamId: {
-                      type: "string",
-                      title: "Binding Team ID",
-                      description:
-                        "Optional team/workspace ID constraint used by providers that scope chats under teams. Add this when you need bindings isolated to one workspace context.",
-                    },
-                    roles: {
-                      type: "array",
-                      items: {
-                        type: "string",
-                      },
-                      title: "Binding Roles",
-                      description:
-                        "Optional role-based filter list used by providers that attach roles to chat context. Use this to route privileged or operational role traffic to specialized agents.",
-                    },
-                  },
-                  required: ["channel"],
-                  additionalProperties: false,
-                  title: "Binding Match Rule",
-                  description:
-                    "Match rule object for deciding when a binding applies, including channel and optional account/peer constraints. Keep rules narrow to avoid accidental agent takeover across contexts.",
-                },
-                acp: {
-                  type: "object",
-                  properties: {
-                    mode: {
-                      type: "string",
-                      enum: ["persistent", "oneshot"],
-                      title: "ACP Binding Mode",
-                      description:
-                        "ACP session mode override for this binding (persistent or oneshot).",
-                    },
-                    label: {
-                      type: "string",
-                      title: "ACP Binding Label",
-                      description:
-                        "Human-friendly label for ACP status/diagnostics in this bound conversation.",
-                    },
-                    cwd: {
-                      type: "string",
-                      title: "ACP Binding Working Directory",
-                      description:
-                        "Working directory override for ACP sessions created from this binding.",
-                    },
-                    backend: {
-                      type: "string",
-                      title: "ACP Binding Backend",
-                      description:
-                        "ACP backend override for this binding (falls back to agent runtime ACP backend, then global acp.backend).",
-                    },
-                  },
-                  additionalProperties: false,
-                  title: "ACP Binding Overrides",
-                  description:
-                    "Optional per-binding ACP overrides for bindings[].type=acp. This layer overrides agents.list[].runtime.acp defaults for the matched conversation.",
-                },
-              },
-              required: ["type", "agentId", "match"],
-              additionalProperties: false,
-            },
-          ],
+          },
+          required: ["agentId", "match"],
+          additionalProperties: false,
         },
         title: "Bindings",
         description:
@@ -22632,9 +22289,14 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       help: "Only tool outputs with at least this many characters are eligible for pruning. Start around 1200 for balanced cleanup; raise to 2000+ if you want to keep more detail.",
       tags: ["advanced"],
     },
+    "dennou.toolsPrune.keepLastAssistants": {
+      label: "Shared: Keep Last Assistant Turns",
+      help: "Keep tool results of the most recent assistant speeches untouched (assistant-boundary protection). Typical safe range is 3; use 0 only when you are aggressively shrinking history.",
+      tags: ["advanced"],
+    },
     "dennou.toolsPrune.keepLastTools": {
-      label: "Shared: Keep Last Tools",
-      help: "Always keep the most recent N tool outputs untouched as a safety tail. Typical safe range is 5-10; use 0 only when you are aggressively shrinking history.",
+      label: "Shared: Keep Last Tools (deprecated)",
+      help: "Deprecated legacy key (line-count based). Accepted and ignored for backward compatibility; use keepLastAssistants instead.",
       tags: ["media"],
     },
     "dennou.toolsPrune.placeholder": {
@@ -22663,9 +22325,14 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       help: "Closed-session override for min prunable size. Leave unset to inherit shared defaults; set only if closed sessions should prune more or less aggressively.",
       tags: ["storage"],
     },
+    "dennou.sessionToolsPrune.keepLastAssistants": {
+      label: "Session: Keep Last Assistant Turns",
+      help: "Closed-session override for how many of the most recent assistant turns are always preserved.",
+      tags: ["storage"],
+    },
     "dennou.sessionToolsPrune.keepLastTools": {
-      label: "Session: Keep Last Tools",
-      help: "Closed-session override for how many latest tool outputs are always preserved.",
+      label: "Session: Keep Last Tools (deprecated)",
+      help: "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
       tags: ["storage", "media"],
     },
     "dennou.sessionToolsPrune.placeholder": {
@@ -22699,9 +22366,14 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       help: "Active-session override for min prunable size.",
       tags: ["storage"],
     },
+    "dennou.activeSessionToolsPrune.keepLastAssistants": {
+      label: "Active: Keep Last Assistant Turns",
+      help: "Active-session override for how many most-recent assistant turns are protected. 3 is a practical default for ongoing chats.",
+      tags: ["storage"],
+    },
     "dennou.activeSessionToolsPrune.keepLastTools": {
-      label: "Active: Keep Last Tools",
-      help: "Active-session override for how many most-recent tool outputs are protected. 10 is a practical default for ongoing chats.",
+      label: "Active: Keep Last Tools (deprecated)",
+      help: "Deprecated legacy key (rows based). Accepted for backward compatibility; use keepLastAssistants instead.",
       tags: ["storage", "media"],
     },
     "dennou.activeSessionToolsPrune.placeholder": {

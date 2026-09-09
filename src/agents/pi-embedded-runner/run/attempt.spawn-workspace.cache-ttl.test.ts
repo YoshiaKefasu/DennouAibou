@@ -14,10 +14,10 @@ describe("runEmbeddedAttempt cache-ttl tracking after compaction", () => {
       timedOutDuringCompaction: false,
       compactionOccurredThisAttempt: true,
       config: {
-        agents: {
-          defaults: {
-            contextPruning: {
-              mode: "cache-ttl",
+        plugins: {
+          entries: {
+            "context-pruner": {
+              enabled: true,
             },
           },
         },
@@ -45,10 +45,10 @@ describe("runEmbeddedAttempt cache-ttl tracking after compaction", () => {
       timedOutDuringCompaction: false,
       compactionOccurredThisAttempt: false,
       config: {
-        agents: {
-          defaults: {
-            contextPruning: {
-              mode: "cache-ttl",
+        plugins: {
+          entries: {
+            "context-pruner": {
+              enabled: true,
             },
           },
         },

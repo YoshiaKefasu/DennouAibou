@@ -7,7 +7,7 @@
  * Prune条件:
  * 1. `role: "toolResult"` のエントリ
  * 2. content の文字数が `minPrunableToolChars` 以上
- * 3. セッション末尾から `keepLastTools` 以内でない
+ * 3. セッション末尾から `keepLastAssistants` 回以内のアシスタント発言より後ろでない（直近 N ターン保護）
  *
  * Pruneされたエントリはプレースホルダ行に置き換える（行数は変えない）。
  *

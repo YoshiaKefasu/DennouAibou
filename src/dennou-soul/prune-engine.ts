@@ -3,8 +3,67 @@
  *
  * 閉じたセッション・アクティブセッションの両方で使う行レベルPruneロジック。
  * ファイルI/Oは含まず、行配列の変換のみを行う純粋関数。
+ *
+ * COMPACTION_FEATURE.md Phase 1 により:
+ * - 従来の行数ベース `keepLastTools` を廃止し、アシスタント発言境界ベースの
+ *   `keepLastAssistants`（直近 N 回のアシスタント発言を保護）に一本化した。
+ * - `pruneToolResultEntry` は export 化し、冪等性ガード（二重置換防止）を追加した。
  */
 import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from "./types.js";
+
+/**
+ * プレースホルダー化済みとみなすマーカー。
+ *
+ * - `[出力省略:` … 本プロジェクトの正準プレースホルダー（`[出力省略: N行 / X 正常終了]`）
+ * - `[Old tool output` … 旧 OpenClaw 製 context-pruning の互換マーカー
+ *
+ * どちらかを含むツール結果は「既にプレースホルダー化済み」と判定し、二重に置換しない。
+ */
+export const PLACEHOLDER_MARKERS: readonly string[] = ["[出力省略:", "[Old tool output"];
+
+/** 文字列にプレースホルダーマーカーが含まれるか（冪等性判定用）。 */
+export function hasPlaceholderMarker(text: string): boolean {
+  return PLACEHOLDER_MARKERS.some((marker) => text.includes(marker));
+}
+
+/**
+ * バイト数（文字数）を人間可読なサイズ表記に整形する。
+ * 例: 120 → "120B", 3481 → "3.4KB", 15360 → "15KB", 3400000 → "3.4MB"
+ */
+export function formatPrunableSizeLabel(chars: number): string {
+  if (!Number.isFinite(chars) || chars < 0) {
+    return "0B";
+  }
+  if (chars < 1024) {
+    return `${chars}B`;
+  }
+  const units = ["KB", "MB", "GB"] as const;
+  let value = chars / 1024;
+  let unit = "KB" as string;
+  for (let i = 1; i < units.length && value >= 1024; i++) {
+    value /= 1024;
+    unit = units[i];
+  }
+  const rounded = value >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded}${unit}`;
+}
+
+/**
+ * 正準プレースホルダーテキストを組み立てる。
+ *
+ * 仕様（COMPACTION_FEATURE.md §4.3）: `[出力省略: {行数}行 / {サイズ} 正常終了]`
+ *
+ * @param lineCount - 元テキストの行数
+ * @param sizeLabel - 元テキストのサイズ表記（例: "3.4KB"）
+ * @param status - 実行状態（デフォルト "正常終了"）
+ */
+export function buildCanonicalPlaceholder(params: {
+  lineCount: number;
+  sizeLabel: string;
+  status?: string;
+}): string {
+  return `[出力省略: ${params.lineCount}行 / ${params.sizeLabel} ${params.status ?? "正常終了"}]`;
+}
 
 /** JSONLの1行を表すパース済みエントリ */
 interface JsonlEntry {
@@ -123,20 +182,73 @@ export function isProtectedByWorkspacePath(
 }
 
 /**
+ * プレースホルダー化済みエントリかどうかを判定する（冪等性ガード）。
+ * 既に `[出力省略:` または `[Old tool output` を含むツール結果は二重に置換しない。
+ */
+export function isAlreadyPlaceholderized(entry: JsonlEntry): boolean {
+  return hasPlaceholderMarker(getToolResultTextContent(entry));
+}
+
+/**
  * ツール結果エントリの content のみを placeholder に置き換え、
  * JSON構造（id, parentId, toolCallId, toolName, isError など）を保持したまま
  * JSON文字列として返す。
  *
  * これにより session-file-repair が malformed line として落とすことがなくなり、
  * parent chain が切れない。
+ *
+ * 冪等性: 既にプレースホルダー化されたエントリ（`[出力省略:` または
+ * `[Old tool output` を含む）は置換せず、元の行をそのまま返す。
  */
-function pruneToolResultEntry(entry: JsonlEntry, placeholder: string): string {
+export function pruneToolResultEntry(entry: JsonlEntry, placeholder: string): string {
+  // 冪等性ガード: 既にプレースホルダー化済みなら二重に置換しない
+  if (isAlreadyPlaceholderized(entry)) {
+    return entry.raw;
+  }
   const cloned: Record<string, unknown> = JSON.parse(JSON.stringify(entry.parsed));
   const msg = cloned.message as Record<string, unknown> | undefined;
   if (msg && typeof msg === "object") {
     msg.content = [{ type: "text", text: placeholder }];
   }
   return JSON.stringify(cloned);
+}
+
+/**
+ * アシスタント発言境界のカットオフ index を求める（findAssistantCutoffIndex 方式）。
+ *
+ * セッション末尾から数えて `keepLastAssistants` 回目のアシスタント発言の行 index を返す。
+ * `index < cutoff` のツール結果が Prune 対象となり、`index >= cutoff` は保護される
+ * （直近 N ターンのツール出力は現在進行形の思考に必要なため生データを保持する）。
+ *
+ * @param lines - JSONL行配列（末尾空行除去済み）
+ * @param keepLastAssistants - 保護する直近アシスタント発言数
+ * @returns カットオフ index。`keepLastAssistants <= 0` の場合は全行対象のため
+ *          lines.length を返す。保護対象のアシスタント発言が足りない場合は
+ *          null を返し、呼び出し側は何も Prune しない（安全側）。
+ */
+export function findAssistantCutoffIndex(
+  lines: string[],
+  keepLastAssistants: number,
+): number | null {
+  if (keepLastAssistants <= 0) {
+    return lines.length;
+  }
+  let remaining = keepLastAssistants;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const entry = parseLine(lines[i]);
+    if (!entry) {
+      continue;
+    }
+    const msg = entry.parsed.message as Record<string, unknown> | undefined;
+    if (msg && typeof msg === "object" && msg.role === "assistant") {
+      remaining--;
+      if (remaining === 0) {
+        return i;
+      }
+    }
+  }
+  // 保護対象のアシスタント発言が足りない → 全行保護（何もPruneしない）
+  return null;
 }
 
 /**
@@ -156,9 +268,12 @@ export function pruneToolOutputLines(
 ): { resultLines: string[]; prunedCount: number } {
   let prunedCount = 0;
   const resultLines: string[] = [];
-  const totalLines = lines.length;
 
-  for (let i = 0; i < totalLines; i++) {
+  // アシスタント発言境界のカットオフを事前計算する（直近 N ターン保護）。
+  // アシスタント発言が足りない場合は null → 全行保護（何もPruneしない）。
+  const cutoffIndex = findAssistantCutoffIndex(lines, config.keepLastAssistants);
+
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const entry = parseLine(line);
 
@@ -170,6 +285,12 @@ export function pruneToolOutputLines(
 
     // ツール結果でなければそのまま
     if (!isToolResultEntry(entry)) {
+      resultLines.push(line);
+      continue;
+    }
+
+    // 冪等性ガード: 既にプレースホルダー化済みのエントリは二重に置換しない
+    if (isAlreadyPlaceholderized(entry)) {
       resultLines.push(line);
       continue;
     }
@@ -186,9 +307,9 @@ export function pruneToolOutputLines(
       continue;
     }
 
-    // 末尾から keepLastTools 以内のエントリは保護
-    const positionFromEnd = totalLines - i;
-    if (positionFromEnd <= config.keepLastTools) {
+    // 直近 keepLastAssistants 回のアシスタント発言以降（index >= cutoff）は保護。
+    // カットオフが null の場合は全行保護。
+    if (cutoffIndex === null || i >= cutoffIndex) {
       resultLines.push(line);
       continue;
     }

@@ -1,0 +1,44 @@
+{
+  "id": "context-pruner",
+  "kind": "memory",
+  "description": "Write-time tool-result compaction: placeholder-izes oversized tool outputs in the session JSONL while preserving JSON structure, parent links, and recent-turn protection (COMPACTION_FEATURE.md Phase 1). Enable with plugins.slots.memory: \"context-pruner\" (kind: memory plugins are gated by the memory slot).",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Master switch for write-time tool-result pruning."
+      },
+      "keepLastAssistants": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 3,
+        "description": "Number of most-recent assistant speeches whose tool results are kept raw (assistant-boundary protection)."
+      },
+      "minPrunableToolChars": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 1200,
+        "description": "Tool results shorter than this many characters are never placeholder-ized."
+      },
+      "defaultPreserve": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, keep raw tool output by default (Phase 2 will add per-call preserve: true override)."
+      },
+      "placeholder": {
+        "type": "string",
+        "description": "Optional custom placeholder text. Defaults to the canonical format [出力省略: {行数}行 / {サイズ} 正常終了]."
+      },
+      "protectedContentKeywords": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Tool results containing any of these keywords (case-insensitive) are never pruned (e.g. config paths like AGENTS.md / SOUL.md)."
+      }
+    }
+  }
+}

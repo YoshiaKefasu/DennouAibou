@@ -7,7 +7,7 @@ const configMocks = vi.hoisted(() => ({
     activeSessionToolsPrune: {
       enabled: true,
       minPrunableToolChars: 1200,
-      keepLastTools: 12,
+      keepLastAssistants: 12,
       placeholder: "[pruned]",
       dryRun: false,
       idleDelayMinutes: 0.001,
