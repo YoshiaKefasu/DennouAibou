@@ -31,6 +31,17 @@ export { resolveContextPrunerConfig, transformToolResultForPersistence } from ".
 export type { ContextPrunerConfig, PruneDecision } from "./src/pruner.js";
 export { CONTEXT_PRUNER_DEFAULT_KEYWORDS, TOOL_RESULT_SAFETY_CAP_CHARS } from "./src/pruner.js";
 
+// 裏方圧縮 ステップ 1（COMPACTION_FEATURE.md §7.1 / §7.2）: 時間認識による
+// ブロック分割エンジン（純粋関数）。今後の Background Historian 統合で使用する。
+export {
+  detectTemporalPauses,
+  partitionHistoryBlocks,
+  DEFAULT_MAX_BLOCK_TOKENS,
+  DEFAULT_MIN_PAUSE_THRESHOLD_MS,
+  DEFAULT_PAUSE_MULTIPLIER,
+} from "./src/compartment.js";
+export type { CompartmentMessage, HistoryBlock, PartitionOptions } from "./src/compartment.js";
+
 /** セッションキー（sessionKey 優先、無ければ agentId） */
 function sessionCounterKey(ctx: { sessionKey?: string; agentId?: string }): string | undefined {
   return ctx.sessionKey ?? ctx.agentId;
