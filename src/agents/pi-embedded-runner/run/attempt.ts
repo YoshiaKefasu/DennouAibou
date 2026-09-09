@@ -6,6 +6,11 @@ import {
   DefaultResourceLoader,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import {
+  applyPromptEvictionSafetyValve,
+  isEvictionSafetyValveEnabled,
+  resolveEvictionOptionsFromCompaction,
+} from "../../../../extensions/context-pruner/index.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { ModelCompatConfig } from "../../../config/types.models.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
@@ -1238,7 +1243,24 @@ export async function runEmbeddedAttempt(
           : truncated;
         cacheTrace?.recordStage("session:limited", { messages: limited });
         if (limited.length > 0) {
-          activeSession.agent.state.messages = limited;
+          // 裏方圧縮 ステップ 2（COMPACTION_FEATURE.md §7.3-§7.5）: 一時退避安全弁
+          // （インメモリフィルター）。コンテキストが閾値（既定 950K）を超えている場合、
+          // 直近 250K より古い過去ログのみをプロンプトから一時退避する。
+          // セッションファイル（.jsonl）の実ログは一切変更せず、プロンプトへの
+          // 注入だけをスキップする（可逆・SESSION_INTEGRITY_GUARD 非破壊）。
+          // DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 でバイパス可能。
+          const evictionSafetyValve = isEvictionSafetyValveEnabled()
+            ? applyPromptEvictionSafetyValve(
+                limited,
+                resolveEvictionOptionsFromCompaction(params.config?.agents?.defaults?.compaction),
+              )
+            : undefined;
+          if (evictionSafetyValve?.evicted) {
+            log.debug(
+              `eviction safety valve: temporarily evicted ${evictionSafetyValve.evictedMessageCount} messages (${evictionSafetyValve.evictedTokens} tokens) from prompt; protected ${evictionSafetyValve.protectedTokens} recent tokens (session file untouched)`,
+            );
+          }
+          activeSession.agent.state.messages = evictionSafetyValve?.messages ?? limited;
         }
 
         if (params.contextEngine) {

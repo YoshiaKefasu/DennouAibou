@@ -36,11 +36,28 @@ export { CONTEXT_PRUNER_DEFAULT_KEYWORDS, TOOL_RESULT_SAFETY_CAP_CHARS } from ".
 export {
   detectTemporalPauses,
   partitionHistoryBlocks,
+  estimateMessageChars,
+  estimateMessageTokens,
   DEFAULT_MAX_BLOCK_TOKENS,
   DEFAULT_MIN_PAUSE_THRESHOLD_MS,
   DEFAULT_PAUSE_MULTIPLIER,
 } from "./src/compartment.js";
 export type { CompartmentMessage, HistoryBlock, PartitionOptions } from "./src/compartment.js";
+
+// 裏方圧縮 ステップ 2（COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5）: 一時退避安全弁
+// （インメモリフィルター）。コンテキストが閾値（既定 950K）を超えた際、プロンプト
+// 構築時に直近 250K より古い過去ブロックを一時退避する。セッションファイル
+// （.jsonl）の実ログは 100% 保持され、プロンプトへの注入のみがスキップされる。
+export {
+  applyPromptEvictionSafetyValve,
+  isEvictionSafetyValveEnabled,
+  resolveEvictionOptionsFromCompaction,
+  DEFAULT_EVICTION_THRESHOLD_TOKENS,
+  DEFAULT_PROTECTED_RECENT_TOKENS,
+  DEFAULT_EVICTION_NOTICE,
+  DEFAULT_EVICTION_BASE_CONTEXT_TOKENS,
+} from "./src/eviction.js";
+export type { EvictionOptions, EvictionResult, CompactionConfigLike } from "./src/eviction.js";
 
 /** セッションキー（sessionKey 優先、無ければ agentId） */
 function sessionCounterKey(ctx: { sessionKey?: string; agentId?: string }): string | undefined {

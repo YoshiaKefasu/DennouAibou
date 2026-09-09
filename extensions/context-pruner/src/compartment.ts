@@ -115,7 +115,7 @@ function computeGapMs(left: CompartmentMessage, right: CompartmentMessage): numb
 }
 
 /** メッセージ content から文字数を概算する（string 直 or ブロック配列の text/data 合計）。 */
-function estimateMessageChars(content: unknown): number {
+export function estimateMessageChars(content: unknown): number {
   if (typeof content === "string") {
     return content.length;
   }
@@ -138,7 +138,7 @@ function estimateMessageChars(content: unknown): number {
 }
 
 /** メッセージの推定トークン数（約4文字 = 1トークン。空でも構造分の1トークン）。 */
-function estimateMessageTokens(message: CompartmentMessage): number {
+export function estimateMessageTokens(message: CompartmentMessage): number {
   const chars = estimateMessageChars(message.content);
   return chars > 0 ? Math.ceil(chars / CHARS_PER_TOKEN_ESTIMATE) : 1;
 }
