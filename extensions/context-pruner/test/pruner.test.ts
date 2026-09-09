@@ -13,6 +13,8 @@ import { describe, expect, it, beforeEach } from "vitest";
 import {
   applyToolResultSafetyCap,
   buildMessagePlaceholder,
+  getToolResultImageDataChars,
+  getToolResultTextChars,
   hasPlaceholderMarkerInMessage,
   resolveContextPrunerConfig,
   TOOL_RESULT_SAFETY_CAP_CHARS,
@@ -46,6 +48,22 @@ function makeJsonlEntry(overrides?: Record<string, unknown>): Record<string, unk
     parentId: "asst-45",
     timestamp: "2026-01-01T00:00:00.000Z",
     message: makeToolResultMessage(),
+    ...overrides,
+  };
+}
+
+/** Base64 画像データ（type: "image"）を持つツール結果メッセージの雛形 */
+function makeImageToolResultMessage(
+  imageDataChars: number,
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    role: "toolResult",
+    toolCallId: "tc-img-1",
+    toolName: "read_image",
+    isError: false,
+    timestamp: 1_700_000_000_000,
+    content: [{ type: "image", data: "A".repeat(imageDataChars), mimeType: "image/png" }],
     ...overrides,
   };
 }
@@ -417,6 +435,131 @@ describe("protection rules", () => {
     });
     expect(decision.placeholderized).toBe(false);
     expect(decision.message).toBe(user);
+  });
+});
+
+// ── 画像ブロック（type: "image"）のサイズ認識と遅延プレースホルダー化 ──
+
+// 2000文字のBase64画像データ → 2000/1024 ≈ 1.95 → 端数切上げで 2KB
+const IMAGE_2KB_DATA_CHARS = 2_000;
+
+describe("image blocks (type: image) size awareness & delayed placeholder-ization", () => {
+  it("counts image block base64 data length toward the total size", () => {
+    const message = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS);
+    // テキストブロックが無いツール結果でも、画像データ長がサイズとして認識される
+    expect(getToolResultImageDataChars(message as never)).toBe(IMAGE_2KB_DATA_CHARS);
+    expect(getToolResultTextChars(message as never)).toBe(IMAGE_2KB_DATA_CHARS);
+
+    // テキスト + 画像の併存時は合計に加算される
+    const mixed = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS, {
+      content: [
+        { type: "text", text: "hello" },
+        { type: "image", data: "A".repeat(IMAGE_2KB_DATA_CHARS), mimeType: "image/png" },
+      ],
+    });
+    expect(getToolResultTextChars(mixed as never)).toBe(5 + IMAGE_2KB_DATA_CHARS);
+  });
+
+  it("placeholder-izes an oversized image result once the turn fence is crossed", () => {
+    const message = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS); // 2000 > minPrunableToolChars 1200
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 4,
+    });
+    assertPlaceholderized(decision);
+
+    const text = (decision.message as { content: { text: string }[] }).content[0]!.text;
+    expect(text).toBe("[出力省略: 画像データ (2KB) 正常終了]");
+  });
+
+  it("keeps image results raw within keepLastAssistants turns", () => {
+    // 直近 keepLastAssistants=3 ターンは生データのまま保持（遅延プレースホルダー化）
+    for (const count of [0, 1, 2, 3]) {
+      const message = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS);
+      const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+        assistantTurnCount: count,
+      });
+      expect(decision.placeholderized, `count=${count}`).toBe(false);
+      expect(decision.message, `count=${count}`).toBe(message); // 画像dataも含め無変換（同一参照）
+    }
+  });
+
+  it("combines image data and text in the placeholder when both exist", () => {
+    const message = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS, {
+      content: [
+        { type: "image", data: "A".repeat(IMAGE_2KB_DATA_CHARS), mimeType: "image/png" },
+        { type: "text", text: "file.png\nloaded" },
+      ],
+    });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 4,
+    });
+    assertPlaceholderized(decision);
+
+    const text = (decision.message as { content: { text: string }[] }).content[0]!.text;
+    expect(text).toBe("[出力省略: 画像データ (2KB) / テキスト 2行 / 15B 正常終了]");
+  });
+
+  it("keeps image results below minPrunableToolChars raw", () => {
+    const message = makeImageToolResultMessage(600); // 600 < minPrunableToolChars 1200
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+    });
+    expect(decision.placeholderized).toBe(false);
+  });
+
+  it("keeps full JSONL structure (id, parentId, toolCallId) intact when placeholder-izing images", () => {
+    const entry = makeJsonlEntry({
+      id: "tr-img-999",
+      parentId: "asst-77",
+      message: makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS, {
+        toolCallId: "tc-img-xyz",
+      }),
+    });
+    const decision = transformToolResultForPersistence(entry.message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 10,
+    });
+    assertPlaceholderized(decision);
+
+    const persisted = JSON.parse(JSON.stringify({ ...entry, message: decision.message }));
+    expect(persisted.type).toBe("message");
+    expect(persisted.id).toBe("tr-img-999");
+    expect(persisted.parentId).toBe("asst-77");
+    expect(persisted.timestamp).toBe("2026-01-01T00:00:00.000Z");
+    expect(persisted.message.role).toBe("toolResult");
+    expect(persisted.message.toolCallId).toBe("tc-img-xyz");
+    expect(persisted.message.toolName).toBe("read_image");
+    expect(persisted.message.isError).toBe(false);
+    expect(persisted.message.content).toHaveLength(1);
+    expect(persisted.message.content[0].type).toBe("text");
+    expect(persisted.message.content[0].text).toBe("[出力省略: 画像データ (2KB) 正常終了]");
+  });
+
+  it("detects image placeholders via hasPlaceholderMarker (idempotency guard)", () => {
+    const message = makeToolResultMessage({
+      content: [{ type: "text", text: "[出力省略: 画像データ (12KB) 正常終了]" }],
+    });
+    // 画像用プレースホルダーも正準プレフィックス `[出力省略:` で検知される
+    expect(hasPlaceholderMarkerInMessage(message as never)).toBe(true);
+
+    // 二重にプレースホルダー化しない
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+    });
+    expect(decision.placeholderized).toBe(false);
+    expect(decision.message).toBe(message);
+  });
+
+  it("applies idempotency to mixed image+text placeholder form as well", () => {
+    const message = makeToolResultMessage({
+      content: [
+        { type: "text", text: "[出力省略: 画像データ (2KB) / テキスト 2行 / 14B 正常終了]" },
+      ],
+    });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+    });
+    expect(decision.placeholderized).toBe(false);
+    expect(decision.message).toBe(message);
   });
 });
 

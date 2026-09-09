@@ -17,6 +17,7 @@ import {
   pruneToolResultEntry,
   buildCanonicalPlaceholder,
   formatPrunableSizeLabel,
+  getToolResultContentLength,
 } from "./prune-engine.js";
 import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from "./types.js";
 
@@ -51,6 +52,26 @@ function makeWorkspaceFileResult(text: string): string {
       toolCallId: "call_read",
       toolName: "readFile",
       content: [{ type: "text", text }],
+      isError: false,
+    },
+  });
+}
+
+/** 画像ブロック（type: "image"、Base64 data）を含むツール結果エントリ */
+function makeImageToolResult(imageDataChars: number): string {
+  return JSON.stringify({
+    type: "message",
+    id: "tool-img",
+    parentId: "msg-2",
+    timestamp: "2026-01-01T00:00:03.000Z",
+    message: {
+      role: "toolResult",
+      toolCallId: "call_img",
+      toolName: "read_image",
+      content: [
+        { type: "text", text: "screenshot.png" },
+        { type: "image", data: "A".repeat(imageDataChars), mimeType: "image/png" },
+      ],
       isError: false,
     },
   });
@@ -123,6 +144,83 @@ const defaultProtection: DennouPruneProtectionConfig = {
   protectedContentKeywords: ["AGENTS.md", "SOUL.md", "DENNOU_RULES"],
   resolvedWorkspacePaths: [],
 };
+
+// ── getToolResultContentLength: 画像ブロックのサイズ認識 ──
+
+describe("getToolResultContentLength with image blocks", () => {
+  it("includes image block base64 data length in the total size", () => {
+    const parsed = parseLine(makeImageToolResult(2_000))!;
+    // テキスト14文字（"screenshot.png"）+ 画像data 2000文字
+    expect(getToolResultContentLength(parsed)).toBe(14 + 2_000);
+  });
+
+  it("prunes oversized image results once they age past the cutoff, keeping JSON structure", () => {
+    // keepLastAssistants=2 → カットオフ index 4。index 2 の画像結果は境界より前（古い）→ Prune対象。
+    // index 5 の画像結果は直近2ターン内 → 生保持（遅延プレースホルダー化）。
+    const lines = [
+      makeSessionHeader(), // 0
+      makeUserMessage("hello"), // 1
+      makeImageToolResult(2_000), // 2, 古い画像結果 → prune対象
+      makeAssistantMessage("a1"), // 3
+      makeAssistantMessage("a2"), // 4 ← カットオフ
+      makeImageToolResult(2_000), // 5, 直近2ターン → 保護（生保持）
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastAssistants: 2,
+      minPrunableToolChars: 1200,
+    };
+
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, () => {});
+
+    expect(prunedCount).toBe(1);
+    // プレースホルダー化後も JSON 構造（id / parentId / toolCallId / toolName / isError）は100%保持
+    const parsed = JSON.parse(resultLines[2]!) as {
+      id?: string;
+      parentId?: string;
+      message?: {
+        role?: string;
+        toolCallId?: string;
+        toolName?: string;
+        isError?: boolean;
+        content?: Array<{ type?: string; text?: string }>;
+      };
+    };
+    expect(parsed.id).toBe("tool-img");
+    expect(parsed.parentId).toBe("msg-2");
+    expect(parsed.message?.role).toBe("toolResult");
+    expect(parsed.message?.toolCallId).toBe("call_img");
+    expect(parsed.message?.toolName).toBe("read_image");
+    expect(parsed.message?.isError).toBe(false);
+    expect(parsed.message?.content).toEqual([{ type: "text", text: "[pruned]" }]);
+    // 直近ターンの画像結果は生データのまま（画像ブロックも残っている）
+    expect(resultLines[5]).toBe(lines[5]);
+    expect(JSON.parse(resultLines[5]!).message.content[1]).toEqual({
+      type: "image",
+      data: "A".repeat(2_000),
+      mimeType: "image/png",
+    });
+  });
+
+  it("keeps image results within recent protect window raw even when oversized", () => {
+    // keepLastAssistants=3 でアシスタント発言は2回 → カットオフは null → 全行保護
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      makeImageToolResult(5_000),
+      makeAssistantMessage("a1"),
+      makeAssistantMessage("a2"),
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      keepLastAssistants: 3,
+      minPrunableToolChars: 100,
+    };
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, () => {});
+    expect(prunedCount).toBe(0);
+    expect(resultLines[2]).toBe(lines[2]);
+  });
+});
 
 // ── isProtectedByKeyword ──────────────────────────────────
 

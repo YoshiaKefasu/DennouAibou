@@ -17,6 +17,16 @@
  * - `id` / `parentId` / `toolCallId` / `toolName` / `isError` 等のJSON構造は 100% 保持し、
  *   `content` の中身だけを正準プレースホルダー `[出力省略: {行数}行 / {サイズ} 正常終了]`
  *   に置換する。SESSION_INTEGRITY_GUARD の検証を通過し、孤児ノードを生まない。
+ *
+ * 画像ブロック（type: "image"、Base64 `data`）の扱い:
+ * - サイズ認識: テキストブロックと同じく `getToolResultTextChars` の合計に含め、
+ *   `minPrunableToolChars` 閾値の判定対象にする。
+ * - 遅延プレースホルダー化: 読み込み直後の数ターン（keepLastAssistants フェンス内）は
+ *   生データのまま保持し、フェンスを過ぎて古くなったツール結果だけを
+ *   `[出力省略: 画像データ (NKB) 正常終了]`（テキスト併存時は
+ *   `[出力省略: 画像データ (NKB) / テキスト {行数}行 / {サイズ} 正常終了]`）に置換する。
+ *   画像プレースホルダーも `[出力省略:` プレフィックスを持つため、冪等性ガード
+ *   （hasPlaceholderMarker）で二重置換を防止できる。
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
@@ -103,12 +113,32 @@ export function isToolResultMessage(message: AgentMessage): message is ToolResul
   return message.role === "toolResult";
 }
 
-/** ツール結果の全テキストブロック文字数合計（UTF-16単位）。 */
+/**
+ * ツール結果の全テキストブロック文字数合計（UTF-16単位）。
+ * type: "image" ブロックは Base64 data 文字列長も合計に含める
+ * （画像ツール結果のサイズ認識に使う）。
+ */
 export function getToolResultTextChars(message: ToolResultMessage): number {
   let total = 0;
   for (const block of message.content) {
-    if (block && block.type === "text" && typeof block.text === "string") {
+    if (!block) {
+      continue;
+    }
+    if (block.type === "text" && typeof block.text === "string") {
       total += block.text.length;
+    } else if (block.type === "image" && typeof block.data === "string") {
+      total += block.data.length;
+    }
+  }
+  return total;
+}
+
+/** ツール結果内の画像ブロック（type: "image"）の Base64 data 文字数合計。 */
+export function getToolResultImageDataChars(message: ToolResultMessage): number {
+  let total = 0;
+  for (const block of message.content) {
+    if (block && block.type === "image" && typeof block.data === "string") {
+      total += block.data.length;
     }
   }
   return total;
@@ -164,6 +194,11 @@ export function isProtectedByKeywordInMessage(
  * 正準プレースホルダーを組み立てる。
  * `[出力省略: {行数}行 / {サイズ} 正常終了]`（customPlaceholder 指定時はそれを優先）。
  * 行数・サイズは置換前の元テキストから算出する。
+ *
+ * 画像ブロック（type: "image"）を含むツール結果は画像専用表記
+ * `[出力省略: 画像データ ({approxKb}KB) 正常終了]` を返す。テキストブロックも併存する場合は
+ * `[出力省略: 画像データ ({approxKb}KB) / テキスト {行数}行 / {サイズ} 正常終了]` の
+ * 併記形式を返す（画像データのサイズ認識と直近ターン保護後の遅延プレースホルダー化）。
  */
 export function buildMessagePlaceholder(
   message: ToolResultMessage,
@@ -172,9 +207,20 @@ export function buildMessagePlaceholder(
   if (typeof customPlaceholder === "string" && customPlaceholder.trim()) {
     return customPlaceholder.trim();
   }
+  const imageDataChars = getToolResultImageDataChars(message);
+  if (imageDataChars > 0) {
+    const approxKb = Math.max(1, Math.round(imageDataChars / 1024));
+    const text = getToolResultText(message);
+    if (text.length > 0) {
+      const lineCount = Math.max(1, text.split("\n").length);
+      const sizeLabel = formatPrunableSizeLabel(text.length);
+      return `[出力省略: 画像データ (${approxKb}KB) / テキスト ${lineCount}行 / ${sizeLabel} 正常終了]`;
+    }
+    return `[出力省略: 画像データ (${approxKb}KB) 正常終了]`;
+  }
   const text = getToolResultText(message);
   const lineCount = Math.max(1, text.split("\n").length);
-  const sizeLabel = formatPrunableSizeLabel(getToolResultTextChars(message));
+  const sizeLabel = formatPrunableSizeLabel(text.length);
   return buildCanonicalPlaceholder({ lineCount, sizeLabel });
 }
 
@@ -230,7 +276,10 @@ export function transformToolResultForPersistence(
   }
 
   const originalText = getToolResultText(message);
-  if (originalText.length === 0) {
+  // テキストも画像ブロックも無いツール結果だけ noop（画像のみの結果は
+  // サイズ認識で minPrunableToolChars 判定・遅延プレースホルダー化の対象にする）。
+  const totalChars = getToolResultTextChars(message);
+  if (originalText.length === 0 && totalChars === 0) {
     return noop;
   }
 

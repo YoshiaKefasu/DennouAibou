@@ -14,7 +14,9 @@ import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from 
 /**
  * プレースホルダー化済みとみなすマーカー。
  *
- * - `[出力省略:` … 本プロジェクトの正準プレースホルダー（`[出力省略: N行 / X 正常終了]`）
+ * - `[出力省略:` … 本プロジェクトの正準プレースホルダー（`[出力省略: N行 / X 正常終了]`）。
+ *   画像用プレースホルダー `[出力省略: 画像データ (NKB) 正常終了]` / テキスト併記形式も
+ *   同じプレフィックスを持つため、このマーカーで検知される。
  * - `[Old tool output` … 旧 OpenClaw 製 context-pruning の互換マーカー
  *
  * どちらかを含むツール結果は「既にプレースホルダー化済み」と判定し、二重に置換しない。
@@ -103,7 +105,9 @@ export function isToolResultEntry(entry: JsonlEntry): boolean {
 }
 
 /**
- * ツール結果エントリのテキスト内容の合計文字数を返す。
+ * ツール結果エントリのテキスト内容＋画像データの合計文字数を返す。
+ * type: "image" ブロック（Base64 data）もサイズ合計に含める
+ * （画像ツール結果のサイズ認識と直近ターン保護後の遅延プレースホルダー化）。
  */
 export function getToolResultContentLength(entry: JsonlEntry): number {
   const msg = entry.parsed.message as Record<string, unknown> | undefined;
@@ -114,8 +118,13 @@ export function getToolResultContentLength(entry: JsonlEntry): number {
 
   let totalLength = 0;
   for (const item of content) {
-    if (item && typeof item === "object" && "text" in item && typeof item.text === "string") {
-      totalLength += item.text.length;
+    if (!item || typeof item !== "object") continue;
+    const block = item as Record<string, unknown>;
+    if (typeof block.text === "string") {
+      totalLength += block.text.length;
+    }
+    if (block.type === "image" && typeof block.data === "string") {
+      totalLength += block.data.length;
     }
   }
   return totalLength;
