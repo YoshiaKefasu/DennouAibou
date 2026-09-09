@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { isChannelSurfaceTestFile } from "../vitest.channel-paths.mjs";
-import { isAcpxExtensionRoot } from "../vitest.extension-acpx-paths.mjs";
 import { isDiffsExtensionRoot } from "../vitest.extension-diffs-paths.mjs";
 import { isMattermostExtensionRoot } from "../vitest.extension-mattermost-paths.mjs";
 import { isMemoryExtensionRoot } from "../vitest.extension-memory-paths.mjs";
@@ -26,7 +25,6 @@ const CONTRACTS_VITEST_CONFIG = "vitest.contracts.config.ts";
 const CRON_VITEST_CONFIG = "vitest.cron.config.ts";
 const DAEMON_VITEST_CONFIG = "vitest.daemon.config.ts";
 const E2E_VITEST_CONFIG = "vitest.e2e.config.ts";
-const EXTENSION_ACPX_VITEST_CONFIG = "vitest.extension-acpx.config.ts";
 const EXTENSION_CHANNELS_VITEST_CONFIG = "vitest.extension-channels.config.ts";
 const EXTENSION_DIFFS_VITEST_CONFIG = "vitest.extension-diffs.config.ts";
 const EXTENSION_MATTERMOST_VITEST_CONFIG = "vitest.extension-mattermost.config.ts";
@@ -117,9 +115,6 @@ function classifyTarget(arg, cwd) {
     const extensionRoot = relative.split("/").slice(0, 2).join("/");
     if (isChannelSurfaceTestFile(relative)) {
       return "extensionChannel";
-    }
-    if (isAcpxExtensionRoot(extensionRoot)) {
-      return "extensionAcpx";
     }
     if (isDiffsExtensionRoot(extensionRoot)) {
       return "extensionDiffs";
@@ -337,7 +332,6 @@ export function buildVitestRunPlans(args, cwd = process.cwd()) {
     "utils",
     "wizard",
     "e2e",
-    "extensionAcpx",
     "extensionDiffs",
     "extensionMattermost",
     "extensionChannel",
@@ -415,39 +409,36 @@ export function buildVitestRunPlans(args, cwd = process.cwd()) {
                                                               ? WIZARD_VITEST_CONFIG
                                                               : kind === "e2e"
                                                                 ? E2E_VITEST_CONFIG
-                                                                : kind === "extensionAcpx"
-                                                                  ? EXTENSION_ACPX_VITEST_CONFIG
-                                                                  : kind === "extensionDiffs"
-                                                                    ? EXTENSION_DIFFS_VITEST_CONFIG
-                                                                    : kind === "extensionMattermost"
-                                                                      ? EXTENSION_MATTERMOST_VITEST_CONFIG
-                                                                      : kind === "extensionChannel"
-                                                                        ? EXTENSION_CHANNELS_VITEST_CONFIG
+                                                                : kind === "extensionDiffs"
+                                                                  ? EXTENSION_DIFFS_VITEST_CONFIG
+                                                                  : kind === "extensionMattermost"
+                                                                    ? EXTENSION_MATTERMOST_VITEST_CONFIG
+                                                                    : kind === "extensionChannel"
+                                                                      ? EXTENSION_CHANNELS_VITEST_CONFIG
+                                                                      : kind === "extensionTelegram"
+                                                                        ? EXTENSION_TELEGRAM_VITEST_CONFIG
                                                                         : kind ===
-                                                                            "extensionTelegram"
-                                                                          ? EXTENSION_TELEGRAM_VITEST_CONFIG
+                                                                            "extensionVoiceCall"
+                                                                          ? EXTENSION_VOICE_CALL_VITEST_CONFIG
                                                                           : kind ===
-                                                                              "extensionVoiceCall"
-                                                                            ? EXTENSION_VOICE_CALL_VITEST_CONFIG
+                                                                              "extensionMemory"
+                                                                            ? EXTENSION_MEMORY_VITEST_CONFIG
                                                                             : kind ===
-                                                                                "extensionMemory"
-                                                                              ? EXTENSION_MEMORY_VITEST_CONFIG
+                                                                                "extensionMsTeams"
+                                                                              ? EXTENSION_MSTEAMS_VITEST_CONFIG
                                                                               : kind ===
-                                                                                  "extensionMsTeams"
-                                                                                ? EXTENSION_MSTEAMS_VITEST_CONFIG
+                                                                                  "extensionMessaging"
+                                                                                ? EXTENSION_MESSAGING_VITEST_CONFIG
                                                                                 : kind ===
-                                                                                    "extensionMessaging"
-                                                                                  ? EXTENSION_MESSAGING_VITEST_CONFIG
+                                                                                    "extensionProvider"
+                                                                                  ? EXTENSION_PROVIDERS_VITEST_CONFIG
                                                                                   : kind ===
-                                                                                      "extensionProvider"
-                                                                                    ? EXTENSION_PROVIDERS_VITEST_CONFIG
+                                                                                      "channel"
+                                                                                    ? CHANNEL_VITEST_CONFIG
                                                                                     : kind ===
-                                                                                        "channel"
-                                                                                      ? CHANNEL_VITEST_CONFIG
-                                                                                      : kind ===
-                                                                                          "extension"
-                                                                                        ? EXTENSIONS_VITEST_CONFIG
-                                                                                        : DEFAULT_VITEST_CONFIG;
+                                                                                        "extension"
+                                                                                      ? EXTENSIONS_VITEST_CONFIG
+                                                                                      : DEFAULT_VITEST_CONFIG;
     const includePatterns =
       kind === "default" || kind === "e2e"
         ? null

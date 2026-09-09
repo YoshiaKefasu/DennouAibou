@@ -23,7 +23,10 @@ import {
   buildCanonicalPlaceholder,
   formatPrunableSizeLabel,
   hasPlaceholderMarker,
+  TOOL_RESULT_SAFETY_CAP_CHARS,
 } from "../../../src/dennou-soul/prune-engine.js";
+
+export { TOOL_RESULT_SAFETY_CAP_CHARS };
 
 /** プラグイン設定（plugins.entries["context-pruner"].config 相当） */
 export type ContextPrunerConfig = {
@@ -52,8 +55,9 @@ export const CONTEXT_PRUNER_DEFAULT_KEYWORDS: readonly string[] = [
  * 50k cap（安全弁）: 1回のツール結果がこの文字数を超える極端な巨大出力の場合、
  * 先頭25,000文字と末尾25,000文字を残して中間を切り詰める
  * （通常圧縮ではなく、モデルのコンテキスト圧死を防ぐ安全弁。明示保存時にも適用）。
+ * 閾値そのものは共有エンジン（src/dennou-soul/prune-engine.ts）の
+ * TOOL_RESULT_SAFETY_CAP_CHARS を参照する（kernel と単一の値で一致させる）。
  */
-export const TOOL_RESULT_SAFETY_CAP_CHARS = 50_000;
 export const TOOL_RESULT_SAFETY_CAP_HEAD_CHARS = 25_000;
 export const TOOL_RESULT_SAFETY_CAP_TAIL_CHARS = 25_000;
 export const TOOL_RESULT_SAFETY_CAP_MARKER =
@@ -190,8 +194,8 @@ export type PruneDecision = {
  * 1. 無効時 / ツール結果以外 → 無変換
  * 2. 冪等性ガード（既に `[出力省略:` または `[Old tool output` を含む → 二重置換しない）
  * 3. isError → 生保持
- * 4. defaultPreserve → 生保持
- * 5. 50k 安全弁（超えたら head/tail 切り詰め）→ 以降も判定を続行
+ * 4. 50k 安全弁（超えたら head/tail 切り詰め）→ 以降も判定を続行
+ * 5. opts.preserve === true / defaultPreserve → 生データのまま（50k cap は適用済み）
  * 6. minPrunableToolChars 未満 → 生保持
  * 7. 重要キーワード保護（設定パス等）→ 生保持
  * 8. 直近 keepLastAssistants ターン保護（観測フェンス）→ 生保持
@@ -200,11 +204,12 @@ export type PruneDecision = {
  * @param message - 永続化直前のツール結果メッセージ
  * @param config - プラグイン設定
  * @param opts.assistantTurnCount - このセッションで観測済みのアシスタント発言数
+ * @param opts.preserve - ツール呼び出し時の `preserve: true`（生保持）フラグ
  */
 export function transformToolResultForPersistence(
   message: AgentMessage,
   config: ContextPrunerConfig,
-  opts?: { assistantTurnCount?: number },
+  opts?: { assistantTurnCount?: number; preserve?: boolean },
 ): PruneDecision {
   const noop: PruneDecision = { message, placeholderized: false, capped: false };
   if (!config.enabled) {
@@ -224,22 +229,23 @@ export function transformToolResultForPersistence(
     return noop;
   }
 
-  // 明示保存（preserve: true / defaultPreserve: true）は生データのまま
-  if (config.defaultPreserve) {
-    return noop;
-  }
-
   const originalText = getToolResultText(message);
   if (originalText.length === 0) {
     return noop;
   }
 
-  // 50k 安全弁（preserve に関係なく適用される安全上限）
+  // 50k 安全弁（preserve に関係なく常に適用される安全上限）
   let next: ToolResultMessage = message;
   let capped = false;
   if (originalText.length > TOOL_RESULT_SAFETY_CAP_CHARS) {
     next = applyToolResultSafetyCap(message);
     capped = true;
+  }
+
+  // 明示保存（ツール呼び出しの preserve: true / defaultPreserve）は生データのまま。
+  // ただし 50k 安全弁は preserve でも適用される（上で cap 済みの next を返す）。
+  if (opts?.preserve === true || config.defaultPreserve) {
+    return { message: next, placeholderized: false, capped };
   }
 
   // サイズ閾値: 短い出力はそもそもプレースホルダー化しない

@@ -21,6 +21,14 @@ import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from 
  */
 export const PLACEHOLDER_MARKERS: readonly string[] = ["[出力省略:", "[Old tool output"];
 
+/**
+ * 50k cap（安全弁）: preserve: true による明示保存時であっても、1回のツール結果が
+ * この文字数を超える極端な巨大出力は許容しない（モデルのコンテキスト圧死を防ぐ）。
+ * kernel（session-tool-result-guard の preserve 時サイズ上限）と
+ * context-pruner プラグイン（applyToolResultSafetyCap）で共有する単一の値。
+ */
+export const TOOL_RESULT_SAFETY_CAP_CHARS = 50_000;
+
 /** 文字列にプレースホルダーマーカーが含まれるか（冪等性判定用）。 */
 export function hasPlaceholderMarker(text: string): boolean {
   return PLACEHOLDER_MARKERS.some((marker) => text.includes(marker));

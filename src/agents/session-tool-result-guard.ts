@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
+import { TOOL_RESULT_SAFETY_CAP_CHARS } from "../dennou-soul/prune-engine.js";
 import type {
   PluginHookBeforeMessageWriteEvent,
   PluginHookBeforeMessageWriteResult,
@@ -32,12 +33,18 @@ type SessionManagerWithRawAppend = SessionManager & {
  * Truncate oversized text content blocks in a tool result message.
  * Returns the original message if under the limit, or a new message with
  * truncated text blocks otherwise.
+ *
+ * Preserved tool results (`preserve: true`) are allowed up to the shared
+ * 50k safety cap instead of the default 40k live cap; larger outputs are
+ * still truncated so a single result cannot dominate the context window.
  */
-function capToolResultSize(msg: AgentMessage): AgentMessage {
+function capToolResultSize(msg: AgentMessage, preserve?: boolean): AgentMessage {
   if ((msg as { role?: string }).role !== "toolResult") {
     return msg;
   }
-  return truncateToolResultMessage(msg, DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS, {
+  const maxChars =
+    preserve === true ? TOOL_RESULT_SAFETY_CAP_CHARS : DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS;
+  return truncateToolResultMessage(msg, maxChars, {
     suffix: GUARD_TRUNCATION_SUFFIX,
     minKeepChars: 2_000,
   });
@@ -104,7 +111,13 @@ export function installSessionToolResultGuard(
      */
     transformToolResultForPersistence?: (
       message: AgentMessage,
-      meta: { toolCallId?: string; toolName?: string; isSynthetic?: boolean },
+      meta: {
+        toolCallId?: string;
+        toolName?: string;
+        isSynthetic?: boolean;
+        /** True when the tool call requested `preserve: true`. */
+        preserve?: boolean;
+      },
     ) => AgentMessage;
     /**
      * Whether to synthesize missing tool results to satisfy strict providers.
@@ -150,7 +163,7 @@ export function installSessionToolResultGuard(
 
   const persistToolResult = (
     message: AgentMessage,
-    meta: { toolCallId?: string; toolName?: string; isSynthetic?: boolean },
+    meta: { toolCallId?: string; toolName?: string; isSynthetic?: boolean; preserve?: boolean },
   ) => {
     const transformer = opts?.transformToolResultForPersistence;
     return transformer ? transformer(message, meta) : message;
@@ -223,18 +236,20 @@ export function installSessionToolResultGuard(
     if (nextRole === "toolResult") {
       const id = extractToolResultId(nextMessage as Extract<AgentMessage, { role: "toolResult" }>);
       const toolName = id ? pendingState.getToolName(id) : undefined;
+      const preserve = id ? pendingState.getPreserve(id) : false;
       if (id) {
         pendingState.delete(id);
       }
       const normalizedToolResult = normalizePersistedToolResultName(nextMessage, toolName);
       // Apply hard size cap before persistence to prevent oversized tool results
       // from consuming the entire context window on subsequent LLM calls.
-      const capped = capToolResultSize(persistMessage(normalizedToolResult));
+      const capped = capToolResultSize(persistMessage(normalizedToolResult), preserve);
       const persisted = applyBeforeWriteHook(
         persistToolResult(capped, {
           toolCallId: id ?? undefined,
           toolName,
           isSynthetic: false,
+          preserve,
         }),
       );
       if (!persisted) {

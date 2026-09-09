@@ -104,15 +104,18 @@ export default definePluginEntry({
       return undefined;
     });
 
-    // 書き込み時介入の本体: ツール結果をプレースホルダー化する
+    // 書き込み時介入の本体: ツール結果をプレースホルダー化する。
+    // preserve: true（ツール呼び出し引数由来）は生データのまま保持する。
     api.on("tool_result_persist", (event, ctx) => {
       if (!config.enabled) {
         return undefined;
       }
       const key = sessionCounterKey(ctx);
       const assistantTurnCount = key ? (assistantTurnCounts.get(key) ?? 0) : 0;
+      const preserve = event.preserve ?? ctx.preserve;
       const decision = transformToolResultForPersistence(event.message, config, {
         assistantTurnCount,
+        preserve,
       });
       if (decision.message !== event.message) {
         return { message: decision.message };

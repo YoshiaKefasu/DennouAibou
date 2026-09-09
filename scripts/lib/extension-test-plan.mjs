@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { channelTestRoots } from "../../vitest.channel-paths.mjs";
-import { isAcpxExtensionRoot } from "../../vitest.extension-acpx-paths.mjs";
 import { isDiffsExtensionRoot } from "../../vitest.extension-diffs-paths.mjs";
 import { isMattermostExtensionRoot } from "../../vitest.extension-mattermost-paths.mjs";
 import { isMemoryExtensionRoot } from "../../vitest.extension-memory-paths.mjs";
@@ -98,37 +97,33 @@ export function resolveExtensionTestPlan(params = {}) {
   }
 
   const usesChannelConfig = roots.some((root) => channelTestRoots.includes(root));
-  const usesAcpxConfig = roots.some((root) => isAcpxExtensionRoot(root));
   const usesDiffsConfig = roots.some((root) => isDiffsExtensionRoot(root));
   const usesMattermostConfig = roots.some((root) => isMattermostExtensionRoot(root));
   const usesTelegramConfig = roots.some((root) => isTelegramExtensionRoot(root));
   const usesVoiceCallConfig = roots.some((root) => isVoiceCallExtensionRoot(root));
-  const usesMatrixConfig = roots.some((root) => isMatrixExtensionRoot(root));
   const usesMemoryConfig = roots.some((root) => isMemoryExtensionRoot(root));
   const usesMsTeamsConfig = roots.some((root) => isMsTeamsExtensionRoot(root));
   const usesMessagingConfig = roots.some((root) => isMessagingExtensionRoot(root));
   const usesProviderConfig = roots.some((root) => isProviderExtensionRoot(root));
   const config = usesChannelConfig
     ? "vitest.extension-channels.config.ts"
-    : usesAcpxConfig
-      ? "vitest.extension-acpx.config.ts"
-      : usesDiffsConfig
-        ? "vitest.extension-diffs.config.ts"
-        : usesMattermostConfig
-          ? "vitest.extension-mattermost.config.ts"
-          : usesTelegramConfig
-            ? "vitest.extension-telegram.config.ts"
-            : usesVoiceCallConfig
-              ? "vitest.extension-voice-call.config.ts"
-              : usesMemoryConfig
-                ? "vitest.extension-memory.config.ts"
-                : usesMsTeamsConfig
-                  ? "vitest.extension-msteams.config.ts"
-                  : usesMessagingConfig
-                    ? "vitest.extension-messaging.config.ts"
-                    : usesProviderConfig
-                      ? "vitest.extension-providers.config.ts"
-                      : "vitest.extensions.config.ts";
+    : usesDiffsConfig
+      ? "vitest.extension-diffs.config.ts"
+      : usesMattermostConfig
+        ? "vitest.extension-mattermost.config.ts"
+        : usesTelegramConfig
+          ? "vitest.extension-telegram.config.ts"
+          : usesVoiceCallConfig
+            ? "vitest.extension-voice-call.config.ts"
+            : usesMemoryConfig
+              ? "vitest.extension-memory.config.ts"
+              : usesMsTeamsConfig
+                ? "vitest.extension-msteams.config.ts"
+                : usesMessagingConfig
+                  ? "vitest.extension-messaging.config.ts"
+                  : usesProviderConfig
+                    ? "vitest.extension-providers.config.ts"
+                    : "vitest.extensions.config.ts";
   const testFileCount = roots.reduce(
     (sum, root) => sum + countTestFiles(path.join(repoRoot, root)),
     0,

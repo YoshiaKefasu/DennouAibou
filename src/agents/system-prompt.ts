@@ -520,6 +520,7 @@ export function buildAgentSystemPrompt(params: {
         "Keep narration brief and value-dense; avoid repeating obvious steps.",
         "Use plain human language for narration unless in a technical context.",
         "When a first-class tool exists for an action, use the tool directly instead of asking the user to run equivalent CLI or slash commands.",
+        "Tool outputs are stored as lightweight placeholders by default to conserve context. Only add `preserve: true` to a tool call's arguments when you need the raw output kept verbatim as evidence for later turns.",
         buildExecApprovalPromptGuidance({
           runtimeChannel: params.runtimeInfo?.channel,
           inlineButtonsEnabled,

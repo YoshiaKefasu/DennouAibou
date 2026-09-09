@@ -58,20 +58,29 @@ export function guardSessionManager(
     : undefined;
 
   const transform = hookRunner?.hasHooks("tool_result_persist")
-    ? // oxlint-disable-next-line typescript/no-explicit-any
-      (message: any, meta: { toolCallId?: string; toolName?: string; isSynthetic?: boolean }) => {
+    ? (
+        message: AgentMessage,
+        meta: {
+          toolCallId?: string;
+          toolName?: string;
+          isSynthetic?: boolean;
+          preserve?: boolean;
+        },
+      ) => {
         const out = hookRunner.runToolResultPersist(
           {
             toolName: meta.toolName,
             toolCallId: meta.toolCallId,
             message,
             isSynthetic: meta.isSynthetic,
+            preserve: meta.preserve,
           },
           {
             agentId: opts?.agentId,
             sessionKey: opts?.sessionKey,
             toolName: meta.toolName,
             toolCallId: meta.toolCallId,
+            preserve: meta.preserve,
           },
         );
         return out?.message ?? message;

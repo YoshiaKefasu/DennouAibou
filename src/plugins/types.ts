@@ -2576,6 +2576,8 @@ export type PluginHookToolResultPersistContext = {
   sessionKey?: string;
   toolName?: string;
   toolCallId?: string;
+  /** True when the tool call requested `preserve: true` (raw result persistence). */
+  preserve?: boolean;
 };
 
 export type PluginHookToolResultPersistEvent = {
@@ -2588,6 +2590,8 @@ export type PluginHookToolResultPersistEvent = {
   message: AgentMessage;
   /** True when the tool result was synthesized by a guard/repair step. */
   isSynthetic?: boolean;
+  /** True when the tool call requested `preserve: true` (raw result persistence). */
+  preserve?: boolean;
 };
 
 export type PluginHookToolResultPersistResult = {

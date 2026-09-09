@@ -53,7 +53,12 @@ function writeTempPlugin(dir: string, id: string, entryUrl: string): string {
 }
 
 /** アシスタント（toolCall含む）→ ツール結果 の1ターン分を書き込む */
-function appendOneTurn(sm: SessionManager, turnIndex: number, toolText: string): void {
+function appendOneTurn(
+  sm: SessionManager,
+  turnIndex: number,
+  toolText: string,
+  extraArguments?: Record<string, unknown>,
+): void {
   const append = sm.appendMessage.bind(sm) as unknown as (message: unknown) => void;
   append({
     role: "assistant",
@@ -62,7 +67,7 @@ function appendOneTurn(sm: SessionManager, turnIndex: number, toolText: string):
         type: "toolCall",
         id: `call-${turnIndex}`,
         name: "read_file",
-        arguments: { path: "/tmp/foo.ts" },
+        arguments: { path: "/tmp/foo.ts", ...(extraArguments ?? {}) },
       },
     ],
     timestamp: Date.now(),
@@ -98,33 +103,40 @@ afterEach(() => {
   delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
 });
 
+/** context-pruner 本体をプラグインローダで登録し、guard 済み SessionManager を作る */
+async function createPrunerGuardedSession(sessionKey = "main"): Promise<SessionManager> {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "context-pruner-e2e-"));
+  process.env.DENNOU_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+  const pluginFile = writeTempPlugin(tmp, "context-pruner", REAL_PLUGIN_ENTRY);
+
+  const registry = loadOpenClawPlugins({
+    cache: false,
+    workspaceDir: tmp,
+    config: {
+      plugins: {
+        // kind: "memory" のプラグインはメモリスロットに選定されないとロードされない
+        slots: { memory: "context-pruner" },
+        load: { paths: [pluginFile] },
+        allow: ["context-pruner"],
+      },
+    },
+  });
+  initializeGlobalHookRunner(registry);
+
+  // ロード確認（メモリスロット選定が効いていること）
+  expect(getGlobalHookRunner()?.hasHooks("tool_result_persist")).toBe(true);
+
+  return guardSessionManager(SessionManager.inMemory(), {
+    agentId: "main",
+    // 観測フェンス（assistantTurnCounts）は sessionKey 単位なので、テストごとに
+    // 異なるキーを使うことでカウンタのリークを防ぐ。
+    sessionKey,
+  });
+}
+
 describe("context-pruner write-path (real plugin entry)", () => {
   it("keeps the first keepLastAssistants turns raw and placeholder-izes later oversized results", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "context-pruner-e2e-"));
-    process.env.DENNOU_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
-    const pluginFile = writeTempPlugin(tmp, "context-pruner", REAL_PLUGIN_ENTRY);
-
-    const registry = loadOpenClawPlugins({
-      cache: false,
-      workspaceDir: tmp,
-      config: {
-        plugins: {
-          // kind: "memory" のプラグインはメモリスロットに選定されないとロードされない
-          slots: { memory: "context-pruner" },
-          load: { paths: [pluginFile] },
-          allow: ["context-pruner"],
-        },
-      },
-    });
-    initializeGlobalHookRunner(registry);
-
-    // ロード確認（メモリスロット選定が効いていること）
-    expect(getGlobalHookRunner()?.hasHooks("tool_result_persist")).toBe(true);
-
-    const sm = guardSessionManager(SessionManager.inMemory(), {
-      agentId: "main",
-      sessionKey: "main",
-    });
+    const sm = await createPrunerGuardedSession();
 
     const bigText = "T".repeat(2_000);
     // ターン1〜3: フェンス内 → 生データのまま
@@ -205,5 +217,35 @@ describe("context-pruner write-path (real plugin entry)", () => {
     expect(health.orphanCount).toBe(0);
     expect(health.orphanEntries).toEqual([]);
     expect(health.totalLines).toBeGreaterThan(0);
+  });
+
+  it("keeps preserved tool results raw even beyond the turn fence (Phase 2)", async () => {
+    const sm = await createPrunerGuardedSession("main-preserve");
+
+    const bigText = "T".repeat(2_000);
+    // ターン1〜3: フェンス内 → 生データのまま
+    for (let turn = 1; turn <= 3; turn++) {
+      appendOneTurn(sm, turn, bigText);
+      expect(persistedToolResultText(sm, turn)).toBe(bigText);
+    }
+    // ターン4: フェンス越えでも preserve: true なら生保持される
+    appendOneTurn(sm, 4, bigText, { preserve: true });
+    expect(persistedToolResultText(sm, 4)).toBe(bigText);
+    // ターン5: preserve なし → 正準プレースホルダー化（2000文字 → 2KB）
+    appendOneTurn(sm, 5, bigText);
+    expect(persistedToolResultText(sm, 5)).toBe("[出力省略: 1行 / 2KB 正常終了]");
+
+    // JSONL 不破壊: 全行が有効JSONで、親子リンクが保持されている
+    const lines = sm
+      .getEntries()
+      .map((entry) => JSON.stringify(entry))
+      .filter((line) => line.trim().length > 0);
+    for (const line of lines) {
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+    const health = runHealthCheck(lines.join("\n"));
+    expect(health.jsonErrorCount).toBe(0);
+    expect(health.duplicateIdCount).toBe(0);
+    expect(health.orphanCount).toBe(0);
   });
 });

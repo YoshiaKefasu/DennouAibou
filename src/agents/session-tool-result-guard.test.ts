@@ -375,6 +375,220 @@ describe("installSessionToolResultGuard", () => {
     expect(text).toBe(originalText);
   });
 
+  it("passes preserve:true from tool call arguments to the persistence transform", () => {
+    const sm = SessionManager.inMemory();
+    const seenMeta: Array<{ preserve?: boolean }> = [];
+    installSessionToolResultGuard(sm, {
+      transformToolResultForPersistence: (message, meta) => {
+        seenMeta.push(meta);
+        return message;
+      },
+    });
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read",
+            arguments: { path: "/tmp/foo.ts", preserve: true },
+          },
+        ],
+      }),
+    );
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      }),
+    );
+
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]?.preserve).toBe(true);
+  });
+
+  it("passes preserve:true from JSON-encoded tool call arguments", () => {
+    const sm = SessionManager.inMemory();
+    const seenMeta: Array<{ preserve?: boolean }> = [];
+    installSessionToolResultGuard(sm, {
+      transformToolResultForPersistence: (message, meta) => {
+        seenMeta.push(meta);
+        return message;
+      },
+    });
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read",
+            arguments: JSON.stringify({ path: "/tmp/foo.ts", preserve: true }),
+          },
+        ],
+      }),
+    );
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      }),
+    );
+
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]?.preserve).toBe(true);
+  });
+
+  it("passes preserve:true from toolUse input blocks", () => {
+    const sm = SessionManager.inMemory();
+    const seenMeta: Array<{ preserve?: boolean }> = [];
+    installSessionToolResultGuard(sm, {
+      transformToolResultForPersistence: (message, meta) => {
+        seenMeta.push(meta);
+        return message;
+      },
+    });
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolUse",
+            id: "use_1",
+            name: "read",
+            input: { path: "/tmp/foo.ts", preserve: true },
+          },
+        ],
+      }),
+    );
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolUseId: "use_1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      }),
+    );
+
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]?.preserve).toBe(true);
+  });
+
+  it("omits preserve when the tool call does not request it", () => {
+    const sm = SessionManager.inMemory();
+    const seenMeta: Array<{ preserve?: boolean }> = [];
+    installSessionToolResultGuard(sm, {
+      transformToolResultForPersistence: (message, meta) => {
+        seenMeta.push(meta);
+        return message;
+      },
+    });
+
+    sm.appendMessage(toolCallMessage); // arguments: {}  → preserve なし
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+      }),
+    );
+
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]?.preserve).toBe(false);
+  });
+
+  it("allows preserved tool results up to the 50k safety cap", () => {
+    const sm = SessionManager.inMemory();
+    installSessionToolResultGuard(sm);
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read",
+            arguments: { preserve: true },
+          },
+        ],
+      }),
+    );
+    const bigText = "x".repeat(45_000);
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: bigText }],
+        isError: false,
+      }),
+    );
+
+    // 45k はデフォルトの 40k を超えるが、preserve 時は 50k まで許容される
+    expect(getToolResultText(getPersistedMessages(sm))).toBe(bigText);
+  });
+
+  it("truncates preserved tool results above the 50k safety cap", () => {
+    const sm = SessionManager.inMemory();
+    installSessionToolResultGuard(sm);
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read",
+            arguments: { preserve: true },
+          },
+        ],
+      }),
+    );
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: "x".repeat(60_000) }],
+        isError: false,
+      }),
+    );
+
+    const text = getToolResultText(getPersistedMessages(sm));
+    expect(text.length).toBeLessThan(60_000);
+    expect(text).toContain("truncated");
+  });
+
+  it("truncates non-preserved tool results above the default 40k cap", () => {
+    const sm = SessionManager.inMemory();
+    installSessionToolResultGuard(sm);
+
+    sm.appendMessage(toolCallMessage); // preserve なし
+    sm.appendMessage(
+      asAppendMessage({
+        role: "toolResult",
+        toolCallId: "call_1",
+        content: [{ type: "text", text: "x".repeat(45_000) }],
+        isError: false,
+      }),
+    );
+
+    const text = getToolResultText(getPersistedMessages(sm));
+    expect(text.length).toBeLessThan(45_000);
+    expect(text.length).toBeLessThanOrEqual(40_000);
+    expect(text).toContain("truncated");
+  });
+
   it("blocks persistence when before_message_write returns block=true", () => {
     const sm = SessionManager.inMemory();
     installSessionToolResultGuard(sm, {

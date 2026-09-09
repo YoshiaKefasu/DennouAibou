@@ -461,17 +461,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes acpx extension tests to the acpx config", () => {
-    expect(buildVitestRunPlans(["extensions/acpx/src/runtime.test.ts"])).toEqual([
-      {
-        config: "vitest.extension-acpx.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["extensions/acpx/src/runtime.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes diffs extension tests to the diffs config", () => {
     expect(buildVitestRunPlans(["extensions/diffs/src/render.test.ts"])).toEqual([
       {

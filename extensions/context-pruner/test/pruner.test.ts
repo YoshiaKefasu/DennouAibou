@@ -6,7 +6,7 @@
  * - JSON構造・親子リンク（id / parentId / toolCallId / toolName / isError）の不破壊
  * - 直近3ターン保護（keepLastAssistants フェンス）
  * - 冪等性（二重置換防止）
- * - 50k cap（50,000文字超の安全弁）
+ * - 50k cap（50,000文字超の安全弁） / preserve: true の生保持（COMPACTION_FEATURE.md Phase 2）
  * - 重要キーワード保護 / エラー保持 / minPrunableToolChars / defaultPreserve
  */
 import { describe, expect, it, beforeEach } from "vitest";
@@ -274,6 +274,36 @@ describe("50k safety cap", () => {
     expect((decision.message as { toolName: string }).toolName).toBe("read_file");
     expect((decision.message as { isError: boolean }).isError).toBe(false);
   });
+
+  it("applies the 50k cap to preserved results without placeholder-izing", () => {
+    const text = "P".repeat(30_000) + "Q".repeat(40_000);
+    const message = makeToolResultMessage({ content: [{ type: "text", text }] });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+      preserve: true,
+    });
+    expect(decision.capped).toBe(true);
+    expect(decision.placeholderized).toBe(false);
+    const out = (decision.message as { content: { text: string }[] }).content[0]!.text;
+    expect(out).toContain(TOOL_RESULT_SAFETY_CAP_MARKER);
+    const [head, tail] = out.split(TOOL_RESULT_SAFETY_CAP_MARKER);
+    expect(head).toBe("P".repeat(30_000).slice(0, TOOL_RESULT_SAFETY_CAP_HEAD_CHARS));
+    expect(tail).toBe("Q".repeat(40_000).slice(-TOOL_RESULT_SAFETY_CAP_TAIL_CHARS));
+  });
+
+  it("caps oversized results even when defaultPreserve is true", () => {
+    const cfg = resolveContextPrunerConfig({ defaultPreserve: true });
+    const text = "D".repeat(TOOL_RESULT_SAFETY_CAP_CHARS + 10_000);
+    const message = makeToolResultMessage({ content: [{ type: "text", text }] });
+    const decision = transformToolResultForPersistence(message as never, cfg, {
+      assistantTurnCount: 99,
+    });
+    expect(decision.capped).toBe(true);
+    expect(decision.placeholderized).toBe(false);
+    expect((decision.message as { content: { text: string }[] }).content[0]!.text).toContain(
+      TOOL_RESULT_SAFETY_CAP_MARKER,
+    );
+  });
 });
 
 // ── 保護ルール（キーワード / エラー / 閾値 / preserve）──
@@ -330,6 +360,44 @@ describe("protection rules", () => {
       assistantTurnCount: 99,
     });
     expect(decision.placeholderized).toBe(false);
+  });
+
+  it("keeps raw when opts.preserve is true even beyond the turn fence", () => {
+    const message = makeToolResultMessage({ content: [{ type: "text", text: "x".repeat(5_000) }] });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+      preserve: true,
+    });
+    expect(decision.placeholderized).toBe(false);
+    expect(decision.message).toBe(message);
+  });
+
+  it("placeholder-izes the same input when preserve is omitted", () => {
+    const message = makeToolResultMessage({ content: [{ type: "text", text: "x".repeat(5_000) }] });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+    });
+    assertPlaceholderized(decision);
+  });
+
+  it("treats explicit preserve:false the same as an omitted flag", () => {
+    const message = makeToolResultMessage({ content: [{ type: "text", text: "x".repeat(5_000) }] });
+    const decision = transformToolResultForPersistence(message as never, DEFAULT_CONFIG, {
+      assistantTurnCount: 99,
+      preserve: false,
+    });
+    assertPlaceholderized(decision);
+  });
+
+  it("keeps raw when opts.preserve is true with a custom placeholder configured", () => {
+    const cfg = resolveContextPrunerConfig({ placeholder: "[pruned]" });
+    const message = makeToolResultMessage({ content: [{ type: "text", text: "x".repeat(5_000) }] });
+    const decision = transformToolResultForPersistence(message as never, cfg, {
+      assistantTurnCount: 99,
+      preserve: true,
+    });
+    expect(decision.placeholderized).toBe(false);
+    expect(decision.message).toBe(message);
   });
 
   it("is a no-op when the plugin is disabled", () => {

@@ -43,15 +43,6 @@ describe("scripts/test-extension.mjs", () => {
     expect(plan.hasTests).toBe(true);
   });
 
-  it("resolves acpx onto the acpx vitest config", () => {
-    const plan = resolveExtensionTestPlan({ targetArg: "acpx", cwd: process.cwd() });
-
-    expect(plan.extensionId).toBe("acpx");
-    expect(plan.config).toBe("vitest.extension-acpx.config.ts");
-    expect(plan.roots).toContain(bundledPluginRoot("acpx"));
-    expect(plan.hasTests).toBe(true);
-  });
-
   it("resolves diffs onto the diffs vitest config", () => {
     const plan = resolveExtensionTestPlan({ targetArg: "diffs", cwd: process.cwd() });
 
@@ -193,13 +184,11 @@ describe("scripts/test-extension.mjs", () => {
         "voice-call",
         "memory-core",
         "msteams",
-        "acpx",
         "diffs",
       ],
     });
 
     expect(batch.extensionIds).toEqual([
-      "acpx",
       "diffs",
       "firecrawl",
       "line",
@@ -212,12 +201,6 @@ describe("scripts/test-extension.mjs", () => {
       "voice-call",
     ]);
     expect(batch.planGroups).toEqual([
-      {
-        config: "vitest.extension-acpx.config.ts",
-        extensionIds: ["acpx"],
-        roots: [bundledPluginRoot("acpx")],
-        testFileCount: expect.any(Number),
-      },
       {
         config: "vitest.extension-channels.config.ts",
         extensionIds: ["line", "slack"],

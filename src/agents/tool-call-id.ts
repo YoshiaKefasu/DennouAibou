@@ -10,6 +10,8 @@ const TOOL_CALL_TYPES = new Set(["toolCall", "toolUse", "functionCall"]);
 export type ToolCallLike = {
   id: string;
   name?: string;
+  /** True when the tool call requested `preserve: true` (raw persistence of the tool result). */
+  preserve?: boolean;
 };
 
 /**
@@ -42,6 +44,46 @@ export function sanitizeToolCallId(id: string, mode: ToolCallIdMode = "strict"):
   return alphanumericOnly.length > 0 ? alphanumericOnly : "sanitizedtoolid";
 }
 
+function isTruePreserve(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as { preserve?: unknown }).preserve === true
+  );
+}
+
+/**
+ * Extract the `preserve` flag from a tool call block's `arguments` / `input`.
+ *
+ * Provider shapes differ: some carry `arguments` as an object, others as a
+ * JSON-encoded string (or `input` for Anthropic-style toolUse blocks). Any
+ * `preserve === true` occurrence wins; malformed JSON is ignored.
+ */
+function extractPreserveFlag(block: object): boolean {
+  const rec = block as { arguments?: unknown; input?: unknown };
+  for (const candidate of [rec.arguments, rec.input]) {
+    if (candidate === undefined || candidate === null) {
+      continue;
+    }
+    if (typeof candidate === "object") {
+      if (isTruePreserve(candidate)) {
+        return true;
+      }
+      continue;
+    }
+    if (typeof candidate === "string" && candidate.length > 0) {
+      try {
+        if (isTruePreserve(JSON.parse(candidate))) {
+          return true;
+        }
+      } catch {
+        // Malformed JSON arguments: ignore and keep the raw block untouched.
+      }
+    }
+  }
+  return false;
+}
+
 export function extractToolCallsFromAssistant(
   msg: Extract<AgentMessage, { role: "assistant" }>,
 ): ToolCallLike[] {
@@ -60,9 +102,11 @@ export function extractToolCallsFromAssistant(
       continue;
     }
     if (typeof rec.type === "string" && TOOL_CALL_TYPES.has(rec.type)) {
+      const preserve = extractPreserveFlag(block);
       toolCalls.push({
         id: rec.id,
         name: typeof rec.name === "string" ? rec.name : undefined,
+        ...(preserve ? { preserve } : {}),
       });
     }
   }
