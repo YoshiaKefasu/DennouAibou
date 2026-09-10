@@ -8,6 +8,8 @@ import type {
   EmbeddingRecord,
   InsertEmbeddingParams,
   LoadedEmbeddings,
+  PairWindowMessage,
+  PendingPairBase,
   SearchParams,
   SearchResult,
   SearchResults,
@@ -17,6 +19,15 @@ import { blobToVector, normalizeL2, vectorToBlob } from "./vector-math.js";
 
 const DEFAULT_SNIPPET_MAX_LENGTH = 300;
 const SCHEMA_VERSION = "1";
+
+/**
+ * Cap for a single pending-base query.
+ *
+ * `selectPendingPairBases` only ranks a window of recent candidate rows, and
+ * `embedPendingPairs` never asks for more than its own batch limit, so this is a
+ * pure runaway guard against an unbounded caller-supplied limit.
+ */
+const MAX_PENDING_PAIR_BASES = 1000;
 
 export function resolveRawChatDbPath(
   agentId?: string,
@@ -93,8 +104,26 @@ export class RawChatDatabase {
       this.db.exec("PRAGMA journal_mode = WAL;");
       this.db.exec("PRAGMA busy_timeout = 5000;");
       this.db.exec("PRAGMA synchronous = NORMAL;");
+      // Required for the chat_embeddings -> chat_messages ON DELETE CASCADE (§4.1).
+      // node:sqlite enables foreign keys by default today, but that default is a
+      // constructor option (enableForeignKeyConstraints) rather than a schema
+      // guarantee, so state it explicitly and keep the cascade true regardless of
+      // how the connection was opened (§7 Phase 2 review follow-up).
+      this.db.exec("PRAGMA foreign_keys = ON;");
     } catch {
       // Best-effort for memory DBs or environments with restricted pragmas
+    }
+  }
+
+  /** True when the connection enforces foreign keys (PRAGMA foreign_keys = 1). */
+  public isForeignKeyEnforcementEnabled(): boolean {
+    try {
+      const row = this.db.prepare("PRAGMA foreign_keys;").get() as
+        | { foreign_keys?: number | bigint }
+        | undefined;
+      return Number(row?.foreign_keys ?? 0) === 1;
+    } catch {
+      return false;
     }
   }
 
@@ -364,6 +393,128 @@ export class RawChatDatabase {
 
   public getPath(): string {
     return this.dbPath;
+  }
+
+  /** Total rows in `chat_messages`; used to detect a not-yet-populated ledger. */
+  public countChatMessages(): number {
+    const row = this.db.prepare("SELECT COUNT(*) AS total FROM chat_messages").get() as
+      | { total: number | bigint }
+      | undefined;
+    return Number(row?.total ?? 0);
+  }
+
+  /**
+   * Reads the `chat_messages` window that covers one round trip.
+   *
+   * The window is `fromId .. toId` inclusive within one session, ordered by id.
+   * It intentionally includes `toolResult` rows: {@link extractConversationPairs}
+   * ignores them, and passing the raw rows keeps the SQL free of turn rules that
+   * would otherwise duplicate the extractor's logic.
+   */
+  public selectPairWindow(params: {
+    sessionId: string;
+    fromId: number;
+    toId: number;
+  }): PairWindowMessage[] {
+    const stmt = this.db.prepare(`
+      SELECT id, session_id, role, text, timestamp_iso
+      FROM chat_messages
+      WHERE session_id = ? AND id >= ? AND id <= ?
+      ORDER BY id ASC;
+    `);
+    const rows = stmt.all(params.sessionId, params.fromId, params.toId) as Array<{
+      id: number | bigint;
+      session_id: string;
+      role: string;
+      text: string;
+      timestamp_iso: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: Number(row.id),
+      sessionId: String(row.session_id),
+      role: String(row.role),
+      text: String(row.text),
+      timestampIso: String(row.timestamp_iso),
+    }));
+  }
+
+  /**
+   * Lists round-trip base candidates that still need a vector (§7 Phase 2).
+   *
+   * A base is the first message of a run of consecutive user messages whose turn
+   * is closed by an assistant reply — the same shape
+   * {@link extractConversationPairs} pairs, minus the noise filter (which needs
+   * message text and therefore runs in JS). The closing reply is the first
+   * assistant row carrying text after the base, because a second user message
+   * continues the same turn instead of ending it.
+   *
+   * Pairs already present in `chat_embeddings` are excluded, so repeated calls
+   * are idempotent by construction rather than by convention. Candidates that are
+   * dropped as noise stay in this result forever (they never get a row); callers
+   * walk past them with the `afterId` / `beforeId` cursors.
+   */
+  public selectPendingPairBases(params: {
+    limit: number;
+    order?: "asc" | "desc";
+    /** Ascending cursor: only base ids greater than this. */
+    afterId?: number;
+    /** Descending cursor: only base ids lower than this. */
+    beforeId?: number;
+  }): PendingPairBase[] {
+    const limit = Math.max(1, Math.min(Math.floor(params.limit), MAX_PENDING_PAIR_BASES));
+    const direction = params.order === "asc" ? "ASC" : "DESC";
+    const afterId = Number.isFinite(params.afterId) ? Number(params.afterId) : 0;
+    const beforeId = Number.isFinite(params.beforeId)
+      ? Number(params.beforeId)
+      : Number.MAX_SAFE_INTEGER;
+
+    const stmt = this.db.prepare(`
+      SELECT
+        base.id AS base_id,
+        base.session_id AS session_id,
+        closing.id AS closing_assistant_id
+      FROM chat_messages base
+      LEFT JOIN chat_embeddings e ON e.message_id = base.id
+      JOIN chat_messages closing ON closing.id = (
+        SELECT a.id
+        FROM chat_messages a
+        WHERE a.session_id = base.session_id
+          AND a.id > base.id
+          AND LOWER(a.role) = 'assistant'
+          AND TRIM(a.text) <> ''
+        ORDER BY a.id ASC
+        LIMIT 1
+      )
+      WHERE LOWER(base.role) = 'user'
+        AND TRIM(base.text) <> ''
+        AND base.id > ?
+        AND base.id < ?
+        AND e.id IS NULL
+        AND (
+          SELECT LOWER(p.role)
+          FROM chat_messages p
+          WHERE p.session_id = base.session_id
+            AND p.id < base.id
+            AND TRIM(p.text) <> ''
+          ORDER BY p.id DESC
+          LIMIT 1
+        ) IS NOT 'user'
+      ORDER BY base.id ${direction}
+      LIMIT ?;
+    `);
+
+    const rows = stmt.all(afterId, beforeId, limit) as Array<{
+      base_id: number | bigint;
+      session_id: string;
+      closing_assistant_id: number | bigint;
+    }>;
+
+    return rows.map((row) => ({
+      baseId: Number(row.base_id),
+      sessionId: String(row.session_id),
+      closingAssistantId: Number(row.closing_assistant_id),
+    }));
   }
 
   public getWatermark(sourceFile: string): WatermarkRecord | null {

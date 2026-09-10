@@ -16,7 +16,9 @@ export type GeminiEmbeddingFailureCode =
   | "missing-api-key"
   | "timeout"
   | "http-error"
-  | "invalid-response";
+  | "invalid-response"
+  /** Bad arguments (empty text, non-positive timeout/dimensions): a caller bug. */
+  | "invalid-request";
 
 export class GeminiEmbeddingError extends Error {
   readonly code: GeminiEmbeddingFailureCode;
@@ -110,7 +112,23 @@ export async function embedTextWithGemini(
   }
 
   const dimensions = options.dimensions ?? EMBEDDING_DIMENSIONS;
+  if (!Number.isInteger(dimensions) || dimensions < 1) {
+    throw new GeminiEmbeddingError(
+      "invalid-request",
+      `raw-chat-search: invalid embedding dimensions (${dimensions})`,
+    );
+  }
+
   const timeoutMs = options.timeoutMs ?? GEMINI_EMBEDDING_TIMEOUT_MS;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1) {
+    // Validated up front so the RangeError from `AbortSignal.timeout` is never
+    // misreported as a network failure further down.
+    throw new GeminiEmbeddingError(
+      "invalid-request",
+      `raw-chat-search: invalid embedding timeout (${timeoutMs}ms)`,
+    );
+  }
+
   const endpoint = options.endpoint ?? GEMINI_EMBEDDING_ENDPOINT;
   const fetchImpl = options.fetchImpl ?? fetch;
 
@@ -180,18 +198,57 @@ export async function embedTextWithGemini(
 }
 
 /**
+ * Failure codes that mean "the outside world failed", not "the caller is wrong".
+ *
+ * These are expected in normal operation (design doc §6: a slow or failing
+ * embedding API must never block a reply; §3: no key means FTS5-only), so the
+ * fail-open wrapper swallows them without noise.
+ */
+const EXPECTED_EXTERNAL_FAILURE_CODES = new Set<GeminiEmbeddingFailureCode>([
+  "missing-api-key",
+  "timeout",
+  "http-error",
+]);
+
+/**
  * Fail-open variant of {@link embedTextWithGemini}: returns `null` instead of
  * throwing so recall can be skipped silently (design doc §6).
+ *
+ * Expected external failures (timeout, HTTP/network error, missing API key) are
+ * swallowed silently. Anything else is a caller bug or a broken contract — a
+ * `TypeError` from bad arguments, an invalid timeout, or a response whose vector
+ * length no longer matches the request — so it is logged and still returns
+ * `null`: the reply path must never break, but the problem has to stay
+ * detectable. (A network outage also surfaces as `TypeError` from `fetch`, which
+ * is why the classification keys off `GeminiEmbeddingError.code` rather than the
+ * error type alone.)
  */
 export async function embedTextWithGeminiOrNull(
   text: string,
   options: GeminiEmbedOptions = {},
 ): Promise<Float32Array | null> {
-  try {
-    return await embedTextWithGemini(text, options);
-  } catch {
+  if (typeof text !== "string" || !text.trim()) {
+    warnEmbeddingAnomaly("refusing to embed empty or non-string input", typeof text);
     return null;
   }
+
+  try {
+    return await embedTextWithGemini(text, options);
+  } catch (error) {
+    if (error instanceof GeminiEmbeddingError && EXPECTED_EXTERNAL_FAILURE_CODES.has(error.code)) {
+      return null;
+    }
+    warnEmbeddingAnomaly(
+      "embedding call failed unexpectedly",
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+}
+
+/** Logs a non-expected embedding failure so it is visible in gateway logs. */
+function warnEmbeddingAnomaly(reason: string, detail: unknown): void {
+  console.warn(`raw-chat-search: ${reason}`, detail);
 }
 
 /** Converts a normalized embedding to the BLOB representation stored in SQLite. */

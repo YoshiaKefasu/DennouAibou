@@ -108,6 +108,32 @@ export interface LoadedEmbeddings {
   dim: number;
 }
 
+/** Minimal `chat_messages` row shape used for round-trip pair extraction. */
+export interface PairWindowMessage {
+  /** `chat_messages.id`; insertion order and therefore chronological order. */
+  id: number;
+  /** `chat_messages.session_id`; pairs never span sessions. */
+  sessionId: string;
+  /** `chat_messages.role` (`user`, `assistant`, `toolResult`, ...). */
+  role: string;
+  /** `chat_messages.text`. */
+  text: string;
+  /** `chat_messages.timestamp_iso` of the message. */
+  timestampIso: string;
+}
+
+/**
+ * A round-trip base candidate: a user message that starts a turn and has both no
+ * stored embedding yet and a closing assistant reply (RAW_CHAT_SEARCH §7 Phase 2).
+ */
+export interface PendingPairBase {
+  /** `chat_messages.id` of the first user message of the turn. */
+  baseId: number;
+  sessionId: string;
+  /** `chat_messages.id` of the first assistant reply carrying text. */
+  closingAssistantId: number;
+}
+
 export interface RawChatMessageInput {
   type?: string;
   id?: string;

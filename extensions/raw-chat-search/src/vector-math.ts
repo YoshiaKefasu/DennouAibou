@@ -2,9 +2,11 @@
  * Vector math for RAW_CHAT_SEARCH (design doc §4.2).
  *
  * Stored vectors are L2-normalized (unit vectors), so the inner product of a
- * query vector and a stored vector is the cosine similarity in the 0.0 - 1.0
- * range. The inner loops are unrolled 4-way: production vectors are 1280
- * dimensions, which divides evenly by 4.
+ * query vector and a stored vector is the cosine similarity in the -1.0 - 1.0
+ * range. Both operands are unit vectors, so a query can also point away from a
+ * stored vector; only the practical ranking band (unrelated text lands near 0, a
+ * paraphrase near 1) lives in the positive half. The inner loops are unrolled
+ * 4-way: production vectors are 1280 dimensions, which divides evenly by 4.
  */
 import { Buffer } from "node:buffer";
 
@@ -13,6 +15,8 @@ export const EMBEDDING_DIMENSIONS = 1280;
 
 /**
  * Cosine similarity of two equal-length L2-normalized vectors.
+ *
+ * Range is -1.0 (opposite) to 1.0 (identical) for non-zero inputs.
  *
  * `vecA` and `vecB` must both be non-empty and have the same dimension.
  */
