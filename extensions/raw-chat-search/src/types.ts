@@ -86,6 +86,28 @@ export interface BackfillResult {
   errors: number;
 }
 
+export interface InsertEmbeddingParams {
+  messageId: number;
+  sessionId: string;
+  dimensions?: number;
+  embedding: Float32Array;
+  textSnippet: string;
+}
+
+export interface EmbeddingRecord {
+  id: number;
+  messageId: number;
+  embedding: Float32Array;
+  textSnippet: string;
+}
+
+export interface LoadedEmbeddings {
+  messageIds: number[];
+  vectors: Float32Array;
+  count: number;
+  dim: number;
+}
+
 export interface RawChatMessageInput {
   type?: string;
   id?: string;

@@ -6,6 +6,14 @@ import {
   resolveRawChatDbPath,
 } from "./src/database.js";
 import {
+  blobToEmbedding,
+  embedTextWithGemini,
+  embedTextWithGeminiOrNull,
+  embeddingToBlob,
+  GeminiEmbeddingError,
+  resolveGeminiApiKey,
+} from "./src/embedding-client.js";
+import {
   isRawChatIndexingEnabled,
   resolveSessionAgentIdFromKey,
   startRawChatIndexer,
@@ -13,6 +21,14 @@ import {
 } from "./src/hook.js";
 import { backfillSessionFiles, extractTextFromContent, indexSessionFile } from "./src/indexer.js";
 import { ChatSearchSchema, createChatSearchTool } from "./src/tools.js";
+import {
+  blobToVector,
+  cosineSimilarity,
+  cosineSimilarityBatch,
+  EMBEDDING_DIMENSIONS,
+  normalizeL2,
+  vectorToBlob,
+} from "./src/vector-math.js";
 
 export {
   RawChatDatabase,
@@ -28,6 +44,20 @@ export {
   resolveSessionAgentIdFromKey,
   createChatSearchTool,
   ChatSearchSchema,
+  // Vector computation engine (RAW_CHAT_SEARCH Phase 1)
+  cosineSimilarity,
+  cosineSimilarityBatch,
+  normalizeL2,
+  vectorToBlob,
+  blobToVector,
+  EMBEDDING_DIMENSIONS,
+  // Gemini Embedding 2 client (RAW_CHAT_SEARCH Phase 1)
+  embedTextWithGemini,
+  embedTextWithGeminiOrNull,
+  embeddingToBlob,
+  blobToEmbedding,
+  resolveGeminiApiKey,
+  GeminiEmbeddingError,
 };
 
 export type {
@@ -41,7 +71,12 @@ export type {
   BackfillParams,
   BackfillResult,
   RawChatMessageInput,
+  InsertEmbeddingParams,
+  EmbeddingRecord,
+  LoadedEmbeddings,
 } from "./src/types.js";
+
+export type { GeminiEmbedOptions, GeminiEmbeddingFailureCode } from "./src/embedding-client.js";
 
 export default definePluginEntry({
   id: "raw-chat-search",

@@ -1,15 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DatabaseSync, StatementSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { requireNodeSqlite } from "../../../src/infra/node-sqlite.js";
 import { resolveStateDir } from "../../../src/plugin-sdk/state-paths.js";
 import type {
   ChatMessageRecord,
+  EmbeddingRecord,
+  InsertEmbeddingParams,
+  LoadedEmbeddings,
   SearchParams,
   SearchResult,
   SearchResults,
   WatermarkRecord,
 } from "./types.js";
+import { blobToVector, normalizeL2, vectorToBlob } from "./vector-math.js";
 
 const DEFAULT_SNIPPET_MAX_LENGTH = 300;
 const SCHEMA_VERSION = "1";
@@ -173,6 +177,21 @@ export class RawChatDatabase {
       this.fts5Available = false;
     }
 
+    // Vector embeddings for the two-stage recall pipeline (RAW_CHAT_SEARCH §4.1)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_embeddings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL UNIQUE,
+        session_id TEXT NOT NULL,
+        dimensions INTEGER NOT NULL DEFAULT 1280,
+        embedding BLOB NOT NULL,
+        text_snippet TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_embeddings_session ON chat_embeddings(session_id);
+    `);
+
     // Watermarks table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS chat_index_watermarks (
@@ -197,6 +216,150 @@ export class RawChatDatabase {
 
   public getRawDb(): DatabaseSync {
     return this.db;
+  }
+
+  /**
+   * Inserts or replaces the embedding for `messageId`.
+   *
+   * The vector is L2-normalized before it is stored (RAW_CHAT_SEARCH §4.2), so a
+   * recall query only needs an inner product to get a 0.0 - 1.0 similarity.
+   * Normalizing here rather than at each call site keeps that invariant true for
+   * every future caller; `normalizeL2` is idempotent for already-unit vectors.
+   */
+  public insertEmbedding(params: InsertEmbeddingParams): void {
+    const dimensions = params.dimensions ?? params.embedding.length;
+    if (params.embedding.length !== dimensions) {
+      throw new Error(
+        `raw-chat-search: embedding length ${params.embedding.length} does not match dimensions ${dimensions}`,
+      );
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO chat_embeddings (
+        message_id, session_id, dimensions, embedding, text_snippet, created_at_ms
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(message_id) DO UPDATE SET
+        session_id = excluded.session_id,
+        dimensions = excluded.dimensions,
+        embedding = excluded.embedding,
+        text_snippet = excluded.text_snippet,
+        created_at_ms = excluded.created_at_ms;
+    `);
+
+    stmt.run(
+      params.messageId,
+      params.sessionId,
+      dimensions,
+      vectorToBlob(normalizeL2(params.embedding)),
+      params.textSnippet,
+      Date.now(),
+    );
+  }
+
+  public getEmbeddingByMessageId(messageId: number): EmbeddingRecord | null {
+    const stmt = this.db.prepare(`
+      SELECT id, message_id, dimensions, embedding, text_snippet
+      FROM chat_embeddings
+      WHERE message_id = ?
+      LIMIT 1;
+    `);
+    const row = stmt.get(messageId) as
+      | {
+          id: number | bigint;
+          message_id: number | bigint;
+          dimensions: number | bigint;
+          embedding: Uint8Array;
+          text_snippet: string;
+        }
+      | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: Number(row.id),
+      messageId: Number(row.message_id),
+      embedding: blobToVector(row.embedding, Number(row.dimensions)),
+      textSnippet: String(row.text_snippet),
+    };
+  }
+
+  /**
+   * Loads every stored embedding into one flat `Float32Array` for in-memory
+   * similarity search (RAW_CHAT_SEARCH §6: load once, then query without disk I/O).
+   *
+   * Rows whose dimension differs from the dominant dimension are skipped; mixing
+   * dimensions in one flat buffer would corrupt every score after the first row.
+   * Returns an empty result when no embeddings are stored.
+   */
+  public loadAllEmbeddings(sessionId?: string): LoadedEmbeddings {
+    const where = sessionId ? "WHERE session_id = ?" : "";
+    const args: string[] = sessionId ? [sessionId] : [];
+
+    const countStmt = this.db.prepare(`
+      SELECT COUNT(*) AS total FROM chat_embeddings ${where};
+    `);
+    const countRow = countStmt.get(...args) as { total: number | bigint } | undefined;
+    if (Number(countRow?.total ?? 0) === 0) {
+      return { messageIds: [], vectors: new Float32Array(0), count: 0, dim: 0 };
+    }
+
+    // Dominant dimension wins; higher dimensions break ties so the production
+    // 1280-dimension rows outrank accidental stragglers. Mixing dimensions in one
+    // flat buffer would corrupt every score after the first row, so rows that do
+    // not match the dominant dimension are dropped.
+    const dimStmt = this.db.prepare(`
+      SELECT dimensions, COUNT(*) AS total
+      FROM chat_embeddings ${where}
+      GROUP BY dimensions
+      ORDER BY total DESC, dimensions DESC
+      LIMIT 1;
+    `);
+    const dimRow = dimStmt.get(...args) as
+      | { dimensions: number | bigint; total: number | bigint }
+      | undefined;
+    const dim = Number(dimRow?.dimensions ?? 0);
+    const rowCount = Number(dimRow?.total ?? 0);
+    if (dim <= 0 || rowCount === 0) {
+      return { messageIds: [], vectors: new Float32Array(0), count: 0, dim: 0 };
+    }
+
+    const rowStmt = this.db.prepare(`
+      SELECT message_id, embedding
+      FROM chat_embeddings
+      ${where ? `${where} AND` : "WHERE"} dimensions = ?
+      ORDER BY id ASC;
+    `);
+    const rows = rowStmt.iterate(...args, dim);
+
+    const messageIds: number[] = [];
+    const vectors = new Float32Array(rowCount * dim);
+    let offset = 0;
+    for (const raw of rows) {
+      const row = raw as { message_id: number | bigint; embedding: Uint8Array };
+      const blob = row.embedding;
+      if (blob.byteLength !== dim * 4) {
+        continue;
+      }
+      // `iterate()` may reuse its row buffer and node:sqlite blobs are not
+      // guaranteed to be 4-byte aligned, so copy through `blobToVector`.
+      vectors.set(blobToVector(blob, dim), offset * dim);
+      messageIds.push(Number(row.message_id));
+      offset += 1;
+    }
+
+    if (offset !== rowCount) {
+      // Defensive: a malformed row changed the element count mid-iteration.
+      return {
+        messageIds,
+        vectors: vectors.subarray(0, offset * dim),
+        count: offset,
+        dim,
+      };
+    }
+
+    return { messageIds, vectors, count: offset, dim };
   }
 
   public getPath(): string {
