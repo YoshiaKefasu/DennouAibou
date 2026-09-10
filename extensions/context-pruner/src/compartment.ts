@@ -92,7 +92,7 @@ function resolvePartitionOptions(options?: PartitionOptions): Required<Partition
 }
 
 /** タイムスタンプを epoch ミリ秒に正規化する。解釈できない場合は null。 */
-function toEpochMs(timestamp: number | string): number | null {
+export function toEpochMs(timestamp: number | string): number | null {
   if (typeof timestamp === "number") {
     return Number.isFinite(timestamp) ? timestamp : null;
   }

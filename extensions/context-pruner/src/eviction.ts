@@ -1,5 +1,6 @@
 /**
- * context-pruner — 裏方圧縮 ステップ 2: 一時退避安全弁（インメモリフィルター）
+ * context-pruner — 裏方圧縮 ステップ 2/3: 一時退避安全弁（インメモリフィルター）＋
+ * 章立て要約目次への差し替え
  *
  * 仕様: DENNOU_DOCS/COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5
  *
@@ -8,10 +9,18 @@
  * 「直近 protectedRecentTokens（既定 250K）より古い過去ブロック群」を一時的に
  * 除外（テンポラリ退避）するフェイルセーフ。
  *
+ * ステップ 3 の拡張（§7.5 の「要約完成時の復帰・差し替え」）:
+ * 退避対象となった過去領域のうち、要約（BlockSummary）が完成しているブロック群は
+ * 単なる「過去ログ退避中注記」の代わりに、historian.ts の formatTableOfContents で
+ * 生成した「章立て要約目次メッセージ（role: "user"）」へ差し替えてプロンプト先頭に
+ * 復帰注入する。まだ要約が完了していないブロックがある場合は、その分の一時退避注記も
+ * 併記する。これによりプロンプトは「章立て要約目次（数千トークン）＋ 直近 250K 生データ」
+ * という理想的な軽量状態に落ち着く。
+ *
  * 設計メモ:
  * - ファイルI/O・セッション操作は一切行わない純粋関数。セッションファイル
- *   （.jsonl）上の実ログは 100% 保持され、プロンプトへの注入のみがスキップされる。
- *   退避は常に可逆で、SESSION_INTEGRITY_GUARD の親子リンク破壊リスクを構造的に
+ *   （.jsonl）上の実ログは 100% 保持され、プロンプトへの注入のみがスキップ・差し替え
+ *   される。退避は常に可逆で、SESSION_INTEGRITY_GUARD の親子リンク破壊リスクを構造的に
  *   排除する（§7.5）。
  * - 直近 protectedRecentTokens トークンは「1文字も削らない不可侵領域」（§7.4）。
  *   退避対象は常にそれより古い過去分のみ。トークン推定はステップ 1
@@ -20,6 +29,11 @@
  * - 250K 境界はステップ 1 の時間認識（detectTemporalPauses、§7.1）で求まる
  *   「会話の間（ま）」のうち、境界の手前で最も新しいものを優先して自然分割する。
  *   「間」が無い場合はメッセージ境界でフォールバック分割する。
+ * - 要約の差し替え適否判定: 退避領域へ完全に含まれるブロック（要約の endTime が
+ *   保持テール先頭メッセージのタイムスタンプより前）の要約のみを目次へ適用する
+ *   （保持テール途中にまでかかるブロックの要約は適用しない = 直近 250K は決して
+ *   差し替え・削除されない）。タイムスタンプが解釈できない場合は差し替えを見送る
+ *   （要約の誤挿入を防ぐ安全側の挙動）。
  * - 退避発火時は先頭にシステム注記（role: "user" の notice message）を付与する。
  *   AgentMessage 型に "system" ロールが無いため "user" で表現する（設計書 §7.5
  *   は role: "system" または role: "user" のどちらかを許容する）。
@@ -31,9 +45,11 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   detectTemporalPauses,
   estimateMessageTokens,
+  toEpochMs,
   DEFAULT_MIN_PAUSE_THRESHOLD_MS,
   DEFAULT_PAUSE_MULTIPLIER,
 } from "./compartment.js";
+import { formatTableOfContents, type BlockSummary } from "./historian.js";
 
 /** 退避発火閾値（既定 950K トークン = 1M コンテキスト - 50K reserve）。 */
 export const DEFAULT_EVICTION_THRESHOLD_TOKENS = 950_000;
@@ -57,6 +73,13 @@ export type EvictionOptions = {
   pauseMultiplier?: number;
   /** 退避時に先頭へ付与する注記テキスト（既定 DEFAULT_EVICTION_NOTICE）。 */
   noticeText?: string;
+  /**
+   * 完了済みのブロック要約群（§7.5 の復帰差し替え用。opt-in）。
+   * 退避領域に完全に含まれる要約済みブロックだけが章立て要約目次へ差し替えられる。
+   */
+  summaries?: BlockSummary[];
+  /** 完了済みのブロック要約群（blockId キーの Map 版。reconcileBlockSummaries の出力をそのまま渡せる）。 */
+  summaryMap?: Map<string, BlockSummary>;
 };
 
 /** 一時退避の実行結果。 */
@@ -73,6 +96,8 @@ export type EvictionResult = {
   evictedTokens: number;
   /** 保持された直近（保護テール）の推定トークン数。 */
   protectedTokens: number;
+  /** 章立て要約目次へ差し替え適用された要約数（0 のときは注記のみの退避）。 */
+  appliedSummaryCount: number;
 };
 
 /** kernel の compaction 設定のうち、安全弁が参照する最小形（agents.defaults.compaction）。 */
@@ -86,7 +111,31 @@ function positiveFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function resolveEvictionOptions(options?: EvictionOptions): Required<EvictionOptions> {
+/** summaries と summaryMap を統合する（summaries 優先、blockId で重複排除）。 */
+function collectSummaries(options?: EvictionOptions): BlockSummary[] {
+  const collected: BlockSummary[] = [];
+  const seen = new Set<string>();
+  const push = (summary: BlockSummary): void => {
+    if (typeof summary.blockId === "string" && !seen.has(summary.blockId)) {
+      seen.add(summary.blockId);
+      collected.push(summary);
+    }
+  };
+  for (const summary of options?.summaries ?? []) {
+    push(summary);
+  }
+  for (const summary of options?.summaryMap?.values() ?? []) {
+    push(summary);
+  }
+  return collected;
+}
+
+type ResolvedEvictionOptions = Required<Omit<EvictionOptions, "summaries" | "summaryMap">> & {
+  /** summaries と summaryMap を統合・重複排除した配列。 */
+  summaries: BlockSummary[];
+};
+
+function resolveEvictionOptions(options?: EvictionOptions): ResolvedEvictionOptions {
   return {
     evictionThresholdTokens: Math.floor(
       positiveFinite(options?.evictionThresholdTokens) ?? DEFAULT_EVICTION_THRESHOLD_TOKENS,
@@ -102,6 +151,7 @@ function resolveEvictionOptions(options?: EvictionOptions): Required<EvictionOpt
       typeof options?.noticeText === "string" && options.noticeText.trim() !== ""
         ? options.noticeText.trim()
         : DEFAULT_EVICTION_NOTICE,
+    summaries: collectSummaries(options),
   };
 }
 
@@ -212,6 +262,7 @@ export function applyPromptEvictionSafetyValve(
     evictedMessageCount: 0,
     evictedTokens: 0,
     protectedTokens: totalTokens,
+    appliedSummaryCount: 0,
   });
 
   // 閾値以下: 退避不要（§7.3 の発火条件に未達）
@@ -270,18 +321,54 @@ export function applyPromptEvictionSafetyValve(
 
   const evictedMessageCount = cut;
   const protectedTokens = estimates.slice(cut).reduce((sum, value) => sum + value, 0);
-  const notice: AgentMessage = {
-    role: "user",
-    content: opts.noticeText,
-    timestamp: Date.now(),
-  };
+  const evictedTokens = totalTokens - protectedTokens;
+
+  // ── 章立て要約目次による復帰差し替え（§7.5 通常成功パス）──
+  // 退避された過去領域のうち、要約が完了しているブロック（endTime が保持テール先頭
+  // タイムスタンプより前 = 完全に退避領域へ含まれるブロック）だけを
+  // formatTableOfContents の目次メッセージ（role: "user"）へ差し替えてプロンプト先頭へ
+  // 復帰注入する。まだ要約が完了していない分（coveredTokens が退避トークンに満たない分）は
+  // 従来どおり一時退避注記を併記する。
+  // タイムスタンプが解釈できない場合は差し替えを見送る（要約の誤挿入を防ぐ安全側の挙動）。
+  const applicable: BlockSummary[] = [];
+  let coveredTokens = 0;
+  if (cut < messages.length) {
+    const boundaryEpochMs = toEpochMs(messages[cut].timestamp);
+    if (boundaryEpochMs !== null) {
+      for (const summary of opts.summaries) {
+        const endMs = toEpochMs(summary.endTime);
+        if (endMs !== null && endMs < boundaryEpochMs) {
+          applicable.push(summary);
+          const tokens =
+            typeof summary.tokenCount === "number" && Number.isFinite(summary.tokenCount)
+              ? Math.max(0, Math.floor(summary.tokenCount))
+              : 0;
+          coveredTokens += tokens;
+        }
+      }
+    }
+  }
+  const allEvictedCovered = coveredTokens >= evictedTokens;
+
+  const front: AgentMessage[] = [];
+  if (applicable.length > 0) {
+    front.push({
+      role: "user",
+      content: formatTableOfContents(applicable),
+      timestamp: Date.now(),
+    });
+  }
+  if (!allEvictedCovered) {
+    front.push({ role: "user", content: opts.noticeText, timestamp: Date.now() });
+  }
 
   return {
-    messages: [notice, ...messages.slice(cut)],
+    messages: [...front, ...messages.slice(cut)],
     evicted: true,
     totalTokens,
     evictedMessageCount,
-    evictedTokens: totalTokens - protectedTokens,
+    evictedTokens,
     protectedTokens,
+    appliedSummaryCount: applicable.length,
   };
 }

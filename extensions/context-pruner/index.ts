@@ -59,6 +59,18 @@ export {
 } from "./src/eviction.js";
 export type { EvictionOptions, EvictionResult, CompactionConfigLike } from "./src/eviction.js";
 
+// 裏方圧縮 ステップ 3（COMPACTION_FEATURE.md §7.2 / §7.5）: 裏方要約（Historian）と
+// 章立て目次管理。950K 到達時に過去ブロック群を小分け（maxBatches）で要約生成・蓄積し、
+// 一時退避されている過去領域をプロンプト上で「章立て要約目次」へ安全に差し替える。
+// セッションファイル（.jsonl）の実ログは不変（インメモリ管理のみ）。
+export {
+  formatTableOfContents,
+  reconcileBlockSummaries,
+  TABLE_OF_CONTENTS_HEADER,
+  TABLE_OF_CONTENTS_REVERSIBILITY_NOTE,
+} from "./src/historian.js";
+export type { BlockSummary, SummarizeFn, ReconcileBlockSummariesParams } from "./src/historian.js";
+
 /** セッションキー（sessionKey 優先、無ければ agentId） */
 function sessionCounterKey(ctx: { sessionKey?: string; agentId?: string }): string | undefined {
   return ctx.sessionKey ?? ctx.agentId;
