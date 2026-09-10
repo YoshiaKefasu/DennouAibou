@@ -46,6 +46,12 @@ function which(cmd) {
 }
 
 function resolveRunner() {
+  if (process.env.OPENCLAW_PREFER_PNPM === "1") {
+    const pnpm = which("pnpm");
+    if (pnpm) {
+      return { cmd: pnpm, kind: "pnpm" };
+    }
+  }
   const bun = which("bun");
   if (bun) {
     return { cmd: bun, kind: "bun" };
