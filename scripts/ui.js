@@ -14,7 +14,7 @@ const WINDOWS_UNSAFE_SHELL_ARG_PATTERN = /[\r\n"&|<>^%!]/;
 
 function usage() {
   // keep this tiny; it's invoked from npm scripts too
-  process.stderr.write("Usage: node scripts/ui.js <install|dev|build|test> [...args]\n");
+  process.stderr.write("Usage: bun scripts/ui.js <install|dev|build|test> [...args]\n");
 }
 
 function which(cmd) {
@@ -46,6 +46,10 @@ function which(cmd) {
 }
 
 function resolveRunner() {
+  const bun = which("bun");
+  if (bun) {
+    return { cmd: bun, kind: "bun" };
+  }
   const pnpm = which("pnpm");
   if (pnpm) {
     return { cmd: pnpm, kind: "pnpm" };
@@ -168,7 +172,7 @@ export function main(argv = process.argv.slice(2)) {
 
   const runner = resolveRunner();
   if (!runner) {
-    process.stderr.write("Missing UI runner: install pnpm, then retry.\n");
+    process.stderr.write("Missing UI runner: install bun (or pnpm), then retry.\n");
     process.exit(1);
   }
 
@@ -189,6 +193,11 @@ export function main(argv = process.argv.slice(2)) {
     runSync(runner.cmd, installArgs, installEnv);
   }
 
+  // `bun run <script> <args>` and `pnpm run <script> <args>` share the same
+  // argument layout; bun forwards trailing args after the script name to the
+  // underlying command. Keep the "run" verb explicit for bun (kind === "bun")
+  // so `bun build` / `bun dev` never hit the bun bundler/dev-server CLI
+  // instead of the package scripts.
   run(runner.cmd, ["run", script, ...rest]);
 }
 

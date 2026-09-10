@@ -3,6 +3,27 @@ import path from "node:path";
 
 const WINDOWS_UNSAFE_CMD_CHARS_RE = /[&|<>%\r\n]/;
 
+function resolveNodeDirFromPath(params) {
+  const dirs = (params.env[params.pathKey] ?? "").split(params.pathImpl.delimiter).filter(Boolean);
+  const extensions =
+    params.platform === "win32"
+      ? (params.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
+      : [""];
+  for (const dir of dirs) {
+    for (const ext of extensions) {
+      const candidate = params.pathImpl.join(dir, `node${ext}`);
+      try {
+        if (params.existsSync(candidate)) {
+          return params.pathImpl.dirname(candidate);
+        }
+      } catch {
+        // ignore unreadable PATH entries
+      }
+    }
+  }
+  return null;
+}
+
 function resolvePathEnvKey(env) {
   return Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
 }
@@ -82,6 +103,31 @@ export function resolveNpmRunner(params = {}) {
     return npmToolchain;
   }
   if (platform === "win32") {
+    // Non-Node runtimes (e.g. Bun) report their own binary as `process.execPath`
+    // (bun.exe), so the toolchain-local lookup above cannot succeed. Fall back
+    // to a PATH-resolved node.exe installation so npm still resolves through a
+    // real Node toolchain instead of being shelled out as a bare command.
+    const pathKey = resolvePathEnvKey(env);
+    const nodeDirFromPath = resolveNodeDirFromPath({
+      env,
+      existsSync,
+      pathImpl,
+      platform,
+      pathKey,
+    });
+    if (nodeDirFromPath !== null && nodeDirFromPath !== nodeDir) {
+      const fromPath = resolveToolchainNpmRunner({
+        comSpec,
+        existsSync,
+        nodeDir: nodeDirFromPath,
+        npmArgs,
+        pathImpl,
+        platform,
+      });
+      if (fromPath) {
+        return fromPath;
+      }
+    }
     const expectedPaths = [
       pathImpl.resolve(nodeDir, "../lib/node_modules/npm/bin/npm-cli.js"),
       pathImpl.resolve(nodeDir, "node_modules/npm/bin/npm-cli.js"),
