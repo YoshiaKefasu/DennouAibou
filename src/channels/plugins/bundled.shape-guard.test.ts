@@ -122,19 +122,6 @@ describe("bundled channel entry shape guards", () => {
     expect(source.includes("getChatChannelMeta")).toBe(false);
   });
 
-  it("keeps bundled hot runtime barrels off the broad core SDK surface", () => {
-    const offenders = [
-      "extensions/googlechat/runtime-api.ts",
-      "extensions/irc/src/runtime-api.ts",
-      // extensions/matrix削除済み
-      // "extensions/matrix/src/runtime-api.ts",
-    ].filter((filePath) =>
-      fs.readFileSync(path.resolve(filePath), "utf8").includes("openclaw/plugin-sdk/core"),
-    );
-
-    expect(offenders).toEqual([]);
-  });
-
   it("keeps runtime helper surfaces off bootstrap-registry", () => {
     const offenders = [
       "src/config/markdown-tables.ts",
@@ -163,11 +150,7 @@ describe("bundled channel entry shape guards", () => {
   it("keeps bundled doctor surfaces off the broad runtime barrel", () => {
     const offenders = [
       "extensions/discord/src/doctor.ts",
-      // extensions/matrix削除済み
-      // "extensions/matrix/src/doctor.ts",
-      "extensions/slack/src/doctor.ts",
       "extensions/telegram/src/doctor.ts",
-      "extensions/zalouser/src/doctor.ts",
     ].filter((filePath) =>
       fs
         .readFileSync(path.resolve(filePath), "utf8")

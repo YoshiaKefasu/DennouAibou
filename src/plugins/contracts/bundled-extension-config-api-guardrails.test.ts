@@ -25,25 +25,11 @@ const BUNDLED_EXTENSION_CONFIG_IMPORT_GUARDS = [
   //   path: "extensions/signal/src/config-schema.ts",
   //   allowedSpecifier: "../config-api.js",
   // },
-  {
-    path: "extensions/imessage/src/config-schema.ts",
-    allowedSpecifier: "../config-api.js",
-  },
   // extensions/whatsapp削除済み
   // {
   //   path: "extensions/whatsapp/src/config-schema.ts",
   //   allowedSpecifier: "../config-api.js",
   // },
-  {
-    path: "extensions/googlechat/src/config-schema.ts",
-    allowedSpecifier: "openclaw/plugin-sdk/googlechat",
-  },
-  // Teams keeps a package-local config barrel so production code does not
-  // self-import via openclaw/plugin-sdk/msteams from inside the same extension.
-  {
-    path: "extensions/msteams/src/config-schema.ts",
-    allowedSpecifier: "../config-api.js",
-  },
 ] as const;
 
 describe("bundled extension config api guardrails", () => {

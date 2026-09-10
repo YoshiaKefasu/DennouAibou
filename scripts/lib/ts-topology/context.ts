@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import ts from "typescript";
+import ts from "typescript6";
 import type { CanonicalSymbol, ProgramContext, SymbolKind } from "./types.js";
 
 function assert(condition: unknown, message: string): asserts condition {

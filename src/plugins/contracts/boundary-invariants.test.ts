@@ -51,7 +51,6 @@ const ALLOWED_EXTENSION_PATH_STRING_TESTS = new Set([
 const ALLOWED_CONTRACT_BUNDLED_PATH_HELPERS = new Set([
   "src/plugins/contracts/boundary-invariants.test.ts",
   "src/plugins/contracts/plugin-sdk-index.bundle.test.ts",
-  "src/plugins/contracts/plugin-sdk-runtime-api-guardrails.test.ts",
 ]);
 
 const ALLOWED_CHANNEL_BUNDLED_METADATA_CONSUMERS = new Set([

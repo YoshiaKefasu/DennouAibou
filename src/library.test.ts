@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import ts from "typescript6";
 import { describe, expect, it } from "vitest";
 
 const libraryPath = resolve(dirname(fileURLToPath(import.meta.url)), "library.ts");

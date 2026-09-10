@@ -1,4 +1,4 @@
-import type ts from "typescript";
+import type ts from "typescript6";
 
 export type UsageBucket = "internal" | "production" | "test";
 

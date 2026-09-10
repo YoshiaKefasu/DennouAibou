@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import ts from "typescript";
+import ts from "typescript6";
 import { bundledPluginFile } from "./lib/bundled-plugin-paths.mjs";
 import { runCallsiteGuard } from "./lib/callsite-guard.mjs";
 import {

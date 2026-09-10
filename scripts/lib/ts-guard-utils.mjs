@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 let tsCache;
 
 function getTypeScript() {
-  tsCache ??= require("typescript");
+  tsCache ??= require("typescript6");
   return tsCache;
 }
 
