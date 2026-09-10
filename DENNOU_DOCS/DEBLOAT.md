@@ -1166,7 +1166,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/memory-host-sdk/{engine-embeddings,engine-foundation,engine-qmd,engine-storage,multimodal,query,runtime-cli,runtime-core,runtime-files,secret,status}.ts`（ファサードに re-export されていた wrapper）— 今回の `src/plugin-sdk/memory-core-host-*` 削除後も直接参照されるファイルなので温存
 - WebUI i18n locales の `tabs.dreams` / `subtitles.dreams` / `dreaming.*` 翻訳キー — 他のロケールとの同期崩壊リスクを避けるため **orphaned translation として温存**（次期 i18n cleanup 時に削除検討）
 - `extensions/session-integrity-guard/src/cron-job.ts` / `notify.ts` の doc コメント内 `extensions/memory-core/src/dreaming.ts` への参照 — 歴史的パターン参照としてコメント温存
-- `DENNOU_DOCS/BUN_MIGRATION.md` / `DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md` / `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md` の `memory-core` 言及 — 歴史的記録・稼働ログ・パターン参照として温存
+- `DENNOU_DOCS/BUN_MIGRATION.md` / `DENNOU_DOCS/AGENT_SESSION.md`（旧 `SESSION_INTEGRITY_GUARD.md`。2026-09-10 に統合） / `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md` の `memory-core` 言及 — 歴史的記録・稼働ログ・パターン参照として温存
 
 ### 19.5 dreaming cron / memory flush 経路の調査結果
 
