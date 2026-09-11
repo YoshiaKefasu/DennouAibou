@@ -9,7 +9,7 @@ import {
   loadModelCatalog,
   modelSupportsAudio,
 } from "../../agents/model-catalog.js";
-import { resolveModelRefFromString } from "../../agents/model-selection.js";
+import { resolveModelRefFromString, type ModelAliasIndex } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR, ensureAgentWorkspace } from "../../agents/workspace.js";
 import { resolveChannelModelOverride } from "../../channels/model-overrides.js";
@@ -28,7 +28,12 @@ import { handleInlineActions } from "./get-reply-inline-actions.js";
 import { runPreparedReply } from "./get-reply-run.js";
 import { finalizeInboundContext } from "./inbound-context.js";
 import { emitPreAgentMessageHooks } from "./message-preprocess-hooks.js";
-import { initSessionState } from "./session.js";
+import { resolveStoredModelOverride } from "./model-selection.js";
+import {
+  initSessionState,
+  resolveSessionModelOverrideSnapshot,
+  type SessionModelOverrideSnapshot,
+} from "./session.js";
 import { createTypingController } from "./typing.js";
 
 type ResetCommandAction = "new" | "reset";
@@ -151,6 +156,81 @@ async function applyLinkUnderstandingIfNeeded(params: {
   return true;
 }
 
+/**
+ * Resolve the effective active model BEFORE media understanding runs.
+ *
+ * The reply path only resolves the session-stored `modelOverride`/
+ * `providerOverride` (via directives) AFTER initSessionState, but the media
+ * decision (native audio inlining vs Deepgram STT) needs the real active
+ * model at inbound time. A user who switched `/model agy-gemini-3.8-flash`
+ * must get `skipAudio: true` even when the global default model has no audio
+ * input support. Priority mirrors the reply path: explicit heartbeat model >
+ * session-stored override (incl. parent fallback) > channel override >
+ * defaults.
+ */
+function resolveEffectiveActiveMediaModel(params: {
+  ctx: MsgContext;
+  cfg: OpenClawConfig;
+  snapshot: SessionModelOverrideSnapshot;
+  provider: string;
+  model: string;
+  defaultProvider: string;
+  aliasIndex: ModelAliasIndex;
+  hasResolvedHeartbeatModelOverride: boolean;
+}): { provider: string; model: string } {
+  const { provider, model } = params;
+  if (params.hasResolvedHeartbeatModelOverride) {
+    return { provider, model };
+  }
+  const { sessionEntry, sessionStore, sessionKey, groupResolution } = params.snapshot;
+  const hasSessionModelOverride = Boolean(
+    sessionEntry?.modelOverride?.trim() || sessionEntry?.providerOverride?.trim(),
+  );
+  if (hasSessionModelOverride) {
+    const stored = resolveStoredModelOverride({
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      parentSessionKey: params.ctx.ParentSessionKey,
+      defaultProvider: params.defaultProvider,
+    });
+    if (stored?.model) {
+      return { provider: stored.provider || params.defaultProvider, model: stored.model };
+    }
+    // Session override present but unresolvable — keep the current default.
+    // The channel override is intentionally skipped here, matching the reply
+    // path gating (`hasSessionModelOverride`).
+    return { provider, model };
+  }
+  const channelModelOverride = resolveChannelModelOverride({
+    cfg: params.cfg,
+    channel:
+      groupResolution?.channel ??
+      sessionEntry?.channel ??
+      sessionEntry?.origin?.provider ??
+      (typeof params.ctx.OriginatingChannel === "string"
+        ? params.ctx.OriginatingChannel
+        : undefined) ??
+      params.ctx.Provider,
+    groupId: groupResolution?.id ?? sessionEntry?.groupId,
+    groupChatType: sessionEntry?.chatType ?? params.ctx.ChatType,
+    groupChannel: sessionEntry?.groupChannel ?? params.ctx.GroupChannel,
+    groupSubject: sessionEntry?.subject ?? params.ctx.GroupSubject,
+    parentSessionKey: params.ctx.ParentSessionKey,
+  });
+  if (channelModelOverride) {
+    const resolved = resolveModelRefFromString({
+      raw: channelModelOverride.model,
+      defaultProvider: params.defaultProvider,
+      aliasIndex: params.aliasIndex,
+    });
+    if (resolved) {
+      return { provider: resolved.ref.provider, model: resolved.ref.model };
+    }
+  }
+  return { provider, model };
+}
+
 export async function getReplyFromConfig(
   ctx: MsgContext,
   opts?: GetReplyOptions,
@@ -226,11 +306,33 @@ export async function getReplyFromConfig(
   const finalized = finalizeInboundContext(ctx);
 
   if (!isFastTestEnv) {
+    // Resolve the effective active model (session-stored /model override,
+    // channel override) BEFORE media understanding so native-audio inlining
+    // (`skipAudio`) is decided against the model the session is actually
+    // using, not the global default. See #native-audio.
+    const sessionModelOverrideSnapshot = hasInboundMedia(finalized)
+      ? resolveSessionModelOverrideSnapshot({
+          ctx: finalized,
+          cfg,
+        })
+      : null;
+    const effectiveActiveModel = sessionModelOverrideSnapshot
+      ? resolveEffectiveActiveMediaModel({
+          ctx: finalized,
+          cfg,
+          snapshot: sessionModelOverrideSnapshot,
+          provider,
+          model,
+          defaultProvider,
+          aliasIndex,
+          hasResolvedHeartbeatModelOverride,
+        })
+      : { provider, model };
     await applyMediaUnderstandingIfNeeded({
       ctx: finalized,
       cfg,
       agentDir,
-      activeModel: { provider, model },
+      activeModel: effectiveActiveModel,
     });
     await applyLinkUnderstandingIfNeeded({
       ctx: finalized,

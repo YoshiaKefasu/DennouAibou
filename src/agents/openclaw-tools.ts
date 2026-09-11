@@ -14,6 +14,7 @@ import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import type { SpawnedToolContext } from "./spawned-context.js";
 import type { ToolFsPolicy } from "./tool-fs-policy.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
+import { createAudioTool } from "./tools/audio-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
 import { createCronTool } from "./tools/cron-tool.js";
@@ -188,6 +189,15 @@ export function createOpenClawTools(
         fsPolicy: options?.fsPolicy,
       })
     : null;
+  const audioTool = options?.agentDir?.trim()
+    ? createAudioTool({
+        config: options?.config,
+        agentDir: options.agentDir,
+        workspaceDir,
+        sandbox,
+        fsPolicy: options?.fsPolicy,
+      })
+    : null;
   const webSearchTool = createWebSearchTool({
     config: options?.config,
     sandboxed: options?.sandboxed,
@@ -293,6 +303,7 @@ export function createOpenClawTools(
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
     ...(pdfTool ? [pdfTool] : []),
+    ...(audioTool ? [audioTool] : []),
   ];
 
   if (options?.disablePluginTools) {

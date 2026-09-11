@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   triggerInternalHook: vi.fn(async (..._args: unknown[]) => undefined),
   resolveReplyDirectives: vi.fn(),
   initSessionState: vi.fn(),
+  resolveSessionModelOverrideSnapshot: vi.fn(),
   loadModelCatalog: vi.fn(),
   hasInlineableNativeAudio: vi.fn(),
 }));
@@ -73,6 +74,7 @@ vi.mock("./get-reply-inline-actions.js", () => ({
 }));
 vi.mock("./session.js", () => ({
   initSessionState: mocks.initSessionState,
+  resolveSessionModelOverrideSnapshot: mocks.resolveSessionModelOverrideSnapshot,
 }));
 
 let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
@@ -136,6 +138,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
     mocks.triggerInternalHook.mockReset();
     mocks.resolveReplyDirectives.mockReset();
     mocks.initSessionState.mockReset();
+    mocks.resolveSessionModelOverrideSnapshot.mockReset();
     mocks.loadModelCatalog.mockReset();
     mocks.hasInlineableNativeAudio.mockReset();
 
@@ -152,6 +155,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
     );
     mocks.triggerInternalHook.mockResolvedValue(undefined);
     mocks.hasInlineableNativeAudio.mockResolvedValue(true);
+    mocks.resolveSessionModelOverrideSnapshot.mockReturnValue(null);
     mocks.resolveReplyDirectives.mockResolvedValue({ kind: "reply", reply: { text: "ok" } });
     mocks.initSessionState.mockResolvedValue({
       sessionCtx: {},
@@ -199,5 +203,78 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
     expect(mocks.applyMediaUnderstanding).toHaveBeenCalledWith(
       expect.objectContaining({ skipAudio: false }),
     );
+  });
+
+  it("applies a session-stored audio-capable override (skipAudio: true) before media understanding", async () => {
+    // User previously switched `/model agy-gemini-3.8-flash` (native audio).
+    // The persisted session override must be resolved from the session entry
+    // BEFORE media understanding, so the native-audio decision uses the
+    // overridden model instead of the global default (openai/gpt-4o-mini,
+    // which has no audio input).
+    mocks.loadModelCatalog.mockResolvedValue([
+      {
+        id: "agy-gemini-3.8-flash",
+        name: "AGY Gemini 3.8 Flash",
+        provider: "google",
+        input: ["text", "image", "audio"],
+      },
+    ]);
+    mocks.resolveSessionModelOverrideSnapshot.mockReturnValue({
+      sessionEntry: {
+        sessionId: "session-1",
+        modelOverride: "agy-gemini-3.8-flash",
+        providerOverride: "google",
+      },
+      sessionStore: {},
+      sessionKey: "agent:main:telegram:-100123",
+    });
+
+    await getReplyFromConfig(buildCtx(), undefined, {});
+
+    expect(mocks.resolveSessionModelOverrideSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ctx: expect.objectContaining({ SessionKey: "agent:main:telegram:-100123" }),
+      }),
+    );
+    expect(mocks.applyMediaUnderstanding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeModel: { provider: "google", model: "agy-gemini-3.8-flash" },
+        skipAudio: true,
+      }),
+    );
+    expect(mocks.hasInlineableNativeAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Deepgram (skipAudio: false) when the session override lacks audio input", async () => {
+    // The session override takes precedence over the global default for the
+    // media decision in both directions: a non-audio override must NOT get
+    // native audio inlining just because the default model would.
+    mocks.loadModelCatalog.mockResolvedValue([
+      {
+        id: "agy-gemini-3.8-flash",
+        name: "AGY Gemini 3.8 Flash",
+        provider: "google",
+        input: ["text", "image"],
+      },
+    ]);
+    mocks.resolveSessionModelOverrideSnapshot.mockReturnValue({
+      sessionEntry: {
+        sessionId: "session-1",
+        modelOverride: "agy-gemini-3.8-flash",
+        providerOverride: "google",
+      },
+      sessionStore: {},
+      sessionKey: "agent:main:telegram:-100123",
+    });
+
+    await getReplyFromConfig(buildCtx(), undefined, {});
+
+    expect(mocks.applyMediaUnderstanding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeModel: { provider: "google", model: "agy-gemini-3.8-flash" },
+        skipAudio: false,
+      }),
+    );
+    expect(mocks.hasInlineableNativeAudio).not.toHaveBeenCalled();
   });
 });

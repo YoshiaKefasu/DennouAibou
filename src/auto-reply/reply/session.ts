@@ -180,12 +180,26 @@ function resolveBoundConversationSessionKey(params: {
   return binding.targetSessionKey;
 }
 
-export async function initSessionState(params: {
-  ctx: MsgContext;
-  cfg: OpenClawConfig;
-  commandAuthorized: boolean;
-}): Promise<SessionInitResult> {
-  const { ctx, cfg, commandAuthorized } = params;
+/**
+ * Pure, read-only portion of session identity resolution shared by
+ * `initSessionState` and `resolveSessionModelOverrideSnapshot`. No store
+ * writes, no hooks, no reset handling — only the inputs needed to locate the
+ * persisted session entry for a message.
+ */
+function resolveSessionReadContext(params: { ctx: MsgContext; cfg: OpenClawConfig }): {
+  sessionCtxForState: MsgContext;
+  sessionCfg: OpenClawConfig["session"];
+  mainKey: string;
+  agentId: string;
+  groupResolution?: GroupKeyResolution;
+  resetTriggers: string[];
+  parentForkMaxTokens: number;
+  sessionScope: SessionScope;
+  storePath: string;
+  /** Command-target/bound session key for native slash commands (may be undefined). */
+  targetSessionKey?: string;
+} {
+  const { ctx, cfg } = params;
   const conversationBindingContext = resolveSessionConversationBindingContext(cfg, ctx);
   // Native slash commands (Telegram/Discord/Slack) are delivered on a separate
   // "slash session" key, but should mutate the target chat session.
@@ -214,6 +228,83 @@ export async function initSessionState(params: {
   const parentForkMaxTokens = resolveParentForkMaxTokens(cfg);
   const sessionScope = sessionCfg?.scope ?? "per-sender";
   const storePath = resolveStorePath(sessionCfg?.store, { agentId });
+  return {
+    sessionCtxForState,
+    sessionCfg,
+    mainKey,
+    agentId,
+    groupResolution,
+    resetTriggers,
+    parentForkMaxTokens,
+    sessionScope,
+    storePath,
+    targetSessionKey,
+  };
+}
+
+export type SessionModelOverrideSnapshot = {
+  /** Persisted session entry (may be undefined for brand-new sessions). */
+  sessionEntry?: SessionEntry;
+  sessionStore: Record<string, SessionEntry>;
+  sessionKey: string;
+  groupResolution?: GroupKeyResolution;
+};
+
+/**
+ * Read-only snapshot of the persisted session entry for a message.
+ *
+ * `getReplyFromConfig` uses this BEFORE media understanding runs so the
+ * effective active model (session `modelOverride`/`providerOverride`, channel
+ * override, etc.) is known when deciding whether inbound audio can be inlined
+ * natively (`skipAudio`) instead of being transcribed via Deepgram. Mirrors
+ * `initSessionState` key resolution exactly, but performs no writes, no
+ * resets, and fires no hooks.
+ */
+export function resolveSessionModelOverrideSnapshot(params: {
+  ctx: MsgContext;
+  cfg: OpenClawConfig;
+}): SessionModelOverrideSnapshot | null {
+  const read = resolveSessionReadContext(params);
+  if (!read.storePath) {
+    return null;
+  }
+  // CRITICAL: Skip cache to ensure fresh data when resolving session identity
+  // (same rationale as initSessionState — see #17971).
+  const sessionStore = loadSessionStore(read.storePath, { skipCache: true });
+  const sessionKey = canonicalizeMainSessionAlias({
+    cfg: params.cfg,
+    agentId: read.agentId,
+    sessionKey: resolveSessionKey(read.sessionScope, read.sessionCtxForState, read.mainKey),
+  });
+  if (!sessionKey) {
+    return null;
+  }
+  return {
+    sessionEntry: sessionStore[sessionKey],
+    sessionStore,
+    sessionKey,
+    groupResolution: read.groupResolution,
+  };
+}
+
+export async function initSessionState(params: {
+  ctx: MsgContext;
+  cfg: OpenClawConfig;
+  commandAuthorized: boolean;
+}): Promise<SessionInitResult> {
+  const { ctx, cfg, commandAuthorized } = params;
+  const {
+    sessionCtxForState,
+    sessionCfg,
+    mainKey,
+    agentId,
+    groupResolution,
+    resetTriggers,
+    parentForkMaxTokens,
+    sessionScope,
+    storePath,
+    targetSessionKey,
+  } = resolveSessionReadContext({ ctx, cfg });
   const ingressTimingEnabled = process.env.DENNOU_DEBUG_INGRESS_TIMING === "1";
 
   // CRITICAL: Skip cache to ensure fresh data when resolving session identity.

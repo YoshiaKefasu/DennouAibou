@@ -43,6 +43,7 @@ vi.mock("./get-reply-inline-actions.js", () => ({
 }));
 vi.mock("./session.js", () => ({
   initSessionState: mocks.initSessionState,
+  resolveSessionModelOverrideSnapshot: vi.fn(() => null),
 }));
 
 let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;

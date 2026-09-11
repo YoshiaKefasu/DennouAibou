@@ -78,6 +78,7 @@ vi.mock("./reply/get-reply-inline-actions.js", () => ({
 }));
 vi.mock("./reply/session.js", () => ({
   initSessionState: (...args: unknown[]) => mocks.initSessionState(...args),
+  resolveSessionModelOverrideSnapshot: vi.fn(() => null),
 }));
 vi.mock("./reply/get-reply-run.js", () => ({
   runPreparedReply: (...args: unknown[]) => mocks.runPreparedReply(...args),

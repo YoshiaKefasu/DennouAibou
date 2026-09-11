@@ -1,5 +1,6 @@
 import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
+import type { MediaUnderstandingConfig } from "../config/types.tools.js";
 import {
   type ActiveMediaModel,
   buildProviderRegistry,
@@ -17,7 +18,14 @@ export async function runAudioTranscription(params: {
   providers?: Record<string, MediaUnderstandingProvider>;
   activeModel?: ActiveMediaModel;
   localPathRoots?: readonly string[];
-}): Promise<{ transcript: string | undefined; attachments: MediaAttachment[] }> {
+  /** Override for `cfg.tools.media.audio` (e.g. a tool-supplied prompt). */
+  config?: MediaUnderstandingConfig;
+}): Promise<{
+  transcript: string | undefined;
+  provider?: string;
+  model?: string;
+  attachments: MediaAttachment[];
+}> {
   const attachments = params.attachments ?? normalizeMediaAttachments(params.ctx);
   if (attachments.length === 0) {
     return { transcript: undefined, attachments };
@@ -38,12 +46,17 @@ export async function runAudioTranscription(params: {
       media: attachments,
       agentDir: params.agentDir,
       providerRegistry,
-      config: params.cfg.tools?.media?.audio,
+      config: params.config ?? params.cfg.tools?.media?.audio,
       activeModel: params.activeModel,
     });
     const output = result.outputs.find((entry) => entry.kind === "audio.transcription");
     const transcript = output?.text?.trim();
-    return { transcript: transcript || undefined, attachments };
+    return {
+      transcript: transcript || undefined,
+      provider: output?.provider,
+      model: output?.model,
+      attachments,
+    };
   } finally {
     await cache.cleanup();
   }
