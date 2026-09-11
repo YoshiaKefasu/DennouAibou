@@ -9,7 +9,31 @@
       "enabled": {
         "type": "boolean",
         "default": true,
-        "description": "Master switch for write-time tool-result pruning."
+        "description": "Master switch for write-time tool-result pruning and deferred audio transcription."
+      },
+      "stt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["groq"],
+            "default": "groq",
+            "description": "Deferred audio transcription provider."
+          },
+          "model": {
+            "type": "string",
+            "default": "whisper-large-v3-turbo",
+            "description": "Groq Whisper model used after the delay window."
+          },
+          "delayMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "default": 30,
+            "description": "Minimum age in minutes before an untranscribed audio attachment is sent to STT."
+          }
+        },
+        "description": "Fail-open deferred audio transcription settings. GROQ_API_KEY is read from Gateway env or process environment."
       },
       "keepLastAssistants": {
         "type": "integer",

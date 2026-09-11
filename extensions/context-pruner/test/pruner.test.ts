@@ -86,12 +86,22 @@ describe("resolveContextPrunerConfig", () => {
   it("applies defaults when config is absent or malformed", () => {
     expect(resolveContextPrunerConfig(undefined)).toEqual({
       enabled: true,
+      stt: {
+        provider: "groq",
+        model: "whisper-large-v3-turbo",
+        delayMinutes: 30,
+      },
       keepLastAssistants: 3,
       minPrunableToolChars: 1200,
       defaultPreserve: false,
     });
     expect(resolveContextPrunerConfig("garbage")).toEqual({
       enabled: true,
+      stt: {
+        provider: "groq",
+        model: "whisper-large-v3-turbo",
+        delayMinutes: 30,
+      },
       keepLastAssistants: 3,
       minPrunableToolChars: 1200,
       defaultPreserve: false,

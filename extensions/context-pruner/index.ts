@@ -21,6 +21,7 @@
  */
 
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { startAudioSttWorker } from "./src/audio-stt.js";
 import {
   resolveContextPrunerConfig,
   transformToolResultForPersistence,
@@ -28,7 +29,27 @@ import {
 } from "./src/pruner.js";
 
 export { resolveContextPrunerConfig, transformToolResultForPersistence } from "./src/pruner.js";
-export type { ContextPrunerConfig, PruneDecision } from "./src/pruner.js";
+export type { ContextPrunerConfig, PruneDecision, SttConfig } from "./src/pruner.js";
+export {
+  AUDIO_STT_DEFAULTS,
+  AUDIO_STT_GROQ_ENDPOINT,
+  discoverSessionFiles,
+  findAudioAttachments,
+  findEligibleAudioAttachments,
+  formatAudioTranscript,
+  replaceAudioTranscriptInEntry,
+  resolveGroqApiKey,
+  scanSessionFile,
+  startAudioSttWorker,
+  transcribeWithGroq,
+} from "./src/audio-stt.js";
+export type {
+  AudioAttachmentTarget,
+  AudioSttLogger,
+  AudioSttScanResult,
+  AudioSttWorker,
+  AudioSttWorkerOptions,
+} from "./src/audio-stt.js";
 export { CONTEXT_PRUNER_DEFAULT_KEYWORDS, TOOL_RESULT_SAFETY_CAP_CHARS } from "./src/pruner.js";
 
 // 裏方圧縮 ステップ 1（COMPACTION_FEATURE.md §7.1 / §7.2）: 時間認識による
@@ -81,6 +102,7 @@ function sessionCounterKey(ctx: { sessionKey?: string; agentId?: string }): stri
  * プロセス内メモリのみ。session_start でリセット、session_end で削除する。
  */
 const assistantTurnCounts = new Map<string, number>();
+const audioSttStops = new Set<() => void>();
 const MAX_TRACKED_SESSIONS = 512;
 
 function bumpSessionCounter(key: string): number {
@@ -104,6 +126,16 @@ function readPluginConfig(
   );
 }
 
+function resolveStateDir(
+  api: Parameters<Parameters<typeof definePluginEntry>[0]["register"]>[0],
+): string {
+  try {
+    return api.runtime.state.resolveStateDir();
+  } catch {
+    return api.resolvePath("~/.openclaw");
+  }
+}
+
 export default definePluginEntry({
   id: "context-pruner",
   name: "Context Pruner",
@@ -112,6 +144,28 @@ export default definePluginEntry({
   kind: "memory",
   register(api) {
     const config = readPluginConfig(api);
+
+    api.registerService({
+      id: "context-pruner-audio-stt",
+      start(ctx) {
+        if (!config.enabled) {
+          return;
+        }
+        const stop = startAudioSttWorker({
+          stt: config.stt,
+          stateDir: ctx.stateDir || resolveStateDir(api),
+          gatewayConfig: ctx.config,
+          logger: api.logger,
+        });
+        audioSttStops.add(stop);
+      },
+      stop() {
+        for (const stop of audioSttStops) {
+          stop();
+        }
+        audioSttStops.clear();
+      },
+    });
 
     // セッション開始: 観測フェンスをリセット（このセッションの直近Nターンを保護する）
     api.on("session_start", (event) => {

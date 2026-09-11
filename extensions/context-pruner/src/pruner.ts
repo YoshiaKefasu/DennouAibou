@@ -38,10 +38,19 @@ import {
 
 export { TOOL_RESULT_SAFETY_CAP_CHARS };
 
+/** Deferred speech-to-text settings for old audio attachments. */
+export type SttConfig = {
+  provider: "groq";
+  model: string;
+  delayMinutes: number;
+};
+
 /** プラグイン設定（plugins.entries["context-pruner"].config 相当） */
 export type ContextPrunerConfig = {
   /** 機能のON/OFF */
   enabled: boolean;
+  /** 30分後の音声文字起こし設定 */
+  stt: SttConfig;
   /** 保護する直近アシスタント発言数（観測フェンス） */
   keepLastAssistants: number;
   /** この文字数以上のツール結果のみプレースホルダー化対象 */
@@ -77,6 +86,11 @@ export const TOOL_RESULT_SAFETY_CAP_MARKER =
 export function resolveContextPrunerConfig(raw: unknown): ContextPrunerConfig {
   const base: ContextPrunerConfig = {
     enabled: true,
+    stt: {
+      provider: "groq",
+      model: "whisper-large-v3-turbo",
+      delayMinutes: 30,
+    },
     keepLastAssistants: 3,
     minPrunableToolChars: 1200,
     defaultPreserve: false,
@@ -85,8 +99,24 @@ export function resolveContextPrunerConfig(raw: unknown): ContextPrunerConfig {
     return base;
   }
   const cfg = raw as Record<string, unknown>;
+  const sttRecord =
+    cfg.stt && typeof cfg.stt === "object" && !Array.isArray(cfg.stt)
+      ? (cfg.stt as Record<string, unknown>)
+      : undefined;
+  const stt: SttConfig = {
+    provider: sttRecord?.provider === "groq" ? "groq" : base.stt.provider,
+    model:
+      typeof sttRecord?.model === "string" && sttRecord.model.trim()
+        ? sttRecord.model.trim()
+        : base.stt.model,
+    delayMinutes:
+      typeof sttRecord?.delayMinutes === "number" && Number.isFinite(sttRecord.delayMinutes)
+        ? Math.max(0, sttRecord.delayMinutes)
+        : base.stt.delayMinutes,
+  };
   return {
     enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : base.enabled,
+    stt,
     keepLastAssistants:
       typeof cfg.keepLastAssistants === "number" && Number.isFinite(cfg.keepLastAssistants)
         ? Math.max(0, Math.floor(cfg.keepLastAssistants))
