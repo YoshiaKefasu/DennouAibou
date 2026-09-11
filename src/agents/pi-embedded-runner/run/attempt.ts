@@ -198,6 +198,7 @@ import { pruneProcessedHistoryImages } from "./history-image-prune.js";
 import { detectAndLoadPromptImages } from "./images.js";
 import { buildAttemptReplayMetadata } from "./incomplete-turn.js";
 import { resolveLlmIdleTimeoutMs, streamWithIdleTimeout } from "./llm-idle-timeout.js";
+import { createNativeAudioStreamFn, resolveNativeAudioBlocks } from "./native-audio.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 
 export {
@@ -996,12 +997,23 @@ export async function runEmbeddedAttempt(
         agentDir,
         workspaceDir: effectiveWorkspace,
       });
+      const supportsNativeAudio = (params.model.input as Array<string> | undefined)?.includes(
+        "audio",
+      );
+      const nativeAudioBlocks = supportsNativeAudio
+        ? await resolveNativeAudioBlocks({
+            paths: params.nativeAudioPaths,
+            types: params.nativeAudioTypes,
+            fallbackType: params.nativeAudioMimeType,
+            workspaceDir: effectiveWorkspace,
+          })
+        : [];
       const streamStrategy = describeEmbeddedAgentStreamStrategy({
         currentStreamFn: defaultSessionStreamFn,
         providerStreamFn,
         model: params.model,
       });
-      activeSession.agent.streamFunction = resolveEmbeddedAgentStreamFn({
+      const resolvedStreamFn = resolveEmbeddedAgentStreamFn({
         currentStreamFn: defaultSessionStreamFn,
         providerStreamFn,
         sessionId: params.sessionId,
@@ -1010,6 +1022,10 @@ export async function runEmbeddedAttempt(
         resolvedApiKey: params.resolvedApiKey,
         authStorage: legacyAuth,
       });
+      activeSession.agent.streamFunction = createNativeAudioStreamFn(
+        resolvedStreamFn,
+        nativeAudioBlocks,
+      );
 
       const { effectiveExtraParams } = applyExtraParamsToAgent(
         activeSession.agent,
@@ -1756,7 +1772,25 @@ export async function runEmbeddedAttempt(
 
           // Only pass images option if there are actually images to pass
           // This avoids potential issues with models that don't expect the images parameter
-          if (imageResult.images.length > 0) {
+          if (
+            nativeAudioBlocks.length > 0 &&
+            (params.model.input as Array<string> | undefined)?.includes("audio") &&
+            (params.model.api === "google-generative-ai" ||
+              params.model.api === "openai-completions" ||
+              params.model.api === "openai-responses" ||
+              params.model.api === "azure-openai-responses")
+          ) {
+            // Native audio inline support: for capable providers the stream
+            // wrapper injects the audio into the current user turn, so the
+            // session prompt only carries the text payload.
+            if (imageResult.images.length > 0) {
+              await abortable(
+                activeSession.prompt(effectivePrompt, { images: imageResult.images }),
+              );
+            } else {
+              await abortable(activeSession.prompt(effectivePrompt));
+            }
+          } else if (imageResult.images.length > 0) {
             await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
           } else {
             await abortable(activeSession.prompt(effectivePrompt));

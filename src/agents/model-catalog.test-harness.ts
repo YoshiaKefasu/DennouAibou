@@ -40,6 +40,11 @@ export function mockCatalogImportFailThenRecover() {
     return {
       discoverAuthStorage: () => ({}),
       AuthStorage: class {},
+      discoverModels: async () => ({
+        getAll() {
+          return [{ id: "gpt-4.1", name: "GPT-4.1", provider: "openai" }];
+        },
+      }),
       ModelRegistry: class {
         getAll() {
           return [{ id: "gpt-4.1", name: "GPT-4.1", provider: "openai" }];

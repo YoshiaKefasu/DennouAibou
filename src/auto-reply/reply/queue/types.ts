@@ -80,6 +80,9 @@ export type FollowupRun = {
     ownerNumbers?: string[];
     inputProvenance?: InputProvenance;
     extraSystemPrompt?: string;
+    nativeAudioPaths?: string[];
+    nativeAudioTypes?: string[];
+    nativeAudioMimeType?: string;
     enforceFinalTag?: boolean;
     silentExpected?: boolean;
   };

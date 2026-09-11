@@ -32,6 +32,7 @@ import {
   normalizeProviderResolvedModelWithPlugin,
 } from "../plugins/provider-runtime.js";
 import type { ProviderRuntimeModel } from "../plugins/types.js";
+import { parseJsonWithJson5Fallback } from "../utils/parse-json-compat.js";
 import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { resolveProviderEnvApiKeyCandidates } from "./model-auth-env-vars.js";
 import { resolveEnvApiKey } from "./model-auth-env.js";
@@ -284,6 +285,43 @@ export function discoverAuthStorage(agentDir: string): PiAuthStorage {
   return createAuthStorage(PiAuthStorageClass, authPath, credentials);
 }
 
+function modelConfigContainsAudioInput(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const providers = value.providers;
+  if (!isRecord(providers)) {
+    return false;
+  }
+  return Object.values(providers).some((provider) => {
+    if (!isRecord(provider) || !Array.isArray(provider.models)) {
+      return false;
+    }
+    return provider.models.some(
+      (model) => isRecord(model) && Array.isArray(model.input) && model.input.includes("audio"),
+    );
+  });
+}
+
+function createAudioAwareModelConfig(parsed: unknown): {
+  getProvider(providerId: string): unknown;
+  getProviderIds(): string[];
+  getError(): undefined;
+} {
+  const providers = isRecord(parsed) && isRecord(parsed.providers) ? parsed.providers : {};
+  return {
+    getProvider(providerId) {
+      return providers[providerId];
+    },
+    getProviderIds() {
+      return Object.keys(providers);
+    },
+    getError() {
+      return undefined;
+    },
+  };
+}
+
 export async function discoverModels(
   authStorage: PiAuthStorage,
   agentDir: string,
@@ -298,7 +336,17 @@ export async function discoverModels(
   // `builtins` empty, so `rebuildProviders()` only sees providers that come
   // from `models.json` via `ModelConfig`. `ModelRuntime.create()` would
   // inject the SDK's 30+ builtin providers here, which we don't want.
-  const config = await PiModelConfigImpl.load(modelsJsonPath);
+  let config: Awaited<ReturnType<typeof PiModelConfigImpl.load>>;
+  try {
+    const parsed = parseJsonWithJson5Fallback(fs.readFileSync(modelsJsonPath, "utf8"));
+    config = modelConfigContainsAudioInput(parsed)
+      ? (createAudioAwareModelConfig(parsed) as unknown as Awaited<
+          ReturnType<typeof PiModelConfigImpl.load>
+        >)
+      : await PiModelConfigImpl.load(modelsJsonPath);
+  } catch {
+    config = await PiModelConfigImpl.load(modelsJsonPath);
+  }
   const modelsStore = new PiFileModelsStoreImpl(
     path.join(path.dirname(modelsJsonPath), "models-store.json"),
   );

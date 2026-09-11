@@ -460,6 +460,7 @@ export async function applyMediaUnderstanding(params: {
   agentDir?: string;
   providers?: Record<string, MediaUnderstandingProvider>;
   activeModel?: ActiveMediaModel;
+  skipAudio?: boolean;
 }): Promise<ApplyMediaUnderstandingResult> {
   const { ctx, cfg } = params;
   const commandCandidates = [ctx.CommandBody, ctx.RawBody, ctx.Body];
@@ -476,6 +477,16 @@ export async function applyMediaUnderstanding(params: {
 
   try {
     const tasks = CAPABILITY_ORDER.map((capability) => async () => {
+      if (capability === "audio" && params.skipAudio) {
+        return {
+          outputs: [],
+          decision: {
+            capability,
+            outcome: "skipped" as const,
+            attachments: [],
+          },
+        };
+      }
       const config = cfg.tools?.media?.[capability];
       return await runCapability({
         capability,

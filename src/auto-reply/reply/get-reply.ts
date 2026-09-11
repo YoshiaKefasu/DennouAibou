@@ -4,12 +4,18 @@ import {
   resolveSessionAgentId,
   resolveAgentSkillsFilter,
 } from "../../agents/agent-scope.js";
+import {
+  findModelInCatalog,
+  loadModelCatalog,
+  modelSupportsAudio,
+} from "../../agents/model-catalog.js";
 import { resolveModelRefFromString } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR, ensureAgentWorkspace } from "../../agents/workspace.js";
 import { resolveChannelModelOverride } from "../../channels/model-overrides.js";
 import { type OpenClawConfig, loadConfig } from "../../config/config.js";
 import { applyMergePatch } from "../../config/merge-patch.js";
+import { hasInlineableNativeAudio } from "../../media/native-audio.js";
 import { defaultRuntime } from "../../runtime.js";
 import { normalizeStringEntries } from "../../shared/string-normalization.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
@@ -112,8 +118,24 @@ async function applyMediaUnderstandingIfNeeded(params: {
   if (!hasInboundMedia(params.ctx)) {
     return false;
   }
+  const catalog = await loadModelCatalog({ config: params.cfg });
+  const modelEntry = findModelInCatalog(
+    catalog,
+    params.activeModel.provider,
+    params.activeModel.model,
+  );
+  const audioPaths = params.ctx.MediaPaths ?? (params.ctx.MediaPath ? [params.ctx.MediaPath] : []);
+  const audioTypes = params.ctx.MediaTypes;
+  const nativeAudio = modelSupportsAudio(modelEntry)
+    ? await hasInlineableNativeAudio({
+        paths: audioPaths,
+        types: audioTypes,
+        fallbackType: params.ctx.MediaType,
+        workspaceDir: params.agentDir,
+      })
+    : false;
   const { applyMediaUnderstanding } = await import("../../media-understanding/apply.runtime.js");
-  await applyMediaUnderstanding(params);
+  await applyMediaUnderstanding({ ...params, skipAudio: nativeAudio });
   return true;
 }
 

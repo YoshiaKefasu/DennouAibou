@@ -14,6 +14,7 @@ import {
   __setModelCatalogImportForTest,
   findModelInCatalog,
   loadModelCatalog,
+  modelSupportsAudio,
 } from "./model-catalog.js";
 import {
   installModelCatalogTestHooks,
@@ -27,6 +28,11 @@ function mockPiDiscoveryModels(models: unknown[]) {
       ({
         discoverAuthStorage: () => ({}),
         AuthStorage: class {},
+        discoverModels: async () => ({
+          getAll() {
+            return models;
+          },
+        }),
         ModelRegistry: class {
           getAll() {
             return models;
@@ -39,6 +45,31 @@ function mockPiDiscoveryModels(models: unknown[]) {
 function mockSingleOpenAiCatalogModel() {
   mockPiDiscoveryModels([{ id: "gpt-4.1", provider: "openai", name: "GPT-4.1" }]);
 }
+
+describe("modelSupportsAudio", () => {
+  it("returns true when model input includes audio", () => {
+    expect(
+      modelSupportsAudio({
+        id: "gemini-audio",
+        name: "Gemini Audio",
+        provider: "google",
+        input: ["text", "audio"],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when model input does not include audio", () => {
+    expect(
+      modelSupportsAudio({
+        id: "text-only",
+        name: "Text Only",
+        provider: "openai",
+        input: ["text"],
+      }),
+    ).toBe(false);
+    expect(modelSupportsAudio(undefined)).toBe(false);
+  });
+});
 
 describe("loadModelCatalog", () => {
   installModelCatalogTestHooks();
@@ -72,6 +103,20 @@ describe("loadModelCatalog", () => {
           ({
             discoverAuthStorage: () => ({}),
             AuthStorage: class {},
+            discoverModels: async () => ({
+              getAll() {
+                return [
+                  { id: "gpt-4.1", name: "GPT-4.1", provider: "openai" },
+                  {
+                    get id() {
+                      throw new Error("boom");
+                    },
+                    provider: "openai",
+                    name: "bad",
+                  },
+                ];
+              },
+            }),
             ModelRegistry: class {
               getAll() {
                 return [

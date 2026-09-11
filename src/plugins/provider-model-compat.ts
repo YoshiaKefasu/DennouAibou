@@ -80,6 +80,10 @@ function normalizeAnthropicBaseUrl(baseUrl: string): string {
 export function normalizeModelCompat(model: Model<Api>): Model<Api> {
   const baseUrl = model.baseUrl ?? "";
 
+  // The pi-ai type contract only models text/image inputs, but DennouAibou
+  // configs may explicitly advertise native audio. The runtime model keeps
+  // the widened `input` value as-is through this compatibility boundary so
+  // capability checks (native audio inlining) stay truthful.
   if (isAnthropicMessagesModel(model) && baseUrl) {
     const normalized = normalizeAnthropicBaseUrl(baseUrl);
     if (normalized !== baseUrl) {

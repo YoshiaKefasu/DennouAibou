@@ -327,7 +327,7 @@ function applyConfiguredProviderOverrides(params: {
       api: requestConfig.api ?? "openai-responses",
       baseUrl: requestConfig.baseUrl ?? discoveredModel.baseUrl,
       reasoning: configuredModel?.reasoning ?? discoveredModel.reasoning,
-      input: normalizedInput,
+      input: normalizedInput as Array<"text" | "image">,
       cost: configuredModel?.cost ?? discoveredModel.cost,
       contextWindow: configuredModel?.contextWindow ?? discoveredModel.contextWindow,
       contextTokens: configuredModel?.contextTokens ?? discoveredModel.contextTokens,

@@ -81,6 +81,12 @@ export type RunEmbeddedPiAgentParams = {
   prompt: string;
   images?: ImageContent[];
   imageOrder?: PromptImageOrderEntry[];
+  /** Local inbound audio paths to inline for models advertising native audio input. */
+  nativeAudioPaths?: string[];
+  /** Per-attachment MIME hints for native audio inlining. */
+  nativeAudioTypes?: string[];
+  /** Single-attachment MIME fallback for native audio inlining. */
+  nativeAudioMimeType?: string;
   /** Optional client-provided tools (OpenResponses hosted tools). */
   clientTools?: ClientToolDefinition[];
   /** Disable built-in tools for this run (LLM-only mode). */

@@ -8,7 +8,7 @@ import { normalizeProviderId } from "./provider-id.js";
 
 const log = createSubsystemLogger("model-catalog");
 
-export type ModelInputType = "text" | "image" | "document";
+export type ModelInputType = "text" | "image" | "audio" | "document";
 
 export type ModelCatalogEntry = {
   id: string;
@@ -72,7 +72,8 @@ function normalizeConfiguredModelInput(input: unknown): ModelInputType[] | undef
     return undefined;
   }
   const normalized = input.filter(
-    (item): item is ModelInputType => item === "text" || item === "image" || item === "document",
+    (item): item is ModelInputType =>
+      item === "text" || item === "image" || item === "audio" || item === "document",
   );
   return normalized.length > 0 ? normalized : undefined;
 }
@@ -309,6 +310,13 @@ export function getCachedModelCatalogSync(): ModelCatalogEntry[] | undefined {
  */
 export function modelSupportsVision(entry: ModelCatalogEntry | undefined): boolean {
   return entry?.input?.includes("image") ?? false;
+}
+
+/**
+ * Check if a model supports native audio input based on its catalog entry.
+ */
+export function modelSupportsAudio(entry: ModelCatalogEntry | undefined): boolean {
+  return entry?.input?.includes("audio") ?? false;
 }
 
 /**
