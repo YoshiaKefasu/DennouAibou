@@ -41,6 +41,21 @@ import { resolvePiCredentialMapFromStore, type PiCredentialMap } from "./pi-auth
 
 const PiAuthStorageClass = PiAuthStorageImpl;
 const PiModelRegistryClass = PiModelRegistryImpl;
+
+/**
+ * DennouAibou-side master model configuration file name.
+ *
+ * Unlike the PI SDK's `models.json`, this file MAY carry extended modalities
+ * such as `"audio"` in a model's `input`. When present, it is the source of
+ * truth: a PI-SDK-safe `models.json` is projected from it (with unsupported
+ * modalities stripped) so the SDK's TypeBox validation always sees
+ * `text`/`image` only.
+ */
+export const DENNOU_MODELS_FILE_NAME = "dennou.models.json";
+
+const PI_SDK_ALLOWED_MODEL_INPUT_MODALITIES = new Set(["text", "image"]);
+const SUPPORTED_MODEL_INPUT_MODALITIES = new Set(["text", "image", "audio", "document"]);
+
 // `ModelRuntime.create()` always loads the SDK's `builtinProviderCatalog`
 // (30+ providers like openrouter/openai/anthropic) and seeds the runtime
 // with them. DennouAibou is a single-provider deployment: `~/.openclaw/agents/
@@ -85,7 +100,126 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function normalizeRegistryModel<T>(value: T, agentDir: string): T {
+/**
+ * Strip modalities the PI SDK's `models.json` schema rejects (e.g. `"audio"`)
+ * from every model entry's `input`. Everything else is preserved verbatim.
+ */
+export function sanitizeModelsInputForPiSdk(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.providers)) {
+    return value;
+  }
+  const providers: Record<string, unknown> = {};
+  for (const [providerId, providerValue] of Object.entries(value.providers)) {
+    if (!isRecord(providerValue) || !Array.isArray(providerValue.models)) {
+      providers[providerId] = providerValue;
+      continue;
+    }
+    const models = providerValue.models.map((model) => {
+      if (!isRecord(model) || !Array.isArray(model.input)) {
+        return model;
+      }
+      const input = model.input.filter(
+        (item): item is string =>
+          typeof item === "string" && PI_SDK_ALLOWED_MODEL_INPUT_MODALITIES.has(item),
+      );
+      return input.length === model.input.length ? model : { ...model, input };
+    });
+    providers[providerId] = { ...providerValue, models };
+  }
+  return { ...value, providers };
+}
+
+function readDennouModelsConfig(agentDir: string): Record<string, unknown> | undefined {
+  try {
+    const pathname = path.join(agentDir, DENNOU_MODELS_FILE_NAME);
+    if (!fs.existsSync(pathname)) {
+      return undefined;
+    }
+    const parsed = parseJsonWithJson5Fallback(fs.readFileSync(pathname, "utf8"));
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Project `dennou.models.json` onto `models.json` with PI-SDK-unsupported
+ * modalities stripped. Writes only when the projected content differs, so the
+ * agent dir stays untouched on already-synchronized runs.
+ */
+function syncPiSdkModelsJsonFromDennou(params: {
+  parsed: Record<string, unknown>;
+  modelsJsonPath: string;
+}): void {
+  const sanitized = sanitizeModelsInputForPiSdk(params.parsed);
+  const contents = `${JSON.stringify(sanitized, null, 2)}\n`;
+  let existing: string | undefined;
+  try {
+    existing = fs.readFileSync(params.modelsJsonPath, "utf8");
+  } catch {
+    existing = undefined;
+  }
+  if (existing === contents) {
+    return;
+  }
+  fs.writeFileSync(params.modelsJsonPath, contents, "utf8");
+  fs.chmodSync(params.modelsJsonPath, 0o600);
+}
+
+function inputsEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * Look up the extended `input` (incl. `"audio"`) declared for a model in
+ * `dennou.models.json`. The SDK-typed registry entry only ever carries the
+ * sanitized `text`/`image` list, so the master file restores the modality in
+ * memory without ever feeding it to the SDK's schema validation.
+ */
+function resolveDennouModelInput(params: {
+  model: Pick<Model<Api>, "id" | "provider">;
+  dennouConfig?: Record<string, unknown>;
+}): Array<"text" | "image" | "audio"> | undefined {
+  const config = params.dennouConfig;
+  if (!config || !isRecord(config.providers)) {
+    return undefined;
+  }
+  const modelId = params.model.id.toLowerCase();
+  const provider = params.model.provider.toLowerCase();
+  for (const [providerId, providerValue] of Object.entries(config.providers)) {
+    if (providerId.toLowerCase() !== provider || !isRecord(providerValue)) {
+      continue;
+    }
+    const models = providerValue.models;
+    if (!Array.isArray(models)) {
+      continue;
+    }
+    for (const model of models) {
+      if (!isRecord(model) || typeof model.id !== "string") {
+        continue;
+      }
+      if (model.id.toLowerCase() !== modelId) {
+        continue;
+      }
+      const input = Array.isArray(model.input)
+        ? model.input.filter(
+            (item): item is "text" | "image" | "audio" | "document" =>
+              typeof item === "string" && SUPPORTED_MODEL_INPUT_MODALITIES.has(item),
+          )
+        : [];
+      if (input.length > 0) {
+        return input as Array<"text" | "image" | "audio">;
+      }
+    }
+  }
+  return undefined;
+}
+
+function normalizeRegistryModel<T>(
+  value: T,
+  agentDir: string,
+  dennouConfig?: Record<string, unknown>,
+): T {
   if (!isRecord(value)) {
     return value;
   }
@@ -147,23 +281,37 @@ function normalizeRegistryModel<T>(value: T, agentDir: string): T {
       ...existing,
     } as typeof mergedModel.compat;
   }
+  // `dennou.models.json` is the source of truth for extended modalities such
+  // as `"audio"` that the PI SDK's models.json schema cannot carry. Restore
+  // the master file's `input` in memory only — the on-disk `models.json` stays
+  // sanitized to `text`/`image`.
+  const dennouInput = resolveDennouModelInput({ model: mergedModel, dennouConfig });
+  if (dennouInput && !inputsEqual(dennouInput, mergedModel.input)) {
+    return {
+      ...mergedModel,
+      input: dennouInput,
+    } as T;
+  }
   return mergedModel as T;
 }
 
 function wrapRegistryWithNormalization(
   registry: PiModelRegistry,
   agentDir: string,
+  dennouConfig?: Record<string, unknown>,
 ): PiModelRegistry {
   const getAll = registry.getAll.bind(registry);
   const getAvailable = registry.getAvailable.bind(registry);
   const find = registry.find.bind(registry);
 
   registry.getAll = () =>
-    getAll().map((entry: Model<Api>) => normalizeRegistryModel(entry, agentDir));
+    getAll().map((entry: Model<Api>) => normalizeRegistryModel(entry, agentDir, dennouConfig));
   registry.getAvailable = () =>
-    getAvailable().map((entry: Model<Api>) => normalizeRegistryModel(entry, agentDir));
+    getAvailable().map((entry: Model<Api>) =>
+      normalizeRegistryModel(entry, agentDir, dennouConfig),
+    );
   registry.find = (provider: string, modelId: string) =>
-    normalizeRegistryModel(find(provider, modelId), agentDir);
+    normalizeRegistryModel(find(provider, modelId), agentDir, dennouConfig);
 
   return registry;
 }
@@ -337,15 +485,27 @@ export async function discoverModels(
   // from `models.json` via `ModelConfig`. `ModelRuntime.create()` would
   // inject the SDK's 30+ builtin providers here, which we don't want.
   let config: Awaited<ReturnType<typeof PiModelConfigImpl.load>>;
-  try {
-    const parsed = parseJsonWithJson5Fallback(fs.readFileSync(modelsJsonPath, "utf8"));
-    config = modelConfigContainsAudioInput(parsed)
-      ? (createAudioAwareModelConfig(parsed) as unknown as Awaited<
-          ReturnType<typeof PiModelConfigImpl.load>
-        >)
-      : await PiModelConfigImpl.load(modelsJsonPath);
-  } catch {
+  // `dennou.models.json` is the master model config for DennouAibou: it may
+  // declare extended modalities (e.g. `"audio"`) that the PI SDK's models.json
+  // schema rejects. When present, project a sanitized `models.json` from it so
+  // the SDK's TypeBox validation always sees `text`/`image` only, then load the
+  // SDK from that clean file. The master file's modalities are restored in
+  // memory by `normalizeRegistryModel`.
+  const dennouConfig = readDennouModelsConfig(agentDir);
+  if (dennouConfig) {
+    syncPiSdkModelsJsonFromDennou({ parsed: dennouConfig, modelsJsonPath });
     config = await PiModelConfigImpl.load(modelsJsonPath);
+  } else {
+    try {
+      const parsed = parseJsonWithJson5Fallback(fs.readFileSync(modelsJsonPath, "utf8"));
+      config = modelConfigContainsAudioInput(parsed)
+        ? (createAudioAwareModelConfig(parsed) as unknown as Awaited<
+            ReturnType<typeof PiModelConfigImpl.load>
+          >)
+        : await PiModelConfigImpl.load(modelsJsonPath);
+    } catch {
+      config = await PiModelConfigImpl.load(modelsJsonPath);
+    }
   }
   const modelsStore = new PiFileModelsStoreImpl(
     path.join(path.dirname(modelsJsonPath), "models-store.json"),
@@ -380,5 +540,5 @@ export async function discoverModels(
   // contract callers (registry, plugin transforms, `loadModelCatalog`) depend on.
   await runtime.refresh({ allowNetwork: false });
   const registry = new PiModelRegistryClass(runtime);
-  return wrapRegistryWithNormalization(registry, agentDir);
+  return wrapRegistryWithNormalization(registry, agentDir, dennouConfig);
 }
