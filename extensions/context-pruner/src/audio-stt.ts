@@ -16,6 +16,8 @@ const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcript
 const DEFAULT_TRANSCRIPTION_TIMEOUT_MS = 60_000;
 const DEFAULT_SCAN_INTERVAL_MS = 5 * 60 * 1_000;
 const MIN_SCAN_INTERVAL_MS = 60 * 1_000;
+const ACTIVE_SESSION_GRACE_MS = 60 * 1_000;
+const SESSION_LOCK_STALE_AFTER_MS = 10 * 60 * 1_000;
 const AUDIO_EXTENSIONS = new Set([
   ".aac",
   ".aiff",
@@ -61,7 +63,13 @@ export type AudioSttScanResult = {
   candidates: number;
   transcribed: number;
   changed: boolean;
-  skipped?: "missing-api-key" | "locked" | "missing-file" | "unsupported-provider";
+  skipped?:
+    | "missing-api-key"
+    | "locked"
+    | "missing-file"
+    | "recently-updated"
+    | "concurrent-update"
+    | "unsupported-provider";
 };
 
 type AudioTranscriber = (target: AudioAttachmentTarget) => Promise<string | undefined>;
@@ -641,34 +649,121 @@ export async function transcribeWithGroq(params: {
   }
 }
 
-async function acquireSessionFileLock(sessionFile: string): Promise<(() => Promise<void>) | null> {
-  const lockPath = `${path.resolve(sessionFile)}.lock`;
-  let handle: fs.FileHandle | undefined;
-  try {
-    handle = await fs.open(lockPath, "wx");
-    await handle.writeFile(
-      JSON.stringify({
-        pid: process.pid,
-        createdAt: new Date().toISOString(),
-        owner: "context-pruner-audio-stt",
-      }),
-      "utf8",
-    );
-  } catch (error) {
-    await handle?.close().catch(() => undefined);
-    if ((error as { code?: string }).code === "EEXIST") {
-      return null;
-    }
-    throw error;
-  }
+type SessionFileSnapshot = {
+  size: number;
+  mtimeMs: number;
+};
 
-  return async () => {
-    await handle?.close().catch(() => undefined);
-    await fs.rm(lockPath, { force: true }).catch(() => undefined);
-  };
+function snapshotSessionFile(stats: { size: number; mtimeMs: number }): SessionFileSnapshot {
+  return { size: stats.size, mtimeMs: stats.mtimeMs };
 }
 
-async function atomicWriteSessionFile(sessionFile: string, content: string): Promise<void> {
+function sessionFileChanged(before: SessionFileSnapshot, after: SessionFileSnapshot): boolean {
+  return before.size !== after.size || before.mtimeMs !== after.mtimeMs;
+}
+
+function isRecentlyUpdated(snapshot: SessionFileSnapshot, now: number): boolean {
+  return now - snapshot.mtimeMs < ACTIVE_SESSION_GRACE_MS;
+}
+
+async function isStaleSessionFileLock(lockPath: string, now: number): Promise<boolean> {
+  let raw: string | undefined;
+  try {
+    raw = await fs.readFile(lockPath, "utf8");
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") {
+      return true;
+    }
+    return false;
+  }
+
+  const lock = asRecord(
+    (() => {
+      try {
+        return JSON.parse(raw) as unknown;
+      } catch {
+        return undefined;
+      }
+    })(),
+  );
+  const createdAt = toEpochMs(lock?.createdAt);
+  if (createdAt !== null) {
+    return now - createdAt >= SESSION_LOCK_STALE_AFTER_MS;
+  }
+
+  // A crash between O_EXCL creation and metadata write leaves an empty or
+  // malformed lock. Its mtime is the only available age signal in that case.
+  try {
+    const stats = await fs.stat(lockPath);
+    return now - stats.mtimeMs >= SESSION_LOCK_STALE_AFTER_MS;
+  } catch (error) {
+    return (error as { code?: string }).code === "ENOENT";
+  }
+}
+
+async function acquireSessionFileLock(
+  sessionFile: string,
+  now = Date.now(),
+): Promise<(() => Promise<void>) | null> {
+  const lockPath = `${path.resolve(sessionFile)}.lock`;
+
+  // A bounded retry prevents a contended lock from turning into a busy loop,
+  // while still allowing one stale lock recovery and its race with another worker.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let handle: fs.FileHandle | undefined;
+    let ownsLockPath = false;
+    const lockId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      handle = await fs.open(lockPath, "wx");
+      ownsLockPath = true;
+      await handle.writeFile(
+        JSON.stringify({
+          pid: process.pid,
+          createdAt: new Date(now).toISOString(),
+          lockId,
+          owner: "context-pruner-audio-stt",
+        }),
+        "utf8",
+      );
+    } catch (error) {
+      await handle?.close().catch(() => undefined);
+      if (ownsLockPath) {
+        await fs.rm(lockPath, { force: true }).catch(() => undefined);
+      }
+      if ((error as { code?: string }).code !== "EEXIST") {
+        throw error;
+      }
+      if (!(await isStaleSessionFileLock(lockPath, now))) {
+        return null;
+      }
+      await fs.rm(lockPath, { force: true }).catch(() => undefined);
+    }
+
+    if (!handle || !ownsLockPath) {
+      continue;
+    }
+
+    return async () => {
+      await handle.close().catch(() => undefined);
+      try {
+        const currentLock = asRecord(JSON.parse(await fs.readFile(lockPath, "utf8")));
+        if (currentLock?.lockId === lockId) {
+          await fs.rm(lockPath, { force: true });
+        }
+      } catch {
+        // The lock may already have been recovered or removed by another worker.
+      }
+    };
+  }
+
+  return null;
+}
+
+async function atomicWriteSessionFile(
+  sessionFile: string,
+  content: string,
+  expectedSnapshot: SessionFileSnapshot,
+): Promise<boolean> {
   const absolute = path.resolve(sessionFile);
   const temporary = path.join(
     path.dirname(absolute),
@@ -676,10 +771,27 @@ async function atomicWriteSessionFile(sessionFile: string, content: string): Pro
   );
   try {
     await fs.writeFile(temporary, content, "utf8");
+
+    // Check after the temporary file is complete and immediately before rename.
+    // The live writer owns the session file, so a changed size/mtime aborts the
+    // replacement instead of allowing this worker to overwrite a fresh append.
+    let currentSnapshot: SessionFileSnapshot;
+    try {
+      currentSnapshot = snapshotSessionFile(await fs.stat(absolute));
+    } catch (error) {
+      if ((error as { code?: string }).code === "ENOENT") {
+        return false;
+      }
+      throw error;
+    }
+    if (sessionFileChanged(expectedSnapshot, currentSnapshot)) {
+      return false;
+    }
+
     await fs.rename(temporary, absolute);
-  } catch (error) {
+    return true;
+  } finally {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
-    throw error;
   }
 }
 
@@ -744,14 +856,35 @@ export async function scanSessionFile(
     return { ...baseResult, skipped: "missing-api-key" };
   }
 
-  const release = await acquireSessionFileLock(options.sessionFile);
+  const now = options.now ?? Date.now();
+  let initialSnapshot: SessionFileSnapshot;
+  try {
+    initialSnapshot = snapshotSessionFile(await fs.stat(options.sessionFile));
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") {
+      return { ...baseResult, skipped: "missing-file" };
+    }
+    throw error;
+  }
+  if (isRecentlyUpdated(initialSnapshot, now)) {
+    return { ...baseResult, skipped: "recently-updated" };
+  }
+
+  const release = await acquireSessionFileLock(options.sessionFile, now);
   if (!release) {
     return { ...baseResult, skipped: "locked" };
   }
 
   try {
     let raw: string;
+    let readSnapshot: SessionFileSnapshot;
     try {
+      // Recheck after acquiring the lock so an append that happened while the
+      // lock was being created is treated as an active-session skip as well.
+      readSnapshot = snapshotSessionFile(await fs.stat(options.sessionFile));
+      if (isRecentlyUpdated(readSnapshot, now)) {
+        return { ...baseResult, skipped: "recently-updated" };
+      }
       raw = await fs.readFile(options.sessionFile, "utf8");
     } catch (error) {
       if ((error as { code?: string }).code === "ENOENT") {
@@ -792,7 +925,20 @@ export async function scanSessionFile(
     }
 
     if (changed) {
-      await atomicWriteSessionFile(options.sessionFile, rewritten.join(newline));
+      const written = await atomicWriteSessionFile(
+        options.sessionFile,
+        rewritten.join(newline),
+        readSnapshot,
+      );
+      if (!written) {
+        return {
+          ...baseResult,
+          candidates,
+          transcribed: 0,
+          changed: false,
+          skipped: "concurrent-update",
+        };
+      }
     }
     return { ...baseResult, candidates, transcribed, changed };
   } finally {

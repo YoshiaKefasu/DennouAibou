@@ -24,6 +24,11 @@ async function makeFixture() {
   return { dir, audioPath };
 }
 
+async function makeSessionScannable(sessionFile: string, now = NOW): Promise<void> {
+  const staleTime = new Date(now - 2 * 60 * 1_000);
+  await fs.utimes(sessionFile, staleTime, staleTime);
+}
+
 function makeAudioEntry(params: { audioPath: string; timestamp: number }) {
   return {
     type: "message",
@@ -102,6 +107,7 @@ describe("Groq transcription and session replacement", () => {
       [header, originalEntry].map((entry) => JSON.stringify(entry)).join("\n") + "\n",
       "utf8",
     );
+    await makeSessionScannable(sessionFile);
 
     const fetchImpl = vi.fn<typeof fetch>(async (_input, init) => {
       expect(init?.method).toBe("POST");
@@ -175,6 +181,7 @@ describe("Groq transcription and session replacement", () => {
     const sessionFile = path.join(path.dirname(audioPath), "session.jsonl");
     const content = `${JSON.stringify(entry)}\n`;
     await fs.writeFile(sessionFile, content, "utf8");
+    await makeSessionScannable(sessionFile);
 
     const result = await scanSessionFile({
       sessionFile,
@@ -194,6 +201,94 @@ describe("Groq transcription and session replacement", () => {
         gatewayConfig: { env: { vars: { GROQ_API_KEY: "from-gateway" } } },
       }),
     ).toBe("from-gateway");
+  });
+
+  it("skips a session updated within the active-session grace period", async () => {
+    const { audioPath } = await makeFixture();
+    const sessionFile = path.join(path.dirname(audioPath), "session.jsonl");
+    await fs.writeFile(
+      sessionFile,
+      `${JSON.stringify(makeAudioEntry({ audioPath, timestamp: NOW - THIRTY_MINUTES - 1 }))}\n`,
+      "utf8",
+    );
+
+    const transcribeAudio = vi.fn(async () => "should not run");
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      now: Date.now(),
+      transcribeAudio,
+    });
+
+    expect(result.skipped).toBe("recently-updated");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
+  it("recovers a stale lock and completes the scan", async () => {
+    const { audioPath } = await makeFixture();
+    const sessionFile = path.join(path.dirname(audioPath), "session.jsonl");
+    await fs.writeFile(
+      sessionFile,
+      `${JSON.stringify(makeAudioEntry({ audioPath, timestamp: NOW - THIRTY_MINUTES - 1 }))}\n`,
+      "utf8",
+    );
+    await makeSessionScannable(sessionFile);
+    const lockPath = `${sessionFile}.lock`;
+    await fs.writeFile(
+      lockPath,
+      JSON.stringify({
+        pid: 99999,
+        createdAt: new Date(NOW - 11 * 60 * 1_000).toISOString(),
+        owner: "context-pruner-audio-stt",
+      }),
+      "utf8",
+    );
+
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      now: NOW,
+      transcribeAudio: async () => "stale lock recovered",
+    });
+
+    expect(result).toMatchObject({ candidates: 1, transcribed: 1, changed: true });
+    await expect(fs.access(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("aborts the rewrite when the session is appended during transcription", async () => {
+    const { audioPath } = await makeFixture();
+    const sessionFile = path.join(path.dirname(audioPath), "session.jsonl");
+    const originalEntry = makeAudioEntry({
+      audioPath,
+      timestamp: NOW - THIRTY_MINUTES - 1,
+    });
+    const liveAppend = {
+      type: "message",
+      id: "live-append",
+      message: { role: "assistant", content: [{ type: "text", text: "new live row" }] },
+    };
+    await fs.writeFile(sessionFile, `${JSON.stringify(originalEntry)}\n`, "utf8");
+    await makeSessionScannable(sessionFile);
+
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      now: NOW,
+      transcribeAudio: async () => {
+        await fs.appendFile(sessionFile, `${JSON.stringify(liveAppend)}\n`, "utf8");
+        return "must not overwrite the append";
+      },
+    });
+
+    expect(result).toMatchObject({
+      candidates: 1,
+      transcribed: 0,
+      changed: false,
+      skipped: "concurrent-update",
+    });
+    expect(await fs.readFile(sessionFile, "utf8")).toBe(
+      `${JSON.stringify(originalEntry)}\n${JSON.stringify(liveAppend)}\n`,
+    );
   });
 });
 
