@@ -404,6 +404,112 @@ export class RawChatDatabase {
   }
 
   /**
+   * Reads a chronological context window around one message without changing
+   * the transcript or exposing rows from another session.
+   */
+  public selectRecallContext(params: {
+    messageId: number;
+    contextBefore: number;
+    contextAfter: number;
+  }): Array<{
+    id: number;
+    role: string;
+    timestampIso: string;
+    text: string;
+  }> {
+    const targetStmt = this.db.prepare(`
+      SELECT id, session_id, role, timestamp_iso, text
+      FROM chat_messages
+      WHERE id = ?
+      LIMIT 1;
+    `);
+    const target = targetStmt.get(params.messageId) as
+      | {
+          id: number | bigint;
+          session_id: string;
+          role: string;
+          timestamp_iso: string;
+          text: string;
+        }
+      | undefined;
+
+    if (!target) {
+      return [];
+    }
+
+    const contextBefore = Math.max(0, Math.floor(params.contextBefore));
+    const contextAfter = Math.max(0, Math.floor(params.contextAfter));
+    const rows: Array<{
+      id: number;
+      role: string;
+      timestampIso: string;
+      text: string;
+    }> = [];
+
+    if (contextBefore > 0) {
+      const beforeStmt = this.db.prepare(`
+        SELECT id, role, timestamp_iso, text
+        FROM chat_messages
+        WHERE session_id = ? AND id < ?
+        ORDER BY id DESC
+        LIMIT ?;
+      `);
+      const beforeRows = beforeStmt.all(
+        target.session_id,
+        Number(target.id),
+        contextBefore,
+      ) as Array<{
+        id: number | bigint;
+        role: string;
+        timestamp_iso: string;
+        text: string;
+      }>;
+      for (let index = beforeRows.length - 1; index >= 0; index--) {
+        const row = beforeRows[index];
+        rows.push({
+          id: Number(row.id),
+          role: String(row.role),
+          timestampIso: String(row.timestamp_iso),
+          text: String(row.text),
+        });
+      }
+    }
+
+    rows.push({
+      id: Number(target.id),
+      role: String(target.role),
+      timestampIso: String(target.timestamp_iso),
+      text: String(target.text),
+    });
+
+    if (contextAfter > 0) {
+      const afterStmt = this.db.prepare(`
+        SELECT id, role, timestamp_iso, text
+        FROM chat_messages
+        WHERE session_id = ? AND id > ?
+        ORDER BY id ASC
+        LIMIT ?;
+      `);
+      const afterRows = afterStmt.all(target.session_id, Number(target.id), contextAfter) as Array<{
+        id: number | bigint;
+        role: string;
+        timestamp_iso: string;
+        text: string;
+      }>;
+      for (const row of afterRows) {
+        rows.push({
+          id: Number(row.id),
+          role: String(row.role),
+          timestampIso: String(row.timestamp_iso),
+          text: String(row.text),
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  /**
    * Reads the `chat_messages` window that covers one round trip.
    *
    * The window is `fromId .. toId` inclusive within one session, ordered by id.

@@ -41,8 +41,10 @@ type GeminiEmbedResponse = {
 };
 
 export type GeminiEmbedOptions = {
-  /** Explicit API key; falls back to `process.env.GEMINI_API_KEY`. */
+  /** Explicit API key; falls back to `env.GEMINI_API_KEY`. */
   apiKey?: string;
+  /** Environment used to resolve the fallback API key. */
+  env?: NodeJS.ProcessEnv;
   /** Request timeout in milliseconds. Defaults to 400ms. */
   timeoutMs?: number;
   /** Expected vector length. Defaults to 1280. */
@@ -103,7 +105,7 @@ export async function embedTextWithGemini(
     throw new GeminiEmbeddingError("invalid-response", "raw-chat-search: empty embedding input");
   }
 
-  const apiKey = resolveGeminiApiKey(options.apiKey);
+  const apiKey = resolveGeminiApiKey(options.apiKey, options.env ?? process.env);
   if (!apiKey) {
     throw new GeminiEmbeddingError(
       "missing-api-key",

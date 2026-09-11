@@ -30,6 +30,12 @@ import {
   isNoiseTurn,
   PAIR_SNIPPET_MAX_LENGTH,
 } from "./src/pair-extractor.js";
+import {
+  DEFAULT_RECALL_TIMEOUT_MS,
+  HIGH_RELEVANCE_THRESHOLD,
+  MEDIUM_RELEVANCE_THRESHOLD,
+  performVectorRecall,
+} from "./src/recall.js";
 import { ChatSearchSchema, createChatSearchTool } from "./src/tools.js";
 import {
   blobToVector,
@@ -79,6 +85,11 @@ export {
   backfillEmbeddings,
   startEmbeddingBackfill,
   scheduleEmbeddingSweep,
+  // Two-stage vector recall (RAW_CHAT_SEARCH Phase 3)
+  performVectorRecall,
+  HIGH_RELEVANCE_THRESHOLD,
+  MEDIUM_RELEVANCE_THRESHOLD,
+  DEFAULT_RECALL_TIMEOUT_MS,
 };
 
 export type {
@@ -111,6 +122,7 @@ export type {
 } from "./src/backfill.js";
 
 export type { RawChatIndexerOptions } from "./src/hook.js";
+export type { RecallOptions, RecallResult } from "./src/recall.js";
 
 export default definePluginEntry({
   id: "raw-chat-search",
@@ -138,6 +150,27 @@ export default definePluginEntry({
         stopRawChatIndexer();
         closeAllRawChatDatabases();
       },
+    });
+
+    api.on("before_prompt_build", async (event, ctx) => {
+      if (process.env.DENNOU_SKIP_VECTOR_RECALL === "1") {
+        return undefined;
+      }
+
+      try {
+        const result = await performVectorRecall({
+          prompt: event.prompt,
+          agentId: ctx.agentId,
+          sessionId: ctx.sessionId,
+        });
+        return result.injectedContext ? { prependContext: result.injectedContext } : undefined;
+      } catch (error) {
+        // Recall is an optional accelerator: never make prompt construction fail.
+        api.logger.warn(
+          `raw-chat-search: vector recall skipped: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return undefined;
+      }
     });
   },
 });
