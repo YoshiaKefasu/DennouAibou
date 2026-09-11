@@ -19,10 +19,6 @@ vi.mock("../tools/message-tool.js", () => ({
   createMessageTool: () => stubTool("message"),
 }));
 
-vi.mock("../tools/music-generate-tool.js", () => ({
-  createMusicGenerateTool: () => stubTool("music_generate"),
-}));
-
 vi.mock("../tools/nodes-tool.js", () => ({
   createNodesTool: () => stubTool("nodes"),
 }));

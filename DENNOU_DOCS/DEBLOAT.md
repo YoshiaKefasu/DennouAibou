@@ -1,6 +1,6 @@
 # DEBLOAT — 大規模削除クリーンアップ計画
 
-> 最終更新: 2026-08-21
+> 最終更新: 2026-09-12
 > 対象リポジトリ: DennouAibou（OpenClaw Hard Fork, base v2026.4.5）
 
 ## 1. 目的と方針
@@ -1404,3 +1404,72 @@ ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-s
 - `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の 2 件、`task-executor-policy.test.ts` の 1 件）— §20.7 からの継続
 - `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` の flaky test（`reuses webhook credentials after unbind when rebinding in the same channel`）— 並列実行の webhook モックレース。ACP 削除と無関係だが次の flaky 掃除タスクで対応
 - `src/plugin-sdk/facade-runtime.test.ts` の pre-existing 失敗 8 件 — §20.7 からの継続
+## 22. 生成系ツール（image_generate / music_generate / video_generate）完全削除（2026-09-12 時点作業）
+
+### 22.1 背景・動機
+
+KASOU 運用では画像・音楽・動画の生成系ツール（`image_generate` / `music_generate` / `video_generate`）は未使用。これらは
+
+- システムプロンプトに常時載るツール定義（3 ツール合計で約 2,000 行のスキーマ・説明文）を肥大させ、プロンプトキャッシュのコストとトークン消費を押し上げる
+- 生成系プロバイダー認証（OpenAI / Google / Qwen 等）が env に存在するだけでツールが有効化されるため、モデルが不要な生成呼び出しを行う誤爆のリスクがある
+- DEBLOAT 方針（1 章）の「未使用機能のコード・ビルド・ドキュメント重量を減らす」に合致する
+
+ユーザー裁定：「不要な生成系ツール 3 つの完全撤去（DEBLOAT）」＋「関連する死んだ参照のクリーンアップ」＋「commit は 1 個・push 禁止 / Kasou セッションへの話しかけ禁止」。本セクションは当該作業の記録。
+
+### 22.2 削除したファイル（17 件）
+
+| ファイル | 種別 |
+| --- | --- |
+| `src/agents/tools/image-generate-tool.ts` | ツール本体 |
+| `src/agents/tools/image-generate-tool.test.ts` | テスト |
+| `src/agents/tools/music-generate-tool.ts` | ツール本体 |
+| `src/agents/tools/music-generate-tool.actions.ts` | アクション実装 |
+| `src/agents/tools/music-generate-tool.test.ts` | テスト |
+| `src/agents/tools/video-generate-tool.ts` | ツール本体 |
+| `src/agents/tools/video-generate-tool.actions.ts` | アクション実装 |
+| `src/agents/tools/video-generate-tool.test.ts` | テスト |
+| `src/agents/tools/music-generate-tool.status.test.ts` | status アクションのテスト（削除した actions を import していたため） |
+| `src/agents/tools/video-generate-tool.status.test.ts` | 同上 |
+| `src/agents/tools/music-generate-background.ts` | バックグラウンド生成実装（ツール専用・削除後に死コード化） |
+| `src/agents/tools/music-generate-background.test.ts` | 同上のテスト |
+| `src/agents/tools/video-generate-background.ts` | バックグラウンド生成実装（ツール専用・削除後に死コード化） |
+| `src/agents/tools/video-generate-background.test.ts` | 同上のテスト |
+| `src/agents/tools/media-generate-background-shared.ts` | 上記 background 2 モジュール専用の共有ヘルパー |
+| `src/agents/openclaw-tools.image-generation.test.ts` | `createOpenClawTools` への image_generate 登録テスト |
+| `src/agents/openclaw-tools.video-generation.test.ts` | `createOpenClawTools` への video_generate 登録テスト |
+
+### 22.3 コア参照のクリーンアップ
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `src/agents/openclaw-tools.ts` | `createImageGenerateTool` / `createMusicGenerateTool` / `createVideoGenerateTool` の import・インスタンス生成・`openclawTools` 返却配列からの除去 |
+| `src/agents/pi-embedded-subscribe.handlers.tools.ts` | `COMPACT_PROVIDER_INVENTORY_TOOLS`（image_generate / video_generate 専用）と `hasProviderInventoryDetails` / `shouldEmitCompactToolOutput` を削除。対象ツールが消えたため compact provider inventory 出力機能は空になり不要に |
+| `src/agents/pi-embedded-subscribe.tools.ts` | `TRUSTED_TOOL_RESULT_MEDIA`（ローカル `MEDIA:` パスを許可するコアツール集合）から 3 ツールを除去 |
+| `src/agents/pi-embedded-subscribe.handlers.tools.media.test.ts` | image_generate / video_generate を使用するテストケースを削除・調整（structured media 検証は trusted コアツール `canvas` に置換、compact provider inventory テストは削除） |
+| `src/agents/pi-embedded-subscribe.tools.media.test.ts` | 3 ツールのメディア信頼判定テストを削除（core tool trust テストは `browser` に置換） |
+| `src/agents/tool-catalog.ts` / `tool-catalog.test.ts` | `CORE_TOOL_DEFINITIONS` と coding profile allow 検証から 3 ツールを除去 |
+| `src/agents/tool-display-config.ts` | 表示設定（emoji / title / actions）から 3 ツールを除去 |
+| `src/agents/test-helpers/fast-tool-stubs.ts` | `image-generate-tool.js` / `video-generate-tool.js` のモックを削除 |
+| `src/agents/test-helpers/fast-openclaw-tools-sessions.ts` | `createMusicGenerateTool` のスタブを削除 |
+| `src/agents/test-helpers/fast-openclaw-tools.ts` | コアツールスタブ一覧から `image_generate` / `video_generate` を除去 |
+
+### 22.4 温存した現役機能（触らなかったもの）
+
+- `src/agents/music-generation-task-status.ts` / `src/agents/video-generation-task-status.ts` / `media-generation-task-status-shared.ts` — セッションの非同期タスク状態をプロンプトに反映する現役ヘルパー。`pi-embedded-runner/run/attempt.prompt-helpers.ts` が使用中のため残す
+- `src/tasks/task-executor.test.ts` / `src/gateway/server-methods/agent.test.ts` 等のサンプルデータ内の `music_generate:...` / `video_generate:...` 文字列 — タスク実行基盤のテストフィクスチャでありツール参照ではないため温存
+- `docs/tools/image-generation.md` / `music-generation.md` / `video-generation.md` — ドキュメント改訂は本タスクのスコープ外（別フェーズ候補）
+
+### 22.5 検証ゲート結果
+
+| ゲート | 結果 |
+| --- | --- |
+| `pnpm exec tsgo --noEmit` | **0 errors** |
+| `pnpm exec oxfmt --check`（変更 11 ファイル） | **clean** |
+| 影響範囲スコープテスト（編集モジュールを import する 24 テストファイル） | **198/198 passed**（`server.sessions-send.test.ts` のみ gateway テストヘルパーの `afterAll` フック 180 秒タイムアウトで環境要因失敗・単体再現確認済、テスト本体 2 件は pass） |
+
+### 22.6 変更規模
+
+- 削除: 17 ファイル・5,541 行
+- 修正: 11 ファイル（ソース 8・テスト 3）
+- 新規追加: なし（DEBLOAT.md 本節のみ追記）
+- コミット: 1 コミット予定（push 禁止、ユーザー指示遵守）

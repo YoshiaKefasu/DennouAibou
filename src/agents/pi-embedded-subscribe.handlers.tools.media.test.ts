@@ -200,7 +200,7 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "image_generate",
+      toolName: "canvas",
       toolCallId: "tc-1",
       isError: false,
       result: {
@@ -228,14 +228,14 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "image_generate",
+      toolName: "canvas",
       toolCallId: "tc-1",
       isError: false,
       result: {
         content: [
           {
             type: "text",
-            text: "Generated 1 image with google/gemini-3.1-flash-image-preview.\nMEDIA:/tmp/generated.png",
+            text: "Rendered canvas output.\nMEDIA:/tmp/generated.png",
           },
         ],
         details: {
@@ -259,14 +259,14 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "image_generate",
+      toolName: "canvas",
       toolCallId: "tc-1",
       isError: false,
       result: {
         content: [
           {
             type: "text",
-            text: "Generated 1 image with google/gemini-3.1-flash-image-preview.\nMEDIA:/tmp/generated.png",
+            text: "Rendered canvas output.\nMEDIA:/tmp/generated.png",
           },
         ],
         details: {
@@ -279,53 +279,6 @@ describe("handleToolExecutionEnd media emission", () => {
 
     expect(ctx.emitToolOutput).toHaveBeenCalled();
     expect(ctx.state.pendingToolMediaUrls).toEqual(["/tmp/generated.png"]);
-  });
-
-  it("emits provider inventory output for compact video_generate list results", async () => {
-    const ctx = createMockContext({
-      shouldEmitToolOutput: false,
-      onToolResult: vi.fn(),
-      toolResultFormat: "plain",
-    });
-
-    await handleToolExecutionEnd(ctx, {
-      type: "tool_execution_end",
-      toolName: "video_generate",
-      toolCallId: "tc-1",
-      isError: false,
-      result: {
-        content: [
-          {
-            type: "text",
-            text: [
-              "openai: default=sora-2 | models=sora-2",
-              "google: default=veo-3.1-fast-generate-preview | models=veo-3.1-fast-generate-preview",
-            ].join("\n"),
-          },
-        ],
-        details: {
-          providers: [
-            { id: "openai", defaultModel: "sora-2", models: ["sora-2"] },
-            {
-              id: "google",
-              defaultModel: "veo-3.1-fast-generate-preview",
-              models: ["veo-3.1-fast-generate-preview"],
-            },
-          ],
-        },
-      },
-    });
-
-    expect(ctx.emitToolOutput).toHaveBeenCalledWith(
-      "video_generate",
-      undefined,
-      [
-        "openai: default=sora-2 | models=sora-2",
-        "google: default=veo-3.1-fast-generate-preview | models=veo-3.1-fast-generate-preview",
-      ].join("\n"),
-      expect.any(Object),
-    );
-    expect(ctx.state.pendingToolMediaUrls).toEqual([]);
   });
 
   it("does NOT emit media for error results", async () => {
@@ -362,7 +315,7 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "image_generate",
+      toolName: "canvas",
       toolCallId: "tc-1",
       isError: false,
       result: {
@@ -429,7 +382,7 @@ describe("handleToolExecutionEnd media emission", () => {
 
     await handleToolExecutionEnd(ctx, {
       type: "tool_execution_end",
-      toolName: "image_generate",
+      toolName: "canvas",
       toolCallId: "tc-1",
       isError: false,
       result: {

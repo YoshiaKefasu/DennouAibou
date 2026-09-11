@@ -277,30 +277,6 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     profiles: ["coding"],
     includeInOpenClawGroup: true,
   },
-  {
-    id: "image_generate",
-    label: "image_generate",
-    description: "Image generation",
-    sectionId: "media",
-    profiles: ["coding"],
-    includeInOpenClawGroup: true,
-  },
-  {
-    id: "music_generate",
-    label: "music_generate",
-    description: "Music generation",
-    sectionId: "media",
-    profiles: ["coding"],
-    includeInOpenClawGroup: true,
-  },
-  {
-    id: "video_generate",
-    label: "video_generate",
-    description: "Video generation",
-    sectionId: "media",
-    profiles: ["coding"],
-    includeInOpenClawGroup: true,
-  },
 ];
 
 const CORE_TOOL_BY_ID = new Map<string, CoreToolDefinition>(
