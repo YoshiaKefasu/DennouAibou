@@ -29,6 +29,12 @@ import type { MsgContext } from "openclaw/plugin-sdk/reply-runtime";
 import { logVerbose } from "openclaw/plugin-sdk/runtime-env";
 import type { NormalizedAllowFrom } from "./bot-access.js";
 import { isSenderAllowed } from "./bot-access.js";
+import {
+  findModelInCatalog,
+  loadModelCatalog,
+  modelSupportsAudio,
+  resolveDefaultModelForAgent,
+} from "./bot-message-context.agent.runtime.js";
 import type {
   TelegramLogger,
   TelegramMediaRef,
@@ -67,6 +73,24 @@ async function resolveStickerVisionSupport(params: {
     const { resolveStickerVisionSupportRuntime } = await import("./sticker-vision.runtime.js");
     return await resolveStickerVisionSupportRuntime(params);
   } catch {
+    return false;
+  }
+}
+
+async function resolveActiveModelSupportsAudio(params: {
+  cfg: OpenClawConfig;
+  agentId?: string;
+}): Promise<boolean> {
+  try {
+    const catalog = await loadModelCatalog({ config: params.cfg });
+    const activeModel = resolveDefaultModelForAgent({
+      cfg: params.cfg,
+      agentId: params.agentId,
+    });
+    const entry = findModelInCatalog(catalog, activeModel.provider, activeModel.model);
+    return modelSupportsAudio(entry);
+  } catch {
+    // Keep the existing transcription fallback when model resolution is unavailable.
     return false;
   }
 }
@@ -180,7 +204,7 @@ export async function resolveTelegramInboundBody(params: {
     !useAccessGroups || !allowForCommands.hasEntries || senderAllowedForCommands;
 
   let preflightTranscript: string | undefined;
-  const needsPreflightTranscription =
+  const canPreflightByChannel =
     hasAudio &&
     !hasUserText &&
     (!isGroup ||
@@ -188,6 +212,11 @@ export async function resolveTelegramInboundBody(params: {
         mentionRegexes.length > 0 &&
         !disableAudioPreflight &&
         senderAllowedForAudioPreflight));
+  // Native-audio models must receive the original audio marker so the later
+  // media pipeline can append the Base64 audio block without transcript text.
+  const needsPreflightTranscription =
+    canPreflightByChannel &&
+    !(await resolveActiveModelSupportsAudio({ cfg, agentId: routeAgentId }));
 
   if (needsPreflightTranscription) {
     try {
