@@ -804,7 +804,7 @@ Gatekeeper は「誰が変更したか」を保証する監査層であり、JSO
 ```
 
 - `actor`: 登録済み caller identity。例: `attempt`、`compact`、`prune`、`audio-stt`、`repair`、`gateway`、`plugin`。
-- `action`: `append | prune | rewrite | repair` のいずれか。
+- `action`: `append | prune | rewrite | repair | compact` のいずれか。
 - `op`: 再試行・同時実行を区別する操作 ID。
 - `lines`: 変更した行数。拒否時は `0` とし、`result=rejected reason=unknown-actor` 等の理由を付加する。
 - `sessionId`: 対象セッションを省略しない。解決できない場合は変更を拒否する。
@@ -828,8 +828,8 @@ Gatekeeper は「誰が変更したか」を保証する監査層であり、JSO
 
 | フェーズ | 内容 | 完了条件 |
 | --- | --- | --- |
-| **Phase A: ログのみ** | 全 append / prune / rewrite / repair 経路を Gatekeeper に接続し、caller identity とチェックインログを記録する。既存挙動は維持し、未登録 caller は警告付きで棚卸しする。 | journal / gateway ログから actor・action・op・lines・sessionId を追跡でき、全変更経路の一覧が得られる |
-| **Phase B: 未知却下** | Phase A で確定した allowlist を登録し、空・未知・不完全な caller の変更を実行前に拒否する。 | 未知 caller の JSONL が 1 行も変更されず、拒否ログ（`lines=0`）から理由を特定できる |
+| **Phase A: ログのみ** | 全 append / prune / rewrite / repair / compact 経路を Gatekeeper に接続し、caller identity とチェックインログを記録する。既存挙動は維持し、未登録 caller は警告付きで棚卸しする。 | journal / gateway ログから actor・action・op・lines・sessionId を追跡でき、全変更経路の一覧が得られる |
+| **Phase B: 未知却下** | Phase A で確定した allowlist を登録し、空・未知・不完全な caller の変更を実行前に拒否する。詳細は §5.7。 | 未知 caller の JSONL が 1 行も変更されず、拒否ログ（`lines=0`）から理由を特定できる |
 
 ### 5.6 §4 既存ガードとの関係
 
@@ -846,15 +846,16 @@ Gatekeeper は「誰が変更したか」を保証する監査層であり、JSO
 
 ### 5.7 事前申請・事前承認（Pre-auth）
 
-> **状態**: Phase B を「未知却下」から **事前申請・事前承認** に格上げする。書き込む前に、誰が何をするかを Gateway へ申請し、承認後にだけ処理を開始する。
+> **状態**: Phase B を「未知却下」から **事前申請・事前承認** に格上げする。書き込む前に、誰が何をするかを Gatekeeper へ申請し、承認後にだけ処理を開始する。
 
-「やった後はもう遅い。入る前・やる前に、誰が・何をやるか記録する。」を原則とする。すべてのセッション JSONL の append / prune / rewrite / repair / compact は、変更前に次の申請を Gateway へ送る。
+「やった後はもう遅い。入る前・やる前に、誰が・何をやるか記録する。」を原則とする。すべてのセッション JSONL の append / prune / rewrite / repair / compact は、変更前に次の申請を Gatekeeper へ送る。
 
 ```ts
 requestSessionWrite({
   actor,
   action,
   op,
+  sessionId,
   targetLines,
   reason,
 })
@@ -863,9 +864,9 @@ requestSessionWrite({
 #### 申請フロー
 
 1. caller は、ファイル・セッションへ一切書き込む前に `requestSessionWrite(...)` を呼び出す。
-2. Gateway（門番）は必須フィールド、allowlist、操作 ID の一意性、対象行範囲、理由の明確性を検証する。
+2. Gatekeeper は必須フィールド（`sessionId` を含む）、allowlist、操作 ID の一意性、対象セッション、対象行範囲、理由の明確性を検証する。
 3. 検証成功時は `granted` を返す。caller は **承認を受けてから**書き込みを実行する。
-4. 1つでも欠落・空欄・不明瞭な値がある場合は `denied: reason` を返し、書き込みを実行しない。
+4. 1つでも欠落・空欄・不明瞭な値がある場合は `result=rejected reason=<reason>` を返し、書き込みを実行しない。
 5. 実行後は、既存の Phase A チェックインログを出力し、申請と実績を `op` で突合できるようにする。
 
 #### 必須フィールド
@@ -875,15 +876,16 @@ requestSessionWrite({
 | `actor` | 誰が実行するか。登録済み caller identity であること。 |
 | `action` | `append` / `prune` / `rewrite` / `repair` / `compact` のいずれか。 |
 | `op` | 申請を一意に識別する操作 ID。同一 ID の再利用は却下する。 |
+| `sessionId` | 対象セッションを省略しない。解決できない場合は申請を却下する。 |
 | `targetLines` | 変更対象の行範囲。対象が明確な非空の範囲であること。 |
 | `reason` | 何のために実行するか。空欄・曖昧な説明は不可。 |
 
-上記のいずれか1つでも欠ける、空である、または「誰が・何を・何行・なぜ」が特定できない申請は門前払いとする。申請の承認結果は Gateway の事前記録に残し、caller が `granted` を自己発行したり、承認後に対象範囲を変更したりしてはならない。範囲や操作を変更する場合は、新しい `op` で再申請する。
+上記のいずれか1つでも欠ける、空である、または「誰が・何を・何行・なぜ」が特定できない申請は門前払いとする。申請の承認結果は Gatekeeper の事前記録に残し、caller が `granted` を自己発行したり、承認後に対象範囲を変更したりしてはならない。範囲や操作を変更する場合は、新しい `op` で再申請する。
 
 #### Phase A / Phase B / §4 との関係
 
 - **Phase A（事後ログ）** はそのまま残す。承認後の実行結果をチェックインログへ記録し、事前申請と事後実績の二重記録にする。
-- **Phase B（未知却下）** は本節の事前申請・事前承認へ格上げする。空・未知・不完全な申請は、書き込み前に `denied: reason` として拒否する。
+- **Phase B（未知却下）** は本節の事前申請・事前承認へ格上げする。空・未知・不完全な申請は、書き込み前に `result=rejected reason=<reason>` として拒否する。
 - **§4 の整合性ガード** は変更しない。`granted` 後の書き込みだけが §4 の post-append 検証、ヘルスチェック、自動修復へ進む。
 
 ---
