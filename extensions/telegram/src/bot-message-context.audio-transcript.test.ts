@@ -1,23 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const transcribeFirstAudioMock = vi.fn();
-const loadModelCatalogMock = vi.fn();
-const findModelInCatalogMock = vi.fn();
-const modelSupportsAudioMock = vi.fn();
-const resolveDefaultModelForAgentMock = vi.fn();
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5";
 const DEFAULT_WORKSPACE = "/tmp/openclaw";
 const DEFAULT_MENTION_PATTERN = "\\bbot\\b";
 
 vi.mock("./media-understanding.runtime.js", () => ({
   transcribeFirstAudio: (...args: unknown[]) => transcribeFirstAudioMock(...args),
-}));
-
-vi.mock("./bot-message-context.agent.runtime.js", () => ({
-  findModelInCatalog: (...args: unknown[]) => findModelInCatalogMock(...args),
-  loadModelCatalog: (...args: unknown[]) => loadModelCatalogMock(...args),
-  modelSupportsAudio: (...args: unknown[]) => modelSupportsAudioMock(...args),
-  resolveDefaultModelForAgent: (...args: unknown[]) => resolveDefaultModelForAgentMock(...args),
 }));
 
 const { buildTelegramMessageContextForTest } =
@@ -60,6 +49,7 @@ async function buildGroupVoiceContext(params: {
   mediaPath: string;
   groupDisableAudioPreflight?: boolean;
   topicDisableAudioPreflight?: boolean;
+  forceWasMentioned?: boolean;
 }) {
   const groupConfig = {
     requireMention: true,
@@ -82,7 +72,7 @@ async function buildGroupVoiceContext(params: {
       voice: { file_id: params.fileId },
     },
     allMedia: [{ path: params.mediaPath, contentType: "audio/ogg" }],
-    options: { forceWasMentioned: true },
+    options: params.forceWasMentioned ? { forceWasMentioned: true } : undefined,
     cfg: {
       agents: { defaults: { model: DEFAULT_MODEL, workspace: DEFAULT_WORKSPACE } },
       channels: { telegram: {} },
@@ -97,35 +87,19 @@ async function buildGroupVoiceContext(params: {
   });
 }
 
-function expectTranscriptRendered(
-  ctx: Awaited<ReturnType<typeof buildGroupVoiceContext>>,
-  transcript: string,
-) {
-  expect(ctx).not.toBeNull();
-  expect(ctx?.ctxPayload?.BodyForAgent).toBe(transcript);
-  expect(ctx?.ctxPayload?.Body).toContain(transcript);
-  expect(ctx?.ctxPayload?.Body).not.toContain("<media:audio>");
-}
-
 function expectAudioPlaceholderRendered(ctx: Awaited<ReturnType<typeof buildGroupVoiceContext>>) {
   expect(ctx).not.toBeNull();
+  expect(ctx?.ctxPayload?.BodyForAgent).toBe("<media:audio>");
   expect(ctx?.ctxPayload?.Body).toContain("<media:audio>");
 }
 
 describe("buildTelegramMessageContext audio transcript body", () => {
   beforeEach(() => {
     transcribeFirstAudioMock.mockReset();
-    loadModelCatalogMock.mockReset().mockResolvedValue([]);
-    findModelInCatalogMock.mockReset().mockReturnValue(undefined);
-    modelSupportsAudioMock.mockReset().mockReturnValue(false);
-    resolveDefaultModelForAgentMock.mockReset().mockReturnValue({
-      provider: "anthropic",
-      model: "claude-opus-4-5",
-    });
   });
 
-  it("skips DM preflight when the active model supports native audio", async () => {
-    modelSupportsAudioMock.mockReturnValue(true);
+  it("skips DM preflight and keeps the audio marker in the body", async () => {
+    transcribeFirstAudioMock.mockResolvedValueOnce("hello from a voice note");
 
     const ctx = await buildDirectVoiceContext({
       messageId: 10,
@@ -133,64 +107,24 @@ describe("buildTelegramMessageContext audio transcript body", () => {
       date: 1_700_000_010,
       fromId: 42,
       firstName: "Pat",
-      fileId: "voice-native-1",
-      mediaPath: "/tmp/voice-native.ogg",
+      fileId: "voice-dm-1",
+      mediaPath: "/tmp/voice-dm.ogg",
     });
 
-    expect(loadModelCatalogMock).toHaveBeenCalledTimes(1);
-    expect(resolveDefaultModelForAgentMock).toHaveBeenCalledTimes(1);
-    expect(findModelInCatalogMock).toHaveBeenCalledTimes(1);
-    expect(modelSupportsAudioMock).toHaveBeenCalledTimes(1);
     expect(transcribeFirstAudioMock).not.toHaveBeenCalled();
     expect(ctx?.ctxPayload?.BodyForAgent).toBe("<media:audio>");
     expect(ctx?.ctxPayload?.Body).toContain("<media:audio>");
+    expect(ctx?.ctxPayload?.Body).not.toContain("hello from a voice note");
   });
 
-  it("runs DM preflight when the active model does not support native audio", async () => {
-    transcribeFirstAudioMock.mockResolvedValueOnce("hello from a non-native voice note");
-
-    const ctx = await buildDirectVoiceContext({
-      messageId: 11,
-      chatId: 43,
-      date: 1_700_000_011,
-      fromId: 43,
-      firstName: "Quinn",
-      fileId: "voice-nonnative-1",
-      mediaPath: "/tmp/voice-nonnative.ogg",
-    });
-
-    expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
-    expect(ctx?.ctxPayload?.BodyForAgent).toBe("hello from a non-native voice note");
-    expect(ctx?.ctxPayload?.Body).toContain("hello from a non-native voice note");
-    expect(ctx?.ctxPayload?.Body).not.toContain("<media:audio>");
-  });
-
-  it("runs DM preflight when the active model cannot be resolved", async () => {
-    loadModelCatalogMock.mockRejectedValueOnce(new Error("catalog unavailable"));
-    transcribeFirstAudioMock.mockResolvedValueOnce("fallback transcript");
-
-    const ctx = await buildDirectVoiceContext({
-      messageId: 12,
-      chatId: 44,
-      date: 1_700_000_012,
-      fromId: 44,
-      firstName: "Riley",
-      fileId: "voice-fallback-1",
-      mediaPath: "/tmp/voice-fallback.ogg",
-    });
-
-    expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
-    expect(ctx?.ctxPayload?.BodyForAgent).toBe("fallback transcript");
-  });
-
-  it("uses preflight transcript as BodyForAgent for mention-gated group voice messages", async () => {
+  it("keeps the audio marker in the body when group preflight finds a mention", async () => {
     transcribeFirstAudioMock.mockResolvedValueOnce("hey bot please help");
 
     const ctx = await buildGroupVoiceContext({
       messageId: 1,
       chatId: -1001234567890,
       title: "Test Group",
-      date: 1700000000,
+      date: 1_700_000_000,
       fromId: 42,
       firstName: "Alice",
       fileId: "voice-1",
@@ -198,22 +132,24 @@ describe("buildTelegramMessageContext audio transcript body", () => {
     });
 
     expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
-    expectTranscriptRendered(ctx, "hey bot please help");
+    expect(ctx?.ctxPayload?.BodyForAgent).toBe("<media:audio>");
+    expect(ctx?.ctxPayload?.Body).toContain("<media:audio>");
+    expect(ctx?.ctxPayload?.Body).not.toContain("hey bot please help");
+    expect(ctx?.ctxPayload?.WasMentioned).toBe(true);
   });
 
   it("skips preflight transcription when disableAudioPreflight is true", async () => {
-    transcribeFirstAudioMock.mockClear();
-
     const ctx = await buildGroupVoiceContext({
       messageId: 2,
       chatId: -1001234567891,
       title: "Test Group 2",
-      date: 1700000100,
+      date: 1_700_000_100,
       fromId: 43,
       firstName: "Bob",
       fileId: "voice-2",
       mediaPath: "/tmp/voice2.ogg",
       groupDisableAudioPreflight: true,
+      forceWasMentioned: true,
     });
 
     expect(transcribeFirstAudioMock).not.toHaveBeenCalled();
@@ -227,33 +163,34 @@ describe("buildTelegramMessageContext audio transcript body", () => {
       messageId: 3,
       chatId: -1001234567892,
       title: "Test Group 3",
-      date: 1700000200,
+      date: 1_700_000_200,
       fromId: 44,
       firstName: "Cara",
       fileId: "voice-3",
       mediaPath: "/tmp/voice3.ogg",
       groupDisableAudioPreflight: true,
       topicDisableAudioPreflight: false,
+      forceWasMentioned: true,
     });
 
     expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
-    expectTranscriptRendered(ctx, "topic override transcript");
+    expectAudioPlaceholderRendered(ctx);
+    expect(ctx?.ctxPayload?.Body).not.toContain("topic override transcript");
   });
 
   it("uses topic disableAudioPreflight=true to override group disableAudioPreflight=false", async () => {
-    transcribeFirstAudioMock.mockClear();
-
     const ctx = await buildGroupVoiceContext({
       messageId: 4,
       chatId: -1001234567893,
       title: "Test Group 4",
-      date: 1700000300,
+      date: 1_700_000_300,
       fromId: 45,
       firstName: "Dan",
       fileId: "voice-4",
       mediaPath: "/tmp/voice4.ogg",
       groupDisableAudioPreflight: false,
       topicDisableAudioPreflight: true,
+      forceWasMentioned: true,
     });
 
     expect(transcribeFirstAudioMock).not.toHaveBeenCalled();

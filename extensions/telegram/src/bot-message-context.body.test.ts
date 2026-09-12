@@ -141,12 +141,13 @@ describe("resolveTelegramInboundBody", () => {
 
     expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
-      bodyText: "hey bot please help",
+      bodyText: "<media:audio>",
       effectiveWasMentioned: true,
     });
+    expect(result?.bodyText).not.toContain("hey bot please help");
   });
 
-  it("transcribes DM voice notes via preflight (not only groups)", async () => {
+  it("skips DM voice-note preflight and keeps the audio marker in the body", async () => {
     transcribeFirstAudioMock.mockReset();
     transcribeFirstAudioMock.mockResolvedValueOnce("hello from a voice note");
 
@@ -183,10 +184,10 @@ describe("resolveTelegramInboundBody", () => {
       logger: { info: vi.fn() },
     });
 
-    expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
+    expect(transcribeFirstAudioMock).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      bodyText: "hello from a voice note",
+      bodyText: "<media:audio>",
     });
-    expect(result?.bodyText).not.toContain("<media:audio>");
+    expect(result?.bodyText).not.toContain("hello from a voice note");
   });
 });
