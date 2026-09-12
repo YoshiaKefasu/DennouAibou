@@ -10,8 +10,9 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { logSessionCheckin, requestSessionWrite } from "../agents/session-gatekeeper.js";
 import { logDebug } from "../logger.js";
-import { pruneToolOutputLines } from "./prune-engine.js";
+import { parseLine, pruneToolOutputLines } from "./prune-engine.js";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 
 /** 安全なatomic renameのための一時ファイル拡張子 */
@@ -95,6 +96,27 @@ export function pruneActiveSessionFile(
     return -1; // 呼び出し元に「中断した」ことを伝える
   }
 
+  const sessionHeader = lines
+    .map((line) => parseLine(line)?.parsed)
+    .find((entry) => entry?.type === "session");
+  const sessionId = typeof sessionHeader?.id === "string" ? sessionHeader.id.trim() : "";
+  const op = `prune-${Date.now()}-${prunedCount}`;
+  const authorization = requestSessionWrite({
+    actor: "prune",
+    action: "prune",
+    op,
+    sessionId,
+    targetLines: `1-${lines.length}`,
+    reason: `prune oversized tool results in ${path.basename(filePath)}`,
+  });
+  if (!authorization.granted) {
+    logger(
+      `[DennouAibou] SKIP write ${filePath}: session pre-authorization denied ` +
+        `reason=${authorization.reason}`,
+    );
+    return 0;
+  }
+
   // ---- atomic write ----
   // 閉じたファイルと違い、アクティブセッションは上流がいつ書き込むかわからない。
   // 一時ファイルに書き出してから atomic rename することで安全に置き換える。
@@ -124,6 +146,13 @@ export function pruneActiveSessionFile(
     // atomic rename
     fs.renameSync(tmpPath, filePath);
     logger(`[DennouAibou] PRUNED ${filePath} (${prunedCount} lines)`);
+    logSessionCheckin({
+      actor: "prune",
+      action: "prune",
+      op,
+      lines: prunedCount,
+      sessionId,
+    });
     return prunedCount;
   } catch (err) {
     // 後片付け

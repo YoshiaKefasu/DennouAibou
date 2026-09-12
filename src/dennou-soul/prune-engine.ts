@@ -9,7 +9,6 @@
  *   `keepLastAssistants`（直近 N 回のアシスタント発言を保護）に一本化した。
  * - `pruneToolResultEntry` は export 化し、冪等性ガード（二重置換防止）を追加した。
  */
-import { logSessionCheckin } from "../agents/session-gatekeeper.js";
 import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from "./types.js";
 
 /**
@@ -349,27 +348,6 @@ export function pruneToolOutputLines(
       resultLines.push(pruneToolResultEntry(entry, config.placeholder));
     }
     prunedCount++;
-  }
-
-  if (prunedCount > 0 && !config.dryRun) {
-    try {
-      const sessionHeader = lines
-        .map((line) => parseLine(line)?.parsed)
-        .find((entry) => entry?.type === "session");
-      const sessionId =
-        typeof sessionHeader?.id === "string" && sessionHeader.id.trim().length > 0
-          ? sessionHeader.id
-          : "unknown";
-      logSessionCheckin({
-        actor: "prune",
-        action: "prune",
-        op: `prune-${Date.now()}-${prunedCount}`,
-        lines: prunedCount,
-        sessionId,
-      });
-    } catch {
-      // Phase A logging is best-effort and must not affect pruning.
-    }
   }
 
   return { resultLines, prunedCount };

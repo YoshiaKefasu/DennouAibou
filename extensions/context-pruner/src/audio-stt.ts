@@ -10,7 +10,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { logSessionCheckin } from "openclaw/plugin-sdk/session-gatekeeper";
+import { logSessionCheckin, requestSessionWrite } from "openclaw/plugin-sdk/session-gatekeeper";
 import type { SttConfig } from "./pruner.js";
 
 const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
@@ -70,7 +70,8 @@ export type AudioSttScanResult = {
     | "missing-file"
     | "recently-updated"
     | "concurrent-update"
-    | "unsupported-provider";
+    | "unsupported-provider"
+    | "preauth-denied";
 };
 
 type AudioTranscriber = (target: AudioAttachmentTarget) => Promise<string | undefined>;
@@ -934,7 +935,30 @@ export async function scanSessionFile(
       rewritten.push(JSON.stringify(result.entry));
     }
 
+    let writeOp: string | undefined;
     if (changed) {
+      writeOp = `audio-stt-${Date.now()}-${transcribed}`;
+      const authorization = requestSessionWrite({
+        actor: "audio-stt",
+        action: "rewrite",
+        op: writeOp,
+        sessionId,
+        targetLines: `1-${lines.length}`,
+        reason: `replace stale audio attachments with transcripts in ${path.basename(options.sessionFile)}`,
+      });
+      if (!authorization.granted) {
+        options.logger?.warn?.(
+          `context-pruner: audio session write skipped for ${options.sessionFile}: ` +
+            `pre-authorization denied (${authorization.reason})`,
+        );
+        return {
+          ...baseResult,
+          candidates,
+          transcribed: 0,
+          changed: false,
+          skipped: "preauth-denied",
+        };
+      }
       const written = await atomicWriteSessionFile(
         options.sessionFile,
         rewritten.join(newline),
@@ -953,7 +977,7 @@ export async function scanSessionFile(
         logSessionCheckin({
           actor: "audio-stt",
           action: "rewrite",
-          op: `audio-stt-${Date.now()}-${transcribed}`,
+          op: writeOp,
           lines: transcribed,
           sessionId,
         });

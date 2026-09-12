@@ -15,9 +15,10 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { logSessionCheckin, requestSessionWrite } from "../agents/session-gatekeeper.js";
 import { resolveStateDir } from "../config/paths.js";
 import { logDebug } from "../logger.js";
-import { pruneToolOutputLines } from "./prune-engine.js";
+import { parseLine, pruneToolOutputLines } from "./prune-engine.js";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
 
 /**
@@ -67,9 +68,36 @@ export function pruneClosedSessionFile(
 
   // dry-runの場合は書き込まない
   if (!config.dryRun && prunedCount > 0) {
+    const sessionHeader = lines
+      .map((line) => parseLine(line)?.parsed)
+      .find((entry) => entry?.type === "session");
+    const sessionId = typeof sessionHeader?.id === "string" ? sessionHeader.id.trim() : "";
+    const op = `prune-${Date.now()}-${prunedCount}`;
+    const authorization = requestSessionWrite({
+      actor: "prune",
+      action: "prune",
+      op,
+      sessionId,
+      targetLines: `1-${lines.length}`,
+      reason: `prune oversized tool results in ${path.basename(filePath)}`,
+    });
+    if (!authorization.granted) {
+      logger(
+        `[DennouAibou] SKIP write ${filePath}: session pre-authorization denied ` +
+          `reason=${authorization.reason}`,
+      );
+      return 0;
+    }
     const output = resultLines.join("\n") + "\n";
     fs.writeFileSync(filePath, output, "utf8");
     logger(`[DennouAibou] WROTE ${filePath} (pruned ${prunedCount} lines)`);
+    logSessionCheckin({
+      actor: "prune",
+      action: "prune",
+      op,
+      lines: prunedCount,
+      sessionId,
+    });
   }
 
   return prunedCount;

@@ -70,7 +70,7 @@ import { registerProviderStreamForModel } from "../provider-stream.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
 import { resolveSandboxContext } from "../sandbox.js";
 import { repairSessionFileIfNeeded } from "../session-file-repair.js";
-import { logSessionCheckin } from "../session-gatekeeper.js";
+import { logSessionCheckin, requestSessionWrite } from "../session-gatekeeper.js";
 import { guardSessionManager } from "../session-tool-result-guard-wrapper.js";
 import { sanitizeToolUseResultPairing } from "../session-transcript-repair.js";
 import {
@@ -928,6 +928,21 @@ export async function compactEmbeddedPiSessionDirect(
             // the sanity check below becomes a no-op instead of crashing compaction.
           }
           const activeSession = session;
+          const writeAuthorization = requestSessionWrite({
+            actor: "compact",
+            action: "compact",
+            op: runId,
+            sessionId: params.sessionId,
+            targetLines: `1-${Math.max(1, messageCountCompactionInput)}`,
+            reason: `compact session transcript trigger=${trigger}`,
+          });
+          if (!writeAuthorization.granted) {
+            log.warn(
+              `[session:preauth] session write skipped: actor=compact ` +
+                `op=${runId} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
+            );
+            return fail(`session write denied: ${writeAuthorization.reason}`);
+          }
           const result = await compactWithSafetyTimeout(
             () => {
               setCompactionSafeguardCancelReason(compactionSessionManager, undefined);
@@ -1202,6 +1217,26 @@ export async function compactEmbeddedPiSession(
             });
           }
         }
+        const writeOp = `compact-${params.sessionId}-${Date.now()}`;
+        const writeAuthorization = requestSessionWrite({
+          actor: "compact",
+          action: "compact",
+          op: writeOp,
+          sessionId: params.sessionId,
+          targetLines: "session-file:all-lines",
+          reason: `compact session transcript trigger=${params.trigger ?? "manual"} engine-owned`,
+        });
+        if (!writeAuthorization.granted) {
+          log.warn(
+            `[session:preauth] session write skipped: actor=compact ` +
+              `op=${writeOp} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
+          );
+          return {
+            ok: false,
+            compacted: false,
+            reason: `session write denied: ${writeAuthorization.reason}`,
+          };
+        }
         const result = await contextEngine.compact({
           sessionId: params.sessionId,
           sessionKey: params.sessionKey,
@@ -1233,7 +1268,7 @@ export async function compactEmbeddedPiSession(
             logSessionCheckin({
               actor: "compact",
               action: "rewrite",
-              op: `compact-${params.sessionId}-${Date.now()}`,
+              op: writeOp,
               lines: 0,
               sessionId: params.sessionId,
               detail: `trigger=${params.trigger ?? "manual"} engine-owned`,

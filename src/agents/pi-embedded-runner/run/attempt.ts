@@ -81,7 +81,7 @@ import { registerProviderStreamForModel } from "../../provider-stream.js";
 import { resolveSandboxContext } from "../../sandbox.js";
 import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
 import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
-import { logSessionCheckin } from "../../session-gatekeeper.js";
+import { logSessionCheckin, requestSessionWrite } from "../../session-gatekeeper.js";
 import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
 import { sanitizeToolUseResultPairing } from "../../session-transcript-repair.js";
 import {
@@ -1810,28 +1810,43 @@ export async function runEmbeddedAttempt(
             ...imageResult.images,
             ...(nativeAudioBlocks as unknown as ImageContent[]),
           ];
-          if (promptMedia.length > 0) {
-            await abortable(activeSession.prompt(effectivePrompt, { images: promptMedia }));
-            for (const block of nativeAudioBlocks) {
-              log.info(
-                `[audio:session_persist] audio block persisted in user message: ` +
-                  `sessionId=${params.sessionId} messageRole=user mimeType=${block.mimeType} ` +
-                  `b64Bytes=${Buffer.byteLength(block.data, "base64")}`,
-              );
-            }
+          const writeAuthorization = requestSessionWrite({
+            actor: "attempt",
+            action: "append",
+            op: params.runId,
+            sessionId: params.sessionId,
+            targetLines: 1,
+            reason: "persist inbound prompt message",
+          });
+          if (!writeAuthorization.granted) {
+            log.warn(
+              `[session:preauth] session write skipped: actor=attempt ` +
+                `op=${params.runId} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
+            );
           } else {
-            await abortable(activeSession.prompt(effectivePrompt));
-          }
-          try {
-            logSessionCheckin({
-              actor: "attempt",
-              action: "append",
-              op: params.runId,
-              lines: 1,
-              sessionId: params.sessionId,
-            });
-          } catch (checkinErr) {
-            log.warn(`session check-in logging failed after prompt: ${String(checkinErr)}`);
+            if (promptMedia.length > 0) {
+              await abortable(activeSession.prompt(effectivePrompt, { images: promptMedia }));
+              for (const block of nativeAudioBlocks) {
+                log.info(
+                  `[audio:session_persist] audio block persisted in user message: ` +
+                    `sessionId=${params.sessionId} messageRole=user mimeType=${block.mimeType} ` +
+                    `b64Bytes=${Buffer.byteLength(block.data, "base64")}`,
+                );
+              }
+            } else {
+              await abortable(activeSession.prompt(effectivePrompt));
+            }
+            try {
+              logSessionCheckin({
+                actor: "attempt",
+                action: "append",
+                op: params.runId,
+                lines: 1,
+                sessionId: params.sessionId,
+              });
+            } catch (checkinErr) {
+              log.warn(`session check-in logging failed after prompt: ${String(checkinErr)}`);
+            }
           }
         } catch (err) {
           // Yield-triggered abort is intentional — treat as clean stop, not error.

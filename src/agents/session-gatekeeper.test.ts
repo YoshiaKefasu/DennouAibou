@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const info = vi.hoisted(() => vi.fn());
 
@@ -6,7 +6,22 @@ vi.mock("../logging/subsystem.js", () => ({
   createSubsystemLogger: vi.fn(() => ({ info })),
 }));
 
-import { logSessionCheckin } from "./session-gatekeeper.js";
+import { logSessionCheckin, requestSessionWrite } from "./session-gatekeeper.js";
+
+function validRequest(op = `test-op-${Date.now()}-${Math.random()}`) {
+  return {
+    actor: "attempt" as const,
+    action: "append" as const,
+    op,
+    sessionId: "agent:main:main",
+    targetLines: "1",
+    reason: "persist inbound prompt message",
+  };
+}
+
+beforeEach(() => {
+  info.mockClear();
+});
 
 describe("logSessionCheckin", () => {
   it("writes the structured check-in fields to the gateway log", () => {
@@ -39,5 +54,46 @@ describe("logSessionCheckin", () => {
         sessionId: "session-1",
       }),
     ).toBe(true);
+  });
+});
+
+describe("requestSessionWrite", () => {
+  it("rejects a request with a missing required field", () => {
+    const request = validRequest();
+    delete (request as Partial<typeof request>).reason;
+
+    expect(requestSessionWrite(request)).toEqual({
+      granted: false,
+      reason: "missing-or-ambiguous-field",
+    });
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("result=rejected"));
+  });
+
+  it("rejects an actor outside the allowlist", () => {
+    const request = { ...validRequest(), actor: "intruder" } as never;
+
+    expect(requestSessionWrite(request)).toEqual({
+      granted: false,
+      reason: "unknown-actor",
+    });
+  });
+
+  it("rejects reuse of an operation id", () => {
+    const request = validRequest();
+
+    expect(requestSessionWrite(request)).toEqual({ granted: true, op: request.op });
+    expect(requestSessionWrite(request)).toEqual({ granted: false, reason: "op-reused" });
+  });
+
+  it("approves a complete allowlisted request and records pre-authorization", () => {
+    const request = validRequest();
+
+    expect(requestSessionWrite(request)).toEqual({ granted: true, op: request.op });
+    expect(info).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[session:preauth] actor=attempt action=append op=${request.op} ` +
+          "targetLines=1 sessionId=agent:main:main result=granted",
+      ),
+    );
   });
 });
