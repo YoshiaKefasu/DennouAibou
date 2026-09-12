@@ -849,6 +849,10 @@
       "types": "./dist/plugin-sdk/state-paths.d.ts",
       "default": "./dist/plugin-sdk/state-paths.js"
     },
+    "./plugin-sdk/session-gatekeeper": {
+      "types": "./dist/plugin-sdk/session-gatekeeper.d.ts",
+      "default": "./dist/plugin-sdk/session-gatekeeper.js"
+    },
     "./plugin-sdk/target-resolver-runtime": {
       "types": "./dist/plugin-sdk/target-resolver-runtime.d.ts",
       "default": "./dist/plugin-sdk/target-resolver-runtime.js"

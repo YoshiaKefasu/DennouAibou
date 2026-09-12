@@ -70,6 +70,7 @@ import { registerProviderStreamForModel } from "../provider-stream.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
 import { resolveSandboxContext } from "../sandbox.js";
 import { repairSessionFileIfNeeded } from "../session-file-repair.js";
+import { logSessionCheckin } from "../session-gatekeeper.js";
 import { guardSessionManager } from "../session-tool-result-guard-wrapper.js";
 import { sanitizeToolUseResultPairing } from "../session-transcript-repair.js";
 import {
@@ -945,6 +946,18 @@ export async function compactEmbeddedPiSessionDirect(
             sessionKey: params.sessionKey,
             sessionFile: params.sessionFile,
           });
+          try {
+            logSessionCheckin({
+              actor: "compact",
+              action: "rewrite",
+              op: runId,
+              lines: Math.max(0, messageCountCompactionInput - session.messages.length),
+              sessionId: params.sessionId,
+              detail: `trigger=${trigger}`,
+            });
+          } catch (checkinErr) {
+            log.warn(`session check-in logging failed after compaction: ${String(checkinErr)}`);
+          }
           // Estimate tokens after compaction by summing token estimates for remaining messages
           const tokensAfter = estimateTokensAfterCompaction({
             messagesAfter: session.messages,
@@ -1216,6 +1229,18 @@ export async function compactEmbeddedPiSession(
             sessionKey: params.sessionKey,
             sessionFile: params.sessionFile,
           });
+          try {
+            logSessionCheckin({
+              actor: "compact",
+              action: "rewrite",
+              op: `compact-${params.sessionId}-${Date.now()}`,
+              lines: 0,
+              sessionId: params.sessionId,
+              detail: `trigger=${params.trigger ?? "manual"} engine-owned`,
+            });
+          } catch (checkinErr) {
+            log.warn(`session check-in logging failed after compaction: ${String(checkinErr)}`);
+          }
         }
         if (
           result.ok &&

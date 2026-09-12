@@ -10,6 +10,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { logSessionCheckin } from "openclaw/plugin-sdk/session-gatekeeper";
 import type { SttConfig } from "./pruner.js";
 
 const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
@@ -898,6 +899,7 @@ export async function scanSessionFile(
     let changed = false;
     let candidates = 0;
     let transcribed = 0;
+    let sessionId = path.basename(options.sessionFile, path.extname(options.sessionFile));
     const rewritten = [] as string[];
 
     for (const line of lines) {
@@ -912,6 +914,14 @@ export async function scanSessionFile(
       } catch {
         rewritten.push(line);
         continue;
+      }
+      const entryRecord = asRecord(entry);
+      if (
+        entryRecord?.type === "session" &&
+        typeof entryRecord.id === "string" &&
+        entryRecord.id.trim().length > 0
+      ) {
+        sessionId = entryRecord.id.trim();
       }
       const result = await transcribeEntry({ entry, options, apiKey });
       candidates += result.candidates;
@@ -938,6 +948,17 @@ export async function scanSessionFile(
           changed: false,
           skipped: "concurrent-update",
         };
+      }
+      try {
+        logSessionCheckin({
+          actor: "audio-stt",
+          action: "rewrite",
+          op: `audio-stt-${Date.now()}-${transcribed}`,
+          lines: transcribed,
+          sessionId,
+        });
+      } catch {
+        // Phase A logging is best-effort and must not affect transcription.
       }
     }
     return { ...baseResult, candidates, transcribed, changed };

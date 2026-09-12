@@ -166,6 +166,7 @@
   "session-store-runtime",
   "string-normalization-runtime",
   "state-paths",
+  "session-gatekeeper",
   "target-resolver-runtime",
   "telegram-command-config",
   "tlon",

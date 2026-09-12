@@ -81,6 +81,7 @@ import { registerProviderStreamForModel } from "../../provider-stream.js";
 import { resolveSandboxContext } from "../../sandbox.js";
 import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
 import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
+import { logSessionCheckin } from "../../session-gatekeeper.js";
 import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
 import { sanitizeToolUseResultPairing } from "../../session-transcript-repair.js";
 import {
@@ -1820,6 +1821,17 @@ export async function runEmbeddedAttempt(
             }
           } else {
             await abortable(activeSession.prompt(effectivePrompt));
+          }
+          try {
+            logSessionCheckin({
+              actor: "attempt",
+              action: "append",
+              op: params.runId,
+              lines: 1,
+              sessionId: params.sessionId,
+            });
+          } catch (checkinErr) {
+            log.warn(`session check-in logging failed after prompt: ${String(checkinErr)}`);
           }
         } catch (err) {
           // Yield-triggered abort is intentional — treat as clean stop, not error.
