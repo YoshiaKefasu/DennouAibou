@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -19,6 +20,10 @@ import {
   ensureGlobalUndiciStreamTimeouts,
 } from "../../../infra/net/undici-global-dispatcher.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
+import {
+  selectNativeAudioAttachments,
+  type NativeAudioContentBlock,
+} from "../../../media/native-audio.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import { resolveToolCallArgumentsEncoding } from "../../../plugins/provider-model-compat.js";
 import { resolveProviderSystemPromptContribution } from "../../../plugins/provider-runtime.js";
@@ -1008,6 +1013,29 @@ export async function runEmbeddedAttempt(
             workspaceDir: effectiveWorkspace,
           })
         : [];
+      const nativeAudioAttachments = selectNativeAudioAttachments({
+        paths: params.nativeAudioPaths,
+        types: params.nativeAudioTypes,
+        fallbackType: params.nativeAudioMimeType,
+      });
+      for (const [index, block] of nativeAudioBlocks.entries()) {
+        log.info(
+          `[audio:inbound] native audio attachment loaded: ` +
+            `path=${nativeAudioAttachments[index]?.path ?? "(unresolved)"} ` +
+            `mimeType=${block.mimeType} sizeBytes=${Buffer.byteLength(block.data, "base64")}`,
+        );
+      }
+      if (
+        supportsNativeAudio &&
+        nativeAudioAttachments.length > 0 &&
+        nativeAudioBlocks.length === 0
+      ) {
+        log.warn(
+          `[audio:error] native audio pipeline could not load any attachment: ` +
+            `stage=resolve reason=no_loadable_audio ` +
+            `error=selected=${nativeAudioAttachments.length} loaded=0`,
+        );
+      }
       const streamStrategy = describeEmbeddedAgentStreamStrategy({
         currentStreamFn: defaultSessionStreamFn,
         providerStreamFn,
@@ -1770,28 +1798,26 @@ export async function runEmbeddedAttempt(
             inFlightPrompt: effectivePrompt,
           });
 
-          // Only pass images option if there are actually images to pass
-          // This avoids potential issues with models that don't expect the images parameter
-          if (
-            nativeAudioBlocks.length > 0 &&
-            (params.model.input as Array<string> | undefined)?.includes("audio") &&
-            (params.model.api === "google-generative-ai" ||
-              params.model.api === "openai-completions" ||
-              params.model.api === "openai-responses" ||
-              params.model.api === "azure-openai-responses")
-          ) {
-            // Native audio inline support: for capable providers the stream
-            // wrapper injects the audio into the current user turn, so the
-            // session prompt only carries the text payload.
-            if (imageResult.images.length > 0) {
-              await abortable(
-                activeSession.prompt(effectivePrompt, { images: imageResult.images }),
+          // Only pass the images option when there are media blocks to pass
+          // (images and/or native audio). This avoids potential issues with
+          // models that don't expect the images parameter.
+          // Native audio blocks are passed exactly like images: the PI SDK
+          // pushes `options.images` into the user message content, so the
+          // session JSONL persistently stores `{ type: "audio", data, mimeType }`
+          // instead of just a text placeholder.
+          const promptMedia: ImageContent[] = [
+            ...imageResult.images,
+            ...(nativeAudioBlocks as unknown as ImageContent[]),
+          ];
+          if (promptMedia.length > 0) {
+            await abortable(activeSession.prompt(effectivePrompt, { images: promptMedia }));
+            for (const block of nativeAudioBlocks) {
+              log.info(
+                `[audio:session_persist] audio block persisted in user message: ` +
+                  `sessionId=${params.sessionId} messageRole=user mimeType=${block.mimeType} ` +
+                  `b64Bytes=${Buffer.byteLength(block.data, "base64")}`,
               );
-            } else {
-              await abortable(activeSession.prompt(effectivePrompt));
             }
-          } else if (imageResult.images.length > 0) {
-            await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
           } else {
             await abortable(activeSession.prompt(effectivePrompt));
           }
@@ -1820,6 +1846,12 @@ export async function runEmbeddedAttempt(
           } else {
             promptError = err;
             promptErrorSource = "prompt";
+            if (nativeAudioBlocks.length > 0) {
+              log.warn(
+                `[audio:error] session prompt with audio blocks failed: ` +
+                  `stage=prompt reason=prompt_failed error=${String(err)}`,
+              );
+            }
           }
         } finally {
           log.debug(

@@ -1,11 +1,12 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Context, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { mergeInboundPathRoots } from "../../../media/inbound-path-policy.js";
 import { getDefaultMediaLocalRoots } from "../../../media/local-roots.js";
 import {
   loadNativeAudioBlocks,
   type NativeAudioContentBlock,
 } from "../../../media/native-audio.js";
-import { mergeInboundPathRoots } from "../../../media/inbound-path-policy.js";
+import { defaultRuntime } from "../../../runtime.js";
 
 export async function resolveNativeAudioBlocks(params: {
   paths?: readonly string[];
@@ -89,11 +90,56 @@ function rewriteAudioPayload(payload: unknown): unknown {
   return next;
 }
 
+export function contentHasAudioPart(part: unknown): boolean {
+  if (!part || typeof part !== "object") {
+    return false;
+  }
+  return (part as { type?: unknown }).type === "audio";
+}
+
+function messageHasAudioPart(message: { content?: unknown }): boolean {
+  return Array.isArray(message.content) && message.content.some(contentHasAudioPart);
+}
+
+export function contextHasAudio(context: Context): boolean {
+  return context.messages.some((message) => {
+    if (!message || typeof message !== "object") {
+      return false;
+    }
+    return messageHasAudioPart(message);
+  });
+}
+
+export function contextAudioBytes(context: Context): number {
+  let total = 0;
+  for (const message of context.messages) {
+    if (!message || typeof message !== "object" || !Array.isArray(message.content)) {
+      continue;
+    }
+    for (const part of message.content) {
+      if (!contentHasAudioPart(part)) {
+        continue;
+      }
+      const data = (part as { data?: unknown }).data;
+      if (typeof data === "string" && data.length > 0) {
+        total += Buffer.byteLength(data, "base64");
+      }
+    }
+  }
+  return total;
+}
+
 function injectAudioIntoContext(
   context: Context,
   blocks: readonly NativeAudioContentBlock[],
 ): Context {
   if (blocks.length === 0) {
+    return context;
+  }
+  if (contextHasAudio(context)) {
+    // Audio blocks already live in the session history (persisted user
+    // content). Injecting again would duplicate the payload on every
+    // follow-up dispatch within the turn.
     return context;
   }
   const messages = [...context.messages];
@@ -108,9 +154,6 @@ function injectAudioIntoContext(
   const content = Array.isArray(message.content)
     ? [...message.content]
     : [{ type: "text" as const, text: message.content }];
-  if (content.some((part) => (part as { type?: unknown }).type === "audio")) {
-    return context;
-  }
   content.push(...(blocks as never[]));
   messages[userIndex] = { ...message, content } as typeof message;
   return { ...context, messages };
@@ -120,19 +163,24 @@ export function createNativeAudioStreamFn(
   inner: StreamFn,
   blocks: readonly NativeAudioContentBlock[],
 ): StreamFn {
-  if (blocks.length === 0) {
-    return inner;
-  }
   return (model, context, options?: SimpleStreamOptions) => {
     const nextContext = injectAudioIntoContext(context, blocks);
+    const dataBytes = contextAudioBytes(nextContext);
+    if (dataBytes > 0) {
+      defaultRuntime.log(
+        `[audio:llm_dispatch] audio delivered to model: model=${model?.id ?? "unknown"} ` +
+          `format=input_audio dataBytes=${dataBytes}`,
+      );
+    }
+    if (blocks.length === 0) {
+      return inner(model, context, options);
+    }
     const previousOnPayload = options?.onPayload;
     const nextOptions = {
       ...options,
       onPayload: async (payload: unknown, payloadModel: typeof model) => {
         const rewritten = rewriteAudioPayload(payload);
-        return previousOnPayload
-          ? await previousOnPayload(rewritten, payloadModel)
-          : rewritten;
+        return previousOnPayload ? await previousOnPayload(rewritten, payloadModel) : rewritten;
       },
     } satisfies SimpleStreamOptions;
     return inner(model, nextContext, nextOptions);
@@ -140,6 +188,9 @@ export function createNativeAudioStreamFn(
 }
 
 export const __testing = {
+  contentHasAudioPart,
+  contextAudioBytes,
+  contextHasAudio,
   parseAudioDataUrl,
   rewriteAudioPayload,
 };

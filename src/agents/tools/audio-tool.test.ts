@@ -106,6 +106,24 @@ function requireAudioTool(
   return tool;
 }
 
+type ToolContentBlock = { type?: unknown; text?: string };
+
+function findTextBlock(content: unknown[]): string {
+  const block = content.find((entry) => typeof (entry as ToolContentBlock).text === "string") as
+    | ToolContentBlock
+    | undefined;
+  return block?.text ?? "";
+}
+
+function findAudioBlock(
+  content: unknown[],
+): { type: "audio"; data: string; mimeType: string } | null {
+  const block = content.find((entry) => (entry as ToolContentBlock).type === "audio") as
+    | { type: "audio"; data: string; mimeType: string }
+    | undefined;
+  return block ?? null;
+}
+
 describe("audio tool", () => {
   beforeEach(() => {
     vi.stubEnv("PATH", "");
@@ -130,12 +148,68 @@ describe("audio tool", () => {
 
         const result = await tool.execute("t1", { path: audioPath });
 
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain("hello from fake stt");
+        expect(findTextBlock(result.content)).toContain("hello from fake stt");
         const details = result.details as { path?: string; provider?: string; model?: string };
         expect(details.path).toBe(audioPath);
         expect(details.provider).toBe("deepgram");
         expect(details.model).toBe("nova-3");
+      });
+    });
+  });
+
+  it("returns a base64 audio content block alongside the transcript", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      await withTempAudioFile(async ({ workspaceDir, audioPath }) => {
+        const cfg = createAudioConfig();
+        const tool = requireAudioTool(
+          createAudioTool({
+            config: cfg,
+            agentDir,
+            workspaceDir,
+            providers: { deepgram: createFakeAudioProvider() },
+          }),
+        );
+
+        const result = await tool.execute("t1", { path: audioPath });
+
+        const audioBlock = findAudioBlock(result.content);
+        expect(audioBlock).not.toBeNull();
+        expect(audioBlock?.mimeType).toBe("audio/wav");
+        // The base64 payload decodes back to the exact fixture bytes. This is
+        // the payload that the session JSONL persists so audio-capable models
+        // hear the clip from history instead of only reading text.
+        expect(Buffer.from(audioBlock!.data, "base64")).toEqual(createSafeAudioFixtureBuffer());
+        expect(findTextBlock(result.content)).toContain("hello from fake stt");
+      });
+    });
+  });
+
+  it("still returns the transcript text when the base64 media reload fails", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      await withTempAudioFile(async ({ workspaceDir }) => {
+        const cfg = createAudioConfig();
+        const tool = requireAudioTool(
+          createAudioTool({
+            config: cfg,
+            agentDir,
+            workspaceDir,
+            providers: { deepgram: createFakeAudioProvider() },
+          }),
+        );
+
+        // A path outside every allowed local root: transcription already
+        // rejects it (no_transcript) and the media reload would too. The
+        // tool must fail with the transcript error, not a raw load error.
+        const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-audio-outside-"));
+        const outsidePath = path.join(outsideDir, "secret.ogg");
+        await fs.writeFile(outsidePath, createSafeAudioFixtureBuffer());
+        try {
+          const result = await tool.execute("t1", { path: outsidePath });
+          expect(result.details).toMatchObject({ error: "no_transcript" });
+          expect(findAudioBlock(result.content)).toBeNull();
+        } finally {
+          await fs.rm(outsideDir, { recursive: true, force: true });
+        }
       });
     });
   });
@@ -157,12 +231,10 @@ describe("audio tool", () => {
           path: audioPath,
           prompt: "What is the tone?",
         });
-        expect((withPrompt.content[0] as { text: string }).text).toContain(
-          "[prompt=What is the tone?]",
-        );
+        expect(findTextBlock(withPrompt.content)).toContain("[prompt=What is the tone?]");
 
         const withoutPrompt = await tool.execute("t2", { path: audioPath });
-        expect((withoutPrompt.content[0] as { text: string }).text).toContain(
+        expect(findTextBlock(withoutPrompt.content)).toContain(
           "[prompt=Transcribe and describe the audio content.]",
         );
       });
@@ -187,7 +259,7 @@ describe("audio tool", () => {
 
           const details = result.details as { path?: string };
           expect(details.path).toBe(path.join(workspaceDir, "notes", "note.wav"));
-          expect((result.content[0] as { text: string }).text).toContain("hello from fake stt");
+          expect(findTextBlock(result.content)).toContain("hello from fake stt");
         },
         { relativeDir: "notes" },
       );
@@ -223,7 +295,7 @@ describe("audio tool", () => {
 
         // File inside the workspace is allowed.
         const inside = await tool.execute("t1", { path: "voice.wav" });
-        expect((inside.content[0] as { text: string }).text).toContain("hello from fake stt");
+        expect(findTextBlock(inside.content)).toContain("hello from fake stt");
 
         // File outside the workspace is blocked by the inbound path policy.
         const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-audio-outside-"));

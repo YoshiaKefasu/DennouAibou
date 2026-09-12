@@ -1,12 +1,18 @@
 import path from "node:path";
+import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { runAudioTranscription } from "../../media-understanding/audio-transcription-runner.js";
 import type { MediaUnderstandingProvider } from "../../media-understanding/types.js";
+import { MAX_AUDIO_BYTES } from "../../media/constants.js";
+import { resolveNativeAudioMimeType } from "../../media/native-audio.js";
+import { loadWebMediaRaw } from "../../media/web-media.js";
+import { defaultRuntime } from "../../runtime.js";
 import { resolveUserPath } from "../../utils.js";
 import { resolveMediaToolLocalRoots } from "./media-tool-shared.js";
 import {
+  createSandboxBridgeReadFile,
   resolveSandboxedBridgeMediaPath,
   type AnyAgentTool,
   type SandboxedBridgeMediaPathConfig,
@@ -171,6 +177,10 @@ export function createAudioTool(options?: {
       });
 
       if (!transcript) {
+        defaultRuntime.log(
+          `[audio:error] audio tool produced no transcript: ` +
+            `stage=tool_transcribe reason=no_transcript path=${resolvedPath}`,
+        );
         return {
           content: [
             {
@@ -188,8 +198,71 @@ export function createAudioTool(options?: {
         };
       }
 
+      // Load the raw audio media so the tool result can include a base64
+      // audio content block alongside the transcript. The PI SDK persists
+      // tool result content into the session JSONL as-is, so the audio lands
+      // in the session as `{ type: "audio", data: <base64>, mimeType }` and
+      // audio-capable models hear the clip directly instead of only reading
+      // the transcription. Mirrors the image tool's sandbox-aware loading.
+      // A failed/oversized load degrades gracefully to the text-only result.
+      let audioBlock: { type: "audio"; data: string; mimeType: string } | null = null;
+      let audioLoadError: string | undefined;
+      try {
+        const maxBytes = options?.config?.tools?.media?.audio?.maxBytes ?? MAX_AUDIO_BYTES;
+        const media = sandboxConfig
+          ? await loadWebMediaRaw(resolvedPath, {
+              maxBytes,
+              sandboxValidated: true,
+              readFile: createSandboxBridgeReadFile({ sandbox: sandboxConfig }),
+            })
+          : await loadWebMediaRaw(resolvedPath, {
+              maxBytes,
+              localRoots: localPathRoots,
+            });
+        const mimeType = resolveNativeAudioMimeType({
+          path: resolvedPath,
+          mimeType: media.contentType,
+        });
+        if (media.kind === "audio" && mimeType) {
+          audioBlock = {
+            type: "audio",
+            data: media.buffer.toString("base64"),
+            mimeType,
+          };
+        } else {
+          audioLoadError =
+            `unexpected media kind ${media.kind ?? "unknown"} ` +
+            `(contentType=${media.contentType ?? "none"})`;
+        }
+      } catch (err) {
+        audioLoadError = err instanceof Error ? err.message : String(err);
+      }
+
+      defaultRuntime.log(
+        `[audio:tool_call] audio tool executed: path=${resolvedPath} ` +
+          `returnedAudioBytes=${audioBlock ? Buffer.byteLength(audioBlock.data, "base64") : 0} ` +
+          `hasTranscript=true`,
+      );
+      if (audioLoadError) {
+        defaultRuntime.log(
+          `[audio:error] audio tool could not attach base64 audio: ` +
+            `stage=tool_load_media reason=load_failed error=${audioLoadError}`,
+        );
+      }
+
       return {
-        content: [{ type: "text", text: transcript }],
+        // Note: AgentToolResult.content is statically typed as
+        // (TextContent | ImageContent)[], but the PI SDK persists tool result
+        // content into the session JSONL verbatim, so the audio block
+        // round-trips even though the static type predates audio tool
+        // results (same runtime contract the session prompt images option
+        // uses for `{ type: "audio" }` user content).
+        content: [
+          ...(audioBlock
+            ? [audioBlock as unknown as AgentToolResult<unknown>["content"][number]]
+            : []),
+          { type: "text", text: transcript },
+        ] as AgentToolResult<unknown>["content"],
         details: {
           path: resolvedPath,
           ...(provider ? { provider } : {}),
