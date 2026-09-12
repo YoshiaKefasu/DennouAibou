@@ -977,6 +977,48 @@ describe("buildStatusMessage", () => {
     });
   }
 
+  it("accumulates prompt usage across the full session transcript", async () => {
+    await withTempHome(
+      async (dir) => {
+        const sessionId = "sess-usage-aggregate";
+        writeTranscriptUsageLog({
+          dir,
+          agentId: "main",
+          sessionId,
+          usage: { input: 400, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 410 },
+        });
+        const logPath = path.join(
+          dir,
+          ".openclaw",
+          "agents",
+          "main",
+          "sessions",
+          `${sessionId}.jsonl`,
+        );
+        fs.appendFileSync(
+          logPath,
+          `\n${JSON.stringify({
+            message: { usage: { input: 500, cacheRead: 100, output: 20 } },
+          })}`,
+          "utf-8",
+        );
+
+        const text = buildStatusMessage({
+          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 2_000 },
+          sessionEntry: { sessionId, updatedAt: 0, totalTokens: 50, contextTokens: 2_000 },
+          sessionKey: "agent:main:main",
+          sessionScope: "per-sender",
+          queue: { mode: "collect", depth: 0 },
+          includeTranscriptUsage: true,
+          modelAuth: "api-key",
+        });
+
+        expect(normalizeTestText(text)).toContain("Context: 1.0k/2.0k");
+      },
+      { prefix: "openclaw-status-" },
+    );
+  });
+
   it("prefers cached prompt tokens from the session log", async () => {
     await withTempHome(
       async (dir) => {

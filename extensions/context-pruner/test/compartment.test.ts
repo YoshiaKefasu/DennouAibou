@@ -14,6 +14,8 @@
 import { describe, expect, it } from "vitest";
 import {
   detectTemporalPauses,
+  estimateMessageTokens,
+  resolveMeasuredPromptTokens,
   partitionHistoryBlocks,
   type CompartmentMessage,
   type HistoryBlock,
@@ -122,6 +124,23 @@ describe("detectTemporalPauses", () => {
 });
 
 // ── ブロック分割: partitionHistoryBlocks ───────────────────
+
+describe("token estimation", () => {
+  it("weights Japanese characters at roughly one token each", () => {
+    expect(estimateMessageTokens({ timestamp: BASE_TIME, content: "日本語" })).toBe(3);
+    expect(estimateMessageTokens({ timestamp: BASE_TIME, content: "abcd" })).toBe(1);
+  });
+
+  it("accumulates provider usage across transcript entries", () => {
+    expect(
+      resolveMeasuredPromptTokens([
+        { message: { usage: { input: 100, cacheRead: 20, output: 5 } } },
+        { usage: { input: 200, cacheWrite: 30, output: 7 } },
+      ]),
+    ).toBe(230);
+    expect(resolveMeasuredPromptTokens([{ content: "日本語" }])).toBeUndefined();
+  });
+});
 
 describe("partitionHistoryBlocks", () => {
   it("returns a single block for an even-tempo conversation (no sudden splits)", () => {

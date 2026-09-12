@@ -45,6 +45,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   detectTemporalPauses,
   estimateMessageTokens,
+  resolveMeasuredPromptTokens,
   toEpochMs,
   DEFAULT_MIN_PAUSE_THRESHOLD_MS,
   DEFAULT_PAUSE_MULTIPLIER,
@@ -63,9 +64,9 @@ export const DEFAULT_EVICTION_BASE_CONTEXT_TOKENS = 1_000_000;
 
 /** 一時退避安全弁のオプション（すべて省略可）。 */
 export type EvictionOptions = {
-  /** 退避を発火する全体推定トークン閾値（既定 950,000）。 */
+  /** 退避を発火する全体トークン閾値（実測優先、既定 950,000）。 */
   evictionThresholdTokens?: number;
-  /** 不可侵の直近保護トークン数（既定 250,000）。 */
+  /** 不可侵の直近保護トークン数（実測/CJK補正推定で逆算）。 */
   protectedRecentTokens?: number;
   /** 「会話の間（ま）」と判定する最小の絶対沈黙フロア ms（既定 30分）。 */
   minPauseThresholdMs?: number;
@@ -80,6 +81,10 @@ export type EvictionOptions = {
   summaries?: BlockSummary[];
   /** 完了済みのブロック要約群（blockId キーの Map 版。reconcileBlockSummaries の出力をそのまま渡せる）。 */
   summaryMap?: Map<string, BlockSummary>;
+  /** セッション transcript から累積した実測 prompt/context tokens。 */
+  measuredTotalTokens?: number;
+  /** transcript message または sessions.json の usage 値。実測値を優先する。 */
+  measuredUsage?: readonly unknown[];
 };
 
 /** 一時退避の実行結果。 */
@@ -130,9 +135,13 @@ function collectSummaries(options?: EvictionOptions): BlockSummary[] {
   return collected;
 }
 
-type ResolvedEvictionOptions = Required<Omit<EvictionOptions, "summaries" | "summaryMap">> & {
+type ResolvedEvictionOptions = Required<
+  Omit<EvictionOptions, "summaries" | "summaryMap" | "measuredTotalTokens" | "measuredUsage">
+> & {
   /** summaries と summaryMap を統合・重複排除した配列。 */
   summaries: BlockSummary[];
+  measuredTotalTokens?: number;
+  measuredUsage?: readonly unknown[];
 };
 
 function resolveEvictionOptions(options?: EvictionOptions): ResolvedEvictionOptions {
@@ -152,6 +161,10 @@ function resolveEvictionOptions(options?: EvictionOptions): ResolvedEvictionOpti
         ? options.noticeText.trim()
         : DEFAULT_EVICTION_NOTICE,
     summaries: collectSummaries(options),
+    ...(options?.measuredTotalTokens !== undefined
+      ? { measuredTotalTokens: options.measuredTotalTokens }
+      : {}),
+    ...(options?.measuredUsage ? { measuredUsage: options.measuredUsage } : {}),
   };
 }
 
@@ -237,7 +250,8 @@ function findToolCallParentIndex(
 /**
  * 一時退避安全弁（§7.3 / §7.4 / §7.5）。
  *
- * 1. 入力全体の推定トークン数が閾値以下なら退避しない（元の配列をそのまま返す）。
+ * 1. provider/session の実測 prompt tokens（利用可能な場合）を優先し、無ければ
+ *    CJK 補正済みの入力推定トークン数を使う。閾値以下なら退避しない（元の配列をそのまま返す）。
  * 2. 超過時は末尾から逆走査し、直近の累積トークンが protectedRecentTokens に
  *    達する最小境界を特定する（直近保護ウィンドウは不可侵）。
  * 3. ステップ 1 の時間認識（detectTemporalPauses）で求まる「会話の間（ま）」の
@@ -253,7 +267,26 @@ export function applyPromptEvictionSafetyValve(
 ): EvictionResult {
   const opts = resolveEvictionOptions(options);
   const estimates = messages.map(estimateMessageTokens);
-  const totalTokens = estimates.reduce((sum, value) => sum + value, 0);
+  const estimatedTotalTokens = estimates.reduce((sum, value) => sum + value, 0);
+  const measuredTotalTokens =
+    positiveFinite(opts.measuredTotalTokens) ??
+    (opts.measuredUsage ? resolveMeasuredPromptTokens(opts.measuredUsage) : undefined);
+  // Provider/session usage is the source of truth for the firing decision. Scale
+  // each message's CJK-aware estimate to the measured current context so the
+  // protected-tail reverse scan uses the same units as the 250K policy.
+  const measurementScale =
+    measuredTotalTokens !== undefined && estimatedTotalTokens > 0
+      ? measuredTotalTokens / estimatedTotalTokens
+      : 1;
+  const effectiveEstimates =
+    measuredTotalTokens !== undefined
+      ? estimates.map((value) => Math.floor(value * measurementScale))
+      : estimates;
+  if (measuredTotalTokens !== undefined && effectiveEstimates.length > 0) {
+    const scaledTotal = effectiveEstimates.reduce((sum, value) => sum + value, 0);
+    effectiveEstimates[effectiveEstimates.length - 1] += measuredTotalTokens - scaledTotal;
+  }
+  const totalTokens = measuredTotalTokens ?? estimatedTotalTokens;
 
   const noEviction = (): EvictionResult => ({
     messages,
@@ -280,7 +313,7 @@ export function applyPromptEvictionSafetyValve(
   let suffixTokens = 0;
   while (boundary > 0 && suffixTokens < minProtected) {
     boundary -= 1;
-    suffixTokens += estimates[boundary];
+    suffixTokens += effectiveEstimates[boundary];
   }
   // 保護ウィンドウが全体を覆う場合（設定異常など）は退避しない
   if (boundary === 0) {
@@ -320,7 +353,7 @@ export function applyPromptEvictionSafetyValve(
   }
 
   const evictedMessageCount = cut;
-  const protectedTokens = estimates.slice(cut).reduce((sum, value) => sum + value, 0);
+  const protectedTokens = effectiveEstimates.slice(cut).reduce((sum, value) => sum + value, 0);
   const evictedTokens = totalTokens - protectedTokens;
 
   // ── 章立て要約目次による復帰差し替え（§7.5 通常成功パス）──

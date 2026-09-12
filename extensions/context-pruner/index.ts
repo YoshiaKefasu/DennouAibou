@@ -59,6 +59,7 @@ export {
   partitionHistoryBlocks,
   estimateMessageChars,
   estimateMessageTokens,
+  resolveMeasuredPromptTokens,
   DEFAULT_MAX_BLOCK_TOKENS,
   DEFAULT_MIN_PAUSE_THRESHOLD_MS,
   DEFAULT_PAUSE_MULTIPLIER,

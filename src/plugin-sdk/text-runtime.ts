@@ -25,6 +25,7 @@ export * from "../utils/chunk-items.js";
 export * from "../utils/fetch-timeout.js";
 export * from "../utils/reaction-level.js";
 export * from "../utils/with-timeout.js";
+export * from "./cjk-chars.js";
 export {
   CONFIG_DIR,
   clamp,

@@ -268,25 +268,17 @@ const readUsageFromSessionLog = (
   }
 
   try {
-    // Read the tail only; we only need the most recent usage entries.
-    const TAIL_BYTES = 8192;
-    const stat = fs.statSync(logPath);
-    const offset = Math.max(0, stat.size - TAIL_BYTES);
-    const buf = Buffer.alloc(Math.min(TAIL_BYTES, stat.size));
-    const fd = fs.openSync(logPath, "r");
-    try {
-      fs.readSync(fd, buf, 0, buf.length, offset);
-    } finally {
-      fs.closeSync(fd);
-    }
-    const tail = buf.toString("utf-8");
-    const lines = (offset > 0 ? tail.slice(tail.indexOf("\n") + 1) : tail).split(/\n+/);
+    const transcript = fs.readFileSync(logPath, "utf-8");
+    const lines = transcript.split(/\r?\n/);
 
     let input = 0;
     let output = 0;
+    let cacheRead = 0;
+    let cacheWrite = 0;
     let promptTokens = 0;
+    let total = 0;
+    let sawUsage = false;
     let model: string | undefined;
-    let lastUsage: ReturnType<typeof normalizeUsage> | undefined;
 
     for (const line of lines) {
       if (!line.trim()) {
@@ -303,32 +295,33 @@ const readUsageFromSessionLog = (
         };
         const usageRaw = parsed.message?.usage ?? parsed.usage;
         const usage = normalizeUsage(usageRaw);
-        if (usage) {
-          lastUsage = usage;
+        if (!usage) {
+          model = parsed.message?.model ?? parsed.model ?? model;
+          continue;
         }
+        sawUsage = true;
+        input += usage.input ?? 0;
+        output += usage.output ?? 0;
+        cacheRead += usage.cacheRead ?? 0;
+        cacheWrite += usage.cacheWrite ?? 0;
+        promptTokens += derivePromptTokens(usage) ?? 0;
+        total += usage.total ?? (usage.input ?? 0) + (usage.output ?? 0);
         model = parsed.message?.model ?? parsed.model ?? model;
       } catch {
-        // ignore bad lines (including a truncated first tail line)
+        // ignore malformed lines
       }
     }
 
-    if (!lastUsage) {
-      return undefined;
-    }
-    input = lastUsage.input ?? 0;
-    output = lastUsage.output ?? 0;
-    promptTokens = derivePromptTokens(lastUsage) ?? lastUsage.total ?? input + output;
-    const total = lastUsage.total ?? promptTokens + output;
-    if (promptTokens === 0 && total === 0) {
+    if (!sawUsage || (promptTokens === 0 && total === 0)) {
       return undefined;
     }
     return {
       input,
       output,
-      cacheRead: lastUsage.cacheRead ?? 0,
-      cacheWrite: lastUsage.cacheWrite ?? 0,
-      promptTokens,
-      total,
+      cacheRead,
+      cacheWrite,
+      promptTokens: promptTokens || total,
+      total: total || promptTokens,
       model,
     };
   } catch {

@@ -28,6 +28,12 @@
  *   そのブロックだけはバジェット超過になり得る）。
  */
 
+import {
+  estimateStringChars,
+  estimateTokensFromChars,
+  CHARS_PER_TOKEN_ESTIMATE,
+} from "openclaw/plugin-sdk/text-runtime";
+
 /** 会話メッセージの最小構造（分割ロジックが必要とするフィールドのみ）。 */
 export type CompartmentMessage = {
   /** メッセージのタイムスタンプ（epoch ミリ秒 or ISO 8601 文字列） */
@@ -73,9 +79,6 @@ export const DEFAULT_MIN_PAUSE_THRESHOLD_MS = 30 * 60 * 1000;
 /** 既定の平均インターバル倍率 */
 export const DEFAULT_PAUSE_MULTIPLIER = 3.0;
 
-/** トークン推定の簡易近似（約4文字 = 1トークン。カーネル側の定数と同じ係数） */
-const CHARS_PER_TOKEN_ESTIMATE = 4;
-
 /** 有効な正の数値のみ通す（不正値は null としてデフォルトへフォールバック）。 */
 function positiveFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
@@ -117,7 +120,7 @@ function computeGapMs(left: CompartmentMessage, right: CompartmentMessage): numb
 /** メッセージ content から文字数を概算する（string 直 or ブロック配列の text/data 合計）。 */
 export function estimateMessageChars(content: unknown): number {
   if (typeof content === "string") {
-    return content.length;
+    return estimateStringChars(content);
   }
   if (Array.isArray(content)) {
     let total = 0;
@@ -127,9 +130,9 @@ export function estimateMessageChars(content: unknown): number {
       }
       const record = block as Record<string, unknown>;
       if (typeof record.text === "string") {
-        total += record.text.length;
+        total += estimateStringChars(record.text);
       } else if (typeof record.data === "string") {
-        total += record.data.length;
+        total += estimateStringChars(record.data);
       }
     }
     return total;
@@ -137,10 +140,77 @@ export function estimateMessageChars(content: unknown): number {
   return 0;
 }
 
-/** メッセージの推定トークン数（約4文字 = 1トークン。空でも構造分の1トークン）。 */
+/** メッセージの推定トークン数（CJK補正済み。空でも構造分の1トークン）。 */
 export function estimateMessageTokens(message: CompartmentMessage): number {
   const chars = estimateMessageChars(message.content);
-  return chars > 0 ? Math.ceil(chars / CHARS_PER_TOKEN_ESTIMATE) : 1;
+  return chars > 0 ? estimateTokensFromChars(chars) : 1;
+}
+
+/**
+ * プロバイダーが返した usage から現在の prompt/context トークンを抽出する。
+ * 実測 usage は文字数推定より先に安全弁の判定と保持量換算へ使う。
+ */
+function resolvePromptTokensFromUsage(usage: unknown): number | undefined {
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) {
+    return undefined;
+  }
+  const record = usage as Record<string, unknown>;
+  const number = (...values: unknown[]): number | undefined => {
+    const value = values.find((candidate) => typeof candidate === "number");
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+  };
+  const input = number(
+    record.input,
+    record.inputTokens,
+    record.input_tokens,
+    record.promptTokens,
+    record.prompt_tokens,
+  );
+  const cacheRead = number(
+    record.cacheRead,
+    record.cache_read,
+    record.cacheReadInputTokens,
+    record.cache_read_input_tokens,
+    record.cached_tokens,
+  );
+  const cacheWrite = number(
+    record.cacheWrite,
+    record.cache_write,
+    record.cacheCreationInputTokens,
+    record.cache_creation_input_tokens,
+  );
+  const total = number(record.total, record.totalTokens, record.total_tokens);
+  const prompt = (input ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);
+  if (prompt > 0) {
+    return prompt;
+  }
+  return total !== undefined && total > 0 ? total : undefined;
+}
+
+/**
+ * Transcript message 群に含まれる provider usage の最新 prompt/context snapshot を返す。
+ * usage が一件も無い場合は undefined を返し、呼び出し側が文字数推定へフォールバックできる。
+ * `/status` の累積表示は別の読み取り経路で全 usage を合算するため、ここは現在の
+ * prompt build と比較するための「最新実測値」に限定する。
+ */
+export function resolveMeasuredPromptTokens(messages: readonly unknown[]): number | undefined {
+  let latest: number | undefined;
+  for (const message of messages) {
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      continue;
+    }
+    const record = message as Record<string, unknown>;
+    const usage =
+      record.usage ??
+      (record.message && typeof record.message === "object" && !Array.isArray(record.message)
+        ? (record.message as Record<string, unknown>).usage
+        : undefined);
+    const promptTokens = resolvePromptTokensFromUsage(usage);
+    if (promptTokens !== undefined) {
+      latest = promptTokens;
+    }
+  }
+  return latest;
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   applyPromptEvictionSafetyValve,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
+  resolveMeasuredPromptTokens,
 } from "../../../../extensions/context-pruner/index.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { ModelCompatConfig } from "../../../config/types.models.js";
@@ -1295,10 +1296,12 @@ export async function runEmbeddedAttempt(
           // 注入だけをスキップする（可逆・SESSION_INTEGRITY_GUARD 非破壊）。
           // DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 でバイパス可能。
           const evictionSafetyValve = isEvictionSafetyValveEnabled()
-            ? applyPromptEvictionSafetyValve(
-                limited,
-                resolveEvictionOptionsFromCompaction(params.config?.agents?.defaults?.compaction),
-              )
+            ? applyPromptEvictionSafetyValve(limited, {
+                ...resolveEvictionOptionsFromCompaction(
+                  params.config?.agents?.defaults?.compaction,
+                ),
+                measuredTotalTokens: resolveMeasuredPromptTokens(limited),
+              })
             : undefined;
           if (evictionSafetyValve?.evicted) {
             log.debug(

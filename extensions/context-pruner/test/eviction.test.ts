@@ -236,6 +236,57 @@ describe("applyPromptEvictionSafetyValve", () => {
     expect(result.messages).toBe(input);
     expect(result.messages[0]).toBe(input[0]);
   });
+
+  it("uses measured usage before the local character estimate", () => {
+    const input = castMessages(makeEvenUserMessages(10, 4));
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 90,
+      protectedRecentTokens: 50,
+      measuredTotalTokens: 101,
+    });
+    expect(result.evicted).toBe(true);
+    expect(result.totalTokens).toBe(101);
+    expect(result.protectedTokens).toBe(51);
+    expect(result.evictedTokens + result.protectedTokens).toBe(101);
+  });
+
+  it("uses the latest measured context usage supplied by transcript entries", () => {
+    const input = castMessages([
+      { role: "user", content: "x", timestamp: BASE_TIME },
+      { role: "assistant", content: "x", timestamp: BASE_TIME + MINUTE_MS, usage: { input: 60 } },
+      {
+        role: "assistant",
+        content: "x",
+        timestamp: BASE_TIME + 2 * MINUTE_MS,
+        usage: { input: 50 },
+      },
+    ]);
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 40,
+      protectedRecentTokens: 1,
+      measuredUsage: input,
+    });
+    expect(result.evicted).toBe(true);
+    expect(result.totalTokens).toBe(50);
+  });
+
+  it("keeps a 250-token Japanese tail using CJK-aware estimates", () => {
+    const past = makeEvenUserMessages(100, 1);
+    const recent = Array.from({ length: 250 }, (_unused, i) => ({
+      role: "user",
+      content: "日",
+      timestamp: BASE_TIME + (100 + i) * MINUTE_MS,
+    }));
+    const result = applyPromptEvictionSafetyValve(castMessages([...past, ...recent]), {
+      evictionThresholdTokens: 100,
+      protectedRecentTokens: 250,
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(100);
+    expect(result.protectedTokens).toBe(250);
+    expect(result.messages[1]).toBe(recent[0]);
+  });
 });
 
 // ── 純粋なインメモリ変換 ──────────────────────────────────
