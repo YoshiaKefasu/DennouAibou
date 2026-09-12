@@ -3,7 +3,7 @@
 > 最終更新: 2026-09-10
 > 対象: DennouAibou（Phase F スリムカーネル・プラグイン駆動アーキテクチャ）
 > 適用環境: KASOU（本番環境）
-> 統合履歴: 本書は旧 `DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md`（2026-09-04 初版）を **§4 として統合**し、旧ファイルを削除したもの。旧ファイルへの `§N` 参照は末尾 **§6 章対応表** で読み替える。
+> 統合履歴: 本書は旧 `DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md`（2026-09-04 初版）を **§4 として統合**し、旧ファイルを削除したもの。旧ファイルへの `§N` 参照は末尾 **§7 章対応表** で読み替える。
 
 ---
 
@@ -765,7 +765,88 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 ---
 
-## 5. ロードマップ
+## 5. セッションガードレール（門番・チェックインログ）
+
+> **状態**: 設計追加。§4 の整合性ガードを置き換えず、「誰がセッション JSONL に入って何を変更したか」を書き込み単位で監査する。
+
+### 5.1 背景と目的
+
+KASOU 本番セッション `93fcc1a8-...` では、コンテキスト表示が「700K → 400K → 100K」と激減し、Kasou が過去の記憶（アスピリン等）を思い出せなくなった。一方、セッション JSONL 自体は **1565 行・孤児 0** で無傷だった。したがって、ファイルの破損だけでなく、どの経路がプロンプトへ渡す文脈を変更したかを後から特定できる監査線が必要である。
+
+目的は、セッションを家にたとえたときの「玄関の門番」を設けることにある。
+
+- **誰が入るか**: 書き込み主体（caller identity）を必須にする。
+- **誰が変更したか**: 変更ごとに actor・操作・対象セッション・変更行数を記録する。
+- **身元不明を通さない**: 最終状態（Phase B）では、未登録または不明な caller の変更を実行前に拒否する。
+
+### 5.2 門番（Gatekeeper）の責務
+
+セッション JSONL への **全書き込み・全変更** を、単一の Gatekeeper seam から一元的に仲介する。対象は通常の append だけでなく、`prune`、`rewrite`、`repair`、audio-stt、gateway、plugin 等の変更経路も含む。直接のファイル書き込みや raw `SessionManager` 操作は、登録済み identity を付けて門番を通さなければならない。
+
+```text
+caller（attempt / compact / prune / audio-stt / repair / gateway / plugin）
+  → Gatekeeper: actor・action・op・sessionId・変更行数を検証
+  → チェックインログを journal / gateway ログへ出力
+  → 変更を実行
+  → §4 の post-append 検証・cron ヘルスチェック・自動修復
+```
+
+Gatekeeper は「誰が変更したか」を保証する監査層であり、JSONL の親子構造を検証・修復する §4 の処理を内部へ重複実装しない。変更前に拒否できること、または拒否できない既存経路を発見できることが責務である。
+
+### 5.3 チェックインログの形式
+
+変更ごとに、次の構造化ログを 1 件以上出力する。`op` は変更操作の一意な ID、`lines` はその操作で実際に追加・除去・書き換えた行数とする。
+
+```text
+[session:checkin] actor=attempt action=append op=op-... lines=1 sessionId=agent:main:main
+[session:checkin] actor=prune action=prune op=op-... lines=12 sessionId=agent:main:main
+[session:checkin] actor=repair action=repair op=op-... lines=3 sessionId=agent:main:main
+```
+
+- `actor`: 登録済み caller identity。例: `attempt`、`compact`、`prune`、`audio-stt`、`repair`、`gateway`、`plugin`。
+- `action`: `append | prune | rewrite | repair` のいずれか。
+- `op`: 再試行・同時実行を区別する操作 ID。
+- `lines`: 変更した行数。拒否時は `0` とし、`result=rejected reason=unknown-actor` 等の理由を付加する。
+- `sessionId`: 対象セッションを省略しない。解決できない場合は変更を拒否する。
+
+ログは journal / gateway ログに集約し、後から「犯人」を actor と op で一発検索できるようにする。成功・拒否・失敗のいずれも記録し、ログ出力自体に失敗した場合は、Phase B では変更を fail-closed で止める。
+
+### 5.4 身元不明の却下ルール
+
+本番の強制ルールは **Reject Unknown** とする。
+
+| 判定 | 動作 |
+| --- | --- |
+| actor が登録済み、action / op / sessionId が妥当 | チェックインログを出力して変更を許可 |
+| actor が空、未登録、または action が不明 | 変更前に拒否し、`lines=0` の拒否ログを出力 |
+| sessionId または op を解決できない | 変更前に拒否し、対象不明として記録 |
+| Gatekeeper を迂回する直接書き込みを検出 | §4 のヘルスチェックで異常化し、経路を登録対象へ戻す |
+
+「警告ログだけで通す」扱いは、既存 caller を棚卸しする Phase A の移行期間に限る。Phase B 以降は、誰が変更したか明確でない書き込みを通さない。
+
+### 5.5 実装フェーズ
+
+| フェーズ | 内容 | 完了条件 |
+| --- | --- | --- |
+| **Phase A: ログのみ** | 全 append / prune / rewrite / repair 経路を Gatekeeper に接続し、caller identity とチェックインログを記録する。既存挙動は維持し、未登録 caller は警告付きで棚卸しする。 | journal / gateway ログから actor・action・op・lines・sessionId を追跡でき、全変更経路の一覧が得られる |
+| **Phase B: 未知却下** | Phase A で確定した allowlist を登録し、空・未知・不完全な caller の変更を実行前に拒否する。 | 未知 caller の JSONL が 1 行も変更されず、拒否ログ（`lines=0`）から理由を特定できる |
+
+### 5.6 §4 既存ガードとの関係
+
+門番は §4 の Phase 1〜3 と競合しない。役割を次のように分離する。
+
+| 層 | 主な問い | 動作 |
+| --- | --- | --- |
+| **§5 Gatekeeper** | 「誰が変更しようとしているか」 | 変更前に identity を確認し、記録または拒否 |
+| **§4 Phase 1** | 「追加後のエントリ構造は成立しているか」 | post-append 検証で異常を記録 |
+| **§4 Phase 2** | 「JSONL 全体に孤児・重複・構文異常がないか」 | cron ヘルスチェックで検知 |
+| **§4 Phase 3** | 「検知した安全な孤児をどう戻すか」 | バックアップ後に限定的な自動修復 |
+
+したがって、§5 が身元と変更履歴を担い、§4 は構造の検知と回復を担う。Gatekeeper が拒否した変更は §4 の修復対象にせず、許可された変更だけが既存の整合性ガードへ進む。直接書き換えや SDK 内部経路など、Phase A で発見した未接続経路は、Phase B の allowlist 登録または Gatekeeper 接続を完了するまで本番の書き込み主体として扱わない。
+
+---
+
+## 6. ロードマップ
 
 1. **Step 1: マスターセッション保護ガードの実装・実証** ✅ **完了 (commit `50af3a2b`)**
    - `isProtectedSessionKey` の導入と 7 系統の防御 chokepoint 設置。
@@ -788,7 +869,7 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 ---
 
-## 6. 章対応表（旧 `SESSION_INTEGRITY_GUARD.md` → 本書）
+## 7. 章対応表（旧 `SESSION_INTEGRITY_GUARD.md` → 本書）
 
 旧ファイルを参照しているコメント・コミットメッセージ・過去ログの `§N` は、以下のように読み替える。
 
@@ -811,7 +892,7 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 ---
 
-## 7. 関連ドキュメント
+## 8. 関連ドキュメント
 
 - `DENNOU_DOCS/PHASE_F_SLIM_KERNEL.md` — カーネルを細く保つ方針（本設計の前提）
 - `DENNOU_DOCS/COMPACTION_FEATURE.md` — コンテキスト圧縮（§4 の整合性ガードと整合するよう JSONL を非破壊で扱う）
