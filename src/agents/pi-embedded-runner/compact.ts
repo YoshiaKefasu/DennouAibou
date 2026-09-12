@@ -931,7 +931,7 @@ export async function compactEmbeddedPiSessionDirect(
           const writeAuthorization = requestSessionWrite({
             actor: "compact",
             action: "compact",
-            op: runId,
+            op: diagId,
             sessionId: params.sessionId,
             targetLines: `1-${Math.max(1, messageCountCompactionInput)}`,
             reason: `compact session transcript trigger=${trigger}`,
@@ -939,7 +939,7 @@ export async function compactEmbeddedPiSessionDirect(
           if (!writeAuthorization.granted) {
             log.warn(
               `[session:preauth] session write skipped: actor=compact ` +
-                `op=${runId} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
+                `op=${diagId} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
             );
             return fail(`session write denied: ${writeAuthorization.reason}`);
           }
@@ -965,7 +965,7 @@ export async function compactEmbeddedPiSessionDirect(
             logSessionCheckin({
               actor: "compact",
               action: "rewrite",
-              op: runId,
+              op: diagId,
               lines: Math.max(0, messageCountCompactionInput - session.messages.length),
               sessionId: params.sessionId,
               detail: `trigger=${trigger}`,

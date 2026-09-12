@@ -1819,8 +1819,13 @@ export async function runEmbeddedAttempt(
             reason: "persist inbound prompt message",
           });
           if (!writeAuthorization.granted) {
+            const error = new Error(
+              `Session write denied: ${writeAuthorization.reason} (op=${params.runId})`,
+            );
+            promptError = error;
+            promptErrorSource = "prompt";
             log.warn(
-              `[session:preauth] session write skipped: actor=attempt ` +
+              `[session:preauth] session write rejected: actor=attempt ` +
                 `op=${params.runId} sessionId=${params.sessionId} reason=${writeAuthorization.reason}`,
             );
           } else {

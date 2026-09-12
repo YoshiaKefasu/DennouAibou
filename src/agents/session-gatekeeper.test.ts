@@ -6,7 +6,11 @@ vi.mock("../logging/subsystem.js", () => ({
   createSubsystemLogger: vi.fn(() => ({ info })),
 }));
 
-import { logSessionCheckin, requestSessionWrite } from "./session-gatekeeper.js";
+import {
+  logSessionCheckin,
+  requestSessionWrite,
+  resetSessionWriteOpsForTest,
+} from "./session-gatekeeper.js";
 
 function validRequest(op = `test-op-${Date.now()}-${Math.random()}`) {
   return {
@@ -21,6 +25,7 @@ function validRequest(op = `test-op-${Date.now()}-${Math.random()}`) {
 
 beforeEach(() => {
   info.mockClear();
+  resetSessionWriteOpsForTest();
 });
 
 describe("logSessionCheckin", () => {
@@ -95,5 +100,35 @@ describe("requestSessionWrite", () => {
           "targetLines=1 sessionId=agent:main:main result=granted",
       ),
     );
+  });
+
+  it("resets consumed operation ids for isolated tests", () => {
+    const request = validRequest("resettable-op");
+
+    expect(requestSessionWrite(request)).toEqual({ granted: true, op: request.op });
+    resetSessionWriteOpsForTest();
+    expect(requestSessionWrite(request)).toEqual({ granted: true, op: request.op });
+  });
+
+  it("bounds operation ids and evicts the least recently used entry", () => {
+    const first = validRequest("lru-first");
+    expect(requestSessionWrite(first)).toEqual({ granted: true, op: first.op });
+
+    for (let index = 0; index < 4_095; index++) {
+      expect(requestSessionWrite(validRequest(`lru-fill-${index}`))).toEqual({
+        granted: true,
+        op: `lru-fill-${index}`,
+      });
+    }
+
+    expect(requestSessionWrite(first)).toEqual({ granted: false, reason: "op-reused" });
+    expect(requestSessionWrite(validRequest("lru-overflow"))).toEqual({
+      granted: true,
+      op: "lru-overflow",
+    });
+    expect(requestSessionWrite(validRequest("lru-fill-0"))).toEqual({
+      granted: true,
+      op: "lru-fill-0",
+    });
   });
 });

@@ -11,6 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { logSessionCheckin, requestSessionWrite } from "../agents/session-gatekeeper.js";
+import { generateSecureToken } from "../infra/secure-random.js";
 import { logDebug } from "../logger.js";
 import { parseLine, pruneToolOutputLines } from "./prune-engine.js";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
@@ -100,7 +101,7 @@ export function pruneActiveSessionFile(
     .map((line) => parseLine(line)?.parsed)
     .find((entry) => entry?.type === "session");
   const sessionId = typeof sessionHeader?.id === "string" ? sessionHeader.id.trim() : "";
-  const op = `prune-${Date.now()}-${prunedCount}`;
+  const op = `prune-${path.basename(filePath)}-${Date.now()}-${prunedCount}-${generateSecureToken(4)}`;
   const authorization = requestSessionWrite({
     actor: "prune",
     action: "prune",
@@ -114,7 +115,7 @@ export function pruneActiveSessionFile(
       `[DennouAibou] SKIP write ${filePath}: session pre-authorization denied ` +
         `reason=${authorization.reason}`,
     );
-    return 0;
+    return -1;
   }
 
   // ---- atomic write ----

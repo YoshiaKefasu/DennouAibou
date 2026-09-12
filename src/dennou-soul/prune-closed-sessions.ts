@@ -17,6 +17,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { logSessionCheckin, requestSessionWrite } from "../agents/session-gatekeeper.js";
 import { resolveStateDir } from "../config/paths.js";
+import { generateSecureToken } from "../infra/secure-random.js";
 import { logDebug } from "../logger.js";
 import { parseLine, pruneToolOutputLines } from "./prune-engine.js";
 import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } from "./types.js";
@@ -27,7 +28,7 @@ import { type DennouSessionToolsPruneConfig, type DennouPruneProtectionConfig } 
  * @param filePath - 対象JSONLファイルの絶対パス
  * @param config - Prune設定
  * @param logger - ログ出力関数（省略時はconsole.log）
- * @returns Pruneした行数
+ * @returns Pruneした行数。事前承認で拒否された場合は -1
  */
 export function pruneClosedSessionFile(
   filePath: string,
@@ -72,7 +73,7 @@ export function pruneClosedSessionFile(
       .map((line) => parseLine(line)?.parsed)
       .find((entry) => entry?.type === "session");
     const sessionId = typeof sessionHeader?.id === "string" ? sessionHeader.id.trim() : "";
-    const op = `prune-${Date.now()}-${prunedCount}`;
+    const op = `prune-${path.basename(filePath)}-${Date.now()}-${prunedCount}-${generateSecureToken(4)}`;
     const authorization = requestSessionWrite({
       actor: "prune",
       action: "prune",
@@ -86,7 +87,7 @@ export function pruneClosedSessionFile(
         `[DennouAibou] SKIP write ${filePath}: session pre-authorization denied ` +
           `reason=${authorization.reason}`,
       );
-      return 0;
+      return -1;
     }
     const output = resultLines.join("\n") + "\n";
     fs.writeFileSync(filePath, output, "utf8");
@@ -109,7 +110,7 @@ export function pruneClosedSessionFile(
  * @param sessionsDir - セッションディレクトリの絶対パス
  * @param config - Prune設定
  * @param logger - ログ出力関数（省略時はconsole.log）
- * @returns Pruneした総行数
+ * @returns Pruneした総行数。いずれかのファイルで事前承認が拒否された場合は -1
  */
 export function pruneAllClosedSessions(
   sessionsDir: string,
@@ -135,6 +136,9 @@ export function pruneAllClosedSessions(
     }
 
     const pruned = pruneClosedSessionFile(fullPath, config, logger, protection);
+    if (pruned < 0) {
+      return -1;
+    }
     totalPruned += pruned;
   }
 
@@ -147,6 +151,7 @@ export function pruneAllClosedSessions(
  * @param config - Prune設定
  * @param logger - ログ出力関数
  * @param protection - 保護設定
+ * @returns Pruneした総行数。いずれかのファイルで事前承認が拒否された場合は -1
  */
 export function pruneAllAgentsClosedSessions(
   config: DennouSessionToolsPruneConfig,
@@ -168,6 +173,9 @@ export function pruneAllAgentsClosedSessions(
     if (!fs.existsSync(sessionsDir)) continue;
 
     const pruned = pruneAllClosedSessions(sessionsDir, config, logger, protection);
+    if (pruned < 0) {
+      return -1;
+    }
     totalPruned += pruned;
   }
 

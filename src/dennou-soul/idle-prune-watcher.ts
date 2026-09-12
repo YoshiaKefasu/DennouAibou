@@ -132,7 +132,7 @@ function handleIdleEvent(
     );
 
     if (result === -1) {
-      console.warn(`[DennouAibou] Prune aborted for ${filePath} (file changed mid-operation)`);
+      console.warn(`[DennouAibou] Prune skipped or aborted for ${filePath}`);
     } else if (result > 0) {
       logDebug(`[DennouAibou] Idle prune complete: ${filePath} (${result} lines pruned)`);
     }
