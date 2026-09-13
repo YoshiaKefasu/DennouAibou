@@ -1059,6 +1059,7 @@
     "test:all": "pnpm lint && pnpm build && pnpm test && pnpm test:e2e && pnpm test:live && pnpm test:docker:all",
     "test:auth:compat": "node scripts/run-vitest.mjs run --config vitest.gateway.config.ts src/gateway/server.auth.compat-baseline.test.ts src/gateway/client.test.ts src/gateway/reconnect-gating.test.ts src/gateway/protocol/connect-error-details.test.ts",
     "test:build:singleton": "node scripts/test-built-plugin-singleton.mjs",
+    "test:bun:tier-b": "node scripts/run-bun-tier-b.mjs",
     "test:bundled": "node scripts/run-vitest.mjs run --config vitest.bundled.config.ts",
     "test:changed": "node scripts/test-projects.mjs --changed origin/main",
     "test:changed:max": "DENNOU_VITEST_MAX_WORKERS=8 node scripts/test-projects.mjs --changed origin/main",
