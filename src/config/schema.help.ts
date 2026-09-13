@@ -1156,6 +1156,8 @@ export const FIELD_HELP: Record<string, string> = {
     "Max image side length in pixels when sanitizing transcript/tool-result image payloads (default: 1200).",
   "agents.defaults.compaction":
     "Compaction tuning for when context nears token limits, including history share, reserve headroom, and pre-compaction memory flush behavior. Use this when long-running sessions need stable continuity under tight context windows.",
+  "agents.defaults.compaction.enabled":
+    "Master switch for compaction and its pre-compaction side effects (default: true). Set false to disable auto-compaction, overflow/manual compaction, preflight compaction, the pre-compaction memory flush, and the prompt eviction safety valve; keep true to preserve existing behavior.",
   "agents.defaults.compaction.mode":
     'Compaction strategy mode: "default" uses baseline behavior, while "safeguard" applies stricter guardrails to preserve recent context. Keep "default" unless you observe aggressive history loss near limit boundaries.',
   "agents.defaults.compaction.reserveTokens":

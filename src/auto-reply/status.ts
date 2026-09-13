@@ -271,6 +271,12 @@ const readUsageFromSessionLog = (
     const transcript = fs.readFileSync(logPath, "utf-8");
     const lines = transcript.split(/\r?\n/);
 
+    // NOTE: every assistant usage entry is a snapshot of the *whole prompt* for that model
+    // call, not a delta. Summing them counts the same context over and over (the `251.1m`
+    // `/status` regression). Dedupe by transcript entry id and keep the high-water mark as
+    // the session prompt size; the last call's counters still drive the input/output/cache
+    // fallbacks because those describe a single response.
+    const seenEntryIds = new Set<string>();
     let input = 0;
     let output = 0;
     let cacheRead = 0;
@@ -286,6 +292,7 @@ const readUsageFromSessionLog = (
       }
       try {
         const parsed = JSON.parse(line) as {
+          id?: string;
           message?: {
             usage?: UsageLike;
             model?: string;
@@ -293,19 +300,36 @@ const readUsageFromSessionLog = (
           usage?: UsageLike;
           model?: string;
         };
-        const usageRaw = parsed.message?.usage ?? parsed.usage;
-        const usage = normalizeUsage(usageRaw);
+        const entryId = typeof parsed.id === "string" ? parsed.id : undefined;
+        if (entryId !== undefined) {
+          if (seenEntryIds.has(entryId)) {
+            continue;
+          }
+          seenEntryIds.add(entryId);
+        }
+        const usage = normalizeUsage(parsed.message?.usage ?? parsed.usage);
         if (!usage) {
           model = parsed.message?.model ?? parsed.model ?? model;
           continue;
         }
         sawUsage = true;
-        input += usage.input ?? 0;
-        output += usage.output ?? 0;
-        cacheRead += usage.cacheRead ?? 0;
-        cacheWrite += usage.cacheWrite ?? 0;
-        promptTokens += derivePromptTokens(usage) ?? 0;
-        total += usage.total ?? (usage.input ?? 0) + (usage.output ?? 0);
+        const prompt = derivePromptTokens(usage) ?? 0;
+        if (prompt > promptTokens) {
+          promptTokens = prompt;
+        }
+        const callTotal =
+          usage.total ??
+          (usage.input ?? 0) +
+            (usage.output ?? 0) +
+            (usage.cacheRead ?? 0) +
+            (usage.cacheWrite ?? 0);
+        if (callTotal > total) {
+          total = callTotal;
+        }
+        input = usage.input ?? input;
+        output = usage.output ?? output;
+        cacheRead = usage.cacheRead ?? cacheRead;
+        cacheWrite = usage.cacheWrite ?? cacheWrite;
         model = parsed.message?.model ?? parsed.model ?? model;
       } catch {
         // ignore malformed lines

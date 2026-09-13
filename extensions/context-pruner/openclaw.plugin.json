@@ -9,7 +9,7 @@
       "enabled": {
         "type": "boolean",
         "default": true,
-        "description": "Master switch for write-time tool-result pruning and deferred audio transcription."
+        "description": "Master switch for this plugin only: write-time tool-result placeholder-ization, the 50k safety cap, the background Historian/eviction wiring, and deferred audio transcription. Independent of agents.defaults.compaction.enabled (set that false to stop kernel compaction too)."
       },
       "stt": {
         "type": "object",

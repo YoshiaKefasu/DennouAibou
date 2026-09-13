@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { MIN_PROMPT_BUDGET_RATIO, MIN_PROMPT_BUDGET_TOKENS } from "./pi-compaction-constants.js";
 import {
+  applyPiAutoCompactionGuard,
   applyPiCompactionSettingsFromConfig,
   DEFAULT_PI_COMPACTION_RESERVE_TOKENS_FLOOR,
+  isCompactionEnabled,
   resolveCompactionReserveTokensFloor,
   resolveTimeoutCompactionPromptUsageThreshold,
+  shouldDisablePiAutoCompaction,
 } from "./pi-settings.js";
 
 describe("applyPiCompactionSettingsFromConfig", () => {
@@ -365,5 +368,44 @@ describe("resolveTimeoutCompactionPromptUsageThreshold", () => {
         contextTokenBudget: 200_000,
       }),
     ).toBe(0.9);
+  });
+});
+
+describe("compaction master switch", () => {
+  it("defaults to enabled and only explicit false disables it", () => {
+    expect(isCompactionEnabled(undefined)).toBe(true);
+    expect(isCompactionEnabled({})).toBe(true);
+    expect(isCompactionEnabled({ agents: { defaults: { compaction: { enabled: true } } } })).toBe(
+      true,
+    );
+    expect(isCompactionEnabled({ agents: { defaults: { compaction: { enabled: false } } } })).toBe(
+      false,
+    );
+  });
+
+  it("forces Pi auto-compaction off when config disables compaction", () => {
+    expect(shouldDisablePiAutoCompaction({ compactionEnabled: false })).toBe(true);
+    expect(shouldDisablePiAutoCompaction({ compactionEnabled: true })).toBe(false);
+    // A context engine that owns compaction still disables Pi auto-compaction.
+    expect(
+      shouldDisablePiAutoCompaction({
+        contextEngineInfo: { id: "test", name: "Test Engine", ownsCompaction: true },
+        compactionEnabled: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("disables the settings manager when config turns compaction off", () => {
+    const settingsManager = {
+      getCompactionReserveTokens: () => 16_384,
+      getCompactionKeepRecentTokens: () => 20_000,
+      applyOverrides: vi.fn(),
+      setCompactionEnabled: vi.fn(),
+    };
+
+    const result = applyPiAutoCompactionGuard({ settingsManager, compactionEnabled: false });
+
+    expect(result).toEqual({ supported: true, disabled: true });
+    expect(settingsManager.setCompactionEnabled).toHaveBeenCalledWith(false);
   });
 });

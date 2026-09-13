@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   applyPromptEvictionSafetyValve,
+  isCompactionDisabled,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
   resolveMeasuredPromptTokens,
@@ -892,6 +893,7 @@ export async function runEmbeddedAttempt(
       applyPiAutoCompactionGuard({
         settingsManager,
         contextEngineInfo: params.contextEngine?.info,
+        compactionEnabled: params.config?.agents?.defaults?.compaction?.enabled,
       });
 
       // Sets compaction runtime state and returns extension factories
@@ -1294,15 +1296,16 @@ export async function runEmbeddedAttempt(
           // 直近 250K より古い過去ログのみをプロンプトから一時退避する。
           // セッションファイル（.jsonl）の実ログは一切変更せず、プロンプトへの
           // 注入だけをスキップする（可逆・SESSION_INTEGRITY_GUARD 非破壊）。
-          // DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 でバイパス可能。
-          const evictionSafetyValve = isEvictionSafetyValveEnabled()
-            ? applyPromptEvictionSafetyValve(limited, {
-                ...resolveEvictionOptionsFromCompaction(
-                  params.config?.agents?.defaults?.compaction,
-                ),
-                measuredTotalTokens: resolveMeasuredPromptTokens(limited),
-              })
-            : undefined;
+          // DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 または
+          // agents.defaults.compaction.enabled=false でバイパス可能。
+          const compactionCfg = params.config?.agents?.defaults?.compaction;
+          const evictionSafetyValve =
+            isEvictionSafetyValveEnabled() && !isCompactionDisabled(compactionCfg)
+              ? applyPromptEvictionSafetyValve(limited, {
+                  ...resolveEvictionOptionsFromCompaction(compactionCfg),
+                  measuredTotalTokens: resolveMeasuredPromptTokens(limited),
+                })
+              : undefined;
           if (evictionSafetyValve?.evicted) {
             log.debug(
               `eviction safety valve: temporarily evicted ${evictionSafetyValve.evictedMessageCount} messages (${evictionSafetyValve.evictedTokens} tokens) from prompt; protected ${evictionSafetyValve.protectedTokens} recent tokens (session file untouched)`,

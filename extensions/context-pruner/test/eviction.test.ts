@@ -19,6 +19,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "vitest";
 import {
   applyPromptEvictionSafetyValve,
+  isCompactionDisabled,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
   DEFAULT_EVICTION_NOTICE,
@@ -327,6 +328,17 @@ describe("isEvictionSafetyValveEnabled", () => {
     expect(isEvictionSafetyValveEnabled({ DENNOU_SKIP_EVICTION_SAFETY_VALVE: "0" })).toBe(true);
     expect(isEvictionSafetyValveEnabled({ DENNOU_SKIP_EVICTION_SAFETY_VALVE: "true" })).toBe(true);
     expect(isEvictionSafetyValveEnabled({ DENNOU_SKIP_EVICTION_SAFETY_VALVE: "1" })).toBe(false);
+  });
+});
+
+// ── compaction 全体キルスイッチ ────────────────────────────
+
+describe("isCompactionDisabled", () => {
+  it("only treats an explicit enabled:false as disabled", () => {
+    expect(isCompactionDisabled(undefined)).toBe(false);
+    expect(isCompactionDisabled({})).toBe(false);
+    expect(isCompactionDisabled({ enabled: true })).toBe(false);
+    expect(isCompactionDisabled({ enabled: false })).toBe(true);
   });
 });
 

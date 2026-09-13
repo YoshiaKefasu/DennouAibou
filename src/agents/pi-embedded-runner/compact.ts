@@ -64,7 +64,7 @@ import {
   setCompactionSafeguardCancelReason,
 } from "../pi-hooks/compaction-safeguard-runtime.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
-import { applyPiCompactionSettingsFromConfig } from "../pi-settings.js";
+import { applyPiCompactionSettingsFromConfig, isCompactionEnabled } from "../pi-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import { registerProviderStreamForModel } from "../provider-stream.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
@@ -296,6 +296,15 @@ export async function compactEmbeddedPiSessionDirect(
   const attempt = params.attempt ?? 1;
   const maxAttempts = params.maxAttempts ?? 1;
   const runId = params.runId ?? params.sessionId;
+  // `agents.defaults.compaction.enabled: false` stops every compaction entry point, including
+  // manual `/compact`, overflow recovery, and preflight compaction.
+  if (isCompactionEnabled(params.config) === false) {
+    log.info(
+      `[compaction] skipped — agents.defaults.compaction.enabled=false ` +
+        `(sessionKey=${params.sessionKey ?? params.sessionId})`,
+    );
+    return { ok: true, compacted: false, reason: "compaction disabled" };
+  }
   const resolvedWorkspace = resolveUserPath(params.workspaceDir);
   ensureRuntimePluginsLoaded({
     config: params.config,

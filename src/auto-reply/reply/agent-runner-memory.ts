@@ -5,6 +5,7 @@ import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-bu
 import { estimateMessagesTokens } from "../../agents/compaction.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { compactEmbeddedPiSession, runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
+import { isCompactionEnabled } from "../../agents/pi-settings.js";
 import { resolveSandboxConfigForAgent, resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import {
   derivePromptTokens,
@@ -316,6 +317,11 @@ export async function runPreflightCompactionIfNeeded(params: {
     return params.sessionEntry;
   }
 
+  // `agents.defaults.compaction.enabled: false` stops preflight compaction entirely.
+  if (!isCompactionEnabled(params.cfg)) {
+    return params.sessionEntry;
+  }
+
   let entry =
     params.sessionEntry ??
     (params.sessionKey ? params.sessionStore?.[params.sessionKey] : undefined);
@@ -467,6 +473,11 @@ export async function runMemoryFlushIfNeeded(params: {
   isHeartbeat: boolean;
   replyOperation: ReplyOperation;
 }): Promise<SessionEntry | undefined> {
+  // `agents.defaults.compaction.enabled: false` also stops the pre-compaction memory flush,
+  // because the flush exists only to feed an upcoming compaction.
+  if (!isCompactionEnabled(params.cfg)) {
+    return params.sessionEntry;
+  }
   const memoryFlushPlan = resolveMemoryFlushPlan({ cfg: params.cfg });
   if (!memoryFlushPlan) {
     return params.sessionEntry;

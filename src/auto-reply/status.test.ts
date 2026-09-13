@@ -977,7 +977,7 @@ describe("buildStatusMessage", () => {
     });
   }
 
-  it("accumulates prompt usage across the full session transcript", async () => {
+  it("keeps the largest measured prompt across the full session transcript", async () => {
     await withTempHome(
       async (dir) => {
         const sessionId = "sess-usage-aggregate";
@@ -985,7 +985,7 @@ describe("buildStatusMessage", () => {
           dir,
           agentId: "main",
           sessionId,
-          usage: { input: 400, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 410 },
+          usage: { input: 700, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 710 },
         });
         const logPath = path.join(
           dir,
@@ -998,14 +998,23 @@ describe("buildStatusMessage", () => {
         fs.appendFileSync(
           logPath,
           `\n${JSON.stringify({
-            message: { usage: { input: 500, cacheRead: 100, output: 20 } },
+            id: "msg-2",
+            message: { usage: { input: 750, cacheRead: 0, output: 20 } },
+          })}`,
+          "utf-8",
+        );
+        fs.appendFileSync(
+          logPath,
+          `\n${JSON.stringify({
+            id: "msg-3",
+            message: { usage: { input: 800, cacheRead: 0, output: 30 } },
           })}`,
           "utf-8",
         );
 
         const text = buildStatusMessage({
-          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 2_000 },
-          sessionEntry: { sessionId, updatedAt: 0, totalTokens: 50, contextTokens: 2_000 },
+          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 1_000 },
+          sessionEntry: { sessionId, updatedAt: 0, totalTokens: 50, contextTokens: 1_000 },
           sessionKey: "agent:main:main",
           sessionScope: "per-sender",
           queue: { mode: "collect", depth: 0 },
@@ -1013,7 +1022,51 @@ describe("buildStatusMessage", () => {
           modelAuth: "api-key",
         });
 
-        expect(normalizeTestText(text)).toContain("Context: 1.0k/2.0k");
+        // Usage entries are per-call snapshots of the whole prompt, so summing them
+        // overstated context (2.4k/1.0k = 240%). The reported size is the high-water
+        // mark, which never exceeds the real prompt.
+        expect(normalizeTestText(text)).toContain("Context: 800/1.0k (80%)");
+        expect(normalizeTestText(text)).not.toContain("(240%)");
+      },
+      { prefix: "openclaw-status-" },
+    );
+  });
+
+  it("counts a duplicated transcript entry once by message id", async () => {
+    await withTempHome(
+      async (dir) => {
+        const sessionId = "sess-usage-dedup";
+        const logPath = path.join(
+          dir,
+          ".openclaw",
+          "agents",
+          "main",
+          "sessions",
+          `${sessionId}.jsonl`,
+        );
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        const entry = JSON.stringify({
+          id: "msg-dup",
+          type: "message",
+          message: {
+            role: "assistant",
+            model: "anthropic/claude-opus-4-6",
+            usage: { input: 900, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 905 },
+          },
+        });
+        fs.writeFileSync(logPath, `${entry}\n${entry}`, "utf-8");
+
+        const text = buildStatusMessage({
+          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 1_000 },
+          sessionEntry: { sessionId, updatedAt: 0, contextTokens: 1_000 },
+          sessionKey: "agent:main:main",
+          sessionScope: "per-sender",
+          queue: { mode: "collect", depth: 0 },
+          includeTranscriptUsage: true,
+          modelAuth: "api-key",
+        });
+
+        expect(normalizeTestText(text)).toContain("Context: 900/1.0k (90%)");
       },
       { prefix: "openclaw-status-" },
     );

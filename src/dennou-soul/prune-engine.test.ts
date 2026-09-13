@@ -10,6 +10,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import {
   parseLine,
   pruneToolOutputLines,
+  isPruneEnabled,
   isProtectedByKeyword,
   isProtectedByWorkspacePath,
   findAssistantCutoffIndex,
@@ -398,6 +399,13 @@ describe("placeholder idempotency", () => {
     const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, () => {});
     expect(prunedCount).toBe(0);
     expect(resultLines[2]).toBe(already);
+  });
+
+  it("isPruneEnabled only treats DENNOU_SKIP_PRUNE=1 as off", () => {
+    expect(isPruneEnabled({})).toBe(true);
+    expect(isPruneEnabled({ DENNOU_SKIP_PRUNE: "0" })).toBe(true);
+    expect(isPruneEnabled({ DENNOU_SKIP_PRUNE: "true" })).toBe(true);
+    expect(isPruneEnabled({ DENNOU_SKIP_PRUNE: "1" })).toBe(false);
   });
 });
 

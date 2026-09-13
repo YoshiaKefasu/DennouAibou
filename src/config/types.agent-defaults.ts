@@ -239,6 +239,8 @@ export type AgentCompactionQualityGuardConfig = {
 };
 
 export type AgentCompactionConfig = {
+  /** Master switch for compaction and its pre-compaction side effects (default: true). */
+  enabled?: boolean;
   /** Compaction summarization mode. */
   mode?: AgentCompactionMode;
   /** Pi reserve tokens target before floor enforcement. */

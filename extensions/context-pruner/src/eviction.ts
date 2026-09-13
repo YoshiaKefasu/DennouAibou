@@ -107,9 +107,19 @@ export type EvictionResult = {
 
 /** kernel の compaction 設定のうち、安全弁が参照する最小形（agents.defaults.compaction）。 */
 export type CompactionConfigLike = {
+  /** Master switch for compaction and its pre-compaction side effects (default: true). */
+  enabled?: boolean;
   reserveTokens?: number;
   keepRecentTokens?: number;
 };
+
+/**
+ * compaction 全体のキルスイッチ: `agents.defaults.compaction.enabled === false` のとき true。
+ * 未指定（undefined）は既定の有効（false を返す）として扱い、既存動作を変えない。
+ */
+export function isCompactionDisabled(compaction: CompactionConfigLike | undefined): boolean {
+  return compaction?.enabled === false;
+}
 
 /** 有効な正の数値のみ通す（不正値は null としてデフォルトへフォールバック）。 */
 function positiveFinite(value: unknown): number | null {

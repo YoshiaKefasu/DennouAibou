@@ -72,6 +72,7 @@ export type { CompartmentMessage, HistoryBlock, PartitionOptions } from "./src/c
 // （.jsonl）の実ログは 100% 保持され、プロンプトへの注入のみがスキップされる。
 export {
   applyPromptEvictionSafetyValve,
+  isCompactionDisabled,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
   DEFAULT_EVICTION_THRESHOLD_TOKENS,
@@ -149,6 +150,8 @@ export default definePluginEntry({
     api.registerService({
       id: "context-pruner-audio-stt",
       start(ctx) {
+        // Plugin-level master switch: `plugins.entries["context-pruner"].config.enabled: false`
+        // stops deferred audio transcription together with placeholder-ization.
         if (!config.enabled) {
           return;
         }
@@ -200,6 +203,8 @@ export default definePluginEntry({
     });
 
     // 書き込み時介入の本体: ツール結果をプレースホルダー化する。
+    // 有効/無効はこのプラグイン単体の `config.enabled` で決まる
+    // （`agents.defaults.compaction.enabled` とは独立してON/OFFできる）。
     // preserve: true（ツール呼び出し引数由来）は生データのまま保持する。
     api.on("tool_result_persist", (event, ctx) => {
       if (!config.enabled) {

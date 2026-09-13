@@ -162,17 +162,36 @@ export function resolveTimeoutCompactionPromptUsageThreshold(params: {
 /** Decide whether Pi's internal auto-compaction should be disabled for this run. */
 export function shouldDisablePiAutoCompaction(params: {
   contextEngineInfo?: ContextEngineInfo;
+  /** Explicit `agents.defaults.compaction.enabled` value (false = force off). */
+  compactionEnabled?: boolean;
 }): boolean {
+  if (params.compactionEnabled === false) {
+    return true;
+  }
   return params.contextEngineInfo?.ownsCompaction === true;
 }
 
-/** Disable Pi auto-compaction via settings when a context engine owns compaction. */
+/**
+ * Resolve the compaction master switch from config.
+ *
+ * `agents.defaults.compaction.enabled` defaults to enabled, so an unset value keeps
+ * existing behavior; only an explicit `false` turns compaction and its pre-compaction
+ * side effects off.
+ */
+export function isCompactionEnabled(cfg?: OpenClawConfig): boolean {
+  return cfg?.agents?.defaults?.compaction?.enabled !== false;
+}
+
+/** Disable Pi auto-compaction via settings when a context engine owns compaction or config forces it off. */
 export function applyPiAutoCompactionGuard(params: {
   settingsManager: PiSettingsManagerLike;
   contextEngineInfo?: ContextEngineInfo;
+  /** Explicit `agents.defaults.compaction.enabled` value (false = force off). */
+  compactionEnabled?: boolean;
 }): { supported: boolean; disabled: boolean } {
   const disable = shouldDisablePiAutoCompaction({
     contextEngineInfo: params.contextEngineInfo,
+    compactionEnabled: params.compactionEnabled,
   });
   const hasMethod = typeof params.settingsManager.setCompactionEnabled === "function";
   if (!disable || !hasMethod) {

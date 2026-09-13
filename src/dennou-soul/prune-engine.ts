@@ -31,6 +31,15 @@ export const PLACEHOLDER_MARKERS: readonly string[] = ["[出力省略:", "[Old t
  */
 export const TOOL_RESULT_SAFETY_CAP_CHARS = 50_000;
 
+/**
+ * 環境変数キルスイッチ: `DENNOU_SKIP_PRUNE=1` のとき prune エンジン全体を無効化する。
+ * 判定は純粋関数（env を注入可能）にして単体テスト可能にする。
+ * 既存の `DENNOU_SKIP_EVICTION_SAFETY_VALVE=1` と同じパターンに揃える。
+ */
+export function isPruneEnabled(env: { DENNOU_SKIP_PRUNE?: string } = process.env): boolean {
+  return env.DENNOU_SKIP_PRUNE !== "1";
+}
+
 /** 文字列にプレースホルダーマーカーが含まれるか（冪等性判定用）。 */
 export function hasPlaceholderMarker(text: string): boolean {
   return PLACEHOLDER_MARKERS.some((marker) => text.includes(marker));
@@ -283,6 +292,12 @@ export function pruneToolOutputLines(
   logger: (msg: string) => void,
   protection?: DennouPruneProtectionConfig,
 ): { resultLines: string[]; prunedCount: number } {
+  // キルスイッチ: DENNOU_SKIP_PRUNE=1 のときは読み取りだけで一切変換しない。
+  if (!isPruneEnabled()) {
+    logger("[DennouAibou] SKIP prune: DENNOU_SKIP_PRUNE=1");
+    return { resultLines: [...lines], prunedCount: 0 };
+  }
+
   let prunedCount = 0;
   const resultLines: string[] = [];
 

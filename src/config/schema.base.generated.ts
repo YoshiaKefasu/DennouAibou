@@ -2770,6 +2770,10 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                               type: "string",
                               const: "image",
                             },
+                            {
+                              type: "string",
+                              const: "audio",
+                            },
                           ],
                         },
                       },
@@ -3982,6 +3986,12 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
               compaction: {
                 type: "object",
                 properties: {
+                  enabled: {
+                    type: "boolean",
+                    title: "Compaction Enabled",
+                    description:
+                      "Master switch for compaction and its pre-compaction side effects (default: true). Set false to disable auto-compaction, overflow/manual compaction, preflight compaction, the pre-compaction memory flush, and the prompt eviction safety valve; keep true to preserve existing behavior.",
+                  },
                   mode: {
                     anyOf: [
                       {
@@ -24811,6 +24821,11 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
     "agents.defaults.compaction": {
       label: "Compaction",
       help: "Compaction tuning for when context nears token limits, including history share, reserve headroom, and pre-compaction memory flush behavior. Use this when long-running sessions need stable continuity under tight context windows.",
+      tags: ["advanced"],
+    },
+    "agents.defaults.compaction.enabled": {
+      label: "Compaction Enabled",
+      help: "Master switch for compaction and its pre-compaction side effects (default: true). Set false to disable auto-compaction, overflow/manual compaction, preflight compaction, the pre-compaction memory flush, and the prompt eviction safety valve; keep true to preserve existing behavior.",
       tags: ["advanced"],
     },
     "agents.defaults.compaction.mode": {
