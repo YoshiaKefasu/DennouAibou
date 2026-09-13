@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPublishedInstallScenarios,
   collectInstalledPackageErrors,
-} from "../scripts/openclaw-npm-postpublish-verify.ts";
+} from "../scripts/dennou-aibou-npm-postpublish-verify.ts";
 import { BUNDLED_RUNTIME_SIDECAR_PATHS } from "../src/plugins/runtime-sidecar-paths.ts";
 
 describe("buildPublishedInstallScenarios", () => {

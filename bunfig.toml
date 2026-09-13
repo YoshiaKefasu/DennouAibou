@@ -1,0 +1,10 @@
+# Bun runtime + test runner configuration.
+
+[test]
+# Load shared test bootstrap before any test file runs.
+#
+# NOTE: The per-test timeout is NOT configured here. Bun 1.4.0 silently ignores
+# `[test] timeout` in bunfig.toml, so a `timeout = 120000` key would look
+# configured while doing nothing. The 120s default (matching vitest's
+# `testTimeout`) is applied from the preload via `setDefaultTimeout()` instead.
+preload = ["./test/setup.bun.ts"]

@@ -13,7 +13,7 @@ import {
   resolveNpmCommandInvocation,
   shouldSkipPackedTarballValidation,
   utcCalendarDayDistance,
-} from "../scripts/openclaw-npm-release-check.ts";
+} from "../scripts/dennou-aibou-npm-release-check.ts";
 
 describe("parseReleaseVersion", () => {
   it("parses stable CalVer releases", () => {
@@ -171,7 +171,7 @@ describe("shouldSkipPackedTarballValidation", () => {
   it("accepts truthy values for metadata-only validation", () => {
     expect(
       shouldSkipPackedTarballValidation({
-        OPENCLAW_NPM_RELEASE_SKIP_PACK_CHECK: "1",
+        DENNOU_NPM_RELEASE_SKIP_PACK_CHECK: "1",
       }),
     ).toBe(true);
   });
@@ -179,7 +179,7 @@ describe("shouldSkipPackedTarballValidation", () => {
   it("treats false-like values as disabled", () => {
     expect(
       shouldSkipPackedTarballValidation({
-        OPENCLAW_NPM_RELEASE_SKIP_PACK_CHECK: "false",
+        DENNOU_NPM_RELEASE_SKIP_PACK_CHECK: "false",
       }),
     ).toBe(false);
   });

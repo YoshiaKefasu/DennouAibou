@@ -364,17 +364,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes acp targets to the acp config", () => {
-    expect(buildVitestRunPlans(["src/acp/control-plane/manager.test.ts"])).toEqual([
-      {
-        config: "vitest.acp.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["src/acp/control-plane/manager.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes cli targets to the cli config", () => {
     expect(buildVitestRunPlans(["src/cli/test-runtime-capture.test.ts"])).toEqual([
       {

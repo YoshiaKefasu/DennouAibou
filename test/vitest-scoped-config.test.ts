@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createAcpVitestConfig } from "../vitest.acp.config.ts";
 import { createAgentsVitestConfig } from "../vitest.agents.config.ts";
 import { createAutoReplyVitestConfig } from "../vitest.auto-reply.config.ts";
 import { createChannelsVitestConfig } from "../vitest.channels.config.ts";
@@ -10,7 +9,6 @@ import { createCliVitestConfig } from "../vitest.cli.config.ts";
 import { createCommandsVitestConfig } from "../vitest.commands.config.ts";
 import { createCronVitestConfig } from "../vitest.cron.config.ts";
 import { createDaemonVitestConfig } from "../vitest.daemon.config.ts";
-import { createExtensionAcpxVitestConfig } from "../vitest.extension-acpx.config.ts";
 import { createExtensionChannelsVitestConfig } from "../vitest.extension-channels.config.ts";
 import { createExtensionDiffsVitestConfig } from "../vitest.extension-diffs.config.ts";
 import { createExtensionMattermostVitestConfig } from "../vitest.extension-mattermost.config.ts";
@@ -111,10 +109,8 @@ describe("createScopedVitestConfig", () => {
 
 describe("scoped vitest configs", () => {
   const defaultChannelsConfig = createChannelsVitestConfig({});
-  const defaultAcpConfig = createAcpVitestConfig({});
   const defaultCliConfig = createCliVitestConfig({});
   const defaultExtensionsConfig = createExtensionsVitestConfig({});
-  const defaultExtensionAcpxConfig = createExtensionAcpxVitestConfig({});
   const defaultExtensionChannelsConfig = createExtensionChannelsVitestConfig({});
   const defaultExtensionDiffsConfig = createExtensionDiffsVitestConfig({});
   const defaultExtensionMattermostConfig = createExtensionMattermostVitestConfig({});
@@ -151,7 +147,6 @@ describe("scoped vitest configs", () => {
   it("keeps scoped lanes on threads with the shared non-isolated runner", () => {
     for (const config of [
       defaultChannelsConfig,
-      defaultAcpConfig,
       defaultExtensionsConfig,
       defaultExtensionChannelsConfig,
       defaultExtensionProvidersConfig,
@@ -229,11 +224,6 @@ describe("scoped vitest configs", () => {
     );
   });
 
-  it("normalizes acpx extension include patterns relative to the scoped dir", () => {
-    expect(defaultExtensionAcpxConfig.test?.dir).toBe("extensions");
-    expect(defaultExtensionAcpxConfig.test?.include).toEqual(["acpx/**/*.test.ts"]);
-  });
-
   it("normalizes diffs extension include patterns relative to the scoped dir", () => {
     expect(defaultExtensionDiffsConfig.test?.dir).toBe("extensions");
     expect(defaultExtensionDiffsConfig.test?.include).toEqual(["diffs/**/*.test.ts"]);
@@ -280,9 +270,9 @@ describe("scoped vitest configs", () => {
 
   it("normalizes memory extension include patterns relative to the scoped dir", () => {
     expect(defaultExtensionMemoryConfig.test?.dir).toBe("extensions");
-    expect(defaultExtensionMemoryConfig.test?.include).toEqual(
-      expect.arrayContaining(["memory-core/**/*.test.ts", "memory-lancedb/**/*.test.ts"]),
-    );
+    expect(defaultExtensionMemoryConfig.test?.include).toEqual([
+      "session-integrity-guard/**/*.test.ts",
+    ]);
   });
 
   it("keeps telegram plugin tests out of the shared extensions lane", () => {
@@ -352,15 +342,8 @@ describe("scoped vitest configs", () => {
     const extensionExcludes = defaultExtensionsConfig.test?.exclude ?? [];
     expect(
       extensionExcludes.some((pattern) =>
-        path.matchesGlob("memory-core/src/memory/test-runtime-mocks.ts", pattern),
+        path.matchesGlob("session-integrity-guard/test/health-check.test.ts", pattern),
       ),
-    ).toBe(true);
-  });
-
-  it("keeps acpx tests out of the shared extensions lane", () => {
-    const extensionExcludes = defaultExtensionsConfig.test?.exclude ?? [];
-    expect(
-      extensionExcludes.some((pattern) => path.matchesGlob("acpx/src/runtime.test.ts", pattern)),
     ).toBe(true);
   });
 
@@ -451,11 +434,6 @@ describe("scoped vitest configs", () => {
         "src/config/doc-baseline.integration.test.ts",
       ]),
     );
-  });
-
-  it("normalizes acp include patterns relative to the scoped dir", () => {
-    expect(defaultAcpConfig.test?.dir).toBe("src/acp");
-    expect(defaultAcpConfig.test?.include).toEqual(["**/*.test.ts"]);
   });
 
   it("normalizes cli include patterns relative to the scoped dir", () => {
