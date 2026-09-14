@@ -340,50 +340,57 @@ describe("gateway canvas host auth", () => {
     });
   }, 60_000);
 
-  test("accepts capability-scoped paths over IPv6 loopback", async () => {
-    await withTempConfig({
-      cfg: {
-        gateway: {
-          trustedProxies: ["::1"],
+  test.skipIf(process.platform === "win32")(
+    "accepts capability-scoped paths over IPv6 loopback",
+    async () => {
+      await withTempConfig({
+        cfg: {
+          gateway: {
+            trustedProxies: ["::1"],
+          },
         },
-      },
-      run: async () => {
-        try {
-          await withCanvasGatewayHarness({
-            resolvedAuth: tokenResolvedAuth,
-            listenHost: "::1",
-            handleHttpRequest: allowCanvasHostHttp,
-            run: async ({ listener, clients }) => {
-              const capability = "ipv6-node";
-              clients.add(
-                makeWsClient({
-                  connId: "c-ipv6-node",
-                  clientIp: "fd12:3456:789a::2",
-                  role: "node",
-                  mode: "node",
-                  canvasCapability: capability,
-                  canvasCapabilityExpiresAtMs: Date.now() + 60_000,
-                }),
-              );
+        run: async () => {
+          try {
+            await withCanvasGatewayHarness({
+              resolvedAuth: tokenResolvedAuth,
+              listenHost: "::1",
+              handleHttpRequest: allowCanvasHostHttp,
+              run: async ({ listener, clients }) => {
+                const capability = "ipv6-node";
+                clients.add(
+                  makeWsClient({
+                    connId: "c-ipv6-node",
+                    clientIp: "fd12:3456:789a::2",
+                    role: "node",
+                    mode: "node",
+                    canvasCapability: capability,
+                    canvasCapabilityExpiresAtMs: Date.now() + 60_000,
+                  }),
+                );
 
-              const canvasPath = scopedCanvasPath(capability, `${CANVAS_HOST_PATH}/`);
-              const wsPath = scopedCanvasPath(capability, CANVAS_WS_PATH);
-              const scopedCanvas = await fetch(`http://[::1]:${listener.port}${canvasPath}`);
-              expect(scopedCanvas.status).toBe(200);
+                const canvasPath = scopedCanvasPath(capability, `${CANVAS_HOST_PATH}/`);
+                const wsPath = scopedCanvasPath(capability, CANVAS_WS_PATH);
+                const scopedCanvas = await fetch(`http://[::1]:${listener.port}${canvasPath}`);
+                expect(scopedCanvas.status).toBe(200);
 
-              await expectWsConnected(`ws://[::1]:${listener.port}${wsPath}`);
-            },
-          });
-        } catch (err) {
-          const message = String(err);
-          if (message.includes("EAFNOSUPPORT") || message.includes("EADDRNOTAVAIL") || message.includes("ConnectionRefused")) {
-            return;
+                await expectWsConnected(`ws://[::1]:${listener.port}${wsPath}`);
+              },
+            });
+          } catch (err) {
+            const code =
+              err && typeof err === "object" && "code" in err
+                ? String((err as { code?: unknown }).code)
+                : undefined;
+            if (code === "EAFNOSUPPORT" || code === "EADDRNOTAVAIL" || code === "ECONNREFUSED") {
+              return;
+            }
+            throw err;
           }
-          throw err;
-        }
-      },
-    });
-  }, 60_000);
+        },
+      });
+    },
+    60_000,
+  );
 
   test("returns 429 for repeated failed canvas auth attempts (HTTP + WS upgrade)", async () => {
     await withLoopbackTrustedProxy(async () => {

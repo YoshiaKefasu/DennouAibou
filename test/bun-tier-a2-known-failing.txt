@@ -8,7 +8,8 @@
 #
 # All entries below are pre-existing (fail under vitest too on this Windows machine).
 # None are bun-specific regressions. Verified by running the same files under vitest
-# on the same machine.
+# on the same machine. The A3 all-tier baseline records this same classification
+# for the overlapping gateway/channel files.
 #
 # Root causes:
 #   1. Missing `dist/` or `dist-runtime/` build output — most bundled channel metadata
@@ -16,9 +17,10 @@
 #      requires a `pnpm build` to generate. These tests cannot pass without it.
 #   2. Windows path difference — tests hardcode `/tmp/...` but path.resolve() on
 #      Windows produces the current drive (`D:\tmp\...`).
-#   3. IPv6 loopback unavailable on this Windows machine — bun returns
-#      `ConnectionRefused` for `[::1]` connections. The test's try/catch already
-#      covers `EAFNOSUPPORT`/`EADDRNOTAVAIL`; `ConnectionRefused` is now added.
+#   3. IPv6 loopback unavailable on this Windows machine — the IPv6 canvas test
+#      is classified as pre-existing because the loopback is unavailable under
+#      both Bun and Vitest. The test skips on Windows and still retains an
+#      error-code guard for non-Windows environments.
 #   4. E2E tests in gateway.test.ts need a running gateway instance.
 #   5. ACP-specific session tests need bundled ACP channel metadata.
 #   6. talk-config contract fixtures need provider resolution from bundled data.
