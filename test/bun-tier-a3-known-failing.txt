@@ -2,7 +2,7 @@
 #
 # Measured on bun 1.4.0 / Windows / Phase 2-A3 tree:
 #   bun test --isolate --timeout 120000 <all 1097 Tier A files>
-#   -> 505 files ran, 51 known failures, 592 not reached (timeout on 900s shell)
+#   -> 505 files ran, 51 known failures, 573 not reached (592 originally, 19 reclassified as pre-existing; timeout on 900s shell)
 #
 # Tier A = tests that exist under src/ or extensions/ (excl. discord/context-pruner)
 # and classifiable as "no vi.* API use" by run-bun-tier-b.mjs's analyzer.
@@ -71,7 +71,7 @@ src/gateway/gateway.test.ts
 src/gateway/model-pricing-cache.test.ts
 src/gateway/server.canvas-auth.test.ts
 
-# unknown / not-reached (592)
+# unknown / not-reached (573; 592 originally, 19 reclassified as pre-existing)
 # These files were not reached within the 900s shell timeout during the
 # Phase 2-A3 measurement run. Keep this complete list to track coverage.
 src/config/config.legacy-config-detection.rejects-routing-allowfrom.test.ts
