@@ -1,0 +1,41 @@
+# Tier A1 files (src/agents/, no vi.*) that `bun test` does not currently pass.
+#
+# Measured on bun 1.4.0 / Windows / HEAD 28b94078e4:
+#   bun test --isolate --timeout 120000 <all 233 Tier A1 files>
+#   -> 1933 pass / 46 skip / 54 fail / 18 errors
+#
+# All failures are pre-existing: they also fail identically under vitest at
+# HEAD. No bun-specific regression was found in the Tier A1 suite.
+#
+# The 46 skipped tests come from bash-tools.exec.script-preflight.test.ts,
+# which uses `it.skip` — those are skipped under both runners.
+#
+# Classification of each entry:
+#
+#   pre-existing  vitest fails too  -> already broken at HEAD, not a bun regression
+#
+# Keep in sync when a file starts passing:
+#   bun test --isolate --timeout 120000 <the file>
+
+# pre-existing (21 files)
+src/agents/bash-tools.exec.pty.test.ts
+src/agents/bash-tools.exec.script-preflight.test.ts
+src/agents/live-auth-keys.test.ts
+src/agents/model-tool-support.test.ts
+src/agents/models-config.fills-missing-provider-apikey-from-env-var.test.ts
+src/agents/models-config.providers.google-antigravity.test.ts
+src/agents/models-config.providers.moonshot.test.ts
+src/agents/models-config.providers.plugin-allowlist-compat.test.ts
+src/agents/models-config.providers.qianfan.test.ts
+src/agents/models-config.providers.vercel-ai-gateway.test.ts
+src/agents/models-config.providers.volcengine-byteplus.test.ts
+src/agents/pi-bundle-mcp-tools.materialize.test.ts
+src/agents/pi-embedded-runner/kilocode.test.ts
+src/agents/pi-embedded-runner/tool-result-context-guard.test.ts
+src/agents/pi-model-discovery.auth.test.ts
+src/agents/sandbox-explain.test.ts
+src/agents/skills.buildworkspaceskillsnapshot.test.ts
+src/agents/skills.env-path-guidance.test.ts
+src/agents/skills/compact-format.test.ts
+src/agents/subagent-control.test.ts
+src/agents/workspace.test.ts

@@ -1,0 +1,79 @@
+# Tier A3 files that `bun test --isolate` does not currently pass.
+#
+# Measured on bun 1.4.0 / Windows / Phase 2-A3 tree:
+#   bun test --isolate --timeout 120000 <all 1097 Tier A files>
+#   -> 505 files ran, 48 with failures, 592 not reached (timeout on 900s shell)
+#
+# Tier A = tests that exist under src/ or extensions/ (excl. discord/context-pruner)
+# and classifiable as "no vi.* API use" by run-bun-tier-b.mjs's analyzer.
+#
+# The 592 unreached files could not be assessed. They WILL run when the
+# test file count per shard decreases, but are treated as unknown until
+# confirmed — treat as potentially failing.
+#
+# Classification of each entry:
+#   bun-only      vitest passes, bun fails         -> real Bun gap
+#   pre-existing  vitest fails too                 -> already broken at HEAD
+#   unknown       not measured                     -> re-check before trusting
+
+# bun-only (8)
+extensions/google/index.test.ts
+extensions/raw-chat-search/src/raw-chat.test.ts
+extensions/telegram/src/update-offset-store.test.ts
+src/agents/workspace.test.ts
+src/channels/plugins/contracts/channel-import-guardrails.test.ts
+src/gateway/gateway.test.ts
+src/gateway/model-pricing-cache.test.ts
+src/gateway/server.canvas-auth.test.ts
+
+# pre-existing (40)
+src/agents/bash-tools.exec.pty.test.ts
+src/agents/live-auth-keys.test.ts
+src/agents/models-config.fills-missing-provider-apikey-from-env-var.test.ts
+src/agents/models-config.providers.moonshot.test.ts
+src/agents/pi-bundle-mcp-tools.materialize.test.ts
+src/agents/pi-embedded-runner/kilocode.test.ts
+src/agents/pi-model-discovery.auth.test.ts
+src/agents/skills.env-path-guidance.test.ts
+src/agents/spawned-context.test.ts
+src/auto-reply/commands-registry.test.ts
+src/auto-reply/reply/queue.collect.test.ts
+src/channels/ids.test.ts
+src/channels/plugins/configured-state.test.ts
+src/channels/plugins/persisted-auth-state.test.ts
+src/channels/registry.helpers.test.ts
+src/cli/completion-cli.test.ts
+src/cli/message-secret-scope.test.ts
+src/commands/auth-choice-legacy.test.ts
+src/commands/doctor-legacy-config.test.ts
+src/commands/doctor/repair-sequencing.test.ts
+src/commands/doctor/shared/empty-allowlist-policy.test.ts
+src/commands/doctor/shared/legacy-config-migrate.test.ts
+src/config/channel-configured.test.ts
+src/config/channel-token-and-http.validation.test.ts
+src/config/config.allowlist-requires-allowfrom.test.ts
+src/config/config.dm-policy-alias.test.ts
+src/config/config.irc.test.ts
+src/config/config.legacy-config-provider-shapes.test.ts
+src/config/config.msteams.test.ts
+src/config/config.pruning-defaults.test.ts
+src/config/doc-baseline.integration.test.ts
+src/config/model-alias-defaults.test.ts
+src/config/normalize-paths.test.ts
+src/config/plugin-auto-enable.channels.test.ts
+src/config/plugin-auto-enable.core.test.ts
+src/config/plugin-auto-enable.providers.test.ts
+src/config/schema.test.ts
+src/config/sessions.test.ts
+src/config/talk.normalize.test.ts
+src/config/validation.allowed-values.test.ts
+src/config/zod-schema.signal-groups.test.ts
+src/docker-build-cache.test.ts
+src/dockerfile.test.ts
+
+# unknown / not-reached (592)
+# These were not reached within the 900s shell timeout during the
+# Phase 2-A3 measurement run. Listed here to track completeness:
+# (This section is intentionally empty — the full file list is in
+#  .tmp-tier-a3-clean.txt. When retesting, run the complete list and
+#  migrate entries from pass to the header.)
