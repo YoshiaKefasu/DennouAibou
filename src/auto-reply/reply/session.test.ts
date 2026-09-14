@@ -614,7 +614,7 @@ describe("initSessionState RawBody", () => {
     expect(result.bodyStripped).toBe("KeepThisCase");
     expect(result.triggerBodyNormalized).toBe("/NEW KeepThisCase");
   });
-      it("uses the default per-agent sessions store when config store is unset", async () => {
+  it("uses the default per-agent sessions store when config store is unset", async () => {
     const root = await makeCaseDir("openclaw-session-store-default-");
     const stateDir = path.join(root, ".openclaw");
     const agentId = "worker1";
@@ -623,7 +623,7 @@ describe("initSessionState RawBody", () => {
     const sessionFile = path.join(stateDir, "agents", agentId, "sessions", `${sessionId}.jsonl`);
     const storePath = path.join(stateDir, "agents", agentId, "sessions", "sessions.json");
 
-    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+    setTestEnv("DENNOU_STATE_DIR", stateDir);
     try {
       await fs.mkdir(path.dirname(storePath), { recursive: true });
       await writeSessionStoreFast(storePath, {
@@ -651,7 +651,7 @@ describe("initSessionState RawBody", () => {
       expect(result.sessionEntry.sessionFile).toBe(sessionFile);
       expect(result.storePath).toBe(storePath);
     } finally {
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     }
   });
 
@@ -1318,7 +1318,7 @@ describe("drainFormattedSystemEvents", () => {
       const expectedTimestamp = formatZonedTimestamp(timestamp, {
         displaySeconds: true,
       });
-      vi.setSystemTime(timestamp);
+      vi.useFakeTimers({ now: timestamp });
 
       enqueueSystemEvent("Model switched.", { sessionKey: "agent:main:main" });
 

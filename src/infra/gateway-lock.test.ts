@@ -157,7 +157,7 @@ describe("gateway lock", () => {
     // This test relies on fake timers advancing Date.now and setTimeout deterministically.
     vi.useRealTimers();
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   afterAll(async () => {

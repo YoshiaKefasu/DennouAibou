@@ -276,9 +276,8 @@ describe("delivery-queue recovery", () => {
   });
 
   it("recovers deferred entries on a later restart once backoff elapsed", async () => {
-    vi.useFakeTimers();
     const start = new Date("2026-01-01T00:00:00.000Z");
-    vi.setSystemTime(start);
+    vi.useFakeTimers({ now: start });
 
     const id = await enqueueDelivery(
       { channel: "demo-channel-a", to: "+1", payloads: [{ text: "later" }] },
@@ -296,7 +295,7 @@ describe("delivery-queue recovery", () => {
     });
     expect(firstDeliver).not.toHaveBeenCalled();
 
-    vi.setSystemTime(new Date(start.getTime() + 600_000 + 1));
+    vi.advanceTimersByTime(600_000 + 1);
     const secondDeliver = vi.fn().mockResolvedValue([]);
     const secondRun = await runRecovery({ deliver: secondDeliver, maxRecoveryMs: 60_000 });
     expect(secondRun.result).toEqual({

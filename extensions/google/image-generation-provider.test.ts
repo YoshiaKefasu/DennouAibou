@@ -1,6 +1,7 @@
 import * as providerAuthRuntime from "openclaw/plugin-sdk/provider-auth-runtime";
 import * as providerHttp from "openclaw/plugin-sdk/provider-http";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setTestGlobal } from "../../src/test-utils/bun-test-mocks.js";
 import { buildGoogleImageGenerationProvider } from "./image-generation-provider.js";
 import { __testing as geminiWebSearchTesting } from "./src/gemini-web-search-provider.js";
 
@@ -39,7 +40,7 @@ function installGoogleFetchMock(params?: {
       ],
     }),
   });
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
@@ -74,7 +75,7 @@ describe("Google image-generation provider", () => {
         ],
       }),
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const provider = buildGoogleImageGenerationProvider();
     const result = await provider.generateImage({
@@ -143,7 +144,7 @@ describe("Google image-generation provider", () => {
         ],
       }),
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const provider = buildGoogleImageGenerationProvider();
     const result = await provider.generateImage({

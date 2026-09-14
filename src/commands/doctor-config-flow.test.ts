@@ -938,7 +938,7 @@ describe("doctor config flow", () => {
   it("warns and continues when Telegram account inspection hits inactive SecretRef surfaces", async () => {
     const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
     const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    setTestGlobal("fetch", fetchSpy);
     try {
       const result = await runDoctorConfigWithInput({
         repair: true,
@@ -986,7 +986,7 @@ describe("doctor config flow", () => {
       ).toBe(true);
     } finally {
       noteSpy.mockRestore();
-      vi.unstubAllGlobals();
+      restoreTestGlobals();
     }
   });
 

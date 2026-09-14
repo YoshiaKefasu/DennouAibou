@@ -115,7 +115,7 @@ function createProviderFallbackTool() {
 }
 
 function withoutAmbientFirecrawlEnv() {
-  vi.stubEnv("FIRECRAWL_API_KEY", "");
+  setTestEnv("FIRECRAWL_API_KEY", "");
 }
 
 async function executeFetch(
@@ -158,7 +158,7 @@ describe("web_fetch extraction fallbacks", () => {
   afterEach(() => {
     global.fetch = priorFetch;
     lookupMock.mockReset();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     vi.restoreAllMocks();
   });
 
@@ -254,7 +254,7 @@ describe("web_fetch extraction fallbacks", () => {
   });
 
   it("keeps DNS pinning for untrusted web_fetch URLs even when HTTP_PROXY is configured", async () => {
-    vi.stubEnv("HTTP_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTP_PROXY", "http://127.0.0.1:7890");
     const mockFetch = installMockFetch((input: RequestInfo | URL) =>
       Promise.resolve({
         ok: true,

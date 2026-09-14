@@ -16,7 +16,7 @@ describe("Ollama auto-discovery", () => {
   let ollamaCatalogProviderPromise: Promise<ProviderPlugin | undefined> | undefined;
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     globalThis.fetch = originalFetch;
     delete process.env.OLLAMA_API_KEY;
   });

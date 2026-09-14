@@ -68,8 +68,7 @@ function createStaleSocketDiscordManager(startedAt: number, staleAt: number): Ch
 }
 
 function withReadinessClock(run: () => void) {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date("2026-03-06T12:00:00Z"));
+  vi.useFakeTimers({ now: new Date("2026-03-06T12:00:00Z") });
   try {
     run();
   } finally {

@@ -154,8 +154,7 @@ describe("telegram thread bindings", () => {
   });
 
   it("updates lifecycle windows by session key", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-06T10:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-06T10:00:00.000Z") });
     const manager = createTelegramThreadBindingManager({
       accountId: "work",
       persist: false,
@@ -179,7 +178,7 @@ describe("telegram thread bindings", () => {
       targetSessionKey: "agent:main:subagent:child-1",
       idleTimeoutMs: 2 * 60 * 60 * 1000,
     });
-    vi.setSystemTime(new Date("2026-03-06T12:00:00.000Z"));
+    vi.advanceTimersByTime(2 * 60 * 60_000);
     const maxAgeUpdated = setTelegramThreadBindingMaxAgeBySessionKey({
       accountId: "work",
       targetSessionKey: "agent:main:subagent:child-1",
@@ -208,8 +207,7 @@ describe("telegram thread bindings", () => {
   it("does not persist lifecycle updates when manager persistence is disabled", async () => {
     stateDirOverride = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-telegram-bindings-"));
     process.env.OPENCLAW_STATE_DIR = stateDirOverride;
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-06T10:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-06T10:00:00.000Z") });
 
     createTelegramThreadBindingManager({
       accountId: "no-persist",
@@ -285,8 +283,7 @@ describe("telegram thread bindings", () => {
   it("flushes pending lifecycle update persists before test reset", async () => {
     stateDirOverride = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-telegram-bindings-"));
     process.env.OPENCLAW_STATE_DIR = stateDirOverride;
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-06T10:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-06T10:00:00.000Z") });
 
     createTelegramThreadBindingManager({
       accountId: "persist-reset",

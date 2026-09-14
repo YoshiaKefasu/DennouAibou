@@ -74,13 +74,13 @@ describe("web_fetch SSRF protection", () => {
   const priorFetch = global.fetch;
 
   beforeEach(() => {
-    vi.stubEnv("FIRECRAWL_API_KEY", "");
+    setTestEnv("FIRECRAWL_API_KEY", "");
   });
 
   afterEach(() => {
     global.fetch = priorFetch;
     lookupMock.mockClear();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("blocks localhost hostnames before fetch/firecrawl", async () => {

@@ -139,8 +139,7 @@ describe("startGatewayMaintenanceTimers", () => {
   });
 
   it("keeps stale buffers for active runs that still have abort controllers", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-22T00:00:00Z") });
     const { startGatewayMaintenanceTimers } = await import("./server-maintenance.js");
     const deps = createMaintenanceTimerDeps();
     const runId = "run-active";
@@ -161,8 +160,7 @@ describe("startGatewayMaintenanceTimers", () => {
   });
 
   it("sweeps orphaned stale buffers once the abort controller is gone", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-22T00:00:00Z") });
     const { startGatewayMaintenanceTimers } = await import("./server-maintenance.js");
     const deps = createMaintenanceTimerDeps();
     const runId = "run-orphaned";
@@ -182,8 +180,7 @@ describe("startGatewayMaintenanceTimers", () => {
   });
 
   it("clears deltaLastBroadcastLen when aborted runs age out", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-22T00:00:00Z") });
     const { startGatewayMaintenanceTimers } = await import("./server-maintenance.js");
     const deps = createMaintenanceTimerDeps();
     const runId = "run-aborted";

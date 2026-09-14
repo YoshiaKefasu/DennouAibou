@@ -80,7 +80,7 @@ async function withAnthropicPdfTool(
   run: (tool: PdfToolInstance, agentDir: string) => Promise<void>,
 ) {
   await withTempAgentDir(async (agentDir) => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+    setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
     const cfg = withDefaultModel(ANTHROPIC_PDF_MODEL);
     const tool = requirePdfTool(createPdfTool({ config: cfg, agentDir }));
     await run(tool, agentDir);
@@ -125,17 +125,17 @@ function makeGeminiAnalyzeParams(
 }
 
 function resetAuthEnv() {
-  vi.stubEnv("OPENAI_API_KEY", "");
-  vi.stubEnv("ANTHROPIC_API_KEY", "");
-  vi.stubEnv("ANTHROPIC_OAUTH_TOKEN", "");
-  vi.stubEnv("GEMINI_API_KEY", "");
-  vi.stubEnv("GOOGLE_API_KEY", "");
-  vi.stubEnv("MINIMAX_API_KEY", "");
-  vi.stubEnv("ZAI_API_KEY", "");
-  vi.stubEnv("Z_AI_API_KEY", "");
-  vi.stubEnv("COPILOT_GITHUB_TOKEN", "");
-  vi.stubEnv("GH_TOKEN", "");
-  vi.stubEnv("GITHUB_TOKEN", "");
+  setTestEnv("OPENAI_API_KEY", "");
+  setTestEnv("ANTHROPIC_API_KEY", "");
+  setTestEnv("ANTHROPIC_OAUTH_TOKEN", "");
+  setTestEnv("GEMINI_API_KEY", "");
+  setTestEnv("GOOGLE_API_KEY", "");
+  setTestEnv("MINIMAX_API_KEY", "");
+  setTestEnv("ZAI_API_KEY", "");
+  setTestEnv("Z_AI_API_KEY", "");
+  setTestEnv("COPILOT_GITHUB_TOKEN", "");
+  setTestEnv("GH_TOKEN", "");
+  setTestEnv("GITHUB_TOKEN", "");
 }
 
 function withDefaultModel(primary: string): OpenClawConfig {
@@ -271,7 +271,7 @@ describe("resolvePdfModelConfigForTool", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     global.fetch = priorFetch;
   });
 
@@ -318,8 +318,8 @@ describe("resolvePdfModelConfigForTool", () => {
 
   it("prefers anthropic when available for native PDF support", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
-      vi.stubEnv("OPENAI_API_KEY", "openai-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("OPENAI_API_KEY", "openai-test");
       const cfg = withDefaultModel("openai/gpt-5.4");
       const config = resolvePdfModelConfigForTool({ cfg, agentDir });
       expect(config).not.toBeNull();
@@ -330,7 +330,7 @@ describe("resolvePdfModelConfigForTool", () => {
 
   it("uses anthropic primary when provider is anthropic", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const cfg = withDefaultModel(ANTHROPIC_PDF_MODEL);
       const config = resolvePdfModelConfigForTool({ cfg, agentDir });
       expect(config?.primary).toBe(ANTHROPIC_PDF_MODEL);
@@ -352,7 +352,7 @@ describe("createPdfTool", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     global.fetch = priorFetch;
   });
 
@@ -400,7 +400,7 @@ describe("createPdfTool", () => {
 
   it("respects fsPolicy.workspaceOnly for non-sandbox pdf paths", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-pdf-ws-"));
       const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-pdf-out-"));
       try {

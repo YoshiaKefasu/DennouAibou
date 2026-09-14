@@ -44,7 +44,7 @@ const createGeminiBatchFetchMock = (count: number, embeddingValues = [1, 2, 3]) 
   }));
 
 function installFetchMock(fetchMock: typeof globalThis.fetch) {
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
 }
 
 function readFirstFetchRequest(fetchMock: { mock: { calls: unknown[][] } }) {
@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock("undici");
   vi.resetAllMocks();
-  vi.unstubAllGlobals();
+  restoreTestGlobals();
 });
 
 function mockResolvedProviderKey(apiKey = "test-key") {

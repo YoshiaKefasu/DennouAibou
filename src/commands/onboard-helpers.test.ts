@@ -40,16 +40,16 @@ vi.mock("../gateway/probe.js", () => ({
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 describe("openUrl", () => {
   it("quotes URLs on win32 so '&' is not treated as cmd separator", async () => {
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "");
     const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "development");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "development");
 
     const url =
       "https://accounts.google.com/o/oauth2/v2/auth?client_id=abc&response_type=code&redirect_uri=http%3A%2F%2Flocalhost";

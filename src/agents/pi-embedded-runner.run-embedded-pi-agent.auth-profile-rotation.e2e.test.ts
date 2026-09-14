@@ -546,7 +546,7 @@ async function withTimedAgentWorkspace<T>(
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-agent-"));
     const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-workspace-"));
     const now = Date.now();
-    vi.setSystemTime(now);
+    vi.useFakeTimers({ now });
 
     try {
       return await run({ agentDir, workspaceDir, now });
@@ -766,7 +766,7 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
     try {
       await writeCopilotAuthStore(agentDir);
       const now = Date.now();
-      vi.setSystemTime(now);
+      vi.useFakeTimers({ now });
 
       resolveCopilotApiTokenMock.mockResolvedValue({
         token: "copilot-initial",

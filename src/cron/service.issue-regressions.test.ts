@@ -158,7 +158,7 @@ describe("Cron issue regressions", () => {
   it("does not advance unrelated due jobs when updating another job", async () => {
     const store = cronIssueRegressionFixtures.makeStorePath();
     const now = Date.parse("2026-02-06T10:05:00.000Z");
-    vi.setSystemTime(now);
+    vi.advanceTimersByTime(now - Date.now());
     const cron = await startCronForStore({ storePath: store.storePath, cronEnabled: false });
 
     const dueJob = await cron.add({
@@ -181,7 +181,7 @@ describe("Cron issue regressions", () => {
     const originalDueNextRunAtMs = dueJob.state.nextRunAtMs;
     expect(typeof originalDueNextRunAtMs).toBe("number");
 
-    vi.setSystemTime(now + 5 * 60_000);
+    vi.advanceTimersByTime(now + 5 * 60_000 - Date.now());
 
     await cron.update(otherJob.id, {
       payload: { kind: "systemEvent", text: "other-updated" },

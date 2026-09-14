@@ -70,7 +70,7 @@ describe("runServiceRestart token drift", () => {
 
   it("prints the container restart hint when restart is requested for a not-loaded service", async () => {
     service.isLoaded.mockResolvedValue(false);
-    vi.stubEnv("DENNOU_CONTAINER_HINT", "openclaw-demo-container");
+    setTestEnv("DENNOU_CONTAINER_HINT", "openclaw-demo-container");
 
     await runServiceRestart({
       serviceNoun: "Gateway",
@@ -110,7 +110,7 @@ describe("runServiceRestart token drift", () => {
       programArguments: [],
       environment: { DENNOU_GATEWAY_TOKEN: "env-token" },
     });
-    vi.stubEnv("DENNOU_GATEWAY_TOKEN", "env-token");
+    setTestEnv("DENNOU_GATEWAY_TOKEN", "env-token");
 
     await runServiceRestart(createServiceRunArgs(true));
 
@@ -177,7 +177,7 @@ describe("runServiceRestart token drift", () => {
         SERVICE_GATEWAY_TOKEN: "service-token",
       },
     });
-    vi.stubEnv("SERVICE_GATEWAY_TOKEN", "process-token");
+    setTestEnv("SERVICE_GATEWAY_TOKEN", "process-token");
 
     await runServiceRestart(createServiceRunArgs(true));
 

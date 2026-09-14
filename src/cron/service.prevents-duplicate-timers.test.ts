@@ -51,7 +51,7 @@ describe("CronService", () => {
 
     await cronB.start();
 
-    vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:01.000Z") - Date.now());
     await vi.runOnlyPendingTimersAsync();
     await cronA.status();
     await cronB.status();

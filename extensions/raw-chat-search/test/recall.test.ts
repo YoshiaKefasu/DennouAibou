@@ -120,14 +120,14 @@ describe("RAW_CHAT_SEARCH Phase 3 vector recall", () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "raw-chat-recall-"));
     stateDir = path.join(tmpDir, "state");
-    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+    setTestEnv("DENNOU_STATE_DIR", stateDir);
     db = getRawChatDatabase("main");
   });
 
   afterEach(() => {
     closeAllRawChatDatabases();
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+    restoreTestGlobals();
+    restoreTestEnvs();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -278,8 +278,8 @@ describe("RAW_CHAT_SEARCH Phase 3 vector recall", () => {
 
   it("bypasses recall when DENNOU_SKIP_VECTOR_RECALL is enabled", async () => {
     const fetchImpl = createFetchStub(axisVector(1));
-    vi.stubGlobal("fetch", fetchImpl);
-    vi.stubEnv("DENNOU_SKIP_VECTOR_RECALL", "1");
+    setTestGlobal("fetch", fetchImpl);
+    setTestEnv("DENNOU_SKIP_VECTOR_RECALL", "1");
     const { handler } = registerBeforePromptBuildHook();
 
     await expect(
@@ -300,8 +300,8 @@ describe("RAW_CHAT_SEARCH Phase 3 vector recall", () => {
       textSnippet: "gateway port pair",
     });
     const fetchImpl = createFetchStub(axisVector(1));
-    vi.stubGlobal("fetch", fetchImpl);
-    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    setTestGlobal("fetch", fetchImpl);
+    setTestEnv("GEMINI_API_KEY", "test-key");
     const { handler } = registerBeforePromptBuildHook();
 
     const result = (await handler(

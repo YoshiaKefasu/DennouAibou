@@ -115,8 +115,7 @@ describe("auth profile store cache", () => {
     const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-auth-store-missing-"));
     const previousAgentDir = process.env.DENNOU_AGENT_DIR;
     const previousPiAgentDir = process.env.PI_CODING_AGENT_DIR;
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-21T15:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-21T15:00:00.000Z") });
     let syncCount = 0;
     mocks.syncExternalCliCredentials.mockImplementation((store) => {
       syncCount += 1;

@@ -315,7 +315,7 @@ describe("subagent announce timeout config", () => {
 
   it("retries gateway timeout for externally delivered completion announces before giving up", async () => {
     try {
-      vi.stubEnv("DENNOU_TEST_FAST", "1");
+      setTestEnv("DENNOU_TEST_FAST", "1");
       callGatewayImpl = async (request) => {
         if (request.method === "chat.history") {
           return { messages: [] };
@@ -337,7 +337,7 @@ describe("subagent announce timeout config", () => {
       );
       expect(directAgentCalls).toHaveLength(4);
     } finally {
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     }
   });
 

@@ -24,7 +24,7 @@ const relayGatewayIdentity = (() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  restoreTestGlobals();
 });
 
 function createRelayPushParams() {
@@ -203,7 +203,7 @@ describe("push-apns.relay", () => {
         status: 302,
         json: vi.fn().mockRejectedValue(new Error("no body")),
       });
-      vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+      setTestGlobal("fetch", fetchMock as unknown as typeof fetch);
 
       const result = await sendApnsRelayPush(createRelayPushParams());
 
@@ -223,7 +223,7 @@ describe("push-apns.relay", () => {
         status: 202,
         json: vi.fn().mockRejectedValue(new Error("bad json")),
       });
-      vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+      setTestGlobal("fetch", fetchMock as unknown as typeof fetch);
 
       await expect(sendApnsRelayPush(createRelayPushParams())).resolves.toEqual({
         ok: true,
@@ -247,7 +247,7 @@ describe("push-apns.relay", () => {
           tokenSuffix: " abcd1234 ",
         }),
       });
-      vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+      setTestGlobal("fetch", fetchMock as unknown as typeof fetch);
 
       await expect(sendApnsRelayPush(createRelayPushParams())).resolves.toEqual({
         ok: false,

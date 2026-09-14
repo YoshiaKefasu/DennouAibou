@@ -59,8 +59,7 @@ describe("tasks commands", () => {
   it("keeps tasks audit JSON stable while adding TaskFlow summary fields", async () => {
     await withTaskCommandStateDir(async () => {
       const now = Date.now();
-      vi.useFakeTimers();
-      vi.setSystemTime(now - 40 * 60_000);
+      vi.useFakeTimers({ now: now - 40 * 60_000 });
       createRunningTaskRun({
         runtime: "cli",
         ownerKey: "agent:main:main",
@@ -68,7 +67,7 @@ describe("tasks commands", () => {
         runId: "task-stale-queued",
         task: "Inspect issue backlog",
       });
-      vi.setSystemTime(now);
+      vi.advanceTimersByTime(40 * 60_000);
       createManagedTaskFlow({
         ownerKey: "agent:main:main",
         controllerId: "tests/tasks-command",
@@ -102,8 +101,7 @@ describe("tasks commands", () => {
   it("sorts combined audit findings before applying the limit", async () => {
     await withTaskCommandStateDir(async () => {
       const now = Date.now();
-      vi.useFakeTimers();
-      vi.setSystemTime(now - 40 * 60_000);
+      vi.useFakeTimers({ now: now - 40 * 60_000 });
       createRunningTaskRun({
         runtime: "cli",
         ownerKey: "agent:main:main",
@@ -111,7 +109,7 @@ describe("tasks commands", () => {
         runId: "task-stale-queued",
         task: "Queue audit",
       });
-      vi.setSystemTime(now);
+      vi.advanceTimersByTime(40 * 60_000);
       const runningFlow = createManagedTaskFlow({
         ownerKey: "agent:main:main",
         controllerId: "tests/tasks-command",

@@ -181,9 +181,9 @@ describe("pairing setup code", () => {
   }
 
   beforeEach(() => {
-    vi.stubEnv("DENNOU_GATEWAY_TOKEN", "");
-    vi.stubEnv("DENNOU_GATEWAY_PASSWORD", "");
-    vi.stubEnv("DENNOU_GATEWAY_PORT", "");
+    setTestEnv("DENNOU_GATEWAY_TOKEN", "");
+    setTestEnv("DENNOU_GATEWAY_PASSWORD", "");
+    setTestEnv("DENNOU_GATEWAY_PORT", "");
   });
 
   beforeAll(async () => {
@@ -197,7 +197,7 @@ describe("pairing setup code", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it.each([

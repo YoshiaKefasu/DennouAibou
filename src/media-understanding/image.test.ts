@@ -72,12 +72,12 @@ const { describeImageWithModel } = await import("./image.js");
 
 describe("describeImageWithModel", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     vi.restoreAllMocks();
   });
 
   beforeEach(() => {
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
     vi.clearAllMocks();
     fetchMock.mockResolvedValue({
       ok: true,

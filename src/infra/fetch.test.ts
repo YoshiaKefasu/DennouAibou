@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { setTestGlobal, restoreTestGlobals } from "../test-utils/bun-test-mocks.js";
 import { withFetchPreconnect } from "../test-utils/fetch-mock.js";
 import { resolveFetch, wrapFetchWithAbortSignal } from "./fetch.js";
 
@@ -253,13 +254,12 @@ describe("wrapFetchWithAbortSignal", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     } as unknown as AbortSignal;
-    const previousAbortController = globalThis.AbortController;
-    vi.stubGlobal("AbortController", undefined);
+    setTestGlobal("AbortController", undefined);
 
     try {
       await wrapped("https://example.com", { signal: fakeSignal });
     } finally {
-      vi.stubGlobal("AbortController", previousAbortController);
+      restoreTestGlobals();
     }
 
     expect(seenSignal).toBe(fakeSignal);
@@ -304,12 +304,11 @@ describe("wrapFetchWithAbortSignal", () => {
 
 describe("resolveFetch", () => {
   it("returns undefined when neither an explicit nor global fetch exists", () => {
-    const previousFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", undefined);
+    setTestGlobal("fetch", undefined);
     try {
       expect(resolveFetch(undefined)).toBeUndefined();
     } finally {
-      vi.stubGlobal("fetch", previousFetch);
+      restoreTestGlobals();
     }
   });
 });

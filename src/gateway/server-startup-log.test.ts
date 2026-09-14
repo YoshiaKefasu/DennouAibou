@@ -50,8 +50,7 @@ describe("gateway startup log", () => {
   });
 
   it("logs a compact ready line with plugin count and duration", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-03T10:00:16.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-04-03T10:00:16.000Z") });
 
     const info = vi.fn();
     const warn = vi.fn();

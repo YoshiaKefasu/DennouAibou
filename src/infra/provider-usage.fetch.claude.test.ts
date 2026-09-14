@@ -33,9 +33,9 @@ type ScopeFallbackFetch = ReturnType<typeof createScopeFallbackFetch>;
 async function expectMissingScopeWithoutFallback(mockFetch: ScopeFallbackFetch) {
   // Use explicit non-session values so this stays deterministic even when worker env contains
   // real Claude session variables from other suites.
-  vi.stubEnv("CLAUDE_AI_SESSION_KEY", "missing-session-key");
-  vi.stubEnv("CLAUDE_WEB_SESSION_KEY", "missing-session-key");
-  vi.stubEnv("CLAUDE_WEB_COOKIE", "foo=bar");
+  setTestEnv("CLAUDE_AI_SESSION_KEY", "missing-session-key");
+  setTestEnv("CLAUDE_WEB_SESSION_KEY", "missing-session-key");
+  setTestEnv("CLAUDE_WEB_COOKIE", "foo=bar");
 
   const result = await fetchClaudeUsage("token", 5000, mockFetch);
   expectMissingScopeError(result);
@@ -50,7 +50,7 @@ function makeOrgAResponse() {
 
 describe("fetchClaudeUsage", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("parses oauth usage windows", async () => {
@@ -129,7 +129,7 @@ describe("fetchClaudeUsage", () => {
   });
 
   it("falls back to claude web usage when oauth scope is missing", async () => {
-    vi.stubEnv("CLAUDE_AI_SESSION_KEY", "sk-ant-session-key");
+    setTestEnv("CLAUDE_AI_SESSION_KEY", "sk-ant-session-key");
 
     const mockFetch = createProviderUsageFetch(async (url, init) => {
       if (url.includes("/api/oauth/usage")) {
@@ -159,7 +159,7 @@ describe("fetchClaudeUsage", () => {
   });
 
   it("parses sessionKey from Cookie-prefixed CLAUDE_WEB_COOKIE headers", async () => {
-    vi.stubEnv("CLAUDE_WEB_COOKIE", "Cookie: foo=bar; sessionKey=sk-ant-cookie-header");
+    setTestEnv("CLAUDE_WEB_COOKIE", "Cookie: foo=bar; sessionKey=sk-ant-cookie-header");
 
     const mockFetch = createScopeFallbackFetch(async (url) => {
       if (url.endsWith("/api/organizations")) {
@@ -178,7 +178,7 @@ describe("fetchClaudeUsage", () => {
   });
 
   it("parses sessionKey from CLAUDE_WEB_COOKIE for web fallback", async () => {
-    vi.stubEnv("CLAUDE_WEB_COOKIE", "sessionKey=sk-ant-cookie-session");
+    setTestEnv("CLAUDE_WEB_COOKIE", "sessionKey=sk-ant-cookie-session");
 
     const mockFetch = createScopeFallbackFetch(async (url) => {
       if (url.endsWith("/api/organizations")) {
@@ -231,7 +231,7 @@ describe("fetchClaudeUsage", () => {
   ])(
     "returns oauth error when web fallback is unavailable: $name",
     async ({ orgResponse, usageResponse }) => {
-      vi.stubEnv("CLAUDE_AI_SESSION_KEY", "sk-ant-fallback");
+      setTestEnv("CLAUDE_AI_SESSION_KEY", "sk-ant-fallback");
 
       const mockFetch = createScopeFallbackFetch(async (url) => {
         if (url.endsWith("/api/organizations")) {

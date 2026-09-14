@@ -53,7 +53,7 @@ function stubFetchSequence(
       json: async () => ({}),
     });
   }
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
@@ -134,8 +134,8 @@ function applyCustomModelConfigWithContextWindow(contextWindow?: number) {
 
 describe("promptCustomApiConfig", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+    restoreTestGlobals();
+    restoreTestEnvs();
     vi.useRealTimers();
   });
 
@@ -349,7 +349,7 @@ describe("promptCustomApiConfig", () => {
         });
       })
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const promise = runPromptCustomApi(prompter);
 
@@ -360,7 +360,7 @@ describe("promptCustomApiConfig", () => {
   });
 
   it("stores env SecretRef for custom provider when selected", async () => {
-    vi.stubEnv("CUSTOM_PROVIDER_API_KEY", "test-env-key");
+    setTestEnv("CUSTOM_PROVIDER_API_KEY", "test-env-key");
     const prompter = createTestPrompter({
       text: ["https://example.com/v1", "CUSTOM_PROVIDER_API_KEY", "detected-model", "custom", ""],
       select: ["ref", "env", "openai"],
@@ -381,7 +381,7 @@ describe("promptCustomApiConfig", () => {
   });
 
   it("re-prompts source after provider ref preflight fails and succeeds with env ref", async () => {
-    vi.stubEnv("CUSTOM_PROVIDER_API_KEY", "test-env-key");
+    setTestEnv("CUSTOM_PROVIDER_API_KEY", "test-env-key");
     const prompter = createTestPrompter({
       text: [
         "https://example.com/v1",

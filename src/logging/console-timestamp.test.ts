@@ -30,8 +30,7 @@ describe("formatConsoleTimestamp", () => {
   }
 
   it("pretty style returns local HH:MM:SS with timezone offset", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-17T18:01:02.345Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-17T18:01:02.345Z") });
 
     const result = formatConsoleTimestamp("pretty");
     const now = new Date();
@@ -49,8 +48,7 @@ describe("formatConsoleTimestamp", () => {
     const result = formatConsoleTimestamp("compact");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/);
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-17T18:01:02.345Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-17T18:01:02.345Z") });
     const now = new Date();
     expect(formatConsoleTimestamp("compact")).toBe(formatExpectedLocalIsoWithOffset(now));
   });
@@ -59,15 +57,13 @@ describe("formatConsoleTimestamp", () => {
     const result = formatConsoleTimestamp("json");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/);
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-17T18:01:02.345Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-17T18:01:02.345Z") });
     const now = new Date();
     expect(formatConsoleTimestamp("json")).toBe(formatExpectedLocalIsoWithOffset(now));
   });
 
   it("timestamp contains the correct local date components", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-17T18:01:02.345Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-17T18:01:02.345Z") });
 
     const before = new Date();
     const result = formatConsoleTimestamp("compact");

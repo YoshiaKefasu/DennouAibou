@@ -369,7 +369,7 @@ describe("thread binding lifecycle", () => {
   it("updates idle timeout by target session key", async () => {
     vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2026-02-20T23:00:00.000Z"));
+      vi.useFakeTimers({ now: new Date("2026-02-20T23:00:00.000Z") });
       const manager = createThreadBindingManager({
         accountId: "default",
         persist: false,
@@ -389,7 +389,7 @@ describe("thread binding lifecycle", () => {
       });
 
       const boundAt = manager.getByThreadId("thread-1")?.boundAt;
-      vi.setSystemTime(new Date("2026-02-20T23:15:00.000Z"));
+      vi.advanceTimersByTime(15 * 60_000);
 
       const updated = setThreadBindingIdleTimeoutBySessionKey({
         accountId: "default",
@@ -414,7 +414,7 @@ describe("thread binding lifecycle", () => {
   it("updates max age by target session key", async () => {
     vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2026-02-20T10:00:00.000Z"));
+      vi.useFakeTimers({ now: new Date("2026-02-20T10:00:00.000Z") });
       const manager = createThreadBindingManager({
         accountId: "default",
         persist: false,
@@ -431,7 +431,7 @@ describe("thread binding lifecycle", () => {
         agentId: "main",
       });
 
-      vi.setSystemTime(new Date("2026-02-20T10:30:00.000Z"));
+      vi.advanceTimersByTime(30 * 60_000);
       const updated = setThreadBindingMaxAgeBySessionKey({
         accountId: "default",
         targetSessionKey: "agent:main:subagent:child",
@@ -559,9 +559,8 @@ describe("thread binding lifecycle", () => {
   });
 
   it("refreshes inactivity window when thread activity is touched", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
     try {
-      vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
       const manager = createThreadBindingManager({
         accountId: "default",
         persist: false,
@@ -578,7 +577,7 @@ describe("thread binding lifecycle", () => {
         agentId: "main",
       });
 
-      vi.setSystemTime(new Date("2026-02-20T00:00:30.000Z"));
+      vi.advanceTimersByTime(30_000);
       const touched = manager.touchThread({ threadId: "thread-1", persist: false });
       expect(touched).not.toBeNull();
 
@@ -602,7 +601,7 @@ describe("thread binding lifecycle", () => {
     process.env.OPENCLAW_STATE_DIR = stateDir;
     try {
       __testing.resetThreadBindingsForTests();
-      vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+      vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
       const manager = createThreadBindingManager({
         accountId: "default",
         persist: true,
@@ -622,7 +621,7 @@ describe("thread binding lifecycle", () => {
       });
 
       const touchedAt = new Date("2026-02-20T00:00:30.000Z").getTime();
-      vi.setSystemTime(touchedAt);
+      vi.advanceTimersByTime(touchedAt - Date.now());
       manager.touchThread({ threadId: "thread-1" });
 
       __testing.resetThreadBindingsForTests();
@@ -1015,7 +1014,6 @@ describe("thread binding lifecycle", () => {
     expect(a.getByThreadId("thread-1")).toBeUndefined();
     expect(b.getByThreadId("thread-1")?.targetSessionKey).toBe("agent:main:subagent:b");
   });
-
 
   it("migrates legacy expiresAt bindings to idle/max-age semantics", () => {
     const previousStateDir = process.env.OPENCLAW_STATE_DIR;

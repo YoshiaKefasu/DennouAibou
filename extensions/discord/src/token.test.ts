@@ -4,11 +4,11 @@ import { resolveDiscordToken } from "./token.js";
 
 describe("resolveDiscordToken", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("prefers config token over env", () => {
-    vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
+    setTestEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: { discord: { token: "cfg-token" } },
     } as OpenClawConfig;
@@ -18,7 +18,7 @@ describe("resolveDiscordToken", () => {
   });
 
   it("uses env token when config is missing", () => {
-    vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
+    setTestEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: { discord: {} },
     } as OpenClawConfig;
@@ -28,7 +28,7 @@ describe("resolveDiscordToken", () => {
   });
 
   it("prefers account token for non-default accounts", () => {
-    vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
+    setTestEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: {
         discord: {

@@ -317,11 +317,11 @@ describe("Gemini Embedding 2 client", () => {
   const baseOptions = { apiKey: "test-key", dimensions: 4, timeoutMs: 400 };
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("resolves the API key from the argument first, then GEMINI_API_KEY", () => {
-    vi.stubEnv("GEMINI_API_KEY", "env-key");
+    setTestEnv("GEMINI_API_KEY", "env-key");
     expect(resolveGeminiApiKey("explicit-key")).toBe("explicit-key");
     expect(resolveGeminiApiKey()).toBe("env-key");
     expect(resolveGeminiApiKey("   ")).toBe("env-key");
@@ -382,7 +382,7 @@ describe("Gemini Embedding 2 client", () => {
   });
 
   it("throws a missing-api-key error when no key is available", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
+    setTestEnv("GEMINI_API_KEY", "");
     await expect(
       embedTextWithGemini("hello", { apiKey: "  ", fetchImpl: vi.fn() as unknown as typeof fetch }),
     ).rejects.toMatchObject({ code: "missing-api-key" });

@@ -45,8 +45,7 @@ afterEach(async () => {
 
 describe("device bootstrap tokens", () => {
   it("issues bootstrap tokens and persists them with an expiry", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-14T12:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-14T12:00:00Z") });
 
     const baseDir = await createTempDir();
     const issued = await issueDeviceBootstrapToken({ baseDir });
@@ -364,8 +363,7 @@ describe("device bootstrap tokens", () => {
   });
 
   it("repairs malformed persisted state when issuing a new token", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-14T12:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-14T12:00:00Z") });
 
     const baseDir = await createTempDir();
     const bootstrapPath = resolveBootstrapPath(baseDir);
@@ -425,12 +423,10 @@ describe("device bootstrap tokens", () => {
   });
 
   it("fails closed for unbound legacy records and prunes expired tokens", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-03-14T12:00:00Z") });
     const baseDir = await createTempDir();
     const bootstrapPath = resolveBootstrapPath(baseDir);
     await fs.mkdir(path.dirname(bootstrapPath), { recursive: true });
-
-    vi.setSystemTime(new Date("2026-03-14T12:00:00Z"));
     await fs.writeFile(
       bootstrapPath,
       `${JSON.stringify(

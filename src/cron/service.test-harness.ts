@@ -77,7 +77,7 @@ export function installCronTestHooks(options: {
     // timers from a previous file can still sit in the fake-timer queue.
     // Clear them before advancing time in the next test file.
     vi.clearAllTimers();
-    vi.setSystemTime(new Date(options.baseTimeIso ?? "2025-12-13T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date(options.baseTimeIso ?? "2025-12-13T00:00:00.000Z") });
     options.logger.debug.mockClear();
     options.logger.info.mockClear();
     options.logger.warn.mockClear();

@@ -255,7 +255,7 @@ describe("runMessageAction plugin dispatch", () => {
     afterEach(() => {
       setActivePluginRegistry(createTestRegistry([]));
       vi.clearAllMocks();
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     });
 
     it("dispatches messageId/chatId-based Feishu actions through the shared runner", async () => {
@@ -314,7 +314,7 @@ describe("runMessageAction plugin dispatch", () => {
     it("routes execution context ids into plugin handleAction", async () => {
       const stateDir = path.join("/tmp", "openclaw-plugin-dispatch-media-roots");
       const expectedWorkspaceRoot = path.resolve(stateDir, "workspace-alpha");
-      vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+      setTestEnv("DENNOU_STATE_DIR", stateDir);
 
       await runMessageAction({
         cfg: {

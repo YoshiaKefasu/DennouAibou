@@ -227,12 +227,12 @@ async function withTempWorkspacePng(
 function registerImageToolEnvReset(priorFetch: typeof global.fetch, keys: string[]) {
   beforeEach(() => {
     for (const key of keys) {
-      vi.stubEnv(key, "");
+      setTestEnv(key, "");
     }
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     global.fetch = priorFetch;
   });
 }
@@ -249,7 +249,7 @@ function stubMinimaxOkFetch() {
     }),
   });
   global.fetch = withFetchPreconnect(fetch);
-  vi.stubEnv("MINIMAX_API_KEY", "minimax-test");
+  setTestEnv("MINIMAX_API_KEY", "minimax-test");
   return fetch;
 }
 
@@ -617,10 +617,10 @@ describe("image tool implicit imageModel config", () => {
 
   it("pairs minimax primary with MiniMax-VL-01 (and fallbacks) when auth exists", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("MINIMAX_API_KEY", "minimax-test");
-      vi.stubEnv("MINIMAX_OAUTH_TOKEN", "minimax-oauth-test");
-      vi.stubEnv("OPENAI_API_KEY", "openai-test");
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("MINIMAX_API_KEY", "minimax-test");
+      setTestEnv("MINIMAX_OAUTH_TOKEN", "minimax-oauth-test");
+      setTestEnv("OPENAI_API_KEY", "openai-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const cfg: OpenClawConfig = {
         agents: { defaults: { model: { primary: "minimax/MiniMax-M2.7" } } },
       };
@@ -646,8 +646,8 @@ describe("image tool implicit imageModel config", () => {
           },
         },
       });
-      vi.stubEnv("OPENAI_API_KEY", "openai-test");
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("OPENAI_API_KEY", "openai-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const cfg: OpenClawConfig = {
         agents: { defaults: { model: { primary: "minimax-portal/MiniMax-M2.7" } } },
       };
@@ -660,9 +660,9 @@ describe("image tool implicit imageModel config", () => {
 
   it("pairs zai primary with glm-4.6v (and fallbacks) when auth exists", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("ZAI_API_KEY", "zai-test");
-      vi.stubEnv("OPENAI_API_KEY", "openai-test");
-      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test");
+      setTestEnv("ZAI_API_KEY", "zai-test");
+      setTestEnv("OPENAI_API_KEY", "openai-test");
+      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const cfg: OpenClawConfig = {
         agents: { defaults: { model: { primary: "zai/glm-4.7" } } },
       };
@@ -755,7 +755,7 @@ describe("image tool implicit imageModel config", () => {
     // When the primary model supports images, we still keep the tool available
     // because images are auto-injected into prompts. The tool description is
     // adjusted via modelHasVision to discourage redundant usage.
-    vi.stubEnv("OPENAI_API_KEY", "test-key");
+    setTestEnv("OPENAI_API_KEY", "test-key");
     await withTempAgentDir(async (agentDir) => {
       const cfg: OpenClawConfig = {
         agents: {
@@ -787,7 +787,7 @@ describe("image tool implicit imageModel config", () => {
 
   it("sends moonshot image requests with user+image payloads only", async () => {
     await withTempAgentDir(async (agentDir) => {
-      vi.stubEnv("MOONSHOT_API_KEY", "moonshot-test");
+      setTestEnv("MOONSHOT_API_KEY", "moonshot-test");
       const fetch = stubOpenAiCompletionsOkFetch("ok moonshot");
       const cfg: OpenClawConfig = {
         agents: {
@@ -1115,7 +1115,7 @@ describe("image tool implicit imageModel config", () => {
       await fs.writeFile(path.join(sandboxRoot, "img.png"), "fake", "utf8");
       const sandbox = { root: sandboxRoot, bridge: createHostSandboxFsBridge(sandboxRoot) };
 
-      vi.stubEnv("OPENAI_API_KEY", "openai-test");
+      setTestEnv("OPENAI_API_KEY", "openai-test");
       const cfg: OpenClawConfig = {
         agents: { defaults: { model: { primary: "minimax/MiniMax-M2.7" } } },
       };
@@ -1244,7 +1244,7 @@ describe("image tool MiniMax VLM routing", () => {
     const fetch = stubMinimaxFetch(baseResp, baseResp.status_code === 0 ? "ok" : "");
 
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-minimax-vlm-"));
-    vi.stubEnv("MINIMAX_API_KEY", "minimax-test");
+    setTestEnv("MINIMAX_API_KEY", "minimax-test");
     const cfg = createMinimaxImageConfig();
     const tool = createRequiredImageTool({ config: cfg, agentDir });
     return { fetch, tool };

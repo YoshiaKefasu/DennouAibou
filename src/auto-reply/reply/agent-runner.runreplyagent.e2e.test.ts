@@ -105,7 +105,7 @@ beforeEach(() => {
   (enqueueFollowupRun as Mock).mockClear();
   (refreshQueuedFollowupSession as Mock).mockClear();
   (scheduleFollowupDrain as Mock).mockClear();
-  vi.stubEnv("DENNOU_TEST_FAST", "1");
+  setTestEnv("DENNOU_TEST_FAST", "1");
 });
 
 function createMinimalRun(params?: {

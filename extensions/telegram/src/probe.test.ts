@@ -63,7 +63,7 @@ describe("probeTelegram retry logic", () => {
     resetTelegramProbeFetcherCacheForTests();
     resolveTelegramFetch.mockReset();
     makeProxyFetch.mockReset();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     vi.clearAllMocks();
     if (originalFetch) {
       global.fetch = originalFetch;
@@ -204,8 +204,8 @@ describe("probeTelegram retry logic", () => {
 
   it("reuses probe fetcher across repeated probes for the same account transport settings", async () => {
     const fetchMock = installFetchMock();
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "production");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "production");
 
     mockGetMeSuccess(fetchMock);
     mockGetWebhookInfoSuccess(fetchMock);
@@ -230,8 +230,8 @@ describe("probeTelegram retry logic", () => {
 
   it("does not reuse probe fetcher cache when network settings differ", async () => {
     const fetchMock = installFetchMock();
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "production");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "production");
 
     mockGetMeSuccess(fetchMock);
     mockGetWebhookInfoSuccess(fetchMock);
@@ -256,8 +256,8 @@ describe("probeTelegram retry logic", () => {
 
   it("reuses probe fetcher cache across token rotation when accountId is stable", async () => {
     const fetchMock = installFetchMock();
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "production");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "production");
 
     mockGetMeSuccess(fetchMock);
     mockGetWebhookInfoSuccess(fetchMock);

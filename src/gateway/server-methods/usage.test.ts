@@ -107,8 +107,7 @@ describe("gateway usage helpers", () => {
   });
 
   it("parseDateRange uses specific offset for today/day math after UTC midnight", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-17T03:57:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-17T03:57:00.000Z") });
     const range = __test.parseDateRange({
       days: 1,
       mode: "specific",
@@ -119,8 +118,7 @@ describe("gateway usage helpers", () => {
   });
 
   it("parseDateRange uses gateway local day boundaries in gateway mode", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-05T12:34:56.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-05T12:34:56.000Z") });
     const range = __test.parseDateRange({ days: 1, mode: "gateway" });
     const expectedStart = new Date(2026, 1, 5).getTime();
     expect(range.startMs).toBe(expectedStart);
@@ -128,8 +126,7 @@ describe("gateway usage helpers", () => {
   });
 
   it("parseDateRange clamps days to at least 1 and defaults to 30 days", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-05T12:34:56.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-05T12:34:56.000Z") });
     const oneDay = __test.parseDateRange({ days: 0 });
     expect(oneDay.endMs).toBe(Date.UTC(2026, 1, 5) + dayMs - 1);
     expect(oneDay.startMs).toBe(Date.UTC(2026, 1, 5));
@@ -140,8 +137,7 @@ describe("gateway usage helpers", () => {
   });
 
   it("loadCostUsageSummaryCached caches within TTL", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-05T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-05T00:00:00.000Z") });
 
     const config = {} as OpenClawConfig;
     const a = await __test.loadCostUsageSummaryCached({

@@ -310,7 +310,7 @@ async function runIsolatedAnnounceJobAndWait(params: {
   status: "ok" | "error";
 }) {
   const { job, runAt } = await addDefaultIsolatedAnnounceJob(params.cron, params.name);
-  vi.setSystemTime(runAt);
+  vi.useFakeTimers({ now: runAt });
   await vi.runOnlyPendingTimersAsync();
   await params.events.waitFor(
     (evt) => evt.jobId === job.id && evt.action === "finished" && evt.status === params.status,
@@ -426,7 +426,7 @@ describe("CronService", () => {
 
     expect(job.state.nextRunAtMs).toBe(atMs);
 
-    vi.setSystemTime(new Date("2025-12-13T00:00:02.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:02.000Z") - Date.now());
     await vi.runOnlyPendingTimersAsync();
     await events.waitFor((evt) => evt.jobId === job.id && evt.action === "finished");
 
@@ -446,7 +446,7 @@ describe("CronService", () => {
         name: "one-shot delete",
       });
 
-    vi.setSystemTime(new Date("2025-12-13T00:00:02.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:02.000Z") - Date.now());
     await vi.runOnlyPendingTimersAsync();
     await events.waitFor((evt) => evt.jobId === job.id && evt.action === "removed");
 

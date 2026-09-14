@@ -107,7 +107,7 @@ describe("resolveApiKeyForProfile fallback to main agent", () => {
   afterEach(async () => {
     resetFileLockStateForTest();
     clearRuntimeAuthProfileStoreSnapshots();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
 
     envSnapshot.restore();
 

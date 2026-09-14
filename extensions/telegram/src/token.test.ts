@@ -43,7 +43,7 @@ describe("resolveTelegramToken", () => {
   }
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     for (const dir of tempDirs.splice(0)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -87,13 +87,13 @@ describe("resolveTelegramToken", () => {
       expected: { token: "cfg-token", source: "config" },
     },
   ])("$name", ({ envToken, cfg, resolveCfg, expected }) => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", envToken);
+    setTestEnv("TELEGRAM_BOT_TOKEN", envToken);
     const res = resolveTelegramToken(resolveCfg ? resolveCfg() : cfg);
     expect(res).toEqual(expected);
   });
 
   it.runIf(process.platform !== "win32")("rejects symlinked tokenFile paths", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     const dir = createTempDir();
     const tokenFile = path.join(dir, "token.txt");
     const tokenLink = path.join(dir, "token-link.txt");
@@ -107,7 +107,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("does not fall back to config when tokenFile is missing", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     const dir = createTempDir();
     const tokenFile = path.join(dir, "missing-token.txt");
     const cfg = {
@@ -119,7 +119,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("resolves per-account tokens when the config account key casing doesn't match routing normalization", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     const cfg = {
       channels: {
         telegram: {
@@ -137,7 +137,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("resolves per-account tokens when config keys normalize spaces to dashes", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     const cfg = {
       channels: {
         telegram: {
@@ -208,7 +208,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("does not use env token for non-default accounts", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "env-token");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "env-token");
     const cfg = {
       channels: {
         telegram: {
@@ -225,7 +225,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("does not fall through to channel-level token when non-default accountId is not in config", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     expectNoTokenForUnknownAccount(createUnknownAccountConfig());
   });
 
@@ -262,7 +262,7 @@ describe("resolveTelegramToken", () => {
   });
 
   it("still blocks fallthrough for unknown accountId when accounts section exists", () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
     expectNoTokenForUnknownAccount(createUnknownAccountConfig());
   });
 });

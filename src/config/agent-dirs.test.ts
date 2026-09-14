@@ -3,7 +3,7 @@ import { findDuplicateAgentDirs } from "./agent-dirs.js";
 import type { OpenClawConfig } from "./types.js";
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 describe("resolveEffectiveAgentDir via findDuplicateAgentDirs", () => {

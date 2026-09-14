@@ -66,7 +66,7 @@ describe("runReplyAgent media path normalization", () => {
     enqueueFollowupRunMock.mockReset();
     scheduleFollowupDrainMock.mockReset();
     refreshQueuedFollowupSessionMock.mockReset();
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     runWithModelFallbackMock.mockImplementation(
       async ({
         provider,

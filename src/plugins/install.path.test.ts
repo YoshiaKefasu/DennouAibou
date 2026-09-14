@@ -176,7 +176,7 @@ afterAll(() => {
 beforeEach(() => {
   resetGlobalHookRunner();
   vi.clearAllMocks();
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 describe("installPluginFromPath", () => {

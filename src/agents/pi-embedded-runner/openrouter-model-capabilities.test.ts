@@ -23,13 +23,13 @@ async function importOpenRouterModelCapabilities(scope: string) {
 
 describe("openrouter-model-capabilities", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     delete process.env.DENNOU_STATE_DIR;
   });
 
   it("uses top-level OpenRouter max token fields when top_provider is absent", async () => {
     await withOpenRouterStateDir(async () => {
-      vi.stubGlobal(
+      setTestGlobal(
         "fetch",
         vi.fn(
           async () =>
@@ -102,7 +102,7 @@ describe("openrouter-model-capabilities", () => {
             },
           ),
       );
-      vi.stubGlobal("fetch", fetchSpy);
+      setTestGlobal("fetch", fetchSpy);
 
       const module = await importOpenRouterModelCapabilities("awaited-miss");
       await module.loadOpenRouterModelCapabilities("acme/missing-model");

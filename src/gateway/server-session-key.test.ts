@@ -57,8 +57,7 @@ describe("resolveSessionKeyForRun", () => {
   });
 
   it("caches misses briefly before re-checking the combined store", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-12T15:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-12T15:00:00Z") });
     hoisted.loadConfigMock.mockReturnValue({});
     hoisted.loadCombinedSessionStoreForGatewayMock.mockReturnValue({
       storePath: "(multiple)",

@@ -18,7 +18,7 @@ function expectBindMountsToThrow(binds: string[], expected: RegExp, label: strin
 
 describe("getBlockedBindReason", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("blocks common Docker socket directories", () => {
@@ -33,7 +33,7 @@ describe("getBlockedBindReason", () => {
   });
 
   it("blocks sensitive home credential paths", () => {
-    vi.stubEnv("HOME", "/home/tester");
+    setTestEnv("HOME", "/home/tester");
 
     const cases = [
       "/home/tester/.aws/credentials",
@@ -54,8 +54,8 @@ describe("getBlockedBindReason", () => {
   });
 
   it("still blocks OS-home credential paths when DENNOU_HOME points elsewhere", () => {
-    vi.stubEnv("HOME", "/home/tester");
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/tester");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
 
     expect(getBlockedBindReason("/home/tester/.gnupg/secring.gpg:/mnt/gnupg:ro")).toEqual(
       expect.objectContaining({
@@ -75,7 +75,7 @@ describe("getBlockedBindReason", () => {
     const aliasHome = join(dir, "alias-home");
     mkdirSync(join(realHome, ".ssh"), { recursive: true });
     symlinkSync(realHome, aliasHome);
-    vi.stubEnv("HOME", aliasHome);
+    setTestEnv("HOME", aliasHome);
 
     expect(getBlockedBindReason(`${join(realHome, ".ssh", "config")}:/mnt/ssh:ro`)).toEqual(
       expect.objectContaining({
@@ -88,7 +88,7 @@ describe("getBlockedBindReason", () => {
 
 describe("validateBindMounts", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("allows legitimate project directory mounts", () => {
@@ -165,7 +165,7 @@ describe("validateBindMounts", () => {
   });
 
   it("blocks sensitive home credential binds", () => {
-    vi.stubEnv("HOME", "/home/tester");
+    setTestEnv("HOME", "/home/tester");
 
     expect(() => validateBindMounts(["/home/tester/.docker/config.json:/mnt/docker:ro"])).toThrow(
       /blocked path/,
@@ -183,7 +183,7 @@ describe("validateBindMounts", () => {
     const aliasHome = join(dir, "alias-home");
     mkdirSync(join(realHome, ".docker"), { recursive: true });
     symlinkSync(realHome, aliasHome);
-    vi.stubEnv("HOME", aliasHome);
+    setTestEnv("HOME", aliasHome);
 
     expect(() =>
       validateBindMounts([`${join(realHome, ".docker", "config.json")}:/mnt/docker:ro`]),

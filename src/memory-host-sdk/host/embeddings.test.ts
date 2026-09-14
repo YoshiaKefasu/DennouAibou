@@ -64,7 +64,7 @@ const createGeminiFetchMock = () =>
   }));
 
 function installFetchMock(fetchMock: typeof globalThis.fetch) {
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
 }
 
 function readFirstFetchRequest(fetchMock: { mock: { calls: unknown[][] } }) {
@@ -86,7 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.resetAllMocks();
-  vi.unstubAllGlobals();
+  restoreTestGlobals();
 });
 
 function requireProvider(result: Awaited<ReturnType<typeof createEmbeddingProvider>>) {
@@ -283,7 +283,7 @@ describe("embedding provider remote overrides", () => {
     const fetchMock = createGeminiFetchMock();
     installFetchMock(fetchMock as unknown as typeof globalThis.fetch);
     mockPublicPinnedHostname();
-    vi.stubEnv("GEMINI_API_KEY", "env-gemini-key");
+    setTestEnv("GEMINI_API_KEY", "env-gemini-key");
 
     const result = await createEmbeddingProvider({
       config: {} as never,
@@ -434,7 +434,7 @@ describe("embedding provider auto selection", () => {
 
     for (const testCase of cases) {
       vi.resetAllMocks();
-      vi.unstubAllGlobals();
+      restoreTestGlobals();
       const fetchMock = testCase.fetchMockFactory();
       installFetchMock(fetchMock as unknown as typeof globalThis.fetch);
       mockPublicPinnedHostname();

@@ -78,8 +78,7 @@ function createDeferredIsolatedRun() {
 
 describe("CronService read ops while job is running", () => {
   it("keeps list and status responsive during a long isolated run", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2025-12-13T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2025-12-13T00:00:00.000Z") });
     const store = await makeStorePath();
     const enqueueSystemEvent = vi.fn();
     const requestWakeNow = vi.fn();
@@ -122,7 +121,7 @@ describe("CronService read ops while job is running", () => {
         delivery: { mode: "none" },
       });
 
-      vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
+      vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:01.000Z") - Date.now());
       await vi.runOnlyPendingTimersAsync();
 
       await isolatedRun.runStarted;

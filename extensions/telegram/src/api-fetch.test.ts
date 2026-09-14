@@ -48,7 +48,7 @@ function getOwnSymbolValue(
 }
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 vi.mock("undici", () => ({
@@ -86,7 +86,7 @@ describe("fetchTelegramChatId", () => {
 
   for (const testCase of cases) {
     it(testCase.name, async () => {
-      vi.stubGlobal("fetch", testCase.fetchImpl);
+      setTestGlobal("fetch", testCase.fetchImpl);
 
       const id = await fetchTelegramChatId({
         token: "abc",
@@ -102,7 +102,7 @@ describe("fetchTelegramChatId", () => {
       ok: true,
       json: async () => ({ ok: true, result: { id: 12345 } }),
     }));
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     await fetchTelegramChatId({ token: "abc", chatId: "@user" });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -116,7 +116,7 @@ describe("fetchTelegramChatId", () => {
       ok: true,
       json: async () => ({ ok: true, result: { id: 12345 } }),
     }));
-    vi.stubGlobal(
+    setTestGlobal(
       "fetch",
       vi.fn(async () => {
         throw new Error("global fetch should not be called");
@@ -138,7 +138,7 @@ describe("fetchTelegramChatId", () => {
 
 describe("undici env proxy semantics", () => {
   it("uses proxyTls rather than connect for proxied HTTPS transport settings", () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     const connect = {
       family: 4,
       autoSelectFamily: false,

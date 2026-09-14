@@ -40,7 +40,7 @@ const createFetchMock = () => {
 };
 
 function installFetchMock(fetchMock: typeof globalThis.fetch) {
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
 }
 
 let createVoyageEmbeddingProvider: typeof import("./embeddings-voyage.js").createVoyageEmbeddingProvider;
@@ -83,7 +83,7 @@ describe("voyage embedding provider", () => {
   afterEach(() => {
     vi.doUnmock("undici");
     vi.resetAllMocks();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   it("configures client with correct defaults and headers", async () => {

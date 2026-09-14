@@ -86,10 +86,10 @@ describe("runCapability proxy fetch passthrough", () => {
     vi.clearAllMocks();
     clearMediaUnderstandingBinaryCacheForTests();
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => restoreTestEnvs());
 
   it("passes fetchFn to audio provider when HTTPS_PROXY is set", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://proxy.test:8080");
+    setTestEnv("HTTPS_PROXY", "http://proxy.test:8080");
     const seenFetchFn = await runAudioCapabilityWithFetchCapture({
       fixturePrefix: "openclaw-audio-proxy",
       outputText: "transcribed",
@@ -98,7 +98,7 @@ describe("runCapability proxy fetch passthrough", () => {
   });
 
   it("passes fetchFn to video provider when HTTPS_PROXY is set", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://proxy.test:8080");
+    setTestEnv("HTTPS_PROXY", "http://proxy.test:8080");
 
     await withVideoFixture("openclaw-video-proxy", async ({ ctx, media, cache }) => {
       let seenFetchFn: typeof fetch | undefined;
@@ -147,10 +147,10 @@ describe("runCapability proxy fetch passthrough", () => {
   });
 
   it("does not pass fetchFn when no proxy env vars are set", async () => {
-    vi.stubEnv("HTTPS_PROXY", "");
-    vi.stubEnv("HTTP_PROXY", "");
-    vi.stubEnv("https_proxy", "");
-    vi.stubEnv("http_proxy", "");
+    setTestEnv("HTTPS_PROXY", "");
+    setTestEnv("HTTP_PROXY", "");
+    setTestEnv("https_proxy", "");
+    setTestEnv("http_proxy", "");
 
     const seenFetchFn = await runAudioCapabilityWithFetchCapture({
       fixturePrefix: "openclaw-audio-no-proxy",

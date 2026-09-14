@@ -1,9 +1,10 @@
 import * as fs from "node:fs/promises";
 import { vi } from "vitest";
+import { setTestGlobal } from "./bun-test-mocks.js";
 import { withFetchPreconnect } from "./fetch-mock.js";
 
 export function stubFetchResponse(response: Response) {
-  vi.stubGlobal("fetch", withFetchPreconnect(vi.fn(async () => response)));
+  setTestGlobal("fetch", withFetchPreconnect(vi.fn(async () => response)));
 }
 
 export function stubFetchTextResponse(text: string, init?: ResponseInit) {

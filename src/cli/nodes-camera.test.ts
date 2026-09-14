@@ -164,7 +164,7 @@ describe("nodes camera helpers", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   it("writes url payload to file", async () => {

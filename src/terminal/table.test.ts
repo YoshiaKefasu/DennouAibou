@@ -7,7 +7,7 @@ describe("renderTable", () => {
   const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     if (originalPlatformDescriptor) {
       Object.defineProperty(process, "platform", originalPlatformDescriptor);
     }
@@ -182,9 +182,9 @@ describe("renderTable", () => {
 
   it("falls back to ASCII borders on legacy Windows consoles", () => {
     Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-    vi.stubEnv("WT_SESSION", "");
-    vi.stubEnv("TERM_PROGRAM", "");
-    vi.stubEnv("TERM", "vt100");
+    setTestEnv("WT_SESSION", "");
+    setTestEnv("TERM_PROGRAM", "");
+    setTestEnv("TERM", "vt100");
 
     const out = renderTable({
       columns: [
@@ -200,9 +200,9 @@ describe("renderTable", () => {
 
   it("keeps unicode borders on modern Windows terminals", () => {
     Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-    vi.stubEnv("WT_SESSION", "1");
-    vi.stubEnv("TERM", "");
-    vi.stubEnv("TERM_PROGRAM", "");
+    setTestEnv("WT_SESSION", "1");
+    setTestEnv("TERM", "");
+    setTestEnv("TERM_PROGRAM", "");
 
     const out = renderTable({
       columns: [

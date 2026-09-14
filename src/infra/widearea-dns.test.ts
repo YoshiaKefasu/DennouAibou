@@ -168,8 +168,7 @@ describe("wide-area DNS zone writes", () => {
   });
 
   it("increments same-day serials when content changes", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-13T12:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-13T12:00:00.000Z") });
     vi.spyOn(utils, "ensureDir").mockResolvedValue(undefined);
     vi.spyOn(fs, "readFileSync").mockReturnValue(
       renderWideAreaGatewayZoneText({ ...makeZoneOpts(), serial: 2026031304 }),

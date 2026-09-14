@@ -155,7 +155,7 @@ async function executePhotosLatest(params: { modelHasVision: boolean }) {
 
 beforeEach(() => {
   callGateway.mockClear();
-  vi.unstubAllGlobals();
+  restoreTestGlobals();
 });
 
 describe("nodes camera_snap", () => {

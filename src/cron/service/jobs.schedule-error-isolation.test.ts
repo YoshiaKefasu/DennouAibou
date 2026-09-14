@@ -49,8 +49,7 @@ function createJob(overrides: Partial<CronJob> = {}): CronJob {
 
 describe("cron schedule error isolation", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2025-01-15T10:30:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2025-01-15T10:30:00.000Z") });
   });
 
   afterEach(() => {

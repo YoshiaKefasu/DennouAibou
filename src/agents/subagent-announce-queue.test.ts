@@ -120,7 +120,7 @@ describe("subagent-announce-queue", () => {
 
   it("uses debounce floor for retries when debounce exceeds backoff", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-01T00:00:00.000Z") });
     const previousFast = process.env.DENNOU_TEST_FAST;
     delete process.env.DENNOU_TEST_FAST;
 

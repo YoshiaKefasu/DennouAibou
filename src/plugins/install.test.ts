@@ -588,7 +588,7 @@ beforeAll(async () => {
 beforeEach(() => {
   resetGlobalHookRunner();
   vi.clearAllMocks();
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
   resolveCompatibilityHostVersionMock.mockReturnValue("2026.3.28-beta.1");
 });
 

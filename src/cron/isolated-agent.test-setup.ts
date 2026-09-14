@@ -7,6 +7,7 @@ import type { ChannelOutboundAdapter, ChannelOutboundContext } from "../channels
 import { callGateway } from "../gateway/call.js";
 import { resolveOutboundSendDep } from "../infra/outbound/send-deps.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
+import { setTestEnv } from "../test-utils/bun-test-mocks.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 
 type TestSendFn = (
@@ -147,7 +148,7 @@ telegramOutboundForTest.sendMedia = async ({
 
 export function setupIsolatedAgentTurnMocks(params?: { fast?: boolean }): void {
   if (params?.fast) {
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
   }
   (runEmbeddedPiAgent as Mock).mockReset();
   (loadModelCatalog as Mock).mockResolvedValue([]);

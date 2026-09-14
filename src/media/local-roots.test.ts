@@ -15,7 +15,7 @@ function normalizeHostPath(value: string): string {
 
 describe("local media roots", () => {
   function withStateDir<T>(stateDir: string, run: () => T): T {
-    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+    setTestEnv("DENNOU_STATE_DIR", stateDir);
     return run();
   }
 
@@ -81,7 +81,7 @@ describe("local media roots", () => {
   }
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it.each([

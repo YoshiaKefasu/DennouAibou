@@ -207,7 +207,7 @@ async function probeTelegramAccountForTest(
 }
 
 function stubTelegramFetchOk(calls: string[]) {
-  vi.stubGlobal(
+  setTestGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       calls.push(url);
@@ -249,9 +249,9 @@ async function runSuccessfulTelegramProbe(
 ) {
   testConfig = config;
   testStore = {};
-  vi.stubEnv("DISCORD_BOT_TOKEN", "");
+  setTestEnv("DISCORD_BOT_TOKEN", "");
   if (options?.clearTokenEnv) {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
   }
 
   const calls: string[] = [];
@@ -309,8 +309,8 @@ describe("getHealthSnapshot", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+    restoreTestGlobals();
+    restoreTestEnvs();
   });
 
   it("skips telegram probe when not configured", async () => {
@@ -321,8 +321,8 @@ describe("getHealthSnapshot", () => {
       main: { updatedAt: 1000 },
       foo: { updatedAt: 2000 },
     };
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
-    vi.stubEnv("DISCORD_BOT_TOKEN", "");
+    setTestEnv("TELEGRAM_BOT_TOKEN", "");
+    setTestEnv("DISCORD_BOT_TOKEN", "");
     const snap = (await getHealthSnapshot({
       timeoutMs: 10,
     })) satisfies HealthSummary;
@@ -367,9 +367,9 @@ describe("getHealthSnapshot", () => {
   it("returns a structured telegram probe error when getMe fails", async () => {
     testConfig = { channels: { telegram: { botToken: "bad-token" } } };
     testStore = {};
-    vi.stubEnv("DISCORD_BOT_TOKEN", "");
+    setTestEnv("DISCORD_BOT_TOKEN", "");
 
-    vi.stubGlobal(
+    setTestGlobal(
       "fetch",
       vi.fn(async (url: string) => {
         if (url.includes("/getMe")) {
@@ -397,9 +397,9 @@ describe("getHealthSnapshot", () => {
   it("captures unexpected probe exceptions as errors", async () => {
     testConfig = { channels: { telegram: { botToken: "t-err" } } };
     testStore = {};
-    vi.stubEnv("DISCORD_BOT_TOKEN", "");
+    setTestEnv("DISCORD_BOT_TOKEN", "");
 
-    vi.stubGlobal(
+    setTestGlobal(
       "fetch",
       vi.fn(async () => {
         throw new Error("network down");

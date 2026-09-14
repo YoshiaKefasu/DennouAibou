@@ -220,7 +220,7 @@ describe("marketplace plugins", () => {
     fetchWithSsrFGuardMock.mockClear();
     installPluginFromPathMock.mockReset();
     runCommandWithTimeoutMock.mockReset();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     await Promise.all(
       tempOutsideDirs.splice(0, tempOutsideDirs.length).map(async (dir) => {
         await fs.rm(dir, { recursive: true, force: true });

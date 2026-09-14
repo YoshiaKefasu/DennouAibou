@@ -98,8 +98,7 @@ describe("system-presence", () => {
   });
 
   it("prunes stale non-self entries after TTL", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(Date.now());
+    vi.useFakeTimers({ now: Date.now() });
 
     const deviceId = randomUUID();
     upsertPresence(deviceId, {

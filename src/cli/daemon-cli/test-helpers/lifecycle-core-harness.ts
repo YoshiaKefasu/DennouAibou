@@ -51,7 +51,7 @@ export function resetLifecycleServiceMocks() {
 }
 
 export function stubEmptyGatewayEnv() {
-  vi.unstubAllEnvs();
-  vi.stubEnv("DENNOU_GATEWAY_TOKEN", "");
-  vi.stubEnv("DENNOU_GATEWAY_URL", "");
+  restoreTestEnvs();
+  setTestEnv("DENNOU_GATEWAY_TOKEN", "");
+  setTestEnv("DENNOU_GATEWAY_URL", "");
 }

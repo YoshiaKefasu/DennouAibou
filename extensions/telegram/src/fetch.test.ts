@@ -101,7 +101,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
   loggerInfo.mockReset();
   loggerDebug.mockReset();
 });
@@ -320,7 +320,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("uses EnvHttpProxyAgent dispatcher when proxy env is configured", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     undiciFetch.mockResolvedValue({ ok: true } as Response);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -351,7 +351,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("pins env-proxy transport policy onto proxyTls for proxied HTTPS requests", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     undiciFetch.mockResolvedValue({ ok: true } as Response);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -482,7 +482,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("does not blind-retry when sticky IPv4 fallback is disallowed for env proxy paths", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     primeStickyFallbackRetry("EHOSTUNREACH", 1);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -500,7 +500,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("treats ALL_PROXY-only env as direct transport and arms sticky IPv4 fallback", async () => {
-    vi.stubEnv("ALL_PROXY", "socks5://127.0.0.1:1080");
+    setTestEnv("ALL_PROXY", "socks5://127.0.0.1:1080");
     undiciFetch
       .mockRejectedValueOnce(buildFetchFallbackError("EHOSTUNREACH"))
       .mockResolvedValueOnce({ ok: true } as Response)
@@ -533,7 +533,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("arms sticky IPv4 fallback when env proxy init falls back to direct Agent", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     EnvHttpProxyAgentCtor.mockImplementationOnce(function ThrowingEnvProxyAgent() {
       throw new Error("invalid proxy config");
     });
@@ -551,8 +551,8 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("arms sticky IPv4 fallback when NO_PROXY bypasses telegram under env proxy", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
-    vi.stubEnv("NO_PROXY", "api.telegram.org");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("NO_PROXY", "api.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
 
     expect(undiciFetch).toHaveBeenCalledTimes(3);
@@ -567,9 +567,9 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("uses no_proxy over NO_PROXY when deciding env-proxy bypass", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
-    vi.stubEnv("NO_PROXY", "");
-    vi.stubEnv("no_proxy", "api.telegram.org");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("NO_PROXY", "");
+    setTestEnv("no_proxy", "api.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
 
     expect(EnvHttpProxyAgentCtor).toHaveBeenCalledTimes(2);
@@ -577,8 +577,8 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("matches whitespace and wildcard no_proxy entries like EnvHttpProxyAgent", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
-    vi.stubEnv("no_proxy", "localhost *.telegram.org");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("no_proxy", "localhost *.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
 
     expect(EnvHttpProxyAgentCtor).toHaveBeenCalledTimes(2);
@@ -604,7 +604,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("falls back to Agent when env proxy dispatcher initialization fails", async () => {
-    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     EnvHttpProxyAgentCtor.mockImplementationOnce(function ThrowingEnvProxyAgent() {
       throw new Error("invalid proxy config");
     });

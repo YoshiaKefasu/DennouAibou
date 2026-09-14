@@ -8,8 +8,7 @@ import {
 describe("channel activity", () => {
   beforeEach(() => {
     resetChannelActivityForTest();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-08T00:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-08T00:00:00Z") });
   });
 
   afterEach(() => {

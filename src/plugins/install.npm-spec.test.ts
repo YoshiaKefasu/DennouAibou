@@ -129,7 +129,7 @@ afterAll(() => {
 
 beforeEach(() => {
   runCommandWithTimeoutMock.mockReset();
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 describe("installPluginFromNpmSpec", () => {

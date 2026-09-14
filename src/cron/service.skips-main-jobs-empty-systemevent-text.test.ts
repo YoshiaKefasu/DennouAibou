@@ -47,8 +47,7 @@ async function withCronService(
 
 describe("CronService", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2025-12-13T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2025-12-13T00:00:00.000Z") });
     noopLogger.debug.mockClear();
     noopLogger.info.mockClear();
     noopLogger.warn.mockClear();
@@ -71,7 +70,7 @@ describe("CronService", () => {
         payload: { kind: "systemEvent", text: "   " },
       });
 
-      vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
+      vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:01.000Z") - Date.now());
       await vi.runOnlyPendingTimersAsync();
 
       expect(enqueueSystemEvent).not.toHaveBeenCalled();
@@ -99,7 +98,7 @@ describe("CronService", () => {
       expect(status.enabled).toBe(false);
       expect(status.nextWakeAtMs).toBeNull();
 
-      vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
+      vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:01.000Z") - Date.now());
       await vi.runOnlyPendingTimersAsync();
 
       expect(enqueueSystemEvent).not.toHaveBeenCalled();

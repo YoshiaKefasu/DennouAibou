@@ -74,7 +74,7 @@ async function runSingleJobAndReadState(params: {
   job: CronAddInput;
 }) {
   const job = await params.cron.add(params.job);
-  vi.setSystemTime(new Date(job.state.nextRunAtMs! + 5));
+  vi.advanceTimersByTime(job.state.nextRunAtMs! + 5 - Date.now());
   await vi.runOnlyPendingTimersAsync();
   await params.finished.waitForOk(job.id);
 

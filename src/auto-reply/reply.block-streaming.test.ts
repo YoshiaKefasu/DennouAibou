@@ -169,7 +169,7 @@ function createContinueDirectivesResult() {
 describe("block streaming", () => {
   beforeEach(async () => {
     await loadFreshGetReplyModuleForTest();
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     mocks.resolveReplyDirectives.mockReset();
     mocks.handleInlineActions.mockReset();
     mocks.initSessionState.mockReset();

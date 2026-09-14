@@ -214,7 +214,7 @@ describe("createDiscordGatewayPlugin", () => {
   }
 
   beforeEach(() => {
-    vi.stubGlobal("fetch", globalFetchMock);
+    setTestGlobal("fetch", globalFetchMock);
     vi.useRealTimers();
     baseRegisterClientSpy.mockClear();
     globalFetchMock.mockClear();

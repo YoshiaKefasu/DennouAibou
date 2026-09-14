@@ -375,7 +375,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets idle timeout for the focused thread-chat session", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createThreadBinding());
     hoisted.setThreadBindingIdleTimeoutBySessionKeyMock.mockReturnValue([
@@ -400,7 +400,7 @@ describe("/session idle and /session max-age", () => {
 
   it("shows active idle timeout when no value is provided", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(
       createThreadBinding({
@@ -420,7 +420,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets max age for the focused thread-chat session", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createThreadBinding());
     hoisted.setThreadBindingMaxAgeBySessionKeyMock.mockReturnValue([
@@ -449,7 +449,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets idle timeout for focused topic-chat conversations", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createTopicBinding());
     hoisted.setTelegramThreadBindingIdleTimeoutBySessionKeyMock.mockReturnValue([
@@ -474,7 +474,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets idle timeout for focused room-chat threads", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createRoomBinding());
     hoisted.setMatrixThreadBindingIdleTimeoutBySessionKeyMock.mockReturnValue([
@@ -502,7 +502,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets idle timeout for the triggering room-chat always-thread turn", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createRoomTriggerBinding());
     hoisted.setMatrixThreadBindingIdleTimeoutBySessionKeyMock.mockReturnValue([
@@ -537,7 +537,7 @@ describe("/session idle and /session max-age", () => {
 
   it("sets max age for focused room-chat threads", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     const boundAt = Date.parse("2026-02-19T22:00:00.000Z");
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(createRoomBinding({ boundAt }));
@@ -567,7 +567,7 @@ describe("/session idle and /session max-age", () => {
 
   it("reports topic-chat max-age expiry from the original bind time", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
 
     const boundAt = Date.parse("2026-02-19T22:00:00.000Z");
     hoisted.sessionBindingResolveByConversationMock.mockReturnValue(

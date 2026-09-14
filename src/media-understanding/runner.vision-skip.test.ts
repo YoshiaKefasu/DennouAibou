@@ -90,7 +90,7 @@ describe("runCapability image skip", () => {
     catalog = [...baseCatalog];
     loadModelCatalog.mockClear();
     setActivePluginRegistry(createEmptyPluginRegistry());
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("skips image understanding when the active model supports vision", async () => {
@@ -124,7 +124,7 @@ describe("runCapability image skip", () => {
   });
 
   it("uses active OpenRouter image models for auto image resolution", async () => {
-    vi.stubEnv("OPENROUTER_API_KEY", "test-openrouter-key");
+    setTestEnv("OPENROUTER_API_KEY", "test-openrouter-key");
     const cfg = {} as OpenClawConfig;
     const pluginRegistry = createEmptyPluginRegistry();
     pluginRegistry.mediaUnderstandingProviders.push({
@@ -150,7 +150,7 @@ describe("runCapability image skip", () => {
       });
     } finally {
       setActivePluginRegistry(createEmptyPluginRegistry());
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     }
   });
 

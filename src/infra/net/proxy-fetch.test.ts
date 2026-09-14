@@ -139,11 +139,11 @@ describe("getProxyUrlFromFetch", () => {
 describe("resolveProxyFetchFromEnv", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     clearProxyEnv();
   });
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     restoreProxyEnv();
   });
 

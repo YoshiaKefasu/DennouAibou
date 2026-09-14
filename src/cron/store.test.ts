@@ -31,12 +31,12 @@ function makeStore(jobId: string, enabled: boolean): CronStoreFile {
 
 describe("resolveCronStorePath", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("uses DENNOU_HOME for tilde expansion", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     const result = resolveCronStorePath("~/cron/jobs.json");
     expect(result).toBe(path.resolve("/srv/openclaw-home", "cron", "jobs.json"));

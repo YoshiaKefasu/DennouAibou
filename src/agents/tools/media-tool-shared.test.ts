@@ -9,7 +9,7 @@ function normalizeHostPath(value: string): string {
 
 describe("resolveMediaToolLocalRoots", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("does not widen default local roots from media sources", () => {
@@ -19,7 +19,7 @@ describe("resolveMediaToolLocalRoots", () => {
     const moviesDir =
       process.platform === "win32" ? "C:\\Users\\peter\\Movies" : "/Users/peter/Movies";
 
-    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+    setTestEnv("DENNOU_STATE_DIR", stateDir);
 
     const roots = resolveMediaToolLocalRoots(path.join(stateDir, "workspace-agent"), undefined, [
       path.join(picturesDir, "photo.png"),

@@ -100,7 +100,7 @@ describe("telegram proxy client", () => {
 
   beforeEach(() => {
     resetTelegramClientOptionsCacheForTests();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     botApi.sendMessage.mockResolvedValue({ message_id: 1, chat: { id: "123" } });
     botApi.setMessageReaction.mockResolvedValue(undefined);
     botApi.deleteMessage.mockResolvedValue(true);
@@ -114,8 +114,8 @@ describe("telegram proxy client", () => {
 
   it("reuses cached Telegram client options for repeated sends with same account transport settings", async () => {
     const { fetchImpl } = prepareProxyFetch();
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "production");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "production");
 
     await sendMessageTelegram("123", "first", { token: "tok", accountId: "foo" });
     await sendMessageTelegram("123", "second", { token: "tok", accountId: "foo" });

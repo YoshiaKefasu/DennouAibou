@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { restoreTestGlobals, setTestGlobal } from "../test-utils/bun-test-mocks.js";
 import { createProviderUsageFetch, makeResponse } from "../test-utils/provider-usage-fetch.js";
 import { loadProviderUsageSummary } from "./provider-usage.load.js";
 import { ignoredErrors } from "./provider-usage.shared.js";
@@ -118,7 +119,7 @@ describe("provider-usage.load", () => {
 
   it("throws when fetch is unavailable", async () => {
     const previousFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", undefined);
+    setTestGlobal("fetch", undefined);
     try {
       await expect(
         loadProviderUsageSummary({
@@ -128,7 +129,7 @@ describe("provider-usage.load", () => {
         }),
       ).rejects.toThrow("fetch is not available");
     } finally {
-      vi.stubGlobal("fetch", previousFetch);
+      restoreTestGlobals();
     }
   });
 });

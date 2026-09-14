@@ -250,7 +250,7 @@ describe("resolveTelegramAllowFromEntries", () => {
       ok: true,
       json: async () => ({ ok: true, result: { id: 12345 } }),
     }));
-    vi.stubGlobal("fetch", globalFetch);
+    setTestGlobal("fetch", globalFetch);
     const proxyFetch = vi.fn();
     const fetchModule = await import("./fetch.js");
     const proxyModule = await import("./proxy.js");
@@ -280,7 +280,7 @@ describe("resolveTelegramAllowFromEntries", () => {
     } finally {
       makeProxyFetch.mockRestore();
       resolveTelegramFetch.mockRestore();
-      vi.unstubAllGlobals();
+      restoreTestGlobals();
     }
   });
 });

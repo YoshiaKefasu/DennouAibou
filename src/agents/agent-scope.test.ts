@@ -21,7 +21,7 @@ import {
 } from "./agent-scope.js";
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 describe("resolveAgentConfig", () => {
@@ -417,7 +417,7 @@ describe("resolveAgentConfig", () => {
 
   it("uses DENNOU_HOME for default agent workspace", () => {
     const home = path.join(path.sep, "srv", "openclaw-home");
-    vi.stubEnv("DENNOU_HOME", home);
+    setTestEnv("DENNOU_HOME", home);
 
     const workspace = resolveAgentWorkspaceDir({} as OpenClawConfig, "main");
     expect(workspace).toBe(path.join(path.resolve(home), ".openclaw", "workspace"));
@@ -425,9 +425,9 @@ describe("resolveAgentConfig", () => {
 
   it("uses DENNOU_HOME for default agentDir", () => {
     const home = path.join(path.sep, "srv", "openclaw-home");
-    vi.stubEnv("DENNOU_HOME", home);
+    setTestEnv("DENNOU_HOME", home);
     // Clear state dir so it falls back to DENNOU_HOME
-    vi.stubEnv("DENNOU_STATE_DIR", "");
+    setTestEnv("DENNOU_STATE_DIR", "");
 
     const agentDir = resolveAgentDir({} as OpenClawConfig, "main");
     expect(agentDir).toBe(path.join(path.resolve(home), ".openclaw", "agents", "main", "agent"));
@@ -457,7 +457,7 @@ describe("resolveAgentConfig", () => {
 
   it("non-default agent without defaults.workspace falls back to stateDir", () => {
     const stateDir = path.join(path.sep, "tmp", "test-state");
-    vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+    setTestEnv("DENNOU_STATE_DIR", stateDir);
     const cfg: OpenClawConfig = {
       agents: {
         list: [{ id: "main" }, { id: "work", default: true, workspace: "/work-ws" }],

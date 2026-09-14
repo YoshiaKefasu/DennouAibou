@@ -8,8 +8,7 @@ import {
 
 describe("telegram error policy", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-01T00:00:00Z") });
     resetTelegramErrorPolicyStoreForTest();
   });
 

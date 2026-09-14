@@ -69,32 +69,32 @@ describe("resolveConfigDir", () => {
 
 describe("resolveHomeDir", () => {
   it("prefers DENNOU_HOME over HOME", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     expect(resolveHomeDir()).toBe(path.resolve("/srv/openclaw-home"));
 
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 });
 
 describe("shortenHomePath", () => {
   it("uses $DENNOU_HOME prefix when DENNOU_HOME is set", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     expect(
       shortenHomePath(`${path.resolve("/srv/openclaw-home")}/.openclaw/dennou-aibou.json`),
     ).toBe("$DENNOU_HOME/.openclaw/dennou-aibou.json");
 
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 });
 
 describe("shortenHomeInString", () => {
   it("uses $DENNOU_HOME replacement when DENNOU_HOME is set", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     expect(
       shortenHomeInString(
@@ -102,7 +102,7 @@ describe("shortenHomeInString", () => {
       ),
     ).toBe("config: $DENNOU_HOME/.openclaw/dennou-aibou.json");
 
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 });
 
@@ -122,12 +122,12 @@ describe("resolveUserPath", () => {
   });
 
   it("prefers DENNOU_HOME for tilde expansion", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     expect(resolveUserPath("~/openclaw")).toBe(path.resolve("/srv/openclaw-home", "openclaw"));
 
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("uses the provided env for tilde expansion", () => {

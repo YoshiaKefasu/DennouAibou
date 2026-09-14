@@ -104,7 +104,7 @@ describe("fetchWithSsrFGuard hardening", () => {
     mode: (typeof GUARDED_FETCH_MODE)[keyof typeof GUARDED_FETCH_MODE];
     expectEnvProxy: boolean;
   }): Promise<void> {
-    vi.stubEnv("HTTP_PROXY", "http://127.0.0.1:7890");
+    setTestEnv("HTTP_PROXY", "http://127.0.0.1:7890");
     const lookupFn = createPublicLookup();
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const requestInit = init as RequestInit & { dispatcher?: unknown };
@@ -129,7 +129,7 @@ describe("fetchWithSsrFGuard hardening", () => {
   }
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     agentCtor.mockClear();
     envHttpProxyAgentCtor.mockClear();
     proxyAgentCtor.mockClear();

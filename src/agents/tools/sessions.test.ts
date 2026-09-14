@@ -137,11 +137,11 @@ async function withStubbedStateDir<T>(
   run: (stateDir: string) => Promise<T>,
 ): Promise<T> {
   const stateDir = path.join(os.tmpdir(), name);
-  vi.stubEnv("DENNOU_STATE_DIR", stateDir);
+  setTestEnv("DENNOU_STATE_DIR", stateDir);
   try {
     return await run(stateDir);
   } finally {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   }
 }
 

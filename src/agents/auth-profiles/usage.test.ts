@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setTestGlobal } from "../../test-utils/bun-test-mocks.js";
 import type { AuthProfileStore, ProfileUsageStats } from "./types.js";
 import {
   __testing as authProfileUsageTesting,
@@ -29,7 +30,7 @@ vi.mock("./store.js", async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   fetchMock.mockReset();
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
   storeMocks.updateAuthProfileStoreWithLock.mockResolvedValue(null);
   authProfileUsageTesting.setDepsForTest({
     saveAuthProfileStore: storeMocks.saveAuthProfileStore,
@@ -613,8 +614,7 @@ describe("markAuthProfileFailure — active windows do not extend on retry", () 
     now: number;
     reason: "rate_limit" | "billing" | "auth_permanent";
   }): Promise<void> {
-    vi.useFakeTimers();
-    vi.setSystemTime(params.now);
+    vi.useFakeTimers({ now: params.now });
     try {
       await markAuthProfileFailure({
         store: params.store,
@@ -765,8 +765,7 @@ describe("markAuthProfileFailure — WHAM-aware Codex cooldowns", () => {
     reason?: "rate_limit" | "unknown";
     useLock?: boolean;
   }): Promise<void> {
-    vi.useFakeTimers();
-    vi.setSystemTime(params.now);
+    vi.useFakeTimers({ now: params.now });
     if (params.useLock) {
       storeMocks.updateAuthProfileStoreWithLock.mockImplementationOnce(
         async (lockParams: { updater: (store: AuthProfileStore) => boolean }) => {
@@ -918,8 +917,7 @@ describe("markAuthProfileFailure — WHAM-aware Codex cooldowns", () => {
     const now = 1_700_000_000_000;
     const store = makeStore({});
 
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.useFakeTimers({ now });
     try {
       await markAuthProfileFailure({
         store,
@@ -951,8 +949,7 @@ describe("markAuthProfileFailure — per-model cooldown metadata", () => {
     now: number;
     modelId?: string;
   }): Promise<void> {
-    vi.useFakeTimers();
-    vi.setSystemTime(params.now);
+    vi.useFakeTimers({ now: params.now });
     try {
       await markAuthProfileFailure({
         store: params.store,

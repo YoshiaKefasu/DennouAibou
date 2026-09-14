@@ -52,7 +52,7 @@ describe("#16156: cron.list() must not silently advance past-due recurring jobs"
     expect(firstDueAt).toBe(Date.parse("2025-12-13T00:01:00.000Z"));
 
     // Advance time so the job is past-due but the timer hasn't fired yet.
-    vi.setSystemTime(new Date(firstDueAt + 5));
+    vi.advanceTimersByTime(firstDueAt + 5 - Date.now());
 
     // Simulate the user running `cron list` while the job is past-due.
     // Before the fix, this would call recomputeNextRuns() which silently
@@ -105,7 +105,7 @@ describe("#16156: cron.list() must not silently advance past-due recurring jobs"
     const firstDueAt = job.state.nextRunAtMs!;
 
     // Advance time past due.
-    vi.setSystemTime(new Date(firstDueAt + 10));
+    vi.advanceTimersByTime(firstDueAt + 10 - Date.now());
 
     // Call status() while job is past-due.
     await cron.status();

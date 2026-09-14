@@ -166,7 +166,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("early return (active subagent) sets deliveryAttempted=true so timer skips enqueueSystemEvent", async () => {
@@ -346,8 +346,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("skips stale cron deliveries while still suppressing fallback main summary", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-18T17:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-18T17:00:00.000Z") });
     (countActiveDescendantRuns as Mock).mockReturnValue(0);
     (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
@@ -379,8 +378,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("still delivers when the run started on time but finished more than three hours later", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-03-18T17:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-03-18T17:00:00.000Z") });
     (countActiveDescendantRuns as Mock).mockReturnValue(0);
     (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
     (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
@@ -441,7 +439,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("retries transient direct announce failures before succeeding", async () => {
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     (countActiveDescendantRuns as Mock).mockReturnValue(0);
     (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
     (deliverOutboundPayloads as Mock)
@@ -513,7 +511,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("does not retry permanent direct announce failures", async () => {
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     (countActiveDescendantRuns as Mock).mockReturnValue(0);
     (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
     (deliverOutboundPayloads as Mock).mockRejectedValue(new Error("chat not found"));
@@ -589,7 +587,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       .mockRejectedValueOnce(new Error("gateway timeout"))
       .mockResolvedValueOnce([{ ok: true } as never]);
 
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     try {
       const params = makeBaseParams({ synthesizedText: "Retry test." });
       const state = await dispatchCronDelivery(params);
@@ -603,7 +601,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       expect(calls[0][0]).toEqual(expect.objectContaining({ skipQueue: true }));
       expect(calls[1][0]).toEqual(expect.objectContaining({ skipQueue: true }));
     } finally {
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     }
   });
 

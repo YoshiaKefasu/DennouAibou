@@ -832,12 +832,12 @@ describe("readLatestSessionUsageFromTranscript", () => {
 
 describe("resolveSessionTranscriptCandidates", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   test("fallback candidate uses DENNOU_HOME instead of os.homedir()", () => {
-    vi.stubEnv("DENNOU_HOME", "/srv/openclaw-home");
-    vi.stubEnv("HOME", "/home/other");
+    setTestEnv("DENNOU_HOME", "/srv/openclaw-home");
+    setTestEnv("HOME", "/home/other");
 
     const candidates = resolveSessionTranscriptCandidates("sess-1", undefined);
     const fallback = candidates[candidates.length - 1];
@@ -971,11 +971,11 @@ describe("archiveSessionTranscripts", () => {
   });
 
   beforeAll(() => {
-    vi.stubEnv("DENNOU_HOME", tmpDir);
+    setTestEnv("DENNOU_HOME", tmpDir);
   });
 
   afterAll(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   test.each([

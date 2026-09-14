@@ -42,7 +42,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  vi.unstubAllEnvs();
+  restoreTestEnvs();
 });
 
 function aclEntry(params: {

@@ -13,7 +13,7 @@ describe("brave web search provider", () => {
   const priorFetch = global.fetch;
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     global.fetch = priorFetch;
   });
 
@@ -135,7 +135,7 @@ describe("brave web search provider", () => {
   });
 
   it("returns validation errors for invalid date ranges", async () => {
-    vi.stubEnv("BRAVE_API_KEY", "");
+    setTestEnv("BRAVE_API_KEY", "");
     const provider = createBraveWebSearchProvider();
     const tool = provider.createTool({
       config: {},
@@ -160,7 +160,7 @@ describe("brave web search provider", () => {
   });
 
   it("falls back unsupported country values before calling Brave", async () => {
-    vi.stubEnv("BRAVE_API_KEY", "test-key");
+    setTestEnv("BRAVE_API_KEY", "test-key");
     const mockFetch = vi.fn(async (_input?: unknown, _init?: unknown) => {
       return {
         ok: true,

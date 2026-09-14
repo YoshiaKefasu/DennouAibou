@@ -7,6 +7,7 @@ import type {
   AudioTranscriptionRequest,
   MediaUnderstandingProvider,
 } from "../../media-understanding/types.js";
+import { setTestEnv, restoreTestEnvs } from "../../test-utils/bun-test-mocks.js";
 import { createAudioTool } from "./audio-tool.js";
 
 // Keep these tests focused on the tool instead of paying the full plugin
@@ -126,11 +127,11 @@ function findAudioBlock(
 
 describe("audio tool", () => {
   beforeEach(() => {
-    vi.stubEnv("PATH", "");
+    setTestEnv("PATH", "");
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("transcribes a local audio file with the configured engine", async () => {

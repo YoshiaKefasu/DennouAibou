@@ -158,7 +158,7 @@ describe("CronService restart catch-up", () => {
     );
   });
   it("replays the most recent missed cron slot after restart when nextRunAtMs already advanced", async () => {
-    vi.setSystemTime(new Date("2025-12-13T04:02:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T04:02:00.000Z") - Date.now());
     await withRestartedCron(
       [
         {
@@ -228,7 +228,7 @@ describe("CronService restart catch-up", () => {
   });
 
   it("does not replay cron slot when the latest slot already ran before restart", async () => {
-    vi.setSystemTime(new Date("2025-12-13T04:02:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T04:02:00.000Z") - Date.now());
     await withRestartedCron(
       [
         {
@@ -256,7 +256,7 @@ describe("CronService restart catch-up", () => {
   });
 
   it("does not replay missed cron slots while error backoff is pending after restart", async () => {
-    vi.setSystemTime(new Date("2025-12-13T04:02:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T04:02:00.000Z") - Date.now());
     await withRestartedCron(
       [
         {
@@ -286,7 +286,7 @@ describe("CronService restart catch-up", () => {
   });
 
   it("replays missed cron slot after restart when error backoff has already elapsed", async () => {
-    vi.setSystemTime(new Date("2025-12-13T04:02:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T04:02:00.000Z") - Date.now());
     await withRestartedCron(
       [
         {

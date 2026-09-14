@@ -33,7 +33,7 @@ describe("sendWebhookMessageDiscord activity", () => {
   beforeEach(() => {
     recordChannelActivityMock.mockClear();
     loadConfigMock.mockClear();
-    vi.stubGlobal(
+    setTestGlobal(
       "fetch",
       vi.fn(async () => {
         return new Response(JSON.stringify({ id: "msg-1", channel_id: "thread-1" }), {
@@ -45,7 +45,7 @@ describe("sendWebhookMessageDiscord activity", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   it("records outbound channel activity for webhook sends", async () => {

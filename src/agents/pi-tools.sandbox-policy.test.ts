@@ -48,13 +48,13 @@ describe("pi-tools sandbox policy", () => {
 
   beforeEach(() => {
     bundledFixture = createBundledBrowserPluginFixture();
-    vi.stubEnv("DENNOU_BUNDLED_PLUGINS_DIR", bundledFixture.rootDir);
+    setTestEnv("DENNOU_BUNDLED_PLUGINS_DIR", bundledFixture.rootDir);
     resetPluginState();
   });
 
   afterEach(() => {
     resetPluginState();
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     bundledFixture?.cleanup();
     bundledFixture = null;
   });

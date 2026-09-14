@@ -26,7 +26,7 @@ describe("gaxios fetch compat", () => {
     Reflect.deleteProperty(globalThis as object, TEST_GAXIOS_CONSTRUCTOR_OVERRIDE);
     __testing.resetGaxiosFetchCompatForTests();
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   it("uses native fetch without defining window or importing node-fetch", async () => {
@@ -45,7 +45,7 @@ describe("gaxios fetch compat", () => {
       });
     });
 
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
     class MockGaxios {
       _defaultAdapter!: (config: MockRequestConfig) => Promise<Response>;
 
@@ -79,7 +79,7 @@ describe("gaxios fetch compat", () => {
 
   it("falls back to a legacy window fetch shim when gaxios is unavailable", async () => {
     const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
-    vi.stubGlobal("fetch", vi.fn<FetchLike>());
+    setTestGlobal("fetch", vi.fn<FetchLike>());
     Reflect.deleteProperty(globalThis as object, "window");
     (globalThis as Record<string, unknown>)[TEST_GAXIOS_CONSTRUCTOR_OVERRIDE] = null;
     try {

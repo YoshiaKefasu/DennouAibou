@@ -641,7 +641,7 @@ describe("applyAuthChoice", () => {
   }
 
   afterEach(async () => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     resolvePluginProviders.mockReset();
     resolvePluginProviders.mockReturnValue(createDefaultProviderPlugins());
     detectZaiEndpoint.mockReset();
@@ -1865,7 +1865,7 @@ describe("applyAuthChoice", () => {
       }
       return new Response("not found", { status: 404 });
     });
-    vi.stubGlobal("fetch", fetchSpy);
+    setTestGlobal("fetch", fetchSpy);
 
     const runtime = createExitThrowingRuntime();
     const text: WizardPrompter["text"] = vi.fn(async (params) => {

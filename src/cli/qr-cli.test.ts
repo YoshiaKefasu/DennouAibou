@@ -169,15 +169,15 @@ describe("registerQrCli", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetRuntimeCapture();
-    vi.stubEnv("DENNOU_GATEWAY_TOKEN", "");
-    vi.stubEnv("DENNOU_GATEWAY_PASSWORD", "");
+    setTestEnv("DENNOU_GATEWAY_TOKEN", "");
+    setTestEnv("DENNOU_GATEWAY_PASSWORD", "");
     runtimeExit.mockImplementation(() => {
       throw new Error("exit");
     });
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
   });
 
   it("prints setup code only when requested", async () => {
@@ -288,7 +288,7 @@ describe("registerQrCli", () => {
   });
 
   it("resolves local gateway auth password SecretRefs before setup code generation", async () => {
-    vi.stubEnv("QR_LOCAL_GATEWAY_PASSWORD", "local-password-secret");
+    setTestEnv("QR_LOCAL_GATEWAY_PASSWORD", "local-password-secret");
     loadConfig.mockReturnValue(
       createLocalGatewayConfigWithAuth(
         createLocalGatewayPasswordRefAuth("QR_LOCAL_GATEWAY_PASSWORD"),
@@ -302,7 +302,7 @@ describe("registerQrCli", () => {
   });
 
   it("uses DENNOU_GATEWAY_PASSWORD without resolving local password SecretRef", async () => {
-    vi.stubEnv("DENNOU_GATEWAY_PASSWORD", "password-from-env");
+    setTestEnv("DENNOU_GATEWAY_PASSWORD", "password-from-env");
     loadConfig.mockReturnValue(
       createLocalGatewayConfigWithAuth(
         createLocalGatewayPasswordRefAuth("MISSING_LOCAL_GATEWAY_PASSWORD"),
@@ -331,7 +331,7 @@ describe("registerQrCli", () => {
   });
 
   it("resolves local password SecretRef when auth mode is inferred", async () => {
-    vi.stubEnv("QR_INFERRED_GATEWAY_PASSWORD", "inferred-password");
+    setTestEnv("QR_INFERRED_GATEWAY_PASSWORD", "inferred-password");
     loadConfig.mockReturnValue(
       createLocalGatewayConfigWithAuth({
         ...createLocalGatewayEnvPasswordRefAuth("QR_INFERRED_GATEWAY_PASSWORD"),
@@ -345,7 +345,7 @@ describe("registerQrCli", () => {
   });
 
   it("fails when token and password SecretRefs are both configured with inferred mode", async () => {
-    vi.stubEnv("QR_INFERRED_GATEWAY_TOKEN", "inferred-token");
+    setTestEnv("QR_INFERRED_GATEWAY_TOKEN", "inferred-token");
     loadConfig.mockReturnValue({
       secrets: {
         providers: {

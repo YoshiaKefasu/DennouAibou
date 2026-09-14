@@ -65,7 +65,7 @@ describe("web fetch runtime", () => {
   });
 
   beforeEach(() => {
-    vi.unstubAllEnvs();
+    restoreTestEnvs();
     resolvePluginWebFetchProvidersMock.mockReset();
     resolveRuntimeWebFetchProvidersMock.mockReset();
     resolvePluginWebFetchProvidersMock.mockReturnValue([]);
@@ -110,7 +110,7 @@ describe("web fetch runtime", () => {
       },
     };
 
-    vi.stubEnv("FIRECRAWL_API_KEY", "");
+    setTestEnv("FIRECRAWL_API_KEY", "");
 
     expect(resolveWebFetchDefinition({ config })).toBeNull();
   });
@@ -169,7 +169,7 @@ describe("web fetch runtime", () => {
       autoDetectOrder: 1,
     });
     resolvePluginWebFetchProvidersMock.mockReturnValue([provider]);
-    vi.stubEnv("FIRECRAWL_API_KEY", "firecrawl-env-key");
+    setTestEnv("FIRECRAWL_API_KEY", "firecrawl-env-key");
 
     const resolved = resolveWebFetchDefinition({
       config: {},

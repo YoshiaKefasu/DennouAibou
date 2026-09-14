@@ -104,7 +104,7 @@ afterAll(async () => {
 
 describe("gateway server channels", () => {
   test("channels.status returns snapshot without probe", async () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", undefined);
+    setTestEnv("TELEGRAM_BOT_TOKEN", undefined);
     setRegistry(defaultRegistry);
     const res = await rpcReq<{
       channels?: Record<
@@ -142,7 +142,7 @@ describe("gateway server channels", () => {
   });
 
   test("channels.logout clears telegram bot token from config", async () => {
-    vi.stubEnv("TELEGRAM_BOT_TOKEN", undefined);
+    setTestEnv("TELEGRAM_BOT_TOKEN", undefined);
     setRegistry(defaultRegistry);
     await writeConfigFile({
       channels: {

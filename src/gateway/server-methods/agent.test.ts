@@ -118,7 +118,11 @@ type AgentIdentityGetParams = AgentIdentityGetHandlerArgs["params"];
 // (Date.now + setTimeout) instead of vi fake timers so Windows CI wall time is
 // what actually gates the assertion.
 const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
-async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 2_000, stepMs = 5) {
+async function waitForAssertion(
+  assertion: () => void,
+  timeoutMs = isCI ? 4_000 : 2_000,
+  stepMs = 5,
+) {
   const startedAt = Date.now();
   for (;;) {
     try {
@@ -156,7 +160,7 @@ function buildExistingMainStoreEntry(overrides: Record<string, unknown> = {}) {
 
 function setupNewYorkTimeConfig(isoDate: string) {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(isoDate)); // Wed Jan 28, 8:30 PM EST
+  vi.advanceTimersByTime(new Date(isoDate).getTime() - Date.now()); // Wed Jan 28, 8:30 PM EST
   mocks.agentCommand.mockClear();
   mocks.loadConfigReturn = {
     agents: {

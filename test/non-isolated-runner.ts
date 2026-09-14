@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { TestRunner, type RunnerTestSuite, vi } from "vitest";
+import { restoreTestEnvs, restoreTestGlobals } from "../src/test-utils/bun-test-mocks.js";
 
 type EvaluatedModuleNode = {
   promise?: unknown;
@@ -58,8 +59,8 @@ export default class OpenClawNonIsolatedRunner extends TestRunner {
       vi.useRealTimers();
     }
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+    restoreTestGlobals();
+    restoreTestEnvs();
     vi.clearAllMocks();
     vi.resetModules();
     this.moduleRunner?.mocker?.reset?.();

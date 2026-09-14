@@ -2,6 +2,7 @@ import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import * as providerAuth from "openclaw/plugin-sdk/provider-auth-runtime";
 import type { ProviderPlugin } from "openclaw/plugin-sdk/provider-model-shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setTestGlobal } from "../../src/test-utils/bun-test-mocks.js";
 import { createTestPluginApi } from "../../test/helpers/plugins/plugin-api.js";
 import {
   registerProviderPlugin,
@@ -68,7 +69,7 @@ describe("openai plugin", () => {
         ],
       }),
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const provider = buildOpenAIImageGenerationProvider();
     const authStore = { version: 1, profiles: {} };
@@ -127,7 +128,7 @@ describe("openai plugin", () => {
         ],
       }),
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const provider = buildOpenAIImageGenerationProvider();
     const authStore = { version: 1, profiles: {} };
@@ -187,7 +188,7 @@ describe("openai plugin", () => {
       mode: "api-key",
     });
     const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const provider = buildOpenAIImageGenerationProvider();
     await expect(

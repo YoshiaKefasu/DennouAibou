@@ -703,11 +703,11 @@ async function withZaiProbeFetch<T>(
   const originalVitest = process.env.VITEST;
   delete process.env.VITEST;
   const fetchMock = createZaiFetchMock(responses);
-  vi.stubGlobal("fetch", fetchMock);
+  setTestGlobal("fetch", fetchMock);
   try {
     return await run(fetchMock);
   } finally {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     if (originalVitest === undefined) {
       delete process.env.VITEST;
     } else {
@@ -889,7 +889,7 @@ describe("onboard (non-interactive): provider auth", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
     clearRuntimeAuthProfileStoreSnapshots();
     resetFileLockStateForTest();
     clearPluginDiscoveryCache();

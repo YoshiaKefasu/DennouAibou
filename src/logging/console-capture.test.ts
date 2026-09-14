@@ -62,8 +62,7 @@ describe("enableConsoleCapture", () => {
   it("prefixes console output with timestamps when enabled", () => {
     setLoggerOverride({ level: "info", file: tempLogPath() });
     const now = new Date("2026-01-17T18:01:02.000Z");
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.useFakeTimers({ now });
     const warn = vi.fn();
     console.warn = warn;
     setConsoleTimestampPrefix(true);

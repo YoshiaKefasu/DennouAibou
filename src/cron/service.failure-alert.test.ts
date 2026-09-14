@@ -44,7 +44,7 @@ function createFailureAlertCron(params: {
 describe("CronService failure alerts", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-01T00:00:00.000Z") });
     noopLogger.debug.mockClear();
     noopLogger.info.mockClear();
     noopLogger.warn.mockClear();

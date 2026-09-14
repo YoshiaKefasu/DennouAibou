@@ -34,7 +34,7 @@ describe("runCronIsolatedAgentTurn owner auth", () => {
 
   beforeEach(() => {
     previousFastTestEnv = process.env.DENNOU_TEST_FAST;
-    vi.stubEnv("DENNOU_TEST_FAST", "1");
+    setTestEnv("DENNOU_TEST_FAST", "1");
     resetRunCronIsolatedAgentTurnHarness();
     resolveDeliveryTargetMock.mockResolvedValue({
       channel: "telegram",
@@ -50,11 +50,11 @@ describe("runCronIsolatedAgentTurn owner auth", () => {
 
   afterEach(() => {
     if (previousFastTestEnv == null) {
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
       delete process.env.DENNOU_TEST_FAST;
       return;
     }
-    vi.stubEnv("DENNOU_TEST_FAST", previousFastTestEnv);
+    setTestEnv("DENNOU_TEST_FAST", previousFastTestEnv);
   });
 
   it(

@@ -231,8 +231,7 @@ describe("format-relative", () => {
 
   describe("formatRelativeTimestamp", () => {
     beforeEach(() => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-02-10T12:00:00.000Z"));
+      vi.useFakeTimers({ now: new Date("2024-02-10T12:00:00.000Z") });
     });
 
     afterEach(() => {

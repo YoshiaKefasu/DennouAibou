@@ -19,14 +19,13 @@ describe("DirectoryCache", () => {
   });
 
   it("expires entries after ttl", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-01T00:00:00.000Z") });
     const cache = new DirectoryCache<string>(1000, 10);
 
     cache.set("a", "value-a", cfg);
     expect(cache.get("a", cfg)).toBe("value-a");
 
-    vi.setSystemTime(new Date("2026-01-01T00:00:02.000Z"));
+    vi.advanceTimersByTime(2_000);
     expect(cache.get("a", cfg)).toBeUndefined();
   });
 

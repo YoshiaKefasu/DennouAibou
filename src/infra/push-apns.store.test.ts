@@ -272,10 +272,9 @@ describe("push APNs registration store", () => {
   });
 
   it("only clears a registration when the stored entry still matches", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: new Date("2026-03-11T00:00:00Z") });
     try {
       const baseDir = await makeTempDir();
-      vi.setSystemTime(new Date("2026-03-11T00:00:00Z"));
       const stale = await registerApnsToken({
         nodeId: "ios-node-1",
         token: "ABCD1234ABCD1234ABCD1234ABCD1234",
@@ -284,7 +283,7 @@ describe("push APNs registration store", () => {
         baseDir,
       });
 
-      vi.setSystemTime(new Date("2026-03-11T00:00:01Z"));
+      vi.advanceTimersByTime(1_000);
       const fresh = await registerApnsToken({
         nodeId: "ios-node-1",
         token: "ABCD1234ABCD1234ABCD1234ABCD1234",

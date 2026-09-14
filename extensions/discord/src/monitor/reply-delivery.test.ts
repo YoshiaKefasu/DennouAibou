@@ -583,9 +583,9 @@ describe("deliverDiscordReply", () => {
   it("touches bound-thread activity after outbound delivery", async () => {
     vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2026-02-20T00:00:00.000Z"));
+      vi.useFakeTimers({ now: new Date("2026-02-20T00:00:00.000Z") });
       const threadBindings = await createBoundThreadBindings();
-      vi.setSystemTime(new Date("2026-02-20T00:02:00.000Z"));
+      vi.advanceTimersByTime(2 * 60_000);
 
       await deliverDiscordReply({
         replies: [{ text: "Activity ping" }],

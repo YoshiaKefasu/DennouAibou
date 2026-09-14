@@ -15,16 +15,16 @@ import { resolveImplicitProviders } from "./models-config.providers.js";
 import type { ProviderConfig } from "./models-config.providers.js";
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
+  restoreTestEnvs();
+  restoreTestGlobals();
 });
 
 describe("Ollama provider", () => {
   const createAgentDir = () => mkdtempSync(join(tmpdir(), "openclaw-test-"));
 
   const enableDiscoveryEnv = () => {
-    vi.stubEnv("VITEST", "");
-    vi.stubEnv("NODE_ENV", "development");
+    setTestEnv("VITEST", "");
+    setTestEnv("NODE_ENV", "development");
   };
 
   const fetchCallUrls = (fetchMock: ReturnType<typeof vi.fn>): string[] =>
@@ -175,7 +175,7 @@ describe("Ollama provider", () => {
       }
       return notFoundJsonResponse();
     });
-    vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+    setTestGlobal("fetch", withFetchPreconnect(fetchMock));
 
     await withOllamaApiKey(async () => {
       const provider = await runOllamaCatalog({
@@ -227,7 +227,7 @@ describe("Ollama provider", () => {
       }
       return notFoundJsonResponse();
     });
-    vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+    setTestGlobal("fetch", withFetchPreconnect(fetchMock));
 
     const providers = await resolveProvidersWithOllamaKey(agentDir);
     const models = providers?.ollama?.models ?? [];
@@ -254,7 +254,7 @@ describe("Ollama provider", () => {
       }
       return notFoundJsonResponse();
     });
-    vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+    setTestGlobal("fetch", withFetchPreconnect(fetchMock));
 
     const providers = await resolveProvidersWithOllamaKey(agentDir);
     const model = providers?.ollama?.models?.find((entry) => entry.id === "qwen3:32b");
@@ -284,7 +284,7 @@ describe("Ollama provider", () => {
         json: async () => ({ model_info: { "llama.context_length": 65536 } }),
       };
     });
-    vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+    setTestGlobal("fetch", withFetchPreconnect(fetchMock));
 
     const providers = await resolveProvidersWithOllamaKey(agentDir);
     const models = providers?.ollama?.models ?? [];
@@ -311,7 +311,7 @@ describe("Ollama provider", () => {
   it("should skip discovery fetch when explicit models are configured", async () => {
     await withoutAmbientOllamaEnv(async () => {
       const fetchMock = vi.fn();
-      vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+      setTestGlobal("fetch", withFetchPreconnect(fetchMock));
       const explicitModels: ModelDefinitionConfig[] = [
         {
           id: "gpt-oss:20b",
@@ -360,7 +360,7 @@ describe("Ollama provider", () => {
         }
         return notFoundJsonResponse();
       });
-      vi.stubGlobal("fetch", withFetchPreconnect(fetchMock));
+      setTestGlobal("fetch", withFetchPreconnect(fetchMock));
 
       const provider = await runOllamaCatalog({
         config: {

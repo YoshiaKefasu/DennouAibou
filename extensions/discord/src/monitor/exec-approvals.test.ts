@@ -900,7 +900,7 @@ describe("DiscordExecApprovalHandler gateway auth", () => {
   });
 
   it("prefers OPENCLAW_GATEWAY_TOKEN when config token is missing", async () => {
-    vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", "env-gateway-token");
+    setTestEnv("OPENCLAW_GATEWAY_TOKEN", "env-gateway-token");
     const handler = new DiscordExecApprovalHandler({
       token: "discord-bot-token",
       accountId: "default",
@@ -917,7 +917,7 @@ describe("DiscordExecApprovalHandler gateway auth", () => {
     try {
       await handler.start();
     } finally {
-      vi.unstubAllEnvs();
+      restoreTestEnvs();
     }
 
     expect(gatewayClientStarts).toHaveBeenCalledTimes(1);

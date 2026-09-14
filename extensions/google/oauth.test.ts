@@ -658,7 +658,7 @@ describe("loginGeminiCliOAuth", () => {
       }
     }
     setOAuthSettingsFsForTest();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   it("falls back across loadCodeAssist endpoints with aligned headers and metadata", async () => {
@@ -688,7 +688,7 @@ describe("loginGeminiCliOAuth", () => {
       }
       throw new Error(`Unexpected request: ${url}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const { loginGeminiCliOAuth } = await import("./oauth.js");
     await runRemoteLoginExpectingProjectId(loginGeminiCliOAuth, "daily-project");
@@ -736,7 +736,7 @@ describe("loginGeminiCliOAuth", () => {
       }
       throw new Error(`Unexpected request: ${url}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const { loginGeminiCliOAuth } = await import("./oauth.js");
     const { authUrl } = await runRemoteLoginWithCapturedAuthUrl(loginGeminiCliOAuth);
@@ -790,7 +790,7 @@ describe("loginGeminiCliOAuth", () => {
       }
       throw new Error(`Unexpected request: ${url}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const { loginGeminiCliOAuth } = await import("./oauth.js");
     await runRemoteLoginExpectingProjectId(loginGeminiCliOAuth, "env-project");
@@ -827,7 +827,7 @@ describe("loginGeminiCliOAuth", () => {
       }
       throw new Error(`Unexpected request: ${url}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    setTestGlobal("fetch", fetchMock);
 
     const { loginGeminiCliOAuth } = await import("./oauth.js");
     const { result } = await runRemoteLoginWithCapturedAuthUrl(loginGeminiCliOAuth);

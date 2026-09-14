@@ -24,7 +24,7 @@ describe("CronService interval/cron jobs fire on time", () => {
     jobId: string;
     firstDueAt: number;
   }) => {
-    vi.setSystemTime(new Date(firstDueAt + 5));
+    vi.advanceTimersByTime(firstDueAt + 5 - Date.now());
     await vi.runOnlyPendingTimersAsync();
     await finished.waitForOk(jobId);
     const jobs = await cron.list({ includeDisabled: true });
@@ -84,7 +84,7 @@ describe("CronService interval/cron jobs fire on time", () => {
     });
 
     // Set time to just before a minute boundary.
-    vi.setSystemTime(new Date("2025-12-13T00:00:59.000Z"));
+    vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:59.000Z") - Date.now());
 
     await cron.start();
     const job = await cron.add({
@@ -161,13 +161,13 @@ describe("CronService interval/cron jobs fire on time", () => {
     await cron.start();
     // Perf: a few recomputation cycles are enough to catch legacy "every" drift.
     for (let minute = 1; minute <= 3; minute++) {
-      vi.setSystemTime(new Date(nowMs + minute * 60_000));
+      vi.advanceTimersByTime(nowMs + minute * 60_000 - Date.now());
       const minuteRun = await cron.run("minute-cron", "force");
       expect(minuteRun).toEqual({ ok: true, ran: true });
     }
 
     // "every" cadence is 2m; verify it stays due at the 6-minute boundary.
-    vi.setSystemTime(new Date(nowMs + 6 * 60_000));
+    vi.advanceTimersByTime(nowMs + 6 * 60_000 - Date.now());
     const sfRun = await cron.run("legacy-every", "due");
     expect(sfRun).toEqual({ ok: true, ran: true });
 

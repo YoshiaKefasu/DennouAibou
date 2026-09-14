@@ -73,7 +73,7 @@ function createRelayApnsSendFixture(params: {
 }
 
 afterEach(async () => {
-  vi.unstubAllGlobals();
+  restoreTestGlobals();
 });
 
 describe("push APNs send semantics", () => {

@@ -1,4 +1,7 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { installTestMockCleanup } from "../src/test-utils/bun-test-mocks.js";
+
+installTestMockCleanup(afterEach);
 
 vi.mock("@earendil-works/pi-ai", async () => {
   const original =

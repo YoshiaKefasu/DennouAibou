@@ -27,7 +27,7 @@ describe("runGeminiEmbeddingBatches", () => {
 
   afterEach(() => {
     vi.resetAllMocks();
-    vi.unstubAllGlobals();
+    restoreTestGlobals();
   });
 
   const mockClient: GeminiEmbeddingClient = {
