@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { vi } from "vitest";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
@@ -148,10 +149,10 @@ export function setupIsolatedAgentTurnMocks(params?: { fast?: boolean }): void {
   if (params?.fast) {
     vi.stubEnv("DENNOU_TEST_FAST", "1");
   }
-  vi.mocked(runEmbeddedPiAgent).mockReset();
-  vi.mocked(loadModelCatalog).mockResolvedValue([]);
-  vi.mocked(runSubagentAnnounceFlow).mockReset().mockResolvedValue(true);
-  vi.mocked(callGateway).mockReset().mockResolvedValue({ ok: true, deleted: true });
+  (runEmbeddedPiAgent as Mock).mockReset();
+  (loadModelCatalog as Mock).mockResolvedValue([]);
+  (runSubagentAnnounceFlow as Mock).mockReset().mockResolvedValue(true);
+  (callGateway as Mock).mockReset().mockResolvedValue({ ok: true, deleted: true });
   setActivePluginRegistry(
     createTestRegistry([
       {

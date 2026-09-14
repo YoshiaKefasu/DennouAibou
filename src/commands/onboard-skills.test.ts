@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -73,15 +74,15 @@ function createBundledSkill(params: {
 }
 
 function mockMissingBrewStatus(skills: Array<ReturnType<typeof createBundledSkill>>): void {
-  vi.mocked(detectBinary).mockResolvedValue(false);
-  vi.mocked(installSkill).mockResolvedValue({
+  (detectBinary as Mock).mockResolvedValue(false);
+  (installSkill as Mock).mockResolvedValue({
     ok: true,
     message: "Installed",
     stdout: "",
     stderr: "",
     code: 0,
   });
-  vi.mocked(buildWorkspaceSkillStatus).mockReturnValue({
+  (buildWorkspaceSkillStatus as Mock).mockReturnValue({
     workspaceDir: "/tmp/ws",
     managedSkillsDir: "/tmp/managed",
     skills,

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../gateway/call.js", () => ({
@@ -58,7 +59,7 @@ async function withTempStore(
 }
 
 function mockGatewaySuccessReply(text = "hello") {
-  vi.mocked(callGateway).mockResolvedValue({
+  (callGateway as Mock).mockResolvedValue({
     runId: "idem-1",
     status: "ok",
     result: {
@@ -69,7 +70,7 @@ function mockGatewaySuccessReply(text = "hello") {
 }
 
 function mockLocalAgentReply(text = "local") {
-  vi.mocked(agentCommand).mockImplementationOnce(async (_opts, rt) => {
+  (agentCommand as Mock).mockImplementationOnce(async (_opts, rt) => {
     rt?.log?.(text);
     return {
       payloads: [{ text }],
@@ -90,7 +91,7 @@ describe("agentCliCommand", () => {
       await agentCliCommand({ message: "hi", to: "+1555", timeout: "0" }, runtime);
 
       expect(callGateway).toHaveBeenCalledTimes(1);
-      const request = vi.mocked(callGateway).mock.calls[0]?.[0] as { timeoutMs?: number };
+      const request = (callGateway as Mock).mock.calls[0]?.[0] as { timeoutMs?: number };
       expect(request.timeoutMs).toBe(2_147_000_000);
     });
   });
@@ -109,7 +110,7 @@ describe("agentCliCommand", () => {
 
   it("falls back to embedded agent when gateway fails", async () => {
     await withTempStore(async () => {
-      vi.mocked(callGateway).mockRejectedValue(new Error("gateway not connected"));
+      (callGateway as Mock).mockRejectedValue(new Error("gateway not connected"));
       mockLocalAgentReply();
 
       await agentCliCommand({ message: "hi", to: "+1555" }, runtime);
@@ -135,7 +136,7 @@ describe("agentCliCommand", () => {
 
       expect(callGateway).not.toHaveBeenCalled();
       expect(agentCommand).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(agentCommand).mock.calls[0]?.[0]).toMatchObject({
+      expect((agentCommand as Mock).mock.calls[0]?.[0]).toMatchObject({
         cleanupBundleMcpOnRunEnd: true,
       });
       expect(runtime.log).toHaveBeenCalledWith("local");
@@ -144,13 +145,13 @@ describe("agentCliCommand", () => {
 
   it("does not force bundle MCP cleanup on gateway fallback", async () => {
     await withTempStore(async () => {
-      vi.mocked(callGateway).mockRejectedValue(new Error("gateway not connected"));
+      (callGateway as Mock).mockRejectedValue(new Error("gateway not connected"));
       mockLocalAgentReply();
 
       await agentCliCommand({ message: "hi", to: "+1555" }, runtime);
 
       expect(agentCommand).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(agentCommand).mock.calls[0]?.[0]).not.toMatchObject({
+      expect((agentCommand as Mock).mock.calls[0]?.[0]).not.toMatchObject({
         cleanupBundleMcpOnRunEnd: true,
       });
     });

@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   loadSanitizeSessionHistoryWithCleanMocks,
@@ -35,11 +36,11 @@ describe("sanitizeSessionHistory e2e smoke", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(mockedHelpers.sanitizeSessionMessagesImages).mockImplementation(async (msgs) => msgs);
+    (mockedHelpers.sanitizeSessionMessagesImages as Mock).mockImplementation(async (msgs) => msgs);
   });
 
   it("passes simple user-only history through for google model APIs", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(true);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(true);
 
     const result = await sanitizeSessionHistory({
       messages: mockMessages,
@@ -53,7 +54,7 @@ describe("sanitizeSessionHistory e2e smoke", () => {
   });
 
   it("passes simple user-only history through for openai-responses", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
 
     const result = await sanitizeWithOpenAIResponses({
       sanitizeSessionHistory,

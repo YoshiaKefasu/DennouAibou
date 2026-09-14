@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SecretInput } from "../config/types.secrets.js";
 
@@ -192,7 +193,7 @@ describe("pairing setup code", () => {
   });
 
   beforeEach(() => {
-    vi.mocked(issueDeviceBootstrapTokenMock).mockClear();
+    (issueDeviceBootstrapTokenMock as Mock).mockClear();
   });
 
   afterEach(() => {

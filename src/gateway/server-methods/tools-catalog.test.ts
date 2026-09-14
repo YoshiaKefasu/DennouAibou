@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolvePluginTools } from "../../plugins/tools.js";
 import { ErrorCodes } from "../protocol/index.js";
@@ -150,7 +151,7 @@ describe("tools.catalog handler", () => {
 
     await invoke();
 
-    expect(vi.mocked(resolvePluginTools)).toHaveBeenCalledWith(
+    expect(resolvePluginTools as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         allowGatewaySubagentBinding: true,
       }),

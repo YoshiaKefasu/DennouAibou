@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { vi } from "vitest";
 import type { ModelDefinitionConfig } from "../../config/types.js";
 
@@ -127,7 +128,7 @@ export function mockGoogleGeminiCliFlashTemplateModel(
 }
 
 export function resetMockDiscoverModels(discoverModelsMock: DiscoverModelsMock): void {
-  vi.mocked(discoverModelsMock).mockReturnValue(
+  (discoverModelsMock as Mock).mockReturnValue(
     Promise.resolve({
       find: vi.fn(() => null),
     } as unknown as ReturnType<DiscoverModelsMock>),
@@ -142,7 +143,7 @@ export function mockDiscoveredModel(
     templateModel: unknown;
   },
 ): void {
-  vi.mocked(discoverModelsMock).mockReturnValue(
+  (discoverModelsMock as Mock).mockReturnValue(
     Promise.resolve({
       find: vi.fn((provider: string, modelId: string) => {
         if (provider === params.provider && modelId === params.modelId) {

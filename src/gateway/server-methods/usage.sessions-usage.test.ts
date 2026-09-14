@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withEnvAsync } from "../../test-utils/env.js";
 
@@ -135,9 +136,9 @@ describe("sessions.usage", () => {
   it("discovers sessions across configured agents and keeps agentId in key", async () => {
     const respond = await runSessionsUsage(BASE_USAGE_RANGE);
 
-    expect(vi.mocked(discoverAllSessions)).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(discoverAllSessions).mock.calls[0]?.[0]?.agentId).toBe("main");
-    expect(vi.mocked(discoverAllSessions).mock.calls[1]?.[0]?.agentId).toBe("opus");
+    expect(discoverAllSessions as Mock).toHaveBeenCalledTimes(2);
+    expect((discoverAllSessions as Mock).mock.calls[0]?.[0]?.agentId).toBe("main");
+    expect((discoverAllSessions as Mock).mock.calls[1]?.[0]?.agentId).toBe("opus");
 
     const sessions = expectSuccessfulSessionsUsage(respond);
     expect(sessions).toHaveLength(2);
@@ -162,7 +163,7 @@ describe("sessions.usage", () => {
 
         // Swap the store mock for this test: the canonical key differs from the discovered key
         // but points at the same sessionId.
-        vi.mocked(loadCombinedSessionStoreForGateway).mockReturnValue({
+        (loadCombinedSessionStoreForGateway as Mock).mockReturnValue({
           storePath: "(multiple)",
           store: {
             [storeKey]: {
@@ -179,9 +180,9 @@ describe("sessions.usage", () => {
         const sessions = expectSuccessfulSessionsUsage(respond);
         expect(sessions).toHaveLength(1);
         expect(sessions[0]?.key).toBe(storeKey);
-        expect(vi.mocked(loadSessionCostSummary)).toHaveBeenCalled();
+        expect(loadSessionCostSummary as Mock).toHaveBeenCalled();
         expect(
-          vi.mocked(loadSessionCostSummary).mock.calls.some((call) => call[0]?.agentId === "opus"),
+          (loadSessionCostSummary as Mock).mock.calls.some((call) => call[0]?.agentId === "opus"),
         ).toBe(true);
       });
     } finally {
@@ -200,7 +201,7 @@ describe("sessions.usage", () => {
         const sessionFile = path.join(agentSessionsDir, "run-dup.jsonl");
         fs.writeFileSync(sessionFile, "", "utf-8");
 
-        vi.mocked(loadCombinedSessionStoreForGateway).mockReturnValue({
+        (loadCombinedSessionStoreForGateway as Mock).mockReturnValue({
           storePath: "(multiple)",
           store: {
             [preferredKey]: {
@@ -246,8 +247,8 @@ describe("sessions.usage", () => {
       key: "agent:opus:s-opus",
     });
 
-    expect(vi.mocked(loadSessionUsageTimeSeries)).toHaveBeenCalled();
-    expect(vi.mocked(loadSessionUsageTimeSeries).mock.calls[0]?.[0]?.agentId).toBe("opus");
+    expect(loadSessionUsageTimeSeries as Mock).toHaveBeenCalled();
+    expect((loadSessionUsageTimeSeries as Mock).mock.calls[0]?.[0]?.agentId).toBe("opus");
   });
 
   it("passes parsed agentId into sessions.usage.logs", async () => {
@@ -255,8 +256,8 @@ describe("sessions.usage", () => {
       key: "agent:opus:s-opus",
     });
 
-    expect(vi.mocked(loadSessionLogs)).toHaveBeenCalled();
-    expect(vi.mocked(loadSessionLogs).mock.calls[0]?.[0]?.agentId).toBe("opus");
+    expect(loadSessionLogs as Mock).toHaveBeenCalled();
+    expect((loadSessionLogs as Mock).mock.calls[0]?.[0]?.agentId).toBe("opus");
   });
 
   it("rejects traversal-style keys in timeseries/log lookups", async () => {

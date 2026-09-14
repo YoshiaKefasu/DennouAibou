@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as execApprovals from "../infra/exec-approvals.js";
 import type { ExecApprovalsFile } from "../infra/exec-approvals.js";
@@ -448,7 +449,7 @@ describe("exec approvals CLI", () => {
   });
 
   it("defaults allowlist add to wildcard agent", async () => {
-    const saveExecApprovals = vi.mocked(execApprovals.saveExecApprovals);
+    const saveExecApprovals = execApprovals.saveExecApprovals as Mock;
     saveExecApprovals.mockClear();
 
     await runApprovalsCommand(["approvals", "allowlist", "add", "/usr/bin/uname"]);
@@ -477,7 +478,7 @@ describe("exec approvals CLI", () => {
       },
     };
 
-    const saveExecApprovals = vi.mocked(execApprovals.saveExecApprovals);
+    const saveExecApprovals = execApprovals.saveExecApprovals as Mock;
     saveExecApprovals.mockClear();
 
     await runApprovalsCommand(["approvals", "allowlist", "remove", "/usr/bin/uname"]);

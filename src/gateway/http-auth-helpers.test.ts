@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedGatewayAuth } from "./auth.js";
 import {
@@ -50,8 +51,8 @@ describe("authorizeGatewayBearerRequestOrReply", () => {
   });
 
   it("disables tailscale header auth for HTTP bearer checks", async () => {
-    vi.mocked(getBearerToken).mockReturnValue(undefined);
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({
+    (getBearerToken as Mock).mockReturnValue(undefined);
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({
       ok: false,
       reason: "token_missing",
     });
@@ -59,38 +60,38 @@ describe("authorizeGatewayBearerRequestOrReply", () => {
     const ok = await authorizeGatewayBearerRequestOrReply(makeAuthorizeParams());
 
     expect(ok).toBe(false);
-    expect(vi.mocked(authorizeHttpGatewayConnect)).toHaveBeenCalledWith(
+    expect(authorizeHttpGatewayConnect as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         connectAuth: null,
       }),
     );
-    expect(vi.mocked(sendGatewayAuthFailure)).toHaveBeenCalledTimes(1);
+    expect(sendGatewayAuthFailure as Mock).toHaveBeenCalledTimes(1);
   });
 
   it("forwards bearer token and returns true on successful auth", async () => {
-    vi.mocked(getBearerToken).mockReturnValue("abc");
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({ ok: true, method: "token" });
+    (getBearerToken as Mock).mockReturnValue("abc");
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({ ok: true, method: "token" });
 
     const ok = await authorizeGatewayBearerRequestOrReply(makeAuthorizeParams());
 
     expect(ok).toBe(true);
-    expect(vi.mocked(authorizeHttpGatewayConnect)).toHaveBeenCalledWith(
+    expect(authorizeHttpGatewayConnect as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         connectAuth: { token: "abc", password: "abc" },
       }),
     );
-    expect(vi.mocked(sendGatewayAuthFailure)).not.toHaveBeenCalled();
+    expect(sendGatewayAuthFailure as Mock).not.toHaveBeenCalled();
   });
 
   it("forwards browser-origin policy into HTTP auth", async () => {
     const params = makeAuthorizeParams();
-    vi.mocked(getBearerToken).mockReturnValue(undefined);
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({ ok: true, method: "trusted-proxy" });
+    (getBearerToken as Mock).mockReturnValue(undefined);
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({ ok: true, method: "trusted-proxy" });
 
     await authorizeGatewayBearerRequestOrReply(params);
 
-    expect(vi.mocked(resolveHttpBrowserOriginPolicy)).toHaveBeenCalledWith(params.req);
-    expect(vi.mocked(authorizeHttpGatewayConnect)).toHaveBeenCalledWith(
+    expect(resolveHttpBrowserOriginPolicy as Mock).toHaveBeenCalledWith(params.req);
+    expect(authorizeHttpGatewayConnect as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         browserOriginPolicy: {
           requestHost: "gateway.example.com",
@@ -109,7 +110,7 @@ describe("resolveGatewayRequestedOperatorScopes", () => {
   });
 
   it("returns CLI_DEFAULT_OPERATOR_SCOPES when header is absent", () => {
-    vi.mocked(getHeader).mockReturnValue(undefined);
+    (getHeader as Mock).mockReturnValue(undefined);
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual(CLI_DEFAULT_OPERATOR_SCOPES);
@@ -118,42 +119,42 @@ describe("resolveGatewayRequestedOperatorScopes", () => {
   });
 
   it("returns empty array when header is present but empty", () => {
-    vi.mocked(getHeader).mockReturnValue("");
+    (getHeader as Mock).mockReturnValue("");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual([]);
   });
 
   it("returns empty array when header is present but only whitespace", () => {
-    vi.mocked(getHeader).mockReturnValue("   ");
+    (getHeader as Mock).mockReturnValue("   ");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual([]);
   });
 
   it("parses comma-separated scopes from header", () => {
-    vi.mocked(getHeader).mockReturnValue("operator.write,operator.read");
+    (getHeader as Mock).mockReturnValue("operator.write,operator.read");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual(["operator.write", "operator.read"]);
   });
 
   it("trims whitespace around individual scopes", () => {
-    vi.mocked(getHeader).mockReturnValue("  operator.write , operator.read  ");
+    (getHeader as Mock).mockReturnValue("  operator.write , operator.read  ");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual(["operator.write", "operator.read"]);
   });
 
   it("filters out empty segments from trailing commas", () => {
-    vi.mocked(getHeader).mockReturnValue("operator.write,,operator.read,");
+    (getHeader as Mock).mockReturnValue("operator.write,,operator.read,");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual(["operator.write", "operator.read"]);
   });
 
   it("returns single scope when only one is declared", () => {
-    vi.mocked(getHeader).mockReturnValue("operator.approvals");
+    (getHeader as Mock).mockReturnValue("operator.approvals");
     const req = {} as IncomingMessage;
     const scopes = resolveGatewayRequestedOperatorScopes(req);
     expect(scopes).toEqual(["operator.approvals"]);

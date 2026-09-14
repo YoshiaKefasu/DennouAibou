@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { importFreshModule } from "../../../test/helpers/import-fresh.ts";
 import type { SessionEntry } from "../../config/sessions/types.js";
@@ -235,19 +236,19 @@ describe("runPreparedReply media-only handling", () => {
     runsTesting.resetActiveEmbeddedRuns();
     replyRunTesting.resetReplyRunRegistry();
     const piRuntime = await import("../../agents/pi-embedded.runtime.js");
-    vi.mocked(piRuntime.abortEmbeddedPiRun).mockImplementation((sessionId, opts) =>
+    (piRuntime.abortEmbeddedPiRun as Mock).mockImplementation((sessionId, opts) =>
       abortEmbeddedPiRunActual(sessionId, opts),
     );
-    vi.mocked(piRuntime.isEmbeddedPiRunActive).mockImplementation((sessionId) =>
+    (piRuntime.isEmbeddedPiRunActive as Mock).mockImplementation((sessionId) =>
       isEmbeddedPiRunActiveActual(sessionId),
     );
-    vi.mocked(piRuntime.isEmbeddedPiRunStreaming).mockImplementation((sessionId) =>
+    (piRuntime.isEmbeddedPiRunStreaming as Mock).mockImplementation((sessionId) =>
       isEmbeddedPiRunStreamingActual(sessionId),
     );
-    vi.mocked(piRuntime.resolveActiveEmbeddedRunSessionId).mockImplementation((sessionKey) =>
+    (piRuntime.resolveActiveEmbeddedRunSessionId as Mock).mockImplementation((sessionKey) =>
       resolveActiveEmbeddedRunSessionIdActual(sessionKey),
     );
-    vi.mocked(piRuntime.waitForEmbeddedPiRunEnd).mockImplementation((sessionId, timeoutMs) =>
+    (piRuntime.waitForEmbeddedPiRunEnd as Mock).mockImplementation((sessionId, timeoutMs) =>
       waitForEmbeddedPiRunEndActual(sessionId, timeoutMs),
     );
     await loadFreshGetReplyRunModuleForTest();
@@ -263,7 +264,7 @@ describe("runPreparedReply media-only handling", () => {
     const result = await runPreparedReply(baseParams());
     expect(result).toEqual({ text: "ok" });
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     expect(call?.followupRun.prompt).toContain("[Thread history - for context]");
     expect(call?.followupRun.prompt).toContain("Earlier message in this thread");
@@ -278,7 +279,7 @@ describe("runPreparedReply media-only handling", () => {
     );
     expect(result).toEqual({ text: "ok" });
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     expect(call?.followupRun.prompt).toContain("[Thread history - for context]");
     expect(call?.followupRun.prompt).toContain("Earlier message in this thread");
@@ -303,7 +304,7 @@ describe("runPreparedReply media-only handling", () => {
     expect(result).toEqual({
       text: "I didn't receive any text in your message. Please resend or add a caption.",
     });
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
   });
 
   it("does not send a standalone reset notice for reply-producing /new turns", async () => {
@@ -313,13 +314,13 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call?.resetTriggered).toBe(true);
-    expect(vi.mocked(routeReply)).not.toHaveBeenCalled();
+    expect(routeReply as Mock).not.toHaveBeenCalled();
   });
 
   it("does not emit a reset notice when /new is attempted during gateway drain", async () => {
-    vi.mocked(runReplyAgent).mockRejectedValueOnce(createGatewayDrainingError());
+    (runReplyAgent as Mock).mockRejectedValueOnce(createGatewayDrainingError());
 
     await expect(
       runPreparedReply(
@@ -329,7 +330,7 @@ describe("runPreparedReply media-only handling", () => {
       ),
     ).rejects.toThrow("Gateway is draining for restart; new tasks are not accepted");
 
-    expect(vi.mocked(routeReply)).not.toHaveBeenCalled();
+    expect(routeReply as Mock).not.toHaveBeenCalled();
   });
 
   it("does not register a reply operation before auth setup succeeds", async () => {
@@ -337,7 +338,7 @@ describe("runPreparedReply media-only handling", () => {
       await import("../../agents/auth-profiles/session-override.js");
     const sessionId = "reply-operation-auth-failure";
     const activeBefore = getActiveReplyRunCount();
-    vi.mocked(resolveSessionAuthProfileOverride).mockRejectedValueOnce(new Error("auth failed"));
+    (resolveSessionAuthProfileOverride as Mock).mockRejectedValueOnce(new Error("auth failed"));
 
     await expect(
       runPreparedReply(
@@ -351,7 +352,7 @@ describe("runPreparedReply media-only handling", () => {
   });
   it("waits for the previous active run to clear before registering a new reply operation", async () => {
     const queueSettings = await import("./queue/settings.js");
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
     const previousRun = createReplyOperation({
       sessionId: "session-overlap",
       sessionKey: "session-key",
@@ -367,16 +368,16 @@ describe("runPreparedReply media-only handling", () => {
     );
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     previousRun.complete();
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    expect(vi.mocked(runReplyAgent)).toHaveBeenCalledOnce();
+    expect(runReplyAgent as Mock).toHaveBeenCalledOnce();
   });
   it("interrupts embedded-only active runs even without a reply operation", async () => {
     const queueSettings = await import("./queue/settings.js");
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
     const embeddedAbort = vi.fn();
     const embeddedHandle = {
       queueMessage: vi.fn(async () => {}),
@@ -394,13 +395,13 @@ describe("runPreparedReply media-only handling", () => {
     );
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
     expect(embeddedAbort).toHaveBeenCalledOnce();
 
     clearActiveEmbeddedRun("session-embedded-only", embeddedHandle, "session-key");
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    expect(vi.mocked(runReplyAgent)).toHaveBeenCalledOnce();
+    expect(runReplyAgent as Mock).toHaveBeenCalledOnce();
   });
   it("rechecks same-session ownership after async prep before registering a new reply operation", async () => {
     const { resolveSessionAuthProfileOverride } =
@@ -412,10 +413,10 @@ describe("runPreparedReply media-only handling", () => {
       resolveAuth = resolve;
     });
 
-    vi.mocked(resolveSessionAuthProfileOverride).mockImplementationOnce(
+    (resolveSessionAuthProfileOverride as Mock).mockImplementationOnce(
       async () => await authPromise.then(() => undefined),
     );
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
 
     const runPromise = runPreparedReply(
       baseParams({
@@ -425,7 +426,7 @@ describe("runPreparedReply media-only handling", () => {
     );
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     const intruderRun = createReplyOperation({
       sessionId: "session-auth-race",
@@ -436,12 +437,12 @@ describe("runPreparedReply media-only handling", () => {
     resolveAuth();
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     intruderRun.complete();
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    expect(vi.mocked(runReplyAgent)).toHaveBeenCalledOnce();
+    expect(runReplyAgent as Mock).toHaveBeenCalledOnce();
   });
   it("re-resolves auth profile after waiting for a prior run", async () => {
     const { resolveSessionAuthProfileOverride } =
@@ -456,10 +457,10 @@ describe("runPreparedReply media-only handling", () => {
         updatedAt: 1,
       },
     };
-    vi.mocked(resolveSessionAuthProfileOverride).mockImplementation(async ({ sessionEntry }) => {
+    (resolveSessionAuthProfileOverride as Mock).mockImplementation(async ({ sessionEntry }) => {
       return sessionEntry?.authProfileOverride;
     });
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
     const previousRun = createReplyOperation({
       sessionId: "session-auth-profile",
       sessionKey: "session-key",
@@ -486,9 +487,9 @@ describe("runPreparedReply media-only handling", () => {
     previousRun.complete();
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    const call = vi.mocked(runReplyAgent).mock.calls.at(-1)?.[0];
+    const call = (runReplyAgent as Mock).mock.calls.at(-1)?.[0];
     expect(call?.followupRun.run.authProfileId).toBe("profile-after-wait");
-    expect(vi.mocked(resolveSessionAuthProfileOverride)).toHaveBeenCalledTimes(2);
+    expect(resolveSessionAuthProfileOverride as Mock).toHaveBeenCalledTimes(2);
   });
   it("re-resolves same-session ownership after session-id rotation during async prep", async () => {
     const { resolveSessionAuthProfileOverride } =
@@ -507,10 +508,10 @@ describe("runPreparedReply media-only handling", () => {
       },
     };
 
-    vi.mocked(resolveSessionAuthProfileOverride).mockImplementationOnce(
+    (resolveSessionAuthProfileOverride as Mock).mockImplementationOnce(
       async () => await authPromise.then(() => undefined),
     );
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
 
     const runPromise = runPreparedReply(
       baseParams({
@@ -539,17 +540,17 @@ describe("runPreparedReply media-only handling", () => {
     resolveAuth();
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     rotatedRun.complete();
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    const call = vi.mocked(runReplyAgent).mock.calls.at(-1)?.[0];
+    const call = (runReplyAgent as Mock).mock.calls.at(-1)?.[0];
     expect(call?.followupRun.run.sessionId).toBe("session-after-rotation");
   });
   it("rechecks same-session ownership after wait resolves before calling the runner", async () => {
     const queueSettings = await import("./queue/settings.js");
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
     const previousRun = createReplyOperation({
       sessionId: "session-before-wait",
       sessionKey: "session-key",
@@ -565,7 +566,7 @@ describe("runPreparedReply media-only handling", () => {
     );
 
     await Promise.resolve();
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     previousRun.complete();
     const nextRun = createReplyOperation({
@@ -578,14 +579,14 @@ describe("runPreparedReply media-only handling", () => {
     await expect(runPromise).resolves.toEqual({
       text: "⚠️ Previous run is still shutting down. Please try again in a moment.",
     });
-    expect(vi.mocked(runReplyAgent)).not.toHaveBeenCalled();
+    expect(runReplyAgent as Mock).not.toHaveBeenCalled();
 
     nextRun.complete();
   });
   it("re-drains system events after waiting behind an active run", async () => {
     const queueSettings = await import("./queue/settings.js");
-    vi.mocked(queueSettings.resolveQueueSettings).mockReturnValueOnce({ mode: "interrupt" });
-    vi.mocked(drainFormattedSystemEvents)
+    (queueSettings.resolveQueueSettings as Mock).mockReturnValueOnce({ mode: "interrupt" });
+    (drainFormattedSystemEvents as Mock)
       .mockResolvedValueOnce("System: [t] Initial event.")
       .mockResolvedValueOnce("System: [t] Post-compaction context.");
 
@@ -607,7 +608,7 @@ describe("runPreparedReply media-only handling", () => {
     previousRun.complete();
 
     await expect(runPromise).resolves.toEqual({ text: "ok" });
-    const call = vi.mocked(runReplyAgent).mock.calls.at(-1)?.[0];
+    const call = (runReplyAgent as Mock).mock.calls.at(-1)?.[0];
     expect(call?.commandBody).toContain("System: [t] Initial event.");
     expect(call?.commandBody).toContain("System: [t] Post-compaction context.");
     expect(call?.followupRun.prompt).toContain("System: [t] Initial event.");
@@ -638,7 +639,7 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call?.followupRun.run.messageProvider).toBe("webchat");
   });
 
@@ -669,7 +670,7 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call?.followupRun.run.messageProvider).toBe("feishu");
   });
 
@@ -700,7 +701,7 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call?.followupRun.originatingAccountId).toBe("work");
   });
 
@@ -713,18 +714,18 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(resolveTypingMode).mock.calls[0]?.[0] as
+    const call = (resolveTypingMode as Mock).mock.calls[0]?.[0] as
       | { suppressTyping?: boolean }
       | undefined;
     expect(call?.suppressTyping).toBe(true);
   });
 
   it("routes queued system events into user prompt text, not system prompt context", async () => {
-    vi.mocked(drainFormattedSystemEvents).mockResolvedValueOnce("System: [t] Model switched.");
+    (drainFormattedSystemEvents as Mock).mockResolvedValueOnce("System: [t] Model switched.");
 
     await runPreparedReply(baseParams());
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     expect(call?.commandBody).toContain("System: [t] Model switched.");
     expect(call?.followupRun.run.extraSystemPrompt ?? "").not.toContain("Runtime System Events");
@@ -734,7 +735,7 @@ describe("runPreparedReply media-only handling", () => {
     // drainFormattedSystemEvents returns just the events block; the caller prepends it.
     // The hint must be extracted from the user body BEFORE prepending, so "System:"
     // does not shadow the low|medium|high shorthand.
-    vi.mocked(drainFormattedSystemEvents).mockResolvedValueOnce("System: [t] Node connected.");
+    (drainFormattedSystemEvents as Mock).mockResolvedValueOnce("System: [t] Node connected.");
 
     await runPreparedReply(
       baseParams({
@@ -744,7 +745,7 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     // Think hint extracted before events arrived — level must be "low", not the model default.
     expect(call?.followupRun.run.thinkLevel).toBe("low");
@@ -758,11 +759,11 @@ describe("runPreparedReply media-only handling", () => {
   it("carries system events into followupRun.prompt for deferred turns", async () => {
     // drainFormattedSystemEvents returns the events block; the caller prepends it to
     // effectiveBaseBody for the queue path so deferred turns see events.
-    vi.mocked(drainFormattedSystemEvents).mockResolvedValueOnce("System: [t] Node connected.");
+    (drainFormattedSystemEvents as Mock).mockResolvedValueOnce("System: [t] Node connected.");
 
     await runPreparedReply(baseParams());
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     expect(call?.followupRun.prompt).toContain("System: [t] Node connected.");
   });
@@ -770,7 +771,7 @@ describe("runPreparedReply media-only handling", () => {
   it("does not strip think-hint token from deferred queue body", async () => {
     // In steer mode the inferred thinkLevel is never consumed, so the first token
     // must not be stripped from the queue/steer body (followupRun.prompt).
-    vi.mocked(drainFormattedSystemEvents).mockResolvedValueOnce(undefined);
+    (drainFormattedSystemEvents as Mock).mockResolvedValueOnce(undefined);
 
     await runPreparedReply(
       baseParams({
@@ -783,7 +784,7 @@ describe("runPreparedReply media-only handling", () => {
       }),
     );
 
-    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const call = (runReplyAgent as Mock).mock.calls[0]?.[0];
     expect(call).toBeTruthy();
     // Queue body (used by steer mode) must keep the full original text.
     expect(call?.followupRun.prompt).toContain("low steer this conversation");

@@ -573,7 +573,7 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
           return;
         }
 
-        const runArgs = vi.mocked(invoke.runCommand).mock.calls[0]?.[0] as string[] | undefined;
+        const runArgs = (invoke.runCommand as Mock).mock.calls[0]?.[0] as string[] | undefined;
         expect(runArgs).toEqual(["env", "sh", "-c", "echo SAFE"]);
         expect(fs.existsSync(marker)).toBe(false);
         expectInvokeOk(invoke.sendInvokeResult);
@@ -595,7 +595,7 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
       return;
     }
 
-    const runArgs = vi.mocked(runCommand).mock.calls[0]?.[0] as string[] | undefined;
+    const runArgs = (runCommand as Mock).mock.calls[0]?.[0] as string[] | undefined;
     expect(runArgs).toBeDefined();
     expect(runArgs?.[0]).toMatch(/(^|[/\\])tr$/);
     expect(runArgs?.slice(1)).toEqual(["a", "b"]);

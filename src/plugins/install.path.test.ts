@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import * as tar from "tar";
+import type { Mock } from "vitest";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { expectSingleNpmInstallIgnoreScriptsCall } from "../test-utils/exec-assertions.js";
@@ -345,7 +346,7 @@ describe("installPluginFromPath", () => {
       outName: path.basename(archivePath),
     });
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     run.mockResolvedValue({
       code: 0,
       stdout: "",

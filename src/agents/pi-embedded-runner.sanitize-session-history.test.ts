@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, UserMessage, Usage } from "@earendil-works/pi-ai";
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   expectOpenAIResponsesStrictSanitizeCall,
@@ -100,7 +101,7 @@ describe("sanitizeSessionHistory", () => {
   let mockSessionManager: ReturnType<typeof makeMockSessionManager>;
   const mockMessages = makeSimpleUserMessages();
   const setNonGoogleModelApi = () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
   };
 
   const sanitizeGithubCopilotHistory = async (params: {
@@ -245,7 +246,7 @@ describe("sanitizeSessionHistory", () => {
     >;
 
   const getSingleAssistantUsage = async (messages: AgentMessage[]) => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
     const result = await sanitizeOpenAIHistory(messages);
     return result.find((message) => message.role === "assistant") as
       | (AgentMessage & { usage?: unknown })
@@ -261,12 +262,12 @@ describe("sanitizeSessionHistory", () => {
   beforeEach(() => {
     testTimestamp = 1;
     vi.clearAllMocks();
-    vi.mocked(mockedHelpers.sanitizeSessionMessagesImages).mockImplementation(async (msgs) => msgs);
+    (mockedHelpers.sanitizeSessionMessagesImages as Mock).mockImplementation(async (msgs) => msgs);
     mockSessionManager = makeMockSessionManager();
   });
 
   it("passes simple user-only history through for Google model APIs", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(true);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(true);
 
     const result = await sanitizeSessionHistory({
       messages: mockMessages,
@@ -280,7 +281,7 @@ describe("sanitizeSessionHistory", () => {
   });
 
   it("lets Google provider hooks prepend a bootstrap turn and persist a marker", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(true);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(true);
     const sessionEntries: Array<{ type: string; customType: string; data: unknown }> = [];
     const sessionManager = makeInMemorySessionManager(sessionEntries);
 
@@ -438,7 +439,7 @@ describe("sanitizeSessionHistory", () => {
   });
 
   it("drops stale assistant usage snapshots kept before latest compaction summary", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
 
     const messages = castAgentMessages([
       { role: "user", content: "old context" },
@@ -459,7 +460,7 @@ describe("sanitizeSessionHistory", () => {
   });
 
   it("preserves fresh assistant usage snapshots created after latest compaction summary", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
 
     const messages = castAgentMessages([
       makeAssistantUsageMessage({
@@ -588,7 +589,7 @@ describe("sanitizeSessionHistory", () => {
   });
 
   it("drops stale usage when compaction summary appears before kept assistant messages", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
 
     const compactionTs = Date.parse("2026-02-26T12:00:00.000Z");
     const messages = castAgentMessages([
@@ -609,7 +610,7 @@ describe("sanitizeSessionHistory", () => {
   });
 
   it("keeps fresh usage after compaction timestamp in summary-first ordering", async () => {
-    vi.mocked(mockedHelpers.isGoogleModelApi).mockReturnValue(false);
+    (mockedHelpers.isGoogleModelApi as Mock).mockReturnValue(false);
 
     const compactionTs = Date.parse("2026-02-26T12:00:00.000Z");
     const messages = castAgentMessages([

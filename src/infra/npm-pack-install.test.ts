@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { packNpmSpecToArchive, withTempDir } from "./install-source-utils.js";
 import type { NpmIntegrityDriftPayload } from "./npm-integrity.js";
@@ -30,7 +31,7 @@ describe("installFromNpmSpecArchive", () => {
     name?: string;
     version?: string;
   }) => {
-    vi.mocked(packNpmSpecToArchive).mockResolvedValue({
+    (packNpmSpecToArchive as Mock).mockResolvedValue({
       ok: true,
       archivePath: baseArchivePath,
       metadata: {
@@ -73,12 +74,12 @@ describe("installFromNpmSpecArchive", () => {
   };
 
   beforeEach(() => {
-    vi.mocked(packNpmSpecToArchive).mockClear();
-    vi.mocked(withTempDir).mockClear();
+    (packNpmSpecToArchive as Mock).mockClear();
+    (withTempDir as Mock).mockClear();
   });
 
   it("returns pack errors without invoking installer", async () => {
-    vi.mocked(packNpmSpecToArchive).mockResolvedValue({ ok: false, error: "pack failed" });
+    (packNpmSpecToArchive as Mock).mockResolvedValue({ ok: false, error: "pack failed" });
     const installFromArchive = vi.fn(async () => ({ ok: true as const }));
 
     const result = await installFromNpmSpecArchive({
@@ -198,7 +199,7 @@ describe("installFromNpmSpecArchive", () => {
   });
 
   it("rejects prerelease resolutions unless explicitly requested", async () => {
-    vi.mocked(packNpmSpecToArchive).mockResolvedValue({
+    (packNpmSpecToArchive as Mock).mockResolvedValue({
       ok: true,
       archivePath: baseArchivePath,
       metadata: {
@@ -225,7 +226,7 @@ describe("installFromNpmSpecArchive", () => {
   });
 
   it("allows prerelease resolutions when explicitly requested by tag", async () => {
-    vi.mocked(packNpmSpecToArchive).mockResolvedValue({
+    (packNpmSpecToArchive as Mock).mockResolvedValue({
       ok: true,
       archivePath: baseArchivePath,
       metadata: {
@@ -250,11 +251,11 @@ describe("installFromNpmSpecArchive", () => {
 
 describe("installFromNpmSpecArchiveWithInstaller", () => {
   beforeEach(() => {
-    vi.mocked(packNpmSpecToArchive).mockClear();
+    (packNpmSpecToArchive as Mock).mockClear();
   });
 
   it("passes archive path and installer params to installFromArchive", async () => {
-    vi.mocked(packNpmSpecToArchive).mockResolvedValue({
+    (packNpmSpecToArchive as Mock).mockResolvedValue({
       ok: true,
       archivePath: "/tmp/openclaw-plugin.tgz",
       metadata: {

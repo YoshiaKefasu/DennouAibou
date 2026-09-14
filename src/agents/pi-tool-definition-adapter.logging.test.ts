@@ -1,5 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +31,7 @@ describe("pi tool definition adapter logging", () => {
   });
 
   beforeEach(() => {
-    vi.mocked(logError).mockReset();
+    (logError as Mock).mockReset();
     mocks.logDebug.mockReset();
   });
 

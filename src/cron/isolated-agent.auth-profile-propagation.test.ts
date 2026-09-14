@@ -1,6 +1,7 @@
-import "./isolated-agent.mocks.js";
 import fs from "node:fs/promises";
+import "./isolated-agent.mocks.js";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { createCliDeps } from "./isolated-agent.delivery.test-helpers.js";
@@ -46,7 +47,7 @@ describe("runCronIsolatedAgentTurn auth profile propagation (#20624)", () => {
       );
 
       // 3. Mock runEmbeddedPiAgent to return ok
-      vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+      (runEmbeddedPiAgent as Mock).mockResolvedValue({
         payloads: [{ text: "done" }],
         meta: {
           durationMs: 5,
@@ -77,10 +78,10 @@ describe("runCronIsolatedAgentTurn auth profile propagation (#20624)", () => {
       });
 
       expect(res.status).toBe("ok");
-      expect(vi.mocked(runEmbeddedPiAgent)).toHaveBeenCalledTimes(1);
+      expect(runEmbeddedPiAgent as Mock).toHaveBeenCalledTimes(1);
 
       // 5. Check that authProfileId was passed
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls[0]?.[0] as {
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls[0]?.[0] as {
         authProfileId?: string;
         authProfileIdSource?: string;
       };

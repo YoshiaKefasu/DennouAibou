@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const noop = () => {};
@@ -112,7 +113,7 @@ describe("subagent registry steer restarts", () => {
   };
 
   const withPendingAgentWait = async <T>(run: () => Promise<T>): Promise<T> => {
-    const callGateway = vi.mocked((await import("../gateway/call.js")).callGateway);
+    const callGateway = (await import("../gateway/call.js")).callGateway as Mock;
     const originalCallGateway = callGateway.getMockImplementation();
     callGateway.mockImplementation(async (request: unknown) => {
       const typed = request as { method?: string };

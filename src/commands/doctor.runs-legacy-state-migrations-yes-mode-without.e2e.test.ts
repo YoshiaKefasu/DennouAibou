@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   arrangeLegacyStateMigrationTest,
@@ -50,7 +51,7 @@ describe("doctor command", () => {
   it("skips gateway restarts in non-interactive mode", async () => {
     mockDoctorConfigSnapshot();
 
-    vi.mocked(healthCommand).mockRejectedValueOnce(new Error("gateway closed"));
+    (healthCommand as Mock).mockRejectedValueOnce(new Error("gateway closed"));
 
     serviceIsLoaded.mockResolvedValueOnce(true);
     serviceRestart.mockClear();

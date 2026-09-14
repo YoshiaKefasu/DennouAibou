@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./tools/gateway.js", () => ({
@@ -133,7 +134,7 @@ describe("exec approval followup", () => {
   });
 
   it("falls back to sanitized direct delivery when session resume fails", async () => {
-    vi.mocked(callGatewayTool).mockRejectedValueOnce(new Error("session missing"));
+    (callGatewayTool as Mock).mockRejectedValueOnce(new Error("session missing"));
 
     await sendExecApprovalFollowup({
       approvalId: "req-session-resume-failed",
@@ -173,7 +174,7 @@ describe("exec approval followup", () => {
   });
 
   it("uses safe denied copy when session resume fails", async () => {
-    vi.mocked(callGatewayTool).mockRejectedValueOnce(new Error("session missing"));
+    (callGatewayTool as Mock).mockRejectedValueOnce(new Error("session missing"));
 
     await sendExecApprovalFollowup({
       approvalId: "req-denied-resume-failed",

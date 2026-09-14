@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import { emitAgentEvent, registerAgentRunContext } from "../infra/agent-events.js";
@@ -567,7 +568,7 @@ describe("gateway server chat", () => {
 
   test("routes chat.send slash commands without agent runs", async () => {
     await withMainSessionStore(async () => {
-      const spy = vi.mocked(agentCommand);
+      const spy = agentCommand as Mock;
       const callsBefore = spy.mock.calls.length;
       const eventPromise = onceMessage(
         ws,
@@ -871,7 +872,7 @@ describe("gateway server chat", () => {
     const blockedAgentRun = new Promise<void>((resolve) => {
       resolveAgentRun = resolve;
     });
-    const agentSpy = vi.mocked(agentCommand);
+    const agentSpy = agentCommand as Mock;
     agentSpy.mockImplementationOnce(async () => {
       await blockedAgentRun;
       return undefined;

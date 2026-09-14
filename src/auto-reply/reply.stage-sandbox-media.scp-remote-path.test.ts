@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import { basename, join } from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSandboxMediaContexts,
@@ -37,7 +38,7 @@ function createRemoteStageParams(home: string): {
   remoteCacheDir: string;
 } {
   const sessionKey = "agent:main:main";
-  vi.mocked(sandboxMocks.ensureSandboxWorkspaceForSession).mockResolvedValue(null);
+  (sandboxMocks.ensureSandboxWorkspaceForSession as Mock).mockResolvedValue(null);
   return {
     cfg: createSandboxMediaStageConfig(home),
     workspaceDir: join(home, "openclaw"),

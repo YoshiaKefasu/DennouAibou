@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./subagent-registry.mocks.shared.js";
 import {
@@ -85,14 +86,14 @@ describe("subagent registry persistence resume", () => {
     await loadSubagentRegistryModules();
     const { callGateway } = await import("../gateway/call.js");
     const { onAgentEvent } = await import("../infra/agent-events.js");
-    vi.mocked(callGateway).mockReset();
-    vi.mocked(callGateway).mockResolvedValue({
+    (callGateway as Mock).mockReset();
+    (callGateway as Mock).mockResolvedValue({
       status: "ok",
       startedAt: 111,
       endedAt: 222,
     });
-    vi.mocked(onAgentEvent).mockReset();
-    vi.mocked(onAgentEvent).mockReturnValue(() => undefined);
+    (onAgentEvent as Mock).mockReset();
+    (onAgentEvent as Mock).mockReturnValue(() => undefined);
   });
 
   afterEach(async () => {
@@ -115,7 +116,7 @@ describe("subagent registry persistence resume", () => {
     let releaseInitialWait:
       | ((value: { status: "ok"; startedAt: number; endedAt: number }) => void)
       | undefined;
-    vi.mocked(callGateway)
+    (callGateway as Mock)
       .mockImplementationOnce(
         async () =>
           await new Promise((resolve) => {

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { expectSingleNpmPackIgnoreScriptsCall } from "../test-utils/exec-assertions.js";
@@ -229,7 +230,7 @@ describe("installHooksFromPath", () => {
       "utf-8",
     );
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     await expectInstallUsesIgnoreScripts({
       run,
       install: async () =>
@@ -366,7 +367,7 @@ describe("installHooksFromNpmSpec", () => {
   it("uses --ignore-scripts for npm pack and cleans up temp dir", async () => {
     const stateDir = makeTempDir();
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     let packTmpDir = "";
     const packedName = "test-hooks-0.0.1.tgz";
     run.mockImplementation(async (argv, opts) => {
@@ -410,7 +411,7 @@ describe("installHooksFromNpmSpec", () => {
     expect(fs.existsSync(path.join(result.targetDir, "hooks", "one-hook", "HOOK.md"))).toBe(true);
 
     expectSingleNpmPackIgnoreScriptsCall({
-      calls: run.mock.calls,
+      calls: run.mock.calls as Array<[unknown, unknown]>,
       expectedSpec: "@openclaw/test-hooks@0.0.1",
     });
 
@@ -419,7 +420,7 @@ describe("installHooksFromNpmSpec", () => {
   });
 
   it("aborts when integrity drift callback rejects the fetched artifact", async () => {
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     mockNpmPackMetadataResult(run, {
       id: "@openclaw/test-hooks@0.0.1",
       name: "@openclaw/test-hooks",
@@ -446,7 +447,7 @@ describe("installHooksFromNpmSpec", () => {
   it("rejects invalid npm spec shapes", async () => {
     await expectUnsupportedNpmSpec((spec) => installHooksFromNpmSpec({ spec }));
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     mockNpmPackMetadataResult(run, {
       id: "@openclaw/test-hooks@0.0.2-beta.1",
       name: "@openclaw/test-hooks",

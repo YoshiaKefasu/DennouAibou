@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // This file primarily tests lsof-based Unix port polling. On Windows,
@@ -402,7 +403,7 @@ describe.skipIf(isWindows)("restart-stale-pids", () => {
       // pollPortOnce must catch it and return the transient-inconclusive result
       // rather than propagating the exception.
       const stalePid = process.pid + 402;
-      const mockedResolveLsof = vi.mocked(resolveLsofCommandSync);
+      const mockedResolveLsof = resolveLsofCommandSync as Mock;
 
       mockedResolveLsof.mockImplementationOnce(() => {
         // First call: initial findGatewayPidsOnPortSync — succeed normally

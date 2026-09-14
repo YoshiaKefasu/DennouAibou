@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Mock } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedGatewayAuth } from "./auth.js";
 import { handleGatewayPostJsonEndpoint } from "./http-endpoint-helpers.js";
@@ -44,7 +45,7 @@ describe("handleGatewayPostJsonEndpoint", () => {
   });
 
   it("returns undefined and replies when method is not POST", async () => {
-    const mockedSendMethodNotAllowed = vi.mocked(sendMethodNotAllowed);
+    const mockedSendMethodNotAllowed = sendMethodNotAllowed as Mock;
     mockedSendMethodNotAllowed.mockClear();
     const result = await handleGatewayPostJsonEndpoint(
       {
@@ -60,7 +61,7 @@ describe("handleGatewayPostJsonEndpoint", () => {
   });
 
   it("returns undefined when auth fails", async () => {
-    vi.mocked(authorizeGatewayHttpRequestOrReply).mockResolvedValue(null);
+    (authorizeGatewayHttpRequestOrReply as Mock).mockResolvedValue(null);
     const result = await handleGatewayPostJsonEndpoint(
       {
         url: "/v1/ok",
@@ -74,10 +75,10 @@ describe("handleGatewayPostJsonEndpoint", () => {
   });
 
   it("returns body when auth succeeds and JSON parsing succeeds", async () => {
-    vi.mocked(authorizeGatewayHttpRequestOrReply).mockResolvedValue({
+    (authorizeGatewayHttpRequestOrReply as Mock).mockResolvedValue({
       trustDeclaredOperatorScopes: true,
     });
-    vi.mocked(readJsonBodyOrError).mockResolvedValue({ hello: "world" });
+    (readJsonBodyOrError as Mock).mockResolvedValue({ hello: "world" });
     const result = await handleGatewayPostJsonEndpoint(
       {
         url: "/v1/ok",
@@ -94,17 +95,17 @@ describe("handleGatewayPostJsonEndpoint", () => {
   });
 
   it("returns undefined and replies when required operator scope is missing", async () => {
-    vi.mocked(authorizeGatewayHttpRequestOrReply).mockResolvedValue({
+    (authorizeGatewayHttpRequestOrReply as Mock).mockResolvedValue({
       trustDeclaredOperatorScopes: false,
     });
-    vi.mocked(resolveTrustedHttpOperatorScopes).mockReturnValue(["operator.approvals"]);
-    vi.mocked(authorizeOperatorScopesForMethod).mockReturnValue({
+    (resolveTrustedHttpOperatorScopes as Mock).mockReturnValue(["operator.approvals"]);
+    (authorizeOperatorScopesForMethod as Mock).mockReturnValue({
       allowed: false,
       missingScope: "operator.write",
     });
-    const mockedSendJson = vi.mocked(sendJson);
+    const mockedSendJson = sendJson as Mock;
     mockedSendJson.mockClear();
-    vi.mocked(readJsonBodyOrError).mockClear();
+    (readJsonBodyOrError as Mock).mockClear();
 
     const result = await handleGatewayPostJsonEndpoint(
       {
@@ -122,7 +123,7 @@ describe("handleGatewayPostJsonEndpoint", () => {
     );
 
     expect(result).toBeUndefined();
-    expect(vi.mocked(authorizeOperatorScopesForMethod)).toHaveBeenCalledWith("chat.send", [
+    expect(authorizeOperatorScopesForMethod as Mock).toHaveBeenCalledWith("chat.send", [
       "operator.approvals",
     ]);
     expect(mockedSendJson).toHaveBeenCalledWith(
@@ -136,16 +137,16 @@ describe("handleGatewayPostJsonEndpoint", () => {
         }),
       }),
     );
-    expect(vi.mocked(readJsonBodyOrError)).not.toHaveBeenCalled();
+    expect(readJsonBodyOrError as Mock).not.toHaveBeenCalled();
   });
 
   it("uses a custom operator scope resolver when provided", async () => {
-    vi.mocked(authorizeGatewayHttpRequestOrReply).mockResolvedValue({
+    (authorizeGatewayHttpRequestOrReply as Mock).mockResolvedValue({
       authMethod: "token",
       trustDeclaredOperatorScopes: false,
     });
-    vi.mocked(authorizeOperatorScopesForMethod).mockReturnValue({ allowed: true });
-    vi.mocked(readJsonBodyOrError).mockResolvedValue({ ok: true });
+    (authorizeOperatorScopesForMethod as Mock).mockReturnValue({ allowed: true });
+    (readJsonBodyOrError as Mock).mockResolvedValue({ ok: true });
     const resolveOperatorScopes = vi.fn(() => ["operator.admin", "operator.write"]);
 
     const result = await handleGatewayPostJsonEndpoint(

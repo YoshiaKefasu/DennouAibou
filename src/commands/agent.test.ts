@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
@@ -158,7 +159,7 @@ async function runWithDefaultAgentConfig(params: {
   const store = path.join(params.home, "sessions.json");
   mockConfig(params.home, store, undefined, undefined, params.agentsList);
   await agentCommand(params.args, runtime);
-  return vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+  return (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
 }
 
 async function runEmbeddedWithTempConfig(params: {
@@ -171,7 +172,7 @@ async function runEmbeddedWithTempConfig(params: {
     const store = path.join(home, "sessions.json");
     mockConfig(home, store, params.agentOverrides, params.telegramOverrides, params.agentsList);
     await agentCommand(params.args, runtime);
-    return vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+    return (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
   });
 }
 
@@ -197,7 +198,7 @@ function createDefaultAgentResult(params?: {
 }
 
 function getLastEmbeddedCall() {
-  return vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+  return (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
 }
 
 function expectLastRunProviderModel(provider: string, model: string): void {
@@ -268,7 +269,7 @@ async function expectDefaultThinkLevel(params: {
   await withTempHome(async (home) => {
     const store = path.join(home, "sessions.json");
     mockConfig(home, store, params.agentOverrides);
-    vi.mocked(loadModelCatalog).mockResolvedValueOnce([params.catalogEntry as never]);
+    (loadModelCatalog as Mock).mockResolvedValueOnce([params.catalogEntry as never]);
     await agentCommand({ message: "hi", to: "+1555" }, runtime);
     expect(getLastEmbeddedCall()?.thinkLevel).toBe(params.expected);
   });
@@ -319,10 +320,10 @@ beforeEach(() => {
   resetAgentEventsForTest();
   resetAgentRunContextForTest();
   resetPluginRuntimeStateForTest();
-  
+
   configModule.clearRuntimeConfigSnapshot();
-  vi.mocked(runEmbeddedPiAgent).mockResolvedValue(createDefaultAgentResult());
-  vi.mocked(loadModelCatalog).mockResolvedValue([]);
+  (runEmbeddedPiAgent as Mock).mockResolvedValue(createDefaultAgentResult());
+  (loadModelCatalog as Mock).mockResolvedValue([]);
   readConfigFileSnapshotForWriteSpy.mockResolvedValue({
     snapshot: { valid: false, resolved: {} as OpenClawConfig },
     writeOptions: {},
@@ -453,7 +454,7 @@ describe("agentCommand", () => {
       expect(entry.thinkingLevel).toBe("high");
       expect(entry.verboseLevel).toBe("on");
 
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(callArgs?.thinkLevel).toBe("high");
       expect(callArgs?.verboseLevel).toBe("on");
     });
@@ -512,7 +513,7 @@ describe("agentCommand", () => {
         { message: "hi", to: "+1555", senderIsOwner: false, allowModelOverride: false },
         runtime,
       );
-      const ingressCall = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const ingressCall = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(ingressCall?.senderIsOwner).toBe(false);
       expect(ingressCall).not.toHaveProperty("allowModelOverride");
     });
@@ -532,7 +533,7 @@ describe("agentCommand", () => {
 
       await agentCommand({ message: "resume me", sessionId: "session-123" }, runtime);
 
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(callArgs?.sessionId).toBe("session-123");
     });
   });
@@ -678,7 +679,7 @@ describe("agentCommand", () => {
         });
       });
 
-      vi.mocked(runEmbeddedPiAgent).mockImplementationOnce(async (params) => {
+      (runEmbeddedPiAgent as Mock).mockImplementationOnce(async (params) => {
         const runId = (params as { runId?: string } | undefined)?.runId ?? "run";
         const data = { text: "hello", delta: "hello" };
         (
@@ -742,12 +743,12 @@ describe("agentCommand", () => {
         },
       });
 
-      vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+      (loadModelCatalog as Mock).mockResolvedValueOnce([
         { id: "claude-opus-4-6", name: "Opus", provider: "anthropic" },
         { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", provider: "openai" },
         { id: "gpt-5.4", name: "GPT-5.2", provider: "openai" },
       ]);
-      vi.mocked(runEmbeddedPiAgent)
+      (runEmbeddedPiAgent as Mock)
         .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
         .mockResolvedValueOnce({
           payloads: [{ text: "ok" }],
@@ -792,13 +793,13 @@ describe("agentCommand", () => {
         models: {},
       });
 
-      vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+      (loadModelCatalog as Mock).mockResolvedValueOnce([
         { id: "claude-opus-4-6", name: "Opus", provider: "anthropic" },
       ]);
 
       await runAgentWithSessionKey("agent:main:subagent:allow-any");
 
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(callArgs?.provider).toBe("openai");
       expect(callArgs?.model).toBe("gpt-custom-foo");
 
@@ -836,7 +837,7 @@ describe("agentCommand", () => {
         },
       });
 
-      vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+      (loadModelCatalog as Mock).mockResolvedValueOnce([
         { id: "claude-opus-4-6", name: "Opus", provider: "anthropic" },
         { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", provider: "openai" },
       ]);
@@ -976,7 +977,7 @@ describe("agentCommand", () => {
           "openai/gpt-4.1-mini": {},
         },
       });
-      vi.mocked(authProfilesModule.ensureAuthProfileStore).mockReturnValue({
+      (authProfilesModule.ensureAuthProfileStore as Mock).mockReturnValue({
         version: 1,
         profiles: {
           "anthropic:work": {
@@ -1033,7 +1034,7 @@ describe("agentCommand", () => {
         runtime,
       );
 
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(callArgs?.sessionKey).toBe("agent:main:subagent:abc");
 
       const saved = JSON.parse(fs.readFileSync(store, "utf-8")) as Record<
@@ -1133,7 +1134,7 @@ describe("agentCommand", () => {
 
   it("prints JSON payload when requested", async () => {
     await withTempHome(async (home) => {
-      vi.mocked(runEmbeddedPiAgent).mockResolvedValue(
+      (runEmbeddedPiAgent as Mock).mockResolvedValue(
         createDefaultAgentResult({
           payloads: [{ text: "json-reply", mediaUrl: "http://x.test/a.jpg" }],
           durationMs: 42,

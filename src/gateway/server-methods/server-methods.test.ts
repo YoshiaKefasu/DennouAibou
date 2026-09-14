@@ -3,6 +3,7 @@ import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { emitAgentEvent } from "../../infra/agent-events.js";
 import { formatZonedTimestamp } from "../../infra/format-time/format-datetime.js";
@@ -113,8 +114,7 @@ describe("waitForAgentJob", () => {
 
 describe("injectTimestamp", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-29T01:30:00.000Z"));
+    vi.useFakeTimers({ now: new Date("2026-01-29T01:30:00.000Z") });
   });
 
   afterEach(() => {
@@ -186,7 +186,7 @@ describe("injectTimestamp", () => {
   });
 
   it("handles midnight correctly", () => {
-    vi.setSystemTime(new Date("2026-02-01T05:00:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2026-02-01T05:00:00.000Z") - Date.now());
 
     const result = injectTimestamp("hello", { timezone: "America/New_York" });
 
@@ -194,7 +194,7 @@ describe("injectTimestamp", () => {
   });
 
   it("handles date boundaries (just before midnight)", () => {
-    vi.setSystemTime(new Date("2026-02-01T04:59:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2026-02-01T04:59:00.000Z") - Date.now());
 
     const result = injectTimestamp("hello", { timezone: "America/New_York" });
 
@@ -202,11 +202,11 @@ describe("injectTimestamp", () => {
   });
 
   it("handles DST correctly (same UTC hour, different local time)", () => {
-    vi.setSystemTime(new Date("2026-01-15T05:00:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2026-01-15T05:00:00.000Z") - Date.now());
     const winter = injectTimestamp("winter", { timezone: "America/New_York" });
     expect(winter).toMatch(/^\[Thu 2026-01-15 00:00 EST\]/);
 
-    vi.setSystemTime(new Date("2026-07-15T04:00:00.000Z"));
+    vi.advanceTimersByTime(Date.parse("2026-07-15T04:00:00.000Z") - Date.now());
     const summer = injectTimestamp("summer", { timezone: "America/New_York" });
     expect(summer).toMatch(/^\[Wed 2026-07-15 00:00 EDT\]/);
   });
@@ -1373,7 +1373,7 @@ describe("gateway healthHandlers.status scope handling", () => {
   });
 
   beforeEach(() => {
-    vi.mocked(statusModule.getStatusSummary).mockClear();
+    (statusModule.getStatusSummary as Mock).mockClear();
   });
 
   async function runHealthStatus(scopes: string[]) {
@@ -1399,7 +1399,7 @@ describe("gateway healthHandlers.status scope handling", () => {
     async ({ scopes, includeSensitive }) => {
       const respond = await runHealthStatus(scopes);
 
-      expect(vi.mocked(statusModule.getStatusSummary)).toHaveBeenCalledWith({ includeSensitive });
+      expect(statusModule.getStatusSummary as Mock).toHaveBeenCalledWith({ includeSensitive });
       expect(respond).toHaveBeenCalledWith(true, { ok: true }, undefined);
     },
   );

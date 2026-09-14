@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 
@@ -37,7 +38,7 @@ function resolveWithStoredEntry(params?: {
   const store: SessionStore = params?.entry
     ? ({ [sessionKey]: params.entry as SessionStoreEntry } as SessionStore)
     : {};
-  vi.mocked(loadSessionStore).mockReturnValue(store);
+  (loadSessionStore as Mock).mockReturnValue(store);
 
   return resolveCronSession({
     cfg: {} as OpenClawConfig,
@@ -50,7 +51,7 @@ function resolveWithStoredEntry(params?: {
 
 describe("resolveCronSession", () => {
   beforeEach(() => {
-    vi.mocked(clearBootstrapSnapshot).mockReset();
+    (clearBootstrapSnapshot as Mock).mockReset();
   });
 
   it("preserves modelOverride and providerOverride from existing session entry", () => {

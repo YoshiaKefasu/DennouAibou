@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
 import { buildSystemRunPreparePayload } from "../test-utils/system-run-prepare-payload.js";
@@ -118,7 +119,7 @@ function expectPendingCommandText(
 }
 
 function mockGatewayOkCalls(calls: string[]) {
-  vi.mocked(callGatewayTool).mockImplementation(async (method) => {
+  (callGatewayTool as Mock).mockImplementation(async (method) => {
     calls.push(method);
     return { ok: true };
   });
@@ -186,7 +187,7 @@ function mockAcceptedApprovalFlow(options: {
   onAgent?: (params: Record<string, unknown>) => void;
   onNodeInvoke?: (params: unknown) => unknown;
 }) {
-  vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+  (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
     if (method === "exec.approval.request") {
       return acceptedApprovalResponse(params);
     }
@@ -205,7 +206,7 @@ function mockAcceptedApprovalFlow(options: {
 }
 
 function mockPendingApprovalRegistration() {
-  vi.mocked(callGatewayTool).mockImplementation(async (method) => {
+  (callGatewayTool as Mock).mockImplementation(async (method) => {
     if (method === "exec.approval.request") {
       return { status: "accepted", id: "approval-id" };
     }
@@ -217,7 +218,7 @@ function mockPendingApprovalRegistration() {
 }
 
 function mockNoApprovalRouteRegistration() {
-  vi.mocked(callGatewayTool).mockImplementation(async (method) => {
+  (callGatewayTool as Mock).mockImplementation(async (method) => {
     if (method === "exec.approval.request") {
       return { id: "approval-id", decision: null };
     }
@@ -252,8 +253,8 @@ describe("exec approvals", () => {
     process.env.USERPROFILE = tempDir;
     delete process.env.DENNOU_BUNDLED_PLUGINS_DIR;
     process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = "1";
-    vi.mocked(callGatewayTool).mockReset();
-    vi.mocked(sendMessage).mockClear();
+    (callGatewayTool as Mock).mockReset();
+    (sendMessage as Mock).mockClear();
   });
 
   afterEach(() => {
@@ -355,7 +356,7 @@ describe("exec approvals", () => {
     };
 
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approvals.node.get") {
         return { file: approvalsFile };
@@ -391,7 +392,7 @@ describe("exec approvals", () => {
     const remoteWorkdir = "/Users/vv";
     let prepareCwd: string | undefined;
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "node.invoke") {
         const invoke = params as { command?: string; params?: { cwd?: string } };
         if (invoke.command === "system.run.prepare") {
@@ -426,7 +427,7 @@ describe("exec approvals", () => {
     let prepareHasCwd = false;
     let prepareCwd: string | undefined;
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "node.invoke") {
         const invoke = params as { command?: string; params?: { cwd?: string } };
         if (invoke.command === "system.run.prepare") {
@@ -460,7 +461,7 @@ describe("exec approvals", () => {
 
   it("honors ask=off for elevated gateway exec without prompting", async () => {
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method) => {
+    (callGatewayTool as Mock).mockImplementation(async (method) => {
       calls.push(method);
       return { ok: true };
     });
@@ -546,7 +547,7 @@ describe("exec approvals", () => {
       agents: {},
     });
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approval.request") {
         return acceptedApprovalResponse(params);
@@ -597,7 +598,7 @@ describe("exec approvals", () => {
 
   it("keeps ask=always prompts for node-host runs even with durable trust", async () => {
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approvals.node.get") {
         return {
@@ -643,7 +644,7 @@ describe("exec approvals", () => {
 
   it("reuses exact-command durable trust for node shell-wrapper reruns", async () => {
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approvals.node.get") {
         const prepared = buildPreparedSystemRunPayload({
@@ -706,7 +707,7 @@ describe("exec approvals", () => {
       resolveApproval = resolve;
     });
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approval.request") {
         resolveApproval?.();
@@ -825,7 +826,7 @@ describe("exec approvals", () => {
       resolveDecision = resolve;
     });
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "exec.approval.request") {
         return acceptedApprovalResponse(params);
       }
@@ -961,7 +962,7 @@ describe("exec approvals", () => {
   it("uses a deny-specific followup prompt so prior output is not reused", async () => {
     const agentCalls: Array<Record<string, unknown>> = [];
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "exec.approval.request") {
         return acceptedApprovalResponse(params);
       }
@@ -1007,7 +1008,7 @@ describe("exec approvals", () => {
     const requestIds: string[] = [];
     const waitIds: string[] = [];
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "exec.approval.request") {
         const request = params as { id?: string; command?: string };
         if (typeof request.command === "string") {
@@ -1049,7 +1050,7 @@ describe("exec approvals", () => {
 
   it("shows full chained gateway commands in approval-pending message", async () => {
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approval.request") {
         return acceptedApprovalResponse(params);
@@ -1126,7 +1127,7 @@ describe("exec approvals", () => {
 
   it("shows full chained node commands in approval-pending message", async () => {
     const calls: string[] = [];
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "node.invoke") {
         const invoke = params as { command?: string };
@@ -1159,7 +1160,7 @@ describe("exec approvals", () => {
       resolveRegistration = resolve;
     });
 
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       calls.push(method);
       if (method === "exec.approval.request") {
         return await registrationPromise;
@@ -1195,7 +1196,7 @@ describe("exec approvals", () => {
   });
 
   it("fails fast when approval registration fails", async () => {
-    vi.mocked(callGatewayTool).mockImplementation(async (method) => {
+    (callGatewayTool as Mock).mockImplementation(async (method) => {
       if (method === "exec.approval.request") {
         throw new Error("gateway offline");
       }
@@ -1236,16 +1237,16 @@ describe("exec approvals", () => {
 
     expect(result.details.status).toBe("completed");
     expect(getResultText(result)).toContain("cron-ok");
-    expect(vi.mocked(callGatewayTool)).toHaveBeenCalledWith(
+    expect(callGatewayTool as Mock).toHaveBeenCalledWith(
       "exec.approval.request",
       expect.anything(),
       expect.anything(),
       expect.objectContaining({ expectFinal: false }),
     );
     expect(
-      vi
-        .mocked(callGatewayTool)
-        .mock.calls.some(([method]) => method === "exec.approval.waitDecision"),
+      (callGatewayTool as Mock).mock.calls.some(
+        ([method]) => method === "exec.approval.waitDecision",
+      ),
     ).toBe(false);
   });
 
@@ -1271,7 +1272,7 @@ describe("exec approvals", () => {
         sha256: "deadbeef",
       },
     };
-    vi.mocked(callGatewayTool).mockImplementation(async (method, _opts, params) => {
+    (callGatewayTool as Mock).mockImplementation(async (method, _opts, params) => {
       if (method === "exec.approval.request") {
         return { id: "approval-id", decision: null };
       }

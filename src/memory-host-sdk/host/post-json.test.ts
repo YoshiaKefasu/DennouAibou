@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./remote-http.js", () => ({
@@ -8,12 +9,12 @@ let postJson: typeof import("./post-json.js").postJson;
 let withRemoteHttpResponse: typeof import("./remote-http.js").withRemoteHttpResponse;
 
 describe("postJson", () => {
-  let remoteHttpMock: ReturnType<typeof vi.mocked<typeof withRemoteHttpResponse>>;
+  let remoteHttpMock: Mock;
 
   beforeAll(async () => {
     ({ postJson } = await import("./post-json.js"));
     ({ withRemoteHttpResponse } = await import("./remote-http.js"));
-    remoteHttpMock = vi.mocked(withRemoteHttpResponse);
+    remoteHttpMock = withRemoteHttpResponse as Mock;
   });
 
   beforeEach(() => {

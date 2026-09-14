@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getBuildTelegramModelsProviderChannelData } from "../../../test/helpers/channels/command-contract.js";
 import type { ChannelCommandAdapter } from "../../channels/plugins/types.js";
@@ -1449,7 +1450,7 @@ describe("/compact command", () => {
     );
 
     expect(result).toBeNull();
-    expect(vi.mocked(compactEmbeddedPiSession)).not.toHaveBeenCalled();
+    expect(compactEmbeddedPiSession as Mock).not.toHaveBeenCalled();
   });
 
   it("rejects unauthorized /compact commands", async () => {
@@ -1472,7 +1473,7 @@ describe("/compact command", () => {
     );
 
     expect(result).toEqual({ shouldContinue: false });
-    expect(vi.mocked(compactEmbeddedPiSession)).not.toHaveBeenCalled();
+    expect(compactEmbeddedPiSession as Mock).not.toHaveBeenCalled();
   });
 
   it("routes manual compaction with explicit trigger and context metadata", async () => {
@@ -1486,7 +1487,7 @@ describe("/compact command", () => {
       To: "+15550002",
     });
     const agentDir = "/tmp/openclaw-agent-compact";
-    vi.mocked(compactEmbeddedPiSession).mockResolvedValueOnce({
+    (compactEmbeddedPiSession as Mock).mockResolvedValueOnce({
       ok: true,
       compacted: false,
     });
@@ -1509,8 +1510,8 @@ describe("/compact command", () => {
     );
 
     expect(result?.shouldContinue).toBe(false);
-    expect(vi.mocked(compactEmbeddedPiSession)).toHaveBeenCalledOnce();
-    expect(vi.mocked(compactEmbeddedPiSession)).toHaveBeenCalledWith(
+    expect(compactEmbeddedPiSession as Mock).toHaveBeenCalledOnce();
+    expect(compactEmbeddedPiSession as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: "session-1",
         sessionKey: "agent:main:main",
@@ -1561,7 +1562,7 @@ describe("abort trigger command", () => {
 
     expect(result).toEqual({ shouldContinue: false });
     expect(sessionStore[params.sessionKey]?.abortedLastRun).toBe(false);
-    expect(vi.mocked(abortEmbeddedPiRun)).not.toHaveBeenCalled();
+    expect(abortEmbeddedPiRun as Mock).not.toHaveBeenCalled();
   });
 });
 

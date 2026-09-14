@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./auth.js", () => ({
@@ -29,12 +30,12 @@ function createReq(headers: Record<string, string> = {}): IncomingMessage {
 
 describe("authorizeGatewayHttpRequestOrReply", () => {
   beforeEach(() => {
-    vi.mocked(authorizeHttpGatewayConnect).mockReset();
-    vi.mocked(sendGatewayAuthFailure).mockReset();
+    (authorizeHttpGatewayConnect as Mock).mockReset();
+    (sendGatewayAuthFailure as Mock).mockReset();
   });
 
   it("marks token-authenticated requests as untrusted for declared HTTP scopes", async () => {
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({
       ok: true,
       method: "token",
     });
@@ -53,7 +54,7 @@ describe("authorizeGatewayHttpRequestOrReply", () => {
   });
 
   it("keeps trusted-proxy requests eligible for declared HTTP scopes", async () => {
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({
       ok: true,
       method: "trusted-proxy",
       user: "operator",
@@ -77,7 +78,7 @@ describe("authorizeGatewayHttpRequestOrReply", () => {
   });
 
   it("forwards browser-origin policy into HTTP auth", async () => {
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({
       ok: true,
       method: "trusted-proxy",
       user: "operator",
@@ -97,7 +98,7 @@ describe("authorizeGatewayHttpRequestOrReply", () => {
       trustedProxies: ["127.0.0.1"],
     });
 
-    expect(vi.mocked(authorizeHttpGatewayConnect)).toHaveBeenCalledWith(
+    expect(authorizeHttpGatewayConnect as Mock).toHaveBeenCalledWith(
       expect.objectContaining({
         browserOriginPolicy: {
           requestHost: "gateway.example.com",
@@ -111,7 +112,7 @@ describe("authorizeGatewayHttpRequestOrReply", () => {
 
   it("replies with auth failure and returns null when auth fails", async () => {
     const res = {} as ServerResponse;
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValue({
       ok: false,
       reason: "unauthorized",
     });

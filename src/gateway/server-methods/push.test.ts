@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ErrorCodes } from "../protocol/index.js";
 import { pushHandlers } from "./push.js";
@@ -69,7 +70,7 @@ function relayRegistration(
 }
 
 function mockDirectAuth() {
-  vi.mocked(resolveApnsAuthConfigFromEnv).mockResolvedValue({
+  (resolveApnsAuthConfigFromEnv as Mock).mockResolvedValue({
     ok: true,
     value: {
       teamId: "TEAM123",
@@ -121,13 +122,13 @@ describe("push.test handler", () => {
   beforeEach(() => {
     mocks.loadConfig.mockClear();
     mocks.loadConfig.mockReturnValue({});
-    vi.mocked(loadApnsRegistration).mockClear();
-    vi.mocked(normalizeApnsEnvironment).mockClear();
-    vi.mocked(resolveApnsAuthConfigFromEnv).mockClear();
-    vi.mocked(resolveApnsRelayConfigFromEnv).mockClear();
-    vi.mocked(sendApnsAlert).mockClear();
-    vi.mocked(clearApnsRegistrationIfCurrent).mockClear();
-    vi.mocked(shouldClearStoredApnsRegistration).mockReturnValue(false);
+    (loadApnsRegistration as Mock).mockClear();
+    (normalizeApnsEnvironment as Mock).mockClear();
+    (resolveApnsAuthConfigFromEnv as Mock).mockClear();
+    (resolveApnsRelayConfigFromEnv as Mock).mockClear();
+    (sendApnsAlert as Mock).mockClear();
+    (clearApnsRegistrationIfCurrent as Mock).mockClear();
+    (shouldClearStoredApnsRegistration as Mock).mockReturnValue(false);
   });
 
   it("rejects invalid params", async () => {
@@ -137,17 +138,17 @@ describe("push.test handler", () => {
   });
 
   it("returns invalid request when node has no APNs registration", async () => {
-    vi.mocked(loadApnsRegistration).mockResolvedValue(null);
+    (loadApnsRegistration as Mock).mockResolvedValue(null);
     const { respond, invoke } = createInvokeParams({ nodeId: "ios-node-1" });
     await invoke();
     expectInvalidRequestResponse(respond, "has no APNs registration");
   });
 
   it("sends push test when registration and auth are available", async () => {
-    vi.mocked(loadApnsRegistration).mockResolvedValue(directRegistration());
+    (loadApnsRegistration as Mock).mockResolvedValue(directRegistration());
     mockDirectAuth();
-    vi.mocked(normalizeApnsEnvironment).mockReturnValue(null);
-    vi.mocked(sendApnsAlert).mockResolvedValue(apnsResult({}));
+    (normalizeApnsEnvironment as Mock).mockReturnValue(null);
+    (sendApnsAlert as Mock).mockResolvedValue(apnsResult({}));
 
     const { respond, invoke } = createInvokeParams({
       nodeId: "ios-node-1",
@@ -175,18 +176,18 @@ describe("push.test handler", () => {
         },
       },
     });
-    vi.mocked(loadApnsRegistration).mockResolvedValue(
+    (loadApnsRegistration as Mock).mockResolvedValue(
       relayRegistration({ installationId: "install-1" }),
     );
-    vi.mocked(resolveApnsRelayConfigFromEnv).mockReturnValue({
+    (resolveApnsRelayConfigFromEnv as Mock).mockReturnValue({
       ok: true,
       value: {
         baseUrl: "https://relay.example.com",
         timeoutMs: 1000,
       },
     });
-    vi.mocked(normalizeApnsEnvironment).mockReturnValue(null);
-    vi.mocked(sendApnsAlert).mockResolvedValue(
+    (normalizeApnsEnvironment as Mock).mockReturnValue(null);
+    (sendApnsAlert as Mock).mockResolvedValue(
       apnsResult({
         tokenSuffix: "abcd1234",
         environment: "production",
@@ -221,17 +222,17 @@ describe("push.test handler", () => {
 
   it("clears stale registrations after invalid token push-test failures", async () => {
     const registration = directRegistration();
-    vi.mocked(loadApnsRegistration).mockResolvedValue(registration);
+    (loadApnsRegistration as Mock).mockResolvedValue(registration);
     mockDirectAuth();
-    vi.mocked(normalizeApnsEnvironment).mockReturnValue(null);
-    vi.mocked(sendApnsAlert).mockResolvedValue(
+    (normalizeApnsEnvironment as Mock).mockReturnValue(null);
+    (sendApnsAlert as Mock).mockResolvedValue(
       apnsResult({
         ok: false,
         status: 400,
         reason: "BadDeviceToken",
       }),
     );
-    vi.mocked(shouldClearStoredApnsRegistration).mockReturnValue(true);
+    (shouldClearStoredApnsRegistration as Mock).mockReturnValue(true);
 
     const { invoke } = createInvokeParams({
       nodeId: "ios-node-1",
@@ -248,15 +249,15 @@ describe("push.test handler", () => {
 
   it("does not clear relay registrations after invalidation-shaped failures", async () => {
     const registration = relayRegistration();
-    vi.mocked(loadApnsRegistration).mockResolvedValue(registration);
-    vi.mocked(resolveApnsRelayConfigFromEnv).mockReturnValue({
+    (loadApnsRegistration as Mock).mockResolvedValue(registration);
+    (resolveApnsRelayConfigFromEnv as Mock).mockReturnValue({
       ok: true,
       value: {
         baseUrl: "https://relay.example.com",
         timeoutMs: 1000,
       },
     });
-    vi.mocked(normalizeApnsEnvironment).mockReturnValue(null);
+    (normalizeApnsEnvironment as Mock).mockReturnValue(null);
     const result = apnsResult({
       ok: false,
       status: 410,
@@ -265,8 +266,8 @@ describe("push.test handler", () => {
       environment: "production",
       transport: "relay",
     });
-    vi.mocked(sendApnsAlert).mockResolvedValue(result);
-    vi.mocked(shouldClearStoredApnsRegistration).mockReturnValue(false);
+    (sendApnsAlert as Mock).mockResolvedValue(result);
+    (shouldClearStoredApnsRegistration as Mock).mockReturnValue(false);
 
     const { invoke } = createInvokeParams({
       nodeId: "ios-node-1",
@@ -285,17 +286,17 @@ describe("push.test handler", () => {
 
   it("does not clear direct registrations when push.test overrides the environment", async () => {
     const registration = directRegistration();
-    vi.mocked(loadApnsRegistration).mockResolvedValue(registration);
+    (loadApnsRegistration as Mock).mockResolvedValue(registration);
     mockDirectAuth();
-    vi.mocked(normalizeApnsEnvironment).mockReturnValue("production");
+    (normalizeApnsEnvironment as Mock).mockReturnValue("production");
     const result = apnsResult({
       ok: false,
       status: 400,
       reason: "BadDeviceToken",
       environment: "production",
     });
-    vi.mocked(sendApnsAlert).mockResolvedValue(result);
-    vi.mocked(shouldClearStoredApnsRegistration).mockReturnValue(false);
+    (sendApnsAlert as Mock).mockResolvedValue(result);
+    (shouldClearStoredApnsRegistration as Mock).mockReturnValue(false);
 
     const { invoke } = createInvokeParams({
       nodeId: "ios-node-1",

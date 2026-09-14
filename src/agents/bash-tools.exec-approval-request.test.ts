@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS,
@@ -18,11 +19,11 @@ describe("requestExecApprovalDecision", () => {
   });
 
   beforeEach(() => {
-    vi.mocked(callGatewayTool).mockClear();
+    (callGatewayTool as Mock).mockClear();
   });
 
   it("returns string decisions", async () => {
-    vi.mocked(callGatewayTool)
+    (callGatewayTool as Mock)
       .mockResolvedValueOnce({
         status: "accepted",
         id: "approval-id",
@@ -79,7 +80,7 @@ describe("requestExecApprovalDecision", () => {
   });
 
   it("returns null for missing or non-string decisions", async () => {
-    vi.mocked(callGatewayTool)
+    (callGatewayTool as Mock)
       .mockResolvedValueOnce({ status: "accepted", id: "approval-id", expiresAtMs: 1234 })
       .mockResolvedValueOnce({});
     await expect(
@@ -94,7 +95,7 @@ describe("requestExecApprovalDecision", () => {
       }),
     ).resolves.toBeNull();
 
-    vi.mocked(callGatewayTool)
+    (callGatewayTool as Mock)
       .mockResolvedValueOnce({ status: "accepted", id: "approval-id-2", expiresAtMs: 1234 })
       .mockResolvedValueOnce({ decision: 123 });
     await expect(
@@ -111,7 +112,7 @@ describe("requestExecApprovalDecision", () => {
   });
 
   it("uses registration response id when waiting for decision", async () => {
-    vi.mocked(callGatewayTool)
+    (callGatewayTool as Mock)
       .mockResolvedValueOnce({
         status: "accepted",
         id: "server-assigned-id",
@@ -139,7 +140,7 @@ describe("requestExecApprovalDecision", () => {
   });
 
   it("treats expired-or-missing waitDecision as null decision", async () => {
-    vi.mocked(callGatewayTool)
+    (callGatewayTool as Mock)
       .mockResolvedValueOnce({
         status: "accepted",
         id: "approval-id",
@@ -160,7 +161,7 @@ describe("requestExecApprovalDecision", () => {
   });
 
   it("returns final decision directly when gateway already replies with decision", async () => {
-    vi.mocked(callGatewayTool).mockResolvedValue({ decision: "deny", id: "approval-id" });
+    (callGatewayTool as Mock).mockResolvedValue({ decision: "deny", id: "approval-id" });
 
     const result = await requestExecApprovalDecision({
       id: "approval-id",
@@ -172,6 +173,6 @@ describe("requestExecApprovalDecision", () => {
     });
 
     expect(result).toBe("deny");
-    expect(vi.mocked(callGatewayTool).mock.calls).toHaveLength(1);
+    expect((callGatewayTool as Mock).mock.calls).toHaveLength(1);
   });
 });

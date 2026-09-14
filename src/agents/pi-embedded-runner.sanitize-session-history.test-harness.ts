@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
+import type { Mock } from "vitest";
 import { expect, vi } from "vitest";
 import type { TranscriptPolicy } from "./transcript-policy.js";
 
@@ -64,7 +65,7 @@ export async function loadSanitizeSessionHistoryWithCleanMocks(): Promise<Saniti
   vi.resetModules();
   vi.resetAllMocks();
   const mockedHelpers = await import("./pi-embedded-helpers.js");
-  vi.mocked(mockedHelpers.sanitizeSessionMessagesImages).mockImplementation(async (msgs) => msgs);
+  (mockedHelpers.sanitizeSessionMessagesImages as Mock).mockImplementation(async (msgs) => msgs);
   const mod = await import("./pi-embedded-runner/replay-history.js");
   return {
     sanitizeSessionHistory: mod.sanitizeSessionHistory,

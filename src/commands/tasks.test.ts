@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeEnv } from "../runtime.js";
 import { createRunningTaskRun } from "../tasks/task-executor.js";
@@ -80,7 +81,7 @@ describe("tasks commands", () => {
       const runtime = createRuntime();
       await tasksAuditCommand({ json: true }, runtime);
 
-      const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
+      const payload = JSON.parse(String((runtime.log as Mock).mock.calls[0]?.[0])) as {
         summary: {
           total: number;
           errors: number;
@@ -123,7 +124,7 @@ describe("tasks commands", () => {
       const runtime = createRuntime();
       await tasksAuditCommand({ json: true, limit: 1 }, runtime);
 
-      const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
+      const payload = JSON.parse(String((runtime.log as Mock).mock.calls[0]?.[0])) as {
         findings: Array<{ kind: string; code: string; token?: string }>;
       };
 
@@ -152,7 +153,7 @@ describe("tasks commands", () => {
       const runtime = createRuntime();
       await tasksMaintenanceCommand({ json: true, apply: false }, runtime);
 
-      const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
+      const payload = JSON.parse(String((runtime.log as Mock).mock.calls[0]?.[0])) as {
         mode: string;
         maintenance: { taskFlows: { pruned: number } };
         auditBefore: {

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { jsonResult } from "../../agents/tools/common.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
@@ -279,8 +280,8 @@ describe("runMessageAction media behavior", () => {
     channelResolutionMocks.executePollAction.mockImplementation(async () => {
       throw new Error("executePollAction should not run in media tests");
     });
-    vi.mocked(loadWebMedia).mockReset();
-    vi.mocked(loadWebMedia).mockImplementation(actualLoadWebMedia);
+    (loadWebMedia as Mock).mockReset();
+    (loadWebMedia as Mock).mockImplementation(actualLoadWebMedia);
   });
 
   describe("sendAttachment hydration", () => {
@@ -333,7 +334,7 @@ describe("runMessageAction media behavior", () => {
           },
         ]),
       );
-      vi.mocked(loadWebMedia).mockResolvedValue({
+      (loadWebMedia as Mock).mockResolvedValue({
         buffer: Buffer.from("hello"),
         contentType: "image/png",
         kind: "image",
@@ -350,7 +351,7 @@ describe("runMessageAction media behavior", () => {
       const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
         "../../media/web-media.js",
       );
-      vi.mocked(loadWebMedia).mockImplementation(actual.loadWebMedia);
+      (loadWebMedia as Mock).mockImplementation(actual.loadWebMedia);
     }
 
     async function expectRejectsLocalAbsolutePathWithoutSandbox(params: {
@@ -411,7 +412,7 @@ describe("runMessageAction media behavior", () => {
       expect((result.payload as { buffer?: string }).buffer).toBe(
         Buffer.from("hello").toString("base64"),
       );
-      const call = vi.mocked(loadWebMedia).mock.calls[0];
+      const call = (loadWebMedia as Mock).mock.calls[0];
       expect(call?.[1]).toEqual(
         expect.objectContaining({
           localRoots: "any",
@@ -545,7 +546,7 @@ describe("runMessageAction media behavior", () => {
           expectedPath: path.join("icons", "group.png"),
         },
       ]) {
-        vi.mocked(loadWebMedia).mockClear();
+        (loadWebMedia as Mock).mockClear();
         await withSandbox(async (sandboxDir) => {
           await runMessageAction({
             cfg,
@@ -559,7 +560,7 @@ describe("runMessageAction media behavior", () => {
             sandboxRoot: sandboxDir,
           });
 
-          const call = vi.mocked(loadWebMedia).mock.calls[0];
+          const call = (loadWebMedia as Mock).mock.calls[0];
           expect(call?.[0], testCase.name).toBe(path.join(sandboxDir, testCase.expectedPath));
           expect(call?.[1], testCase.name).toEqual(
             expect.objectContaining({

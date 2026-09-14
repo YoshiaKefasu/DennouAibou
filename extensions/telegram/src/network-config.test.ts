@@ -1,4 +1,5 @@
 import type { TelegramNetworkConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("openclaw/plugin-sdk/runtime-env", () => ({
@@ -135,7 +136,7 @@ describe("resolveTelegramAutoSelectFamilyDecision", () => {
       if (!isWSL2Sync) {
         throw new Error("runtime-env mock not loaded");
       }
-      vi.mocked(isWSL2Sync).mockReturnValue(wsl2);
+      (isWSL2Sync as Mock).mockReturnValue(wsl2);
       const decision = resolveTelegramAutoSelectFamilyDecision({
         env,
         network,
@@ -145,9 +146,9 @@ describe("resolveTelegramAutoSelectFamilyDecision", () => {
     });
 
     it("memoizes WSL2 detection across repeated defaults", () => {
-      vi.mocked(isWSL2Sync).mockReturnValue(true);
-      vi.mocked(isWSL2Sync).mockClear();
-      vi.mocked(isWSL2Sync).mockReturnValue(false);
+      (isWSL2Sync as Mock).mockReturnValue(true);
+      (isWSL2Sync as Mock).mockClear();
+      (isWSL2Sync as Mock).mockReturnValue(false);
       resolveTelegramAutoSelectFamilyDecision({ env: {}, nodeMajor: 22 });
       resolveTelegramAutoSelectFamilyDecision({ env: {}, nodeMajor: 22 });
       expect(isWSL2Sync).toHaveBeenCalledTimes(1);

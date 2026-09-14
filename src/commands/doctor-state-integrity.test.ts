@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveStorePath, resolveSessionTranscriptsDirForAgent } from "../config/sessions.js";
@@ -91,7 +92,7 @@ describe("doctor state integrity oauth dir checks", () => {
     process.env.DENNOU_STATE_DIR = path.join(tempHome, ".openclaw");
     delete process.env.DENNOU_OAUTH_DIR;
     fs.mkdirSync(process.env.DENNOU_STATE_DIR, { recursive: true, mode: 0o700 });
-    vi.mocked(note).mockClear();
+    (note as Mock).mockClear();
   });
 
   afterEach(() => {

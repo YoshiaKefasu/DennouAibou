@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { MsgContext } from "../templating.js";
@@ -56,9 +57,9 @@ describe("getReplyFromConfig configOverride", () => {
     await loadFreshGetReplyModuleForTest();
     mocks.resolveReplyDirectives.mockReset();
     mocks.initSessionState.mockReset();
-    vi.mocked(loadConfigMock).mockReset();
+    (loadConfigMock as Mock).mockReset();
 
-    vi.mocked(loadConfigMock).mockReturnValue({});
+    (loadConfigMock as Mock).mockReturnValue({});
     mocks.resolveReplyDirectives.mockResolvedValue({ kind: "reply", reply: { text: "ok" } });
     mocks.initSessionState.mockResolvedValue({
       sessionCtx: {},
@@ -81,7 +82,7 @@ describe("getReplyFromConfig configOverride", () => {
   });
 
   it("merges configOverride over fresh loadConfig()", async () => {
-    vi.mocked(loadConfigMock).mockReturnValue({
+    (loadConfigMock as Mock).mockReturnValue({
       channels: {
         telegram: {
           botToken: "resolved-telegram-token",

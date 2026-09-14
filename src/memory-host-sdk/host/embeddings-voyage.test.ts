@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../../agents/model-auth.js";
 import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
@@ -56,7 +57,7 @@ beforeEach(() => {
 });
 
 function mockVoyageApiKey() {
-  vi.mocked(authModule.resolveApiKeyForProvider).mockResolvedValue({
+  (authModule.resolveApiKeyForProvider as Mock).mockResolvedValue({
     apiKey: "voyage-key-123",
     mode: "api-key",
     source: "test",

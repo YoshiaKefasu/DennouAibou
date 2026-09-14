@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import * as tar from "tar";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { safePathSegmentHashed } from "../infra/install-safe-path.js";
 import { runCommandWithTimeout } from "../process/exec.js";
@@ -298,7 +299,7 @@ function expectFailedInstallResult<
   return params.result;
 }
 
-function mockSuccessfulCommandRun(run: ReturnType<typeof vi.mocked<typeof runCommandWithTimeout>>) {
+function mockSuccessfulCommandRun(run: Mock) {
   run.mockResolvedValue({
     code: 0,
     stdout: "",
@@ -1147,7 +1148,7 @@ describe("installPluginFromDir", () => {
   it("uses --ignore-scripts for dependency install", async () => {
     const { pluginDir, extensionsDir } = setupInstallPluginFromDirFixture();
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     await expectInstallUsesIgnoreScripts({
       run,
       install: async () =>
@@ -1166,7 +1167,7 @@ describe("installPluginFromDir", () => {
       },
     });
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     mockSuccessfulCommandRun(run);
 
     const res = await installPluginFromDir({
@@ -1227,7 +1228,7 @@ describe("installPluginFromDir", () => {
         code: expectedCode,
         messageIncludes: expectedMessageIncludes,
       });
-      expect(vi.mocked(runCommandWithTimeout)).not.toHaveBeenCalled();
+      expect(runCommandWithTimeout as Mock).not.toHaveBeenCalled();
     },
   );
 
@@ -1379,7 +1380,7 @@ describe("installPluginFromDir", () => {
       bundleFormat: "codex",
     });
 
-    const run = vi.mocked(runCommandWithTimeout);
+    const run = runCommandWithTimeout as Mock;
     mockSuccessfulCommandRun(run);
 
     const res = await installPluginFromDir({

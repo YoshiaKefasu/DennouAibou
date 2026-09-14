@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
@@ -112,7 +113,7 @@ function expectChannels(call: Record<string, unknown>, channel: string) {
 }
 
 function readAgentCommandCall(fromEnd = 1) {
-  const calls = vi.mocked(agentCommand).mock.calls;
+  const calls = (agentCommand as Mock).mock.calls;
   return (calls.at(-fromEnd)?.[0] ?? {}) as Record<string, unknown>;
 }
 
@@ -313,7 +314,7 @@ describe("gateway server agent", () => {
     expect(res.ok).toBe(false);
     expect(res.error?.code).toBe("INVALID_REQUEST");
     expect(res.error?.message).toMatch(/Channel is required|runtime not initialized/);
-    expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
+    expect(agentCommand as Mock).not.toHaveBeenCalled();
   });
 
   test("agent downgrades to session-only delivery when best-effort is enabled and last channel is webchat", async () => {
@@ -389,7 +390,7 @@ describe("gateway server agent", () => {
 
   test("agent /new on the main session is rejected as a protected session", async () => {
     await writeMainSessionEntry({ sessionId: "sess-main-before-reset" });
-    const spy = vi.mocked(agentCommand);
+    const spy = agentCommand as Mock;
     const callsBefore = spy.mock.calls.length;
     const res = await rpcReq(ws, "agent", {
       message: "/new",
@@ -430,7 +431,7 @@ describe("gateway server agent", () => {
       expect(directReset.ok).toBe(false);
       expect(directReset.error?.message).toContain("missing scope: operator.admin");
 
-      vi.mocked(agentCommand).mockClear();
+      (agentCommand as Mock).mockClear();
       const viaAgent = await rpcReq(writeWs, "agent", {
         message: "/reset",
         sessionKey: "main",
@@ -445,7 +446,7 @@ describe("gateway server agent", () => {
       >;
       expect(store["agent:main:main"]?.sessionId).toBeDefined();
       expect(store["agent:main:main"]?.sessionId).toBe("sess-main-before-write-reset");
-      expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
+      expect(agentCommand as Mock).not.toHaveBeenCalled();
 
       writeWs.close();
     });

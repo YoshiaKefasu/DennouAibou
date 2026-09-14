@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { HookStatusEntry, HookStatusReport } from "../hooks/hooks-status.js";
@@ -122,7 +123,7 @@ describe("onboard-hooks", () => {
     eligible?: boolean;
   }) {
     const { buildWorkspaceHookStatus } = await import("../hooks/hooks-status.js");
-    vi.mocked(buildWorkspaceHookStatus).mockReturnValue(
+    (buildWorkspaceHookStatus as Mock).mockReturnValue(
       createMockHookReport(params.eligible ?? true),
     );
 

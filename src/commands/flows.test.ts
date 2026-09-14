@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeEnv } from "../runtime.js";
 import { createRunningTaskRun } from "../tasks/task-executor.js";
@@ -86,7 +87,7 @@ describe("flows commands", () => {
       const runtime = createRuntime();
       await flowsListCommand({ json: true, status: "blocked" }, runtime);
 
-      const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
+      const payload = JSON.parse(String((runtime.log as Mock).mock.calls[0]?.[0])) as {
         count: number;
         status: string | null;
         flows: Array<{
@@ -200,7 +201,7 @@ describe("flows commands", () => {
       const runtime = createRuntime();
       await flowsShowCommand({ lookup: flow.flowId, json: false }, runtime);
 
-      const lines = vi.mocked(runtime.log).mock.calls.map(([line]) => String(line));
+      const lines = (runtime.log as Mock).mock.calls.map(([line]) => String(line));
       expect(lines).toContain("goal: Investigate\\nqueue\\tstate");
       expect(lines).toContain("currentStep: spawn_child");
       expect(lines).toContain("owner: agent:main:owner");
@@ -226,11 +227,11 @@ describe("flows commands", () => {
       const runtime = createRuntime();
       await flowsCancelCommand({ lookup: flow.flowId }, runtime);
 
-      expect(vi.mocked(runtime.error)).not.toHaveBeenCalled();
-      expect(vi.mocked(runtime.exit)).not.toHaveBeenCalled();
-      expect(String(vi.mocked(runtime.log).mock.calls[0]?.[0])).toContain("Cancelled");
-      expect(String(vi.mocked(runtime.log).mock.calls[0]?.[0])).toContain(flow.flowId);
-      expect(String(vi.mocked(runtime.log).mock.calls[0]?.[0])).toContain("cancelled");
+      expect(runtime.error as Mock).not.toHaveBeenCalled();
+      expect(runtime.exit as Mock).not.toHaveBeenCalled();
+      expect(String((runtime.log as Mock).mock.calls[0]?.[0])).toContain("Cancelled");
+      expect(String((runtime.log as Mock).mock.calls[0]?.[0])).toContain(flow.flowId);
+      expect(String((runtime.log as Mock).mock.calls[0]?.[0])).toContain("cancelled");
     });
   });
 });

@@ -20,7 +20,7 @@
 #
 # Keep in sync when a file starts passing: node scripts/run-bun-tier-b.mjs --all
 
-# bun-only (25)
+# bun-only (27)
 extensions/raw-chat-search/test/embedding-indexer.test.ts
 src/agents/pi-embedded-error-observation.test.ts
 src/agents/pi-tools.whatsapp-login-gating.test.ts
@@ -46,8 +46,10 @@ src/plugins/status.test.ts
 src/plugins/uninstall.test.ts
 src/shared/pid-alive.test.ts
 src/tasks/task-flow-registry.store.test.ts
+src/agents/bash-tools.exec-approval-followup.test.ts
+src/gateway/http-utils.authorize-request.test.ts
 
-# pre-existing (42)
+# pre-existing (44)
 extensions/google/media-understanding-provider.video.test.ts
 src/agents/auth-profiles.ensureauthprofilestore.test.ts
 src/agents/auth-profiles/state-observation.test.ts
@@ -90,3 +92,12 @@ src/plugins/sdk-alias.test.ts
 src/plugins/web-search-providers.runtime.test.ts
 src/security/audit.test.ts
 src/tasks/task-flow-registry.test.ts
+src/agents/subagent-orphan-recovery.test.ts
+src/commands/doctor-state-integrity.test.ts
+
+# structural / unattributed (Phase 3-C1; Bun mock-module API gap)
+src/commands/doctor-config-flow.missing-default-account-bindings.integration.test.ts
+src/cron/isolated-agent.hook-content-wrapping.test.ts
+src/cron/isolated-agent.model-overrides.test.ts
+src/cron/isolated-agent.session-identity.test.ts
+src/cron/isolated-agent.subagent-model.test.ts

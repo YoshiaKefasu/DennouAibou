@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const statusSummaryMocks = vi.hoisted(() => ({
@@ -145,7 +146,7 @@ describe("getStatusSummary", () => {
   it("does not trigger async context warmup while building status summaries", async () => {
     await getStatusSummary();
 
-    expect(vi.mocked(statusSummaryRuntime.resolveContextTokensForModel)).toHaveBeenCalledWith(
+    expect(statusSummaryRuntime.resolveContextTokensForModel as Mock).toHaveBeenCalledWith(
       expect.objectContaining({ allowAsyncLoad: false }),
     );
   });

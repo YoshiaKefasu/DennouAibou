@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
 import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
@@ -62,7 +63,7 @@ async function setTestSessionStore(params: {
 }
 
 function latestAgentCall(): AgentCommandCall {
-  const calls = vi.mocked(agentCommand).mock.calls as unknown as Array<[unknown]>;
+  const calls = (agentCommand as Mock).mock.calls as unknown as Array<[unknown]>;
   return calls.at(-1)?.[0] as AgentCommandCall;
 }
 
@@ -278,7 +279,7 @@ describe("gateway server agent", () => {
     expect(res.ok).toBe(false);
     expect(res.error?.message).toContain("unknown channel");
 
-    const spy = vi.mocked(agentCommand);
+    const spy = agentCommand as Mock;
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -294,7 +295,7 @@ describe("gateway server agent", () => {
     expect(res.ok).toBe(false);
     expect(res.error?.message).toContain("does not match session key agent");
 
-    const spy = vi.mocked(agentCommand);
+    const spy = agentCommand as Mock;
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -308,7 +309,7 @@ describe("gateway server agent", () => {
     expect(res.ok).toBe(false);
     expect(res.error?.message).toContain("malformed session key");
 
-    const spy = vi.mocked(agentCommand);
+    const spy = agentCommand as Mock;
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -450,7 +451,7 @@ describe("gateway server agent", () => {
       expect(res.ok).toBe(false);
       expect(res.error?.code).toBe("INVALID_REQUEST");
       expect(res.error?.message).toContain("Channel is required");
-      expect(vi.mocked(agentCommand)).not.toHaveBeenCalled();
+      expect(agentCommand as Mock).not.toHaveBeenCalled();
     } finally {
       testState.allowFrom = undefined;
     }

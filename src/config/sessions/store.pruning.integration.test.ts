@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "./types.js";
 
@@ -95,7 +96,7 @@ describe("Integration: saveSessionStore with pruning", () => {
     ({ loadConfig } = await import("../config.js"));
     ({ clearSessionStoreCacheForTest, loadSessionStore, saveSessionStore } =
       await import("./store.js"));
-    mockLoadConfig = vi.mocked(loadConfig) as ReturnType<typeof vi.fn>;
+    mockLoadConfig = loadConfig as Mock as ReturnType<typeof vi.fn>;
     testDir = await createCaseDir("pruning-integ");
     storePath = path.join(testDir, "sessions.json");
     savedCacheTtl = process.env.DENNOU_SESSION_CACHE_TTL_MS;

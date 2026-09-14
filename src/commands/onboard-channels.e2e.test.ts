@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -369,7 +370,7 @@ function createMSTeamsPluginRegistryEntry(params?: { includeSetupWizard?: boolea
 }
 
 function mockMSTeamsRegistrySnapshot(params?: { includeSetupWizard?: boolean }) {
-  vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockImplementation(
+  (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockImplementation(
     ({ channel }: { channel: string }) => {
       const registry = createEmptyPluginRegistry();
       if (channel === "msteams") {
@@ -605,13 +606,13 @@ describe("setupChannels", () => {
       plugins: [],
       diagnostics: [],
     });
-    vi.mocked(ensureChannelSetupPluginInstalled).mockClear();
-    vi.mocked(ensureChannelSetupPluginInstalled).mockImplementation(async ({ cfg }) => ({
+    (ensureChannelSetupPluginInstalled as Mock).mockClear();
+    (ensureChannelSetupPluginInstalled as Mock).mockImplementation(async ({ cfg }) => ({
       cfg,
       installed: true,
     }));
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockClear();
-    vi.mocked(reloadChannelSetupPluginRegistry).mockClear();
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockClear();
+    (reloadChannelSetupPluginRegistry as Mock).mockClear();
   });
   it("QuickStart uses single-select (no multiselect) and doesn't prompt for Telegram token when WhatsApp is chosen", async () => {
     const select = vi.fn(async () => "whatsapp");
@@ -887,7 +888,7 @@ describe("setupChannels", () => {
         },
       }),
     );
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockImplementation(
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockImplementation(
       ({ channel }: { channel: string }) => {
         const registry = createEmptyPluginRegistry();
         if (channel === "msteams") {

@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODEL_CONTEXT_TOKEN_CACHE } from "../../agents/context-cache.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
@@ -40,7 +41,7 @@ const makeConfiguredModel = (overrides: Record<string, unknown> = {}) => ({
 
 describe("createModelSelectionState catalog loading", () => {
   it("skips full catalog loading for ordinary allowlist-backed turns", async () => {
-    vi.mocked(loadModelCatalog).mockClear();
+    (loadModelCatalog as Mock).mockClear();
     const cfg = {
       agents: {
         defaults: {
@@ -77,7 +78,7 @@ describe("createModelSelectionState catalog loading", () => {
   });
 
   it("prefers per-agent thinkingDefault over model and global defaults", async () => {
-    vi.mocked(loadModelCatalog).mockClear();
+    (loadModelCatalog as Mock).mockClear();
     const cfg = {
       agents: {
         defaults: {
@@ -112,7 +113,7 @@ describe("createModelSelectionState catalog loading", () => {
   });
 
   it("loads the full catalog for explicit model directives", async () => {
-    vi.mocked(loadModelCatalog).mockClear();
+    (loadModelCatalog as Mock).mockClear();
     const cfg = {
       agents: {
         defaults: {
@@ -533,7 +534,7 @@ describe("createModelSelectionState respects session model override", () => {
 describe("createModelSelectionState resolveDefaultReasoningLevel", () => {
   it("returns on when catalog model has reasoning true", async () => {
     const { loadModelCatalog } = await import("../../agents/model-catalog.js");
-    vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+    (loadModelCatalog as Mock).mockResolvedValueOnce([
       { provider: "openrouter", id: "x-ai/grok-4.1-fast", name: "Grok", reasoning: true },
     ]);
     const state = await createModelSelectionState({

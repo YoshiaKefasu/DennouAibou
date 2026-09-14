@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -89,7 +90,7 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
     resetGlobalUndiciStreamTimeoutsForTests();
     setCurrentDispatcher(new Agent());
     getDefaultAutoSelectFamily.mockReturnValue(undefined);
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(false);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(false);
   });
 
   it("replaces default Agent dispatcher with extended stream timeouts", () => {
@@ -159,7 +160,7 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
 
   it("disables autoSelectFamily on WSL2 to avoid IPv6 connectivity issues", () => {
     getDefaultAutoSelectFamily.mockReturnValue(true);
-    vi.mocked(isWSL2Sync).mockReturnValue(true);
+    (isWSL2Sync as Mock).mockReturnValue(true);
 
     ensureGlobalUndiciStreamTimeouts();
 
@@ -178,11 +179,11 @@ describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
     vi.clearAllMocks();
     resetGlobalUndiciStreamTimeoutsForTests();
     setCurrentDispatcher(new Agent());
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(false);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(false);
   });
 
   it("installs EnvHttpProxyAgent when env HTTP proxy is configured on a default Agent", () => {
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(true);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
 
     ensureGlobalUndiciEnvProxyDispatcher();
 
@@ -191,7 +192,7 @@ describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
   });
 
   it("does not override unsupported custom proxy dispatcher types", () => {
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(true);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
     setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
 
     ensureGlobalUndiciEnvProxyDispatcher();
@@ -200,7 +201,7 @@ describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
   });
 
   it("retries proxy bootstrap after an unsupported dispatcher later becomes a default Agent", () => {
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(true);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
     setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
 
     ensureGlobalUndiciEnvProxyDispatcher();
@@ -214,7 +215,7 @@ describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
   });
 
   it("is idempotent after proxy bootstrap succeeds", () => {
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(true);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
 
     ensureGlobalUndiciEnvProxyDispatcher();
     ensureGlobalUndiciEnvProxyDispatcher();
@@ -223,7 +224,7 @@ describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
   });
 
   it("reinstalls env proxy if an external change later reverts the dispatcher to Agent", () => {
-    vi.mocked(hasEnvHttpProxyConfigured).mockReturnValue(true);
+    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
 
     ensureGlobalUndiciEnvProxyDispatcher();
     expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);

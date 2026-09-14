@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   bundledPluginRoot,
@@ -130,7 +131,7 @@ beforeEach(() => {
 });
 
 function mockRepoLocalPathExists() {
-  vi.mocked(fs.existsSync).mockImplementation((value) => {
+  (fs.existsSync as Mock).mockImplementation((value) => {
     const raw = String(value);
     return raw.endsWith(`${path.sep}.git`) || raw.endsWith(`${path.sep}extensions${path.sep}zalo`);
   });
@@ -169,7 +170,7 @@ describe("ensureChannelSetupPluginInstalled", () => {
       select: vi.fn(async () => "npm") as WizardPrompter["select"],
     });
     const cfg: OpenClawConfig = { plugins: { allow: ["other"] } };
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    (fs.existsSync as Mock).mockReturnValue(false);
     installPluginFromNpmSpec.mockResolvedValue({
       ok: true,
       pluginId: "zalo",
@@ -251,7 +252,7 @@ describe("ensureChannelSetupPluginInstalled", () => {
     const select = vi.fn((async <T extends string>() => "skip" as T) as WizardPrompter["select"]);
     const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
     const cfg: OpenClawConfig = { update: { channel: "beta" } };
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    (fs.existsSync as Mock).mockReturnValue(false);
     resolveBundledPluginSources.mockReturnValue(
       new Map([
         [
@@ -290,7 +291,7 @@ describe("ensureChannelSetupPluginInstalled", () => {
     const select = vi.fn((async <T extends string>() => "skip" as T) as WizardPrompter["select"]);
     const prompter = makePrompter({ select: select as unknown as WizardPrompter["select"] });
     const cfg: OpenClawConfig = { update: { channel: "beta" } };
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    (fs.existsSync as Mock).mockReturnValue(false);
     resolveBundledPluginSources.mockReturnValue(
       new Map([
         [
@@ -389,7 +390,7 @@ describe("ensureChannelSetupPluginInstalled", () => {
       }),
     );
     expect(clearPluginDiscoveryCache.mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(loadOpenClawPlugins).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      (loadOpenClawPlugins as Mock).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
 

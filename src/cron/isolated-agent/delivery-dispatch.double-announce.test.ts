@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 /**
  * Tests for the double-announce bug in cron delivery dispatch.
  *
@@ -9,7 +10,6 @@
  * Fix: both early return paths now set deliveryAttempted = true before
  * returning so the timer correctly skips the system-event fallback.
  */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 
@@ -157,11 +157,11 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetCompletedDirectCronDeliveriesForTests();
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(expectsSubagentFollowup).mockReturnValue(false);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(readDescendantSubagentFallbackReply).mockResolvedValue(undefined);
-    vi.mocked(waitForDescendantSubagentSummary).mockResolvedValue(undefined);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (expectsSubagentFollowup as Mock).mockReturnValue(false);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (readDescendantSubagentFallbackReply as Mock).mockResolvedValue(undefined);
+    (waitForDescendantSubagentSummary as Mock).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -171,9 +171,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
 
   it("early return (active subagent) sets deliveryAttempted=true so timer skips enqueueSystemEvent", async () => {
     // countActiveDescendantRuns returns >0 → enters wait block; still >0 after wait → early return
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(2);
-    vi.mocked(waitForDescendantSubagentSummary).mockResolvedValue(undefined);
-    vi.mocked(readDescendantSubagentFallbackReply).mockResolvedValue(undefined);
+    (countActiveDescendantRuns as Mock).mockReturnValue(2);
+    (waitForDescendantSubagentSummary as Mock).mockResolvedValue(undefined);
+    (readDescendantSubagentFallbackReply as Mock).mockResolvedValue(undefined);
 
     const params = makeBaseParams({ synthesizedText: "on it" });
     const state = await dispatchCronDelivery(params);
@@ -199,13 +199,13 @@ describe("dispatchCronDelivery — double-announce guard", () => {
 
   it("early return (stale interim suppression) sets deliveryAttempted=true so timer skips enqueueSystemEvent", async () => {
     // First countActiveDescendantRuns call returns >0 (had descendants), second returns 0
-    vi.mocked(countActiveDescendantRuns)
+    (countActiveDescendantRuns as Mock)
       .mockReturnValueOnce(2) // initial check → hadDescendants=true, enters wait block
       .mockReturnValueOnce(0); // second check after wait → activeSubagentRuns=0
-    vi.mocked(waitForDescendantSubagentSummary).mockResolvedValue(undefined);
-    vi.mocked(readDescendantSubagentFallbackReply).mockResolvedValue(undefined);
+    (waitForDescendantSubagentSummary as Mock).mockResolvedValue(undefined);
+    (readDescendantSubagentFallbackReply as Mock).mockResolvedValue(undefined);
     // synthesizedText matches initialSynthesizedText & isLikelyInterimCronMessage → stale interim
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(true);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(true);
 
     const params = makeBaseParams({ synthesizedText: "on it, pulling everything together" });
     const state = await dispatchCronDelivery(params);
@@ -230,9 +230,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("consolidates descendant output into the final direct delivery", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(true);
-    vi.mocked(readDescendantSubagentFallbackReply).mockResolvedValue(
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(true);
+    (readDescendantSubagentFallbackReply as Mock).mockResolvedValue(
       "Detailed child result, everything finished successfully.",
     );
 
@@ -255,8 +255,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("normal text delivery sends exactly once and sets deliveryAttempted=true", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "Morning briefing complete." });
     const state = await dispatchCronDelivery(params);
@@ -279,8 +279,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("queues main-session awareness for isolated cron jobs after delivery", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "Morning briefing complete." });
     const state = await dispatchCronDelivery(params);
@@ -296,9 +296,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("keeps the cron run successful when awareness queueing throws after delivery", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(enqueueSystemEvent).mockImplementation(() => {
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (enqueueSystemEvent as Mock).mockImplementation(() => {
       throw new Error("queue unavailable");
     });
 
@@ -312,8 +312,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("skips main-session awareness for session-bound cron jobs", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({
       synthesizedText: "Session-bound cron update.",
@@ -329,8 +329,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("skips main-session awareness for best-effort deliveries", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({
       synthesizedText: "Best-effort cron update.",
@@ -348,8 +348,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   it("skips stale cron deliveries while still suppressing fallback main summary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-18T17:00:00.000Z"));
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "Yesterday's morning briefing." });
     (params.job as { state?: { nextRunAtMs?: number } }).state = {
@@ -381,9 +381,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   it("still delivers when the run started on time but finished more than three hours later", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-18T17:00:00.000Z"));
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     const params = makeBaseParams({ synthesizedText: "Long running report finished." });
     params.runStartedAt = Date.now() - (3 * 60 * 60_000 + 1);
@@ -399,8 +399,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("cleans up the direct cron session after a silent reply when deleteAfterRun is enabled", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: SILENT_REPLY_TOKEN });
     (params.job as { deleteAfterRun?: boolean }).deleteAfterRun = true;
@@ -426,9 +426,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("text delivery fires exactly once (no double-deliver)", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     const params = makeBaseParams({ synthesizedText: "Briefing ready." });
     const state = await dispatchCronDelivery(params);
@@ -442,9 +442,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
 
   it("retries transient direct announce failures before succeeding", async () => {
     vi.stubEnv("DENNOU_TEST_FAST", "1");
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads)
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock)
       .mockRejectedValueOnce(new Error("ECONNRESET while sending"))
       .mockResolvedValueOnce([{ ok: true } as never]);
 
@@ -458,9 +458,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("keeps direct announce delivery idempotent across replay for the same run session", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     const params = makeBaseParams({ synthesizedText: "Replay-safe cron update." });
     const first = await dispatchCronDelivery(params);
@@ -473,9 +473,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("does not cache partial bestEffort delivery replays as delivered", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockImplementation(async (params) => {
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockImplementation(async (params) => {
       const failedPayload = Array.isArray(params.payloads) ? params.payloads[0] : undefined;
       params.onError?.(new Error("payload failed"), failedPayload as never);
       return [{ ok: true } as never];
@@ -496,9 +496,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("prunes the completed-delivery cache back to the entry cap", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     for (let i = 0; i < 2003; i += 1) {
       const params = makeBaseParams({
@@ -514,9 +514,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
 
   it("does not retry permanent direct announce failures", async () => {
     vi.stubEnv("DENNOU_TEST_FAST", "1");
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockRejectedValue(new Error("chat not found"));
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockRejectedValue(new Error("chat not found"));
 
     const params = makeBaseParams({ synthesizedText: "This should fail once." });
     const state = await dispatchCronDelivery(params);
@@ -543,9 +543,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("text delivery always bypasses the write-ahead queue", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     const params = makeBaseParams({ synthesizedText: "Daily digest ready." });
     const state = await dispatchCronDelivery(params);
@@ -565,9 +565,9 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("structured/thread delivery also bypasses the write-ahead queue", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
-    vi.mocked(deliverOutboundPayloads).mockResolvedValue([{ ok: true } as never]);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
+    (deliverOutboundPayloads as Mock).mockResolvedValue([{ ok: true } as never]);
 
     const params = makeBaseParams({ synthesizedText: "Report attached." });
     // Simulate structured content so useDirectDelivery path is taken (no retryTransient)
@@ -581,11 +581,11 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("transient retry delivers exactly once with skipQueue on both attempts", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     // First call throws a transient error, second call succeeds.
-    vi.mocked(deliverOutboundPayloads)
+    (deliverOutboundPayloads as Mock)
       .mockRejectedValueOnce(new Error("gateway timeout"))
       .mockResolvedValueOnce([{ ok: true } as never]);
 
@@ -599,7 +599,7 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       // Two calls total: first failed transiently, second succeeded.
       expect(deliverOutboundPayloads).toHaveBeenCalledTimes(2);
 
-      const calls = vi.mocked(deliverOutboundPayloads).mock.calls;
+      const calls = (deliverOutboundPayloads as Mock).mock.calls;
       expect(calls[0][0]).toEqual(expect.objectContaining({ skipQueue: true }));
       expect(calls[1][0]).toEqual(expect.objectContaining({ skipQueue: true }));
     } finally {
@@ -608,8 +608,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("suppresses NO_REPLY payload in direct delivery so sentinel never leaks to external channels", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "NO_REPLY" });
     // Force the useDirectDelivery path (structured content) to exercise
@@ -644,8 +644,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("suppresses NO_REPLY payload with surrounding whitespace", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "  NO_REPLY  " });
     (params as Record<string, unknown>).deliveryPayloadHasStructuredContent = true;
@@ -674,8 +674,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("suppresses mixed-case NO_REPLY in text delivery", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: "No_Reply" });
     const state = await dispatchCronDelivery(params);
@@ -700,8 +700,8 @@ describe("dispatchCronDelivery — double-announce guard", () => {
   });
 
   it("cleans up the direct cron session after a structured silent reply when deleteAfterRun is enabled", async () => {
-    vi.mocked(countActiveDescendantRuns).mockReturnValue(0);
-    vi.mocked(isLikelyInterimCronMessage).mockReturnValue(false);
+    (countActiveDescendantRuns as Mock).mockReturnValue(0);
+    (isLikelyInterimCronMessage as Mock).mockReturnValue(false);
 
     const params = makeBaseParams({ synthesizedText: SILENT_REPLY_TOKEN });
     (params as Record<string, unknown>).deliveryPayloadHasStructuredContent = true;

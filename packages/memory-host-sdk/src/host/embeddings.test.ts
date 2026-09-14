@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../../../../src/agents/model-auth.js";
 import { DEFAULT_GEMINI_EMBEDDING_MODEL } from "./embeddings-gemini.js";
@@ -72,7 +73,7 @@ function requireProvider(result: Awaited<ReturnType<typeof createEmbeddingProvid
 }
 
 function mockResolvedProviderKey(apiKey = "provider-key") {
-  vi.mocked(authModule.resolveApiKeyForProvider).mockResolvedValue({
+  (authModule.resolveApiKeyForProvider as Mock).mockResolvedValue({
     apiKey,
     mode: "api-key",
     source: "test",
@@ -80,7 +81,7 @@ function mockResolvedProviderKey(apiKey = "provider-key") {
 }
 
 function mockMissingLocalEmbeddingDependency() {
-  vi.mocked(nodeLlamaModule.importNodeLlamaCpp).mockRejectedValue(
+  (nodeLlamaModule.importNodeLlamaCpp as Mock).mockRejectedValue(
     Object.assign(new Error("Cannot find package 'node-llama-cpp'"), {
       code: "ERR_MODULE_NOT_FOUND",
     }),
@@ -325,7 +326,7 @@ describe("embedding provider auto selection", () => {
     }));
     installFetchMock(fetchMock as unknown as typeof globalThis.fetch);
     mockPublicPinnedHostname();
-    vi.mocked(authModule.resolveApiKeyForProvider).mockImplementation(async ({ provider }) => {
+    (authModule.resolveApiKeyForProvider as Mock).mockImplementation(async ({ provider }) => {
       if (provider === "openai") {
         return { apiKey: "openai-key", source: "env: OPENAI_API_KEY", mode: "api-key" };
       }
@@ -413,7 +414,7 @@ describe("embedding provider auto selection", () => {
       const fetchMock = testCase.fetchMockFactory();
       installFetchMock(fetchMock as unknown as typeof globalThis.fetch);
       mockPublicPinnedHostname();
-      vi.mocked(authModule.resolveApiKeyForProvider).mockImplementation(async ({ provider }) =>
+      (authModule.resolveApiKeyForProvider as Mock).mockImplementation(async ({ provider }) =>
         testCase.resolveApiKey(provider),
       );
 
@@ -470,7 +471,7 @@ describe("local embedding normalization", () => {
     resolveModelFile: (modelPath: string, modelDirectory?: string) => Promise<string> = async () =>
       "/fake/model.gguf",
   ): void {
-    vi.mocked(nodeLlamaModule.importNodeLlamaCpp).mockResolvedValue({
+    (nodeLlamaModule.importNodeLlamaCpp as Mock).mockResolvedValue({
       getLlama: async () => ({
         loadModel: vi.fn().mockResolvedValue({
           createEmbeddingContext: vi.fn().mockResolvedValue({
@@ -537,7 +538,7 @@ describe("local embedding normalization", () => {
       [1.0, 1.0, 1.0, 1.0],
     ];
 
-    vi.mocked(nodeLlamaModule.importNodeLlamaCpp).mockResolvedValue({
+    (nodeLlamaModule.importNodeLlamaCpp as Mock).mockResolvedValue({
       getLlama: async () => ({
         loadModel: vi.fn().mockResolvedValue({
           createEmbeddingContext: vi.fn().mockResolvedValue({
@@ -690,7 +691,7 @@ describe("local embedding ensureContext concurrency", () => {
 
 describe("FTS-only fallback when no provider available", () => {
   it("returns null provider when all requested auth paths fail", async () => {
-    vi.mocked(authModule.resolveApiKeyForProvider).mockRejectedValue(
+    (authModule.resolveApiKeyForProvider as Mock).mockRejectedValue(
       new Error("No API key found for provider"),
     );
 

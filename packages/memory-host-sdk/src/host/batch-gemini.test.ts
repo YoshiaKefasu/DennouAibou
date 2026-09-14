@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeminiEmbeddingClient } from "./embeddings-gemini.js";
 
@@ -12,12 +13,12 @@ function magnitude(values: number[]) {
 describe("runGeminiEmbeddingBatches", () => {
   let runGeminiEmbeddingBatches: typeof import("./batch-gemini.js").runGeminiEmbeddingBatches;
   let withRemoteHttpResponse: typeof import("./remote-http.js").withRemoteHttpResponse;
-  let remoteHttpMock: ReturnType<typeof vi.mocked<typeof withRemoteHttpResponse>>;
+  let remoteHttpMock: Mock;
 
   beforeAll(async () => {
     ({ runGeminiEmbeddingBatches } = await import("./batch-gemini.js"));
     ({ withRemoteHttpResponse } = await import("./remote-http.js"));
-    remoteHttpMock = vi.mocked(withRemoteHttpResponse);
+    remoteHttpMock = withRemoteHttpResponse as Mock;
   });
 
   beforeEach(() => {

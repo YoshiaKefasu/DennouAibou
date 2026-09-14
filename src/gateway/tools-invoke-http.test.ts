@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { runBeforeToolCallHook as runBeforeToolCallHookType } from "../agents/pi-tools.before-tool-call.js";
 
@@ -263,7 +264,7 @@ beforeEach(() => {
       params: args.params,
     }),
   );
-  vi.mocked(authorizeHttpGatewayConnect).mockResolvedValue({ ok: true });
+  (authorizeHttpGatewayConnect as Mock).mockResolvedValue({ ok: true });
 });
 
 const gatewayAuthHeaders = () => ({ "x-dennou-scopes": "operator.write" });
@@ -453,7 +454,7 @@ describe("POST /tools/invoke", () => {
 
   it("accepts shared-secret bearer auth on the HTTP tools surface", async () => {
     allowAgentsListForMain();
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValueOnce({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValueOnce({
       ok: true,
       method: "token",
     });
@@ -754,7 +755,7 @@ describe("POST /tools/invoke", () => {
 
   it("requires operator.write scope for HTTP tool invocation", async () => {
     allowAgentsListForMain();
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValueOnce({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValueOnce({
       ok: true,
       method: "trusted-proxy",
     });
@@ -780,7 +781,7 @@ describe("POST /tools/invoke", () => {
 
   it("treats shared-secret bearer auth as full operator access on /tools/invoke", async () => {
     allowAgentsListForMain();
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValueOnce({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValueOnce({
       ok: true,
       method: "token",
     });
@@ -824,7 +825,7 @@ describe("POST /tools/invoke", () => {
 
   it("treats shared-secret bearer auth as owner on /tools/invoke", async () => {
     setMainAllowedTools({ allow: ["owner_only_test"] });
-    vi.mocked(authorizeHttpGatewayConnect).mockResolvedValueOnce({
+    (authorizeHttpGatewayConnect as Mock).mockResolvedValueOnce({
       ok: true,
       method: "token",
     });

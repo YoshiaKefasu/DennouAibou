@@ -1,5 +1,6 @@
-import "./isolated-agent.mocks.js";
 import fs from "node:fs/promises";
+import "./isolated-agent.mocks.js";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as modelSelection from "../agents/model-selection.js";
 import { runSubagentAnnounceFlow } from "../agents/subagent-announce.js";
@@ -440,7 +441,7 @@ describe("runCronIsolatedAgentTurn", () => {
   it("deletes the isolated cron session after NO_REPLY when deleteAfterRun is enabled", async () => {
     await withTelegramAnnounceFixture(async ({ home, storePath, deps }) => {
       mockAgentPayloads([{ text: "NO_REPLY" }]);
-      vi.mocked(callGateway).mockClear();
+      (callGateway as Mock).mockClear();
 
       const res = await runCronIsolatedAgentTurn({
         cfg: makeCfg(home, storePath, {

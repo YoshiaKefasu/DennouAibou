@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type {
@@ -254,8 +255,8 @@ describe("runtime web tools resolution", () => {
 
   beforeEach(() => {
     runtimeWebSearchProviders.__testing.resetWebSearchProviderSnapshotCacheForTests();
-    vi.mocked(runtimeWebSearchProviders.resolvePluginWebSearchProviders).mockClear();
-    vi.mocked(runtimeWebFetchProviders.resolvePluginWebFetchProviders).mockClear();
+    (runtimeWebSearchProviders.resolvePluginWebSearchProviders as Mock).mockClear();
+    (runtimeWebFetchProviders.resolvePluginWebFetchProviders as Mock).mockClear();
   });
 
   afterEach(() => {
@@ -643,7 +644,7 @@ describe("runtime web tools resolution", () => {
   });
 
   it("uses bundled-only runtime provider resolution for configured bundled providers", async () => {
-    const runtimeSpy = vi.mocked(runtimeWebSearchProviders.resolvePluginWebSearchProviders);
+    const runtimeSpy = runtimeWebSearchProviders.resolvePluginWebSearchProviders as Mock;
 
     const { metadata } = await runRuntimeWebTools({
       config: asConfig({
@@ -931,7 +932,7 @@ describe("runtime web tools resolution", () => {
   });
 
   it("keeps web fetch provider discovery bundled-only during runtime secret resolution", async () => {
-    const runtimeSpy = vi.mocked(runtimeWebFetchProviders.resolvePluginWebFetchProviders);
+    const runtimeSpy = runtimeWebFetchProviders.resolvePluginWebFetchProviders as Mock;
 
     const { metadata } = await runRuntimeWebTools({
       config: asConfig({

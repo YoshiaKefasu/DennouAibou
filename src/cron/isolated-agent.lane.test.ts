@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import "./isolated-agent.mocks.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearAllBootstrapSnapshots } from "../agents/bootstrap-cache.js";
@@ -14,7 +15,7 @@ import {
 } from "./isolated-agent.test-harness.js";
 
 function lastEmbeddedLane(): string | undefined {
-  const calls = vi.mocked(runEmbeddedPiAgent).mock.calls;
+  const calls = (runEmbeddedPiAgent as Mock).mock.calls;
   expect(calls.length).toBeGreaterThan(0);
   return (calls.at(-1)?.[0] as { lane?: string } | undefined)?.lane;
 }
@@ -63,7 +64,7 @@ function restoreSnapshotEnv() {
 
 describe("runCronIsolatedAgentTurn lane selection", () => {
   beforeEach(() => {
-    vi.mocked(runEmbeddedPiAgent).mockClear();
+    (runEmbeddedPiAgent as Mock).mockClear();
   });
 
   afterEach(() => {

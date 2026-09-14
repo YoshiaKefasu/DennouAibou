@@ -1,4 +1,5 @@
 import { ChannelType } from "discord-api-types/v10";
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeDiscordRest } from "./send.test-harness.js";
 
@@ -45,7 +46,7 @@ function resetClassicMocks(): void {
 }
 
 describe("sendDiscordComponentMessage", () => {
-  let registerMock: ReturnType<typeof vi.mocked<typeof registerDiscordComponentEntries>>;
+  let registerMock: Mock;
 
   beforeAll(async () => {
     ({ registerDiscordComponentEntries } = await import("./components-registry.js"));
@@ -57,7 +58,7 @@ describe("sendDiscordComponentMessage", () => {
   });
 
   beforeEach(() => {
-    registerMock = vi.mocked(registerDiscordComponentEntries);
+    registerMock = registerDiscordComponentEntries as Mock;
     resetClassicMocks();
   });
 
@@ -172,7 +173,7 @@ describe("sendDiscordComponentMessage classic message downgrade", () => {
 
   it("keeps modal component messages on the component path", async () => {
     const { rest, postMock, getMock } = makeDiscordRest();
-    const registerMock = vi.mocked(registerDiscordComponentEntries);
+    const registerMock = registerDiscordComponentEntries as Mock;
     getMock.mockResolvedValueOnce({
       type: ChannelType.GuildText,
       id: "chan-1",

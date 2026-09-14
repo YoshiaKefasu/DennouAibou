@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelOutboundAdapter } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -88,7 +89,7 @@ function createAllowlistAwareStubOutbound(label: string): ChannelOutboundAdapter
 
 beforeEach(() => {
   resetPluginRuntimeStateForTest();
-  vi.mocked(resolveOutboundTarget).mockReset();
+  (resolveOutboundTarget as Mock).mockReset();
   setActivePluginRegistry(
     createTestRegistry([
       {
@@ -152,7 +153,7 @@ const DEFAULT_TARGET = {
 type SessionStore = ReturnType<typeof loadSessionStore>;
 
 function setSessionStore(store: SessionStore) {
-  vi.mocked(loadSessionStore).mockReturnValue(store);
+  (loadSessionStore as Mock).mockReturnValue(store);
 }
 
 function setMainSessionEntry(entry?: SessionStore[string]) {
@@ -178,7 +179,7 @@ function setLastSessionEntry(params: {
 }
 
 function setStoredWhatsAppAllowFrom(allowFrom: string[]) {
-  vi.mocked(readChannelAllowFromStoreSync).mockReturnValue(allowFrom);
+  (readChannelAllowFromStoreSync as Mock).mockReturnValue(allowFrom);
 }
 
 async function resolveForAgent(params: {
@@ -269,8 +270,8 @@ describe("resolveDeliveryTarget", () => {
 
   it("applies id-like target normalization before returning delivery targets", async () => {
     setMainSessionEntry(undefined);
-    vi.mocked(maybeResolveIdLikeTarget).mockClear();
-    vi.mocked(maybeResolveIdLikeTarget).mockResolvedValueOnce({
+    (maybeResolveIdLikeTarget as Mock).mockClear();
+    (maybeResolveIdLikeTarget as Mock).mockResolvedValueOnce({
       to: "user:123456789",
       kind: "user",
       source: "directory",
@@ -305,7 +306,7 @@ describe("resolveDeliveryTarget", () => {
         },
       ]),
     );
-    vi.mocked(resolveOutboundTarget).mockReturnValueOnce({ ok: true, to: "123456" });
+    (resolveOutboundTarget as Mock).mockReturnValueOnce({ ok: true, to: "123456" });
 
     const result = await resolveDeliveryTarget(makeCfg({ bindings: [] }), AGENT_ID, {
       channel: "telegram",
@@ -405,7 +406,7 @@ describe("resolveDeliveryTarget", () => {
 
   it("returns an error when channel selection is ambiguous", async () => {
     setMainSessionEntry(undefined);
-    vi.mocked(resolveMessageChannelSelection).mockRejectedValueOnce(
+    (resolveMessageChannelSelection as Mock).mockRejectedValueOnce(
       new Error("Channel is required when multiple channels are configured: telegram, slack"),
     );
 

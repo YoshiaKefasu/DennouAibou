@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../../agents/model-auth.js";
 import { mockPublicPinnedHostname } from "./test-helpers/ssrf.js";
@@ -93,7 +94,7 @@ afterEach(() => {
 });
 
 function mockResolvedProviderKey(apiKey = "test-key") {
-  vi.mocked(authModule.resolveApiKeyForProvider).mockResolvedValue({
+  (authModule.resolveApiKeyForProvider as Mock).mockResolvedValue({
     apiKey,
     mode: "api-key",
     source: "test",

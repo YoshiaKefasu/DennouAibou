@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
@@ -176,7 +177,7 @@ function setMinimalChannelsAddRegistryForTests(): void {
 }
 
 function registerMSTeamsSetupPlugin(pluginId = "@openclaw/msteams-plugin"): void {
-  vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockReturnValue(
+  (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockReturnValue(
     createTestRegistry([{ pluginId, plugin: createMSTeamsSetupPlugin(), source: "test" }]),
   );
 }
@@ -239,13 +240,13 @@ describe("channelsAddCommand", () => {
       plugins: [],
       diagnostics: [],
     });
-    vi.mocked(ensureChannelSetupPluginInstalled).mockClear();
-    vi.mocked(ensureChannelSetupPluginInstalled).mockImplementation(async ({ cfg }) => ({
+    (ensureChannelSetupPluginInstalled as Mock).mockClear();
+    (ensureChannelSetupPluginInstalled as Mock).mockImplementation(async ({ cfg }) => ({
       cfg,
       installed: true,
     }));
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockClear();
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockReturnValue(
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockClear();
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockReturnValue(
       createTestRegistry(),
     );
     setMinimalChannelsAddRegistryForTests();
@@ -393,12 +394,12 @@ describe("channelsAddCommand", () => {
       },
     };
     catalogMocks.listChannelPluginCatalogEntries.mockReturnValue([catalogEntry]);
-    vi.mocked(ensureChannelSetupPluginInstalled).mockImplementation(async ({ cfg }) => ({
+    (ensureChannelSetupPluginInstalled as Mock).mockImplementation(async ({ cfg }) => ({
       cfg,
       installed: true,
       pluginId: "@vendor/teams-runtime",
     }));
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockReturnValue(
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockReturnValue(
       createTestRegistry([
         {
           pluginId: "@vendor/teams-runtime",

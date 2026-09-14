@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -57,8 +58,8 @@ beforeAll(async () => {
 
 describe("sendExecApprovalFollowupResult", () => {
   beforeEach(() => {
-    vi.mocked(sendExecApprovalFollowup).mockReset();
-    vi.mocked(logWarn).mockReset();
+    (sendExecApprovalFollowup as Mock).mockReset();
+    (logWarn as Mock).mockReset();
     mocks.resolveExecApprovals.mockReset();
     mocks.resolveExecApprovals.mockReturnValue({
       defaults: {
@@ -79,7 +80,7 @@ describe("sendExecApprovalFollowupResult", () => {
   });
 
   it("logs repeated followup dispatch failures once per approval id and error message", async () => {
-    vi.mocked(sendExecApprovalFollowup).mockRejectedValue(new Error("Channel is required"));
+    (sendExecApprovalFollowup as Mock).mockRejectedValue(new Error("Channel is required"));
 
     const target = {
       approvalId: "approval-log-once",
@@ -95,7 +96,7 @@ describe("sendExecApprovalFollowupResult", () => {
   });
 
   it("evicts oldest followup failure dedupe keys after reaching the cap", async () => {
-    vi.mocked(sendExecApprovalFollowup).mockRejectedValue(new Error("Channel is required"));
+    (sendExecApprovalFollowup as Mock).mockRejectedValue(new Error("Channel is required"));
 
     for (let i = 0; i <= maxExecApprovalFollowupFailureLogKeys; i += 1) {
       await sendExecApprovalFollowupResult(

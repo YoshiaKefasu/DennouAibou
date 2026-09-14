@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, vi } from "vitest";
 import { createEmptyPluginRegistry } from "../plugins/registry-empty.js";
 import type { MockFn } from "../test-utils/vitest-mock-fn.js";
@@ -92,13 +93,11 @@ export const renderGatewayServiceCleanupHints = vi
 export const auditGatewayServiceConfig = vi
   .fn()
   .mockResolvedValue({ ok: true, issues: [] }) as unknown as MockFn;
-export const buildGatewayInstallPlan = vi.mocked(
-  vi.fn().mockResolvedValue({
-    programArguments: ["node", "cli", "gateway", "--port", "18789"],
-    workingDirectory: "/tmp",
-    environment: {},
-  }),
-) as unknown as MockFn;
+export const buildGatewayInstallPlan = vi.fn().mockResolvedValue({
+  programArguments: ["node", "cli", "gateway", "--port", "18789"],
+  workingDirectory: "/tmp",
+  environment: {},
+}) as unknown as MockFn;
 export const resolveGatewayAuthTokenForService = vi
   .fn()
   .mockResolvedValue({ token: undefined }) as unknown as MockFn;

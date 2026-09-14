@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 import { withTempHomeConfig } from "../config/test-helpers.js";
 import { note } from "../terminal/note.js";
@@ -8,7 +9,7 @@ vi.mock("../terminal/note.js", () => ({
 
 import { loadAndMaybeMigrateDoctorConfig } from "./doctor-config-flow.js";
 
-const noteSpy = vi.mocked(note);
+const noteSpy = note as Mock;
 
 describe("doctor include warning", () => {
   it("surfaces include confinement hint for escaped include paths", async () => {

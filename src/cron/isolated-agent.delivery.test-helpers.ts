@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { expect, vi } from "vitest";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import type { CliDeps } from "../cli/deps.js";
@@ -22,7 +23,7 @@ export function mockAgentPayloads(
   payloads: Array<Record<string, unknown>>,
   extra: Partial<Awaited<ReturnType<typeof runEmbeddedPiAgent>>> = {},
 ): void {
-  vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+  (runEmbeddedPiAgent as Mock).mockResolvedValue({
     payloads,
     meta: {
       durationMs: 5,

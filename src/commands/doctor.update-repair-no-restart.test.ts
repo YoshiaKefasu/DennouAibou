@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditGatewayServiceConfig,
@@ -25,7 +26,7 @@ describe("doctor command update-mode repairs", () => {
   it("skips gateway installs during non-interactive update repairs", async () => {
     mockDoctorConfigSnapshot();
 
-    vi.mocked(healthCommand).mockRejectedValueOnce(new Error("gateway closed"));
+    (healthCommand as Mock).mockRejectedValueOnce(new Error("gateway closed"));
 
     serviceIsLoaded.mockResolvedValueOnce(false);
     serviceInstall.mockClear();
@@ -42,7 +43,7 @@ describe("doctor command update-mode repairs", () => {
   it("skips gateway restarts during non-interactive update repairs", async () => {
     mockDoctorConfigSnapshot();
 
-    vi.mocked(healthCommand).mockRejectedValueOnce(new Error("gateway closed"));
+    (healthCommand as Mock).mockRejectedValueOnce(new Error("gateway closed"));
 
     serviceIsLoaded.mockResolvedValueOnce(true);
     serviceRestart.mockClear();
@@ -57,7 +58,7 @@ describe("doctor command update-mode repairs", () => {
   it("skips gateway service-config reinstalls and token persistence during non-interactive update repairs", async () => {
     mockDoctorConfigSnapshot({ config: { gateway: {} }, parsed: { gateway: {} } });
 
-    vi.mocked(healthCommand).mockRejectedValueOnce(new Error("gateway closed"));
+    (healthCommand as Mock).mockRejectedValueOnce(new Error("gateway closed"));
 
     serviceIsLoaded.mockResolvedValueOnce(false);
     serviceReadCommand.mockResolvedValueOnce({

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("openclaw/plugin-sdk/runtime-env", () => ({
@@ -37,7 +38,7 @@ describe("attachDiscordGatewayLogging", () => {
     emitter.emit("debug", "Gateway reconnect scheduled in 1000ms (close, resume=true)");
     emitter.emit("debug", "Gateway forcing fresh IDENTIFY after 3 failed resume attempts");
 
-    const logVerboseMock = vi.mocked(logVerbose);
+    const logVerboseMock = logVerbose as Mock;
     expect(logVerboseMock).toHaveBeenCalledTimes(4);
     expect(runtime.log).toHaveBeenCalledTimes(3);
     expect(runtime.log).toHaveBeenNthCalledWith(
@@ -68,7 +69,7 @@ describe("attachDiscordGatewayLogging", () => {
     emitter.emit("warning", "High latency detected: 1200ms");
     emitter.emit("metrics", { latency: 42, errors: 1 });
 
-    const logVerboseMock = vi.mocked(logVerbose);
+    const logVerboseMock = logVerbose as Mock;
     expect(logVerboseMock).toHaveBeenCalledTimes(2);
     expect(runtime.log).not.toHaveBeenCalled();
 
@@ -85,7 +86,7 @@ describe("attachDiscordGatewayLogging", () => {
     });
     cleanup();
 
-    const logVerboseMock = vi.mocked(logVerbose);
+    const logVerboseMock = logVerbose as Mock;
     logVerboseMock.mockClear();
 
     emitter.emit("debug", "Gateway websocket closed: 1001");

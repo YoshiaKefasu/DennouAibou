@@ -1,5 +1,6 @@
-import "./isolated-agent.mocks.js";
 import fs from "node:fs/promises";
+import "./isolated-agent.mocks.js";
+import type { Mock } from "vitest";
 import { expect, vi } from "vitest";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import type { CliDeps } from "../cli/deps.js";
@@ -26,7 +27,7 @@ export function makeDeps(): CliDeps {
 }
 
 export function mockEmbeddedPayloads(payloads: Array<{ text?: string; isError?: boolean }>) {
-  vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+  (runEmbeddedPiAgent as Mock).mockResolvedValue({
     payloads,
     meta: {
       durationMs: 5,
@@ -44,7 +45,7 @@ export function mockEmbeddedOk() {
 }
 
 export function expectEmbeddedProviderModel(expected: { provider: string; model: string }) {
-  const call = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0] as {
+  const call = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0] as {
     provider?: string;
     model?: string;
   };
@@ -98,7 +99,7 @@ export async function runCronTurn(home: string, options: RunCronTurnOptions = {}
     }));
   const deps = options.deps ?? makeDeps();
   if (options.mockTexts === null) {
-    vi.mocked(runEmbeddedPiAgent).mockClear();
+    (runEmbeddedPiAgent as Mock).mockClear();
   } else {
     mockEmbeddedTexts(options.mockTexts ?? ["ok"]);
   }

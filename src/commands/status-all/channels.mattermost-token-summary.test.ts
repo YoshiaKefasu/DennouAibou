@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
@@ -219,7 +220,7 @@ async function buildTestTable(
   plugins: ChannelPlugin[],
   params?: { cfg?: Record<string, unknown>; sourceConfig?: Record<string, unknown> },
 ) {
-  vi.mocked(listChannelPlugins).mockReturnValue(plugins);
+  (listChannelPlugins as Mock).mockReturnValue(plugins);
   return await buildChannelsTable((params?.cfg ?? { channels: {} }) as never, {
     showSecrets: false,
     sourceConfig: params?.sourceConfig as never,

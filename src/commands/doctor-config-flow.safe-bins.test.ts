@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { note } from "../terminal/note.js";
 import { withEnvAsync } from "../test-utils/env.js";
@@ -13,7 +14,7 @@ vi.mock("../terminal/note.js", () => ({
 import { loadAndMaybeMigrateDoctorConfig } from "./doctor-config-flow.js";
 
 describe("doctor config flow safe bins", () => {
-  const noteSpy = vi.mocked(note);
+  const noteSpy = note as Mock;
 
   beforeEach(() => {
     noteSpy.mockClear();

@@ -2,6 +2,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as piCodingAgent from "@earendil-works/pi-coding-agent";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { retryAsync } from "../infra/retry.js";
 
@@ -14,7 +15,7 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
   };
 });
 
-const mockGenerateSummary = vi.mocked(piCodingAgent.generateSummary);
+const mockGenerateSummary = piCodingAgent.generateSummary as Mock;
 type MockGenerateSummaryCompat = (
   currentMessages: AgentMessage[],
   model: NonNullable<ExtensionContext["model"]>,

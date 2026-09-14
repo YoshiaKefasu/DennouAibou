@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 import { createInlineCodeState } from "../markdown/code-spans.js";
 import { handleAgentEnd } from "./pi-embedded-subscribe.handlers.lifecycle.js";
@@ -61,7 +62,7 @@ describe("handleAgentEnd", () => {
 
     await handleAgentEnd(ctx);
 
-    const warn = vi.mocked(ctx.log.warn);
+    const warn = ctx.log.warn as Mock;
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toBe("embedded run agent end");
     expect(warn.mock.calls[0]?.[1]).toMatchObject({
@@ -93,7 +94,7 @@ describe("handleAgentEnd", () => {
 
     await handleAgentEnd(ctx);
 
-    const warn = vi.mocked(ctx.log.warn);
+    const warn = ctx.log.warn as Mock;
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toBe("embedded run agent end");
     expect(warn.mock.calls[0]?.[1]).toMatchObject({
@@ -119,7 +120,7 @@ describe("handleAgentEnd", () => {
 
     await handleAgentEnd(ctx);
 
-    const warn = vi.mocked(ctx.log.warn);
+    const warn = ctx.log.warn as Mock;
     const meta = warn.mock.calls[0]?.[1];
     expect(meta).toMatchObject({
       consoleMessage:
@@ -145,7 +146,7 @@ describe("handleAgentEnd", () => {
 
     await handleAgentEnd(ctx);
 
-    const warn = vi.mocked(ctx.log.warn);
+    const warn = ctx.log.warn as Mock;
     expect(warn.mock.calls[0]?.[1]).toMatchObject({
       event: "embedded_run_agent_end",
       error: "x-api-key: ***",

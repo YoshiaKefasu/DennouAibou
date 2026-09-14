@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { EventEmitter } from "node:events";
+import type { Mock } from "vitest";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 type MockSpawnChild = EventEmitter & {
@@ -44,7 +45,7 @@ vi.mock("node:child_process", async () => {
   );
 });
 
-const spawnMock = vi.mocked(spawn);
+const spawnMock = spawn as Mock;
 
 let parseSshConfigOutput: typeof import("./ssh-config.js").parseSshConfigOutput;
 let resolveSshConfig: typeof import("./ssh-config.js").resolveSshConfig;

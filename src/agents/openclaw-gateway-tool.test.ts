@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withEnvAsync } from "../test-utils/env.js";
 import "./test-helpers/fast-core-tools.js";
@@ -147,7 +148,7 @@ describe("gateway tool", () => {
     });
 
     expectConfigMutationCall({
-      callGatewayTool: vi.mocked(callGatewayTool),
+      callGatewayTool: callGatewayTool as Mock,
       action: "config.apply",
       raw,
       sessionKey,
@@ -165,7 +166,7 @@ describe("gateway tool", () => {
     });
 
     expectConfigMutationCall({
-      callGatewayTool: vi.mocked(callGatewayTool),
+      callGatewayTool: callGatewayTool as Mock,
       action: "config.patch",
       raw,
       sessionKey,
@@ -190,7 +191,7 @@ describe("gateway tool", () => {
   });
 
   it("rejects config.patch when a legacy tools.bash alias changes exec security", async () => {
-    vi.mocked(callGatewayTool).mockImplementationOnce(async (method: string) => {
+    (callGatewayTool as Mock).mockImplementationOnce(async (method: string) => {
       if (method === "config.get") {
         return { hash: "hash-1", config: {} };
       }

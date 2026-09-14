@@ -1,4 +1,5 @@
 import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { defaultRouteConfig } = vi.hoisted(() => ({
@@ -57,7 +58,7 @@ describe("buildTelegramMessageContext per-topic agentId routing", () => {
   }
 
   beforeEach(() => {
-    vi.mocked(loadConfig).mockReturnValue(defaultRouteConfig as never);
+    (loadConfig as Mock).mockReturnValue(defaultRouteConfig as never);
   });
 
   it("uses group-level agent when no topic agentId is set", async () => {
@@ -103,7 +104,7 @@ describe("buildTelegramMessageContext per-topic agentId routing", () => {
   });
 
   it("preserves an unknown topic agentId in the session key", async () => {
-    vi.mocked(loadConfig).mockReturnValue({
+    (loadConfig as Mock).mockReturnValue({
       agents: {
         list: [{ id: "main", default: true }, { id: "zu" }],
       },

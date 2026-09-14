@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { DiscordAccountConfig } from "openclaw/plugin-sdk/config-runtime";
 import * as pluginCommandsModule from "openclaw/plugin-sdk/plugin-runtime";
 import * as dispatcherModule from "openclaw/plugin-sdk/reply-dispatch-runtime";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { __testing as nativeCommandTesting, createDiscordNativeCommand } from "./native-command.js";
 import {
@@ -275,7 +276,7 @@ describe("Discord native slash commands with commands.allowFrom", () => {
       },
     });
 
-    const dispatchCall = vi.mocked(dispatcherModule.dispatchReplyWithDispatcher).mock
+    const dispatchCall = (dispatcherModule.dispatchReplyWithDispatcher as Mock).mock
       .calls[0]?.[0] as
       | Parameters<typeof dispatcherModule.dispatchReplyWithDispatcher>[0]
       | undefined;

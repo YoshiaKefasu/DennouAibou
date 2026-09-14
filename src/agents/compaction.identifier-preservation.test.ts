@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as piCodingAgent from "@earendil-works/pi-coding-agent";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", async () => {
@@ -11,7 +12,7 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
   };
 });
 
-const mockGenerateSummary = vi.mocked(piCodingAgent.generateSummary);
+const mockGenerateSummary = piCodingAgent.generateSummary as Mock;
 type SummarizeInStagesInput = Parameters<typeof import("./compaction.js").summarizeInStages>[0];
 
 const { buildCompactionSummarizationInstructions, summarizeInStages } =

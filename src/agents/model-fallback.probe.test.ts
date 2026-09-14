@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { AuthProfileStore } from "./auth-profiles.js";
@@ -27,21 +28,11 @@ type AuthProfilesOrderModule = typeof import("./auth-profiles/order.js");
 type ModelFallbackModule = typeof import("./model-fallback.js");
 type LoggerModule = typeof import("../logging/logger.js");
 
-let mockedEnsureAuthProfileStore: ReturnType<
-  typeof vi.mocked<AuthProfilesStoreModule["ensureAuthProfileStore"]>
->;
-let mockedGetSoonestCooldownExpiry: ReturnType<
-  typeof vi.mocked<AuthProfilesUsageModule["getSoonestCooldownExpiry"]>
->;
-let mockedIsProfileInCooldown: ReturnType<
-  typeof vi.mocked<AuthProfilesUsageModule["isProfileInCooldown"]>
->;
-let mockedResolveProfilesUnavailableReason: ReturnType<
-  typeof vi.mocked<AuthProfilesUsageModule["resolveProfilesUnavailableReason"]>
->;
-let mockedResolveAuthProfileOrder: ReturnType<
-  typeof vi.mocked<AuthProfilesOrderModule["resolveAuthProfileOrder"]>
->;
+let mockedEnsureAuthProfileStore: Mock;
+let mockedGetSoonestCooldownExpiry: Mock;
+let mockedIsProfileInCooldown: Mock;
+let mockedResolveProfilesUnavailableReason: Mock;
+let mockedResolveAuthProfileOrder: Mock;
 let runWithModelFallback: ModelFallbackModule["runWithModelFallback"];
 let _probeThrottleInternals: ModelFallbackModule["_probeThrottleInternals"];
 let registerLogTransport: LoggerModule["registerLogTransport"];
@@ -58,13 +49,12 @@ async function loadModelFallbackProbeModules() {
   const authProfilesOrderModule = await import("./auth-profiles/order.js");
   const loggerModule = await import("../logging/logger.js");
   const modelFallbackModule = await import("./model-fallback.js");
-  mockedEnsureAuthProfileStore = vi.mocked(authProfilesStoreModule.ensureAuthProfileStore);
-  mockedGetSoonestCooldownExpiry = vi.mocked(authProfilesUsageModule.getSoonestCooldownExpiry);
-  mockedIsProfileInCooldown = vi.mocked(authProfilesUsageModule.isProfileInCooldown);
-  mockedResolveProfilesUnavailableReason = vi.mocked(
-    authProfilesUsageModule.resolveProfilesUnavailableReason,
-  );
-  mockedResolveAuthProfileOrder = vi.mocked(authProfilesOrderModule.resolveAuthProfileOrder);
+  mockedEnsureAuthProfileStore = authProfilesStoreModule.ensureAuthProfileStore as Mock;
+  mockedGetSoonestCooldownExpiry = authProfilesUsageModule.getSoonestCooldownExpiry as Mock;
+  mockedIsProfileInCooldown = authProfilesUsageModule.isProfileInCooldown as Mock;
+  mockedResolveProfilesUnavailableReason =
+    authProfilesUsageModule.resolveProfilesUnavailableReason as Mock;
+  mockedResolveAuthProfileOrder = authProfilesOrderModule.resolveAuthProfileOrder as Mock;
   runWithModelFallback = modelFallbackModule.runWithModelFallback;
   _probeThrottleInternals = modelFallbackModule._probeThrottleInternals;
   registerLogTransport = loggerModule.registerLogTransport;

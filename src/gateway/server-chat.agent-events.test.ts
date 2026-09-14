@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerAgentRunContext, resetAgentRunContextForTest } from "../infra/agent-events.js";
 
@@ -27,8 +28,8 @@ import { loadGatewaySessionRow } from "./server-chat.load-gateway-session-row.ru
 
 describe("agent event handler", () => {
   beforeEach(() => {
-    vi.mocked(loadConfig).mockReturnValue({});
-    vi.mocked(loadGatewaySessionRow).mockReset().mockReturnValue(null);
+    (loadConfig as Mock).mockReturnValue({});
+    (loadGatewaySessionRow as Mock).mockReset().mockReturnValue(null);
     persistGatewaySessionLifecycleEventMock.mockReset().mockResolvedValue(undefined);
     resetAgentRunContextForTest();
   });
@@ -633,7 +634,7 @@ describe("agent event handler", () => {
       resolveSessionKeyForRun: () => "session-1",
     });
 
-    vi.mocked(loadGatewaySessionRow).mockReturnValue({
+    (loadGatewaySessionRow as Mock).mockReturnValue({
       key: "session-1",
       kind: "direct",
       spawnedBy: "agent:main:main",
@@ -699,7 +700,7 @@ describe("agent event handler", () => {
       resolveSessionKeyForRun: () => "session-1",
     });
 
-    vi.mocked(loadGatewaySessionRow).mockReturnValue({
+    (loadGatewaySessionRow as Mock).mockReturnValue({
       key: "session-1",
       kind: "direct",
       spawnedBy: "agent:main:main",
@@ -764,7 +765,7 @@ describe("agent event handler", () => {
       resolveSessionKeyForRun: () => "session-1",
     });
 
-    vi.mocked(loadGatewaySessionRow).mockReturnValue({
+    (loadGatewaySessionRow as Mock).mockReturnValue({
       key: "session-1",
       kind: "direct",
       spawnedBy: "agent:main:main",
@@ -882,7 +883,7 @@ describe("agent event handler", () => {
   });
 
   it("keeps live session setting metadata at the top level for lifecycle updates", () => {
-    vi.mocked(loadGatewaySessionRow).mockReturnValue({
+    (loadGatewaySessionRow as Mock).mockReturnValue({
       key: "session-finished",
       kind: "direct",
       updatedAt: 1_650,
@@ -1159,7 +1160,7 @@ describe("agent event handler", () => {
   });
 
   it("keeps heartbeat alert text in final chat output when remainder exceeds ackMaxChars", () => {
-    vi.mocked(loadConfig).mockReturnValue({
+    (loadConfig as Mock).mockReturnValue({
       agents: { defaults: { heartbeat: { ackMaxChars: 10 } } },
     });
 

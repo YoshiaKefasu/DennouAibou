@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   onDiagnosticEvent,
@@ -27,7 +28,7 @@ vi.mock("./tools/gateway.js", () => ({
   callGatewayTool: vi.fn(),
 }));
 
-const mockGetGlobalHookRunner = vi.mocked(getGlobalHookRunner);
+const mockGetGlobalHookRunner = getGlobalHookRunner as Mock;
 
 describe("before_tool_call loop detection behavior", () => {
   let hookRunner: {
@@ -340,7 +341,7 @@ describe("before_tool_call requireApproval handling", () => {
     hasHooks: ReturnType<typeof vi.fn>;
     runBeforeToolCall: ReturnType<typeof vi.fn>;
   };
-  const mockCallGateway = vi.mocked(callGatewayTool);
+  const mockCallGateway = callGatewayTool as Mock;
 
   beforeEach(() => {
     resetDiagnosticSessionStateForTest();

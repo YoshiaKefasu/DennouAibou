@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { RateLimitError } from "@buape/carbon";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { Mock } from "vitest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   baseConfig,
@@ -125,7 +126,7 @@ describe("monitorDiscordProvider", () => {
 
   beforeEach(() => {
     resetDiscordProviderMonitorMocks();
-    vi.mocked(runtimeEnvModule.logVerbose).mockClear();
+    (runtimeEnvModule.logVerbose as Mock).mockClear();
     providerTesting.setFetchDiscordApplicationId(async () => "app-1");
     providerTesting.setCreateDiscordNativeCommand(((
       ...args: Parameters<typeof providerTesting.setCreateDiscordNativeCommand>[0] extends
@@ -517,7 +518,7 @@ describe("monitorDiscordProvider", () => {
       runtime,
     });
 
-    const messages = vi.mocked(runtime.log).mock.calls.map((call) => String(call[0]));
+    const messages = (runtime.log as Mock).mock.calls.map((call) => String(call[0]));
     expect(messages.some((msg) => msg.includes("fetch-application-id:start"))).toBe(true);
     expect(messages.some((msg) => msg.includes("fetch-application-id:done"))).toBe(true);
     expect(messages.some((msg) => msg.includes("deploy-commands:start"))).toBe(true);
@@ -539,7 +540,7 @@ describe("monitorDiscordProvider", () => {
       runtime,
     });
 
-    const messages = vi.mocked(runtime.log).mock.calls.map((call) => String(call[0]));
+    const messages = (runtime.log as Mock).mock.calls.map((call) => String(call[0]));
     expect(messages.some((msg) => msg.includes("discord startup ["))).toBe(false);
   });
 });

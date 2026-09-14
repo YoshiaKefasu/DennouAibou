@@ -2,6 +2,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { installPackageDir } from "./install-package-dir.js";
@@ -295,7 +296,7 @@ describe("installPackageDir", () => {
       "utf-8",
     );
 
-    vi.mocked(runCommandWithTimeout).mockResolvedValue({
+    (runCommandWithTimeout as Mock).mockResolvedValue({
       stdout: "",
       stderr: "",
       code: 0,
@@ -315,7 +316,7 @@ describe("installPackageDir", () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(vi.mocked(runCommandWithTimeout)).toHaveBeenCalledWith(
+    expect(runCommandWithTimeout as Mock).toHaveBeenCalledWith(
       ["npm", "install", "--omit=dev", "--silent", "--ignore-scripts"],
       expect.objectContaining({
         cwd: expect.stringContaining(".openclaw-install-stage-"),
@@ -342,7 +343,7 @@ describe("installPackageDir", () => {
     );
     await fs.writeFile(path.join(sourceDir, ".npmrc"), npmrcContent, "utf-8");
 
-    vi.mocked(runCommandWithTimeout).mockImplementation(async (_argv, optionsOrTimeout) => {
+    (runCommandWithTimeout as Mock).mockImplementation(async (_argv, optionsOrTimeout) => {
       const cwd = typeof optionsOrTimeout === "number" ? undefined : optionsOrTimeout.cwd;
       expect(cwd).toBeTruthy();
       await expect(fs.stat(path.join(cwd ?? "", ".npmrc"))).rejects.toMatchObject({

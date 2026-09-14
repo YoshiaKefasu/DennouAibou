@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 
@@ -156,6 +157,6 @@ describe("gateway usage helpers", () => {
 
     expect(a.totals.totalTokens).toBe(1);
     expect(b.totals.totalTokens).toBe(1);
-    expect(vi.mocked(loadCostUsageSummary)).toHaveBeenCalledTimes(1);
+    expect(loadCostUsageSummary as Mock).toHaveBeenCalledTimes(1);
   });
 });

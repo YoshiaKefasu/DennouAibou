@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import * as compactionModule from "../compaction.js";
@@ -25,7 +26,7 @@ vi.mock("../compaction.js", async () => {
   };
 });
 
-const mockSummarizeInStages = vi.mocked(compactionModule.summarizeInStages);
+const mockSummarizeInStages = compactionModule.summarizeInStages as Mock;
 
 const {
   collectToolFailures,

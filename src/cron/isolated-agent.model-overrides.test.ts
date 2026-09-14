@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import "./isolated-agent.mocks.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadModelCatalog } from "../agents/model-catalog.js";
@@ -17,8 +18,8 @@ import {
 describe("runCronIsolatedAgentTurn model overrides", () => {
   beforeEach(() => {
     vi.spyOn(modelSelection, "resolveThinkingDefault").mockReturnValue("off");
-    vi.mocked(runEmbeddedPiAgent).mockClear();
-    vi.mocked(loadModelCatalog).mockResolvedValue([]);
+    (runEmbeddedPiAgent as Mock).mockClear();
+    (loadModelCatalog as Mock).mockResolvedValue([]);
   });
 
   it("treats blank model overrides as unset", async () => {
@@ -28,7 +29,7 @@ describe("runCronIsolatedAgentTurn model overrides", () => {
       });
 
       expect(res.status).toBe("ok");
-      expect(vi.mocked(runEmbeddedPiAgent)).toHaveBeenCalledTimes(1);
+      expect(runEmbeddedPiAgent as Mock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -46,7 +47,7 @@ describe("runCronIsolatedAgentTurn model overrides", () => {
           provider: "anthropic",
         },
       ];
-      vi.mocked(loadModelCatalog).mockResolvedValue(deterministicCatalog);
+      (loadModelCatalog as Mock).mockResolvedValue(deterministicCatalog);
 
       let res = (
         await runCronTurn(home, {
@@ -98,7 +99,7 @@ describe("runCronIsolatedAgentTurn model overrides", () => {
       });
       gmailModel.assert();
 
-      vi.mocked(runEmbeddedPiAgent).mockClear();
+      (runEmbeddedPiAgent as Mock).mockClear();
       res = (
         await runGmailHookTurn(home, {
           "agent:main:hook:gmail:msg-1": {
@@ -120,7 +121,7 @@ describe("runCronIsolatedAgentTurn model overrides", () => {
 
   it("ignores hooks.gmail.model when not in the allowlist", async () => {
     await withTempHome(async (home) => {
-      vi.mocked(loadModelCatalog).mockResolvedValueOnce([
+      (loadModelCatalog as Mock).mockResolvedValueOnce([
         {
           id: "claude-opus-4-6",
           name: "Opus 4.5",
@@ -170,20 +171,20 @@ describe("runCronIsolatedAgentTurn model overrides", () => {
 
       expect(res.status).toBe("error");
       expect(res.error).toMatch("invalid model");
-      expect(vi.mocked(runEmbeddedPiAgent)).not.toHaveBeenCalled();
+      expect(runEmbeddedPiAgent as Mock).not.toHaveBeenCalled();
     });
   });
 
   it("passes through the resolved default thinking level", async () => {
     await withTempHome(async (home) => {
-      vi.mocked(modelSelection.resolveThinkingDefault).mockReturnValueOnce("low");
+      (modelSelection.resolveThinkingDefault as Mock).mockReturnValueOnce("low");
 
       await runCronTurn(home, {
         jobPayload: DEFAULT_AGENT_TURN_PAYLOAD,
         mockTexts: ["done"],
       });
 
-      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      const callArgs = (runEmbeddedPiAgent as Mock).mock.calls.at(-1)?.[0];
       expect(callArgs?.thinkLevel).toBe("low");
     });
   });

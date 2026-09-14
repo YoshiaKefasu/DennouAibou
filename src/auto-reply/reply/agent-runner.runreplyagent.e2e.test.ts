@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "../../config/sessions.js";
 import * as sessions from "../../config/sessions.js";
@@ -101,9 +102,9 @@ beforeAll(async () => {
 beforeEach(() => {
   state.compactEmbeddedPiSessionMock.mockClear();
   state.runEmbeddedPiAgentMock.mockClear();
-  vi.mocked(enqueueFollowupRun).mockClear();
-  vi.mocked(refreshQueuedFollowupSession).mockClear();
-  vi.mocked(scheduleFollowupDrain).mockClear();
+  (enqueueFollowupRun as Mock).mockClear();
+  (refreshQueuedFollowupSession as Mock).mockClear();
+  (scheduleFollowupDrain as Mock).mockClear();
   vi.stubEnv("DENNOU_TEST_FAST", "1");
 });
 
@@ -311,7 +312,7 @@ describe("runReplyAgent heartbeat followup guard", () => {
     const result = await run();
 
     expect(result).toBeUndefined();
-    expect(vi.mocked(enqueueFollowupRun)).not.toHaveBeenCalled();
+    expect(enqueueFollowupRun as Mock).not.toHaveBeenCalled();
     expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     expect(typing.cleanup).toHaveBeenCalledTimes(1);
   });
@@ -327,7 +328,7 @@ describe("runReplyAgent heartbeat followup guard", () => {
     const result = await run();
 
     expect(result).toBeUndefined();
-    expect(vi.mocked(enqueueFollowupRun)).toHaveBeenCalledTimes(1);
+    expect(enqueueFollowupRun as Mock).toHaveBeenCalledTimes(1);
     expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
   });
 
@@ -343,8 +344,8 @@ describe("runReplyAgent heartbeat followup guard", () => {
     const result = await run();
 
     expect(result).toBeUndefined();
-    expect(vi.mocked(enqueueFollowupRun)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(scheduleFollowupDrain)).toHaveBeenCalledTimes(1);
+    expect(enqueueFollowupRun as Mock).toHaveBeenCalledTimes(1);
+    expect(scheduleFollowupDrain as Mock).toHaveBeenCalledTimes(1);
     expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
   });
 
@@ -361,7 +362,7 @@ describe("runReplyAgent heartbeat followup guard", () => {
     try {
       const { run } = createMinimalRun();
       await expect(run()).rejects.toThrow("persist exploded");
-      expect(vi.mocked(scheduleFollowupDrain)).toHaveBeenCalledTimes(1);
+      expect(scheduleFollowupDrain as Mock).toHaveBeenCalledTimes(1);
     } finally {
       persistSpy.mockRestore();
     }
@@ -861,7 +862,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
       });
       await run();
 
-      expect(vi.mocked(refreshQueuedFollowupSession)).toHaveBeenCalledWith({
+      expect(refreshQueuedFollowupSession as Mock).toHaveBeenCalledWith({
         key: "main",
         previousSessionId: "session",
         nextSessionId: "session-rotated",
@@ -1382,7 +1383,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
       }
       expect(payload.text?.toLowerCase()).toContain("reset");
       expect(sessionStore.main.sessionId).not.toBe(sessionId);
-      expect(vi.mocked(refreshQueuedFollowupSession)).toHaveBeenCalledWith({
+      expect(refreshQueuedFollowupSession as Mock).toHaveBeenCalledWith({
         key: "main",
         previousSessionId: sessionId,
         nextSessionId: sessionStore.main.sessionId,
@@ -2081,7 +2082,7 @@ describe("runReplyAgent memory flush", () => {
       expect(await normalizeComparablePath(calls[1]?.sessionFile ?? "")).toBe(
         await normalizeComparablePath(path.join(path.dirname(storePath), "session-rotated.jsonl")),
       );
-      expect(vi.mocked(refreshQueuedFollowupSession)).toHaveBeenCalledWith({
+      expect(refreshQueuedFollowupSession as Mock).toHaveBeenCalledWith({
         key: sessionKey,
         previousSessionId: "session",
         nextSessionId: "session-rotated",

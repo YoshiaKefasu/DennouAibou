@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
@@ -48,13 +49,13 @@ describe("channelsRemoveCommand", () => {
     runtime.exit.mockClear();
     catalogMocks.listChannelPluginCatalogEntries.mockClear();
     catalogMocks.listChannelPluginCatalogEntries.mockReturnValue([]);
-    vi.mocked(ensureChannelSetupPluginInstalled).mockClear();
-    vi.mocked(ensureChannelSetupPluginInstalled).mockImplementation(async ({ cfg }) => ({
+    (ensureChannelSetupPluginInstalled as Mock).mockClear();
+    (ensureChannelSetupPluginInstalled as Mock).mockImplementation(async ({ cfg }) => ({
       cfg,
       installed: true,
     }));
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockClear();
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel).mockReturnValue(
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockClear();
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockReturnValue(
       createTestRegistry(),
     );
     setActivePluginRegistry(createTestRegistry());
@@ -75,7 +76,7 @@ describe("channelsRemoveCommand", () => {
     const catalogEntry: ChannelPluginCatalogEntry = createMSTeamsCatalogEntry();
     catalogMocks.listChannelPluginCatalogEntries.mockReturnValue([catalogEntry]);
     const scopedPlugin = createMSTeamsDeletePlugin();
-    vi.mocked(loadChannelSetupPluginRegistrySnapshotForChannel)
+    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock)
       .mockReturnValueOnce(createTestRegistry())
       .mockReturnValueOnce(
         createTestRegistry([

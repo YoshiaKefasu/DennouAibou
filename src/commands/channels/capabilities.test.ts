@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 process.env.NO_COLOR = "1";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -131,8 +132,8 @@ describe("channelsCapabilitiesCommand", () => {
         },
       }),
     };
-    vi.mocked(listChannelPlugins).mockReturnValue([plugin]);
-    vi.mocked(getChannelPlugin).mockReturnValue(plugin);
+    (listChannelPlugins as Mock).mockReturnValue([plugin]);
+    (getChannelPlugin as Mock).mockReturnValue(plugin);
     mocks.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: { channels: {} },
       channelId: "slack",
@@ -170,8 +171,8 @@ describe("channelsCapabilitiesCommand", () => {
         },
       ],
     };
-    vi.mocked(listChannelPlugins).mockReturnValue([plugin]);
-    vi.mocked(getChannelPlugin).mockReturnValue(plugin);
+    (listChannelPlugins as Mock).mockReturnValue([plugin]);
+    (getChannelPlugin as Mock).mockReturnValue(plugin);
     mocks.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: { channels: {} },
       channelId: "msteams",
@@ -204,8 +205,8 @@ describe("channelsCapabilitiesCommand", () => {
       plugin,
       configChanged: true,
     });
-    vi.mocked(listChannelPlugins).mockReturnValue([]);
-    vi.mocked(getChannelPlugin).mockReturnValue(undefined);
+    (listChannelPlugins as Mock).mockReturnValue([]);
+    (getChannelPlugin as Mock).mockReturnValue(undefined);
 
     await channelsCapabilitiesCommand({ channel: "whatsapp" }, runtime);
 
