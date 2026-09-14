@@ -75,11 +75,8 @@ src/gateway/server.canvas-auth.test.ts
 # These files were not reached within the 900s shell timeout during the
 # Phase 2-A3 measurement run. Keep this complete list to track coverage.
 src/config/config.legacy-config-detection.rejects-routing-allowfrom.test.ts
-src/config/config.legacy-config-provider-shapes.test.ts
 src/config/config.legacy-config-snapshot.test.ts
 src/config/config.meta-timestamp-coercion.test.ts
-src/config/config.msteams.test.ts
-src/config/config.pruning-defaults.test.ts
 src/config/config.sandbox-docker.test.ts
 src/config/config.schema-regressions.test.ts
 src/config/config.secrets-schema.test.ts
@@ -90,7 +87,6 @@ src/config/config.telegram-topic-agentid.test.ts
 src/config/config.tools-alsoAllow.test.ts
 src/config/context-visibility.test.ts
 src/config/dangerous-name-matching.test.ts
-src/config/doc-baseline.integration.test.ts
 src/config/doc-baseline.test.ts
 src/config/env-preserve-io.test.ts
 src/config/env-preserve.test.ts
@@ -105,14 +101,9 @@ src/config/logging-max-file-bytes.test.ts
 src/config/mcp-config.test.ts
 src/config/merge-patch.proto-pollution.test.ts
 src/config/merge-patch.test.ts
-src/config/model-alias-defaults.test.ts
 src/config/mutate.test.ts
-src/config/normalize-paths.test.ts
 src/config/paths.test.ts
-src/config/plugin-auto-enable.channels.test.ts
-src/config/plugin-auto-enable.core.test.ts
 src/config/plugin-auto-enable.model-support.test.ts
-src/config/plugin-auto-enable.providers.test.ts
 src/config/plugins-runtime-boundary.test.ts
 src/config/redact-snapshot.raw.test.ts
 src/config/redact-snapshot.restore.test.ts
@@ -124,8 +115,6 @@ src/config/schema.base.generated.test.ts
 src/config/schema.help.quality.test.ts
 src/config/schema.hints.test.ts
 src/config/schema.shared.test.ts
-src/config/schema.test.ts
-src/config/sessions.test.ts
 src/config/sessions/artifacts.test.ts
 src/config/sessions/cache-fields.test.ts
 src/config/sessions/disk-budget.test.ts
@@ -139,9 +128,7 @@ src/config/sessions/store-read.test.ts
 src/config/sessions/store.session-key-normalization.test.ts
 src/config/sessions/targets.test.ts
 src/config/talk-defaults.test.ts
-src/config/talk.normalize.test.ts
 src/config/thread-bindings-config-keys.test.ts
-src/config/validation.allowed-values.test.ts
 src/config/validation.policy.test.ts
 src/config/version.test.ts
 src/config/web-search-codex-config.test.ts
@@ -153,7 +140,6 @@ src/config/zod-schema.markdown-tables.test.ts
 src/config/zod-schema.providers-core.ingest.test.ts
 src/config/zod-schema.session-maintenance-extensions.test.ts
 src/config/zod-schema.session.test.ts
-src/config/zod-schema.signal-groups.test.ts
 src/config/zod-schema.talk.test.ts
 src/config/zod-schema.tts.test.ts
 src/config/zod-schema.typing-mode.test.ts
@@ -187,9 +173,7 @@ src/dennou-soul/prune-active-session.test.ts
 src/dennou-soul/prune-closed-sessions.test.ts
 src/dennou-soul/prune-engine.test.ts
 src/dennou-soul/raw-chat/raw-chat.test.ts
-src/docker-build-cache.test.ts
 src/docker-image-digests.test.ts
-src/dockerfile.test.ts
 src/docs/slash-commands-doc.test.ts
 src/gateway/agent-prompt.test.ts
 src/gateway/android-node.capabilities.policy-config.test.ts
@@ -206,14 +190,12 @@ src/gateway/control-ui-routing.test.ts
 src/gateway/credential-precedence.parity.test.ts
 src/gateway/credentials.test.ts
 src/gateway/device-auth.test.ts
-src/gateway/gateway.test.ts
 src/gateway/handshake-timeouts.test.ts
 src/gateway/hooks.test.ts
 src/gateway/http-utils.request-context.test.ts
 src/gateway/input-allowlist.test.ts
 src/gateway/live-tool-probe-utils.test.ts
 src/gateway/method-scopes.test.ts
-src/gateway/model-pricing-cache.test.ts
 src/gateway/node-catalog.test.ts
 src/gateway/node-command-policy.test.ts
 src/gateway/node-invoke-system-run-approval-match.test.ts
@@ -235,7 +217,6 @@ src/gateway/role-policy.test.ts
 src/gateway/security-path.test.ts
 src/gateway/server-methods/chat.inject.parentid.test.ts
 src/gateway/server-runtime-config.test.ts
-src/gateway/server.canvas-auth.test.ts
 src/gateway/server.ios-client-id.test.ts
 src/gateway/server/plugin-route-runtime-scopes.test.ts
 src/gateway/server/ws-connection/connect-policy.test.ts
