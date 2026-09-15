@@ -232,7 +232,9 @@ const slackPlugin: ChannelPlugin = {
 
 describe("runMessageAction media behavior", () => {
   beforeEach(async () => {
-    actualLoadWebMedia ??= (await import("../../media/web-media.js")).loadWebMedia;
+    actualLoadWebMedia ??= (
+      await vi.importActual<typeof import("../../media/web-media.js")>("../../media/web-media.js")
+    ).loadWebMedia;
     vi.restoreAllMocks();
     vi.clearAllMocks();
     channelResolutionMocks.resolveOutboundChannelPlugin.mockReset();
@@ -344,7 +346,9 @@ describe("runMessageAction media behavior", () => {
     });
 
     async function restoreRealMediaLoader() {
-      const actual = await import("../../media/web-media.js");
+      const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
+        "../../media/web-media.js",
+      );
       (loadWebMedia as Mock).mockImplementation(actual.loadWebMedia);
     }
 

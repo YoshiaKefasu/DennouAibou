@@ -269,7 +269,9 @@ describe("Discord native plugin command dispatch", () => {
     vi.clearAllMocks();
     clearPluginCommands();
     setActivePluginRegistry(createTestRegistry());
-    const actualPluginRuntime = await import("openclaw/plugin-sdk/plugin-runtime");
+    const actualPluginRuntime = await vi.importActual<
+      typeof import("openclaw/plugin-sdk/plugin-runtime")
+    >("openclaw/plugin-sdk/plugin-runtime");
     runtimeModuleMocks.matchPluginCommand.mockReset();
     runtimeModuleMocks.matchPluginCommand.mockImplementation(
       actualPluginRuntime.matchPluginCommand,
