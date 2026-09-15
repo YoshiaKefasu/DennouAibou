@@ -103,7 +103,7 @@ vi.mock("../infra/restart-stale-pids.js", () => ({
 }));
 
 vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const actual = await import("node:fs/promises");
   const wrapped = {
     ...actual,
     access: vi.fn(async (p: string) => {

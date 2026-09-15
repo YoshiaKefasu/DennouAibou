@@ -22,9 +22,7 @@ const runtimeModuleMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/plugin-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/plugin-runtime")>(
-    "openclaw/plugin-sdk/plugin-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/plugin-runtime");
   return {
     ...actual,
     matchPluginCommand: (...args: unknown[]) => runtimeModuleMocks.matchPluginCommand(...args),
@@ -33,9 +31,7 @@ vi.mock("openclaw/plugin-sdk/plugin-runtime", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/reply-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/reply-runtime")>(
-    "openclaw/plugin-sdk/reply-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/reply-runtime");
   return {
     ...actual,
     dispatchReplyWithDispatcher: (...args: unknown[]) =>
@@ -72,8 +68,6 @@ function createConfig(): OpenClawConfig {
     },
   } as OpenClawConfig;
 }
-
-
 
 async function createNativeCommand(cfg: OpenClawConfig, commandSpec: NativeCommandSpec) {
   return createDiscordNativeCommand({
@@ -275,9 +269,7 @@ describe("Discord native plugin command dispatch", () => {
     vi.clearAllMocks();
     clearPluginCommands();
     setActivePluginRegistry(createTestRegistry());
-    const actualPluginRuntime = await vi.importActual<
-      typeof import("openclaw/plugin-sdk/plugin-runtime")
-    >("openclaw/plugin-sdk/plugin-runtime");
+    const actualPluginRuntime = await import("openclaw/plugin-sdk/plugin-runtime");
     runtimeModuleMocks.matchPluginCommand.mockReset();
     runtimeModuleMocks.matchPluginCommand.mockImplementation(
       actualPluginRuntime.matchPluginCommand,
@@ -624,6 +616,4 @@ describe("Discord native plugin command dispatch", () => {
       "agent:qwen:discord:channel:1478836151241412759",
     );
   });
-
-  
 });

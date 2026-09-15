@@ -14,9 +14,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/auth-profiles.js")>(
-    "../agents/auth-profiles.js",
-  );
+  const actual = await import("../agents/auth-profiles.js");
   return {
     ...actual,
     loadAuthProfileStore: authMocks.loadAuthProfileStore,

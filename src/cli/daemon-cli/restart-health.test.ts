@@ -20,7 +20,7 @@ vi.mock("../../gateway/probe.js", () => ({
 }));
 
 vi.mock("../../utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../../utils.js")>("../../utils.js");
+  const actual = await import("../../utils.js");
   return {
     ...actual,
     sleep: (ms: number) => sleep(ms),

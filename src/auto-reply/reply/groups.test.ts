@@ -12,7 +12,7 @@ describe("group runtime loading", () => {
     const groupsRuntimeLoads = vi.fn();
     vi.doMock("./groups.runtime.js", async () => {
       groupsRuntimeLoads();
-      return await vi.importActual<typeof import("./groups.runtime.js")>("./groups.runtime.js");
+      return await import("./groups.runtime.js");
     });
     const groups = await import("./groups.js");
 
@@ -50,7 +50,7 @@ describe("group runtime loading", () => {
     const groupsRuntimeLoads = vi.fn();
     vi.doMock("./groups.runtime.js", async () => {
       groupsRuntimeLoads();
-      return await vi.importActual<typeof import("./groups.runtime.js")>("./groups.runtime.js");
+      return await import("./groups.runtime.js");
     });
     const groups = await import("./groups.js");
 

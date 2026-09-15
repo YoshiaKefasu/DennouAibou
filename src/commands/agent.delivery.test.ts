@@ -22,9 +22,7 @@ vi.mock("../infra/outbound/deliver.js", () => ({
 }));
 
 vi.mock("../infra/outbound/targets.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/outbound/targets.js")>(
-    "../infra/outbound/targets.js",
-  );
+  const actual = await import("../infra/outbound/targets.js");
   return {
     ...actual,
     resolveOutboundTarget: mocks.resolveOutboundTarget,

@@ -21,8 +21,7 @@ afterAll(() => {
 });
 
 vi.mock("../infra/shell-env.js", async () => {
-  const mod =
-    await vi.importActual<typeof import("../infra/shell-env.js")>("../infra/shell-env.js");
+  const mod = await import("../infra/shell-env.js");
   return {
     ...mod,
     getShellPathFromLoginShell: vi.fn(() => null),
@@ -37,9 +36,7 @@ vi.mock("../plugins/tools.js", () => ({
 }));
 
 vi.mock("../infra/exec-approvals.js", async () => {
-  const mod = await vi.importActual<typeof import("../infra/exec-approvals.js")>(
-    "../infra/exec-approvals.js",
-  );
+  const mod = await import("../infra/exec-approvals.js");
   const approvals: ExecApprovalsResolved = {
     path: "/tmp/exec-approvals.json",
     socketPath: "/tmp/exec-approvals.sock",

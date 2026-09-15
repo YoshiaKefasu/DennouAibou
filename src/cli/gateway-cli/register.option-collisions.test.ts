@@ -33,7 +33,7 @@ vi.mock("../cli-utils.js", () => ({
 }));
 
 vi.mock("../../runtime.js", async () => ({
-  ...(await vi.importActual<typeof import("../../runtime.js")>("../../runtime.js")),
+  ...(await import("../../runtime.js")),
   defaultRuntime: mocks.defaultRuntime,
 }));
 

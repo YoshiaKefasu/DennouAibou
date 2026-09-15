@@ -24,9 +24,7 @@ const { computeBackoffMock, sleepWithAbortMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("./pi-embedded-runner/run/attempt.js", async () => {
-  const actual = await vi.importActual<typeof import("./pi-embedded-runner/run/attempt.js")>(
-    "./pi-embedded-runner/run/attempt.js",
-  );
+  const actual = await import("./pi-embedded-runner/run/attempt.js");
   return {
     ...actual,
     runEmbeddedAttempt: (params: unknown) => runEmbeddedAttemptMock(params),
@@ -34,7 +32,7 @@ vi.mock("./pi-embedded-runner/run/attempt.js", async () => {
 });
 
 vi.mock("../infra/backoff.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/backoff.js")>("../infra/backoff.js");
+  const actual = await import("../infra/backoff.js");
   return {
     ...actual,
     computeBackoff: (
@@ -46,7 +44,7 @@ vi.mock("../infra/backoff.js", async () => {
 });
 
 vi.mock("./models-config.js", async () => {
-  const mod = await vi.importActual<typeof import("./models-config.js")>("./models-config.js");
+  const mod = await import("./models-config.js");
   return {
     ...mod,
     ensureOpenClawModelsJson: vi.fn(async () => ({ wrote: false })),
@@ -71,9 +69,7 @@ const installRunEmbeddedMocks = () => {
       createResolvedEmbeddedRunnerModel(provider, modelId),
   }));
   vi.doMock("../plugins/provider-runtime.js", async () => {
-    const actual = await vi.importActual<typeof import("../plugins/provider-runtime.js")>(
-      "../plugins/provider-runtime.js",
-    );
+    const actual = await import("../plugins/provider-runtime.js");
     return {
       ...actual,
       prepareProviderRuntimeAuth: vi.fn(async () => undefined),

@@ -192,7 +192,7 @@ vi.mock("../plugins/loader.js", () => ({
 }));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     CONFIG_PATH: "/tmp/dennou-aibou.json",
@@ -234,7 +234,7 @@ vi.mock("./doctor-gateway-auth-token.js", () => ({
 }));
 
 vi.mock("../gateway/call.js", async () => {
-  const actual = await vi.importActual<typeof import("../gateway/call.js")>("../gateway/call.js");
+  const actual = await import("../gateway/call.js");
   return {
     ...actual,
     callGateway,
@@ -251,9 +251,7 @@ vi.mock("../infra/openclaw-root.js", () => ({
 }));
 
 vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/auth-profiles.js")>(
-    "../agents/auth-profiles.js",
-  );
+  const actual = await import("../agents/auth-profiles.js");
   return {
     ...actual,
     ensureAuthProfileStore,
@@ -295,7 +293,7 @@ vi.mock("../runtime.js", () => ({
 }));
 
 vi.mock("../utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../utils.js")>("../utils.js");
+  const actual = await import("../utils.js");
   return {
     ...actual,
     resolveUserPath: (value: string) => value,

@@ -27,9 +27,7 @@ async function loadFreshInlineActionsModuleForTest() {
     createOpenClawTools: (...args: unknown[]) => createOpenClawToolsMock(...args),
   }));
   vi.doMock("../../channels/plugins/index.js", async () => {
-    const actual = await vi.importActual<typeof import("../../channels/plugins/index.js")>(
-      "../../channels/plugins/index.js",
-    );
+    const actual = await import("../../channels/plugins/index.js");
     return {
       ...actual,
       getChannelPlugin: (...args: unknown[]) => getChannelPluginMock(...args),

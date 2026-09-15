@@ -176,8 +176,7 @@ describe("applyMediaUnderstanding – echo transcript", () => {
       deliverOutboundPayloads: (...args: unknown[]) => mockDeliverOutboundPayloads(...args),
     }));
     vi.doMock("./provider-registry.js", async () => {
-      const actual =
-        await vi.importActual<typeof import("./provider-registry.js")>("./provider-registry.js");
+      const actual = await import("./provider-registry.js");
       const registryProviders = createRegistryMediaProviders();
       return {
         ...actual,

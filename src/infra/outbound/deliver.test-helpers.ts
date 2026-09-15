@@ -104,18 +104,14 @@ export const queueMocks = _queueMocks;
 export const logMocks = _logMocks;
 
 vi.mock("../../config/sessions/transcript.runtime.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../config/sessions/transcript.runtime.js")
-  >("../../config/sessions/transcript.runtime.js");
+  const actual = await import("../../config/sessions/transcript.runtime.js");
   return {
     ...actual,
     appendAssistantMessageToSessionTranscript: _mocks.appendAssistantMessageToSessionTranscript,
   };
 });
 vi.mock("../../config/sessions/transcript.js", async () => {
-  const actual = await vi.importActual<typeof import("../../config/sessions/transcript.js")>(
-    "../../config/sessions/transcript.js",
-  );
+  const actual = await import("../../config/sessions/transcript.js");
   return {
     ...actual,
     appendAssistantMessageToSessionTranscript: _mocks.appendAssistantMessageToSessionTranscript,

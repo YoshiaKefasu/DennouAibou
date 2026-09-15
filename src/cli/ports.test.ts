@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 const mockCreateServer = vi.hoisted(() => vi.fn());
 
 vi.mock("node:net", async () => {
-  const actual = await vi.importActual<typeof import("node:net")>("node:net");
+  const actual = await import("node:net");
   return { ...actual, createServer: mockCreateServer };
 });
 

@@ -13,13 +13,10 @@ const execFileMock = vi.hoisted(() =>
 
 vi.mock("node:child_process", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:child_process")>("node:child_process"),
-    {
-      spawn: spawnMock,
-      execFile: execFileMock as unknown as typeof execFileType,
-    },
-  );
+  return mockNodeBuiltinModule(() => import("node:child_process"), {
+    spawn: spawnMock,
+    execFile: execFileMock as unknown as typeof execFileType,
+  });
 });
 
 let runCommandWithTimeout: typeof import("./exec.js").runCommandWithTimeout;

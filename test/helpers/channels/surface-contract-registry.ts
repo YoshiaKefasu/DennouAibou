@@ -69,7 +69,7 @@ setBundledChannelRuntime("line", {
 
 vi.mock(buildBundledPluginModuleId("matrix", "runtime-api.js"), async () => {
   const matrixRuntimeApiModuleId = buildBundledPluginModuleId("matrix", "runtime-api.js");
-  const actual = await vi.importActual(matrixRuntimeApiModuleId);
+  const actual = await import(matrixRuntimeApiModuleId);
   return {
     ...actual,
     sendMessageMatrix: sendMessageMatrixMock,

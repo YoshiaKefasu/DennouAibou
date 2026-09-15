@@ -33,7 +33,7 @@ const ProxyAgentCtor = vi.hoisted(() =>
 );
 
 vi.mock("node:dns", async () => {
-  const actual = await vi.importActual<typeof import("node:dns")>("node:dns");
+  const actual = await import("node:dns");
   return {
     ...actual,
     setDefaultResultOrder,
@@ -41,7 +41,7 @@ vi.mock("node:dns", async () => {
 });
 
 vi.mock("node:net", async () => {
-  const actual = await vi.importActual<typeof import("node:net")>("node:net");
+  const actual = await import("node:net");
   return {
     ...actual,
     setDefaultAutoSelectFamily,

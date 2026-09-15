@@ -5,7 +5,7 @@ import type { ChatAbortControllerEntry } from "./chat-abort.js";
 const cleanOldMediaMock = vi.fn(async () => {});
 
 vi.mock("../media/store.js", async () => {
-  const actual = await vi.importActual<typeof import("../media/store.js")>("../media/store.js");
+  const actual = await import("../media/store.js");
   return {
     ...actual,
     cleanOldMedia: cleanOldMediaMock,

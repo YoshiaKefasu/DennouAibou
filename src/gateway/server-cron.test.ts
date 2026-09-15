@@ -35,16 +35,13 @@ vi.mock("../infra/system-events.js", () => ({
 }));
 
 vi.mock("../infra/event-pump.js", async () => {
-  return await mergeMockedModule(
-    await vi.importActual<typeof import("../infra/event-pump.js")>("../infra/event-pump.js"),
-    () => ({
-      requestWakeNow,
-    }),
-  );
+  return await mergeMockedModule(await import("../infra/event-pump.js"), () => ({
+    requestWakeNow,
+  }));
 });
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: () => loadConfigMock(),

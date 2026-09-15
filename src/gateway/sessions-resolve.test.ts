@@ -11,8 +11,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock("../config/sessions.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../config/sessions.js")>("../config/sessions.js");
+  const actual = await import("../config/sessions.js");
   return {
     ...actual,
     loadSessionStore: hoisted.loadSessionStoreMock,
@@ -21,7 +20,7 @@ vi.mock("../config/sessions.js", async () => {
 });
 
 vi.mock("./session-utils.js", async () => {
-  const actual = await vi.importActual<typeof import("./session-utils.js")>("./session-utils.js");
+  const actual = await import("./session-utils.js");
   return {
     ...actual,
     listSessionsFromStore: hoisted.listSessionsFromStoreMock,

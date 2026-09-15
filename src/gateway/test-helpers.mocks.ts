@@ -69,7 +69,7 @@ async function importEmbeddedRunMockModule<TModule extends object>(
   actualPath: string,
   opts?: { includeActiveCount?: boolean },
 ): Promise<TModule> {
-  const actual = await vi.importActual<TModule>(actualPath);
+  const actual = await import(actualPath);
   return {
     ...actual,
     ...createEmbeddedRunMockExports(),
@@ -80,9 +80,7 @@ async function importEmbeddedRunMockModule<TModule extends object>(
 }
 
 vi.mock("../agents/pi-model-discovery.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/pi-model-discovery.js")>(
-    "../agents/pi-model-discovery.js",
-  );
+  const actual = await import("../agents/pi-model-discovery.js");
 
   // discoverModels() creates ModelRuntime + ModelRegistry internally, so the
   // piSdkMock bridge has to wrap discoverModels itself (overriding the
@@ -116,8 +114,7 @@ vi.mock("../infra/tailnet.js", () => ({
 }));
 
 vi.mock("../infra/tailscale.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../infra/tailscale.js")>("../infra/tailscale.js");
+  const actual = await import("../infra/tailscale.js");
   return {
     ...actual,
     readTailscaleWhoisIdentity: async () => testTailscaleWhois.value,
@@ -125,8 +122,7 @@ vi.mock("../infra/tailscale.js", async () => {
 });
 
 vi.mock("../config/sessions.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../config/sessions.js")>("../config/sessions.js");
+  const actual = await import("../config/sessions.js");
   return {
     ...actual,
     saveSessionStore: vi.fn(async (storePath: string, store: unknown) => {
@@ -140,7 +136,7 @@ vi.mock("../config/sessions.js", async () => {
 });
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return createGatewayConfigModuleMock(actual);
 });
 
@@ -183,9 +179,7 @@ vi.mock(buildBundledPluginModuleId("whatsapp", "runtime-api.js"), () => ({
     (gatewayTestHoisted.sendWhatsAppMock as (...args: unknown[]) => unknown)(...args),
 }));
 vi.mock("../channels/web/index.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/web/index.js")>(
-    "../channels/web/index.js",
-  );
+  const actual = await import("../channels/web/index.js");
   return {
     ...actual,
     sendMessageWhatsApp: (...args: unknown[]) =>
@@ -205,9 +199,7 @@ vi.mock("/src/agents/btw.js", () => ({
     gatewayTestHoisted.runBtwSideQuestion(...args),
 }));
 vi.mock("../auto-reply/dispatch.js", async () => {
-  const actual = await vi.importActual<typeof import("../auto-reply/dispatch.js")>(
-    "../auto-reply/dispatch.js",
-  );
+  const actual = await import("../auto-reply/dispatch.js");
   return {
     ...actual,
     dispatchInboundMessage: (...args: Parameters<typeof actual.dispatchInboundMessage>) => {
@@ -219,9 +211,7 @@ vi.mock("../auto-reply/dispatch.js", async () => {
   };
 });
 vi.mock("/src/auto-reply/dispatch.js", async () => {
-  const actual = await vi.importActual<typeof import("../auto-reply/dispatch.js")>(
-    "../auto-reply/dispatch.js",
-  );
+  const actual = await import("../auto-reply/dispatch.js");
   return {
     ...actual,
     dispatchInboundMessage: (...args: Parameters<typeof actual.dispatchInboundMessage>) => {
@@ -250,7 +240,7 @@ vi.mock("/src/auto-reply/reply/get-reply-from-config.runtime.js", () => ({
     gatewayTestHoisted.getReplyFromConfig(...args),
 }));
 vi.mock("../cli/deps.js", async () => {
-  const actual = await vi.importActual<typeof import("../cli/deps.js")>("../cli/deps.js");
+  const actual = await import("../cli/deps.js");
   const base = actual.createDefaultDeps();
   return {
     ...actual,
@@ -263,8 +253,7 @@ vi.mock("../cli/deps.js", async () => {
 });
 
 vi.mock("../plugins/loader.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../plugins/loader.js")>("../plugins/loader.js");
+  const actual = await import("../plugins/loader.js");
   return {
     ...actual,
     loadOpenClawPlugins: () => getTestPluginRegistry(),

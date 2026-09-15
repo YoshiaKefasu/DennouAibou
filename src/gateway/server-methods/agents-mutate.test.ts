@@ -39,8 +39,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: () => mocks.loadConfigReturn,
@@ -62,9 +61,7 @@ vi.mock("../../agents/agent-scope.js", () => ({
 }));
 
 vi.mock("../../agents/workspace.js", async () => {
-  const actual = await vi.importActual<typeof import("../../agents/workspace.js")>(
-    "../../agents/workspace.js",
-  );
+  const actual = await import("../../agents/workspace.js");
   return {
     ...actual,
     ensureAgentWorkspace: mocks.ensureAgentWorkspace,
@@ -81,7 +78,7 @@ vi.mock("../../plugin-sdk/browser-maintenance.js", () => ({
 }));
 
 vi.mock("../../utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../../utils.js")>("../../utils.js");
+  const actual = await import("../../utils.js");
   return {
     ...actual,
     resolveUserPath: (p: string) => `/resolved${p.startsWith("/") ? "" : "/"}${p}`,
@@ -93,8 +90,7 @@ vi.mock("../session-utils.js", () => ({
 }));
 
 vi.mock("../../infra/fs-safe.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../infra/fs-safe.js")>("../../infra/fs-safe.js");
+  const actual = await import("../../infra/fs-safe.js");
   return {
     ...actual,
     appendFileWithinRoot: mocks.appendFileWithinRoot,
@@ -106,7 +102,7 @@ vi.mock("../../infra/fs-safe.js", async () => {
 // which resolves to the module namespace default, so we spread actual and
 // override the methods we need, plus set `default` explicitly.
 vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const actual = await import("node:fs/promises");
   const patched = {
     ...actual,
     access: mocks.fsAccess,

@@ -11,9 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../agents/agent-scope.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/agent-scope.js")>(
-    "../agents/agent-scope.js",
-  );
+  const actual = await import("../agents/agent-scope.js");
   return {
     ...actual,
     resolveAgentDir: vi.fn(() => "/tmp/agent"),
@@ -23,9 +21,7 @@ vi.mock("../agents/agent-scope.js", async () => {
   };
 });
 vi.mock("../agents/model-selection.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/model-selection.js")>(
-    "../agents/model-selection.js",
-  );
+  const actual = await import("../agents/model-selection.js");
   return {
     ...actual,
     resolveModelRefFromString: vi.fn(() => null),

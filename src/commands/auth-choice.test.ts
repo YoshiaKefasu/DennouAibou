@@ -37,9 +37,7 @@ vi.mock("./openai-codex-oauth.js", () => ({
 
 const resolvePluginProviders = vi.hoisted(() => vi.fn<() => ProviderPlugin[]>(() => []));
 vi.mock("../plugins/provider-auth-choice.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/provider-auth-choice.runtime.js")>(
-    "../plugins/provider-auth-choice.runtime.js",
-  );
+  const actual = await import("../plugins/provider-auth-choice.runtime.js");
   return {
     ...actual,
     resolvePluginProviders,

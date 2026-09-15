@@ -32,7 +32,7 @@ const spawnSync = vi.hoisted(() =>
 );
 
 vi.mock("../utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../utils.js")>("../utils.js");
+  const actual = await import("../utils.js");
   return {
     ...actual,
     sleep: (ms: number) => sleepMock(ms),
@@ -40,7 +40,7 @@ vi.mock("../utils.js", async () => {
 });
 
 vi.mock("node:child_process", async () => {
-  const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+  const actual = await import("node:child_process");
   return {
     ...actual,
     spawn,

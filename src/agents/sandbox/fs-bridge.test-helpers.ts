@@ -28,9 +28,7 @@ vi.mock("./docker.js", () => ({
 }));
 
 vi.mock("./fs-bridge-path-safety.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("./fs-bridge-path-safety.runtime.js")>(
-    "./fs-bridge-path-safety.runtime.js",
-  );
+  const actual = await import("./fs-bridge-path-safety.runtime.js");
   actualOpenBoundaryFile = actual.openBoundaryFile;
   return {
     ...actual,
@@ -51,9 +49,7 @@ async function loadFreshFsBridgeModuleForTest() {
       hoisted.execDockerRaw(args, opts),
   }));
   vi.doMock("./fs-bridge-path-safety.runtime.js", async () => {
-    const actual = await vi.importActual<typeof import("./fs-bridge-path-safety.runtime.js")>(
-      "./fs-bridge-path-safety.runtime.js",
-    );
+    const actual = await import("./fs-bridge-path-safety.runtime.js");
     actualOpenBoundaryFile = actual.openBoundaryFile;
     return {
       ...actual,

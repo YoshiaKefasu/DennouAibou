@@ -19,8 +19,7 @@ const {
 }));
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     readConfigFileSnapshot: readConfigFileSnapshotMock,
@@ -30,8 +29,7 @@ vi.mock("../../config/config.js", async () => {
 });
 
 vi.mock("../../plugins/status.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../plugins/status.js")>("../../plugins/status.js");
+  const actual = await import("../../plugins/status.js");
   return {
     ...actual,
     buildPluginSnapshotReport: buildPluginSnapshotReportMock,

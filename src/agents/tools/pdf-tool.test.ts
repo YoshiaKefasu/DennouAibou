@@ -21,8 +21,7 @@ import {
 const completeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@earendil-works/pi-ai", async () => {
-  const actual =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+  const actual = await import("@earendil-works/pi-ai");
   return {
     ...actual,
     complete: completeMock,
@@ -30,9 +29,7 @@ vi.mock("@earendil-works/pi-ai", async () => {
 });
 
 vi.mock("@earendil-works/pi-ai/compat", async () => {
-  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
-    "@earendil-works/pi-ai/compat",
-  );
+  const actual = await import("@earendil-works/pi-ai/compat");
   return {
     ...actual,
     complete: completeMock,

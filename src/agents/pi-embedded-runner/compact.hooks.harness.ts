@@ -202,9 +202,7 @@ export async function loadCompactHooksHarness(): Promise<{
   }));
 
   vi.doMock("../../hooks/internal-hooks.js", async () => {
-    const actual = await vi.importActual<typeof import("../../hooks/internal-hooks.js")>(
-      "../../hooks/internal-hooks.js",
-    );
+    const actual = await import("../../hooks/internal-hooks.js");
     return {
       ...actual,
       triggerInternalHook,
@@ -212,9 +210,7 @@ export async function loadCompactHooksHarness(): Promise<{
   });
 
   vi.doMock("@earendil-works/pi-ai/oauth", async () => {
-    const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
-      "@earendil-works/pi-ai/oauth",
-    );
+    const actual = await import("@earendil-works/pi-ai/oauth");
     return {
       ...actual,
       getOAuthApiKey: vi.fn(),
@@ -487,9 +483,7 @@ export async function loadCompactHooksHarness(): Promise<{
   }));
 
   vi.doMock("../../utils/message-channel.js", async () => {
-    const actual = await vi.importActual<typeof import("../../utils/message-channel.js")>(
-      "../../utils/message-channel.js",
-    );
+    const actual = await import("../../utils/message-channel.js");
     return {
       ...actual,
       normalizeMessageChannel: vi.fn(() => undefined),

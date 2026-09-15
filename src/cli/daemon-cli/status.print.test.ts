@@ -12,8 +12,7 @@ vi.mock("../../runtime.js", () => ({
 }));
 
 vi.mock("../../terminal/theme.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../terminal/theme.js")>("../../terminal/theme.js");
+  const actual = await import("../../terminal/theme.js");
   return {
     ...actual,
     colorize: (_rich: boolean, _theme: unknown, text: string) => text,

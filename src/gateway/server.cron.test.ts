@@ -38,7 +38,7 @@ vi.mock("../infra/net/fetch-guard.js", () => ({
 }));
 
 vi.mock("../cron/delivery.js", async () => {
-  const actual = await vi.importActual<typeof import("../cron/delivery.js")>("../cron/delivery.js");
+  const actual = await import("../cron/delivery.js");
   return {
     ...actual,
     sendFailureNotificationAnnounce: (...args: unknown[]) =>

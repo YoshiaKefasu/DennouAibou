@@ -22,9 +22,7 @@ let createResolverContext: typeof import("./runtime-shared.js").createResolverCo
 let resolveRuntimeWebTools: typeof import("./runtime-web-tools.js").resolveRuntimeWebTools;
 
 vi.mock("../plugins/web-search-providers.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/web-search-providers.runtime.js")>(
-    "../plugins/web-search-providers.runtime.js",
-  );
+  const actual = await import("../plugins/web-search-providers.runtime.js");
   return {
     ...actual,
     resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
@@ -32,9 +30,7 @@ vi.mock("../plugins/web-search-providers.runtime.js", async () => {
 });
 
 vi.mock("../plugins/web-fetch-providers.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/web-fetch-providers.runtime.js")>(
-    "../plugins/web-fetch-providers.runtime.js",
-  );
+  const actual = await import("../plugins/web-fetch-providers.runtime.js");
   return {
     ...actual,
     resolvePluginWebFetchProviders: resolvePluginWebFetchProvidersMock,

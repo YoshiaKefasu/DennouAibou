@@ -14,8 +14,7 @@ const shellEnvMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../infra/shell-env.js", async () => {
-  const mod =
-    await vi.importActual<typeof import("../infra/shell-env.js")>("../infra/shell-env.js");
+  const mod = await import("../infra/shell-env.js");
   return {
     ...mod,
     getShellPathFromLoginShell: shellEnvMocks.getShellPathFromLoginShell,
@@ -24,9 +23,7 @@ vi.mock("../infra/shell-env.js", async () => {
 });
 
 vi.mock("../infra/exec-approvals.js", async () => {
-  const mod = await vi.importActual<typeof import("../infra/exec-approvals.js")>(
-    "../infra/exec-approvals.js",
-  );
+  const mod = await import("../infra/exec-approvals.js");
   return { ...mod, resolveExecApprovals: () => createExecApprovals() };
 });
 

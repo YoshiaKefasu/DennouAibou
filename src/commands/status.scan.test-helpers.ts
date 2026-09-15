@@ -189,7 +189,7 @@ export async function loadStatusScanModuleForTest(
   }
 
   vi.doMock("../config/paths.js", async () => {
-    const actual = await vi.importActual<typeof import("../config/paths.js")>("../config/paths.js");
+    const actual = await import("../config/paths.js");
     return {
       ...actual,
       resolveConfigPath: mocks.resolveConfigPath,

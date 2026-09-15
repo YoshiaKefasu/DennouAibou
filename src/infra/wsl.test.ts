@@ -5,7 +5,7 @@ const readFileSyncMock = vi.hoisted(() => vi.fn());
 const readFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const actual = await import("node:fs");
   return {
     ...actual,
     readFileSync: readFileSyncMock,
@@ -13,7 +13,7 @@ vi.mock("node:fs", async () => {
 });
 
 vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const actual = await import("node:fs/promises");
   return {
     ...actual,
     default: {

@@ -39,7 +39,7 @@ const defaultGatewayMock = async (
 callGatewayFromCli.mockImplementation(defaultGatewayMock);
 
 vi.mock("./gateway-rpc.js", async () => {
-  const actual = await vi.importActual<typeof import("./gateway-rpc.js")>("./gateway-rpc.js");
+  const actual = await import("./gateway-rpc.js");
   return {
     ...actual,
     callGatewayFromCli: (method: string, opts: unknown, params?: unknown, extra?: unknown) =>

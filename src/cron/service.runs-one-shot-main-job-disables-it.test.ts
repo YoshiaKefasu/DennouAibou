@@ -60,7 +60,7 @@ async function makeStorePath() {
 }
 
 vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const actual = await import("node:fs");
   const pathMod = await import("node:path");
   const absInMock = (p: string) => pathMod.resolve(p);
   const isFixtureInMock = (p: string) => {
@@ -156,7 +156,7 @@ vi.mock("node:fs", async () => {
 });
 
 vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const actual = await import("node:fs/promises");
   const wrapped = {
     ...actual,
     mkdir: async (p: string, _opts?: unknown) => {

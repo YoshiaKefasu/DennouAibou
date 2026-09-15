@@ -73,8 +73,7 @@ vi.mock("../gateway/client.js", () => ({
 }));
 
 vi.mock("./onboard-helpers.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./onboard-helpers.js")>("./onboard-helpers.js");
+  const actual = await import("./onboard-helpers.js");
   return {
     ...actual,
     ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,

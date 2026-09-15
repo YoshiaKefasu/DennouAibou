@@ -65,9 +65,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../infra/outbound/message-action-runner.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../infra/outbound/message-action-runner.js")
-  >("../../infra/outbound/message-action-runner.js");
+  const actual = await import("../../infra/outbound/message-action-runner.js");
   return {
     ...actual,
     runMessageAction: mocks.runMessageAction,
@@ -75,8 +73,7 @@ vi.mock("../../infra/outbound/message-action-runner.js", async () => {
 });
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: mocks.loadConfig,

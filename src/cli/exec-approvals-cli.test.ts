@@ -74,7 +74,7 @@ vi.mock("./gateway-rpc.js", () => ({
 }));
 
 vi.mock("./nodes-cli/rpc.js", async () => {
-  const actual = await vi.importActual<typeof import("./nodes-cli/rpc.js")>("./nodes-cli/rpc.js");
+  const actual = await import("./nodes-cli/rpc.js");
   return {
     ...actual,
     resolveNodeId: vi.fn(async () => "node-1"),
@@ -86,7 +86,7 @@ vi.mock("../runtime.js", () => ({
 }));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     readBestEffortConfig: mocks.readBestEffortConfig,
@@ -94,9 +94,7 @@ vi.mock("../config/config.js", async () => {
 });
 
 vi.mock("../infra/exec-approvals.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/exec-approvals.js")>(
-    "../infra/exec-approvals.js",
-  );
+  const actual = await import("../infra/exec-approvals.js");
   return {
     ...actual,
     readExecApprovalsSnapshot: () => localSnapshot,

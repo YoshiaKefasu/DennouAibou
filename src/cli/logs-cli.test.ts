@@ -30,7 +30,7 @@ vi.mock("../logging/log-tail.js", () => ({
 }));
 
 vi.mock("./gateway-rpc.js", async () => {
-  const actual = await vi.importActual<typeof import("./gateway-rpc.js")>("./gateway-rpc.js");
+  const actual = await import("./gateway-rpc.js");
   return {
     ...actual,
     callGatewayFromCli: (...args: Parameters<typeof actual.callGatewayFromCli>) =>

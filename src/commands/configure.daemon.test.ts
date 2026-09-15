@@ -51,8 +51,7 @@ vi.mock("./daemon-runtime.js", () => ({
 }));
 
 vi.mock("../daemon/service.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../daemon/service.js")>("../daemon/service.js");
+  const actual = await import("../daemon/service.js");
   return {
     ...actual,
     resolveGatewayService: vi.fn(() => ({

@@ -49,9 +49,7 @@ vi.mock("./gateway.ts", () => ({
 }));
 
 const { handleGatewayEvent } = await import("./app-gateway.ts");
-const { addExecApproval } = await vi.importActual<typeof import("./controllers/exec-approval.ts")>(
-  "./controllers/exec-approval.ts",
-);
+const { addExecApproval } = await import("./controllers/exec-approval.ts");
 
 function createHost() {
   return {

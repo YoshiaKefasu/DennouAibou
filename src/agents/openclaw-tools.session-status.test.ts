@@ -80,8 +80,7 @@ function installScopedSessionStores(syncUpdates = false) {
 }
 
 async function createSessionsModuleMock() {
-  const actual =
-    await vi.importActual<typeof import("../config/sessions.js")>("../config/sessions.js");
+  const actual = await import("../config/sessions.js");
   return {
     ...actual,
     loadSessionStore: (storePath: string) => loadSessionStoreMock(storePath),
@@ -106,9 +105,7 @@ function createGatewayCallModuleMock() {
 }
 
 async function createGatewaySessionUtilsModuleMock() {
-  const actual = await vi.importActual<typeof import("../gateway/session-utils.js")>(
-    "../gateway/session-utils.js",
-  );
+  const actual = await import("../gateway/session-utils.js");
   return {
     ...actual,
     loadCombinedSessionStoreForGateway: (cfg: unknown) =>
@@ -117,7 +114,7 @@ async function createGatewaySessionUtilsModuleMock() {
 }
 
 async function createConfigModuleMock() {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: () => mockConfig,

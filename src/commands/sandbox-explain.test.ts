@@ -6,7 +6,7 @@ const SANDBOX_EXPLAIN_TEST_TIMEOUT_MS = process.platform === "win32" ? 45_000 : 
 let mockCfg: unknown = {};
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: vi.fn().mockImplementation(() => mockCfg),

@@ -549,9 +549,7 @@ vi.mock("../channel-web.js", () => ({
 }));
 
 vi.mock("../channels/plugins/catalog.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/plugins/catalog.js")>(
-    "../channels/plugins/catalog.js",
-  );
+  const actual = await import("../channels/plugins/catalog.js");
   return {
     ...actual,
     listChannelPluginCatalogEntries: ((...args) => {
@@ -565,9 +563,7 @@ vi.mock("../channels/plugins/catalog.js", async () => {
 });
 
 vi.mock("../plugins/manifest-registry.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/manifest-registry.js")>(
-    "../plugins/manifest-registry.js",
-  );
+  const actual = await import("../plugins/manifest-registry.js");
   return {
     ...actual,
     loadPluginManifestRegistry: manifestRegistryMocks.loadPluginManifestRegistry,
@@ -584,7 +580,7 @@ vi.mock("./onboard-helpers.js", () => ({
 }));
 
 vi.mock("./channel-setup/plugin-install.js", async () => {
-  const actual = await vi.importActual("./channel-setup/plugin-install.js");
+  const actual = await import("./channel-setup/plugin-install.js");
   return {
     ...(actual as Record<string, unknown>),
     ensureChannelSetupPluginInstalled: vi.fn(async ({ cfg }: { cfg: OpenClawConfig }) => ({

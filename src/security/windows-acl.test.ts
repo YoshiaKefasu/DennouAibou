@@ -15,7 +15,7 @@ const userInfoMock = vi.hoisted(() =>
 vi.mock("node:os", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
   return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:os")>("node:os"),
+    () => import("node:os"),
     { userInfo: userInfoMock as unknown as typeof import("node:os").userInfo },
     { mirrorToDefault: true },
   );

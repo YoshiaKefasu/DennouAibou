@@ -16,7 +16,7 @@ const inspectPortUsage = vi.hoisted(() => vi.fn());
 const readLastGatewayErrorLine = vi.hoisted(() => vi.fn(async () => null));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     resolveGatewayPort: vi.fn(() => 18789),
@@ -33,8 +33,7 @@ vi.mock("../daemon/diagnostics.js", () => ({
 }));
 
 vi.mock("../daemon/launchd.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../daemon/launchd.js")>("../daemon/launchd.js");
+  const actual = await import("../daemon/launchd.js");
   return {
     ...actual,
     isLaunchAgentListed: vi.fn(async () => false),
@@ -45,8 +44,7 @@ vi.mock("../daemon/launchd.js", async () => {
 });
 
 vi.mock("../daemon/service.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../daemon/service.js")>("../daemon/service.js");
+  const actual = await import("../daemon/service.js");
   return {
     ...actual,
     resolveGatewayService: () => service,
@@ -58,8 +56,7 @@ vi.mock("../daemon/systemd-hints.js", () => ({
 }));
 
 vi.mock("../daemon/systemd.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../daemon/systemd.js")>("../daemon/systemd.js");
+  const actual = await import("../daemon/systemd.js");
   return {
     ...actual,
     isSystemdUserServiceAvailable: vi.fn(async () => true),
@@ -80,7 +77,7 @@ vi.mock("../terminal/note.js", () => ({
 }));
 
 vi.mock("../utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../utils.js")>("../utils.js");
+  const actual = await import("../utils.js");
   return {
     ...actual,
     sleep,

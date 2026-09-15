@@ -65,9 +65,7 @@ const conversationStoreMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/conversation-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/conversation-runtime")>(
-    "openclaw/plugin-sdk/conversation-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/conversation-runtime");
   return {
     ...actual,
     resolveConfiguredBindingRoute: persistentBindingMocks.resolveConfiguredBindingRoute,
@@ -107,9 +105,7 @@ vi.mock("openclaw/plugin-sdk/conversation-runtime", async () => {
   };
 });
 vi.mock("./bot-native-commands.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("./bot-native-commands.runtime.js")>(
-    "./bot-native-commands.runtime.js",
-  );
+  const actual = await import("./bot-native-commands.runtime.js");
   return {
     ...actual,
     finalizeInboundContext: vi.fn((ctx: unknown) => ctx),

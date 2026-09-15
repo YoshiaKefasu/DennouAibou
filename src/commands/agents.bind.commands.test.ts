@@ -10,9 +10,7 @@ import {
 import { baseConfigSnapshot } from "./test-runtime-config-helpers.js";
 
 vi.mock("../channels/plugins/index.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/plugins/index.js")>(
-    "../channels/plugins/index.js",
-  );
+  const actual = await import("../channels/plugins/index.js");
   const knownChannels = new Map([
     [
       "discord",

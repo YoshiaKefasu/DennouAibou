@@ -4,7 +4,7 @@ import { __testing, resolveCliChannelOptions } from "./channel-options.js";
 const readFileSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const actual = await import("node:fs");
   const base = ("default" in actual ? actual.default : actual) as Record<string, unknown>;
   return {
     ...actual,

@@ -143,8 +143,7 @@ async function loadFreshModelsStatusCommandModuleForTest() {
     shouldEnableShellEnvFallback: mocks.shouldEnableShellEnvFallback,
   }));
   vi.doMock("../../config/config.js", async () => {
-    const actual =
-      await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+    const actual = await import("../../config/config.js");
     return {
       ...actual,
       createConfigIO: mocks.createConfigIO,

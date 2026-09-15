@@ -17,7 +17,7 @@ const childProcessMocks = vi.hoisted(() => ({
 
 vi.mock("../agents/sandbox.js", () => sandboxMocks);
 vi.mock("node:child_process", async () => {
-  const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+  const actual = await import("node:child_process");
   return {
     ...actual,
     spawn: childProcessMocks.spawn,

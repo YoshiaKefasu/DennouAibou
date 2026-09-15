@@ -23,14 +23,14 @@ async function loadFreshStageSandboxMediaModuleForTest() {
   vi.resetModules();
   vi.doMock(sandboxModuleId, () => sandboxMocks);
   vi.doMock("node:child_process", async () => {
-    const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+    const actual = await import("node:child_process");
     return {
       ...actual,
       spawn: childProcessMocks.spawn,
     };
   });
   vi.doMock(fsSafeModuleId, async () => {
-    const actual = await vi.importActual<typeof import("../infra/fs-safe.js")>(fsSafeModuleId);
+    const actual = await import(fsSafeModuleId);
     return {
       ...actual,
       copyFileWithinRoot: vi.fn(async ({ sourcePath, rootDir, relativePath, maxBytes }) => {

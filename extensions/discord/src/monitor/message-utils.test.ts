@@ -6,7 +6,7 @@ const fetchRemoteMedia = vi.fn();
 const saveMediaBuffer = vi.fn();
 
 vi.mock("openclaw/plugin-sdk/media-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/media-runtime")>(
+  const actual = await import(
     "openclaw/plugin-sdk/media-runtime",
   );
   return {
@@ -17,7 +17,7 @@ vi.mock("openclaw/plugin-sdk/media-runtime", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/runtime-env", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/runtime-env")>(
+  const actual = await import(
     "openclaw/plugin-sdk/runtime-env",
   );
   return {

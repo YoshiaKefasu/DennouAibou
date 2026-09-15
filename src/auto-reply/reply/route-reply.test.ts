@@ -17,9 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../infra/outbound/deliver-runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../../infra/outbound/deliver-runtime.js")>(
-    "../../infra/outbound/deliver-runtime.js",
-  );
+  const actual = await import("../../infra/outbound/deliver-runtime.js");
   return {
     ...actual,
     deliverOutboundPayloads: mocks.deliverOutboundPayloads,

@@ -638,8 +638,7 @@ vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async
 });
 
 vi.mock("./onboard-helpers.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./onboard-helpers.js")>("./onboard-helpers.js");
+  const actual = await import("./onboard-helpers.js");
   return {
     ...actual,
     ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,

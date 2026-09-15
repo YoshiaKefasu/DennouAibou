@@ -45,9 +45,7 @@ vi.mock("../logging/subsystem.js", () => {
 });
 
 vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/auth-profiles.js")>(
-    "../agents/auth-profiles.js",
-  );
+  const actual = await import("../agents/auth-profiles.js");
   return {
     ...actual,
     ensureAuthProfileStore: vi.fn(() => ({ version: 1, profiles: {} })),
@@ -66,9 +64,7 @@ vi.mock("../agents/workspace.js", () => {
 });
 
 vi.mock("../agents/command/session-store.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/command/session-store.js")>(
-    "../agents/command/session-store.js",
-  );
+  const actual = await import("../agents/command/session-store.js");
   return {
     ...actual,
     updateSessionStoreAfterAgentRun: vi.fn(async () => undefined),

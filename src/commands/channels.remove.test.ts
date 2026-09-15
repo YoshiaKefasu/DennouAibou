@@ -20,9 +20,7 @@ const catalogMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../channels/plugins/catalog.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/plugins/catalog.js")>(
-    "../channels/plugins/catalog.js",
-  );
+  const actual = await import("../channels/plugins/catalog.js");
   return {
     ...actual,
     listChannelPluginCatalogEntries: catalogMocks.listChannelPluginCatalogEntries,
@@ -30,9 +28,7 @@ vi.mock("../channels/plugins/catalog.js", async () => {
 });
 
 vi.mock("./channel-setup/plugin-install.js", async () => {
-  const actual = await vi.importActual<typeof import("./channel-setup/plugin-install.js")>(
-    "./channel-setup/plugin-install.js",
-  );
+  const actual = await import("./channel-setup/plugin-install.js");
   const { createMockChannelSetupPluginInstallModule } =
     await import("./channels.plugin-install.test-helpers.js");
   return createMockChannelSetupPluginInstallModule(actual);

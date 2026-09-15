@@ -7,15 +7,11 @@ describe("get-reply module imports", () => {
     const sandboxMediaRuntimeLoads = vi.fn();
     vi.doMock("./session-reset-model.runtime.js", async () => {
       resetModelRuntimeLoads();
-      return await vi.importActual<typeof import("./session-reset-model.runtime.js")>(
-        "./session-reset-model.runtime.js",
-      );
+      return await import("./session-reset-model.runtime.js");
     });
     vi.doMock("./stage-sandbox-media.runtime.js", async () => {
       sandboxMediaRuntimeLoads();
-      return await vi.importActual<typeof import("./stage-sandbox-media.runtime.js")>(
-        "./stage-sandbox-media.runtime.js",
-      );
+      return await import("./stage-sandbox-media.runtime.js");
     });
 
     await importFreshModule<typeof import("./get-reply.js")>(

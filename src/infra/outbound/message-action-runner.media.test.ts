@@ -128,9 +128,7 @@ vi.mock("./message-action-threading.js", () => ({
 }));
 
 vi.mock("../../media/web-media.js", async () => {
-  const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
-    "../../media/web-media.js",
-  );
+  const actual = await import("../../media/web-media.js");
   return {
     ...actual,
     loadWebMedia: vi.fn(actual.loadWebMedia),
@@ -234,9 +232,7 @@ const slackPlugin: ChannelPlugin = {
 
 describe("runMessageAction media behavior", () => {
   beforeEach(async () => {
-    actualLoadWebMedia ??= (
-      await vi.importActual<typeof import("../../media/web-media.js")>("../../media/web-media.js")
-    ).loadWebMedia;
+    actualLoadWebMedia ??= (await import("../../media/web-media.js")).loadWebMedia;
     vi.restoreAllMocks();
     vi.clearAllMocks();
     channelResolutionMocks.resolveOutboundChannelPlugin.mockReset();
@@ -348,9 +344,7 @@ describe("runMessageAction media behavior", () => {
     });
 
     async function restoreRealMediaLoader() {
-      const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
-        "../../media/web-media.js",
-      );
+      const actual = await import("../../media/web-media.js");
       (loadWebMedia as Mock).mockImplementation(actual.loadWebMedia);
     }
 

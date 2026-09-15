@@ -20,8 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: () => ({}),
@@ -85,9 +84,7 @@ vi.mock("../../infra/outbound/deliver.js", () => ({
 }));
 
 vi.mock("../../config/sessions.js", async () => {
-  const actual = await vi.importActual<typeof import("../../config/sessions.js")>(
-    "../../config/sessions.js",
-  );
+  const actual = await import("../../config/sessions.js");
   return {
     ...actual,
     appendAssistantMessageToSessionTranscript: mocks.appendAssistantMessageToSessionTranscript,

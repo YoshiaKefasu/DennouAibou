@@ -249,7 +249,7 @@ export const baseConfig = (): OpenClawConfig =>
   }) as OpenClawConfig;
 
 vi.mock("@buape/carbon", async () => {
-  const actual = await vi.importActual<typeof import("@buape/carbon")>("@buape/carbon");
+  const actual = await import("@buape/carbon");
   class RateLimitError extends Error {
     status = 429;
     discordCode?: number;
@@ -298,9 +298,7 @@ vi.mock("@buape/carbon/voice", () => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/command-auth", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/command-auth")>(
-    "openclaw/plugin-sdk/command-auth",
-  );
+  const actual = await import("openclaw/plugin-sdk/command-auth");
   return {
     ...actual,
     listNativeCommandSpecsForConfig: listNativeCommandSpecsForConfigMock,
@@ -308,9 +306,7 @@ vi.mock("openclaw/plugin-sdk/command-auth", async () => {
   };
 });
 vi.mock("openclaw/plugin-sdk/reply-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/reply-runtime")>(
-    "openclaw/plugin-sdk/reply-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/reply-runtime");
   return {
     ...actual,
     resolveTextChunkLimit: () => 2000,
@@ -318,9 +314,7 @@ vi.mock("openclaw/plugin-sdk/reply-runtime", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/config-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/config-runtime")>(
-    "openclaw/plugin-sdk/config-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/config-runtime");
   return {
     ...actual,
     isNativeCommandsExplicitlyDisabled: () => false,
@@ -331,9 +325,7 @@ vi.mock("openclaw/plugin-sdk/config-runtime", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/runtime-env", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/runtime-env")>(
-    "openclaw/plugin-sdk/runtime-env",
-  );
+  const actual = await import("openclaw/plugin-sdk/runtime-env");
   return {
     ...actual,
     danger: (value: string) => value,
@@ -356,9 +348,7 @@ vi.mock("openclaw/plugin-sdk/runtime-env", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/infra-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/infra-runtime")>(
-    "openclaw/plugin-sdk/infra-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/infra-runtime");
   return {
     ...actual,
     formatErrorMessage: (error: unknown) => String(error),

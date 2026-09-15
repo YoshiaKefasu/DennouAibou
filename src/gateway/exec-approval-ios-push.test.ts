@@ -28,9 +28,7 @@ vi.mock("../config/config.js", () => ({
 }));
 
 vi.mock("../infra/device-pairing.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/device-pairing.js")>(
-    "../infra/device-pairing.js",
-  );
+  const actual = await import("../infra/device-pairing.js");
   return {
     ...actual,
     listDevicePairing: listDevicePairingMock,

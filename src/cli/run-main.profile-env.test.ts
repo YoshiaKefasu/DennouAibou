@@ -23,7 +23,7 @@ const maybeRunCliInContainerMock = vi.hoisted(() =>
 );
 
 vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const actual = await import("node:fs");
   type ExistsSyncPath = Parameters<typeof actual.existsSync>[0];
   return {
     ...actual,
@@ -61,8 +61,7 @@ vi.mock("./windows-argv.js", () => ({
 }));
 
 vi.mock("./container-target.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./container-target.js")>("./container-target.js");
+  const actual = await import("./container-target.js");
   return {
     ...actual,
     maybeRunCliInContainer: maybeRunCliInContainerMock,

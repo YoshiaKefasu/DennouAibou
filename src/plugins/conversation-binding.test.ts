@@ -92,8 +92,7 @@ const pluginRuntimeState = vi.hoisted(
 );
 
 vi.mock("../infra/home-dir.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../infra/home-dir.js")>("../infra/home-dir.js");
+  const actual = await import("../infra/home-dir.js");
   return {
     ...actual,
     expandHomePrefix: (value: string) => {
@@ -380,8 +379,7 @@ describe("plugin conversation binding approvals", () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.doMock("../infra/home-dir.js", async () => {
-      const actual =
-        await vi.importActual<typeof import("../infra/home-dir.js")>("../infra/home-dir.js");
+      const actual = await import("../infra/home-dir.js");
       return {
         ...actual,
         expandHomePrefix: (value: string) => {

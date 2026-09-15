@@ -10,9 +10,7 @@ const { resolveControlUiRootSyncMock, isPackageProvenControlUiRootSyncMock } = v
 }));
 
 vi.mock("../infra/control-ui-assets.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/control-ui-assets.js")>(
-    "../infra/control-ui-assets.js",
-  );
+  const actual = await import("../infra/control-ui-assets.js");
   return {
     ...actual,
     resolveControlUiRootSync: resolveControlUiRootSyncMock,

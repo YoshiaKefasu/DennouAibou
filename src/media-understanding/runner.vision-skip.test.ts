@@ -26,9 +26,7 @@ let catalog = [...baseCatalog];
 const loadModelCatalog = vi.hoisted(() => vi.fn(async () => catalog));
 
 vi.mock("../agents/model-catalog.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/model-catalog.js")>(
-    "../agents/model-catalog.js",
-  );
+  const actual = await import("../agents/model-catalog.js");
   return {
     ...actual,
     loadModelCatalog,
@@ -75,9 +73,7 @@ function setCompatibleActiveMediaUnderstandingRegistry(
 describe("runCapability image skip", () => {
   beforeAll(async () => {
     vi.doMock("../agents/model-catalog.js", async () => {
-      const actual = await vi.importActual<typeof import("../agents/model-catalog.js")>(
-        "../agents/model-catalog.js",
-      );
+      const actual = await import("../agents/model-catalog.js");
       return {
         ...actual,
         loadModelCatalog,

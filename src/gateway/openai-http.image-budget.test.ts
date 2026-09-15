@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const extractImageContentFromSourceMock = vi.fn();
 
 vi.mock("../media/input-files.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../media/input-files.js")>("../media/input-files.js");
+  const actual = await import("../media/input-files.js");
   return {
     ...actual,
     extractImageContentFromSource: (...args: unknown[]) =>

@@ -7,7 +7,7 @@ const isDeliverableMessageChannelMock = vi.hoisted(() => vi.fn());
 const normalizeMessageChannelMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: (...args: unknown[]) => loadConfigMock(...args),
@@ -15,9 +15,7 @@ vi.mock("../config/config.js", async () => {
 });
 
 vi.mock("../channels/plugins/index.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/plugins/index.js")>(
-    "../channels/plugins/index.js",
-  );
+  const actual = await import("../channels/plugins/index.js");
   return {
     ...actual,
     getChannelPlugin: (...args: unknown[]) => getChannelPluginMock(...args),

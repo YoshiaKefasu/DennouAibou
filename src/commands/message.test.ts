@@ -13,7 +13,7 @@ import { captureEnv } from "../test-utils/env.js";
 let testConfig: Record<string, unknown> = {};
 const applyPluginAutoEnable = vi.hoisted(() => vi.fn(({ config }) => ({ config, changes: [] })));
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: () => testConfig,

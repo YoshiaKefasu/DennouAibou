@@ -6,12 +6,9 @@ const { spawnMock } = vi.hoisted(() => ({
 
 vi.mock("node:child_process", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:child_process")>("node:child_process"),
-    {
-      spawn: (...args: unknown[]) => spawnMock(...args),
-    },
-  );
+  return mockNodeBuiltinModule(() => import("node:child_process"), {
+    spawn: (...args: unknown[]) => spawnMock(...args),
+  });
 });
 
 let killProcessTree: typeof import("./kill-tree.js").killProcessTree;

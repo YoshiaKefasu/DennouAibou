@@ -94,7 +94,7 @@ vi.mock("../routing/session-key.js", () => ({
 }));
 
 vi.mock("../version.js", async () => {
-  const actual = await vi.importActual<typeof import("../version.js")>("../version.js");
+  const actual = await import("../version.js");
   return {
     ...actual,
     resolveRuntimeServiceVersion: vi.fn(() => "2026.3.8"),

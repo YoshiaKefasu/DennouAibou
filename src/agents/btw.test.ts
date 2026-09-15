@@ -17,8 +17,7 @@ const getActiveEmbeddedRunSnapshotMock = vi.fn();
 const diagDebugMock = vi.fn();
 
 vi.mock("@earendil-works/pi-ai", async () => {
-  const original =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+  const original = await import("@earendil-works/pi-ai");
   return {
     ...original,
     streamSimple: (...args: unknown[]) => streamSimpleMock(...args),
@@ -26,9 +25,7 @@ vi.mock("@earendil-works/pi-ai", async () => {
 });
 
 vi.mock("@earendil-works/pi-ai/compat", async () => {
-  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
-    "@earendil-works/pi-ai/compat",
-  );
+  const original = await import("@earendil-works/pi-ai/compat");
   return {
     ...original,
     streamSimple: (...args: unknown[]) => streamSimpleMock(...args),

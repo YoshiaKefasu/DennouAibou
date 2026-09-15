@@ -10,7 +10,7 @@ let MEDIA_DIR = "";
 const cleanOldMedia = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./store.js", async () => {
-  const actual = await vi.importActual<typeof import("./store.js")>("./store.js");
+  const actual = await import("./store.js");
   return {
     ...actual,
     getMediaDir: () => MEDIA_DIR,

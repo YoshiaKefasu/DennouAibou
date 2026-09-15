@@ -11,9 +11,7 @@ const resolveWideAreaDiscoveryDomain = vi.hoisted(() => vi.fn(() => undefined));
 const detectBinary = vi.hoisted(() => vi.fn<(name: string) => Promise<boolean>>());
 
 vi.mock("../infra/bonjour-discovery.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/bonjour-discovery.js")>(
-    "../infra/bonjour-discovery.js",
-  );
+  const actual = await import("../infra/bonjour-discovery.js");
   return {
     ...actual,
     discoverGatewayBeacons,

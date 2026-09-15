@@ -2,8 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-const { loadConfig, readConfigFileSnapshot, validateConfigObject } =
-  await vi.importActual<typeof import("./config.js")>("./config.js");
+const { loadConfig, readConfigFileSnapshot, validateConfigObject } = await import("./config.js");
 import { withTempHome } from "./test-helpers.js";
 
 async function expectLoadRejectionPreservesField(params: {

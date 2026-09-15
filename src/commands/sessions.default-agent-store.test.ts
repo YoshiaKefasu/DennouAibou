@@ -28,7 +28,7 @@ const resolveStorePathMock = vi.hoisted(() =>
 const loadSessionStoreMock = vi.hoisted(() => vi.fn(() => ({})));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: loadConfigMock,
@@ -36,8 +36,7 @@ vi.mock("../config/config.js", async () => {
 });
 
 vi.mock("../config/sessions.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../config/sessions.js")>("../config/sessions.js");
+  const actual = await import("../config/sessions.js");
   return {
     ...actual,
     resolveStorePath: resolveStorePathMock,

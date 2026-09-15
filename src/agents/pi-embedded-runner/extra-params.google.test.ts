@@ -4,15 +4,11 @@ import { createPiAiStreamSimpleMock } from "./extra-params.pi-ai-mock.js";
 import { runExtraParamsCase } from "./extra-params.test-support.js";
 
 vi.mock("@earendil-works/pi-ai", async () =>
-  createPiAiStreamSimpleMock(() =>
-    vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai"),
-  ),
+  createPiAiStreamSimpleMock(() => import("@earendil-works/pi-ai")),
 );
 
 vi.mock("@earendil-works/pi-ai/compat", async () =>
-  createPiAiStreamSimpleMock(() =>
-    vi.importActual<typeof import("@earendil-works/pi-ai/compat")>("@earendil-works/pi-ai/compat"),
-  ),
+  createPiAiStreamSimpleMock(() => import("@earendil-works/pi-ai/compat")),
 );
 
 describe("extra-params: Google thinking payload compatibility", () => {

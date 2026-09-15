@@ -87,8 +87,7 @@ describe("shared runtime seam contracts", () => {
       diagnostics: [],
     });
     vi.doMock("../manifest-registry.js", async () => {
-      const actual =
-        await vi.importActual<typeof import("../manifest-registry.js")>("../manifest-registry.js");
+      const actual = await import("../manifest-registry.js");
       return {
         ...actual,
         loadPluginManifestRegistry: (

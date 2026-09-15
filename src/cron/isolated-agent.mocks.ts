@@ -15,9 +15,7 @@ vi.mock("../agents/model-catalog.js", () => ({
 }));
 
 vi.mock("../agents/model-selection.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/model-selection.js")>(
-    "../agents/model-selection.js",
-  );
+  const actual = await import("../agents/model-selection.js");
   return {
     ...actual,
     isCliProvider: vi.fn(() => false),

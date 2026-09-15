@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../session-utils.js", async () => {
-  const actual = await vi.importActual<typeof import("../session-utils.js")>("../session-utils.js");
+  const actual = await import("../session-utils.js");
   return {
     ...actual,
     loadSessionEntry: mocks.loadSessionEntry,
@@ -30,9 +30,7 @@ vi.mock("../session-utils.js", async () => {
 });
 
 vi.mock("../../config/sessions.js", async () => {
-  const actual = await vi.importActual<typeof import("../../config/sessions.js")>(
-    "../../config/sessions.js",
-  );
+  const actual = await import("../../config/sessions.js");
   return {
     ...actual,
     updateSessionStore: mocks.updateSessionStore,
@@ -54,8 +52,7 @@ vi.mock("../../commands/agent.js", () => ({
 }));
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: () => mocks.loadConfigReturn,
@@ -89,9 +86,7 @@ vi.mock("../../sessions/send-policy.js", () => ({
 }));
 
 vi.mock("../../utils/delivery-context.js", async () => {
-  const actual = await vi.importActual<typeof import("../../utils/delivery-context.js")>(
-    "../../utils/delivery-context.js",
-  );
+  const actual = await import("../../utils/delivery-context.js");
   return {
     ...actual,
     normalizeSessionDeliveryFields: () => ({}),

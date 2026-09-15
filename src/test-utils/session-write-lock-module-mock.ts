@@ -20,9 +20,6 @@ export function resetModulesWithSessionWriteLockDoMock(
 ): void {
   vi.resetModules();
   vi.doMock(modulePath, () =>
-    buildSessionWriteLockModuleMock(
-      () => vi.importActual<SessionWriteLockModuleShape>(modulePath),
-      acquireSessionWriteLock,
-    ),
+    buildSessionWriteLockModuleMock(() => import(modulePath), acquireSessionWriteLock),
   );
 }

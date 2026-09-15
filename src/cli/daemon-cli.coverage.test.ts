@@ -71,8 +71,7 @@ vi.mock("../daemon/program-args.js", () => ({
 }));
 
 vi.mock("../daemon/service.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../daemon/service.js")>("../daemon/service.js");
+  const actual = await import("../daemon/service.js");
   return {
     ...actual,
     resolveGatewayService: () => ({
@@ -106,7 +105,7 @@ vi.mock("../infra/ports.js", () => ({
 }));
 
 vi.mock("../runtime.js", async () => ({
-  ...(await vi.importActual<typeof import("../runtime.js")>("../runtime.js")),
+  ...(await import("../runtime.js")),
   defaultRuntime: mocks.defaultRuntime,
 }));
 

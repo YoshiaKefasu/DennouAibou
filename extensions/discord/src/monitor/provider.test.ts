@@ -101,9 +101,7 @@ describe("monitorDiscordProvider", () => {
 
   beforeAll(async () => {
     vi.doMock("openclaw/plugin-sdk/plugin-runtime", async () => {
-      const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/plugin-runtime")>(
-        "openclaw/plugin-sdk/plugin-runtime",
-      );
+      const actual = await import("openclaw/plugin-sdk/plugin-runtime");
       return {
         ...actual,
         getPluginCommandSpecs: getPluginCommandSpecsMock,

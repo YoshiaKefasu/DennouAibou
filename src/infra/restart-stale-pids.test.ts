@@ -30,13 +30,10 @@ const mockReadWindowsProcessArgsResult = vi.hoisted(() =>
 
 vi.mock("node:child_process", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:child_process")>("node:child_process"),
-    {
-      spawnSync: (...args: unknown[]) => mockSpawnSync(...args),
-      execFileSync: vi.fn(),
-    },
-  );
+  return mockNodeBuiltinModule(() => import("node:child_process"), {
+    spawnSync: (...args: unknown[]) => mockSpawnSync(...args),
+    execFileSync: vi.fn(),
+  });
 });
 
 vi.mock("../config/paths.js", () => ({

@@ -25,9 +25,7 @@ const bundledProviderModules = vi.hoisted(() => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/provider-auth", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/provider-auth")>(
-    "openclaw/plugin-sdk/provider-auth",
-  );
+  const actual = await import("openclaw/plugin-sdk/provider-auth");
   return {
     ...actual,
     ensureAuthProfileStore: ensureAuthProfileStoreMock,
@@ -43,9 +41,7 @@ function installDiscoveryHooks(state: DiscoveryState, providerIds: BundledProvid
   beforeEach(async () => {
     clearRuntimeAuthProfileStoreSnapshots();
     vi.mock("openclaw/plugin-sdk/provider-auth", async () => {
-      const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/provider-auth")>(
-        "openclaw/plugin-sdk/provider-auth",
-      );
+      const actual = await import("openclaw/plugin-sdk/provider-auth");
       return {
         ...actual,
         ensureAuthProfileStore: ensureAuthProfileStoreMock,

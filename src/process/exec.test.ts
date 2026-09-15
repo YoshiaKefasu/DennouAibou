@@ -16,8 +16,7 @@ async function loadExecModules(options?: { mockSpawn?: boolean }) {
   vi.resetModules();
   if (options?.mockSpawn) {
     vi.doMock("node:child_process", async () => {
-      const actual =
-        await vi.importActual<typeof import("node:child_process")>("node:child_process");
+      const actual = await import("node:child_process");
       return {
         ...actual,
         spawn: spawnMock,

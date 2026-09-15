@@ -58,7 +58,7 @@ const mockResolveGatewayConnectionAuth = vi.hoisted(() => vi.fn());
 const mockCreateOperatorApprovalsGatewayClient = vi.hoisted(() => vi.fn());
 
 vi.mock("../send.shared.js", async () => {
-  const actual = await vi.importActual<typeof import("../send.shared.js")>("../send.shared.js");
+  const actual = await import("../send.shared.js");
   return {
     ...actual,
     createDiscordClient: () => ({
@@ -73,7 +73,7 @@ vi.mock("../send.shared.js", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/config-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/config-runtime")>(
+  const actual = await import(
     "openclaw/plugin-sdk/config-runtime",
   );
   return {
@@ -151,7 +151,7 @@ vi.mock("../../../../src/gateway/client.js", () => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/text-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/text-runtime")>(
+  const actual = await import(
     "openclaw/plugin-sdk/text-runtime",
   );
   return {

@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 
 vi.mock("../../infra/session-cost-usage.js", async () => {
-  const actual = await vi.importActual<typeof import("../../infra/session-cost-usage.js")>(
-    "../../infra/session-cost-usage.js",
-  );
+  const actual = await import("../../infra/session-cost-usage.js");
   return {
     ...actual,
     loadCostUsageSummary: vi.fn(async () => ({

@@ -91,12 +91,9 @@ vi.mock("../infra/system-events.js", () => ({
 }));
 
 vi.mock("../infra/event-pump.js", async () => {
-  return await mergeMockedModule(
-    await vi.importActual<typeof import("../infra/event-pump.js")>("../infra/event-pump.js"),
-    () => ({
-      requestWakeNow: mocks.requestWakeNow,
-    }),
-  );
+  return await mergeMockedModule(await import("../infra/event-pump.js"), () => ({
+    requestWakeNow: mocks.requestWakeNow,
+  }));
 });
 
 vi.mock("../logging/subsystem.js", () => {

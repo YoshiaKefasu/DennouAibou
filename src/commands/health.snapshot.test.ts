@@ -26,8 +26,7 @@ type TelegramHealthAccount = {
 
 async function loadFreshHealthModulesForTest() {
   vi.doMock("../config/config.js", async () => {
-    const actual =
-      await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+    const actual = await import("../config/config.js");
     return {
       ...actual,
       loadConfig: () => testConfig,

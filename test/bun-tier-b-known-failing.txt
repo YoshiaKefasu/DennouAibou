@@ -97,12 +97,13 @@ src/tasks/task-flow-registry.test.ts
 src/agents/subagent-orphan-recovery.test.ts
 src/commands/doctor-state-integrity.test.ts
 
-# structural / unattributed (Phase 3-C1/C2; Bun mock-module API gap)
+# structural / unattributed (Phase 3-C1/C2/C4a; Bun mock-module API gap)
 src/agents/tools/audio-tool.test.ts
 src/gateway/server-methods/usage.test.ts
 src/agents/tools/audio-tool.test.ts
 src/gateway/server-methods/usage.test.ts
 src/commands/doctor-config-flow.missing-default-account-bindings.integration.test.ts
+src/agents/btw.test.ts
 src/cron/isolated-agent.hook-content-wrapping.test.ts
 src/cron/isolated-agent.model-overrides.test.ts
 src/cron/isolated-agent.session-identity.test.ts

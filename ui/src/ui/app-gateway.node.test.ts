@@ -23,7 +23,7 @@ type GatewayClientMock = {
 const gatewayClientInstances: GatewayClientMock[] = [];
 
 vi.mock("./gateway.ts", async () => {
-  const actual = await vi.importActual<typeof import("./gateway.ts")>("./gateway.ts");
+  const actual = await import("./gateway.ts");
 
   function resolveGatewayErrorDetailCode(
     error: { details?: unknown } | null | undefined,
@@ -89,8 +89,7 @@ vi.mock("./gateway.ts", async () => {
 });
 
 vi.mock("./controllers/chat.ts", async () => {
-  const actual =
-    await vi.importActual<typeof import("./controllers/chat.ts")>("./controllers/chat.ts");
+  const actual = await import("./controllers/chat.ts");
   return {
     ...actual,
     loadChatHistory: loadChatHistoryMock,

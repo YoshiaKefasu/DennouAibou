@@ -3,9 +3,7 @@ import { createMockTypingController } from "./reply.test-helpers.js";
 
 export function registerGetReplyCommonMocks(): void {
   vi.mock("../../agents/agent-scope.js", async () => {
-    const actual = await vi.importActual<typeof import("../../agents/agent-scope.js")>(
-      "../../agents/agent-scope.js",
-    );
+    const actual = await import("../../agents/agent-scope.js");
     return {
       ...actual,
       resolveAgentDir: vi.fn(() => "/tmp/agent"),
@@ -15,9 +13,7 @@ export function registerGetReplyCommonMocks(): void {
     };
   });
   vi.mock("../../agents/model-selection.js", async () => {
-    const actual = await vi.importActual<typeof import("../../agents/model-selection.js")>(
-      "../../agents/model-selection.js",
-    );
+    const actual = await import("../../agents/model-selection.js");
     return {
       ...actual,
       resolveModelRefFromString: vi.fn(() => null),

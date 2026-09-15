@@ -18,16 +18,12 @@ vi.mock("../infra/net/fetch-guard.js", () => ({
 }));
 
 vi.mock("../security/skill-scanner.js", async () => ({
-  ...(await vi.importActual<typeof import("../security/skill-scanner.js")>(
-    "../security/skill-scanner.js",
-  )),
+  ...(await import("../security/skill-scanner.js")),
   scanDirectoryWithSummary: (...args: unknown[]) => scanDirectoryWithSummaryMock(...args),
 }));
 
 vi.mock("../shared/config-eval.js", async () => {
-  const actual = await vi.importActual<typeof import("../shared/config-eval.js")>(
-    "../shared/config-eval.js",
-  );
+  const actual = await import("../shared/config-eval.js");
   return {
     ...actual,
     hasBinary: (bin: string) => hasBinaryMock(bin),

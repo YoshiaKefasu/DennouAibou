@@ -23,9 +23,7 @@ import { initSessionState } from "./session.js";
 
 // Perf: session-store locks are exercised elsewhere; most session tests don't need FS lock files.
 vi.mock("../../agents/session-write-lock.js", async () => {
-  const actual = await vi.importActual<typeof import("../../agents/session-write-lock.js")>(
-    "../../agents/session-write-lock.js",
-  );
+  const actual = await import("../../agents/session-write-lock.js");
   return {
     ...actual,
     acquireSessionWriteLock: vi.fn(async () => ({ release: async () => {} })),

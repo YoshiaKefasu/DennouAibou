@@ -10,7 +10,7 @@ const { readJsonBodyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("./hooks.js", async () => {
-  const actual = await vi.importActual<typeof import("./hooks.js")>("./hooks.js");
+  const actual = await import("./hooks.js");
   return {
     ...actual,
     readJsonBody: readJsonBodyMock,

@@ -539,7 +539,7 @@ describe("media store", () => {
   it("prefers header mime extension when sniffed mime lacks mapping", async () => {
     await withTempStore(async (_store, home) => {
       vi.doMock("./mime.js", async () => {
-        const actual = await vi.importActual<typeof import("./mime.js")>("./mime.js");
+        const actual = await import("./mime.js");
         return {
           ...actual,
           detectMime: vi.fn(async () => "audio/opus"),

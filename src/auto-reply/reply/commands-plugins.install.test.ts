@@ -10,9 +10,7 @@ const installPluginFromPathMock = vi.fn();
 const persistPluginInstallMock = vi.fn();
 
 vi.mock("../../plugins/install.js", async () => {
-  const actual = await vi.importActual<typeof import("../../plugins/install.js")>(
-    "../../plugins/install.js",
-  );
+  const actual = await import("../../plugins/install.js");
   return {
     ...actual,
     installPluginFromPath: installPluginFromPathMock,

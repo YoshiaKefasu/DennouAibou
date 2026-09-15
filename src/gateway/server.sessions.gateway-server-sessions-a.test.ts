@@ -79,9 +79,7 @@ const browserSessionTabMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../auto-reply/reply/queue.js", async () => {
-  const actual = await vi.importActual<typeof import("../auto-reply/reply/queue.js")>(
-    "../auto-reply/reply/queue.js",
-  );
+  const actual = await import("../auto-reply/reply/queue.js");
   return {
     ...actual,
     clearSessionQueues: sessionCleanupMocks.clearSessionQueues,
@@ -89,9 +87,7 @@ vi.mock("../auto-reply/reply/queue.js", async () => {
 });
 
 vi.mock("../auto-reply/reply/abort.js", async () => {
-  const actual = await vi.importActual<typeof import("../auto-reply/reply/abort.js")>(
-    "../auto-reply/reply/abort.js",
-  );
+  const actual = await import("../auto-reply/reply/abort.js");
   return {
     ...actual,
     stopSubagentsForRequester: sessionCleanupMocks.stopSubagentsForRequester,
@@ -99,9 +95,7 @@ vi.mock("../auto-reply/reply/abort.js", async () => {
 });
 
 vi.mock("../agents/bootstrap-cache.js", async () => {
-  const actual = await vi.importActual<typeof import("../agents/bootstrap-cache.js")>(
-    "../agents/bootstrap-cache.js",
-  );
+  const actual = await import("../agents/bootstrap-cache.js");
   return {
     ...actual,
     clearBootstrapSnapshot: bootstrapCacheMocks.clearBootstrapSnapshot,
@@ -109,9 +103,7 @@ vi.mock("../agents/bootstrap-cache.js", async () => {
 });
 
 vi.mock("../hooks/internal-hooks.js", async () => {
-  const actual = await vi.importActual<typeof import("../hooks/internal-hooks.js")>(
-    "../hooks/internal-hooks.js",
-  );
+  const actual = await import("../hooks/internal-hooks.js");
   return {
     ...actual,
     hasInternalHookListeners: sessionHookMocks.hasInternalHookListeners,
@@ -120,9 +112,7 @@ vi.mock("../hooks/internal-hooks.js", async () => {
 });
 
 vi.mock("../plugins/hook-runner-global.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/hook-runner-global.js")>(
-    "../plugins/hook-runner-global.js",
-  );
+  const actual = await import("../plugins/hook-runner-global.js");
   return {
     ...actual,
     getGlobalHookRunner: vi.fn(() => ({
@@ -140,9 +130,7 @@ vi.mock("../plugins/hook-runner-global.js", async () => {
 });
 
 vi.mock("../infra/outbound/session-binding-service.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../infra/outbound/session-binding-service.js")
-  >("../infra/outbound/session-binding-service.js");
+  const actual = await import("../infra/outbound/session-binding-service.js");
   return {
     ...actual,
     getSessionBindingService: () => ({

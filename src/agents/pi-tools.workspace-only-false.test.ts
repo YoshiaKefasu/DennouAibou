@@ -4,26 +4,21 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-ai", async () => {
-  const original =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+  const original = await import("@earendil-works/pi-ai");
   return {
     ...original,
   };
 });
 
 vi.mock("@earendil-works/pi-ai/compat", async () => {
-  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
-    "@earendil-works/pi-ai/compat",
-  );
+  const original = await import("@earendil-works/pi-ai/compat");
   return {
     ...original,
   };
 });
 
 vi.mock("@earendil-works/pi-ai/oauth", async () => {
-  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
-    "@earendil-works/pi-ai/oauth",
-  );
+  const actual = await import("@earendil-works/pi-ai/oauth");
   return {
     ...actual,
     getOAuthApiKey: () => undefined,

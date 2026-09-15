@@ -58,7 +58,7 @@ function mockCiaoService(params?: {
 }
 
 vi.mock("../logger.js", async () => {
-  const actual = await vi.importActual<typeof import("../logger.js")>("../logger.js");
+  const actual = await import("../logger.js");
   return {
     ...actual,
     logWarn: (message: string) => logWarn(message),

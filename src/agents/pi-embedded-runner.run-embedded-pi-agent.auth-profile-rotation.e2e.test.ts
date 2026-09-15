@@ -60,9 +60,7 @@ const installRunEmbeddedMocks = () => {
     runEmbeddedAttempt: (params: unknown) => runEmbeddedAttemptMock(params),
   }));
   vi.doMock("../plugins/provider-runtime.js", async () => {
-    const actual = await vi.importActual<typeof import("../plugins/provider-runtime.js")>(
-      "../plugins/provider-runtime.js",
-    );
+    const actual = await import("../plugins/provider-runtime.js");
     return {
       ...actual,
       prepareProviderRuntimeAuth: async (params: {
@@ -95,7 +93,7 @@ const installRunEmbeddedMocks = () => {
     }),
   }));
   vi.doMock("./models-config.js", async () => {
-    const mod = await vi.importActual<typeof import("./models-config.js")>("./models-config.js");
+    const mod = await import("./models-config.js");
     return {
       ...mod,
       ensureOpenClawModelsJson: vi.fn(async () => ({ wrote: false })),

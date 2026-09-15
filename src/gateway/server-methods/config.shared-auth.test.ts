@@ -17,8 +17,7 @@ const scheduleGatewaySigusr1RestartMock = vi.fn(() => ({
 }));
 
 vi.mock("../../config/config.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+  const actual = await import("../../config/config.js");
   return {
     ...actual,
     createConfigIO: () => ({ configPath: "/tmp/dennou-aibou.json" }),

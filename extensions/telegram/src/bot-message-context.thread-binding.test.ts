@@ -5,17 +5,14 @@ const recordInboundSessionMock = vi.hoisted(() => vi.fn().mockResolvedValue(unde
 const resolveTelegramConversationRouteMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./bot-message-context.session.runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("./bot-message-context.session.runtime.js")>(
-    "./bot-message-context.session.runtime.js",
-  );
+  const actual = await import("./bot-message-context.session.runtime.js");
   return {
     ...actual,
     recordInboundSession: (...args: unknown[]) => recordInboundSessionMock(...args),
   };
 });
 vi.mock("./conversation-route.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./conversation-route.js")>("./conversation-route.js");
+  const actual = await import("./conversation-route.js");
   return {
     ...actual,
     resolveTelegramConversationRoute: (...args: unknown[]) =>

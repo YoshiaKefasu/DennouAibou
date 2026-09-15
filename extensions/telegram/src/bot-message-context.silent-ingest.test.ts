@@ -16,9 +16,7 @@ const internalHookMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/hook-runtime", async () => {
-  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/hook-runtime")>(
-    "openclaw/plugin-sdk/hook-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/hook-runtime");
   return {
     ...actual,
     createInternalHookEvent: internalHookMocks.createInternalHookEvent,

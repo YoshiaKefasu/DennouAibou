@@ -15,9 +15,7 @@ const fallbackState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../plugin-sdk/facade-runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../../plugin-sdk/facade-runtime.js")>(
-    "../../plugin-sdk/facade-runtime.js",
-  );
+  const actual = await import("../../plugin-sdk/facade-runtime.js");
   return {
     ...actual,
     tryLoadActivatedBundledPluginPublicSurfaceModuleSync: ({ dirName }: { dirName: string }) =>

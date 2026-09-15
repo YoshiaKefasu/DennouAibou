@@ -24,8 +24,7 @@ vi.mock("../process/exec.js", () => ({
 const resolveCompatibilityHostVersionMock = vi.fn();
 
 vi.mock("./install.runtime.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./install.runtime.js")>("./install.runtime.js");
+  const actual = await import("./install.runtime.js");
   return {
     ...actual,
     resolveCompatibilityHostVersion: (...args: unknown[]) =>

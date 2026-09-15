@@ -14,7 +14,7 @@ vi.mock("./gateway-rpc.js", () => ({
 }));
 
 vi.mock("../runtime.js", async () => ({
-  ...(await vi.importActual<typeof import("../runtime.js")>("../runtime.js")),
+  ...(await import("../runtime.js")),
   defaultRuntime,
   writeRuntimeJson: (runtime: { log: (...args: unknown[]) => void }, value: unknown, space = 2) =>
     runtime.log(JSON.stringify(value, null, space > 0 ? space : undefined)),

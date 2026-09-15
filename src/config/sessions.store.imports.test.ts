@@ -6,9 +6,7 @@ describe("session store module imports", () => {
     const archiveRuntimeLoads = vi.fn();
     vi.doMock("../gateway/session-archive.runtime.js", async () => {
       archiveRuntimeLoads();
-      return await vi.importActual<typeof import("../gateway/session-archive.runtime.js")>(
-        "../gateway/session-archive.runtime.js",
-      );
+      return await import("../gateway/session-archive.runtime.js");
     });
 
     await importFreshModule<typeof import("./sessions/store.js")>(

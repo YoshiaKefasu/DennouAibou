@@ -135,9 +135,7 @@ vi.mock("../monitor/agent-components.deps.runtime.js", () => {
 });
 
 vi.mock("../interactive-dispatch.js", async () => {
-  const actual = await vi.importActual<typeof import("../interactive-dispatch.js")>(
-    "../interactive-dispatch.js",
-  );
+  const actual = await import("../interactive-dispatch.js");
   return {
     ...actual,
     dispatchDiscordPluginInteractiveHandler: (...args: unknown[]) =>

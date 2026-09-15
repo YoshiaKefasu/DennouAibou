@@ -8,9 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../plugins/provider-runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("../../../plugins/provider-runtime.js")>(
-    "../../../plugins/provider-runtime.js",
-  );
+  const actual = await import("../../../plugins/provider-runtime.js");
   return {
     ...actual,
     prepareProviderRuntimeAuth: mocks.prepareProviderRuntimeAuth,
@@ -18,7 +16,7 @@ vi.mock("../../../plugins/provider-runtime.js", async () => {
 });
 
 vi.mock("../../model-auth.js", async () => {
-  const actual = await vi.importActual<typeof import("../../model-auth.js")>("../../model-auth.js");
+  const actual = await import("../../model-auth.js");
   return {
     ...actual,
     getApiKeyForModel: mocks.getApiKeyForModel,

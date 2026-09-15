@@ -75,7 +75,7 @@ vi.mock("../globals.js", () => ({
 }));
 
 vi.mock("../runtime.js", async () => ({
-  ...(await vi.importActual<typeof import("../runtime.js")>("../runtime.js")),
+  ...(await import("../runtime.js")),
   defaultRuntime: mocks.defaultRuntime,
 }));
 
@@ -106,9 +106,7 @@ vi.mock("../daemon/program-args.js", () => ({
 }));
 
 vi.mock("../infra/bonjour-discovery.js", async () => ({
-  ...(await vi.importActual<typeof import("../infra/bonjour-discovery.js")>(
-    "../infra/bonjour-discovery.js",
-  )),
+  ...(await import("../infra/bonjour-discovery.js")),
   discoverGatewayBeacons: (opts: unknown) => discoverGatewayBeacons(opts),
 }));
 

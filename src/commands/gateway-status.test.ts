@@ -134,9 +134,7 @@ vi.mock("../config/config.js", () => ({
 }));
 
 vi.mock("../infra/bonjour-discovery.js", async () => {
-  const actual = await vi.importActual<typeof import("../infra/bonjour-discovery.js")>(
-    "../infra/bonjour-discovery.js",
-  );
+  const actual = await import("../infra/bonjour-discovery.js");
   return {
     ...actual,
     discoverGatewayBeacons: mocks.discoverGatewayBeacons,
@@ -148,8 +146,7 @@ vi.mock("../infra/tailnet.js", () => ({
 }));
 
 vi.mock("../infra/ssh-tunnel.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../infra/ssh-tunnel.js")>("../infra/ssh-tunnel.js");
+  const actual = await import("../infra/ssh-tunnel.js");
   return {
     ...actual,
     startSshPortForward: mocks.startSshPortForward,

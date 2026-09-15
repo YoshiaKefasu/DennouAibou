@@ -9,7 +9,7 @@ let readBestEffortRuntimeConfigSchema: typeof import("./runtime-schema.js").read
 let loadGatewayRuntimeConfigSchema: typeof import("./runtime-schema.js").loadGatewayRuntimeConfigSchema;
 
 vi.mock("./config.js", async () => {
-  const actual = await vi.importActual<typeof import("./config.js")>("./config.js");
+  const actual = await import("./config.js");
   return {
     ...actual,
     loadConfig: () => mockLoadConfig(),

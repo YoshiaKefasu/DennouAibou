@@ -12,7 +12,7 @@ const fsMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const actual = await import("node:fs/promises");
   return {
     ...actual,
     default: {
@@ -45,7 +45,7 @@ vi.mock("../config/paths.js", () => ({
 }));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     writeConfigFile: mocks.writeConfigFile,

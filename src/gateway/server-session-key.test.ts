@@ -12,7 +12,7 @@ vi.mock("../config/config.js", () => ({
 }));
 
 vi.mock("./session-utils.js", async () => {
-  const actual = await vi.importActual<typeof import("./session-utils.js")>("./session-utils.js");
+  const actual = await import("./session-utils.js");
   return {
     ...actual,
     loadCombinedSessionStoreForGateway: (cfg: OpenClawConfig) =>

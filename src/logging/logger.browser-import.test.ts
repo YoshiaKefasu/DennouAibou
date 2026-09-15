@@ -20,9 +20,7 @@ async function importBrowserSafeLogger(params?: {
     });
 
   vi.doMock("../infra/tmp-openclaw-dir.js", async () => {
-    const actual = await vi.importActual<typeof import("../infra/tmp-openclaw-dir.js")>(
-      "../infra/tmp-openclaw-dir.js",
-    );
+    const actual = await import("../infra/tmp-openclaw-dir.js");
     return {
       ...actual,
       resolvePreferredOpenClawTmpDir,

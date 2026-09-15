@@ -184,9 +184,7 @@ vi.mock("../../gateway/call.js", () => ({
 }));
 
 vi.mock("../../infra/outbound/session-binding-service.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../infra/outbound/session-binding-service.js")
-  >("../../infra/outbound/session-binding-service.js");
+  const actual = await import("../../infra/outbound/session-binding-service.js");
   return {
     ...actual,
     getSessionBindingService: () => buildFocusSessionBindingService(),

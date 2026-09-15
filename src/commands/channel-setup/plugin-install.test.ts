@@ -7,7 +7,7 @@ import {
 } from "../../../test/helpers/bundled-plugin-paths.js";
 
 vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  const actual = await import("node:fs");
   const existsSync = vi.fn();
   return {
     ...actual,
@@ -32,9 +32,7 @@ vi.mock("../../config/plugin-auto-enable.js", () => ({
 const resolveBundledPluginSources = vi.fn();
 const getChannelPluginCatalogEntry = vi.fn();
 vi.mock("../../channels/plugins/catalog.js", async () => {
-  const actual = await vi.importActual<typeof import("../../channels/plugins/catalog.js")>(
-    "../../channels/plugins/catalog.js",
-  );
+  const actual = await import("../../channels/plugins/catalog.js");
   return {
     ...actual,
     getChannelPluginCatalogEntry: (...args: unknown[]) => getChannelPluginCatalogEntry(...args),

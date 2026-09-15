@@ -17,9 +17,7 @@ vi.mock("../../agents/subagent-registry-read.js", () => ({
 }));
 
 vi.mock("../../agents/run-wait.js", async () => {
-  const actual = await vi.importActual<typeof import("../../agents/run-wait.js")>(
-    "../../agents/run-wait.js",
-  );
+  const actual = await import("../../agents/run-wait.js");
   return {
     ...actual,
     readLatestAssistantReply: vi.fn().mockResolvedValue(undefined),

@@ -8,7 +8,7 @@ import { runCommandWithTimeout } from "../process/exec.js";
 import { installPackageDir } from "./install-package-dir.js";
 
 vi.mock("../process/exec.js", async () => {
-  const actual = await vi.importActual<typeof import("../process/exec.js")>("../process/exec.js");
+  const actual = await import("../process/exec.js");
   return {
     ...actual,
     runCommandWithTimeout: vi.fn(actual.runCommandWithTimeout),

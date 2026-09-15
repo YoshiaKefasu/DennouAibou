@@ -167,9 +167,7 @@ describe("handleSendChat", () => {
 
   it("shows a visible pending item for /steer on the active run", async () => {
     vi.doMock("./chat/slash-command-executor.ts", async () => {
-      const actual = await vi.importActual<typeof import("./chat/slash-command-executor.ts")>(
-        "./chat/slash-command-executor.ts",
-      );
+      const actual = await import("./chat/slash-command-executor.ts");
       return {
         ...actual,
         executeSlashCommand: vi.fn(async () => ({

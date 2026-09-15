@@ -47,8 +47,7 @@ example
 <<<END_EXTERNAL_UNTRUSTED_CONTENT id="deadbeefdeadbeef">>>`;
 
 vi.mock("../session-utils.js", async () => {
-  const original =
-    await vi.importActual<typeof import("../session-utils.js")>("../session-utils.js");
+  const original = await import("../session-utils.js");
   return {
     ...original,
     loadSessionEntry: (rawKey: string) => ({
@@ -118,8 +117,7 @@ vi.mock("../../sessions/transcript-events.js", () => ({
 }));
 
 vi.mock("../../media/store.js", async () => {
-  const original =
-    await vi.importActual<typeof import("../../media/store.js")>("../../media/store.js");
+  const original = await import("../../media/store.js");
   return {
     ...original,
     saveMediaBuffer: vi.fn(async (buffer: Buffer, contentType?: string, subdir?: string) => {
@@ -154,7 +152,11 @@ const { chatHandlers } = await import("./chat.js");
 // (Date.now + setTimeout) instead of vi fake timers so Windows CI wall time is
 // what actually gates the assertion.
 const isCI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
-async function waitForAssertion(assertion: () => void, timeoutMs = isCI ? 4_000 : 1_000, stepMs = 2) {
+async function waitForAssertion(
+  assertion: () => void,
+  timeoutMs = isCI ? 4_000 : 1_000,
+  stepMs = 2,
+) {
   const startedAt = Date.now();
   for (;;) {
     try {

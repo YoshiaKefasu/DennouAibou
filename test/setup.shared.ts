@@ -4,8 +4,7 @@ import { installTestMockCleanup } from "../src/test-utils/bun-test-mocks.js";
 installTestMockCleanup(afterEach);
 
 vi.mock("@earendil-works/pi-ai", async () => {
-  const original =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+  const original = await import("@earendil-works/pi-ai");
   return {
     ...original,
     getOAuthApiKey: () => undefined,

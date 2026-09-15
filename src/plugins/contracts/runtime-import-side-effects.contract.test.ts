@@ -21,18 +21,14 @@ const CHANNEL_REGISTRY_FIX =
 
 function mockChannelRegistry() {
   vi.doMock("../../channels/plugins/registry.js", async () => {
-    const actual = await vi.importActual<typeof import("../../channels/plugins/registry.js")>(
-      "../../channels/plugins/registry.js",
-    );
+    const actual = await import("../../channels/plugins/registry.js");
     return {
       ...actual,
       listChannelPlugins,
     };
   });
   vi.doMock("../../plugins/runtime.js", async () => {
-    const actual = await vi.importActual<typeof import("../../plugins/runtime.js")>(
-      "../../plugins/runtime.js",
-    );
+    const actual = await import("../../plugins/runtime.js");
     return {
       ...actual,
       getActivePluginChannelRegistryVersion,

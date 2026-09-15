@@ -8,7 +8,7 @@ import type { SessionEntry } from "./types.js";
 
 // Keep integration tests deterministic: never read a real dennou-aibou.json.
 vi.mock("../config.js", async () => ({
-  ...(await vi.importActual<typeof import("../config.js")>("../config.js")),
+  ...(await import("../config.js")),
   loadConfig: vi.fn().mockReturnValue({}),
 }));
 

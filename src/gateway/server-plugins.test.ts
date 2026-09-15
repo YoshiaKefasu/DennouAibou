@@ -33,9 +33,7 @@ vi.mock("../config/plugin-auto-enable.js", () => ({
 }));
 
 vi.mock("../channels/plugins/binding-registry.js", async () => {
-  const actual = await vi.importActual<typeof import("../channels/plugins/binding-registry.js")>(
-    "../channels/plugins/binding-registry.js",
-  );
+  const actual = await import("../channels/plugins/binding-registry.js");
   return {
     ...actual,
     primeConfiguredBindingRegistry,

@@ -81,10 +81,7 @@ vi.mock("openclaw/plugin-sdk/conversation-runtime", async () => {
       ensureConfiguredBindingRouteReadyMock,
       resolveConfiguredBindingRouteMock,
     },
-    () =>
-      vi.importActual<typeof import("openclaw/plugin-sdk/conversation-runtime")>(
-        "openclaw/plugin-sdk/conversation-runtime",
-      ),
+    () => import("openclaw/plugin-sdk/conversation-runtime"),
   );
 });
 

@@ -4,8 +4,7 @@ import { __testing as extraParamsTesting } from "./extra-params.js";
 import { runExtraParamsCase } from "./extra-params.test-support.js";
 
 vi.mock("@earendil-works/pi-ai", async () => {
-  const original =
-    await vi.importActual<typeof import("@earendil-works/pi-ai")>("@earendil-works/pi-ai");
+  const original = await import("@earendil-works/pi-ai");
   return {
     ...original,
     streamSimple: vi.fn(() => ({
@@ -16,9 +15,7 @@ vi.mock("@earendil-works/pi-ai", async () => {
 });
 
 vi.mock("@earendil-works/pi-ai/compat", async () => {
-  const original = await vi.importActual<typeof import("@earendil-works/pi-ai/compat")>(
-    "@earendil-works/pi-ai/compat",
-  );
+  const original = await import("@earendil-works/pi-ai/compat");
   return {
     ...original,
     streamSimple: vi.fn(() => ({

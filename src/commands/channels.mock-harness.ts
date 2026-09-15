@@ -28,7 +28,7 @@ export const offsetMocks: {
 };
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     readConfigFileSnapshot: configMocks.readConfigFileSnapshot,
@@ -38,8 +38,8 @@ vi.mock("../config/config.js", async () => {
 });
 
 vi.mock(buildBundledPluginModuleId("telegram", "update-offset-runtime-api.js"), async () => {
-  const actual: Record<string, unknown> = await vi.importActual(
-    buildBundledPluginModuleId("telegram", "update-offset-runtime-api.js"),
+  const actual: Record<string, unknown> = await import(
+    buildBundledPluginModuleId("telegram", "update-offset-runtime-api.js")
   );
   return {
     ...actual,

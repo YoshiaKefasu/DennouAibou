@@ -30,9 +30,7 @@ async function loadToolsHarness(options?: {
 }) {
   vi.resetModules();
   vi.doMock("../../agents/agent-scope.js", async () => {
-    const actual = await vi.importActual<typeof import("../../agents/agent-scope.js")>(
-      "../../agents/agent-scope.js",
-    );
+    const actual = await import("../../agents/agent-scope.js");
     return {
       ...actual,
       resolveSessionAgentId: () => "main",

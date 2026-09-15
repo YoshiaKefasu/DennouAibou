@@ -9,18 +9,15 @@ const findGatewayPidsOnPortSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:child_process")>("node:child_process"),
-    {
-      spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
-    },
-  );
+  return mockNodeBuiltinModule(() => import("node:child_process"), {
+    spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
+  });
 });
 
 vi.mock("node:fs", async () => {
   const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
   return mockNodeBuiltinModule(
-    () => vi.importActual<typeof import("node:fs")>("node:fs"),
+    () => import("node:fs"),
     {
       readFileSync: (...args: unknown[]) => readFileSyncMock(...args),
     },
