@@ -12,7 +12,7 @@ import { withUnsafeMountedSandboxHarness } from "./test-helpers/unsafe-mounted-s
 
 vi.mock("../infra/shell-env.js", async () => {
   const mod =
-    await vi.importActual<typeof import("../infra/shell-env.js")>("../infra/shell-env.js");
+    await import("../infra/shell-env.js");
   return { ...mod, getShellPathFromLoginShell: () => null };
 });
 

@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import {
   THINKING_TAG_CASES,
   createStubSessionHarness,
@@ -198,7 +199,7 @@ describe("subscribeEmbeddedPiSession", () => {
     });
     emitAssistantTextDelta(emit, "After tool");
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(onToolResult).toHaveBeenCalledTimes(1);
       expect(onPartialReply).toHaveBeenCalledWith(
         expect.objectContaining({ text: "After tool", delta: "After tool" }),

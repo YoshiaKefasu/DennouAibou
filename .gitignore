@@ -191,3 +191,6 @@ extensions/qa-lab/web/dist/
 # webui-bundle-browser-load: per-chunk esbuild normalise scratch files
 .tmp-esbuild-normalize-*.mjs
 .tmp-esbuild-normalize.mjs
+
+# Kasou session restore work (PRIVATE - never commit)
+.session-restore/

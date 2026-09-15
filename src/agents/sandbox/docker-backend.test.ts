@@ -9,7 +9,7 @@ const dockerMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./docker.js", async () => {
-  const actual = await vi.importActual<typeof import("./docker.js")>("./docker.js");
+  const actual = await import("./docker.js");
   return {
     ...actual,
     dockerContainerState: dockerMocks.dockerContainerState,

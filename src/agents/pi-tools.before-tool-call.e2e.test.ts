@@ -16,7 +16,7 @@ import type { AnyAgentTool } from "./tools/common.js";
 import { callGatewayTool } from "./tools/gateway.js";
 
 vi.mock("../plugins/hook-runner-global.js", async () => {
-  const actual = await vi.importActual<typeof import("../plugins/hook-runner-global.js")>(
+  const actual = await import(
     "../plugins/hook-runner-global.js",
   );
   return {

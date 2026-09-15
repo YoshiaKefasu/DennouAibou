@@ -1,5 +1,6 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 const callGatewayMock = vi.fn();
@@ -8,7 +9,7 @@ vi.mock("../gateway/call.js", () => ({
 }));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: () => ({
@@ -79,11 +80,11 @@ function createOpenClawTools(options?: {
 }
 
 const waitForCalls = async (getCount: () => number, count: number, timeoutMs = 2000) => {
-  await vi.waitFor(
+  await pollUntilAssert(
     () => {
       expect(getCount()).toBeGreaterThanOrEqual(count);
     },
-    { timeout: timeoutMs, interval: 5 },
+    { timeoutMs, intervalMs: 5 },
   );
 };
 
@@ -862,11 +863,11 @@ describe("sessions tools", () => {
       status: "ok",
       reply: "initial",
     });
-    await vi.waitFor(
+    await pollUntilAssert(
       () => {
         expect(calls.filter((call) => call.method === "agent")).toHaveLength(4);
       },
-      { timeout: 2_000, interval: 5 },
+      { timeoutMs: 2_000, intervalMs: 5 },
     );
 
     const agentCalls = calls.filter((call) => call.method === "agent");

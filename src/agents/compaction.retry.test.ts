@@ -8,7 +8,7 @@ import { retryAsync } from "../infra/retry.js";
 
 // Mock the external generateSummary function
 vi.mock("@earendil-works/pi-coding-agent", async () => {
-  const actual = await vi.importActual<typeof piCodingAgent>("@earendil-works/pi-coding-agent");
+  const actual = await import("@earendil-works/pi-coding-agent");
   return {
     ...actual,
     generateSummary: vi.fn(),

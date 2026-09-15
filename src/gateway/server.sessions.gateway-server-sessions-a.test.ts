@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
 import { withSessionStoreLockForTest } from "../config/sessions/store.js";
@@ -151,8 +152,6 @@ vi.mock("../infra/outbound/session-binding-service.js", async () => {
     }),
   };
 });
-
-
 
 vi.mock("../plugin-sdk/browser-maintenance.js", () => ({
   closeTrackedBrowserTabsForSessions: browserSessionTabMocks.closeTrackedBrowserTabsForSessions,
@@ -2388,7 +2387,7 @@ describe("gateway server sessions", () => {
         reason: "new",
         commandSource: "gateway:sessions.reset",
       });
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(sessionHookMocks.triggerInternalHook).toHaveBeenCalledTimes(1);
       });
       await fs.writeFile(

@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import {
   createStubSessionHarness,
   emitAssistantTextDelta,
@@ -88,7 +89,7 @@ describe("subscribeEmbeddedPiSession", () => {
       result: { details: { status: "error" } },
     });
     emitAssistantMessageEnd(emit, messageText);
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(onBlockReply).toHaveBeenCalledTimes(1);
     });
   });

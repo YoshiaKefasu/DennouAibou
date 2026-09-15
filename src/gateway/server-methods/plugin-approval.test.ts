@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import type { PluginApprovalRequestPayload } from "../../infra/plugin-approvals.js";
 import { ExecApprovalManager } from "../exec-approval-manager.js";
 import { createPluginApprovalHandlers } from "./plugin-approval.js";
@@ -86,7 +87,7 @@ describe("createPluginApprovalHandlers", () => {
       const handlerPromise = handlers["plugin.approval.request"](opts);
 
       // Wait for the twoPhase "accepted" response
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(respond).toHaveBeenCalledWith(
           true,
           expect.objectContaining({ status: "accepted", id: expect.any(String) }),
@@ -189,7 +190,7 @@ describe("createPluginApprovalHandlers", () => {
 
         const requestPromise = handlers["plugin.approval.request"](opts);
 
-        await vi.waitFor(() => {
+        await pollUntilAssert(() => {
           expect(respond).toHaveBeenCalledWith(
             true,
             expect.objectContaining({ status: "accepted", id: expect.any(String) }),

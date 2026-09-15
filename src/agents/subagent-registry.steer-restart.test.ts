@@ -1,5 +1,6 @@
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 
 const noop = () => {};
 let lifecycleHandler:
@@ -269,10 +270,10 @@ describe("subagent registry steer restarts", () => {
 
       emitLifecycleEnd("run-new");
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(announceSpy).toHaveBeenCalledTimes(1);
       });
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(runSubagentEndedHookMock).toHaveBeenCalledTimes(1);
       });
       expect(runSubagentEndedHookMock).toHaveBeenCalledWith(
@@ -300,13 +301,13 @@ describe("subagent registry steer restarts", () => {
 
       emitLifecycleEnd("run-completion-delayed");
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(announceSpy).toHaveBeenCalledTimes(1);
       });
       expect(runSubagentEndedHookMock).not.toHaveBeenCalled();
 
       resolveAnnounce(true);
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(runSubagentEndedHookMock).toHaveBeenCalledTimes(1);
       });
       expect(runSubagentEndedHookMock).toHaveBeenCalledWith(
@@ -401,7 +402,7 @@ describe("subagent registry steer restarts", () => {
 
       emitLifecycleEnd("run-terminal-state-new");
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(runSubagentEndedHookMock).toHaveBeenCalledWith(
           expect.objectContaining({
             runId: "run-terminal-state-new",
@@ -559,7 +560,7 @@ describe("subagent registry steer restarts", () => {
     expect(run?.outcome).toEqual({ status: "error", error: "manual kill" });
     expect(run?.cleanupHandled).toBe(true);
     expect(typeof run?.cleanupCompletedAt).toBe("number");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(runSubagentEndedHookMock).toHaveBeenCalledWith(
         {
           targetSessionKey: childSessionKey,

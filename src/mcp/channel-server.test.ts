@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, test, vi } from "vitest";
 import { z } from "zod";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { createOpenClawChannelMcpServer, OpenClawChannelBridge } from "./channel-server.js";
 
 const ClaudeChannelNotificationSchema = z.object({
@@ -207,7 +208,7 @@ describe("openclaw channel mcp server", () => {
             },
           });
 
-          await vi.waitFor(() => {
+          await pollUntilAssert(() => {
             expect(channelNotifications).toHaveLength(1);
           });
           expect(channelNotifications[0]).toMatchObject({
@@ -246,7 +247,7 @@ describe("openclaw channel mcp server", () => {
             },
           });
 
-          await vi.waitFor(() => {
+          await pollUntilAssert(() => {
             expect(permissionNotifications).toHaveLength(1);
           });
           expect(permissionNotifications[0]).toEqual({
@@ -270,7 +271,7 @@ describe("openclaw channel mcp server", () => {
             },
           });
 
-          await vi.waitFor(() => {
+          await pollUntilAssert(() => {
             expect(channelNotifications).toHaveLength(2);
           });
           expect(channelNotifications[1]).toMatchObject({

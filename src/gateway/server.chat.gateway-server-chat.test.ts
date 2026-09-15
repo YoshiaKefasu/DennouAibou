@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { emitAgentEvent, registerAgentRunContext } from "../infra/agent-events.js";
 import { extractFirstTextBlock } from "../shared/chat-message-content.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
@@ -651,7 +652,7 @@ describe("gateway server chat", () => {
       });
 
       expect(res.ok).toBe(true);
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(dispatchInboundMessageMock).toHaveBeenCalled();
       });
       const sideResult = await sideResultPromise;
@@ -734,7 +735,7 @@ describe("gateway server chat", () => {
       });
 
       expect(res.ok).toBe(true);
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(dispatchInboundMessageMock).toHaveBeenCalled();
       });
       const sideResult = await sideResultPromise;

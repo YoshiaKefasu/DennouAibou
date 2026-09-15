@@ -15,7 +15,7 @@ const acquireSessionWriteLockMock = vi.hoisted(() =>
 
 vi.mock("../session-write-lock.js", () =>
   buildSessionWriteLockModuleMock(
-    () => vi.importActual<typeof import("../session-write-lock.js")>("../session-write-lock.js"),
+    () => import("../session-write-lock.js"),
     (params) => acquireSessionWriteLockMock(params),
   ),
 );

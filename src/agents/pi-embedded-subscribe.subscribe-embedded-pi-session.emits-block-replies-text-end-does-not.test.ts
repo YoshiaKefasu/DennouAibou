@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import {
   createTextEndBlockReplyHarness,
   emitAssistantTextDelta,
@@ -15,7 +16,7 @@ describe("subscribeEmbeddedPiSession", () => {
     emitAssistantTextEnd({ emit });
     await Promise.resolve();
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(onBlockReply).toHaveBeenCalledTimes(1);
     });
     const payload = onBlockReply.mock.calls[0][0];

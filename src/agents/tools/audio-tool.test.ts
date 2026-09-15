@@ -14,7 +14,7 @@ import { createAudioTool } from "./audio-tool.js";
 // capability registry build (slow in the test environment). The registry
 // override mirrors the engine unit tests: a plain Map keyed by provider id.
 vi.mock("../../media-understanding/runner.js", async () => {
-  const actual = await vi.importActual<typeof import("../../media-understanding/runner.js")>(
+  const actual = await import(
     "../../media-understanding/runner.js",
   );
   return {

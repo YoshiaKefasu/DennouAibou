@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { loadConfig } from "../config/config.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 import "./test-helpers/fast-core-tools.js";
@@ -43,7 +44,7 @@ const hookRunnerMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./pi-embedded.js", async () => {
-  const actual = await vi.importActual<typeof import("./pi-embedded.js")>("./pi-embedded.js");
+  const actual = await import("./pi-embedded.js");
   return {
     ...actual,
     isEmbeddedPiRunActive: () => false,
@@ -115,11 +116,11 @@ function buildDiscordCleanupHooks(onDelete: (key: string | undefined) => void) {
 }
 
 const waitFor = async (predicate: () => boolean, timeoutMs = 1_500) => {
-  await vi.waitFor(
+  await pollUntilAssert(
     () => {
       expect(predicate()).toBe(true);
     },
-    { timeout: timeoutMs, interval: 8 },
+    { timeoutMs, intervalMs: 8 },
   );
 };
 

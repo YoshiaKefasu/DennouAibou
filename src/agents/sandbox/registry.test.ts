@@ -47,7 +47,7 @@ async function loadFreshRegistryModuleForTest() {
     SANDBOX_BROWSER_REGISTRY_PATH,
   }));
   vi.doMock("../../infra/json-files.js", async () => {
-    const actual = await vi.importActual<typeof import("../../infra/json-files.js")>(
+    const actual = await import(
       "../../infra/json-files.js",
     );
     return {

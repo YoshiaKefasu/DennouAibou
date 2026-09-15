@@ -67,7 +67,7 @@ const imageProviderHarness = vi.hoisted(() => {
 });
 
 vi.mock("../bash-tools.js", async () => {
-  const actual = await vi.importActual<typeof import("../bash-tools.js")>("../bash-tools.js");
+  const actual = await import("../bash-tools.js");
   return {
     ...actual,
     createExecTool: vi.fn(() => piToolsHarness.createStubTool("exec")),

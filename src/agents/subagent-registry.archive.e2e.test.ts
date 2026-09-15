@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 
 const noop = () => {};
 let currentConfig = {
@@ -25,7 +26,7 @@ vi.mock("../infra/agent-events.js", () => ({
 }));
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: loadConfigMock,
@@ -194,7 +195,7 @@ describe("subagent registry archive behavior", () => {
     });
 
     expect(replaced).toBe(true);
-    await vi.waitFor(async () => {
+    await pollUntilAssert(async () => {
       await expect(fs.access(attachmentsDir)).rejects.toMatchObject({ code: "ENOENT" });
     });
   });

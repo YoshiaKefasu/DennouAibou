@@ -621,9 +621,7 @@ describe("compactEmbeddedPiSessionDirect hooks", () => {
   });
 
   it("aborts in-flight compaction when the caller abort signal fires", async () => {
-    const { compactWithSafetyTimeout } = await vi.importActual<
-      typeof import("./compaction-safety-timeout.js")
-    >("./compaction-safety-timeout.js");
+    const { compactWithSafetyTimeout } = await import("./compaction-safety-timeout.js");
     const controller = new AbortController();
     const compactStarted = createDeferred<void>();
 

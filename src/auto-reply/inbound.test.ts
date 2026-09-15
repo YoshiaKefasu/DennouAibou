@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { GroupKeyResolution } from "../config/sessions.js";
 import { resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
@@ -383,7 +384,7 @@ describe("createInboundDebouncer", () => {
         | undefined;
       const firstFlush = flushTimer?.();
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(started).toEqual(["1"]);
       });
 
@@ -438,7 +439,7 @@ describe("createInboundDebouncer", () => {
         setTimeoutSpy.mock.calls[firstTimerIndex]?.[0] as (() => Promise<void>) | undefined
       )?.();
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(started).toEqual(["1"]);
       });
 
@@ -578,7 +579,7 @@ describe("createInboundDebouncer", () => {
       );
 
       const overflowEnqueue = debouncer.enqueue({ key: "b", id: "2" });
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(started).toEqual(["2"]);
       });
 
@@ -651,7 +652,7 @@ describe("createInboundDebouncer", () => {
         setTimeoutSpy.mock.calls[secondTimerIndex]?.[0] as (() => Promise<void>) | undefined
       )?.();
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(started).toEqual(["2"]);
       });
 
@@ -668,7 +669,7 @@ describe("createInboundDebouncer", () => {
       const overflowEnqueue = debouncer.enqueue({ key: "d", id: "4" });
 
       expect(setTimeoutSpy.mock.calls).toHaveLength(timerCountBeforeOverflow);
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(started).toEqual(["2", "4"]);
         expect(finished).toEqual(["4"]);
       });

@@ -21,7 +21,7 @@ const backendMocks = vi.hoisted(() => ({
 
 vi.mock("../../config/config.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+    await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: configMocks.loadConfig,

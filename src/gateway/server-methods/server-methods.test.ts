@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Mock } from "vitest";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
 import { formatZonedTimestamp } from "../../infra/format-time/format-datetime.js";
 import {
@@ -1202,7 +1203,7 @@ describe("exec approval handlers", () => {
       },
     });
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(respond).toHaveBeenCalledWith(
         true,
         expect.objectContaining({ status: "accepted", id: "approval-ios-push" }),
@@ -1245,7 +1246,7 @@ describe("exec approval handlers", () => {
     });
     await requestPromise;
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(iosPushDelivery.handleResolved).toHaveBeenCalledWith(
         expect.objectContaining({ id: "approval-ios-cleanup", decision: "allow-once" }),
       );
@@ -1279,7 +1280,7 @@ describe("exec approval handlers", () => {
       await vi.advanceTimersByTimeAsync(250);
       await requestPromise;
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(iosPushDelivery.handleExpired).toHaveBeenCalledWith(
           expect.objectContaining({ id: "approval-ios-expire" }),
         );
@@ -1310,7 +1311,7 @@ describe("exec approval handlers", () => {
         },
       });
 
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(respond).toHaveBeenCalledWith(
           true,
           expect.objectContaining({ status: "accepted", id: "approval-chat-route" }),

@@ -10,7 +10,7 @@ import {
 } from "./pi-embedded-runner.sanitize-session-history.test-harness.js";
 
 vi.mock("./pi-embedded-helpers.js", async () => ({
-  ...(await vi.importActual("./pi-embedded-helpers.js")),
+  ...(await import("./pi-embedded-helpers.js")),
   isGoogleModelApi: vi.fn(),
   sanitizeSessionMessagesImages: vi.fn(async (msgs) => msgs),
 }));

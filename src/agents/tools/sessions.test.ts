@@ -24,7 +24,7 @@ const loadConfigMock = vi.fn<() => SessionsToolTestConfig>(() => ({
 
 vi.mock("../../config/config.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../../config/config.js")>("../../config/config.js");
+    await import("../../config/config.js");
   return {
     ...actual,
     loadConfig: () => loadConfigMock() as never,

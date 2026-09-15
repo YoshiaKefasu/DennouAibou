@@ -12,7 +12,7 @@ const { getOAuthApiKeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@earendil-works/pi-ai/oauth", async () => {
-  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
+  const actual = await import(
     "@earendil-works/pi-ai/oauth",
   );
   return {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { createInlineCodeState } from "../markdown/code-spans.js";
 import {
   buildAssistantStreamData,
@@ -387,7 +388,7 @@ describe("handleMessageUpdate", () => {
       assistantMessageEvent: { type: "text_end" },
     } as never);
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(debug).toHaveBeenCalledWith("text_end block reply flush failed: Error: boom");
     });
   });

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import {
   createStubSessionHarness,
   emitAssistantTextDelta,
@@ -120,7 +121,7 @@ describe("subscribeEmbeddedPiSession", () => {
       toolCallId: "tool-async-flush-1",
       args: { command: "echo flush" },
     });
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(delivered).toEqual(["Short chunk."]);
       expect(flushSnapshots).toEqual([["Short chunk."]]);
     });
@@ -194,7 +195,7 @@ describe("subscribeEmbeddedPiSession", () => {
         content: [{ type: "text", text: "Final reply before lifecycle end." }],
       },
     });
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(delivered).toEqual(["Final reply before lifecycle end."]);
       expect(flushSnapshots).toEqual([["Final reply before lifecycle end."]]);
     });

@@ -1,6 +1,7 @@
 import process from "node:process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { importFreshModule } from "../test/helpers/import-fresh.js";
+import { pollUntilAssert } from "../test/helpers/poll.js";
 
 const applyCliProfileEnvMock = vi.hoisted(() => vi.fn());
 const attachChildProcessBridgeMock = vi.hoisted(() => vi.fn());
@@ -105,7 +106,7 @@ describe("entry root version fast path", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await importEntry("commit-tagged");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(logSpy).toHaveBeenCalledWith("OpenClaw 9.9.9-test (abc1234)");
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
@@ -118,7 +119,7 @@ describe("entry root version fast path", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await importEntry("plain-version");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(logSpy).toHaveBeenCalledWith("OpenClaw 9.9.9-test");
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
@@ -131,7 +132,7 @@ describe("entry root version fast path", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await importEntry("container-target");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(runCliMock).toHaveBeenCalledWith(["node", "openclaw", "--version"]);
     });
     expect(logSpy).not.toHaveBeenCalled();
@@ -146,7 +147,7 @@ describe("entry root version fast path", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await importEntry("gateway-override");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(runCliMock).toHaveBeenCalledWith(["node", "openclaw", "--version"]);
     });
     expect(errorSpy).not.toHaveBeenCalled();

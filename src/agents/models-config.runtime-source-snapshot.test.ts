@@ -19,7 +19,7 @@ vi.mock("../plugins/provider-runtime.js", () => ({
 }));
 
 vi.mock("./models-config.providers.js", async () => {
-  const actual = await vi.importActual<typeof import("./models-config.providers.js")>(
+  const actual = await import(
     "./models-config.providers.js",
   );
   return {

@@ -6,7 +6,7 @@ let configOverride: ReturnType<(typeof import("../config/config.js"))["loadConfi
 };
 
 vi.mock("../config/config.js", async () => {
-  const actual = await vi.importActual<typeof import("../config/config.js")>("../config/config.js");
+  const actual = await import("../config/config.js");
   return {
     ...actual,
     loadConfig: () => configOverride,

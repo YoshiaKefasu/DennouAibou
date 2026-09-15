@@ -9,7 +9,7 @@ import {
 import { castAgentMessage } from "./test-helpers/agent-message-fixtures.js";
 
 vi.mock("./pi-embedded-helpers.js", async () => ({
-  ...(await vi.importActual("./pi-embedded-helpers.js")),
+  ...(await import("./pi-embedded-helpers.js")),
   sanitizeSessionMessagesImages: vi.fn(async (msgs) => msgs),
 }));
 

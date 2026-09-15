@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { DeviceIdentity } from "../infra/device-identity.js";
 import { captureEnv } from "../test-utils/env.js";
 
@@ -488,7 +489,9 @@ describe("GatewayClient connect auth payload", () => {
     failureDetails: Record<string, unknown>;
   }) {
     emitConnectFailure(params.firstWs, params.connectId, params.failureDetails);
-    await vi.waitFor(() => expect(wsInstances.length).toBeGreaterThan(1), { timeout: 3_000 });
+    await pollUntilAssert(() => expect(wsInstances.length).toBeGreaterThan(1), {
+      timeoutMs: 3_000,
+    });
     const ws = getLatestWs();
     ws.emitOpen();
     emitConnectChallenge(ws, "nonce-2");

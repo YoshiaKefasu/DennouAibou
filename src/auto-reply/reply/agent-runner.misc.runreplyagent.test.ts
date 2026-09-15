@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import {
   abortEmbeddedPiRun,
   getActiveEmbeddedRunCount,
@@ -618,7 +619,7 @@ describe("runReplyAgent auto-compaction token update", () => {
     });
 
     try {
-      await vi.waitFor(() => {
+      await pollUntilAssert(() => {
         expect(compactState.compactEmbeddedPiSessionMock).toHaveBeenCalledOnce();
       });
       expect(getActiveEmbeddedRunCount()).toBe(1);
@@ -739,7 +740,7 @@ describe("runReplyAgent auto-compaction token update", () => {
       typingMode: "instant",
     });
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(compactState.compactEmbeddedPiSessionMock).toHaveBeenCalledOnce();
     });
     expect(getActiveEmbeddedRunCount()).toBe(1);
@@ -835,7 +836,7 @@ describe("runReplyAgent auto-compaction token update", () => {
       typingMode: "instant",
     });
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(isEmbeddedPiRunActive("session-rotated")).toBe(true);
     });
     expect(isEmbeddedPiRunActive("session")).toBe(false);

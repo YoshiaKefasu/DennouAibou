@@ -19,7 +19,7 @@ import {
 import compactionSafeguardExtension, { __testing } from "./compaction-safeguard.js";
 
 vi.mock("../compaction.js", async () => {
-  const actual = await vi.importActual<typeof compactionModule>("../compaction.js");
+  const actual = await import("../compaction.js");
   return {
     ...actual,
     summarizeInStages: vi.fn(actual.summarizeInStages),

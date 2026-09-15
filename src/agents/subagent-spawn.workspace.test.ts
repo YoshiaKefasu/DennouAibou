@@ -33,7 +33,7 @@ let spawnSubagentDirect: typeof import("./subagent-spawn.js").spawnSubagentDirec
 let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
 
 vi.mock("@earendil-works/pi-ai/oauth", async () => {
-  const actual = await vi.importActual<typeof import("@earendil-works/pi-ai/oauth")>(
+  const actual = await import(
     "@earendil-works/pi-ai/oauth",
   );
   return {

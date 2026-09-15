@@ -11,7 +11,7 @@ const subsystemErrorLog = vi.hoisted(() => vi.fn());
 
 vi.mock("../logging/subsystem.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../logging/subsystem.js")>("../logging/subsystem.js");
+    await import("../logging/subsystem.js");
   const mockLogger: import("../logging/subsystem.js").SubsystemLogger = (() => {
     const passthrough = (level: string) => (message: string, meta?: Record<string, unknown>) => {
       if (level === "error") {

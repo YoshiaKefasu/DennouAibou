@@ -5,7 +5,7 @@ import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", async () => {
-  const actual = await vi.importActual<typeof piCodingAgent>("@earendil-works/pi-coding-agent");
+  const actual = await import("@earendil-works/pi-coding-agent");
   return {
     ...actual,
     generateSummary: vi.fn(),

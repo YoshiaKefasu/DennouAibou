@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import {
   clearRuntimeConfigSnapshot,
@@ -1568,7 +1569,7 @@ describe("subagent announce formatting", () => {
       ...defaultOutcomeAnnounce,
     });
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(agentSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -1972,7 +1973,7 @@ describe("subagent announce formatting", () => {
       }),
     ]);
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(agentSpy).toHaveBeenCalledTimes(2);
     });
     const accountIds = agentSpy.mock.calls.map(

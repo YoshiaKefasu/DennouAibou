@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { GetReplyOptions } from "../auto-reply/types.js";
 import { clearConfigCache } from "../config/config.js";
 import { __setMaxChatHistoryMessagesBytesForTest } from "./server-constants.js";
@@ -197,9 +198,12 @@ describe("gateway server chat", () => {
         });
         expect(sendRes.ok).toBe(true);
 
-        await vi.waitFor(() => {
-          expect(spy.mock.calls.length).toBeGreaterThan(0);
-        }, FAST_WAIT_OPTS);
+        await pollUntilAssert(
+          () => {
+            expect(spy.mock.calls.length).toBeGreaterThan(0);
+          },
+          { timeoutMs: FAST_WAIT_OPTS.timeout, intervalMs: FAST_WAIT_OPTS.interval },
+        );
 
         expect(capturedOpts?.disableBlockStreaming).toBeUndefined();
       } finally {
@@ -528,9 +532,12 @@ describe("gateway server chat", () => {
 
       const sendRes = await sendResP;
       expect(sendRes.ok).toBe(true);
-      await vi.waitFor(() => {
-        expect(spy.mock.calls.length).toBeGreaterThan(0);
-      }, FAST_WAIT_OPTS);
+      await pollUntilAssert(
+        () => {
+          expect(spy.mock.calls.length).toBeGreaterThan(0);
+        },
+        { timeoutMs: FAST_WAIT_OPTS.timeout, intervalMs: FAST_WAIT_OPTS.interval },
+      );
 
       const inFlight = await rpcReq<{ status?: string }>(ws, "chat.send", {
         sessionKey: "main",
@@ -546,9 +553,12 @@ describe("gateway server chat", () => {
       });
       expect(abortRes.ok).toBe(true);
       expect(abortRes.payload?.aborted).toBe(true);
-      await vi.waitFor(() => {
-        expect(aborted).toBe(true);
-      }, FAST_WAIT_OPTS);
+      await pollUntilAssert(
+        () => {
+          expect(aborted).toBe(true);
+        },
+        { timeoutMs: FAST_WAIT_OPTS.timeout, intervalMs: FAST_WAIT_OPTS.interval },
+      );
 
       spy.mockClear();
       spy.mockResolvedValueOnce(undefined);
@@ -560,15 +570,18 @@ describe("gateway server chat", () => {
       });
       expect(completeRes.ok).toBe(true);
 
-      await vi.waitFor(async () => {
-        const again = await rpcReq<{ status?: string }>(ws, "chat.send", {
-          sessionKey: "main",
-          message: "hello",
-          idempotencyKey: "idem-complete-1",
-        });
-        expect(again.ok).toBe(true);
-        expect(again.payload?.status).toBe("ok");
-      }, FAST_WAIT_OPTS);
+      await pollUntilAssert(
+        async () => {
+          const again = await rpcReq<{ status?: string }>(ws, "chat.send", {
+            sessionKey: "main",
+            message: "hello",
+            idempotencyKey: "idem-complete-1",
+          });
+          expect(again.ok).toBe(true);
+          expect(again.payload?.status).toBe("ok");
+        },
+        { timeoutMs: FAST_WAIT_OPTS.timeout, intervalMs: FAST_WAIT_OPTS.interval },
+      );
     });
   });
 });

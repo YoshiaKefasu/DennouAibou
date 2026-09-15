@@ -22,7 +22,7 @@ vi.mock("../infra/net/fetch-guard.js", () => ({
 }));
 
 vi.mock("./skills.js", async () => ({
-  ...(await vi.importActual<typeof import("./skills.js")>("./skills.js")),
+  ...(await import("./skills.js")),
   hasBinary: (bin: string) => hasBinaryMock(bin),
 }));
 

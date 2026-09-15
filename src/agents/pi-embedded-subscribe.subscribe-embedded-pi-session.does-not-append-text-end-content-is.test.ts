@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import {
   createTextEndBlockReplyHarness,
   emitAssistantTextDelta,
@@ -47,7 +48,7 @@ describe("subscribeEmbeddedPiSession", () => {
     emitTextEnd(content);
     await Promise.resolve();
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(onBlockReply).toHaveBeenCalledTimes(1);
     });
     expect(subscription.assistantTexts).toEqual([expected]);

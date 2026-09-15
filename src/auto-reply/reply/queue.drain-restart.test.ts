@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { importFreshModule } from "../../../test/helpers/import-fresh.js";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { defaultRuntime } from "../../runtime.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
@@ -188,7 +189,7 @@ describe("followup queue drain restart after idle window", () => {
     expect(freshCalls).toHaveLength(0);
 
     scheduleFollowupDrain(key, staleFollowup);
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(freshCalls).toHaveLength(1);
     });
 
@@ -235,11 +236,11 @@ describe("followup queue drain restart after idle window", () => {
         runFollowup,
       );
 
-      await vi.waitFor(
+      await pollUntilAssert(
         () => {
           expect(calls).toHaveLength(2);
         },
-        { timeout: 1_000 },
+        { timeoutMs: 1_000 },
       );
 
       expect(calls[0]?.prompt).toBe("before-idle");

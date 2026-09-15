@@ -86,7 +86,7 @@ function spawnDockerProcess(command: string, args: string[]) {
 }
 
 async function createChildProcessMock() {
-  const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+  const actual = await import("node:child_process");
   return {
     ...actual,
     spawn: spawnDockerProcess,

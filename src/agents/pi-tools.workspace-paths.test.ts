@@ -12,7 +12,7 @@ import { createPiToolsSandboxContext } from "./test-helpers/pi-tools-sandbox-con
 
 vi.mock("../infra/shell-env.js", async () => {
   const mod =
-    await vi.importActual<typeof import("../infra/shell-env.js")>("../infra/shell-env.js");
+    await import("../infra/shell-env.js");
   return { ...mod, getShellPathFromLoginShell: () => null };
 });
 async function withTempDir<T>(prefix: string, fn: (dir: string) => Promise<T>) {

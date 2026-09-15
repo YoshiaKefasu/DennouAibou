@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 
 const preparedPlan = vi.hoisted(() => ({
   argv: ["bun", "./script.ts"],
@@ -27,7 +28,9 @@ const resolveExecHostApprovalContextMock = vi.hoisted(() =>
   })),
 );
 const createAndRegisterDefaultExecApprovalRequestMock = vi.hoisted(() => vi.fn());
-const resolveApprovalDecisionOrUndefinedMock = vi.hoisted(() => vi.fn<() => Promise<string | null>>(async () => "allow-once"));
+const resolveApprovalDecisionOrUndefinedMock = vi.hoisted(() =>
+  vi.fn<() => Promise<string | null>>(async () => "allow-once"),
+);
 const createExecApprovalDecisionStateMock = vi.hoisted(() =>
   vi.fn(() => ({
     baseDecision: { timedOut: false },
@@ -43,7 +46,9 @@ const enforceStrictInlineEvalApprovalBoundaryMock = vi.hoisted(() =>
 const registerExecApprovalRequestForHostOrThrowMock = vi.hoisted(() =>
   vi.fn(async () => undefined),
 );
-const detectInterpreterInlineEvalArgvMock = vi.hoisted(() => vi.fn<() => { kind: string } | null>(() => null));
+const detectInterpreterInlineEvalArgvMock = vi.hoisted(() =>
+  vi.fn<() => { kind: string } | null>(() => null),
+);
 
 vi.mock("../infra/exec-approvals.js", () => ({
   evaluateShellAllowlist: vi.fn(() => ({
@@ -226,7 +231,7 @@ describe("executeNodeHostCommand", () => {
       }),
     );
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(callGatewayToolMock).toHaveBeenCalledTimes(2);
     });
 
@@ -279,7 +284,7 @@ describe("executeNodeHostCommand", () => {
     });
 
     expect(result.details?.status).toBe("approval-pending");
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(sendExecApprovalFollowupResultMock).toHaveBeenCalledWith(
         { approvalId: "approval-1" },
         "Exec denied (node=node-1 id=approval-1, approval-timeout): python3 -c 'print(1)'",

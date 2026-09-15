@@ -285,7 +285,7 @@ vi.mock("../system-prompt.js", () => ({
 }));
 
 vi.mock("../extra-params.js", async () => {
-  const actual = await vi.importActual<typeof import("../extra-params.js")>("../extra-params.js");
+  const actual = await import("../extra-params.js");
   return {
     ...actual,
     applyExtraParamsToAgent: () => ({ effectiveExtraParams: {} }),

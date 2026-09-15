@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { GatewayClient } from "../gateway/client.js";
 import type { PluginApprovalRequest, PluginApprovalResolved } from "./plugin-approvals.js";
 
@@ -281,7 +282,7 @@ describe("createExecApprovalChannelRuntime", () => {
       },
     });
 
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(loggerMocks.error).toHaveBeenCalledWith(
         "error handling approval request: deliver failed",
       );
@@ -361,7 +362,7 @@ describe("createExecApprovalChannelRuntime", () => {
         expiresAtMs: 2000,
       },
     });
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(deliverRequested).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "plugin:abc",
@@ -377,7 +378,7 @@ describe("createExecApprovalChannelRuntime", () => {
         ts: 1500,
       },
     });
-    await vi.waitFor(() => {
+    await pollUntilAssert(() => {
       expect(finalizeResolved).toHaveBeenCalledWith({
         request: expect.objectContaining({ id: "plugin:abc" }),
         resolved: expect.objectContaining({ id: "plugin:abc", decision: "allow-once" }),

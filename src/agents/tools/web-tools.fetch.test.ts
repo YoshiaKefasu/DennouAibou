@@ -11,7 +11,7 @@ const { extractReadableContentMock, resolveWebFetchDefinitionMock } = vi.hoisted
 
 vi.mock("./web-fetch-utils.js", async () => {
   const actual =
-    await vi.importActual<typeof import("./web-fetch-utils.js")>("./web-fetch-utils.js");
+    await import("./web-fetch-utils.js");
   return {
     ...actual,
     extractReadableContent: extractReadableContentMock,

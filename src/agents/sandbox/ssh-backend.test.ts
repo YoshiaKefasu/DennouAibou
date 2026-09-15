@@ -18,7 +18,7 @@ const sshMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./ssh.js", async () => {
-  const actual = await vi.importActual<typeof import("./ssh.js")>("./ssh.js");
+  const actual = await import("./ssh.js");
   return {
     ...actual,
     createSshSandboxSessionFromSettings: sshMocks.createSshSandboxSessionFromSettings,

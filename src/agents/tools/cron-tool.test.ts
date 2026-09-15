@@ -5,7 +5,7 @@ const { callGatewayMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("../agent-scope.js", async () => {
-  const actual = await vi.importActual<typeof import("../agent-scope.js")>("../agent-scope.js");
+  const actual = await import("../agent-scope.js");
   return {
     ...actual,
     resolveSessionAgentId: () => "agent-123",

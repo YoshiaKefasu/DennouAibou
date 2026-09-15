@@ -26,7 +26,7 @@ vi.mock("../tools/web-tools.js", () => ({
 
 vi.mock("../../plugins/tools.js", async () => {
   const mod =
-    await vi.importActual<typeof import("../../plugins/tools.js")>("../../plugins/tools.js");
+    await import("../../plugins/tools.js");
   return {
     ...mod,
     resolvePluginTools: () => [],

@@ -21,7 +21,7 @@ import type { TranscriptPolicy } from "./transcript-policy.js";
 import { makeZeroUsageSnapshot } from "./usage.js";
 
 vi.mock("./pi-embedded-helpers.js", async () => ({
-  ...(await vi.importActual("./pi-embedded-helpers.js")),
+  ...(await import("./pi-embedded-helpers.js")),
   isGoogleModelApi: vi.fn(),
   sanitizeSessionMessagesImages: vi.fn(async (msgs) => msgs),
 }));
