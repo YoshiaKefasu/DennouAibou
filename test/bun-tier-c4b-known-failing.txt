@@ -1,0 +1,116 @@
+# Bun Phase 3-C4b: files retaining vi.doMock / vi.doUnmock.
+#
+# Measured on Bun 1.4.0 / Windows / HEAD c0906b30c5.
+# The task baseline named 279 vi.doMock / 57 vi.doUnmock references. The
+# current HEAD recount is 278 vi.doMock / 56 vi.doUnmock because a701be67ef
+# removed tests before this measurement.
+#
+# Inventory: 81 files, 278 vi.doMock references, 56 vi.doUnmock references.
+# Of these, 69 files fail or time out under the split Bun probe; 12 are
+# helper-only files with no standalone tests and therefore pass with no tests.
+# Split validation used:
+#   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
+#
+# Result by candidate file: 12 helper-only files pass with no standalone tests;
+# 63 files fail at the first unsupported vi.doMock/vi.doUnmock/vi.resetModules/
+# vi.hoisted call; 6 files time out before a conclusive result. The 69 files
+# below are kept out of a green Bun lane until Bun provides the missing dynamic
+# module-mock lifecycle APIs or the tests are split into statically mocked files.
+#
+# Bun 1.4.0 exposes vi.fn, vi.mock, vi.spyOn, timer helpers, and mock reset
+# helpers, but does not expose vi.doMock or vi.doUnmock. Bun module mocks are
+# global-lifetime entries with no individual removal API; --isolate creates a
+# fresh global/module registry per file, not per test. Therefore replacing
+# these calls with mock.module() inside the existing tests would change test
+# semantics and cannot safely emulate Vitest's per-test dynamic mock lifecycle.
+#
+# Keep in sync when a file starts passing:
+#   bun test --isolate --timeout 120000 <the file>
+
+# unsupported dynamic module-mock lifecycle (63 files)
+extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
+extensions/discord/src/monitor/provider.test.ts
+extensions/telegram/src/audit.test.ts
+src/agents/context.lookup.test.ts
+src/agents/model-fallback.run-embedded.e2e.test.ts
+src/agents/openclaw-tools.subagents.sessions-spawn-depth-limits.test.ts
+src/agents/pi-embedded-runner.e2e.test.ts
+src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+src/agents/pi-model-discovery.compat.e2e.test.ts
+src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
+src/agents/sandbox/docker.config-hash-recreate.test.ts
+src/agents/sandbox/registry.test.ts
+src/agents/tools-effective-inventory.test.ts
+src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox-workspace.test.ts
+src/auto-reply/reply/commands-info.tools.test.ts
+src/auto-reply/reply/followup-runner.test.ts
+src/auto-reply/reply/get-reply-inline-actions.skip-when-config-empty.test.ts
+src/auto-reply/reply/get-reply.imports.test.ts
+src/auto-reply/reply/groups.test.ts
+src/auto-reply/reply/session-hooks-context.test.ts
+src/auto-reply/reply/session-updates.lifecycle.test.ts
+src/auto-reply/reply/session.imports.test.ts
+src/auto-reply/skill-commands.test.ts
+src/auto-reply/thinking.test.ts
+src/canvas-host/server.test.ts
+src/channels/channels-misc.test.ts
+src/channels/plugins/bundled.shape-guard.test.ts
+src/channels/plugins/setup-helpers.import-safety.test.ts
+src/cli/command-secret-targets.import.test.ts
+src/commands/health.snapshot.test.ts
+src/commands/models/list.list-command.forward-compat.test.ts
+src/commands/models/list.probe.test.ts
+src/commands/models/list.status.test.ts
+src/config/bundled-channel-config-runtime.test.ts
+src/config/load-channel-config-surface.test.ts
+src/config/sessions.store.imports.test.ts
+src/config/zod-schema.providers.lazy-runtime.test.ts
+src/cron/isolated-agent/delivery-target.test.ts
+src/gateway/gateway-misc.test.ts
+src/infra/gaxios-fetch-compat.test.ts
+src/infra/git-commit.test.ts
+src/infra/net/proxy-fetch.test.ts
+src/infra/net/undici-global-dispatcher.test.ts
+src/infra/session-maintenance-warning.test.ts
+src/logging/logger.browser-import.test.ts
+src/media-understanding/apply.echo-transcript.test.ts
+src/media-understanding/apply.test.ts
+src/media-understanding/runner.vision-skip.test.ts
+src/media/server.outside-workspace.test.ts
+src/media/server.test.ts
+src/media/store.test.ts
+src/plugin-sdk/facade-runtime.test.ts
+src/plugins/contracts/registry.retry.test.ts
+src/plugins/contracts/runtime-import-side-effects.contract.test.ts
+src/plugins/contracts/runtime-seams.contract.test.ts
+src/plugins/conversation-binding.test.ts
+src/plugins/provider-runtime.test.ts
+src/plugins/providers.test.ts
+src/process/exec.test.ts
+src/tasks/task-registry.maintenance.issue-60299.test.ts
+src/tasks/task-registry.test.ts
+test/test-env.test.ts
+ui/src/ui/app-chat.test.ts
+
+# timeout during isolated measurement (6 files)
+packages/memory-host-sdk/src/host/embeddings-gemini.test.ts
+packages/memory-host-sdk/src/host/embeddings-voyage.test.ts
+src/commands/agent.test.ts
+src/cron/isolated-agent.lane.test.ts
+src/memory-host-sdk/host/embeddings-gemini.test.ts
+src/memory-host-sdk/host/embeddings-voyage.test.ts
+
+# helper-only files in the 81-file inventory (pass-with-no-tests; not listed as
+# failures above because they contain no standalone test cases; 12 files)
+# extensions/telegram/src/bot.create-telegram-bot.test-harness.ts
+# extensions/telegram/src/bot.media.e2e-harness.ts
+# src/agents/pi-embedded-runner/compact.hooks.harness.ts
+# src/agents/pi-embedded-runner/run.overflow-compaction.harness.ts
+# src/agents/sandbox/fs-bridge.test-helpers.ts
+# src/agents/subagent-spawn.test-helpers.ts
+# src/auto-reply/reply.directive.directive-behavior.e2e-harness.ts
+# src/auto-reply/reply.directive.directive-behavior.e2e-mocks.ts
+# src/auto-reply/reply.triggers.trigger-handling.test-harness.ts
+# src/commands/doctor.note-test-helpers.ts
+# src/commands/status.scan.test-helpers.ts
+# src/test-utils/session-write-lock-module-mock.ts
