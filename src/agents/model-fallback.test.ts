@@ -604,6 +604,37 @@ describe("runWithModelFallback", () => {
     });
   });
 
+  it("does not skip OpenRouter when legacy cooldown markers exist", async () => {
+    const provider = "openrouter";
+    const cfg = makeProviderFallbackCfg(provider);
+    const store = makeSingleProviderStore({
+      provider,
+      usageStat: {
+        cooldownUntil: Date.now() + 5 * 60_000,
+        disabledUntil: Date.now() + 10 * 60_000,
+        disabledReason: "billing",
+      },
+    });
+    const run = vi.fn().mockImplementation(async (providerId) => {
+      if (providerId === "openrouter") {
+        return "ok";
+      }
+      throw new Error(`unexpected provider: ${providerId}`);
+    });
+
+    const result = await runWithStoredAuth({
+      cfg,
+      store,
+      provider,
+      run,
+    });
+
+    expect(result.result).toBe("ok");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0]?.[0]).toBe("openrouter");
+    expect(result.attempts).toEqual([]);
+  });
+
   it("propagates disabled reason when all profiles are unavailable", async () => {
     const now = Date.now();
     await expectSkippedUnavailableProvider({
@@ -854,6 +885,39 @@ describe("runWithModelFallback", () => {
     ).rejects.toThrow("primary failed");
 
     expect(calls).toEqual([{ provider: "anthropic", model: "claude-opus-4-5" }]);
+  });
+
+  it("keeps explicit fallbacks reachable when models allowlist is present", async () => {
+    const cfg = makeCfg({
+      agents: {
+        defaults: {
+          model: {
+            primary: "anthropic/claude-sonnet-4",
+            fallbacks: ["openai/gpt-4o", "anthropic/claude-haiku-3-5"],
+          },
+          models: {
+            "anthropic/claude-sonnet-4": {},
+          },
+        },
+      },
+    });
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
+      .mockResolvedValueOnce("ok");
+
+    const result = await runWithModelFallback({
+      cfg,
+      provider: "anthropic",
+      model: "claude-sonnet-4",
+      run,
+    });
+
+    expect(result.result).toBe("ok");
+    expect(run.mock.calls).toEqual([
+      ["anthropic", "claude-sonnet-4"],
+      ["openai", "gpt-4o"],
+    ]);
   });
 
   it("defaults provider/model when missing (regression #946)", async () => {

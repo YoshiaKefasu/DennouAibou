@@ -52,6 +52,8 @@ function makeStore(usageStats: AuthProfileStore["usageStats"]): AuthProfileStore
         expires: 4_102_444_800_000,
         accountId: "acct_test_123",
       },
+      "openrouter:default": { type: "api_key", provider: "openrouter", key: "sk-or-test" },
+      "kilocode:default": { type: "api_key", provider: "kilocode", key: "sk-kc-test" },
     },
     usageStats,
   };
@@ -80,6 +82,16 @@ describe("resolveProfileUnusableUntil", () => {
 });
 
 describe("resolveProfileUnusableUntilForDisplay", () => {
+  it("hides cooldown markers for OpenRouter profiles", () => {
+    const store = makeStore({
+      "openrouter:default": {
+        cooldownUntil: Date.now() + 60_000,
+      },
+    });
+
+    expect(resolveProfileUnusableUntilForDisplay(store, "openrouter:default")).toBeNull();
+  });
+
   it("keeps cooldown markers visible for other providers", () => {
     const until = Date.now() + 60_000;
     const store = makeStore({
@@ -124,6 +136,28 @@ describe("isProfileInCooldown", () => {
       },
     });
     expect(isProfileInCooldown(store, "anthropic:default")).toBe(true);
+  });
+
+  it("returns false for OpenRouter even when cooldown fields exist", () => {
+    const store = makeStore({
+      "openrouter:default": {
+        cooldownUntil: Date.now() + 60_000,
+        disabledUntil: Date.now() + 60_000,
+        disabledReason: "billing",
+      },
+    });
+    expect(isProfileInCooldown(store, "openrouter:default")).toBe(false);
+  });
+
+  it("returns false for Kilocode even when cooldown fields exist", () => {
+    const store = makeStore({
+      "kilocode:default": {
+        cooldownUntil: Date.now() + 60_000,
+        disabledUntil: Date.now() + 60_000,
+        disabledReason: "billing",
+      },
+    });
+    expect(isProfileInCooldown(store, "kilocode:default")).toBe(false);
   });
 
   it("returns false for a different model when cooldown is model-scoped (rate_limit)", () => {
