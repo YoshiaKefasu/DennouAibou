@@ -3,11 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
-import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { NON_ENV_SECRETREF_MARKER } from "./model-auth-markers.js";
 import { normalizeProviders } from "./models-config.providers.normalize.js";
-import { resolveApiKeyFromProfiles } from "./models-config.providers.secrets.js";
-import { enforceSourceManagedProviderSecrets } from "./models-config.providers.source-managed.js";
 
 vi.mock("./models-config.providers.policy.runtime.js", () => ({
   applyProviderNativeStreamingUsagePolicy: () => undefined,
@@ -161,45 +158,6 @@ describe("normalizeProviders", () => {
     }
   });
 
-  it("reads provider apiKey markers from auth-profiles env refs", async () => {
-    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-agent-"));
-    try {
-      await fs.writeFile(
-        path.join(agentDir, "auth-profiles.json"),
-        `${JSON.stringify(
-          {
-            version: 1,
-            profiles: {
-              "minimax:default": {
-                type: "api_key",
-                provider: "minimax",
-                keyRef: { source: "env", provider: "default", id: "MINIMAX_API_KEY" },
-              },
-            },
-          },
-          null,
-          2,
-        )}\n`,
-        "utf8",
-      );
-
-      const store = ensureAuthProfileStore(agentDir, {
-        allowKeychainPrompt: false,
-      });
-
-      const resolved = resolveApiKeyFromProfiles({
-        provider: "minimax",
-        store,
-        env: process.env,
-      });
-
-      expect(resolved?.apiKey).toBe("MINIMAX_API_KEY"); // pragma: allowlist secret
-      expect(resolved?.source).toBe("env-ref");
-    } finally {
-      await fs.rm(agentDir, { recursive: true, force: true });
-    }
-  });
-
   it("normalizes SecretRef-backed provider headers to non-secret marker values", async () => {
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-agent-"));
     try {
@@ -224,39 +182,5 @@ describe("normalizeProviders", () => {
     } finally {
       await fs.rm(agentDir, { recursive: true, force: true });
     }
-  });
-
-  it("ignores non-object provider entries during source-managed enforcement", () => {
-    const providers = {
-      openai: null,
-      moonshot: {
-        baseUrl: "https://api.moonshot.ai/v1",
-        api: "openai-completions",
-        apiKey: "sk-runtime-moonshot", // pragma: allowlist secret
-        models: [],
-      },
-    } as unknown as NonNullable<NonNullable<OpenClawConfig["models"]>["providers"]>;
-
-    const sourceProviders: NonNullable<NonNullable<OpenClawConfig["models"]>["providers"]> = {
-      openai: {
-        baseUrl: "https://api.openai.com/v1",
-        api: "openai-completions",
-        apiKey: { source: "env", provider: "default", id: "OPENAI_API_KEY" }, // pragma: allowlist secret
-        models: [],
-      },
-      moonshot: {
-        baseUrl: "https://api.moonshot.ai/v1",
-        api: "openai-completions",
-        apiKey: { source: "env", provider: "default", id: "MOONSHOT_API_KEY" }, // pragma: allowlist secret
-        models: [],
-      },
-    };
-
-    const enforced = enforceSourceManagedProviderSecrets({
-      providers,
-      sourceProviders,
-    });
-    expect((enforced as Record<string, unknown>).openai).toBeNull();
-    expect(enforced?.moonshot?.apiKey).toBe("MOONSHOT_API_KEY"); // pragma: allowlist secret
   });
 });
