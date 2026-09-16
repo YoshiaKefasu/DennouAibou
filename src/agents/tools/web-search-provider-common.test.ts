@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("web_search shared cache", () => {
   it("keeps cache entries module-local instead of exposing them on a global symbol", async () => {
-    vi.resetModules();
     delete (globalThis as Record<PropertyKey, unknown>)[Symbol.for("dennou.web-search.cache")];
 
     const module = await import("./web-search-provider-common.js");

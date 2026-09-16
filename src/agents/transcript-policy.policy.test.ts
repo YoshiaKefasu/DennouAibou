@@ -1,11 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-let resolveTranscriptPolicy: typeof import("./transcript-policy.js").resolveTranscriptPolicy;
-
-beforeEach(async () => {
-  vi.resetModules();
-  ({ resolveTranscriptPolicy } = await import("./transcript-policy.js"));
-});
+import { describe, expect, it } from "vitest";
+import { resolveTranscriptPolicy } from "./transcript-policy.js";
 
 describe("resolveTranscriptPolicy e2e smoke", () => {
   it("uses images-only sanitization without tool-call id rewriting for OpenAI models", () => {
