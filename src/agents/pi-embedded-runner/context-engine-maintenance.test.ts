@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildContextEngineMaintenanceRuntimeContext,
+  runContextEngineMaintenance,
+} from "./context-engine-maintenance.js";
 
 const rewriteTranscriptEntriesInSessionManagerMock = vi.fn((_params?: unknown) => ({
   changed: true,
@@ -10,9 +14,6 @@ const rewriteTranscriptEntriesInSessionFileMock = vi.fn(async (_params?: unknown
   bytesFreed: 123,
   rewrittenEntries: 2,
 }));
-let buildContextEngineMaintenanceRuntimeContext: typeof import("./context-engine-maintenance.js").buildContextEngineMaintenanceRuntimeContext;
-let runContextEngineMaintenance: typeof import("./context-engine-maintenance.js").runContextEngineMaintenance;
-
 vi.mock("./transcript-rewrite.js", () => ({
   rewriteTranscriptEntriesInSessionManager: (params: unknown) =>
     rewriteTranscriptEntriesInSessionManagerMock(params),
@@ -20,17 +21,10 @@ vi.mock("./transcript-rewrite.js", () => ({
     rewriteTranscriptEntriesInSessionFileMock(params),
 }));
 
-async function loadFreshContextEngineMaintenanceModuleForTest() {
-  vi.resetModules();
-  ({ buildContextEngineMaintenanceRuntimeContext, runContextEngineMaintenance } =
-    await import("./context-engine-maintenance.js"));
-}
-
 describe("buildContextEngineMaintenanceRuntimeContext", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     rewriteTranscriptEntriesInSessionManagerMock.mockClear();
     rewriteTranscriptEntriesInSessionFileMock.mockClear();
-    await loadFreshContextEngineMaintenanceModuleForTest();
   });
 
   it("adds a transcript rewrite helper that targets the current session file", async () => {
@@ -100,10 +94,9 @@ describe("buildContextEngineMaintenanceRuntimeContext", () => {
 });
 
 describe("runContextEngineMaintenance", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     rewriteTranscriptEntriesInSessionManagerMock.mockClear();
     rewriteTranscriptEntriesInSessionFileMock.mockClear();
-    await loadFreshContextEngineMaintenanceModuleForTest();
   });
 
   it("passes a rewrite-capable runtime context into maintain()", async () => {

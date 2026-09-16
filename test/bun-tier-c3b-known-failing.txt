@@ -1,0 +1,62 @@
+# Bun Phase 3-C3b: first 50-file vi.resetModules pass.
+#
+# Scope: the first 50 Git-tracked test files containing vi.resetModules at the
+# start of this pass, in path order. Five files were converted to static
+# imports and explicit state cleanup. The 45 files below remain known failures
+# because removing resetModules would change Vitest semantics, or because the
+# file is covered by the C-4b dynamic-mock limitation / a Bun API gap / timeout.
+#
+# Split validation used:
+#   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
+#
+# Bun 1.4.0 has no vi.resetModules. mock.module() is global-lifetime and has
+# no per-test removal API, while --isolate resets the global/module registry
+# only between test files. Do not replace these entries with mock.module() or
+# remove resetModules unless the test is split or gains an explicit state seam.
+
+# C-4b overlap / unsupported dynamic mock lifecycle, Bun API gaps, or timeout
+extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
+extensions/line/src/monitor.lifecycle.test.ts
+extensions/line/src/send.test.ts
+extensions/telegram/src/bot/delivery.test.ts
+extensions/telegram/src/sticker-cache.test.ts
+src/agents/auth-profiles.readonly-sync.test.ts
+src/agents/auth-profiles.store-cache.test.ts
+src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
+src/agents/bash-tools.exec.background-abort.test.ts
+src/agents/bash-tools.exec.pty-cleanup.test.ts
+src/agents/bash-tools.exec.pty-fallback-failure.test.ts
+src/agents/compaction.tool-result-details.test.ts
+src/agents/context.eager-warmup.test.ts
+src/agents/context.lookup.test.ts
+src/agents/model-fallback.probe.test.ts
+src/agents/model-fallback.run-embedded.e2e.test.ts
+src/agents/models-config.write-serialization.test.ts
+src/agents/openclaw-tools.agents.test.ts
+src/agents/openclaw-tools.subagents.sessions-spawn-depth-limits.test.ts
+src/agents/pi-embedded-runner.e2e.test.ts
+src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+src/agents/pi-model-discovery.compat.e2e.test.ts
+src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
+src/agents/pi-tools.read.workspace-root-guard.test.ts
+src/agents/runtime-plugins.test.ts
+src/agents/sandbox-agent-config.agent-specific-sandbox-config.e2e.test.ts
+src/agents/sandbox/browser.create.test.ts
+src/agents/sandbox/docker.config-hash-recreate.test.ts
+src/agents/sandbox/manage.test.ts
+src/agents/sandbox/registry.test.ts
+src/agents/sandbox/ssh.spawn-env.test.ts
+src/agents/subagent-announce.capture-completion-reply.test.ts
+src/agents/subagent-registry.announce-loop-guard.test.ts
+src/agents/subagent-registry.archive.e2e.test.ts
+src/agents/subagent-registry.persistence.resume.test.ts
+src/agents/subagent-registry.steer-restart.test.ts
+src/agents/subagent-registry.test.ts
+src/agents/tools-effective-inventory.test.ts
+src/agents/tools/sessions.test.ts
+src/agents/tools/web-search.redirect.test.ts
+src/auto-reply/reply.block-streaming.test.ts
+src/auto-reply/reply.directive.directive-behavior.applies-inline-reasoning-mixed-messages-acks-immediately.test.ts
+src/auto-reply/reply.directive.directive-behavior.defaults-think-low-reasoning-capable-models-no.test.ts
+src/auto-reply/reply.directive.directive-behavior.shows-current-verbose-level-verbose-has-no.test.ts
+src/auto-reply/reply.directive.exec-agent-defaults.test.ts

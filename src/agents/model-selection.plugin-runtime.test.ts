@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseModelRef } from "./model-selection.js";
 
 const normalizeProviderModelIdWithPluginMock = vi.fn();
 
@@ -9,7 +10,6 @@ vi.mock("./provider-model-normalization.runtime.js", () => ({
 
 describe("model-selection plugin runtime normalization", () => {
   beforeEach(() => {
-    vi.resetModules();
     normalizeProviderModelIdWithPluginMock.mockReset();
   });
 
@@ -23,8 +23,6 @@ describe("model-selection plugin runtime normalization", () => {
       }
       return undefined;
     });
-
-    const { parseModelRef } = await import("./model-selection.js");
 
     expect(parseModelRef("custom-legacy-model", "custom-provider")).toEqual({
       provider: "custom-provider",
