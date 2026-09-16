@@ -1,10 +1,9 @@
 # Bun Phase 3-C3b: first 50-file vi.resetModules pass.
 #
-# Scope: the first 50 Git-tracked test files containing vi.resetModules at the
-# start of this pass, in path order. Five files were converted to static
-# imports and explicit state cleanup. The 45 files below remain known failures
-# because removing resetModules would change Vitest semantics, or because the
-# file is covered by the C-4b dynamic-mock limitation / a Bun API gap / timeout.
+# Scope: Git-tracked test files containing vi.resetModules, in path order.
+# The first 50-file batch converted five files to static imports and explicit
+# state cleanup; the 45 remaining files from that batch are listed below.
+# This second batch adds 69 files (78 calls) measured after the first batch.
 #
 # Split validation used:
 #   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
@@ -14,7 +13,8 @@
 # only between test files. Do not replace these entries with mock.module() or
 # remove resetModules unless the test is split or gains an explicit state seam.
 
-# C-4b overlap / unsupported dynamic mock lifecycle, Bun API gaps, or timeout
+# First batch: C-4b overlap / unsupported dynamic mock lifecycle, Bun API gaps,
+# or timeout (45 files remaining after five conversions)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
 extensions/line/src/monitor.lifecycle.test.ts
 extensions/line/src/send.test.ts
@@ -60,3 +60,79 @@ src/auto-reply/reply.directive.directive-behavior.applies-inline-reasoning-mixed
 src/auto-reply/reply.directive.directive-behavior.defaults-think-low-reasoning-capable-models-no.test.ts
 src/auto-reply/reply.directive.directive-behavior.shows-current-verbose-level-verbose-has-no.test.ts
 src/auto-reply/reply.directive.exec-agent-defaults.test.ts
+
+# Second batch: 69 files / 78 resetModules calls.
+# Measured under Bun 1.4.0 with the split command above: 67 failed at the
+# unsupported resetModules call and 2 timed out before a conclusive result.
+# 30 entries overlap C-4b's dynamic-mock inventory. The remaining entries use
+# resetModules for fresh imports, often alongside vi.hoisted or module mocks;
+# mock.module() would not preserve Vitest's per-test lifecycle.
+src/auto-reply/reply.media-note.test.ts
+src/auto-reply/reply.raw-body.test.ts
+src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox-workspace.test.ts
+src/auto-reply/reply/agent-runner.media-paths.test.ts
+src/auto-reply/reply/commands-info.tools.test.ts
+src/auto-reply/reply/commands-subagents/action-agents.test.ts
+src/auto-reply/reply/commands-system-prompt.test.ts
+src/auto-reply/reply/commands.test.ts
+src/auto-reply/reply/followup-runner.test.ts
+src/auto-reply/reply/get-reply-inline-actions.skip-when-config-empty.test.ts
+src/auto-reply/reply/get-reply.before-agent-reply.test.ts
+src/auto-reply/reply/get-reply.config-override.test.ts
+src/auto-reply/reply/get-reply.message-hooks.test.ts
+src/auto-reply/reply/get-reply.native-audio.test.ts
+src/auto-reply/reply/get-reply.reset-hooks-fallback.test.ts
+src/auto-reply/reply/groups.test.ts
+src/auto-reply/reply/session-hooks-context.test.ts
+src/auto-reply/reply/session-updates.lifecycle.test.ts
+src/auto-reply/skill-commands.test.ts
+src/auto-reply/status.test.ts
+src/auto-reply/thinking.test.ts
+src/canvas-host/server.test.ts
+src/channels/channels-misc.test.ts
+src/cli/command-secret-targets.import.test.ts
+src/cli/gateway-cli/run-loop.test.ts
+src/cli/route.test.ts
+src/commands/agent.test.ts
+src/commands/doctor.runs-legacy-state-migrations-yes-mode-without.e2e.test.ts
+src/commands/doctor.update-repair-no-restart.test.ts
+src/commands/gateway-status.test.ts
+src/commands/models/list.status.test.ts
+src/commands/onboard-non-interactive.gateway.test.ts
+src/commands/onboard-non-interactive.provider-auth.test.ts
+src/config/config.web-search-provider.test.ts
+src/config/sessions/store.pruning.integration.test.ts
+src/cron/isolated-agent.lane.test.ts
+src/cron/isolated-agent/delivery-target.test.ts
+src/gateway/client.test.ts
+src/gateway/embeddings-http.test.ts
+src/gateway/exec-approval-ios-push.test.ts
+src/gateway/gateway-misc.test.ts
+src/gateway/server-methods/send.test.ts
+src/gateway/server-plugins.test.ts
+src/gateway/startup-auth.test.ts
+src/infra/boundary-file-read.test.ts
+src/infra/env.test.ts
+src/infra/outbound/outbound-send-service.test.ts
+src/media-understanding/apply.echo-transcript.test.ts
+src/media-understanding/apply.test.ts
+src/plugin-sdk/facade-runtime.test.ts
+src/plugins/contracts/registry.retry.test.ts
+src/plugins/contracts/runtime-import-side-effects.contract.test.ts
+src/plugins/contracts/runtime-seams.contract.test.ts
+src/plugins/conversation-binding.test.ts
+src/plugins/hook-runner-global.test.ts
+src/plugins/provider-runtime.test.ts
+src/plugins/providers.test.ts
+src/plugins/runtime/gateway-request-scope.test.ts
+src/process/exec.no-output-timer.test.ts
+src/process/exec.test.ts
+src/process/exec.windows.test.ts
+src/process/supervisor/supervisor.test.ts
+src/secrets/provider-env-vars.dynamic.test.ts
+src/tasks/task-registry.maintenance.issue-60299.test.ts
+src/tasks/task-registry.test.ts
+src/tui/theme/theme.test.ts
+test/scripts/test-report-utils.test.ts
+ui/src/i18n/test/translate.test.ts
+ui/src/ui/app-chat.test.ts
