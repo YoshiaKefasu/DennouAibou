@@ -1,9 +1,14 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes as defaultRandomBytes } from "node:crypto";
 import { safeEqualSecret } from "../security/secret-equal.js";
 
 export const PAIRING_TOKEN_BYTES = 32;
 
-export function generatePairingToken(): string {
+export type PairingTokenDeps = {
+  randomBytes?: (size: number) => Buffer;
+};
+
+export function generatePairingToken(deps: PairingTokenDeps = {}): string {
+  const randomBytes = deps.randomBytes ?? defaultRandomBytes;
   return randomBytes(PAIRING_TOKEN_BYTES).toString("base64url");
 }
 

@@ -35,14 +35,19 @@ function formatLockLine(lock: SessionLockInspection): string {
   return `- ${shortenHomePath(lock.lockPath)} ${pidStatus} ${ageStatus} ${staleStatus}${removedStatus}`;
 }
 
-export async function noteSessionLockHealth(params?: { shouldRepair?: boolean; staleMs?: number }) {
+export async function noteSessionLockHealth(params?: {
+  shouldRepair?: boolean;
+  staleMs?: number;
+  note?: typeof note;
+}) {
+  const notify = params?.note ?? note;
   const shouldRepair = params?.shouldRepair === true;
   const staleMs = params?.staleMs ?? DEFAULT_STALE_MS;
   let sessionDirs: string[] = [];
   try {
     sessionDirs = await resolveAgentSessionDirs(resolveStateDir(process.env));
   } catch (err) {
-    note(`- Failed to inspect session lock files: ${String(err)}`, "Session locks");
+    notify(`- Failed to inspect session lock files: ${String(err)}`, "Session locks");
     return;
   }
 
@@ -81,5 +86,5 @@ export async function noteSessionLockHealth(params?: { shouldRepair?: boolean; s
     );
   }
 
-  note(lines.join("\n"), "Session locks");
+  notify(lines.join("\n"), "Session locks");
 }

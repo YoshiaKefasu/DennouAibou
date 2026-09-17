@@ -1,68 +1,33 @@
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { resolveGatewayProgramArguments, type ProgramArgsDeps } from "./program-args.js";
 
-const childProcessMocks = vi.hoisted(() => ({
-  execFileSync: vi.fn(),
-}));
+const EXEC_PATH = "/usr/local/bin/node";
 
-const fsMocks = vi.hoisted(() => ({
-  access: vi.fn(),
-  realpath: vi.fn(),
-}));
-
-vi.mock("node:fs/promises", async () => {
-  const actual = await import("node:fs/promises");
-  return {
-    ...actual,
-    default: {
-      ...actual,
-      access: fsMocks.access,
-      realpath: fsMocks.realpath,
-    },
-    access: fsMocks.access,
-    realpath: fsMocks.realpath,
-  };
-});
-
-vi.mock("node:child_process", async () => {
-  const actual = await import("node:child_process");
-  return {
-    ...actual,
-    execFileSync: childProcessMocks.execFileSync,
-  };
-});
-
-import { resolveGatewayProgramArguments } from "./program-args.js";
-
-const originalArgv = [...process.argv];
-
-afterEach(() => {
-  process.argv = [...originalArgv];
-  vi.resetAllMocks();
-});
+function createAccess(existing: readonly string[]) {
+  return vi.fn(async (target: string) => {
+    if (existing.includes(target)) {
+      return;
+    }
+    throw new Error(`missing: ${target}`);
+  });
+}
 
 describe("resolveGatewayProgramArguments", () => {
   it("uses realpath-resolved dist entry when running via npx shim", async () => {
     const argv1 = path.resolve("/tmp/.npm/_npx/63c3/node_modules/.bin/openclaw");
     const entryPath = path.resolve("/tmp/.npm/_npx/63c3/node_modules/openclaw/dist/entry.js");
-    process.argv = ["node", argv1];
-    fsMocks.realpath.mockResolvedValue(entryPath);
-    fsMocks.access.mockImplementation(async (target: string) => {
-      if (target === entryPath) {
-        return;
-      }
-      throw new Error("missing");
-    });
+    const deps: ProgramArgsDeps = {
+      argv: ["node", argv1],
+      execPath: EXEC_PATH,
+      platform: "linux",
+      realpath: vi.fn(async () => entryPath),
+      access: createAccess([entryPath]),
+    };
 
-    const result = await resolveGatewayProgramArguments({ port: 18789 });
+    const result = await resolveGatewayProgramArguments({ port: 18789 }, deps);
 
-    expect(result.programArguments).toEqual([
-      process.execPath,
-      entryPath,
-      "gateway",
-      "--port",
-      "18789",
-    ]);
+    expect(result.programArguments).toEqual([EXEC_PATH, entryPath, "gateway", "--port", "18789"]);
   });
 
   it("prefers symlinked path over realpath for stable service config", async () => {
@@ -74,11 +39,15 @@ describe("resolveGatewayProgramArguments", () => {
     const realpathResolved = path.resolve(
       "/Users/test/Library/pnpm/global/5/node_modules/.pnpm/openclaw@2026.1.21-2/node_modules/openclaw/dist/entry.js",
     );
-    process.argv = ["node", symlinkPath];
-    fsMocks.realpath.mockResolvedValue(realpathResolved);
-    fsMocks.access.mockResolvedValue(undefined); // Both paths exist
+    const deps: ProgramArgsDeps = {
+      argv: ["node", symlinkPath],
+      execPath: EXEC_PATH,
+      platform: "linux",
+      realpath: vi.fn(async () => realpathResolved),
+      access: vi.fn(async () => undefined), // Both paths exist
+    };
 
-    const result = await resolveGatewayProgramArguments({ port: 18789 });
+    const result = await resolveGatewayProgramArguments({ port: 18789 }, deps);
 
     // Should use the symlinked path, not the realpath-resolved versioned path
     expect(result.programArguments[1]).toBe(symlinkPath);
@@ -88,39 +57,42 @@ describe("resolveGatewayProgramArguments", () => {
   it("falls back to node_modules package dist when .bin path is not resolved", async () => {
     const argv1 = path.resolve("/tmp/.npm/_npx/63c3/node_modules/.bin/openclaw");
     const indexPath = path.resolve("/tmp/.npm/_npx/63c3/node_modules/openclaw/dist/index.js");
-    process.argv = ["node", argv1];
-    fsMocks.realpath.mockRejectedValue(new Error("no realpath"));
-    fsMocks.access.mockImplementation(async (target: string) => {
-      if (target === indexPath) {
-        return;
-      }
-      throw new Error("missing");
-    });
+    const deps: ProgramArgsDeps = {
+      argv: ["node", argv1],
+      execPath: EXEC_PATH,
+      platform: "linux",
+      realpath: vi.fn(async () => {
+        throw new Error("no realpath");
+      }),
+      access: createAccess([indexPath]),
+    };
 
-    const result = await resolveGatewayProgramArguments({ port: 18789 });
+    const result = await resolveGatewayProgramArguments({ port: 18789 }, deps);
 
-    expect(result.programArguments).toEqual([
-      process.execPath,
-      indexPath,
-      "gateway",
-      "--port",
-      "18789",
-    ]);
+    expect(result.programArguments).toEqual([EXEC_PATH, indexPath, "gateway", "--port", "18789"]);
   });
 
   it("uses src/entry.ts for bun dev mode", async () => {
     const repoIndexPath = path.resolve("/repo/src/index.ts");
     const repoEntryPath = path.resolve("/repo/src/entry.ts");
-    process.argv = ["/usr/local/bin/node", repoIndexPath];
-    fsMocks.realpath.mockResolvedValue(repoIndexPath);
-    fsMocks.access.mockResolvedValue(undefined);
-    childProcessMocks.execFileSync.mockReturnValue("/usr/local/bin/bun\n");
+    const execFileSync = vi.fn(() => "/usr/local/bin/bun\n");
+    const deps: ProgramArgsDeps = {
+      argv: ["/usr/local/bin/node", repoIndexPath],
+      execPath: EXEC_PATH,
+      platform: "linux",
+      realpath: vi.fn(async () => repoIndexPath),
+      access: vi.fn(async () => undefined),
+      execFileSync,
+    };
 
-    const result = await resolveGatewayProgramArguments({
-      dev: true,
-      port: 18789,
-      runtime: "bun",
-    });
+    const result = await resolveGatewayProgramArguments(
+      {
+        dev: true,
+        port: 18789,
+        runtime: "bun",
+      },
+      deps,
+    );
 
     expect(result.programArguments).toEqual([
       "/usr/local/bin/bun",

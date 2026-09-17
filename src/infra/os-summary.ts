@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync as defaultSpawnSync } from "node:child_process";
 import os from "node:os";
 
 export type OsSummary = {
@@ -8,28 +8,39 @@ export type OsSummary = {
   label: string;
 };
 
+export type OsSummaryDeps = {
+  platform?: () => NodeJS.Platform;
+  release?: () => string;
+  arch?: () => string;
+  spawnSync?: typeof defaultSpawnSync;
+};
+
 function safeTrim(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function macosVersion(): string {
+function macosVersion(spawnSync: typeof defaultSpawnSync, release: string): string {
   const res = spawnSync("sw_vers", ["-productVersion"], { encoding: "utf-8" });
   const out = safeTrim(res.stdout);
-  return out || os.release();
+  return out || release;
 }
 
-export function resolveOsSummary(): OsSummary {
-  const platform = os.platform();
-  const release = os.release();
-  const arch = os.arch();
+export function resolveOsSummary(deps: OsSummaryDeps = {}): OsSummary {
+  const platform = deps.platform ?? os.platform;
+  const release = deps.release ?? os.release;
+  const arch = deps.arch ?? os.arch;
+  const spawnSync = deps.spawnSync ?? defaultSpawnSync;
+  const platformValue = platform();
+  const releaseValue = release();
+  const archValue = arch();
   const label = (() => {
-    if (platform === "darwin") {
-      return `macos ${macosVersion()} (${arch})`;
+    if (platformValue === "darwin") {
+      return `macos ${macosVersion(spawnSync, releaseValue)} (${archValue})`;
     }
-    if (platform === "win32") {
-      return `windows ${release} (${arch})`;
+    if (platformValue === "win32") {
+      return `windows ${releaseValue} (${archValue})`;
     }
-    return `${platform} ${release} (${arch})`;
+    return `${platformValue} ${releaseValue} (${archValue})`;
   })();
-  return { platform, arch, release, label };
+  return { platform: platformValue, arch: archValue, release: releaseValue, label };
 }

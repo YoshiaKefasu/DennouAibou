@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 200 files.
+# Current known-failure count: 189 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -158,7 +158,7 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (88 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (77 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
@@ -170,7 +170,6 @@ src/commands/configure.wizard.test.ts
 src/commands/doctor-gateway-daemon-flow.test.ts
 src/commands/doctor-gateway-services.test.ts
 src/commands/doctor-security.test.ts
-src/commands/doctor-session-locks.test.ts
 src/commands/doctor/shared/allowlist-policy-repair.test.ts
 src/commands/message.default-agent.test.ts
 src/commands/message.test.ts
@@ -183,10 +182,7 @@ src/commands/status.test.ts
 src/config/markdown-tables.test.ts
 src/config/runtime-schema.test.ts
 src/config/validation.channel-metadata.test.ts
-src/daemon/launchd-restart-handoff.test.ts
 src/daemon/launchd.test.ts
-src/daemon/program-args.test.ts
-src/daemon/runtime-paths.test.ts
 src/daemon/schtasks.startup-fallback.test.ts
 src/daemon/schtasks.stop.test.ts
 src/daemon/systemd.test.ts
@@ -213,7 +209,6 @@ src/infra/exec-approvals-store.test.ts
 src/infra/gateway-processes.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
 src/infra/net/ssrf.dispatcher.test.ts
-src/infra/os-summary.test.ts
 src/infra/outbound/agent-delivery.test.ts
 src/infra/outbound/channel-resolution.test.ts
 src/infra/outbound/channel-selection.test.ts
@@ -221,12 +216,8 @@ src/infra/outbound/deliver.test.ts
 src/infra/outbound/format.test.ts
 src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/outbound/message.test.ts
-src/infra/pairing-token.test.ts
-src/infra/path-env.test.ts
-src/infra/process-respawn.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
 src/infra/windows-task-restart.test.ts
-src/infra/wsl.test.ts
 src/logging/console-settings.test.ts
 src/logging/logger-settings.test.ts
 src/media-understanding/image.test.ts
@@ -243,6 +234,5 @@ src/secrets/configure.test.ts
 src/secrets/runtime-web-tools.test.ts
 src/secrets/runtime.coverage.test.ts
 src/secrets/runtime.test.ts
-src/security/windows-acl.test.ts
 src/tasks/task-executor.test.ts
 src/wizard/setup.gateway-config.test.ts

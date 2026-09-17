@@ -3,6 +3,8 @@ import { runExec } from "../process/exec.js";
 
 export type ExecFn = typeof runExec;
 
+export type UserInfoFn = () => { username?: string };
+
 export type WindowsAclEntry = {
   principal: string;
   rights: string[];
@@ -70,8 +72,11 @@ function normalizeSid(value: string): string {
   return normalized.startsWith("*") ? normalized.slice(1) : normalized;
 }
 
-export function resolveWindowsUserPrincipal(env?: NodeJS.ProcessEnv): string | null {
-  const username = env?.USERNAME?.trim() || os.userInfo().username?.trim();
+export function resolveWindowsUserPrincipal(
+  env?: NodeJS.ProcessEnv,
+  userInfo: UserInfoFn = os.userInfo,
+): string | null {
+  const username = env?.USERNAME?.trim() || userInfo().username?.trim();
   if (!username) {
     return null;
   }
@@ -79,9 +84,9 @@ export function resolveWindowsUserPrincipal(env?: NodeJS.ProcessEnv): string | n
   return domain ? `${domain}\\${username}` : username;
 }
 
-function buildTrustedPrincipals(env?: NodeJS.ProcessEnv): Set<string> {
+function buildTrustedPrincipals(env?: NodeJS.ProcessEnv, userInfo?: UserInfoFn): Set<string> {
   const trusted = new Set<string>(TRUSTED_BASE);
-  const principal = resolveWindowsUserPrincipal(env);
+  const principal = resolveWindowsUserPrincipal(env, userInfo);
   if (principal) {
     trusted.add(normalize(principal));
     const parts = principal.split("\\");
@@ -249,8 +254,9 @@ export function parseIcaclsOutput(output: string, targetPath: string): WindowsAc
 export function summarizeWindowsAcl(
   entries: WindowsAclEntry[],
   env?: NodeJS.ProcessEnv,
+  userInfo?: UserInfoFn,
 ): Pick<WindowsAclSummary, "trusted" | "untrustedWorld" | "untrustedGroup"> {
-  const trustedPrincipals = buildTrustedPrincipals(env);
+  const trustedPrincipals = buildTrustedPrincipals(env, userInfo);
   const trusted: WindowsAclEntry[] = [];
   const untrustedWorld: WindowsAclEntry[] = [];
   const untrustedGroup: WindowsAclEntry[] = [];
@@ -279,7 +285,7 @@ async function resolveCurrentUserSid(exec: ExecFn): Promise<string | null> {
 
 export async function inspectWindowsAcl(
   targetPath: string,
-  opts?: { env?: NodeJS.ProcessEnv; exec?: ExecFn },
+  opts?: { env?: NodeJS.ProcessEnv; exec?: ExecFn; userInfo?: UserInfoFn },
 ): Promise<WindowsAclSummary> {
   const exec = opts?.exec ?? runExec;
   try {
@@ -292,7 +298,11 @@ export async function inspectWindowsAcl(
     const output = `${stdout}\n${stderr}`.trim();
     const entries = parseIcaclsOutput(output, targetPath);
     let effectiveEnv = opts?.env;
-    let { trusted, untrustedWorld, untrustedGroup } = summarizeWindowsAcl(entries, effectiveEnv);
+    let { trusted, untrustedWorld, untrustedGroup } = summarizeWindowsAcl(
+      entries,
+      effectiveEnv,
+      opts?.userInfo,
+    );
 
     const needsUserSidResolution =
       !effectiveEnv?.USERSID &&
@@ -301,7 +311,11 @@ export async function inspectWindowsAcl(
       const currentUserSid = await resolveCurrentUserSid(exec);
       if (currentUserSid) {
         effectiveEnv = { ...effectiveEnv, USERSID: currentUserSid };
-        ({ trusted, untrustedWorld, untrustedGroup } = summarizeWindowsAcl(entries, effectiveEnv));
+        ({ trusted, untrustedWorld, untrustedGroup } = summarizeWindowsAcl(
+          entries,
+          effectiveEnv,
+          opts?.userInfo,
+        ));
       }
     }
 
@@ -331,18 +345,18 @@ export function formatWindowsAclSummary(summary: WindowsAclSummary): string {
 
 export function formatIcaclsResetCommand(
   targetPath: string,
-  opts: { isDir: boolean; env?: NodeJS.ProcessEnv },
+  opts: { isDir: boolean; env?: NodeJS.ProcessEnv; userInfo?: UserInfoFn },
 ): string {
-  const user = resolveWindowsUserPrincipal(opts.env) ?? "%USERNAME%";
+  const user = resolveWindowsUserPrincipal(opts.env, opts.userInfo) ?? "%USERNAME%";
   const grant = opts.isDir ? "(OI)(CI)F" : "F";
   return `icacls "${targetPath}" /inheritance:r /grant:r "${user}:${grant}" /grant:r "*S-1-5-18:${grant}"`;
 }
 
 export function createIcaclsResetCommand(
   targetPath: string,
-  opts: { isDir: boolean; env?: NodeJS.ProcessEnv },
+  opts: { isDir: boolean; env?: NodeJS.ProcessEnv; userInfo?: UserInfoFn },
 ): { command: string; args: string[]; display: string } | null {
-  const user = resolveWindowsUserPrincipal(opts.env);
+  const user = resolveWindowsUserPrincipal(opts.env, opts.userInfo);
   if (!user) {
     return null;
   }

@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+export type AccessFn = (path: string) => Promise<unknown>;
+
 /**
  * Homebrew Cellar paths (e.g. /opt/homebrew/Cellar/node/25.7.0/bin/node)
  * break when Homebrew upgrades Node and removes the old version directory.
@@ -8,7 +10,10 @@ import path from "node:path";
  *   - Default formula "node":  <prefix>/opt/node/bin/node  or  <prefix>/bin/node
  *   - Versioned formula "node@22":  <prefix>/opt/node@22/bin/node  (keg-only)
  */
-export async function resolveStableNodePath(nodePath: string): Promise<string> {
+export async function resolveStableNodePath(
+  nodePath: string,
+  access: AccessFn = fs.access,
+): Promise<string> {
   const cellarMatch = nodePath.match(
     /^(.+?)[\\/]Cellar[\\/]([^\\/]+)[\\/][^\\/]+[\\/]bin[\\/]node$/,
   );
@@ -22,7 +27,7 @@ export async function resolveStableNodePath(nodePath: string): Promise<string> {
   // Try the Homebrew opt symlink first — works for both default and versioned formulas.
   const optPath = pathModule.join(prefix, "opt", formula, "bin", "node");
   try {
-    await fs.access(optPath);
+    await access(optPath);
     return optPath;
   } catch {
     // fall through
@@ -32,7 +37,7 @@ export async function resolveStableNodePath(nodePath: string): Promise<string> {
   if (formula === "node") {
     const binPath = pathModule.join(prefix, "bin", "node");
     try {
-      await fs.access(binPath);
+      await access(binPath);
       return binPath;
     } catch {
       // fall through

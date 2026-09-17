@@ -9,17 +9,41 @@ type GatewayProgramArgs = {
 
 type GatewayRuntimePreference = "auto" | "node" | "bun";
 
-async function resolveCliEntrypointPathForService(): Promise<string> {
-  const argv1 = process.argv[1];
+type ExecFileSyncFn = (
+  command: string,
+  args: readonly string[],
+  options: { encoding: "utf8" },
+) => string;
+
+export type ProgramArgsDeps = {
+  argv?: readonly string[];
+  execPath?: string;
+  platform?: NodeJS.Platform;
+  access?: (target: string) => Promise<unknown>;
+  realpath?: (target: string) => Promise<string>;
+  execFileSync?: ExecFileSyncFn;
+};
+
+async function resolveDefaultExecFileSync(): Promise<ExecFileSyncFn> {
+  const { execFileSync } = await import("node:child_process");
+  return (command, args, options) => execFileSync(command, [...args], options);
+}
+
+async function resolveCliEntrypointPathForService(deps: ProgramArgsDeps): Promise<string> {
+  const argv = deps.argv ?? process.argv;
+  const access = deps.access ?? fs.access;
+  const realpath = deps.realpath ?? fs.realpath;
+
+  const argv1 = argv[1];
   if (!argv1) {
     throw new Error("Unable to resolve CLI entrypoint path");
   }
 
   const normalized = path.resolve(argv1);
-  const resolvedPath = await resolveRealpathSafe(normalized);
+  const resolvedPath = await resolveRealpathSafe(normalized, realpath);
   const looksLikeDist = /[/\\]dist[/\\].+\.(cjs|js|mjs)$/.test(resolvedPath);
   if (looksLikeDist) {
-    await fs.access(resolvedPath);
+    await access(resolvedPath);
     // Prefer the original (possibly symlinked) path over the resolved realpath.
     // This keeps LaunchAgent/systemd paths stable across package version updates,
     // since symlinks like node_modules/openclaw -> .pnpm/openclaw@X.Y.Z/...
@@ -28,7 +52,7 @@ async function resolveCliEntrypointPathForService(): Promise<string> {
     const normalizedLooksLikeDist = /[/\\]dist[/\\].+\.(cjs|js|mjs)$/.test(normalized);
     if (normalizedLooksLikeDist && normalized !== resolvedPath) {
       try {
-        await fs.access(normalized);
+        await access(normalized);
         return normalized;
       } catch {
         // Fall through to return resolvedPath
@@ -41,7 +65,7 @@ async function resolveCliEntrypointPathForService(): Promise<string> {
 
   for (const candidate of distCandidates) {
     try {
-      await fs.access(candidate);
+      await access(candidate);
       return candidate;
     } catch {
       // keep going
@@ -53,9 +77,12 @@ async function resolveCliEntrypointPathForService(): Promise<string> {
   );
 }
 
-async function resolveRealpathSafe(inputPath: string): Promise<string> {
+async function resolveRealpathSafe(
+  inputPath: string,
+  realpath: (target: string) => Promise<string>,
+): Promise<string> {
   try {
-    return await fs.realpath(inputPath);
+    return await realpath(inputPath);
   } catch {
     return inputPath;
   }
@@ -114,8 +141,9 @@ function appendNodeModulesBinCandidates(
   appendDistCandidates(candidates, seen, packageRoot);
 }
 
-function resolveRepoRootForDev(): string {
-  const argv1 = process.argv[1];
+function resolveRepoRootForDev(deps: ProgramArgsDeps): string {
+  const argv = deps.argv ?? process.argv;
+  const argv1 = argv[1];
   if (!argv1) {
     throw new Error("Unable to resolve repo root");
   }
@@ -128,26 +156,28 @@ function resolveRepoRootForDev(): string {
   return parts.slice(0, srcIndex).join(path.sep);
 }
 
-async function resolveBunPath(): Promise<string> {
-  const bunPath = await resolveBinaryPath("bun");
+async function resolveBunPath(deps: ProgramArgsDeps): Promise<string> {
+  const bunPath = await resolveBinaryPath("bun", deps);
   return bunPath;
 }
 
-async function resolveNodePath(): Promise<string> {
-  const nodePath = await resolveBinaryPath("node");
+async function resolveNodePath(deps: ProgramArgsDeps): Promise<string> {
+  const nodePath = await resolveBinaryPath("node", deps);
   return nodePath;
 }
 
-async function resolveBinaryPath(binary: string): Promise<string> {
-  const { execFileSync } = await import("node:child_process");
-  const cmd = process.platform === "win32" ? "where" : "which";
+async function resolveBinaryPath(binary: string, deps: ProgramArgsDeps): Promise<string> {
+  const access = deps.access ?? fs.access;
+  const execFileSync = deps.execFileSync ?? (await resolveDefaultExecFileSync());
+  const platform = deps.platform ?? process.platform;
+  const cmd = platform === "win32" ? "where" : "which";
   try {
     const output = execFileSync(cmd, [binary], { encoding: "utf8" }).trim();
     const resolved = output.split(/\r?\n/)[0]?.trim();
     if (!resolved) {
       throw new Error("empty");
     }
-    await fs.access(resolved);
+    await access(resolved);
     return resolved;
   } catch {
     if (binary === "bun") {
@@ -159,19 +189,23 @@ async function resolveBinaryPath(binary: string): Promise<string> {
   }
 }
 
-async function resolveCliProgramArguments(params: {
-  args: string[];
-  dev?: boolean;
-  runtime?: GatewayRuntimePreference;
-  nodePath?: string;
-}): Promise<GatewayProgramArgs> {
-  const execPath = process.execPath;
+async function resolveCliProgramArguments(
+  params: {
+    args: string[];
+    dev?: boolean;
+    runtime?: GatewayRuntimePreference;
+    nodePath?: string;
+  },
+  deps: ProgramArgsDeps,
+): Promise<GatewayProgramArgs> {
+  const access = deps.access ?? fs.access;
+  const execPath = deps.execPath ?? process.execPath;
   const runtime = params.runtime ?? "auto";
 
   if (runtime === "node") {
     const nodePath =
-      params.nodePath ?? (isNodeRuntime(execPath) ? execPath : await resolveNodePath());
-    const cliEntrypointPath = await resolveCliEntrypointPathForService();
+      params.nodePath ?? (isNodeRuntime(execPath) ? execPath : await resolveNodePath(deps));
+    const cliEntrypointPath = await resolveCliEntrypointPathForService(deps);
     return {
       programArguments: [nodePath, cliEntrypointPath, ...params.args],
     };
@@ -179,18 +213,18 @@ async function resolveCliProgramArguments(params: {
 
   if (runtime === "bun") {
     if (params.dev) {
-      const repoRoot = resolveRepoRootForDev();
+      const repoRoot = resolveRepoRootForDev(deps);
       const devCliPath = path.join(repoRoot, "src", "entry.ts");
-      await fs.access(devCliPath);
-      const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath();
+      await access(devCliPath);
+      const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath(deps);
       return {
         programArguments: [bunPath, devCliPath, ...params.args],
         workingDirectory: repoRoot,
       };
     }
 
-    const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath();
-    const cliEntrypointPath = await resolveCliEntrypointPathForService();
+    const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath(deps);
+    const cliEntrypointPath = await resolveCliEntrypointPathForService(deps);
     return {
       programArguments: [bunPath, cliEntrypointPath, ...params.args],
     };
@@ -198,7 +232,7 @@ async function resolveCliProgramArguments(params: {
 
   if (!params.dev) {
     try {
-      const cliEntrypointPath = await resolveCliEntrypointPathForService();
+      const cliEntrypointPath = await resolveCliEntrypointPathForService(deps);
       return {
         programArguments: [execPath, cliEntrypointPath, ...params.args],
       };
@@ -212,9 +246,9 @@ async function resolveCliProgramArguments(params: {
   }
 
   // Dev mode: use bun to run TypeScript directly
-  const repoRoot = resolveRepoRootForDev();
+  const repoRoot = resolveRepoRootForDev(deps);
   const devCliPath = path.join(repoRoot, "src", "entry.ts");
-  await fs.access(devCliPath);
+  await access(devCliPath);
 
   // If already running under bun, use current execPath
   if (isBunRuntime(execPath)) {
@@ -225,39 +259,48 @@ async function resolveCliProgramArguments(params: {
   }
 
   // Otherwise resolve bun from PATH
-  const bunPath = await resolveBunPath();
+  const bunPath = await resolveBunPath(deps);
   return {
     programArguments: [bunPath, devCliPath, ...params.args],
     workingDirectory: repoRoot,
   };
 }
 
-export async function resolveGatewayProgramArguments(params: {
-  port: number;
-  dev?: boolean;
-  runtime?: GatewayRuntimePreference;
-  nodePath?: string;
-}): Promise<GatewayProgramArgs> {
+export async function resolveGatewayProgramArguments(
+  params: {
+    port: number;
+    dev?: boolean;
+    runtime?: GatewayRuntimePreference;
+    nodePath?: string;
+  },
+  deps: ProgramArgsDeps = {},
+): Promise<GatewayProgramArgs> {
   const gatewayArgs = ["gateway", "--port", String(params.port)];
-  return resolveCliProgramArguments({
-    args: gatewayArgs,
-    dev: params.dev,
-    runtime: params.runtime,
-    nodePath: params.nodePath,
-  });
+  return resolveCliProgramArguments(
+    {
+      args: gatewayArgs,
+      dev: params.dev,
+      runtime: params.runtime,
+      nodePath: params.nodePath,
+    },
+    deps,
+  );
 }
 
-export async function resolveNodeProgramArguments(params: {
-  host: string;
-  port: number;
-  tls?: boolean;
-  tlsFingerprint?: string;
-  nodeId?: string;
-  displayName?: string;
-  dev?: boolean;
-  runtime?: GatewayRuntimePreference;
-  nodePath?: string;
-}): Promise<GatewayProgramArgs> {
+export async function resolveNodeProgramArguments(
+  params: {
+    host: string;
+    port: number;
+    tls?: boolean;
+    tlsFingerprint?: string;
+    nodeId?: string;
+    displayName?: string;
+    dev?: boolean;
+    runtime?: GatewayRuntimePreference;
+    nodePath?: string;
+  },
+  deps: ProgramArgsDeps = {},
+): Promise<GatewayProgramArgs> {
   const args = ["node", "run", "--host", params.host, "--port", String(params.port)];
   if (params.tls || params.tlsFingerprint) {
     args.push("--tls");
@@ -271,10 +314,13 @@ export async function resolveNodeProgramArguments(params: {
   if (params.displayName) {
     args.push("--display-name", params.displayName);
   }
-  return resolveCliProgramArguments({
-    args,
-    dev: params.dev,
-    runtime: params.runtime,
-    nodePath: params.nodePath,
-  });
+  return resolveCliProgramArguments(
+    {
+      args,
+      dev: params.dev,
+      runtime: params.runtime,
+      nodePath: params.nodePath,
+    },
+    deps,
+  );
 }

@@ -1,128 +1,93 @@
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ensureOpenClawCliOnPath } from "./path-env.js";
-
-const state = vi.hoisted(() => ({
-  dirs: new Set<string>(),
-  executables: new Set<string>(),
-}));
+import { describe, expect, it } from "vitest";
+import { ensureOpenClawCliOnPath, type EnsureOpenClawPathFs } from "./path-env.js";
 
 const abs = (p: string) => path.resolve(p);
-const setDir = (p: string) => state.dirs.add(abs(p));
-const setExe = (p: string) => state.executables.add(abs(p));
 
-vi.mock("node:fs", async () => {
-  const actual = await import("node:fs");
-  const pathMod = await import("node:path");
-  const absInMock = (p: string) => pathMod.resolve(p);
+type Harness = {
+  fs: EnsureOpenClawPathFs;
+  setDir: (p: string) => void;
+  setExe: (p: string) => void;
+};
 
-  const wrapped = {
-    ...actual,
-    constants: { ...actual.constants, X_OK: actual.constants.X_OK ?? 1 },
-    accessSync: (p: string, mode?: number) => {
-      const resolved = absInMock(p);
-      if (state.executables.has(resolved)) {
-        return;
-      }
-      actual.accessSync(p, mode);
+function createHarness(): Harness {
+  const dirs = new Set<string>();
+  const executables = new Set<string>();
+  return {
+    fs: {
+      constants: { X_OK: 1 },
+      accessSync: (p: string) => {
+        if (executables.has(abs(p))) {
+          return;
+        }
+        throw new Error(`ENOENT: ${p}`);
+      },
+      statSync: (p: string) => {
+        if (dirs.has(abs(p))) {
+          return { isDirectory: () => true };
+        }
+        throw new Error(`ENOENT: ${p}`);
+      },
     },
-    statSync: (p: string) => {
-      const resolved = absInMock(p);
-      if (state.dirs.has(resolved)) {
-        return {
-          isDirectory: () => true,
-        };
-      }
-      return actual.statSync(p);
-    },
+    setDir: (p) => dirs.add(abs(p)),
+    setExe: (p) => executables.add(abs(p)),
   };
+}
 
-  return { ...wrapped, default: wrapped };
-});
+function createDefaultHarness(): Harness {
+  const harness = createHarness();
+  harness.setDir("/usr/bin");
+  harness.setDir("/bin");
+  return harness;
+}
 
-vi.mock("./env.js", () => ({
-  isTruthyEnvValue: (value?: string) => value === "1" || value === "true",
-}));
+function createEnv(pathValue = "/usr/bin"): NodeJS.ProcessEnv {
+  return { PATH: pathValue };
+}
 
-describe("ensureOpenClawCliOnPath", () => {
-  const envKeys = [
-    "PATH",
-    "DENNOU_PATH_BOOTSTRAPPED",
-    "DENNOU_ALLOW_PROJECT_LOCAL_BIN",
-    "MISE_DATA_DIR",
-    "HOMEBREW_PREFIX",
-    "HOMEBREW_BREW_FILE",
-    "XDG_BIN_HOME",
-  ] as const;
-  let envSnapshot: Record<(typeof envKeys)[number], string | undefined>;
-
-  beforeEach(() => {
-    envSnapshot = Object.fromEntries(envKeys.map((k) => [k, process.env[k]])) as typeof envSnapshot;
-    state.dirs.clear();
-    state.executables.clear();
-
-    setDir("/usr/bin");
-    setDir("/bin");
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    for (const k of envKeys) {
-      const value = envSnapshot[k];
-      if (value === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = value;
-      }
-    }
-  });
-
-  function setupAppCliRoot(name: string) {
-    const tmp = abs(`/tmp/openclaw-path/${name}`);
-    const appBinDir = path.join(tmp, "AppBin");
-    const appCli = path.join(appBinDir, "openclaw");
-    setDir(tmp);
-    setDir(appBinDir);
-    setExe(appCli);
-    return { tmp, appBinDir, appCli };
-  }
-
-  function bootstrapPath(params: {
+function bootstrapPath(
+  harness: Harness,
+  env: NodeJS.ProcessEnv,
+  params: {
     execPath: string;
     cwd: string;
     homeDir: string;
     platform: NodeJS.Platform;
     allowProjectLocalBin?: boolean;
-  }) {
-    ensureOpenClawCliOnPath(params);
-    return (process.env.PATH ?? "").split(path.delimiter);
-  }
+  },
+) {
+  ensureOpenClawCliOnPath({ ...params, env, fs: harness.fs });
+  return (env.PATH ?? "").split(path.delimiter);
+}
 
-  function resetBootstrapEnv(pathValue = "/usr/bin") {
-    process.env.PATH = pathValue;
-    delete process.env.DENNOU_PATH_BOOTSTRAPPED;
-    delete process.env.DENNOU_ALLOW_PROJECT_LOCAL_BIN;
-    delete process.env.HOMEBREW_PREFIX;
-    delete process.env.HOMEBREW_BREW_FILE;
-    delete process.env.XDG_BIN_HOME;
-  }
+function setupAppCliRoot(harness: Harness, name: string) {
+  const tmp = abs(`/tmp/openclaw-path/${name}`);
+  const appBinDir = path.join(tmp, "AppBin");
+  const appCli = path.join(appBinDir, "openclaw");
+  harness.setDir(tmp);
+  harness.setDir(appBinDir);
+  harness.setExe(appCli);
+  return { tmp, appBinDir, appCli };
+}
 
-  function expectPathsAfter(parts: string[], anchor: string, expectedPaths: string[]) {
-    const anchorIndex = parts.indexOf(anchor);
-    expect(anchorIndex).toBeGreaterThanOrEqual(0);
-    for (const expectedPath of expectedPaths) {
-      expect(
-        parts.indexOf(expectedPath),
-        `${expectedPath} should come after ${anchor}`,
-      ).toBeGreaterThan(anchorIndex);
-    }
+function expectPathsAfter(parts: string[], anchor: string, expectedPaths: string[]) {
+  const anchorIndex = parts.indexOf(anchor);
+  expect(anchorIndex).toBeGreaterThanOrEqual(0);
+  for (const expectedPath of expectedPaths) {
+    expect(
+      parts.indexOf(expectedPath),
+      `${expectedPath} should come after ${anchor}`,
+    ).toBeGreaterThan(anchorIndex);
   }
+}
 
+describe("ensureOpenClawCliOnPath", () => {
   it("prepends the bundled app bin dir when a sibling openclaw exists", () => {
-    const { tmp, appBinDir, appCli } = setupAppCliRoot("case-bundled");
-    resetBootstrapEnv();
+    const harness = createDefaultHarness();
+    const { tmp, appBinDir, appCli } = setupAppCliRoot(harness, "case-bundled");
+    const env = createEnv();
 
-    const updated = bootstrapPath({
+    const updated = bootstrapPath(harness, env, {
       execPath: appCli,
       cwd: tmp,
       homeDir: tmp,
@@ -132,28 +97,31 @@ describe("ensureOpenClawCliOnPath", () => {
   });
 
   it("is idempotent", () => {
-    process.env.PATH = "/bin";
-    process.env.DENNOU_PATH_BOOTSTRAPPED = "1";
+    const harness = createDefaultHarness();
+    const env = { PATH: "/bin", DENNOU_PATH_BOOTSTRAPPED: "1" };
     ensureOpenClawCliOnPath({
       execPath: "/tmp/does-not-matter",
       cwd: "/tmp",
       homeDir: "/tmp",
       platform: "darwin",
+      env,
+      fs: harness.fs,
     });
-    expect(process.env.PATH).toBe("/bin");
+    expect(env.PATH).toBe("/bin");
   });
 
   it("appends mise shims after system dirs", () => {
-    const { tmp, appCli } = setupAppCliRoot("case-mise");
+    const harness = createDefaultHarness();
+    const { tmp, appCli } = setupAppCliRoot(harness, "case-mise");
     const miseDataDir = path.join(tmp, "mise");
     const shimsDir = path.join(miseDataDir, "shims");
-    setDir(miseDataDir);
-    setDir(shimsDir);
+    harness.setDir(miseDataDir);
+    harness.setDir(shimsDir);
 
-    process.env.MISE_DATA_DIR = miseDataDir;
-    resetBootstrapEnv();
+    const env = createEnv();
+    env.MISE_DATA_DIR = miseDataDir;
 
-    const updated = bootstrapPath({
+    const updated = bootstrapPath(harness, env, {
       execPath: appCli,
       cwd: tmp,
       homeDir: tmp,
@@ -176,16 +144,15 @@ describe("ensureOpenClawCliOnPath", () => {
   ])(
     "only appends project-local node_modules/.bin when enabled via $name",
     ({ envValue, allowProjectLocalBin }) => {
-      const { tmp, appCli } = setupAppCliRoot("case-project-local");
+      const harness = createDefaultHarness();
+      const { tmp, appCli } = setupAppCliRoot(harness, "case-project-local");
       const localBinDir = path.join(tmp, "node_modules", ".bin");
       const localCli = path.join(localBinDir, "openclaw");
-      setDir(path.join(tmp, "node_modules"));
-      setDir(localBinDir);
-      setExe(localCli);
+      harness.setDir(path.join(tmp, "node_modules"));
+      harness.setDir(localBinDir);
+      harness.setExe(localCli);
 
-      resetBootstrapEnv();
-
-      const withoutOptIn = bootstrapPath({
+      const withoutOptIn = bootstrapPath(harness, createEnv(), {
         execPath: appCli,
         cwd: tmp,
         homeDir: tmp,
@@ -193,14 +160,12 @@ describe("ensureOpenClawCliOnPath", () => {
       });
       expect(withoutOptIn.includes(localBinDir)).toBe(false);
 
-      resetBootstrapEnv();
-      if (envValue === undefined) {
-        delete process.env.DENNOU_ALLOW_PROJECT_LOCAL_BIN;
-      } else {
-        process.env.DENNOU_ALLOW_PROJECT_LOCAL_BIN = envValue;
+      const withOptInEnv = createEnv();
+      if (envValue !== undefined) {
+        withOptInEnv.DENNOU_ALLOW_PROJECT_LOCAL_BIN = envValue;
       }
 
-      const withOptIn = bootstrapPath({
+      const withOptIn = bootstrapPath(harness, withOptInEnv, {
         execPath: appCli,
         cwd: tmp,
         homeDir: tmp,
@@ -212,17 +177,18 @@ describe("ensureOpenClawCliOnPath", () => {
   );
 
   it("prepends XDG_BIN_HOME ahead of other user bin fallbacks", () => {
-    const { tmp, appCli } = setupAppCliRoot("case-xdg-bin-home");
+    const harness = createDefaultHarness();
+    const { tmp, appCli } = setupAppCliRoot(harness, "case-xdg-bin-home");
     const xdgBinHome = path.join(tmp, "xdg-bin");
     const localBin = path.join(tmp, ".local", "bin");
-    setDir(xdgBinHome);
-    setDir(path.join(tmp, ".local"));
-    setDir(localBin);
+    harness.setDir(xdgBinHome);
+    harness.setDir(path.join(tmp, ".local"));
+    harness.setDir(localBin);
 
-    resetBootstrapEnv();
-    process.env.XDG_BIN_HOME = xdgBinHome;
+    const env = createEnv();
+    env.XDG_BIN_HOME = xdgBinHome;
 
-    const updated = bootstrapPath({
+    const updated = bootstrapPath(harness, env, {
       execPath: appCli,
       cwd: tmp,
       homeDir: tmp,
@@ -232,14 +198,13 @@ describe("ensureOpenClawCliOnPath", () => {
   });
 
   it("places ~/.local/bin AFTER /usr/bin to prevent PATH hijack", () => {
-    const { tmp, appCli } = setupAppCliRoot("case-path-hijack");
+    const harness = createDefaultHarness();
+    const { tmp, appCli } = setupAppCliRoot(harness, "case-path-hijack");
     const localBin = path.join(tmp, ".local", "bin");
-    setDir(path.join(tmp, ".local"));
-    setDir(localBin);
+    harness.setDir(path.join(tmp, ".local"));
+    harness.setDir(localBin);
 
-    resetBootstrapEnv("/usr/bin:/bin");
-
-    const updated = bootstrapPath({
+    const updated = bootstrapPath(harness, createEnv("/usr/bin:/bin"), {
       execPath: appCli,
       cwd: tmp,
       homeDir: tmp,
@@ -249,23 +214,22 @@ describe("ensureOpenClawCliOnPath", () => {
   });
 
   it("places all user-writable home dirs after system dirs", () => {
-    const { tmp, appCli } = setupAppCliRoot("case-user-writable-after-system");
+    const harness = createDefaultHarness();
+    const { tmp, appCli } = setupAppCliRoot(harness, "case-user-writable-after-system");
     const localBin = path.join(tmp, ".local", "bin");
     const pnpmBin = path.join(tmp, ".local", "share", "pnpm");
     const bunBin = path.join(tmp, ".bun", "bin");
     const yarnBin = path.join(tmp, ".yarn", "bin");
-    setDir(path.join(tmp, ".local"));
-    setDir(localBin);
-    setDir(path.join(tmp, ".local", "share"));
-    setDir(pnpmBin);
-    setDir(path.join(tmp, ".bun"));
-    setDir(bunBin);
-    setDir(path.join(tmp, ".yarn"));
-    setDir(yarnBin);
+    harness.setDir(path.join(tmp, ".local"));
+    harness.setDir(localBin);
+    harness.setDir(path.join(tmp, ".local", "share"));
+    harness.setDir(pnpmBin);
+    harness.setDir(path.join(tmp, ".bun"));
+    harness.setDir(bunBin);
+    harness.setDir(path.join(tmp, ".yarn"));
+    harness.setDir(yarnBin);
 
-    resetBootstrapEnv("/usr/bin:/bin");
-
-    const updated = bootstrapPath({
+    const updated = bootstrapPath(harness, createEnv("/usr/bin:/bin"), {
       execPath: appCli,
       cwd: tmp,
       homeDir: tmp,
@@ -277,12 +241,12 @@ describe("ensureOpenClawCliOnPath", () => {
   it.each([
     {
       name: "appends Homebrew dirs after immutable OS dirs",
-      setup: () => {
-        const { tmp, appCli } = setupAppCliRoot("case-homebrew-after-system");
-        setDir("/opt/homebrew/bin");
-        setDir("/usr/local/bin");
-        resetBootstrapEnv("/usr/bin:/bin");
+      setup: (harness: Harness) => {
+        const { tmp, appCli } = setupAppCliRoot(harness, "case-homebrew-after-system");
+        harness.setDir("/opt/homebrew/bin");
+        harness.setDir("/usr/local/bin");
         return {
+          env: createEnv("/usr/bin:/bin"),
           params: {
             execPath: appCli,
             cwd: tmp,
@@ -296,19 +260,19 @@ describe("ensureOpenClawCliOnPath", () => {
     },
     {
       name: "appends Linuxbrew dirs after system dirs",
-      setup: () => {
+      setup: (harness: Harness) => {
         const tmp = abs("/tmp/openclaw-path/case-linuxbrew");
         const execDir = path.join(tmp, "exec");
-        setDir(tmp);
-        setDir(execDir);
+        harness.setDir(tmp);
+        harness.setDir(execDir);
         const linuxbrewDir = path.join(tmp, ".linuxbrew");
         const linuxbrewBin = path.join(linuxbrewDir, "bin");
         const linuxbrewSbin = path.join(linuxbrewDir, "sbin");
-        setDir(linuxbrewDir);
-        setDir(linuxbrewBin);
-        setDir(linuxbrewSbin);
-        resetBootstrapEnv();
+        harness.setDir(linuxbrewDir);
+        harness.setDir(linuxbrewBin);
+        harness.setDir(linuxbrewSbin);
         return {
+          env: createEnv(),
           params: {
             execPath: path.join(execDir, "node"),
             cwd: tmp,
@@ -321,8 +285,9 @@ describe("ensureOpenClawCliOnPath", () => {
       },
     },
   ])("$name", ({ setup }) => {
-    const { params, expectedPaths, anchor } = setup();
-    const updated = bootstrapPath(params);
+    const harness = createDefaultHarness();
+    const { env, params, expectedPaths, anchor } = setup(harness);
+    const updated = bootstrapPath(harness, env, params);
     expectPathsAfter(updated, anchor, expectedPaths);
   });
 });

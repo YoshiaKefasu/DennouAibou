@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { isSupportedNodeVersion } from "../infra/runtime-guard.js";
-import { resolveStableNodePath } from "../infra/stable-node-path.js";
+import { resolveStableNodePath, type AccessFn } from "../infra/stable-node-path.js";
 import { getWindowsProgramFilesRoots } from "../infra/windows-install-roots.js";
 
 const VERSION_MANAGER_MARKERS = [
@@ -107,11 +107,12 @@ export function isSystemNodePath(
 export async function resolveSystemNodePath(
   env: Record<string, string | undefined> = process.env,
   platform: NodeJS.Platform = process.platform,
+  access: AccessFn = fs.access,
 ): Promise<string | null> {
   const candidates = buildSystemNodeCandidates(env, platform);
   for (const candidate of candidates) {
     try {
-      await fs.access(candidate);
+      await access(candidate);
       return candidate;
     } catch {
       // keep going
@@ -124,10 +125,11 @@ export async function resolveSystemNodeInfo(params: {
   env?: Record<string, string | undefined>;
   platform?: NodeJS.Platform;
   execFile?: ExecFileAsync;
+  access?: AccessFn;
 }): Promise<SystemNodeInfo | null> {
   const env = params.env ?? process.env;
   const platform = params.platform ?? process.platform;
-  const systemNode = await resolveSystemNodePath(env, platform);
+  const systemNode = await resolveSystemNodePath(env, platform, params.access);
   if (!systemNode) {
     return null;
   }
@@ -159,10 +161,13 @@ export async function resolvePreferredNodePath(params: {
   platform?: NodeJS.Platform;
   execFile?: ExecFileAsync;
   execPath?: string;
+  access?: AccessFn;
 }): Promise<string | undefined> {
   if (params.runtime !== "node") {
     return undefined;
   }
+
+  const access = params.access ?? fs.access;
 
   // Prefer the node that is currently running `openclaw gateway install`.
   // This respects the user's active version manager (fnm/nvm/volta/etc.).
@@ -172,7 +177,7 @@ export async function resolvePreferredNodePath(params: {
     const execFileImpl = params.execFile ?? execFileAsync;
     const version = await resolveNodeVersion(currentExecPath, execFileImpl);
     if (isSupportedNodeVersion(version)) {
-      return resolveStableNodePath(currentExecPath);
+      return resolveStableNodePath(currentExecPath, access);
     }
   }
 

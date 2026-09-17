@@ -1,35 +1,20 @@
-import os from "node:os";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-const spawnSyncMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
-  });
-});
-
+import { describe, expect, it, vi } from "vitest";
 import { resolveOsSummary } from "./os-summary.js";
 
 type OsSummaryCase = {
   name: string;
-  platform: ReturnType<typeof os.platform>;
+  platform: NodeJS.Platform;
   release: string;
-  arch: ReturnType<typeof os.arch>;
+  arch: string;
   swVersStdout?: string;
   expected: ReturnType<typeof resolveOsSummary>;
 };
 
 describe("resolveOsSummary", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it.each<OsSummaryCase>([
     {
       name: "formats darwin labels from sw_vers output",
-      platform: "darwin" as const,
+      platform: "darwin",
       release: "24.0.0",
       arch: "arm64",
       swVersStdout: " 15.4 \n",
@@ -42,7 +27,7 @@ describe("resolveOsSummary", () => {
     },
     {
       name: "falls back to os.release when sw_vers output is blank",
-      platform: "darwin" as const,
+      platform: "darwin",
       release: "24.1.0",
       arch: "x64",
       swVersStdout: "   ",
@@ -55,7 +40,7 @@ describe("resolveOsSummary", () => {
     },
     {
       name: "formats windows labels from os metadata",
-      platform: "win32" as const,
+      platform: "win32",
       release: "10.0.26100",
       arch: "x64",
       expected: {
@@ -67,7 +52,7 @@ describe("resolveOsSummary", () => {
     },
     {
       name: "formats non-darwin labels from os metadata",
-      platform: "linux" as const,
+      platform: "linux",
       release: "10.0.26100",
       arch: "x64",
       expected: {
@@ -78,19 +63,29 @@ describe("resolveOsSummary", () => {
       },
     },
   ])("$name", ({ platform, release, arch, swVersStdout, expected }) => {
-    vi.spyOn(os, "platform").mockReturnValue(platform);
-    vi.spyOn(os, "release").mockReturnValue(release);
-    vi.spyOn(os, "arch").mockReturnValue(arch);
+    const spawnSync = vi.fn().mockReturnValue({
+      stdout: swVersStdout ?? "",
+      stderr: "",
+      pid: 1,
+      output: [],
+      status: 0,
+      signal: null,
+    });
+
+    expect(
+      resolveOsSummary({
+        platform: () => platform,
+        release: () => release,
+        arch: () => arch,
+        spawnSync,
+      }),
+    ).toEqual(expected);
     if (platform === "darwin") {
-      spawnSyncMock.mockReturnValue({
-        stdout: swVersStdout ?? "",
-        stderr: "",
-        pid: 1,
-        output: [],
-        status: 0,
-        signal: null,
+      expect(spawnSync).toHaveBeenCalledWith("sw_vers", ["-productVersion"], {
+        encoding: "utf-8",
       });
+    } else {
+      expect(spawnSync).not.toHaveBeenCalled();
     }
-    expect(resolveOsSummary()).toEqual(expected);
   });
 });

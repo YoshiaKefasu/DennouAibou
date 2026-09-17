@@ -3,6 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { resolveGatewayLaunchAgentLabel } from "./constants.js";
 
+type DetachedSpawn = (
+  command: string,
+  args: readonly string[],
+  options: { detached: true; stdio: "ignore"; env: NodeJS.ProcessEnv },
+) => { pid?: number; unref: () => void };
+
 export type LaunchdRestartHandoffMode = "kickstart" | "start-after-exit";
 
 export type LaunchdRestartHandoffResult = {
@@ -103,14 +109,16 @@ export function scheduleDetachedLaunchdRestartHandoff(params: {
   env?: Record<string, string | undefined>;
   mode: LaunchdRestartHandoffMode;
   waitForPid?: number;
+  spawn?: DetachedSpawn;
 }): LaunchdRestartHandoffResult {
+  const spawnProcess: DetachedSpawn = params.spawn ?? spawn;
   const target = resolveLaunchdRestartTarget(params.env);
   const waitForPid =
     typeof params.waitForPid === "number" && Number.isFinite(params.waitForPid)
       ? Math.floor(params.waitForPid)
       : 0;
   try {
-    const child = spawn(
+    const child = spawnProcess(
       "/bin/sh",
       [
         "-c",

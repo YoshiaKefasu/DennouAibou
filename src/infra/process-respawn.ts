@@ -1,6 +1,22 @@
-import { spawn } from "node:child_process";
-import { triggerOpenClawRestart } from "./restart.js";
+import { spawn as defaultSpawn } from "node:child_process";
+import { triggerOpenClawRestart as defaultTriggerOpenClawRestart } from "./restart.js";
 import { detectRespawnSupervisor } from "./supervisor-markers.js";
+
+type DetachedSpawn = (
+  command: string,
+  args: readonly string[],
+  options: { env: NodeJS.ProcessEnv; detached: true; stdio: "inherit" },
+) => { pid?: number | null; unref: () => void };
+
+export type ProcessRespawnDeps = {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  argv?: readonly string[];
+  execArgv?: readonly string[];
+  execPath?: string;
+  spawn?: DetachedSpawn;
+  triggerRestart?: typeof defaultTriggerOpenClawRestart;
+};
 
 type RespawnMode = "spawned" | "supervised" | "disabled" | "failed";
 
@@ -24,17 +40,24 @@ function isTruthy(value: string | undefined): boolean {
  * - DENNOU_NO_RESPAWN=1: caller should keep in-process restart behavior (tests/dev)
  * - otherwise: spawn detached child with current argv/execArgv, then caller exits
  */
-export function restartGatewayProcessWithFreshPid(): GatewayRespawnResult {
-  if (isTruthy(process.env.DENNOU_NO_RESPAWN)) {
+export function restartGatewayProcessWithFreshPid(
+  deps: ProcessRespawnDeps = {},
+): GatewayRespawnResult {
+  const env = deps.env ?? process.env;
+  const platform = deps.platform ?? process.platform;
+  const spawnProcess = deps.spawn ?? defaultSpawn;
+  const triggerRestart = deps.triggerRestart ?? defaultTriggerOpenClawRestart;
+
+  if (isTruthy(env.DENNOU_NO_RESPAWN)) {
     return { mode: "disabled" };
   }
-  const supervisor = detectRespawnSupervisor(process.env);
+  const supervisor = detectRespawnSupervisor(env, platform);
   if (supervisor) {
     // On macOS launchd, exit cleanly and let KeepAlive relaunch the service.
     // Avoid detached kickstart/start handoffs here so restart timing stays tied
     // to launchd's native supervision rather than a second helper process.
     if (supervisor === "schtasks") {
-      const restart = triggerOpenClawRestart();
+      const restart = triggerRestart();
       if (!restart.ok) {
         return {
           mode: "failed",
@@ -44,7 +67,7 @@ export function restartGatewayProcessWithFreshPid(): GatewayRespawnResult {
     }
     return { mode: "supervised" };
   }
-  if (process.platform === "win32") {
+  if (platform === "win32") {
     // Detached respawn is unsafe on Windows without an identified Scheduled Task:
     // the child becomes orphaned if the original process exits.
     return {
@@ -54,9 +77,12 @@ export function restartGatewayProcessWithFreshPid(): GatewayRespawnResult {
   }
 
   try {
-    const args = [...process.execArgv, ...process.argv.slice(1)];
-    const child = spawn(process.execPath, args, {
-      env: process.env,
+    const argv = deps.argv ?? process.argv;
+    const execArgv = deps.execArgv ?? process.execArgv;
+    const execPath = deps.execPath ?? process.execPath;
+    const args = [...execArgv, ...argv.slice(1)];
+    const child = spawnProcess(execPath, args, {
+      env,
       detached: true,
       stdio: "inherit",
     });

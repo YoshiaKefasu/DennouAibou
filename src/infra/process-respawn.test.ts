@@ -1,89 +1,73 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureFullEnv } from "../test-utils/env.js";
-import { SUPERVISOR_HINT_ENV_VARS } from "./supervisor-markers.js";
+import { describe, expect, it, vi } from "vitest";
+import { restartGatewayProcessWithFreshPid, type ProcessRespawnDeps } from "./process-respawn.js";
+import type { RestartAttempt } from "./restart.js";
 
-const spawnMock = vi.hoisted(() => vi.fn());
-const triggerOpenClawRestartMock = vi.hoisted(() => vi.fn());
+const EXEC_PATH = "/usr/local/bin/node";
 
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    spawn: (...args: unknown[]) => spawnMock(...args),
-  });
-});
-vi.mock("./restart.js", () => ({
-  triggerOpenClawRestart: (...args: unknown[]) => triggerOpenClawRestartMock(...args),
-}));
+type SpawnFn = (
+  command: string,
+  args: readonly string[],
+  options: { env: NodeJS.ProcessEnv; detached: true; stdio: "inherit" },
+) => { pid?: number | null; unref: () => void };
 
-import { restartGatewayProcessWithFreshPid } from "./process-respawn.js";
+type RespawnOverrides = Omit<ProcessRespawnDeps, "spawn" | "triggerRestart">;
 
-const originalArgv = [...process.argv];
-const originalExecArgv = [...process.execArgv];
-const envSnapshot = captureFullEnv();
-const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
-
-function setPlatform(platform: string) {
-  if (!originalPlatformDescriptor) {
-    return;
-  }
-  Object.defineProperty(process, "platform", {
-    ...originalPlatformDescriptor,
-    value: platform,
-  });
+function createFixture(overrides: RespawnOverrides = {}) {
+  const spawn = vi.fn<SpawnFn>();
+  const triggerRestart = vi.fn<() => RestartAttempt>();
+  const deps: RespawnOverrides = {
+    env: {},
+    platform: "linux",
+    argv: [EXEC_PATH, "/repo/dist/index.js", "gateway", "run"],
+    execArgv: [],
+    execPath: EXEC_PATH,
+    ...overrides,
+  };
+  const run = () => restartGatewayProcessWithFreshPid({ ...deps, spawn, triggerRestart });
+  return { deps, spawn, triggerRestart, run };
 }
 
-afterEach(() => {
-  envSnapshot.restore();
-  process.argv = [...originalArgv];
-  process.execArgv = [...originalExecArgv];
-  spawnMock.mockClear();
-  triggerOpenClawRestartMock.mockClear();
-  if (originalPlatformDescriptor) {
-    Object.defineProperty(process, "platform", originalPlatformDescriptor);
-  }
-});
-
-function clearSupervisorHints() {
-  for (const key of SUPERVISOR_HINT_ENV_VARS) {
-    delete process.env[key];
-  }
+function createEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
+  return { ...overrides };
 }
 
 function expectLaunchdSupervisedWithoutKickstart(params?: { launchJobLabel?: string }) {
-  setPlatform("darwin");
+  const env = createEnv({ DENNOU_LAUNCHD_LABEL: "ai.openclaw.gateway" });
   if (params?.launchJobLabel) {
-    process.env.LAUNCH_JOB_LABEL = params.launchJobLabel;
+    env.LAUNCH_JOB_LABEL = params.launchJobLabel;
   }
-  process.env.DENNOU_LAUNCHD_LABEL = "ai.openclaw.gateway";
-  const result = restartGatewayProcessWithFreshPid();
+  const { spawn, triggerRestart, run } = createFixture({ env, platform: "darwin" });
+  const result = run();
   expect(result).toEqual({ mode: "supervised" });
-  expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
-  expect(spawnMock).not.toHaveBeenCalled();
+  expect(triggerRestart).not.toHaveBeenCalled();
+  expect(spawn).not.toHaveBeenCalled();
 }
 
 describe("restartGatewayProcessWithFreshPid", () => {
   it("returns disabled when DENNOU_NO_RESPAWN is set", () => {
-    process.env.DENNOU_NO_RESPAWN = "1";
-    const result = restartGatewayProcessWithFreshPid();
+    const { spawn, run } = createFixture({ env: createEnv({ DENNOU_NO_RESPAWN: "1" }) });
+    const result = run();
     expect(result.mode).toBe("disabled");
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("keeps DENNOU_NO_RESPAWN ahead of inherited supervisor hints", () => {
-    clearSupervisorHints();
-    setPlatform("darwin");
-    process.env.DENNOU_NO_RESPAWN = "1";
-    process.env.LAUNCH_JOB_LABEL = "ai.openclaw.gateway";
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({
+        DENNOU_NO_RESPAWN: "1",
+        LAUNCH_JOB_LABEL: "ai.openclaw.gateway",
+      }),
+      platform: "darwin",
+    });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result).toEqual({ mode: "disabled" });
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("returns supervised when launchd hints are present on macOS (no kickstart)", () => {
-    clearSupervisorHints();
     expectLaunchdSupervisedWithoutKickstart({ launchJobLabel: "ai.openclaw.gateway" });
   });
 
@@ -92,138 +76,147 @@ describe("restartGatewayProcessWithFreshPid", () => {
   });
 
   it("launchd supervisor never returns failed regardless of triggerOpenClawRestart outcome", () => {
-    clearSupervisorHints();
-    setPlatform("darwin");
-    process.env.DENNOU_LAUNCHD_LABEL = "ai.openclaw.gateway";
+    const { triggerRestart, run } = createFixture({
+      env: createEnv({ DENNOU_LAUNCHD_LABEL: "ai.openclaw.gateway" }),
+      platform: "darwin",
+    });
     // Even if triggerOpenClawRestart *would* fail, launchd path must not call it.
-    triggerOpenClawRestartMock.mockReturnValue({
+    triggerRestart.mockReturnValue({
       ok: false,
       method: "launchctl",
       detail: "Bootstrap failed: 5: Input/output error",
     });
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
     expect(result.mode).toBe("supervised");
     expect(result.mode).not.toBe("failed");
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
   });
 
   it("does not schedule kickstart on non-darwin platforms", () => {
-    setPlatform("linux");
-    process.env.INVOCATION_ID = "abc123";
-    process.env.DENNOU_LAUNCHD_LABEL = "ai.openclaw.gateway";
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({
+        INVOCATION_ID: "abc123",
+        DENNOU_LAUNCHD_LABEL: "ai.openclaw.gateway",
+      }),
+      platform: "linux",
+    });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result.mode).toBe("supervised");
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("returns supervised when XPC_SERVICE_NAME is set by launchd", () => {
-    clearSupervisorHints();
-    setPlatform("darwin");
-    process.env.XPC_SERVICE_NAME = "ai.openclaw.gateway";
-    const result = restartGatewayProcessWithFreshPid();
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({ XPC_SERVICE_NAME: "ai.openclaw.gateway" }),
+      platform: "darwin",
+    });
+    const result = run();
     expect(result.mode).toBe("supervised");
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("spawns detached child with current exec argv", () => {
-    delete process.env.DENNOU_NO_RESPAWN;
-    clearSupervisorHints();
-    setPlatform("linux");
-    process.execArgv = ["--import", "tsx"];
-    process.argv = ["/usr/local/bin/node", "/repo/dist/index.js", "gateway", "run"];
-    spawnMock.mockReturnValue({ pid: 4242, unref: vi.fn() });
+    const unref = vi.fn();
+    const { spawn, run } = createFixture({
+      env: createEnv(),
+      platform: "linux",
+      execArgv: ["--import", "tsx"],
+      argv: [EXEC_PATH, "/repo/dist/index.js", "gateway", "run"],
+    });
+    spawn.mockReturnValue({ pid: 4242, unref });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result).toEqual({ mode: "spawned", pid: 4242 });
-    expect(spawnMock).toHaveBeenCalledWith(
-      process.execPath,
+    expect(spawn).toHaveBeenCalledWith(
+      EXEC_PATH,
       ["--import", "tsx", "/repo/dist/index.js", "gateway", "run"],
       expect.objectContaining({
         detached: true,
         stdio: "inherit",
       }),
     );
+    expect(unref).toHaveBeenCalledTimes(1);
   });
 
   it("returns supervised when DENNOU_LAUNCHD_LABEL is set (stock launchd plist)", () => {
-    clearSupervisorHints();
     expectLaunchdSupervisedWithoutKickstart();
   });
 
   it("returns supervised when DENNOU_SYSTEMD_UNIT is set", () => {
-    clearSupervisorHints();
-    setPlatform("linux");
-    process.env.DENNOU_SYSTEMD_UNIT = "openclaw-gateway.service";
-    const result = restartGatewayProcessWithFreshPid();
+    const { spawn, run } = createFixture({
+      env: createEnv({ DENNOU_SYSTEMD_UNIT: "openclaw-gateway.service" }),
+      platform: "linux",
+    });
+    const result = run();
     expect(result.mode).toBe("supervised");
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("returns supervised when OpenClaw gateway task markers are set on Windows", () => {
-    clearSupervisorHints();
-    setPlatform("win32");
-    process.env.DENNOU_SERVICE_MARKER = "openclaw";
-    process.env.DENNOU_SERVICE_KIND = "gateway";
-    triggerOpenClawRestartMock.mockReturnValue({ ok: true, method: "schtasks" });
-    const result = restartGatewayProcessWithFreshPid();
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({ DENNOU_SERVICE_MARKER: "openclaw", DENNOU_SERVICE_KIND: "gateway" }),
+      platform: "win32",
+    });
+    triggerRestart.mockReturnValue({ ok: true, method: "schtasks" });
+    const result = run();
     expect(result.mode).toBe("supervised");
-    expect(triggerOpenClawRestartMock).toHaveBeenCalledOnce();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(triggerRestart).toHaveBeenCalledTimes(1);
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("keeps generic service markers out of non-Windows supervisor detection", () => {
-    clearSupervisorHints();
-    setPlatform("linux");
-    process.env.DENNOU_SERVICE_MARKER = "openclaw";
-    process.env.DENNOU_SERVICE_KIND = "gateway";
-    spawnMock.mockReturnValue({ pid: 4242, unref: vi.fn() });
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({ DENNOU_SERVICE_MARKER: "openclaw", DENNOU_SERVICE_KIND: "gateway" }),
+      platform: "linux",
+    });
+    spawn.mockReturnValue({ pid: 4242, unref: vi.fn() });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result).toEqual({ mode: "spawned", pid: 4242 });
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
   });
 
   it("returns disabled on Windows without Scheduled Task markers", () => {
-    clearSupervisorHints();
-    setPlatform("win32");
+    const { spawn, run } = createFixture({ env: createEnv(), platform: "win32" });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result.mode).toBe("disabled");
     expect(result.detail).toContain("Scheduled Task");
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("ignores node task script hints for gateway restart detection on Windows", () => {
-    clearSupervisorHints();
-    setPlatform("win32");
-    process.env.DENNOU_TASK_SCRIPT = "C:\\openclaw\\node.cmd";
-    process.env.DENNOU_TASK_SCRIPT_NAME = "node.cmd";
-    process.env.DENNOU_SERVICE_MARKER = "openclaw";
-    process.env.DENNOU_SERVICE_KIND = "node";
+    const { spawn, triggerRestart, run } = createFixture({
+      env: createEnv({
+        DENNOU_TASK_SCRIPT: "C:\\openclaw\\node.cmd",
+        DENNOU_TASK_SCRIPT_NAME: "node.cmd",
+        DENNOU_SERVICE_MARKER: "openclaw",
+        DENNOU_SERVICE_KIND: "node",
+      }),
+      platform: "win32",
+    });
 
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
 
     expect(result.mode).toBe("disabled");
-    expect(triggerOpenClawRestartMock).not.toHaveBeenCalled();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(triggerRestart).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("returns failed when spawn throws", () => {
-    delete process.env.DENNOU_NO_RESPAWN;
-    clearSupervisorHints();
-    setPlatform("linux");
+    const { spawn, run } = createFixture({ env: createEnv(), platform: "linux" });
 
-    spawnMock.mockImplementation(() => {
+    spawn.mockImplementation(() => {
       throw new Error("spawn failed");
     });
-    const result = restartGatewayProcessWithFreshPid();
+    const result = run();
     expect(result.mode).toBe("failed");
     expect(result.detail).toContain("spawn failed");
   });
