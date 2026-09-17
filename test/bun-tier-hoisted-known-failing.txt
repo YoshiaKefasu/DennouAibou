@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 53 files.
+# Current known-failure count: 200 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -84,3 +84,166 @@ src/agents/pi-tools.read.host-edit-access.test.ts
 
 # reset/dynamic-mock+conditional (1 file)
 src/agents/sandbox/ssh.spawn-env.test.ts
+
+# reset/dynamic-mock (27 additional files; measured after the first 250)
+src/commands/gateway-status.test.ts
+src/commands/models/list.list-command.forward-compat.test.ts
+src/commands/models/list.status.test.ts
+src/commands/onboard-non-interactive.gateway.test.ts
+src/commands/onboard-non-interactive.provider-auth.test.ts
+src/config/zod-schema.providers.lazy-runtime.test.ts
+src/gateway/client.test.ts
+src/gateway/gateway-misc.test.ts
+src/gateway/server-methods/send.test.ts
+src/gateway/startup-auth.test.ts
+src/infra/boundary-file-read.test.ts
+src/infra/env.test.ts
+src/infra/net/proxy-fetch.test.ts
+src/infra/net/undici-global-dispatcher.test.ts
+src/infra/outbound/outbound-send-service.test.ts
+src/infra/session-maintenance-warning.test.ts
+src/media-understanding/apply.echo-transcript.test.ts
+src/media-understanding/apply.test.ts
+src/media-understanding/runner.vision-skip.test.ts
+src/media/server.outside-workspace.test.ts
+src/plugins/contracts/runtime-import-side-effects.contract.test.ts
+src/plugins/conversation-binding.test.ts
+src/process/exec.no-output-timer.test.ts
+src/process/exec.windows.test.ts
+src/process/supervisor/supervisor.test.ts
+src/secrets/provider-env-vars.dynamic.test.ts
+src/tui/theme/theme.test.ts
+
+# wait/import (2 additional files; measured after the first 250)
+src/entry.test.ts
+src/plugins/marketplace.test.ts
+
+# conditional (3 additional files; measured after the first 250)
+src/config/io.write-config.test.ts
+src/infra/restart.test.ts
+src/process/exec.test.ts
+
+# async-timer (8 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
+src/dennou-soul/idle-prune-watcher.test.ts
+src/gateway/server-channels.test.ts
+src/gateway/server-methods/nodes.invoke-wake.test.ts
+src/infra/exec-approval-channel-runtime.test.ts
+src/infra/transport-ready.test.ts
+src/process/command-queue.test.ts
+src/process/supervisor/adapters/child.test.ts
+src/process/supervisor/adapters/pty.test.ts
+
+# timeout (11 files; no conclusive result within the 40s process guard)
+src/commands/models.set.e2e.test.ts
+src/commands/onboard-channels.e2e.test.ts
+src/cron/isolated-agent/subagent-followup.test.ts
+src/cron/service.runs-one-shot-main-job-disables-it.test.ts
+src/gateway/server-restart-sentinel.test.ts
+src/infra/bonjour.test.ts
+src/infra/outbound/message-action-runner.media.test.ts
+src/media/fetch.test.ts
+src/process/kill-tree.test.ts
+test/scripts/test-report-utils.test.ts
+ui/src/ui/app-gateway.node.test.ts
+
+# runtime/export (3 files; Bun module surface differs from the Vitest runtime)
+src/gateway/call.test.ts
+src/gateway/server-plugins.test.ts
+src/plugins/wired-hooks-after-tool-call.e2e.test.ts
+
+# runtime/lifecycle (5 files; measured failures not covered by the API categories above)
+src/infra/retry.test.ts
+src/tasks/task-registry.test.ts
+ui/src/ui/app-chat.test.ts
+ui/src/ui/app-lifecycle-connect.node.test.ts
+ui/src/ui/gateway.node.test.ts
+
+# measured-failure (88 files; initial after-250 batch, with reason in beyond250-results)
+src/commands/channels.add.test.ts
+src/commands/channels.adds-non-default-telegram-account.test.ts
+src/commands/channels.remove.test.ts
+src/commands/channels/capabilities.test.ts
+src/commands/configure.daemon.test.ts
+src/commands/configure.gateway-auth.prompt-auth-config.test.ts
+src/commands/configure.gateway.test.ts
+src/commands/configure.wizard.test.ts
+src/commands/doctor-gateway-daemon-flow.test.ts
+src/commands/doctor-gateway-services.test.ts
+src/commands/doctor-security.test.ts
+src/commands/doctor-session-locks.test.ts
+src/commands/doctor/shared/allowlist-policy-repair.test.ts
+src/commands/message.default-agent.test.ts
+src/commands/message.test.ts
+src/commands/models/auth.test.ts
+src/commands/onboard-non-interactive.workspace-provider-choice-guard.test.ts
+src/commands/onboard-remote.test.ts
+src/commands/sessions.default-agent-store.test.ts
+src/commands/status.summary.test.ts
+src/commands/status.test.ts
+src/config/markdown-tables.test.ts
+src/config/runtime-schema.test.ts
+src/config/validation.channel-metadata.test.ts
+src/daemon/launchd-restart-handoff.test.ts
+src/daemon/launchd.test.ts
+src/daemon/program-args.test.ts
+src/daemon/runtime-paths.test.ts
+src/daemon/schtasks.startup-fallback.test.ts
+src/daemon/schtasks.stop.test.ts
+src/daemon/systemd.test.ts
+src/entry.version-fast-path.test.ts
+src/gateway/control-ui.auto-root.http.test.ts
+src/gateway/mcp-http.test.ts
+src/gateway/server-cron.test.ts
+src/gateway/server-http.hooks-request-timeout.test.ts
+src/gateway/server-methods/agent.test.ts
+src/gateway/server-methods/agents-mutate.test.ts
+src/gateway/server-methods/chat.abort-persistence.test.ts
+src/gateway/server-methods/chat.directive-tags.test.ts
+src/gateway/server-methods/config.test.ts
+src/gateway/server-methods/devices.test.ts
+src/gateway/server-session-key.test.ts
+src/gateway/server.cron.test.ts
+src/gateway/server.reload.test.ts
+src/gateway/server.sessions.gateway-server-sessions-a.test.ts
+src/gateway/sessions-resolve.test.ts
+src/gateway/tools-invoke-http.test.ts
+src/infra/channel-approval-auth.test.ts
+src/infra/exec-approval-surface.test.ts
+src/infra/exec-approvals-store.test.ts
+src/infra/gateway-processes.test.ts
+src/infra/machine-name.test.ts
+src/infra/net/fetch-guard.ssrf.test.ts
+src/infra/net/ssrf.dispatcher.test.ts
+src/infra/os-summary.test.ts
+src/infra/outbound/agent-delivery.test.ts
+src/infra/outbound/channel-resolution.test.ts
+src/infra/outbound/channel-selection.test.ts
+src/infra/outbound/deliver.test.ts
+src/infra/outbound/format.test.ts
+src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
+src/infra/outbound/message.test.ts
+src/infra/pairing-token.test.ts
+src/infra/path-env.test.ts
+src/infra/process-respawn.test.ts
+src/infra/provider-usage.auth.normalizes-keys.test.ts
+src/infra/windows-task-restart.test.ts
+src/infra/wsl.test.ts
+src/logging/console-settings.test.ts
+src/logging/logger-settings.test.ts
+src/media-understanding/image.test.ts
+src/media-understanding/runtime.test.ts
+src/media-understanding/shared.test.ts
+src/media/host.test.ts
+src/memory-host-sdk/host/qmd-process.test.ts
+src/plugin-activation-boundary.test.ts
+src/plugin-sdk/browser-maintenance.test.ts
+src/plugins/runtime/runtime-taskflow.test.ts
+src/plugins/runtime/runtime-tasks.test.ts
+src/plugins/services.test.ts
+src/secrets/configure.test.ts
+src/secrets/runtime-web-tools.test.ts
+src/secrets/runtime.coverage.test.ts
+src/secrets/runtime.test.ts
+src/security/windows-acl.test.ts
+src/tasks/task-executor.test.ts
+src/wizard/setup.gateway-config.test.ts

@@ -1,22 +1,19 @@
 # Bun Phase 3-C3c: measurements for the 253 files after the first 250 vi.hoisted files
 #
-# Inventory source: hoisted_files.txt (253 entries after the first 250), with
-# the existing Tier B selection determining the 192-file measurable subset.
+# Inventory source: the 253 Git-tracked files after the first 250 vi.hoisted files.
 # Validation command, run sequentially one file at a time:
 #   bun test --isolate --pass-with-no-tests --bail=1 --timeout 30000 <file>
 #
-# Safety note: the wrapper used a 40s process guard per file to avoid allowing
-# a single hanging test to block the remaining sequential measurements. `TIMEOUT`
-# means no conclusive result within that guard; it is not recorded as PASS or FAIL.
+# Safety note: each measurement used a 40s process guard to avoid allowing a
+# single hanging test to block the remaining sequential measurements. `TIMEOUT`
+# means no conclusive result within that guard; it is reported separately from
+# PASS and FAIL and is recorded in the known-failing ledger as unresolved.
 #
-# Summary (192 measurable files): PASS 104, FAIL 34, TIMEOUT 54.
-# Remaining inventory: 61 files were not run because the existing classifier
-# excludes them from this Tier B lane (UI/e2e, Vitest-only API, or out of scope).
-# They remain unverified; see the unmeasured section below.
+# Summary (253 files): PASS 106, FAIL 82, TIMEOUT 65.
 #
 # Result columns: index, status, elapsed seconds, path, runner summary.
 
-# measured (192 files)
+# measured (253 files)
 001 TIMEOUT 40.1 src/commands/channels.add.test.ts process exceeded 40s wrapper limit
 002 TIMEOUT 40.0 src/commands/channels.adds-non-default-telegram-account.test.ts process exceeded 40s wrapper limit
 003 TIMEOUT 40.1 src/commands/channels.remove.test.ts process exceeded 40s wrapper limit
@@ -210,65 +207,64 @@
 191 FAIL 1.5 src/wizard/setup.gateway-config.test.ts Ran 1 test across 1 file
 192 PASS 0.5 src/wizard/setup.test.ts Ran 10 tests across 1 file
 
-# unmeasured (61 files; retained for later)
-src/commands/gateway-status.test.ts
-src/commands/models.set.e2e.test.ts
-src/commands/models/list.list-command.forward-compat.test.ts
-src/commands/models/list.status.test.ts
-src/commands/onboard-channels.e2e.test.ts
-src/commands/onboard-non-interactive.gateway.test.ts
-src/commands/onboard-non-interactive.provider-auth.test.ts
-src/config/io.write-config.test.ts
-src/config/zod-schema.providers.lazy-runtime.test.ts
-src/cron/isolated-agent/subagent-followup.test.ts
-src/cron/service.runs-one-shot-main-job-disables-it.test.ts
-src/daemon/inspect.test.ts
-src/dennou-soul/idle-prune-watcher.test.ts
-src/entry.test.ts
-src/gateway/call.test.ts
-src/gateway/client.test.ts
-src/gateway/gateway-misc.test.ts
-src/gateway/server-channels.test.ts
-src/gateway/server-methods/nodes.invoke-wake.test.ts
-src/gateway/server-methods/send.test.ts
-src/gateway/server-plugins.test.ts
-src/gateway/server-restart-sentinel.test.ts
-src/gateway/startup-auth.test.ts
-src/infra/bonjour.test.ts
-src/infra/boundary-file-read.test.ts
-src/infra/env.test.ts
-src/infra/exec-approval-channel-runtime.test.ts
-src/infra/net/proxy-fetch.test.ts
-src/infra/net/undici-global-dispatcher.test.ts
-src/infra/outbound/message-action-runner.media.test.ts
-src/infra/outbound/outbound-send-service.test.ts
-src/infra/restart-stale-pids.test.ts
-src/infra/restart.test.ts
-src/infra/retry.test.ts
-src/infra/session-maintenance-warning.test.ts
-src/infra/transport-ready.test.ts
-src/media-understanding/apply.echo-transcript.test.ts
-src/media-understanding/apply.test.ts
-src/media-understanding/runner.vision-skip.test.ts
-src/media/fetch.test.ts
-src/media/server.outside-workspace.test.ts
-src/plugins/contracts/runtime-import-side-effects.contract.test.ts
-src/plugins/conversation-binding.test.ts
-src/plugins/marketplace.test.ts
-src/plugins/wired-hooks-after-tool-call.e2e.test.ts
-src/process/command-queue.test.ts
-src/process/exec.no-output-timer.test.ts
-src/process/exec.test.ts
-src/process/exec.windows.test.ts
-src/process/kill-tree.test.ts
-src/process/supervisor/adapters/child.test.ts
-src/process/supervisor/adapters/pty.test.ts
-src/process/supervisor/supervisor.test.ts
-src/secrets/provider-env-vars.dynamic.test.ts
-src/tasks/task-registry.test.ts
-src/tui/theme/theme.test.ts
-test/scripts/test-report-utils.test.ts
-ui/src/ui/app-chat.test.ts
-ui/src/ui/app-gateway.node.test.ts
-ui/src/ui/app-lifecycle-connect.node.test.ts
-ui/src/ui/gateway.node.test.ts
+193 FAIL 0.3 src/commands/gateway-status.test.ts vi.resetModules is not a function
+194 TIMEOUT 40.1 src/commands/models.set.e2e.test.ts process exceeded 40s wrapper limit
+195 FAIL 0.1 src/commands/models/list.list-command.forward-compat.test.ts vi.doMock is not a function
+196 FAIL 0.1 src/commands/models/list.status.test.ts vi.resetModules is not a function
+197 TIMEOUT 40.0 src/commands/onboard-channels.e2e.test.ts process exceeded 40s wrapper limit
+198 FAIL 0.2 src/commands/onboard-non-interactive.gateway.test.ts vi.resetModules is not a function
+199 FAIL 0.1 src/commands/onboard-non-interactive.provider-auth.test.ts vi.resetModules is not a function
+200 FAIL 0.7 src/config/io.write-config.test.ts it.runIf is not a function
+201 FAIL 0.1 src/config/zod-schema.providers.lazy-runtime.test.ts vi.doMock is not a function
+202 TIMEOUT 40.0 src/cron/isolated-agent/subagent-followup.test.ts process exceeded 40s wrapper limit
+203 TIMEOUT 40.0 src/cron/service.runs-one-shot-main-job-disables-it.test.ts process exceeded 40s wrapper limit
+204 PASS 0.2 src/daemon/inspect.test.ts Ran 10 tests across 1 file
+205 FAIL 0.7 src/dennou-soul/idle-prune-watcher.test.ts vi.advanceTimersByTimeAsync is not a function
+206 FAIL 0.2 src/entry.test.ts vi.dynamicImportSettled is not a function
+207 FAIL 0.5 src/gateway/call.test.ts export pickPrimaryTailnetIPv6 not found in src/infra/tailnet.ts
+208 FAIL 0.1 src/gateway/client.test.ts vi.resetModules is not a function
+209 FAIL 9.4 src/gateway/gateway-misc.test.ts vi.resetModules is not a function
+210 FAIL 0.7 src/gateway/server-channels.test.ts vi.advanceTimersByTimeAsync is not a function
+211 FAIL 1.1 src/gateway/server-methods/nodes.invoke-wake.test.ts vi.advanceTimersByTimeAsync is not a function
+212 FAIL 0.1 src/gateway/server-methods/send.test.ts vi.resetModules is not a function
+213 FAIL 0.4 src/gateway/server-plugins.test.ts export getRegisteredChannelPluginMeta not found in src/channels/registry.ts
+214 TIMEOUT 40.0 src/gateway/server-restart-sentinel.test.ts process exceeded 40s wrapper limit
+215 FAIL 0.1 src/gateway/startup-auth.test.ts vi.resetModules is not a function
+216 TIMEOUT 40.0 src/infra/bonjour.test.ts process exceeded 40s wrapper limit
+217 FAIL 0.1 src/infra/boundary-file-read.test.ts vi.resetModules is not a function
+218 FAIL 0.1 src/infra/env.test.ts vi.resetModules is not a function
+219 FAIL 0.1 src/infra/exec-approval-channel-runtime.test.ts vi.advanceTimersByTimeAsync is not a function
+220 FAIL 0.1 src/infra/net/proxy-fetch.test.ts vi.doUnmock is not a function
+221 FAIL 0.1 src/infra/net/undici-global-dispatcher.test.ts vi.doUnmock is not a function
+222 TIMEOUT 40.0 src/infra/outbound/message-action-runner.media.test.ts process exceeded 40s wrapper limit
+223 FAIL 0.1 src/infra/outbound/outbound-send-service.test.ts vi.resetModules is not a function
+224 PASS 0.1 src/infra/restart-stale-pids.test.ts Ran 44 tests across 1 file
+225 FAIL 0.1 src/infra/restart.test.ts describe.runIf is not a function
+226 FAIL 0.1 src/infra/retry.test.ts fake timers are not active
+227 FAIL 0.1 src/infra/session-maintenance-warning.test.ts vi.doMock is not a function
+228 FAIL 0.1 src/infra/transport-ready.test.ts vi.advanceTimersByTimeAsync is not a function
+229 FAIL 0.5 src/media-understanding/apply.echo-transcript.test.ts vi.resetModules is not a function
+230 FAIL 0.4 src/media-understanding/apply.test.ts vi.resetModules is not a function
+231 FAIL 0.5 src/media-understanding/runner.vision-skip.test.ts vi.doMock is not a function
+232 TIMEOUT 40.0 src/media/fetch.test.ts process exceeded 40s wrapper limit
+233 FAIL 0.1 src/media/server.outside-workspace.test.ts vi.doUnmock is not a function
+234 FAIL 0.1 src/plugins/contracts/runtime-import-side-effects.contract.test.ts vi.resetModules is not a function
+235 FAIL 0.1 src/plugins/conversation-binding.test.ts vi.resetModules is not a function
+236 FAIL 0.1 src/plugins/marketplace.test.ts importOriginal is not a function
+237 FAIL 0.7 src/plugins/wired-hooks-after-tool-call.e2e.test.ts export initializeGlobalHookRunner not found in src/plugins/hook-runner-global.ts
+238 FAIL 0.1 src/process/command-queue.test.ts vi.advanceTimersByTimeAsync is not a function
+239 FAIL 0.1 src/process/exec.no-output-timer.test.ts vi.resetModules is not a function
+240 FAIL 0.1 src/process/exec.test.ts it.runIf/attachChildProcessBridge unavailable
+241 FAIL 0.1 src/process/exec.windows.test.ts vi.resetModules is not a function
+242 TIMEOUT 40.0 src/process/kill-tree.test.ts process exceeded 40s wrapper limit
+243 FAIL 0.1 src/process/supervisor/adapters/child.test.ts vi.advanceTimersByTimeAsync is not a function
+244 FAIL 0.1 src/process/supervisor/adapters/pty.test.ts vi.advanceTimersByTimeAsync is not a function
+245 FAIL 0.1 src/process/supervisor/supervisor.test.ts vi.resetModules is not a function
+246 FAIL 0.1 src/secrets/provider-env-vars.dynamic.test.ts vi.resetModules is not a function
+247 FAIL 1.5 src/tasks/task-registry.test.ts EBUSY removing temporary directory on Windows
+248 FAIL 0.2 src/tui/theme/theme.test.ts vi.resetModules is not a function
+249 TIMEOUT 40.0 test/scripts/test-report-utils.test.ts process exceeded 40s wrapper limit
+250 FAIL 0.6 ui/src/ui/app-chat.test.ts vi.stubGlobal/vi.unstubAllGlobals are not functions
+251 TIMEOUT 40.0 ui/src/ui/app-gateway.node.test.ts process exceeded 40s wrapper limit
+252 FAIL 0.2 ui/src/ui/app-lifecycle-connect.node.test.ts window is not defined
+253 FAIL 0.1 ui/src/ui/gateway.node.test.ts vi.stubGlobal/vi.unstubAllGlobals are not functions
