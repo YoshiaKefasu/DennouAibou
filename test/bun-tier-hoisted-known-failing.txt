@@ -69,8 +69,8 @@ src/auto-reply/status.test.ts
 src/auto-reply/thinking.test.ts
 src/cli/route.test.ts
 
-# hoisted-shim (1 file)
-# Split validation fails before running tests with: `vi.hoisted is not a function`.
+# hook-hang (1 file)
+# Loads fine; beforeEach/afterEach hook hangs to the 120s timeout; `--timeout` CLI is ignored for hooks.
 extensions/discord/src/send.webhook-activity.test.ts
 
 # wait/import (4 files)
