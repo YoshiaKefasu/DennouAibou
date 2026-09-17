@@ -19,7 +19,7 @@
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
 #   wait/import: vi.waitFor, vi.importActual, or Vitest importOriginal behavior
 #   conditional: it.runIf is not exposed by bun:test
-#   hoisted-shim: the preload shim does not reach this test's vi instance
+#   hook-hang: beforeEach/afterEach hook hangs to a fixed 120s timeout; CLI --timeout is ignored for hooks
 #
 # reset/dynamic-mock (46 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
