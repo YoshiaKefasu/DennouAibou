@@ -13,10 +13,13 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
+# Current known-failure count: 53 files.
+#
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
 #   wait/import: vi.waitFor, vi.importActual, or Vitest importOriginal behavior
 #   conditional: it.runIf is not exposed by bun:test
+#   hoisted-shim: the preload shim does not reach this test's vi instance
 #
 # reset/dynamic-mock (46 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
@@ -65,6 +68,10 @@ src/auto-reply/reply/session-updates.lifecycle.test.ts
 src/auto-reply/status.test.ts
 src/auto-reply/thinking.test.ts
 src/cli/route.test.ts
+
+# hoisted-shim (1 file)
+# Split validation fails before running tests with: `vi.hoisted is not a function`.
+extensions/discord/src/send.webhook-activity.test.ts
 
 # wait/import (4 files)
 extensions/discord/src/monitor/message-handler.queue.test.ts

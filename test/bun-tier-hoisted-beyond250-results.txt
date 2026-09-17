@@ -1,0 +1,274 @@
+# Bun Phase 3-C3c: measurements for the 253 files after the first 250 vi.hoisted files
+#
+# Inventory source: hoisted_files.txt (253 entries after the first 250), with
+# the existing Tier B selection determining the 192-file measurable subset.
+# Validation command, run sequentially one file at a time:
+#   bun test --isolate --pass-with-no-tests --bail=1 --timeout 30000 <file>
+#
+# Safety note: the wrapper used a 40s process guard per file to avoid allowing
+# a single hanging test to block the remaining sequential measurements. `TIMEOUT`
+# means no conclusive result within that guard; it is not recorded as PASS or FAIL.
+#
+# Summary (192 measurable files): PASS 104, FAIL 34, TIMEOUT 54.
+# Remaining inventory: 61 files were not run because the existing classifier
+# excludes them from this Tier B lane (UI/e2e, Vitest-only API, or out of scope).
+# They remain unverified; see the unmeasured section below.
+#
+# Result columns: index, status, elapsed seconds, path, runner summary.
+
+# measured (192 files)
+001 TIMEOUT 40.1 src/commands/channels.add.test.ts process exceeded 40s wrapper limit
+002 TIMEOUT 40.0 src/commands/channels.adds-non-default-telegram-account.test.ts process exceeded 40s wrapper limit
+003 TIMEOUT 40.1 src/commands/channels.remove.test.ts process exceeded 40s wrapper limit
+004 PASS 25.2 src/commands/channels.resolve.test.ts Ran 2 tests across 1 file
+005 TIMEOUT 40.1 src/commands/channels/capabilities.test.ts process exceeded 40s wrapper limit
+006 PASS 0.7 src/commands/config-validation.test.ts Ran 3 tests across 1 file
+007 TIMEOUT 40.0 src/commands/configure.daemon.test.ts process exceeded 40s wrapper limit
+008 FAIL 1.6 src/commands/configure.gateway-auth.prompt-auth-config.test.ts Ran 1 test across 1 file
+009 FAIL 1.5 src/commands/configure.gateway.test.ts Ran 1 test across 1 file
+010 FAIL 1.7 src/commands/configure.wizard.test.ts Ran 7 tests across 1 file
+011 PASS 0.5 src/commands/daemon-install-helpers.test.ts Ran 18 tests across 1 file
+012 PASS 0.1 src/commands/daemon-install-runtime-warning.test.ts Ran 3 tests across 1 file
+013 PASS 1.5 src/commands/dashboard.links.test.ts Ran 6 tests across 1 file
+014 PASS 1.6 src/commands/dashboard.test.ts Ran 4 tests across 1 file
+015 PASS 0.7 src/commands/doctor-bootstrap-size.test.ts Ran 2 tests across 1 file
+016 TIMEOUT 40.0 src/commands/doctor-gateway-daemon-flow.test.ts process exceeded 40s wrapper limit
+017 TIMEOUT 40.0 src/commands/doctor-gateway-services.test.ts process exceeded 40s wrapper limit
+018 FAIL 0.3 src/commands/doctor-security.test.ts Ran 8 tests across 1 file
+019 FAIL 0.2 src/commands/doctor-session-locks.test.ts Ran 1 test across 1 file
+020 PASS 0.8 src/commands/doctor-workspace-status.test.ts Ran 6 tests across 1 file
+021 FAIL 0.2 src/commands/doctor/shared/allowlist-policy-repair.test.ts Ran 1 test across 1 file
+022 PASS 1.8 src/commands/gateway-install-token.test.ts Ran 10 tests across 1 file
+023 TIMEOUT 40.1 src/commands/message.default-agent.test.ts process exceeded 40s wrapper limit
+024 TIMEOUT 40.0 src/commands/message.test.ts process exceeded 40s wrapper limit
+025 PASS 8.1 src/commands/model-picker.test.ts Ran 10 tests across 1 file
+026 FAIL 0.1 src/commands/models/auth.test.ts Ran 1 test across 1 file
+027 PASS 27.8 src/commands/models/load-config.test.ts Ran 2 tests across 1 file
+028 PASS 0.7 src/commands/models/shared.test.ts Ran 3 tests across 1 file
+029 PASS 0.1 src/commands/node-daemon-install-helpers.test.ts Ran 2 tests across 1 file
+030 PASS 2.1 src/commands/onboard-helpers.test.ts Ran 17 tests across 1 file
+031 PASS 0.7 src/commands/onboard-interactive.test.ts Ran 3 tests across 1 file
+032 TIMEOUT 40.0 src/commands/onboard-non-interactive.workspace-provider-choice-guard.test.ts process exceeded 40s wrapper limit
+033 PASS 0.4 src/commands/onboard-non-interactive/local/auth-choice.plugin-providers.test.ts Ran 3 tests across 1 file
+034 PASS 0.8 src/commands/onboard-non-interactive/local/auth-choice.test.ts Ran 2 tests across 1 file
+035 PASS 2.2 src/commands/onboard-non-interactive/local/daemon-install.test.ts Ran 3 tests across 1 file
+036 TIMEOUT 40.1 src/commands/onboard-remote.test.ts process exceeded 40s wrapper limit
+037 PASS 0.4 src/commands/onboard-search.providers.test.ts Ran 5 tests across 1 file
+038 PASS 1.8 src/commands/onboard.test.ts Ran 7 tests across 1 file
+039 PASS 0.7 src/commands/sandbox.test.ts Ran 19 tests across 1 file
+040 PASS 1.2 src/commands/session-store-targets.test.ts Ran 1 test across 1 file
+041 PASS 6.3 src/commands/sessions-cleanup.test.ts Ran 5 tests across 1 file
+042 TIMEOUT 40.0 src/commands/sessions.default-agent-store.test.ts process exceeded 40s wrapper limit
+043 PASS 0.6 src/commands/status-all/report-lines.test.ts Ran 1 test across 1 file
+044 PASS 0.8 src/commands/status-json.test.ts Ran 2 tests across 1 file
+045 PASS 0.7 src/commands/status.link-channel.test.ts Ran 2 tests across 1 file
+046 PASS 0.1 src/commands/status.node-mode.test.ts Ran 3 tests across 1 file
+047 TIMEOUT 40.0 src/commands/status.summary.test.ts process exceeded 40s wrapper limit
+048 FAIL 36.9 src/commands/status.test.ts Ran 3 tests across 1 file
+049 PASS 0.1 src/config/logging.test.ts Ran 2 tests across 1 file
+050 TIMEOUT 40.0 src/config/markdown-tables.test.ts process exceeded 40s wrapper limit
+051 TIMEOUT 40.0 src/config/runtime-schema.test.ts process exceeded 40s wrapper limit
+052 PASS 0.7 src/config/sessions/delivery-info.test.ts Ran 5 tests across 1 file
+053 PASS 0.6 src/config/sessions/store.lock.test.ts Ran 2 tests across 1 file
+054 FAIL 0.4 src/config/validation.channel-metadata.test.ts Ran 1 test across 1 file
+055 PASS 0.8 src/cron/delivery.failure-notify.test.ts Ran 4 tests across 1 file
+056 PASS 15.1 src/cron/isolated-agent.model-formatting.test.ts Ran 22 tests across 1 file
+057 PASS 0.9 src/cron/isolated-agent/skills-snapshot.test.ts Ran 2 tests across 1 file
+058 TIMEOUT 40.0 src/daemon/launchd-restart-handoff.test.ts process exceeded 40s wrapper limit
+059 TIMEOUT 40.0 src/daemon/launchd.test.ts process exceeded 40s wrapper limit
+060 TIMEOUT 40.0 src/daemon/program-args.test.ts process exceeded 40s wrapper limit
+061 TIMEOUT 40.0 src/daemon/runtime-paths.test.ts process exceeded 40s wrapper limit
+062 PASS 0.1 src/daemon/schtasks-exec.test.ts Ran 2 tests across 1 file
+063 TIMEOUT 40.0 src/daemon/schtasks.startup-fallback.test.ts process exceeded 40s wrapper limit
+064 TIMEOUT 40.0 src/daemon/schtasks.stop.test.ts process exceeded 40s wrapper limit
+065 TIMEOUT 40.1 src/daemon/systemd.test.ts process exceeded 40s wrapper limit
+066 PASS 4.0 src/dennou-soul/config.test.ts Ran 4 tests across 1 file
+067 PASS 0.2 src/entry.respawn.test.ts Ran 4 tests across 1 file
+068 FAIL 2.4 src/entry.version-fast-path.test.ts Ran 2 tests across 1 file
+069 PASS 0.4 src/flows/provider-flow.test.ts Ran 2 tests across 1 file
+070 PASS 0.4 src/flows/search-setup.test.ts Ran 2 tests across 1 file
+071 TIMEOUT 40.0 src/gateway/control-ui.auto-root.http.test.ts process exceeded 40s wrapper limit
+072 TIMEOUT 40.0 src/gateway/mcp-http.test.ts process exceeded 40s wrapper limit
+073 PASS 0.2 src/gateway/probe.test.ts Ran 10 tests across 1 file
+074 TIMEOUT 40.0 src/gateway/server-cron.test.ts process exceeded 40s wrapper limit
+075 PASS 0.2 src/gateway/server-discovery.test.ts Ran 3 tests across 1 file
+076 TIMEOUT 40.0 src/gateway/server-http.hooks-request-timeout.test.ts process exceeded 40s wrapper limit
+077 TIMEOUT 40.0 src/gateway/server-methods/agent.test.ts process exceeded 40s wrapper limit
+078 TIMEOUT 40.0 src/gateway/server-methods/agents-mutate.test.ts process exceeded 40s wrapper limit
+079 PASS 2.1 src/gateway/server-methods/channels.status.test.ts Ran 1 test across 1 file
+080 TIMEOUT 40.0 src/gateway/server-methods/chat.abort-persistence.test.ts process exceeded 40s wrapper limit
+081 TIMEOUT 40.0 src/gateway/server-methods/chat.directive-tags.test.ts process exceeded 40s wrapper limit
+082 TIMEOUT 40.0 src/gateway/server-methods/config.test.ts process exceeded 40s wrapper limit
+083 TIMEOUT 40.0 src/gateway/server-methods/devices.test.ts process exceeded 40s wrapper limit
+084 PASS 0.9 src/gateway/server-methods/nodes-pending.test.ts Ran 3 tests across 1 file
+085 PASS 0.8 src/gateway/server-methods/push.test.ts Ran 7 tests across 1 file
+086 PASS 23.1 src/gateway/server-methods/tools-effective.test.ts Ran 9 tests across 1 file
+087 PASS 24.4 src/gateway/server-node-events.test.ts Ran 28 tests across 1 file
+088 TIMEOUT 40.0 src/gateway/server-session-key.test.ts process exceeded 40s wrapper limit
+089 PASS 0.3 src/gateway/server-startup-memory.test.ts Ran 4 tests across 1 file
+090 TIMEOUT 40.0 src/gateway/server.cron.test.ts process exceeded 40s wrapper limit
+091 TIMEOUT 40.0 src/gateway/server.reload.test.ts process exceeded 40s wrapper limit
+092 TIMEOUT 40.0 src/gateway/server.sessions.gateway-server-sessions-a.test.ts process exceeded 40s wrapper limit
+093 PASS 0.1 src/gateway/server/http-listen.test.ts Ran 3 tests across 1 file
+094 PASS 1.1 src/gateway/session-transcript-key.test.ts Ran 5 tests across 1 file
+095 TIMEOUT 40.0 src/gateway/sessions-resolve.test.ts process exceeded 40s wrapper limit
+096 FAIL 0.1 src/gateway/tools-invoke-http.test.ts Ran 1 test across 1 file
+097 PASS 0.6 src/hooks/gmail-watcher-lifecycle.test.ts Ran 5 tests across 1 file
+098 PASS 0.3 src/image-generation/provider-registry.allowlist.test.ts Ran 1 test across 1 file
+099 PASS 0.3 src/image-generation/provider-registry.test.ts Ran 3 tests across 1 file
+100 PASS 0.5 src/image-generation/runtime.test.ts Ran 4 tests across 1 file
+101 PASS 0.5 src/infra/approval-turn-source.test.ts Ran 3 tests across 1 file
+102 TIMEOUT 40.0 src/infra/channel-approval-auth.test.ts process exceeded 40s wrapper limit
+103 PASS 0.1 src/infra/channels-status-issues.test.ts Ran 2 tests across 1 file
+104 PASS 0.1 src/infra/clipboard.test.ts Ran 3 tests across 1 file
+105 PASS 0.1 src/infra/control-ui-assets.test.ts Ran 14 tests across 1 file
+106 TIMEOUT 40.0 src/infra/exec-approval-surface.test.ts process exceeded 40s wrapper limit
+107 FAIL 0.1 src/infra/exec-approvals-store.test.ts Ran 1 test across 1 file
+108 PASS 0.1 src/infra/exec-host.test.ts Ran 3 tests across 1 file
+109 TIMEOUT 40.0 src/infra/gateway-processes.test.ts process exceeded 40s wrapper limit
+110 PASS 0.2 src/infra/install-from-npm-spec.test.ts Ran 2 tests across 1 file
+111 PASS 0.2 src/infra/install-target.test.ts Ran 4 tests across 1 file
+112 TIMEOUT 40.0 src/infra/machine-name.test.ts process exceeded 40s wrapper limit
+113 FAIL 0.6 src/infra/net/fetch-guard.ssrf.test.ts Ran 12 tests across 1 file
+114 FAIL 0.1 src/infra/net/ssrf.dispatcher.test.ts Ran 1 test across 1 file
+115 PASS 0.1 src/infra/openclaw-root.test.ts Ran 9 tests across 1 file
+116 TIMEOUT 40.0 src/infra/os-summary.test.ts process exceeded 40s wrapper limit
+117 FAIL 0.1 src/infra/outbound/agent-delivery.test.ts Ran 1 test across 1 file
+118 FAIL 0.1 src/infra/outbound/channel-resolution.test.ts Ran 1 test across 1 file
+119 FAIL 0.1 src/infra/outbound/channel-selection.test.ts Ran 7 tests across 1 file
+120 FAIL 0.4 src/infra/outbound/deliver.test.ts Ran 1 test across 1 file
+121 FAIL 0.1 src/infra/outbound/format.test.ts Ran 2 tests across 1 file
+122 PASS 0.1 src/infra/outbound/identity.test.ts Ran 5 tests across 1 file
+123 FAIL 1.2 src/infra/outbound/message-action-runner.plugin-dispatch.test.ts Ran 1 test across 1 file
+124 PASS 1.3 src/infra/outbound/message-action-runner.poll.test.ts Ran 4 tests across 1 file
+125 FAIL 0.3 src/infra/outbound/message.test.ts Ran 1 test across 1 file
+126 PASS 0.2 src/infra/outbound/outbound-policy.test.ts Ran 10 tests across 1 file
+127 PASS 0.6 src/infra/outbound/outbound-session.test.ts Ran 26 tests across 1 file
+128 PASS 0.1 src/infra/outbound/session-context.test.ts Ran 4 tests across 1 file
+129 PASS 0.1 src/infra/outbound/target-normalization.test.ts Ran 9 tests across 1 file
+130 PASS 0.1 src/infra/outbound/target-resolver.test.ts Ran 6 tests across 1 file
+131 PASS 0.3 src/infra/outbound/targets.test.ts Ran 57 tests across 1 file
+132 TIMEOUT 40.0 src/infra/pairing-token.test.ts process exceeded 40s wrapper limit
+133 TIMEOUT 40.0 src/infra/path-env.test.ts process exceeded 40s wrapper limit
+134 PASS 0.6 src/infra/ports.test.ts Ran 5 tests across 1 file
+135 TIMEOUT 40.0 src/infra/process-respawn.test.ts process exceeded 40s wrapper limit
+136 TIMEOUT 40.0 src/infra/provider-usage.auth.normalizes-keys.test.ts process exceeded 40s wrapper limit
+137 PASS 0.1 src/infra/secure-random.test.ts Ran 7 tests across 1 file
+138 TIMEOUT 40.0 src/infra/windows-task-restart.test.ts process exceeded 40s wrapper limit
+139 TIMEOUT 40.0 src/infra/wsl.test.ts process exceeded 40s wrapper limit
+140 PASS 0.1 src/logging/config.test.ts Ran 1 test across 1 file
+141 FAIL 0.1 src/logging/console-settings.test.ts Ran 1 test across 1 file
+142 PASS 0.2 src/logging/level-filter.test.ts Ran 10 tests across 1 file
+143 FAIL 0.1 src/logging/logger-settings.test.ts Ran 1 test across 1 file
+144 PASS 0.6 src/media-understanding/audio-preflight.test.ts Ran 2 tests across 1 file
+145 TIMEOUT 40.0 src/media-understanding/image.test.ts process exceeded 40s wrapper limit
+146 PASS 0.3 src/media-understanding/provider-registry.allowlist.test.ts Ran 1 test across 1 file
+147 PASS 9.3 src/media-understanding/runner.proxy.test.ts Ran 3 tests across 1 file
+148 FAIL 0.6 src/media-understanding/runtime.test.ts Ran 2 tests across 1 file
+149 TIMEOUT 40.0 src/media-understanding/shared.test.ts process exceeded 40s wrapper limit
+150 PASS 0.5 src/media-understanding/transcribe-audio.test.ts Ran 3 tests across 1 file
+151 TIMEOUT 40.0 src/media/host.test.ts process exceeded 40s wrapper limit
+152 PASS 0.1 src/media/store.outside-workspace.test.ts Ran 1 test across 1 file
+153 PASS 0.2 src/memory-host-sdk/host/embeddings-bedrock.test.ts Ran 27 tests across 1 file
+154 PASS 0.1 src/memory-host-sdk/host/embeddings-remote-fetch.test.ts Ran 2 tests across 1 file
+155 PASS 0.7 src/memory-host-sdk/host/embeddings.test.ts Ran 21 tests across 1 file
+156 TIMEOUT 40.0 src/memory-host-sdk/host/qmd-process.test.ts process exceeded 40s wrapper limit
+157 PASS 0.5 src/music-generation/runtime.test.ts Ran 4 tests across 1 file
+158 TIMEOUT 40.0 src/plugin-activation-boundary.test.ts process exceeded 40s wrapper limit
+159 PASS 0.1 src/plugin-sdk/browser-bridge.test.ts Ran 2 tests across 1 file
+160 FAIL 0.1 src/plugin-sdk/browser-maintenance.test.ts Ran 1 test across 1 file
+161 PASS 0.1 src/plugin-sdk/browser-node-host.test.ts Ran 2 tests across 1 file
+162 PASS 0.2 src/plugin-sdk/outbound-media.test.ts Ran 3 tests across 1 file
+163 PASS 0.1 src/plugins/capability-provider-runtime.test.ts Ran 8 tests across 1 file
+164 PASS 0.2 src/plugins/channel-plugin-ids.test.ts Ran 7 tests across 1 file
+165 PASS 0.7 src/plugins/cli.test.ts Ran 9 tests across 1 file
+166 PASS 0.3 src/plugins/contracts/auth-choice.contract.test.ts Ran 1 test across 1 file
+167 PASS 0.1 src/plugins/memory-embedding-provider-runtime.test.ts Ran 3 tests across 1 file
+168 PASS 0.3 src/plugins/provider-auth-choices.test.ts Ran 4 tests across 1 file
+169 PASS 0.4 src/plugins/provider-wizard.test.ts Ran 6 tests across 1 file
+170 FAIL 0.5 src/plugins/runtime/runtime-taskflow.test.ts Ran 4 tests across 1 file
+171 FAIL 0.5 src/plugins/runtime/runtime-tasks.test.ts Ran 2 tests across 1 file
+172 FAIL 0.6 src/plugins/services.test.ts Ran 2 tests across 1 file
+173 PASS 0.2 src/plugins/wired-hooks-compaction.test.ts Ran 8 tests across 1 file
+174 PASS 0.6 src/process/supervisor/supervisor.pty-command.test.ts Ran 2 tests across 1 file
+175 FAIL 0.4 src/secrets/configure.test.ts Ran 1 test across 1 file
+176 FAIL 0.3 src/secrets/runtime-web-tools.test.ts Ran 1 test across 1 file
+177 FAIL 28.8 src/secrets/runtime.coverage.test.ts Ran 2 tests across 1 file
+178 FAIL 27.1 src/secrets/runtime.test.ts Ran 1 test across 1 file
+179 TIMEOUT 40.0 src/security/windows-acl.test.ts process exceeded 40s wrapper limit
+180 FAIL 0.6 src/tasks/task-executor.test.ts Ran 1 test across 1 file
+181 PASS 0.1 src/terminal/prompt-select-styled.test.ts Ran 1 test across 1 file
+182 PASS 0.1 src/terminal/restore.test.ts Ran 3 tests across 1 file
+183 PASS 0.5 src/test-utils/session-state-cleanup.test.ts Ran 1 test across 1 file
+184 PASS 0.7 src/ui-app-settings.agents-files-refresh.test.ts Ran 2 tests across 1 file
+185 PASS 0.3 src/utils/provider-utils.test.ts Ran 25 tests across 1 file
+186 PASS 0.3 src/video-generation/provider-registry.test.ts Ran 3 tests across 1 file
+187 PASS 0.5 src/video-generation/runtime.test.ts Ran 5 tests across 1 file
+188 PASS 24.7 src/web-fetch/runtime.test.ts Ran 6 tests across 1 file
+189 PASS 25.3 src/web-search/runtime.test.ts Ran 5 tests across 1 file
+190 PASS 2.4 src/wizard/setup.finalize.test.ts Ran 8 tests across 1 file
+191 FAIL 1.5 src/wizard/setup.gateway-config.test.ts Ran 1 test across 1 file
+192 PASS 0.5 src/wizard/setup.test.ts Ran 10 tests across 1 file
+
+# unmeasured (61 files; retained for later)
+src/commands/gateway-status.test.ts
+src/commands/models.set.e2e.test.ts
+src/commands/models/list.list-command.forward-compat.test.ts
+src/commands/models/list.status.test.ts
+src/commands/onboard-channels.e2e.test.ts
+src/commands/onboard-non-interactive.gateway.test.ts
+src/commands/onboard-non-interactive.provider-auth.test.ts
+src/config/io.write-config.test.ts
+src/config/zod-schema.providers.lazy-runtime.test.ts
+src/cron/isolated-agent/subagent-followup.test.ts
+src/cron/service.runs-one-shot-main-job-disables-it.test.ts
+src/daemon/inspect.test.ts
+src/dennou-soul/idle-prune-watcher.test.ts
+src/entry.test.ts
+src/gateway/call.test.ts
+src/gateway/client.test.ts
+src/gateway/gateway-misc.test.ts
+src/gateway/server-channels.test.ts
+src/gateway/server-methods/nodes.invoke-wake.test.ts
+src/gateway/server-methods/send.test.ts
+src/gateway/server-plugins.test.ts
+src/gateway/server-restart-sentinel.test.ts
+src/gateway/startup-auth.test.ts
+src/infra/bonjour.test.ts
+src/infra/boundary-file-read.test.ts
+src/infra/env.test.ts
+src/infra/exec-approval-channel-runtime.test.ts
+src/infra/net/proxy-fetch.test.ts
+src/infra/net/undici-global-dispatcher.test.ts
+src/infra/outbound/message-action-runner.media.test.ts
+src/infra/outbound/outbound-send-service.test.ts
+src/infra/restart-stale-pids.test.ts
+src/infra/restart.test.ts
+src/infra/retry.test.ts
+src/infra/session-maintenance-warning.test.ts
+src/infra/transport-ready.test.ts
+src/media-understanding/apply.echo-transcript.test.ts
+src/media-understanding/apply.test.ts
+src/media-understanding/runner.vision-skip.test.ts
+src/media/fetch.test.ts
+src/media/server.outside-workspace.test.ts
+src/plugins/contracts/runtime-import-side-effects.contract.test.ts
+src/plugins/conversation-binding.test.ts
+src/plugins/marketplace.test.ts
+src/plugins/wired-hooks-after-tool-call.e2e.test.ts
+src/process/command-queue.test.ts
+src/process/exec.no-output-timer.test.ts
+src/process/exec.test.ts
+src/process/exec.windows.test.ts
+src/process/kill-tree.test.ts
+src/process/supervisor/adapters/child.test.ts
+src/process/supervisor/adapters/pty.test.ts
+src/process/supervisor/supervisor.test.ts
+src/secrets/provider-env-vars.dynamic.test.ts
+src/tasks/task-registry.test.ts
+src/tui/theme/theme.test.ts
+test/scripts/test-report-utils.test.ts
+ui/src/ui/app-chat.test.ts
+ui/src/ui/app-gateway.node.test.ts
+ui/src/ui/app-lifecycle-connect.node.test.ts
+ui/src/ui/gateway.node.test.ts
