@@ -211,7 +211,6 @@ src/infra/channel-approval-auth.test.ts
 src/infra/exec-approval-surface.test.ts
 src/infra/exec-approvals-store.test.ts
 src/infra/gateway-processes.test.ts
-src/infra/machine-name.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
 src/infra/net/ssrf.dispatcher.test.ts
 src/infra/os-summary.test.ts
