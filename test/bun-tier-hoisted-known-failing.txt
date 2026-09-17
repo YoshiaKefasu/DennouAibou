@@ -1,0 +1,79 @@
+# Bun Phase 3-C3c: first 250 vi.hoisted test files
+#
+# Scope: the first 250 Git-tracked test files containing vi.hoisted, in path
+# order (541 vi.hoisted calls). test/setup.bun.ts now provides an immediate
+# factory shim through src/test-utils/bun-test-mocks.ts, so vi.hoisted itself
+# is supported for this scope.
+#
+# Split validation:
+#   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
+#
+# These files retain a separate Bun/Vitest incompatibility. They are not
+# converted by the vi.hoisted shim because doing so would either change
+# per-test module lifecycle semantics or rely on another unsupported API.
+# Re-check an entry when the test is split or Bun gains the missing API.
+#
+# Categories:
+#   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
+#   wait/import: vi.waitFor, vi.importActual, or Vitest importOriginal behavior
+#   conditional: it.runIf is not exposed by bun:test
+#
+# reset/dynamic-mock (46 files)
+extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
+extensions/line/src/monitor.lifecycle.test.ts
+extensions/line/src/send.test.ts
+extensions/telegram/src/audit.test.ts
+extensions/telegram/src/bot/delivery.test.ts
+src/agents/auth-profiles.readonly-sync.test.ts
+src/agents/auth-profiles.store-cache.test.ts
+src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
+src/agents/bash-tools.exec.pty-cleanup.test.ts
+src/agents/bash-tools.exec.pty-fallback-failure.test.ts
+src/agents/compaction.tool-result-details.test.ts
+src/agents/context.eager-warmup.test.ts
+src/agents/model-fallback.run-embedded.e2e.test.ts
+src/agents/models-config.write-serialization.test.ts
+src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+src/agents/pi-embedded-runner/tool-result-truncation.test.ts
+src/agents/pi-embedded-runner/transcript-rewrite.test.ts
+src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
+src/agents/pi-tools.read.workspace-root-guard.test.ts
+src/agents/runtime-plugins.test.ts
+src/agents/sandbox/browser.create.test.ts
+src/agents/sandbox/docker.config-hash-recreate.test.ts
+src/agents/sandbox/manage.test.ts
+src/agents/sandbox/registry.test.ts
+src/agents/subagent-registry.announce-loop-guard.test.ts
+src/agents/subagent-registry.persistence.resume.test.ts
+src/agents/subagent-registry.test.ts
+src/agents/subagent-spawn.test.ts
+src/agents/subagent-spawn.workspace.test.ts
+src/agents/tools/web-search.redirect.test.ts
+src/auto-reply/reply.block-streaming.test.ts
+src/auto-reply/reply.directive.directive-behavior.applies-inline-reasoning-mixed-messages-acks-immediately.test.ts
+src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox-workspace.test.ts
+src/auto-reply/reply/commands-subagents/action-agents.test.ts
+src/auto-reply/reply/commands-system-prompt.test.ts
+src/auto-reply/reply/commands.test.ts
+src/auto-reply/reply/get-reply.before-agent-reply.test.ts
+src/auto-reply/reply/get-reply.config-override.test.ts
+src/auto-reply/reply/get-reply.message-hooks.test.ts
+src/auto-reply/reply/get-reply.native-audio.test.ts
+src/auto-reply/reply/get-reply.reset-hooks-fallback.test.ts
+src/auto-reply/reply/session-hooks-context.test.ts
+src/auto-reply/reply/session-updates.lifecycle.test.ts
+src/auto-reply/status.test.ts
+src/auto-reply/thinking.test.ts
+src/cli/route.test.ts
+
+# wait/import (4 files)
+extensions/discord/src/monitor/message-handler.queue.test.ts
+extensions/discord/src/monitor/native-command.plugin-dispatch.test.ts
+extensions/line/src/setup-surface.test.ts
+extensions/telegram/src/bot-native-commands.session-meta.test.ts
+
+# conditional (1 file)
+src/agents/pi-tools.read.host-edit-access.test.ts
+
+# reset/dynamic-mock+conditional (1 file)
+src/agents/sandbox/ssh.spawn-env.test.ts

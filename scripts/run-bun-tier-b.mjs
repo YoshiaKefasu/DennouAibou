@@ -48,6 +48,8 @@ const BUN_VI = new Set([
   "vi.getTimerCount",
   "vi.clearAllTimers",
   "vi.isFakeTimers",
+  // test/setup.bun.ts supplies an immediate-factory compatibility shim.
+  "vi.hoisted",
 ]);
 
 // live/e2e/browser/vendor suites are out of scope for the migration (Tier S),
@@ -55,9 +57,10 @@ const BUN_VI = new Set([
 const OUT_OF_SCOPE_PATH =
   /(^|\/)(vendor|fixtures)(\/|$)|\.live\.test\.|\.e2e\.test\.|^ui\/|^apps\//;
 // vitest-only globals that are not reached through `vi`. `expect.poll` and
-// `it.runIf` are evaluated at call time and throw under bun:test.
+// `it.runIf` are evaluated at call time and throw under bun:test. The
+// `vi.hoisted` compatibility shim is classified above as a supported API.
 const VITEST_GLOBAL_RE =
-  /expect\s*\.\s*(?:poll|soft)\b|import\s*\.\s*meta\s*\.\s*vitest\b|\b(?:it|test|describe)\s*\.\s*(?:runIf|skipIf|todo)\b|\bvi\s*\.\s*(?:hoisted|mocked|waitFor|waitUntil|dynamicImportSettled)\b/;
+  /expect\s*\.\s*(?:poll|soft)\b|import\s*\.\s*meta\s*\.\s*vitest\b|\b(?:it|test|describe)\s*\.\s*(?:runIf|skipIf|todo)\b|\bvi\s*\.\s*(?:mocked|waitFor|waitUntil|dynamicImportSettled)\b/;
 const IMPORT_RE =
   /(?:import|export)[^"'`;]*?from\s*["'](\.[^"']+)["']|import\s*\(\s*["'](\.[^"']+)["']\s*\)|require\(\s*["'](\.[^"']+)["']\s*\)/g;
 

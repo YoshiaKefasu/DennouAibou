@@ -1,5 +1,12 @@
 import { vi } from "vitest";
 
+// Bun 1.4 exposes the Vitest-compatible `vi` object but not `vi.hoisted`.
+// Bun evaluates test files normally, so running the factory immediately
+// preserves the value-initialization role used by static `vi.mock` factories.
+if (typeof vi.hoisted !== "function") {
+  vi.hoisted = <T>(factory: () => T): T => factory();
+}
+
 const envSnapshots = new Map<string, string | undefined>();
 const globalSnapshots = new Map<PropertyKey, PropertyDescriptor | undefined>();
 
