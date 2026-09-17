@@ -47,6 +47,40 @@ const DEFAULT_MAX_LOG_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 
 const requireConfig = resolveNodeRequireFromMeta(import.meta.url);
 
+type LoggingConfigLoader = () => OpenClawConfig["logging"] | undefined;
+
+const loadConfigFallbackDefault: LoggingConfigLoader = () => {
+  const loaded = requireConfig?.("../config/config.js") as
+    | {
+        loadConfig?: () => OpenClawConfig;
+      }
+    | undefined;
+  return loaded?.loadConfig?.().logging;
+};
+
+/**
+ * Injectable seams for the config reads performed while resolving logger
+ * settings. Defaults resolve to the real module implementations.
+ */
+export type LoggerConfigDeps = {
+  readLoggingConfig: typeof readLoggingConfig;
+  shouldSkipMutatingLoggingConfigRead: typeof shouldSkipMutatingLoggingConfigRead;
+  loadConfigFallback: LoggingConfigLoader;
+};
+
+const defaultLoggerConfigDeps: LoggerConfigDeps = {
+  readLoggingConfig,
+  shouldSkipMutatingLoggingConfigRead,
+  loadConfigFallback: loadConfigFallbackDefault,
+};
+
+let loggerConfigDeps: LoggerConfigDeps = defaultLoggerConfigDeps;
+
+/** Test seam; pass no argument (or undefined) to restore the real defaults. */
+export function setLoggerConfigDepsForTests(deps?: Partial<LoggerConfigDeps>): void {
+  loggerConfigDeps = deps ? { ...defaultLoggerConfigDeps, ...deps } : defaultLoggerConfigDeps;
+}
+
 export type LoggerSettings = {
   level?: LogLevel;
   file?: string;
@@ -81,16 +115,19 @@ function attachExternalTransport(logger: TsLogger<LogObj>, transport: LogTranspo
   });
 }
 
-function canUseSilentVitestFileLogFastPath(envLevel: LogLevel | undefined): boolean {
+function canUseSilentVitestFileLogFastPath(
+  envLevel: LogLevel | undefined,
+  env: NodeJS.ProcessEnv,
+): boolean {
   return (
-    process.env.VITEST === "true" &&
-    process.env.DENNOU_TEST_FILE_LOG !== "1" &&
+    env.VITEST === "true" &&
+    env.DENNOU_TEST_FILE_LOG !== "1" &&
     !envLevel &&
     !loggingState.overrideSettings
   );
 }
 
-function resolveSettings(): ResolvedSettings {
+function resolveSettings(env: NodeJS.ProcessEnv = process.env): ResolvedSettings {
   if (!canUseNodeFs()) {
     return {
       level: "silent",
@@ -99,10 +136,10 @@ function resolveSettings(): ResolvedSettings {
     };
   }
 
-  const envLevel = resolveEnvLogLevelOverride();
+  const envLevel = resolveEnvLogLevelOverride(env);
   // Test runs default file logs to silent. Skip config reads and fallback load in the
   // common case to avoid pulling heavy config/schema stacks on startup.
-  if (canUseSilentVitestFileLogFastPath(envLevel)) {
+  if (canUseSilentVitestFileLogFastPath(envLevel, env)) {
     return {
       level: "silent",
       file: defaultRollingPathForToday(),
@@ -111,21 +148,17 @@ function resolveSettings(): ResolvedSettings {
   }
 
   let cfg: OpenClawConfig["logging"] | undefined =
-    (loggingState.overrideSettings as LoggerSettings | null) ?? readLoggingConfig();
-  if (!cfg && !shouldSkipMutatingLoggingConfigRead()) {
+    (loggingState.overrideSettings as LoggerSettings | null) ??
+    loggerConfigDeps.readLoggingConfig();
+  if (!cfg && !loggerConfigDeps.shouldSkipMutatingLoggingConfigRead()) {
     try {
-      const loaded = requireConfig?.("../config/config.js") as
-        | {
-            loadConfig?: () => OpenClawConfig;
-          }
-        | undefined;
-      cfg = loaded?.loadConfig?.().logging;
+      cfg = loggerConfigDeps.loadConfigFallback();
     } catch {
       cfg = undefined;
     }
   }
   const defaultLevel =
-    process.env.VITEST === "true" && process.env.DENNOU_TEST_FILE_LOG !== "1" ? "silent" : "info";
+    env.VITEST === "true" && env.DENNOU_TEST_FILE_LOG !== "1" ? "silent" : "info";
   const fromConfig = normalizeLogLevel(cfg?.level, defaultLevel);
   const level = envLevel ?? fromConfig;
   const file = cfg?.file ?? defaultRollingPathForToday();
@@ -309,8 +342,10 @@ export type PinoLikeLogger = {
   fatal: (...args: unknown[]) => void;
 };
 
-export function getResolvedLoggerSettings(): LoggerResolvedSettings {
-  return resolveSettings();
+export function getResolvedLoggerSettings(
+  env: NodeJS.ProcessEnv = process.env,
+): LoggerResolvedSettings {
+  return resolveSettings(env);
 }
 
 // Test helpers

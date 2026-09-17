@@ -8,18 +8,34 @@ export type ApprovalCommandAuthorization = {
   explicit: boolean;
 };
 
-export function resolveApprovalCommandAuthorization(params: {
-  cfg: OpenClawConfig;
-  channel?: string | null;
-  accountId?: string | null;
-  senderId?: string | null;
-  kind: "exec" | "plugin";
-}): ApprovalCommandAuthorization {
+/**
+ * Injectable seam for channel plugin lookup. Defaults to the real
+ * implementation so production callers stay unchanged.
+ */
+export type ChannelApprovalAuthDeps = {
+  getChannelPlugin: typeof getChannelPlugin;
+};
+
+const defaultChannelApprovalAuthDeps: ChannelApprovalAuthDeps = {
+  getChannelPlugin,
+};
+
+export function resolveApprovalCommandAuthorization(
+  params: {
+    cfg: OpenClawConfig;
+    channel?: string | null;
+    accountId?: string | null;
+    senderId?: string | null;
+    kind: "exec" | "plugin";
+  },
+  deps?: Partial<ChannelApprovalAuthDeps>,
+): ApprovalCommandAuthorization {
+  const getPlugin = deps?.getChannelPlugin ?? defaultChannelApprovalAuthDeps.getChannelPlugin;
   const channel = normalizeMessageChannel(params.channel);
   if (!channel) {
     return { authorized: true, explicit: false };
   }
-  const approvalCapability = resolveChannelApprovalCapability(getChannelPlugin(channel));
+  const approvalCapability = resolveChannelApprovalCapability(getPlugin(channel));
   const resolved = approvalCapability?.authorizeActorAction?.({
     cfg: params.cfg,
     accountId: params.accountId,

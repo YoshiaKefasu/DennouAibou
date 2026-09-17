@@ -5,37 +5,25 @@ import type {
   PluginWebFetchProviderEntry,
   PluginWebSearchProviderEntry,
 } from "../plugins/types.js";
+import * as runtimeWebSearchProvidersModule from "../plugins/web-search-providers.runtime.js";
+import type { RuntimeWebToolsDeps } from "./runtime-web-tools.js";
 
 type ProviderUnderTest = "brave" | "gemini" | "grok" | "kimi" | "perplexity" | "duckduckgo";
 
-const { resolvePluginWebSearchProvidersMock } = vi.hoisted(() => ({
-  resolvePluginWebSearchProvidersMock: vi.fn(() => buildTestWebSearchProviders()),
-}));
+const resolvePluginWebSearchProvidersMock = vi.fn(() => buildTestWebSearchProviders());
+const resolvePluginWebFetchProvidersMock = vi.fn(() => buildTestWebFetchProviders());
 
-const { resolvePluginWebFetchProvidersMock } = vi.hoisted(() => ({
-  resolvePluginWebFetchProvidersMock: vi.fn(() => buildTestWebFetchProviders()),
-}));
-let runtimeWebSearchProviders: typeof import("../plugins/web-search-providers.runtime.js");
-let runtimeWebFetchProviders: typeof import("../plugins/web-fetch-providers.runtime.js");
+/** Explicit seams replacing the module-level vi.mock interception. */
+const runtimeWebToolsDeps: Partial<RuntimeWebToolsDeps> = {
+  resolvePluginWebSearchProviders:
+    resolvePluginWebSearchProvidersMock as unknown as RuntimeWebToolsDeps["resolvePluginWebSearchProviders"],
+  resolvePluginWebFetchProviders:
+    resolvePluginWebFetchProvidersMock as unknown as RuntimeWebToolsDeps["resolvePluginWebFetchProviders"],
+};
+
 let secretResolve: typeof import("./resolve.js");
 let createResolverContext: typeof import("./runtime-shared.js").createResolverContext;
 let resolveRuntimeWebTools: typeof import("./runtime-web-tools.js").resolveRuntimeWebTools;
-
-vi.mock("../plugins/web-search-providers.runtime.js", async () => {
-  const actual = await import("../plugins/web-search-providers.runtime.js");
-  return {
-    ...actual,
-    resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
-  };
-});
-
-vi.mock("../plugins/web-fetch-providers.runtime.js", async () => {
-  const actual = await import("../plugins/web-fetch-providers.runtime.js");
-  return {
-    ...actual,
-    resolvePluginWebFetchProviders: resolvePluginWebFetchProvidersMock,
-  };
-});
 
 function asConfig(value: unknown): OpenClawConfig {
   return value as OpenClawConfig;
@@ -242,17 +230,21 @@ function expectInactiveWebFetchProviderSecretRef(params: {
 
 describe("runtime web tools resolution", () => {
   beforeAll(async () => {
-    runtimeWebSearchProviders = await import("../plugins/web-search-providers.runtime.js");
-    runtimeWebFetchProviders = await import("../plugins/web-fetch-providers.runtime.js");
     secretResolve = await import("./resolve.js");
     ({ createResolverContext } = await import("./runtime-shared.js"));
-    ({ resolveRuntimeWebTools } = await import("./runtime-web-tools.js"));
+    const runtimeWebToolsModule = await import("./runtime-web-tools.js");
+    // Bind the injected seams for every call site in this suite.
+    resolveRuntimeWebTools = ((params) =>
+      runtimeWebToolsModule.resolveRuntimeWebTools(
+        params,
+        runtimeWebToolsDeps,
+      )) as typeof runtimeWebToolsModule.resolveRuntimeWebTools;
   });
 
   beforeEach(() => {
-    runtimeWebSearchProviders.__testing.resetWebSearchProviderSnapshotCacheForTests();
-    (runtimeWebSearchProviders.resolvePluginWebSearchProviders as Mock).mockClear();
-    (runtimeWebFetchProviders.resolvePluginWebFetchProviders as Mock).mockClear();
+    runtimeWebSearchProvidersModule.__testing.resetWebSearchProviderSnapshotCacheForTests();
+    resolvePluginWebSearchProvidersMock.mockClear();
+    resolvePluginWebFetchProvidersMock.mockClear();
   });
 
   afterEach(() => {
@@ -640,7 +632,7 @@ describe("runtime web tools resolution", () => {
   });
 
   it("uses bundled-only runtime provider resolution for configured bundled providers", async () => {
-    const runtimeSpy = runtimeWebSearchProviders.resolvePluginWebSearchProviders as Mock;
+    const runtimeSpy = resolvePluginWebSearchProvidersMock as Mock;
 
     const { metadata } = await runRuntimeWebTools({
       config: asConfig({
@@ -928,7 +920,7 @@ describe("runtime web tools resolution", () => {
   });
 
   it("keeps web fetch provider discovery bundled-only during runtime secret resolution", async () => {
-    const runtimeSpy = runtimeWebFetchProviders.resolvePluginWebFetchProviders as Mock;
+    const runtimeSpy = resolvePluginWebFetchProvidersMock as Mock;
 
     const { metadata } = await runRuntimeWebTools({
       config: asConfig({

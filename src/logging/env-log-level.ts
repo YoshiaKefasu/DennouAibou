@@ -1,8 +1,10 @@
 import { ALLOWED_LOG_LEVELS, type LogLevel, tryParseLogLevel } from "./levels.js";
 import { loggingState } from "./state.js";
 
-export function resolveEnvLogLevelOverride(): LogLevel | undefined {
-  const raw = process.env.DENNOU_LOG_LEVEL;
+export function resolveEnvLogLevelOverride(
+  env: NodeJS.ProcessEnv = process.env,
+): LogLevel | undefined {
+  const raw = env.DENNOU_LOG_LEVEL;
   const trimmed = typeof raw === "string" ? raw.trim() : "";
   if (!trimmed) {
     loggingState.invalidEnvLogLevelValue = null;

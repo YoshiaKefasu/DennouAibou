@@ -1,11 +1,10 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { STATE_DIR } from "../config/paths.js";
-import { createSubsystemLogger } from "../logging/subsystem.js";
+import { createSubsystemLogger, type SubsystemLogger } from "../logging/subsystem.js";
 import type { PluginRegistry } from "./registry.js";
 import type { OpenClawPluginServiceContext, PluginLogger } from "./types.js";
 
-const log = createSubsystemLogger("plugins");
-function createPluginLogger(): PluginLogger {
+function createPluginLogger(log: SubsystemLogger): PluginLogger {
   return {
     info: (msg) => log.info(msg),
     warn: (msg) => log.warn(msg),
@@ -14,15 +13,18 @@ function createPluginLogger(): PluginLogger {
   };
 }
 
-function createServiceContext(params: {
-  config: OpenClawConfig;
-  workspaceDir?: string;
-}): OpenClawPluginServiceContext {
+function createServiceContext(
+  params: {
+    config: OpenClawConfig;
+    workspaceDir?: string;
+  },
+  log: SubsystemLogger,
+): OpenClawPluginServiceContext {
   return {
     config: params.config,
     workspaceDir: params.workspaceDir,
     stateDir: STATE_DIR,
-    logger: createPluginLogger(),
+    logger: createPluginLogger(log),
   };
 }
 
@@ -30,19 +32,34 @@ export type PluginServicesHandle = {
   stop: () => Promise<void>;
 };
 
-export async function startPluginServices(params: {
-  registry: PluginRegistry;
-  config: OpenClawConfig;
-  workspaceDir?: string;
-}): Promise<PluginServicesHandle> {
+/**
+ * Injectable seams for plugin service startup. Defaults resolve to the real
+ * subsystem logger factory so production callers stay unchanged.
+ */
+export type PluginServicesDeps = {
+  createSubsystemLogger: typeof createSubsystemLogger;
+};
+
+export async function startPluginServices(
+  params: {
+    registry: PluginRegistry;
+    config: OpenClawConfig;
+    workspaceDir?: string;
+  },
+  deps?: Partial<PluginServicesDeps>,
+): Promise<PluginServicesHandle> {
+  const log = (deps?.createSubsystemLogger ?? createSubsystemLogger)("plugins");
   const running: Array<{
     id: string;
     stop?: () => void | Promise<void>;
   }> = [];
-  const serviceContext = createServiceContext({
-    config: params.config,
-    workspaceDir: params.workspaceDir,
-  });
+  const serviceContext = createServiceContext(
+    {
+      config: params.config,
+      workspaceDir: params.workspaceDir,
+    },
+    log,
+  );
 
   for (const entry of params.registry.services) {
     const service = entry.service;

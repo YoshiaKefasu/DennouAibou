@@ -358,11 +358,27 @@ function hasConfiguredSecretRef(value: unknown, defaults: SecretDefaults | undef
   );
 }
 
-export async function resolveRuntimeWebTools(params: {
-  sourceConfig: OpenClawConfig;
-  resolvedConfig: OpenClawConfig;
-  context: ResolverContext;
-}): Promise<RuntimeWebToolsMetadata> {
+export type RuntimeWebToolsDeps = {
+  resolvePluginWebSearchProviders: typeof resolvePluginWebSearchProviders;
+  resolvePluginWebFetchProviders: typeof resolvePluginWebFetchProviders;
+};
+
+const defaultRuntimeWebToolsDeps: RuntimeWebToolsDeps = {
+  resolvePluginWebSearchProviders,
+  resolvePluginWebFetchProviders,
+};
+
+export async function resolveRuntimeWebTools(
+  params: {
+    sourceConfig: OpenClawConfig;
+    resolvedConfig: OpenClawConfig;
+    context: ResolverContext;
+  },
+  deps?: Partial<RuntimeWebToolsDeps>,
+): Promise<RuntimeWebToolsMetadata> {
+  const resolvedDeps: RuntimeWebToolsDeps = deps
+    ? { ...defaultRuntimeWebToolsDeps, ...deps }
+    : defaultRuntimeWebToolsDeps;
   const defaults = params.sourceConfig.secrets?.defaults;
   const diagnostics: RuntimeWebDiagnostic[] = [];
 
@@ -386,7 +402,7 @@ export async function resolveRuntimeWebTools(params: {
 
   const searchProviders = sortWebSearchProvidersForAutoDetect(
     configuredBundledPluginId
-      ? resolvePluginWebSearchProviders({
+      ? resolvedDeps.resolvePluginWebSearchProviders({
           config: params.sourceConfig,
           env: { ...process.env, ...params.context.env },
           bundledAllowlistCompat: true,
@@ -394,13 +410,13 @@ export async function resolveRuntimeWebTools(params: {
           origin: "bundled",
         })
       : !hasCustomWebSearchPluginRisk(params.sourceConfig)
-        ? resolvePluginWebSearchProviders({
+        ? resolvedDeps.resolvePluginWebSearchProviders({
             config: params.sourceConfig,
             env: { ...process.env, ...params.context.env },
             bundledAllowlistCompat: true,
             origin: "bundled",
           })
-        : resolvePluginWebSearchProviders({
+        : resolvedDeps.resolvePluginWebSearchProviders({
             config: params.sourceConfig,
             env: { ...process.env, ...params.context.env },
             bundledAllowlistCompat: true,
@@ -692,14 +708,14 @@ export async function resolveRuntimeWebTools(params: {
   };
   const fetchProviders = sortWebFetchProvidersForAutoDetect(
     configuredBundledFetchPluginId
-      ? resolvePluginWebFetchProviders({
+      ? resolvedDeps.resolvePluginWebFetchProviders({
           config: params.sourceConfig,
           env: { ...process.env, ...params.context.env },
           bundledAllowlistCompat: true,
           onlyPluginIds: [configuredBundledFetchPluginId],
           origin: "bundled",
         })
-      : resolvePluginWebFetchProviders({
+      : resolvedDeps.resolvePluginWebFetchProviders({
           config: params.sourceConfig,
           env: { ...process.env, ...params.context.env },
           bundledAllowlistCompat: true,

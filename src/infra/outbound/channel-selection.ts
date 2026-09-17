@@ -5,7 +5,6 @@ import { defaultRuntime } from "../../runtime.js";
 import {
   listDeliverableMessageChannels,
   type DeliverableMessageChannel,
-  isDeliverableMessageChannel,
   normalizeMessageChannel,
 } from "../../utils/message-channel.js";
 import { resolveOutboundChannelPlugin } from "./channel-resolution.js";
@@ -16,35 +15,57 @@ export type MessageChannelSelectionSource =
   | "tool-context-fallback"
   | "single-configured";
 
-const getMessageChannels = () => listDeliverableMessageChannels();
+/**
+ * Injectable seams for the channel plugin registry and deliverable channel
+ * catalog. Defaults resolve to the real module implementations so production
+ * callers stay unchanged.
+ */
+export type ChannelSelectionDeps = {
+  listChannelPlugins: typeof listChannelPlugins;
+  resolveOutboundChannelPlugin: typeof resolveOutboundChannelPlugin;
+  listDeliverableMessageChannels: typeof listDeliverableMessageChannels;
+};
 
-function isKnownChannel(value: string): boolean {
-  return getMessageChannels().includes(value as MessageChannelId);
+const defaultChannelSelectionDeps: ChannelSelectionDeps = {
+  listChannelPlugins,
+  resolveOutboundChannelPlugin,
+  listDeliverableMessageChannels,
+};
+
+function resolveDeps(deps?: Partial<ChannelSelectionDeps>): ChannelSelectionDeps {
+  return deps ? { ...defaultChannelSelectionDeps, ...deps } : defaultChannelSelectionDeps;
 }
 
-function resolveKnownChannel(value?: string | null): MessageChannelId | undefined {
+function isKnownChannel(value: string, deps: ChannelSelectionDeps): boolean {
+  return deps.listDeliverableMessageChannels().includes(value as MessageChannelId);
+}
+
+function resolveKnownChannel(
+  value: string | null | undefined,
+  deps: ChannelSelectionDeps,
+): MessageChannelId | undefined {
   const normalized = normalizeMessageChannel(value);
   if (!normalized) {
     return undefined;
   }
-  if (!isDeliverableMessageChannel(normalized)) {
-    return undefined;
-  }
-  if (!isKnownChannel(normalized)) {
+  if (!isKnownChannel(normalized, deps)) {
     return undefined;
   }
   return normalized as MessageChannelId;
 }
 
-function resolveAvailableKnownChannel(params: {
-  cfg: OpenClawConfig;
-  value?: string | null;
-}): MessageChannelId | undefined {
-  const normalized = resolveKnownChannel(params.value);
+function resolveAvailableKnownChannel(
+  params: {
+    cfg: OpenClawConfig;
+    value?: string | null;
+  },
+  deps: ChannelSelectionDeps,
+): MessageChannelId | undefined {
+  const normalized = resolveKnownChannel(params.value, deps);
   if (!normalized) {
     return undefined;
   }
-  return resolveOutboundChannelPlugin({
+  return deps.resolveOutboundChannelPlugin({
     channel: normalized,
     cfg: params.cfg,
   })
@@ -129,10 +150,12 @@ async function isPluginConfigured(plugin: ChannelPlugin, cfg: OpenClawConfig): P
 
 export async function listConfiguredMessageChannels(
   cfg: OpenClawConfig,
+  deps?: Partial<ChannelSelectionDeps>,
 ): Promise<MessageChannelId[]> {
+  const resolvedDeps = resolveDeps(deps);
   const channels: MessageChannelId[] = [];
-  for (const plugin of listChannelPlugins()) {
-    if (!isKnownChannel(plugin.id)) {
+  for (const plugin of resolvedDeps.listChannelPlugins()) {
+    if (!isKnownChannel(plugin.id, resolvedDeps)) {
       continue;
     }
     if (await isPluginConfigured(plugin, cfg)) {
@@ -142,26 +165,36 @@ export async function listConfiguredMessageChannels(
   return channels;
 }
 
-export async function resolveMessageChannelSelection(params: {
-  cfg: OpenClawConfig;
-  channel?: string | null;
-  fallbackChannel?: string | null;
-}): Promise<{
+export async function resolveMessageChannelSelection(
+  params: {
+    cfg: OpenClawConfig;
+    channel?: string | null;
+    fallbackChannel?: string | null;
+  },
+  deps?: Partial<ChannelSelectionDeps>,
+): Promise<{
   channel: MessageChannelId;
   configured: MessageChannelId[];
   source: MessageChannelSelectionSource;
 }> {
+  const resolvedDeps = resolveDeps(deps);
   const normalized = normalizeMessageChannel(params.channel);
   if (normalized) {
-    const availableExplicit = resolveAvailableKnownChannel({
-      cfg: params.cfg,
-      value: normalized,
-    });
-    if (!availableExplicit) {
-      const fallback = resolveAvailableKnownChannel({
+    const availableExplicit = resolveAvailableKnownChannel(
+      {
         cfg: params.cfg,
-        value: params.fallbackChannel,
-      });
+        value: normalized,
+      },
+      resolvedDeps,
+    );
+    if (!availableExplicit) {
+      const fallback = resolveAvailableKnownChannel(
+        {
+          cfg: params.cfg,
+          value: params.fallbackChannel,
+        },
+        resolvedDeps,
+      );
       if (fallback) {
         return {
           channel: fallback,
@@ -169,7 +202,7 @@ export async function resolveMessageChannelSelection(params: {
           source: "tool-context-fallback",
         };
       }
-      if (!isKnownChannel(normalized)) {
+      if (!isKnownChannel(normalized, resolvedDeps)) {
         throw new Error(`Unknown channel: ${String(normalized)}`);
       }
       throw new Error(`Channel is unavailable: ${String(normalized)}`);
@@ -181,10 +214,13 @@ export async function resolveMessageChannelSelection(params: {
     };
   }
 
-  const fallback = resolveAvailableKnownChannel({
-    cfg: params.cfg,
-    value: params.fallbackChannel,
-  });
+  const fallback = resolveAvailableKnownChannel(
+    {
+      cfg: params.cfg,
+      value: params.fallbackChannel,
+    },
+    resolvedDeps,
+  );
   if (fallback) {
     return {
       channel: fallback,
@@ -193,7 +229,7 @@ export async function resolveMessageChannelSelection(params: {
     };
   }
 
-  const configured = await listConfiguredMessageChannels(params.cfg);
+  const configured = await listConfiguredMessageChannels(params.cfg, resolvedDeps);
   if (configured.length === 1) {
     return { channel: configured[0], configured, source: "single-configured" };
   }

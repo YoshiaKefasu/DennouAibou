@@ -1,31 +1,35 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultRuntime } from "../../runtime.js";
+import {
+  __testing,
+  listConfiguredMessageChannels,
+  resolveMessageChannelSelection,
+} from "./channel-selection.js";
 
-const mocks = vi.hoisted(() => ({
-  listChannelPlugins: vi.fn(),
-  resolveOutboundChannelPlugin: vi.fn(),
-}));
+const listChannelPluginsMock = vi.fn();
+const resolveOutboundChannelPluginMock = vi.fn();
 
-vi.mock("../../channels/plugins/index.js", () => ({
-  listChannelPlugins: mocks.listChannelPlugins,
-}));
+/**
+ * Explicit seams replacing the module-level vi.mock interception. The
+ * deliverable channel catalog is injected so the assertions do not depend on
+ * the bundled plugin catalog discovered from disk.
+ */
+const DELEGATE_DELIVERABLE_CHANNELS = [
+  "line",
+  "discord",
+  "telegram",
+  "slack",
+  "signal",
+  "whatsapp",
+  "imessage",
+  "msteams",
+] as const;
 
-vi.mock("./channel-resolution.js", () => ({
-  resolveOutboundChannelPlugin: mocks.resolveOutboundChannelPlugin,
-}));
-
-type ChannelSelectionModule = typeof import("./channel-selection.js");
-type RuntimeModule = typeof import("../../runtime.js");
-
-let __testing: ChannelSelectionModule["__testing"];
-let listConfiguredMessageChannels: ChannelSelectionModule["listConfiguredMessageChannels"];
-let resolveMessageChannelSelection: ChannelSelectionModule["resolveMessageChannelSelection"];
-let runtimeModule: RuntimeModule;
-
-beforeAll(async () => {
-  runtimeModule = await import("../../runtime.js");
-  ({ __testing, listConfiguredMessageChannels, resolveMessageChannelSelection } =
-    await import("./channel-selection.js"));
-});
+const deps = {
+  listChannelPlugins: listChannelPluginsMock,
+  resolveOutboundChannelPlugin: resolveOutboundChannelPluginMock,
+  listDeliverableMessageChannels: () => [...DELEGATE_DELIVERABLE_CHANNELS],
+};
 
 function makePlugin(params: {
   id: string;
@@ -49,18 +53,18 @@ function makePlugin(params: {
 async function expectResolvedSelection(
   params: Parameters<typeof resolveMessageChannelSelection>[0],
 ): Promise<Awaited<ReturnType<typeof resolveMessageChannelSelection>>> {
-  return await resolveMessageChannelSelection(params);
+  return await resolveMessageChannelSelection(params, deps);
 }
 
 describe("listConfiguredMessageChannels", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    errorSpy = vi.spyOn(runtimeModule.defaultRuntime, "error").mockImplementation(() => undefined);
-    mocks.listChannelPlugins.mockReset();
-    mocks.listChannelPlugins.mockReturnValue([]);
-    mocks.resolveOutboundChannelPlugin.mockReset();
-    mocks.resolveOutboundChannelPlugin.mockImplementation(({ channel }: { channel: string }) => ({
+    errorSpy = vi.spyOn(defaultRuntime, "error").mockImplementation(() => undefined);
+    listChannelPluginsMock.mockReset();
+    listChannelPluginsMock.mockReturnValue([]);
+    resolveOutboundChannelPluginMock.mockReset();
+    resolveOutboundChannelPluginMock.mockImplementation(({ channel }: { channel: string }) => ({
       id: channel,
     }));
     __testing.resetLoggedChannelSelectionErrors();
@@ -121,16 +125,16 @@ describe("listConfiguredMessageChannels", () => {
       expectedErrors: 1,
     },
   ])("lists configured channels for %j", async ({ plugins, expected, expectedErrors }) => {
-    mocks.listChannelPlugins.mockReturnValue(plugins);
-    await expect(listConfiguredMessageChannels({} as never)).resolves.toEqual(expected);
+    listChannelPluginsMock.mockReturnValue(plugins);
+    await expect(listConfiguredMessageChannels({} as never, deps)).resolves.toEqual(expected);
     expect(errorSpy).toHaveBeenCalledTimes(expectedErrors);
   });
 });
 
 describe("resolveMessageChannelSelection", () => {
   beforeEach(() => {
-    mocks.listChannelPlugins.mockReset();
-    mocks.listChannelPlugins.mockReturnValue([]);
+    listChannelPluginsMock.mockReset();
+    listChannelPluginsMock.mockReturnValue([]);
   });
 
   it.each([
@@ -145,7 +149,7 @@ describe("resolveMessageChannelSelection", () => {
     {
       setup: () => {
         const isConfigured = vi.fn(async () => true);
-        mocks.listChannelPlugins.mockReturnValue([makePlugin({ id: "slack", isConfigured })]);
+        listChannelPluginsMock.mockReturnValue([makePlugin({ id: "slack", isConfigured })]);
         return { isConfigured };
       },
       params: { cfg: {} as never, channel: "slack" },
@@ -176,7 +180,7 @@ describe("resolveMessageChannelSelection", () => {
     },
     {
       setup: () => {
-        mocks.listChannelPlugins.mockReturnValue([
+        listChannelPluginsMock.mockReturnValue([
           makePlugin({ id: "discord", isConfigured: async () => true }),
         ]);
       },
@@ -189,7 +193,7 @@ describe("resolveMessageChannelSelection", () => {
     },
     {
       setup: () => {
-        mocks.resolveOutboundChannelPlugin.mockImplementation(({ channel }: { channel: string }) =>
+        resolveOutboundChannelPluginMock.mockImplementation(({ channel }: { channel: string }) =>
           channel === "slack" ? { id: "slack" } : undefined,
         );
       },
@@ -213,7 +217,7 @@ describe("resolveMessageChannelSelection", () => {
     },
     {
       setup: () => {
-        mocks.resolveOutboundChannelPlugin.mockReturnValue(undefined);
+        resolveOutboundChannelPluginMock.mockReturnValue(undefined);
       },
       params: { cfg: {} as never, channel: "discord" },
       expectedMessage: "Channel is unavailable: discord",
@@ -224,7 +228,7 @@ describe("resolveMessageChannelSelection", () => {
     },
     {
       setup: () => {
-        mocks.listChannelPlugins.mockReturnValue([
+        listChannelPluginsMock.mockReturnValue([
           makePlugin({ id: "discord", isConfigured: async () => true }),
           makePlugin({ id: "telegram", isConfigured: async () => true }),
         ]);

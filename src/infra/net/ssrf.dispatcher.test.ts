@@ -1,43 +1,39 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { TEST_UNDICI_RUNTIME_DEPS_KEY } from "./undici-runtime.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinnedDispatcher, type PinnedHostname } from "./ssrf.js";
+import type { UndiciRuntimeDeps } from "./undici-runtime.js";
 
-const { agentCtor, envHttpProxyAgentCtor, proxyAgentCtor } = vi.hoisted(() => ({
-  agentCtor: vi.fn(function MockAgent(this: { options: unknown }, options: unknown) {
-    this.options = options;
-  }),
-  envHttpProxyAgentCtor: vi.fn(function MockEnvHttpProxyAgent(
-    this: { options: unknown },
-    options: unknown,
-  ) {
-    this.options = options;
-  }),
-  proxyAgentCtor: vi.fn(function MockProxyAgent(this: { options: unknown }, options: unknown) {
-    this.options = options;
-  }),
-}));
+/**
+ * Records constructor invocations without relying on `vi.fn()` being usable
+ * as a constructor, which differs between test runtimes.
+ */
+function createRecordingCtor() {
+  const calls: unknown[][] = [];
+  class RecordingCtor {
+    constructor(...args: unknown[]) {
+      calls.push(args);
+    }
+  }
+  return {
+    ctor: RecordingCtor as unknown as new (...args: never[]) => unknown,
+    calls,
+  };
+}
 
-import type { PinnedHostname } from "./ssrf.js";
+const agent = createRecordingCtor();
+const envHttpProxyAgent = createRecordingCtor();
+const proxyAgent = createRecordingCtor();
 
-let createPinnedDispatcher: typeof import("./ssrf.js").createPinnedDispatcher;
-
-beforeAll(async () => {
-  ({ createPinnedDispatcher } = await import("./ssrf.js"));
-});
+const undiciDeps: UndiciRuntimeDeps = {
+  Agent: agent.ctor as unknown as UndiciRuntimeDeps["Agent"],
+  EnvHttpProxyAgent: envHttpProxyAgent.ctor as unknown as UndiciRuntimeDeps["EnvHttpProxyAgent"],
+  ProxyAgent: proxyAgent.ctor as unknown as UndiciRuntimeDeps["ProxyAgent"],
+  fetch: (() => Promise.reject(new Error("unused in this test"))) as UndiciRuntimeDeps["fetch"],
+};
 
 beforeEach(() => {
-  agentCtor.mockClear();
-  envHttpProxyAgentCtor.mockClear();
-  proxyAgentCtor.mockClear();
-  (globalThis as Record<string, unknown>)[TEST_UNDICI_RUNTIME_DEPS_KEY] = {
-    Agent: agentCtor,
-    EnvHttpProxyAgent: envHttpProxyAgentCtor,
-    ProxyAgent: proxyAgentCtor,
-    fetch: vi.fn(),
-  };
-});
-
-afterEach(() => {
-  Reflect.deleteProperty(globalThis as object, TEST_UNDICI_RUNTIME_DEPS_KEY);
+  agent.calls.length = 0;
+  envHttpProxyAgent.calls.length = 0;
+  proxyAgent.calls.length = 0;
 });
 
 function createPinnedTelegramHost(lookup: PinnedHostname["lookup"]): PinnedHostname {
@@ -49,16 +45,21 @@ function createPinnedTelegramHost(lookup: PinnedHostname["lookup"]): PinnedHostn
 }
 
 function createDispatcherWithPinnedOverride(lookup: PinnedHostname["lookup"]) {
-  createPinnedDispatcher(createPinnedTelegramHost(lookup), {
-    mode: "direct",
-    pinnedHostname: {
-      hostname: "api.telegram.org",
-      addresses: ["149.154.167.220"],
+  createPinnedDispatcher(
+    createPinnedTelegramHost(lookup),
+    {
+      mode: "direct",
+      pinnedHostname: {
+        hostname: "api.telegram.org",
+        addresses: ["149.154.167.220"],
+      },
     },
-  });
+    undefined,
+    undiciDeps,
+  );
 
-  return (agentCtor.mock.calls.at(-1)?.[0] as { connect?: { lookup?: PinnedHostname["lookup"] } })
-    ?.connect?.lookup;
+  return (agent.calls.at(-1)?.[0] as { connect?: { lookup?: PinnedHostname["lookup"] } })?.connect
+    ?.lookup;
 }
 
 describe("createPinnedDispatcher", () => {
@@ -70,17 +71,17 @@ describe("createPinnedDispatcher", () => {
       lookup,
     };
 
-    const dispatcher = createPinnedDispatcher(pinned);
+    const dispatcher = createPinnedDispatcher(pinned, undefined, undefined, undiciDeps);
 
     expect(dispatcher).toBeDefined();
-    expect(agentCtor).toHaveBeenCalledWith({
-      connect: {
-        lookup,
+    expect(agent.calls).toContainEqual([
+      {
+        connect: {
+          lookup,
+        },
       },
-    });
-    const firstCallArg = agentCtor.mock.calls[0]?.[0] as
-      | { connect?: Record<string, unknown> }
-      | undefined;
+    ]);
+    const firstCallArg = agent.calls[0]?.[0] as { connect?: Record<string, unknown> } | undefined;
     expect(firstCallArg?.connect?.autoSelectFamily).toBeUndefined();
   });
 
@@ -93,22 +94,29 @@ describe("createPinnedDispatcher", () => {
       lookup,
     };
 
-    createPinnedDispatcher(pinned, {
-      mode: "direct",
-      connect: {
-        autoSelectFamily: true,
-        autoSelectFamilyAttemptTimeout: 300,
-        lookup: previousLookup,
+    createPinnedDispatcher(
+      pinned,
+      {
+        mode: "direct",
+        connect: {
+          autoSelectFamily: true,
+          autoSelectFamilyAttemptTimeout: 300,
+          lookup: previousLookup,
+        },
       },
-    });
+      undefined,
+      undiciDeps,
+    );
 
-    expect(agentCtor).toHaveBeenCalledWith({
-      connect: {
-        autoSelectFamily: true,
-        autoSelectFamilyAttemptTimeout: 300,
-        lookup,
+    expect(agent.calls).toContainEqual([
+      {
+        connect: {
+          autoSelectFamily: true,
+          autoSelectFamilyAttemptTimeout: 300,
+          lookup,
+        },
       },
-    });
+    ]);
   });
 
   it("replaces the pinned lookup when a dispatcher override hostname is provided", () => {
@@ -156,6 +164,7 @@ describe("createPinnedDispatcher", () => {
           },
         },
         undefined,
+        undiciDeps,
       ),
     ).toThrow(/private|internal|blocked/i);
   });
@@ -168,25 +177,32 @@ describe("createPinnedDispatcher", () => {
       lookup,
     };
 
-    createPinnedDispatcher(pinned, {
-      mode: "env-proxy",
-      connect: {
-        autoSelectFamily: true,
+    createPinnedDispatcher(
+      pinned,
+      {
+        mode: "env-proxy",
+        connect: {
+          autoSelectFamily: true,
+        },
+        proxyTls: {
+          autoSelectFamily: true,
+        },
       },
-      proxyTls: {
-        autoSelectFamily: true,
-      },
-    });
+      undefined,
+      undiciDeps,
+    );
 
-    expect(envHttpProxyAgentCtor).toHaveBeenCalledWith({
-      connect: {
-        autoSelectFamily: true,
-        lookup,
+    expect(envHttpProxyAgent.calls).toContainEqual([
+      {
+        connect: {
+          autoSelectFamily: true,
+          lookup,
+        },
+        proxyTls: {
+          autoSelectFamily: true,
+        },
       },
-      proxyTls: {
-        autoSelectFamily: true,
-      },
-    });
+    ]);
   });
 
   it("keeps explicit proxy routing intact", () => {
@@ -197,20 +213,27 @@ describe("createPinnedDispatcher", () => {
       lookup,
     };
 
-    createPinnedDispatcher(pinned, {
-      mode: "explicit-proxy",
-      proxyUrl: "http://127.0.0.1:7890",
-      proxyTls: {
-        autoSelectFamily: false,
+    createPinnedDispatcher(
+      pinned,
+      {
+        mode: "explicit-proxy",
+        proxyUrl: "http://127.0.0.1:7890",
+        proxyTls: {
+          autoSelectFamily: false,
+        },
       },
-    });
+      undefined,
+      undiciDeps,
+    );
 
-    expect(proxyAgentCtor).toHaveBeenCalledWith({
-      uri: "http://127.0.0.1:7890",
-      requestTls: {
-        autoSelectFamily: false,
-        lookup,
+    expect(proxyAgent.calls).toContainEqual([
+      {
+        uri: "http://127.0.0.1:7890",
+        requestTls: {
+          autoSelectFamily: false,
+          lookup,
+        },
       },
-    });
+    ]);
   });
 });

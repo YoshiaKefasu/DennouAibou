@@ -37,6 +37,32 @@ export function setConsoleConfigLoaderForTests(loader?: ConsoleConfigLoader): vo
   loadConfigFallback = loader ?? loadConfigFallbackDefault;
 }
 
+type ConsoleConfigRead = {
+  readLoggingConfig: typeof readLoggingConfig;
+  shouldSkipMutatingLoggingConfigRead: typeof shouldSkipMutatingLoggingConfigRead;
+};
+
+const defaultConsoleConfigRead: ConsoleConfigRead = {
+  readLoggingConfig,
+  shouldSkipMutatingLoggingConfigRead,
+};
+
+let consoleConfigRead: ConsoleConfigRead = defaultConsoleConfigRead;
+
+/** Test seam; pass no argument (or undefined) to restore the real defaults. */
+export function setConsoleConfigReadForTests(deps?: Partial<ConsoleConfigRead>): void {
+  consoleConfigRead = deps ? { ...defaultConsoleConfigRead, ...deps } : defaultConsoleConfigRead;
+}
+
+let consoleLoggerFactory: () => ReturnType<typeof getLogger> = () => getLogger();
+
+/** Test seam; pass no argument (or undefined) to restore the real logger factory. */
+export function setConsoleLoggerFactoryForTests(
+  factory?: () => ReturnType<typeof getLogger>,
+): void {
+  consoleLoggerFactory = factory ?? (() => getLogger());
+}
+
 function normalizeConsoleLevel(level?: string): LogLevel {
   if (isVerbose()) {
     return "debug";
@@ -72,8 +98,9 @@ function resolveConsoleSettings(): ConsoleSettings {
   }
 
   let cfg: OpenClawConfig["logging"] | undefined =
-    (loggingState.overrideSettings as LoggerSettings | null) ?? readLoggingConfig();
-  if (!cfg && !shouldSkipMutatingLoggingConfigRead()) {
+    (loggingState.overrideSettings as LoggerSettings | null) ??
+    consoleConfigRead.readLoggingConfig();
+  if (!cfg && !consoleConfigRead.shouldSkipMutatingLoggingConfigRead()) {
     if (loggingState.resolvingConsoleSettings) {
       cfg = undefined;
     } else {
@@ -217,7 +244,7 @@ export function enableConsoleCapture(): void {
   let logger: ReturnType<typeof getLogger> | null = null;
   const getLoggerLazy = () => {
     if (!logger) {
-      logger = getLogger();
+      logger = consoleLoggerFactory();
     }
     return logger;
   };

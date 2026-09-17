@@ -25,28 +25,55 @@ export type AgentDeliveryPlan = {
   deliveryTargetMode?: ChannelOutboundTargetMode;
 };
 
-export function resolveAgentDeliveryPlan(params: {
-  sessionEntry?: SessionEntry;
-  requestedChannel?: string;
-  explicitTo?: string;
-  explicitThreadId?: string | number;
-  accountId?: string;
-  wantsDelivery: boolean;
-  /**
-   * The channel that originated the current agent turn.  When provided,
-   * overrides session-level `lastChannel` to prevent cross-channel reply
-   * routing in shared sessions (dmScope="main").
-   *
-   * @see https://github.com/openclaw/openclaw/issues/24152
-   */
-  turnSourceChannel?: string;
-  /** Turn-source `to` — paired with `turnSourceChannel`. */
-  turnSourceTo?: string;
-  /** Turn-source `accountId` — paired with `turnSourceChannel`. */
-  turnSourceAccountId?: string;
-  /** Turn-source `threadId` — paired with `turnSourceChannel`. */
-  turnSourceThreadId?: string | number;
-}): AgentDeliveryPlan {
+/**
+ * Injectable seams for target resolution and the channel catalog predicates.
+ * Defaults resolve to the real implementations so production callers stay
+ * unchanged.
+ */
+export type AgentDeliveryDeps = {
+  resolveOutboundTarget: typeof resolveOutboundTarget;
+  resolveSessionDeliveryTarget: typeof resolveSessionDeliveryTarget;
+  isDeliverableMessageChannel: typeof isDeliverableMessageChannel;
+  isGatewayMessageChannel: typeof isGatewayMessageChannel;
+};
+
+const defaultAgentDeliveryDeps: AgentDeliveryDeps = {
+  resolveOutboundTarget,
+  resolveSessionDeliveryTarget,
+  isDeliverableMessageChannel,
+  isGatewayMessageChannel,
+};
+
+function resolveDeps(deps?: Partial<AgentDeliveryDeps>): AgentDeliveryDeps {
+  return deps ? { ...defaultAgentDeliveryDeps, ...deps } : defaultAgentDeliveryDeps;
+}
+
+export function resolveAgentDeliveryPlan(
+  params: {
+    sessionEntry?: SessionEntry;
+    requestedChannel?: string;
+    explicitTo?: string;
+    explicitThreadId?: string | number;
+    accountId?: string;
+    wantsDelivery: boolean;
+    /**
+     * The channel that originated the current agent turn.  When provided,
+     * overrides session-level `lastChannel` to prevent cross-channel reply
+     * routing in shared sessions (dmScope="main").
+     *
+     * @see https://github.com/openclaw/openclaw/issues/24152
+     */
+    turnSourceChannel?: string;
+    /** Turn-source `to` — paired with `turnSourceChannel`. */
+    turnSourceTo?: string;
+    /** Turn-source `accountId` — paired with `turnSourceChannel`. */
+    turnSourceAccountId?: string;
+    /** Turn-source `threadId` — paired with `turnSourceChannel`. */
+    turnSourceThreadId?: string | number;
+  },
+  deps?: Partial<AgentDeliveryDeps>,
+): AgentDeliveryPlan {
+  const resolvedDeps = resolveDeps(deps);
   const requestedRaw =
     typeof params.requestedChannel === "string" ? params.requestedChannel.trim() : "";
   const normalizedRequested = requestedRaw ? normalizeMessageChannel(requestedRaw) : undefined;
@@ -62,7 +89,7 @@ export function resolveAgentDeliveryPlan(params: {
     ? normalizeMessageChannel(params.turnSourceChannel)
     : undefined;
   const turnSourceChannel =
-    normalizedTurnSource && isDeliverableMessageChannel(normalizedTurnSource)
+    normalizedTurnSource && resolvedDeps.isDeliverableMessageChannel(normalizedTurnSource)
       ? normalizedTurnSource
       : undefined;
   const turnSourceTo =
@@ -75,7 +102,7 @@ export function resolveAgentDeliveryPlan(params: {
       ? params.turnSourceThreadId
       : undefined;
 
-  const baseDelivery = resolveSessionDeliveryTarget({
+  const baseDelivery = resolvedDeps.resolveSessionDeliveryTarget({
     entry: params.sessionEntry,
     requestedChannel: requestedChannel === INTERNAL_MESSAGE_CHANNEL ? "last" : requestedChannel,
     explicitTo,
@@ -97,7 +124,7 @@ export function resolveAgentDeliveryPlan(params: {
       return INTERNAL_MESSAGE_CHANNEL;
     }
 
-    if (isGatewayMessageChannel(requestedChannel)) {
+    if (resolvedDeps.isGatewayMessageChannel(requestedChannel)) {
       return requestedChannel;
     }
 
@@ -109,7 +136,7 @@ export function resolveAgentDeliveryPlan(params: {
 
   const deliveryTargetMode = explicitTo
     ? "explicit"
-    : isDeliverableMessageChannel(resolvedChannel)
+    : resolvedDeps.isDeliverableMessageChannel(resolvedChannel)
       ? "implicit"
       : undefined;
 
@@ -120,7 +147,7 @@ export function resolveAgentDeliveryPlan(params: {
   let resolvedTo = explicitTo;
   if (
     !resolvedTo &&
-    isDeliverableMessageChannel(resolvedChannel) &&
+    resolvedDeps.isDeliverableMessageChannel(resolvedChannel) &&
     resolvedChannel === baseDelivery.lastChannel
   ) {
     resolvedTo = baseDelivery.lastTo;
@@ -136,21 +163,25 @@ export function resolveAgentDeliveryPlan(params: {
   };
 }
 
-export function resolveAgentOutboundTarget(params: {
-  cfg: OpenClawConfig;
-  plan: AgentDeliveryPlan;
-  targetMode?: ChannelOutboundTargetMode;
-  validateExplicitTarget?: boolean;
-}): {
+export function resolveAgentOutboundTarget(
+  params: {
+    cfg: OpenClawConfig;
+    plan: AgentDeliveryPlan;
+    targetMode?: ChannelOutboundTargetMode;
+    validateExplicitTarget?: boolean;
+  },
+  deps?: Partial<AgentDeliveryDeps>,
+): {
   resolvedTarget: OutboundTargetResolution | null;
   resolvedTo?: string;
   targetMode: ChannelOutboundTargetMode;
 } {
+  const resolvedDeps = resolveDeps(deps);
   const targetMode =
     params.targetMode ??
     params.plan.deliveryTargetMode ??
     (params.plan.resolvedTo ? "explicit" : "implicit");
-  if (!isDeliverableMessageChannel(params.plan.resolvedChannel)) {
+  if (!resolvedDeps.isDeliverableMessageChannel(params.plan.resolvedChannel)) {
     return {
       resolvedTarget: null,
       resolvedTo: params.plan.resolvedTo,
@@ -164,7 +195,7 @@ export function resolveAgentOutboundTarget(params: {
       targetMode,
     };
   }
-  const resolvedTarget = resolveOutboundTarget({
+  const resolvedTarget = resolvedDeps.resolveOutboundTarget({
     channel: params.plan.resolvedChannel,
     to: params.plan.resolvedTo,
     cfg: params.cfg,

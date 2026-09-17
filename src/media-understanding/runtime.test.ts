@@ -2,59 +2,65 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { MediaAttachment, MediaUnderstandingOutput } from "../media-understanding/types.js";
 import { describeImageFile, runMediaUnderstandingFile } from "./runtime.js";
+import type { MediaUnderstandingRuntimeDeps } from "./runtime.js";
 
-const mocks = vi.hoisted(() => {
-  const cleanup = vi.fn(async () => {});
-  return {
-    buildProviderRegistry: vi.fn(() => new Map()),
-    createMediaAttachmentCache: vi.fn(() => ({ cleanup })),
-    normalizeMediaAttachments: vi.fn<() => MediaAttachment[]>(() => []),
-    normalizeMediaProviderId: vi.fn((provider: string) => provider.trim().toLowerCase()),
-    runCapability: vi.fn(),
-    cleanup,
-  };
-});
+const cleanup = vi.fn(async () => {});
 
-vi.mock("../plugin-sdk/media-runtime.js", () => ({
-  buildProviderRegistry: mocks.buildProviderRegistry,
-  createMediaAttachmentCache: mocks.createMediaAttachmentCache,
-  normalizeMediaAttachments: mocks.normalizeMediaAttachments,
-  normalizeMediaProviderId: mocks.normalizeMediaProviderId,
-  runCapability: mocks.runCapability,
-}));
+const buildProviderRegistry = vi.fn(() => new Map());
+const createMediaAttachmentCache = vi.fn(() => ({ cleanup }));
+const normalizeMediaAttachments = vi.fn<() => MediaAttachment[]>(() => []);
+const normalizeMediaProviderId = vi.fn((provider: string) => provider.trim().toLowerCase());
+const runCapability = vi.fn(async () => ({ outputs: [] as MediaUnderstandingOutput[] }));
+
+/** Explicit seams replacing the module-level vi.mock interception. */
+const runtimeDeps: MediaUnderstandingRuntimeDeps = {
+  buildProviderRegistry:
+    buildProviderRegistry as unknown as MediaUnderstandingRuntimeDeps["buildProviderRegistry"],
+  createMediaAttachmentCache:
+    createMediaAttachmentCache as unknown as MediaUnderstandingRuntimeDeps["createMediaAttachmentCache"],
+  normalizeMediaAttachments:
+    normalizeMediaAttachments as unknown as MediaUnderstandingRuntimeDeps["normalizeMediaAttachments"],
+  normalizeMediaProviderId:
+    normalizeMediaProviderId as unknown as MediaUnderstandingRuntimeDeps["normalizeMediaProviderId"],
+  runCapability: runCapability as unknown as MediaUnderstandingRuntimeDeps["runCapability"],
+};
 
 describe("media-understanding runtime", () => {
+  // `mockClear` (not `mockReset`) keeps each mock's default implementation, so
+  // the behavior does not depend on how a runner treats mockReset.
   afterEach(() => {
-    mocks.buildProviderRegistry.mockReset();
-    mocks.createMediaAttachmentCache.mockReset();
-    mocks.normalizeMediaAttachments.mockReset();
-    mocks.normalizeMediaProviderId.mockReset();
-    mocks.runCapability.mockReset();
-    mocks.cleanup.mockReset();
-    mocks.cleanup.mockResolvedValue(undefined);
+    buildProviderRegistry.mockClear();
+    createMediaAttachmentCache.mockClear();
+    normalizeMediaAttachments.mockClear();
+    normalizeMediaProviderId.mockClear();
+    runCapability.mockClear();
+    cleanup.mockClear();
   });
 
   it("returns disabled state without loading providers", async () => {
-    mocks.normalizeMediaAttachments.mockReturnValue([
+    normalizeMediaAttachments.mockReturnValue([
       { index: 0, path: "/tmp/sample.jpg", mime: "image/jpeg" },
     ]);
 
     await expect(
-      runMediaUnderstandingFile({
-        capability: "image",
-        filePath: "/tmp/sample.jpg",
-        mime: "image/jpeg",
-        cfg: {
-          tools: {
-            media: {
-              image: {
-                enabled: false,
+      runMediaUnderstandingFile(
+        {
+          capability: "image",
+          filePath: "/tmp/sample.jpg",
+          mime: "image/jpeg",
+          cfg: {
+            tools: {
+              media: {
+                image: {
+                  enabled: false,
+                },
               },
             },
-          },
-        } as OpenClawConfig,
-        agentDir: "/tmp/agent",
-      }),
+          } as OpenClawConfig,
+          agentDir: "/tmp/agent",
+        },
+        runtimeDeps,
+      ),
     ).resolves.toEqual({
       text: undefined,
       provider: undefined,
@@ -62,8 +68,8 @@ describe("media-understanding runtime", () => {
       output: undefined,
     });
 
-    expect(mocks.buildProviderRegistry).not.toHaveBeenCalled();
-    expect(mocks.runCapability).not.toHaveBeenCalled();
+    expect(buildProviderRegistry).not.toHaveBeenCalled();
+    expect(runCapability).not.toHaveBeenCalled();
   });
 
   it("returns the matching capability output", async () => {
@@ -74,20 +80,23 @@ describe("media-understanding runtime", () => {
       model: "vision-v1",
       text: "image ok",
     };
-    mocks.normalizeMediaAttachments.mockReturnValue([
+    normalizeMediaAttachments.mockReturnValue([
       { index: 0, path: "/tmp/sample.jpg", mime: "image/jpeg" },
     ]);
-    mocks.runCapability.mockResolvedValue({
+    runCapability.mockResolvedValue({
       outputs: [output],
     });
 
     await expect(
-      describeImageFile({
-        filePath: "/tmp/sample.jpg",
-        mime: "image/jpeg",
-        cfg: {} as OpenClawConfig,
-        agentDir: "/tmp/agent",
-      }),
+      describeImageFile(
+        {
+          filePath: "/tmp/sample.jpg",
+          mime: "image/jpeg",
+          cfg: {} as OpenClawConfig,
+          agentDir: "/tmp/agent",
+        },
+        runtimeDeps,
+      ),
     ).resolves.toEqual({
       text: "image ok",
       provider: "vision-plugin",
@@ -95,7 +104,7 @@ describe("media-understanding runtime", () => {
       output,
     });
 
-    expect(mocks.runCapability).toHaveBeenCalledTimes(1);
-    expect(mocks.cleanup).toHaveBeenCalledTimes(1);
+    expect(runCapability).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

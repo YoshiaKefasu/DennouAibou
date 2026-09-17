@@ -96,9 +96,11 @@ export async function fetchWithTimeoutGuarded(
     pinDns?: boolean;
     dispatcherPolicy?: PinnedDispatcherPolicy;
     auditContext?: string;
+    /** Injectable seam; defaults to the real SSRF guard. */
+    fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
   },
 ): Promise<GuardedFetchResult> {
-  return await fetchWithSsrFGuard({
+  return await (options?.fetchWithSsrFGuard ?? fetchWithSsrFGuard)({
     url,
     fetchImpl: fetchFn,
     init,
@@ -121,6 +123,8 @@ export async function postTranscriptionRequest(params: {
   allowPrivateNetwork?: boolean;
   dispatcherPolicy?: PinnedDispatcherPolicy;
   auditContext?: string;
+  /** Injectable seam; defaults to the real SSRF guard. */
+  fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
 }) {
   return fetchWithTimeoutGuarded(
     params.url,
@@ -134,12 +138,14 @@ export async function postTranscriptionRequest(params: {
     params.allowPrivateNetwork ||
       params.dispatcherPolicy ||
       params.pinDns !== undefined ||
-      params.auditContext
+      params.auditContext ||
+      params.fetchWithSsrFGuard
       ? {
           ...(params.allowPrivateNetwork ? { ssrfPolicy: { allowPrivateNetwork: true } } : {}),
           ...(params.pinDns !== undefined ? { pinDns: params.pinDns } : {}),
           ...(params.dispatcherPolicy ? { dispatcherPolicy: params.dispatcherPolicy } : {}),
           ...(params.auditContext ? { auditContext: params.auditContext } : {}),
+          ...(params.fetchWithSsrFGuard ? { fetchWithSsrFGuard: params.fetchWithSsrFGuard } : {}),
         }
       : undefined,
   );
@@ -155,6 +161,8 @@ export async function postJsonRequest(params: {
   allowPrivateNetwork?: boolean;
   dispatcherPolicy?: PinnedDispatcherPolicy;
   auditContext?: string;
+  /** Injectable seam; defaults to the real SSRF guard. */
+  fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
 }) {
   return fetchWithTimeoutGuarded(
     params.url,
@@ -168,12 +176,14 @@ export async function postJsonRequest(params: {
     params.allowPrivateNetwork ||
       params.dispatcherPolicy ||
       params.pinDns !== undefined ||
-      params.auditContext
+      params.auditContext ||
+      params.fetchWithSsrFGuard
       ? {
           ...(params.allowPrivateNetwork ? { ssrfPolicy: { allowPrivateNetwork: true } } : {}),
           ...(params.pinDns !== undefined ? { pinDns: params.pinDns } : {}),
           ...(params.dispatcherPolicy ? { dispatcherPolicy: params.dispatcherPolicy } : {}),
           ...(params.auditContext ? { auditContext: params.auditContext } : {}),
+          ...(params.fetchWithSsrFGuard ? { fetchWithSsrFGuard: params.fetchWithSsrFGuard } : {}),
         }
       : undefined,
   );

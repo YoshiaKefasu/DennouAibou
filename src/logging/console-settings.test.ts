@@ -1,40 +1,38 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as logging from "../logging.js";
+import * as state from "./state.js";
 import { captureConsoleSnapshot, type ConsoleSnapshot } from "./test-helpers/console-snapshot.js";
 
-const shouldSkipMutatingLoggingConfigReadMock = vi.hoisted(() => vi.fn(() => false));
-
-vi.mock("./config.js", () => ({
-  readLoggingConfig: () => undefined,
-  shouldSkipMutatingLoggingConfigRead: () => shouldSkipMutatingLoggingConfigReadMock(),
-}));
-
-vi.mock("./logger.js", () => ({
-  getLogger: () => ({
-    trace: () => {},
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    fatal: () => {},
-  }),
-}));
+const shouldSkipMutatingLoggingConfigReadMock = vi.fn(() => false);
+const readLoggingConfigMock = vi.fn(() => undefined);
+const noopLogger = {
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  fatal: () => {},
+};
+const noopLoggerMock = vi.fn(() => noopLogger);
 
 let loadConfigCalls = 0;
 let originalIsTty: boolean | undefined;
 let originalOpenClawTestConsole: string | undefined;
 let snapshot: ConsoleSnapshot;
-let logging: typeof import("../logging.js");
-let state: typeof import("./state.js");
-
-beforeAll(async () => {
-  logging = await import("../logging.js");
-  state = await import("./state.js");
-});
 
 beforeEach(() => {
   loadConfigCalls = 0;
   shouldSkipMutatingLoggingConfigReadMock.mockReset();
   shouldSkipMutatingLoggingConfigReadMock.mockReturnValue(false);
+  readLoggingConfigMock.mockClear();
+  noopLoggerMock.mockClear();
+  logging.setConsoleConfigReadForTests({
+    readLoggingConfig: readLoggingConfigMock,
+    shouldSkipMutatingLoggingConfigRead: shouldSkipMutatingLoggingConfigReadMock,
+  });
+  logging.setConsoleLoggerFactoryForTests(
+    noopLoggerMock as unknown as () => ReturnType<typeof logging.getLogger>,
+  );
   snapshot = captureConsoleSnapshot();
   originalIsTty = process.stdout.isTTY;
   originalOpenClawTestConsole = process.env.DENNOU_TEST_CONSOLE;
@@ -56,6 +54,8 @@ afterEach(() => {
   }
   Object.defineProperty(process.stdout, "isTTY", { value: originalIsTty, configurable: true });
   logging.setConsoleConfigLoaderForTests();
+  logging.setConsoleConfigReadForTests();
+  logging.setConsoleLoggerFactoryForTests();
   vi.restoreAllMocks();
 });
 

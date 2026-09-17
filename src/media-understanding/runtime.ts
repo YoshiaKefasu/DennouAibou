@@ -13,6 +13,26 @@ import {
 type MediaUnderstandingCapability = "image" | "audio" | "video";
 type MediaUnderstandingOutput = Awaited<ReturnType<typeof runCapability>>["outputs"][number];
 
+/**
+ * Injectable seams for the media runtime helpers. Defaults resolve to the real
+ * plugin-sdk implementations so production callers stay unchanged.
+ */
+export type MediaUnderstandingRuntimeDeps = {
+  buildProviderRegistry: typeof buildProviderRegistry;
+  createMediaAttachmentCache: typeof createMediaAttachmentCache;
+  normalizeMediaAttachments: typeof normalizeMediaAttachments;
+  normalizeMediaProviderId: typeof normalizeMediaProviderId;
+  runCapability: typeof runCapability;
+};
+
+const defaultMediaUnderstandingRuntimeDeps: MediaUnderstandingRuntimeDeps = {
+  buildProviderRegistry,
+  createMediaAttachmentCache,
+  normalizeMediaAttachments,
+  normalizeMediaProviderId,
+  runCapability,
+};
+
 const KIND_BY_CAPABILITY: Record<MediaUnderstandingCapability, MediaUnderstandingOutput["kind"]> = {
   audio: "audio.transcription",
   image: "image.description",
@@ -44,9 +64,10 @@ function buildFileContext(params: { filePath: string; mime?: string }) {
 
 export async function runMediaUnderstandingFile(
   params: RunMediaUnderstandingFileParams,
+  deps: MediaUnderstandingRuntimeDeps = defaultMediaUnderstandingRuntimeDeps,
 ): Promise<RunMediaUnderstandingFileResult> {
   const ctx = buildFileContext(params);
-  const attachments = normalizeMediaAttachments(ctx);
+  const attachments = deps.normalizeMediaAttachments(ctx);
   if (attachments.length === 0) {
     return { text: undefined };
   }
@@ -60,13 +81,13 @@ export async function runMediaUnderstandingFile(
     };
   }
 
-  const providerRegistry = buildProviderRegistry(undefined, params.cfg);
-  const cache = createMediaAttachmentCache(attachments, {
+  const providerRegistry = deps.buildProviderRegistry(undefined, params.cfg);
+  const cache = deps.createMediaAttachmentCache(attachments, {
     localPathRoots: [path.dirname(params.filePath)],
   });
 
   try {
-    const result = await runCapability({
+    const result = await deps.runCapability({
       capability: params.capability,
       cfg: params.cfg,
       ctx,
@@ -92,14 +113,17 @@ export async function runMediaUnderstandingFile(
   }
 }
 
-export async function describeImageFile(params: {
-  filePath: string;
-  cfg: OpenClawConfig;
-  agentDir?: string;
-  mime?: string;
-  activeModel?: ActiveMediaModel;
-}): Promise<RunMediaUnderstandingFileResult> {
-  return await runMediaUnderstandingFile({ ...params, capability: "image" });
+export async function describeImageFile(
+  params: {
+    filePath: string;
+    cfg: OpenClawConfig;
+    agentDir?: string;
+    mime?: string;
+    activeModel?: ActiveMediaModel;
+  },
+  deps: MediaUnderstandingRuntimeDeps = defaultMediaUnderstandingRuntimeDeps,
+): Promise<RunMediaUnderstandingFileResult> {
+  return await runMediaUnderstandingFile({ ...params, capability: "image" }, deps);
 }
 
 export async function describeImageFileWithModel(params: {

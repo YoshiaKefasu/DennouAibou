@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const getChannelPluginMock = vi.hoisted(() => vi.fn());
-
-vi.mock("../channels/plugins/index.js", async () => {
-  const actual = await import("../channels/plugins/index.js");
-  return {
-    ...actual,
-    getChannelPlugin: (...args: unknown[]) => getChannelPluginMock(...args),
-  };
-});
-
 import { resolveApprovalCommandAuthorization } from "./channel-approval-auth.js";
+import type { ChannelApprovalAuthDeps } from "./channel-approval-auth.js";
+
+const getChannelPluginMock = vi.fn();
+
+/** Explicit seam replacing the module-level vi.mock interception. */
+const deps: Partial<ChannelApprovalAuthDeps> = {
+  getChannelPlugin: getChannelPluginMock as unknown as ChannelApprovalAuthDeps["getChannelPlugin"],
+};
 
 describe("resolveApprovalCommandAuthorization", () => {
   beforeEach(() => {
@@ -19,12 +16,15 @@ describe("resolveApprovalCommandAuthorization", () => {
 
   it("allows commands by default when the channel has no approval override", () => {
     expect(
-      resolveApprovalCommandAuthorization({
-        cfg: {} as never,
-        channel: "slack",
-        senderId: "U123",
-        kind: "exec",
-      }),
+      resolveApprovalCommandAuthorization(
+        {
+          cfg: {} as never,
+          channel: "slack",
+          senderId: "U123",
+          kind: "exec",
+        },
+        deps,
+      ),
     ).toEqual({ authorized: true, explicit: false });
   });
 
@@ -44,23 +44,29 @@ describe("resolveApprovalCommandAuthorization", () => {
     });
 
     expect(
-      resolveApprovalCommandAuthorization({
-        cfg: {} as never,
-        channel: "discord",
-        accountId: "work",
-        senderId: "123",
-        kind: "exec",
-      }),
+      resolveApprovalCommandAuthorization(
+        {
+          cfg: {} as never,
+          channel: "discord",
+          accountId: "work",
+          senderId: "123",
+          kind: "exec",
+        },
+        deps,
+      ),
     ).toEqual({ authorized: true, explicit: true });
 
     expect(
-      resolveApprovalCommandAuthorization({
-        cfg: {} as never,
-        channel: "discord",
-        accountId: "work",
-        senderId: "123",
-        kind: "plugin",
-      }),
+      resolveApprovalCommandAuthorization(
+        {
+          cfg: {} as never,
+          channel: "discord",
+          accountId: "work",
+          senderId: "123",
+          kind: "plugin",
+        },
+        deps,
+      ),
     ).toEqual({ authorized: false, reason: "plugin denied", explicit: true });
   });
 
@@ -76,12 +82,15 @@ describe("resolveApprovalCommandAuthorization", () => {
     });
 
     expect(
-      resolveApprovalCommandAuthorization({
-        cfg: {} as never,
-        channel: "matrix",
-        senderId: "123",
-        kind: "exec",
-      }),
+      resolveApprovalCommandAuthorization(
+        {
+          cfg: {} as never,
+          channel: "matrix",
+          senderId: "123",
+          kind: "exec",
+        },
+        deps,
+      ),
     ).toEqual({ authorized: true, explicit: true });
   });
 
@@ -94,13 +103,16 @@ describe("resolveApprovalCommandAuthorization", () => {
     });
 
     expect(
-      resolveApprovalCommandAuthorization({
-        cfg: {} as never,
-        channel: "slack",
-        accountId: "work",
-        senderId: "U123",
-        kind: "exec",
-      }),
+      resolveApprovalCommandAuthorization(
+        {
+          cfg: {} as never,
+          channel: "slack",
+          accountId: "work",
+          senderId: "U123",
+          kind: "exec",
+        },
+        deps,
+      ),
     ).toEqual({ authorized: true, explicit: false });
   });
 });

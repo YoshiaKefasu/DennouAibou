@@ -1,21 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEmptyPluginRegistry } from "./registry.js";
+import { startPluginServices } from "./services.js";
+import type { PluginServicesDeps } from "./services.js";
 import type { OpenClawPluginService, OpenClawPluginServiceContext } from "./types.js";
 
-const mockedLogger = vi.hoisted(() => ({
+const mockedLogger = {
   info: vi.fn<(msg: string) => void>(),
   warn: vi.fn<(msg: string) => void>(),
   error: vi.fn<(msg: string) => void>(),
   debug: vi.fn<(msg: string) => void>(),
   child: vi.fn(() => mockedLogger),
-}));
+};
 
-vi.mock("../logging/subsystem.js", () => ({
-  createSubsystemLogger: () => mockedLogger,
-}));
+/** Explicit seam replacing the module-level vi.mock interception. */
+const servicesDeps: Partial<PluginServicesDeps> = {
+  createSubsystemLogger: (() =>
+    mockedLogger) as unknown as PluginServicesDeps["createSubsystemLogger"],
+};
 
 import { STATE_DIR } from "../config/paths.js";
-import { startPluginServices } from "./services.js";
 
 function createRegistry(services: OpenClawPluginService[]) {
   const registry = createEmptyPluginRegistry();
@@ -76,11 +79,14 @@ async function startTrackingServices(params: {
   config?: Parameters<typeof startPluginServices>[0]["config"];
   workspaceDir?: string;
 }) {
-  return startPluginServices({
-    registry: createRegistry(params.services),
-    config: params.config ?? createServiceConfig(),
-    ...(params.workspaceDir ? { workspaceDir: params.workspaceDir } : {}),
-  });
+  return startPluginServices(
+    {
+      registry: createRegistry(params.services),
+      config: params.config ?? createServiceConfig(),
+      ...(params.workspaceDir ? { workspaceDir: params.workspaceDir } : {}),
+    },
+    servicesDeps,
+  );
 }
 
 function createTrackingService(

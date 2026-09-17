@@ -1,16 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { fetchWithSsrFGuardMock } = vi.hoisted(() => ({
-  fetchWithSsrFGuardMock: vi.fn(),
-}));
-
-vi.mock("../infra/net/fetch-guard.js", async () => {
-  const actual = await import("../infra/net/fetch-guard.js");
-  return {
-    ...actual,
-    fetchWithSsrFGuard: fetchWithSsrFGuardMock,
-  };
-});
+const fetchWithSsrFGuardMock = vi.fn();
 
 import {
   fetchWithTimeoutGuarded,
@@ -166,7 +156,9 @@ describe("fetchWithTimeoutGuarded", () => {
       release: async () => {},
     });
 
-    await fetchWithTimeoutGuarded("https://example.com", {}, undefined, fetch);
+    await fetchWithTimeoutGuarded("https://example.com", {}, undefined, fetch, {
+      fetchWithSsrFGuard: fetchWithSsrFGuardMock,
+    });
 
     expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -185,6 +177,7 @@ describe("fetchWithTimeoutGuarded", () => {
 
     await fetchWithTimeoutGuarded("https://example.com", {}, 5000, fetch, {
       auditContext: "provider-http\r\nfal\timage\u001btest",
+      fetchWithSsrFGuard: fetchWithSsrFGuardMock,
     });
 
     expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(
@@ -211,6 +204,7 @@ describe("fetchWithTimeoutGuarded", () => {
         mode: "explicit-proxy",
         proxyUrl: "http://169.254.169.254:8080",
       },
+      fetchWithSsrFGuard: fetchWithSsrFGuardMock,
     });
 
     expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(
@@ -236,6 +230,7 @@ describe("fetchWithTimeoutGuarded", () => {
       body: { ok: true },
       fetchFn: fetch,
       pinDns: false,
+      fetchWithSsrFGuard: fetchWithSsrFGuardMock,
     });
 
     expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(
@@ -258,6 +253,7 @@ describe("fetchWithTimeoutGuarded", () => {
       body: "audio-bytes",
       fetchFn: fetch,
       pinDns: false,
+      fetchWithSsrFGuard: fetchWithSsrFGuardMock,
     });
 
     expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(

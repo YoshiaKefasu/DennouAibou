@@ -1,30 +1,27 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getResolvedLoggerSettings,
+  resetLogger,
+  setLoggerConfigDepsForTests,
+  setLoggerOverride,
+} from "../logging.js";
 
-const { fallbackRequireMock, readLoggingConfigMock, shouldSkipMutatingLoggingConfigReadMock } =
-  vi.hoisted(() => ({
-    readLoggingConfigMock: vi.fn(() => undefined),
-    shouldSkipMutatingLoggingConfigReadMock: vi.fn(() => false),
-    fallbackRequireMock: vi.fn(() => {
-      throw new Error("config fallback should not be used in this test");
-    }),
-  }));
-
-vi.mock("./config.js", () => ({
-  readLoggingConfig: readLoggingConfigMock,
-  shouldSkipMutatingLoggingConfigRead: shouldSkipMutatingLoggingConfigReadMock,
-}));
-
-vi.mock("./node-require.js", () => ({
-  resolveNodeRequireFromMeta: () => fallbackRequireMock,
-}));
+const readLoggingConfigMock = vi.fn(() => undefined);
+const shouldSkipMutatingLoggingConfigReadMock = vi.fn(() => false);
+const fallbackConfigLoaderMock = vi.fn(() => {
+  throw new Error("config fallback should not be used in this test");
+});
 
 let originalTestFileLog: string | undefined;
 let originalOpenClawLogLevel: string | undefined;
-let logging: typeof import("../logging.js");
 
-beforeAll(async () => {
-  logging = await import("../logging.js");
-});
+/**
+ * Bun does not set `VITEST` in the process env, so the settings resolver is
+ * given an explicit env that matches the default Vitest test environment.
+ */
+function resolveSettings() {
+  return getResolvedLoggerSettings({ ...process.env, VITEST: "true" });
+}
 
 beforeEach(() => {
   originalTestFileLog = process.env.DENNOU_TEST_FILE_LOG;
@@ -34,9 +31,14 @@ beforeEach(() => {
   readLoggingConfigMock.mockClear();
   shouldSkipMutatingLoggingConfigReadMock.mockReset();
   shouldSkipMutatingLoggingConfigReadMock.mockReturnValue(false);
-  fallbackRequireMock.mockClear();
-  logging.resetLogger();
-  logging.setLoggerOverride(null);
+  fallbackConfigLoaderMock.mockClear();
+  resetLogger();
+  setLoggerOverride(null);
+  setLoggerConfigDepsForTests({
+    readLoggingConfig: readLoggingConfigMock,
+    shouldSkipMutatingLoggingConfigRead: shouldSkipMutatingLoggingConfigReadMock,
+    loadConfigFallback: fallbackConfigLoaderMock,
+  });
 });
 
 afterEach(() => {
@@ -50,22 +52,22 @@ afterEach(() => {
   } else {
     process.env.DENNOU_LOG_LEVEL = originalOpenClawLogLevel;
   }
-  logging.resetLogger();
-  logging.setLoggerOverride(null);
-  vi.restoreAllMocks();
+  resetLogger();
+  setLoggerOverride(null);
+  setLoggerConfigDepsForTests();
 });
 
 describe("getResolvedLoggerSettings", () => {
   it("uses a silent fast path in default Vitest mode without config reads", () => {
-    const settings = logging.getResolvedLoggerSettings();
+    const settings = resolveSettings();
     expect(settings.level).toBe("silent");
     expect(readLoggingConfigMock).not.toHaveBeenCalled();
-    expect(fallbackRequireMock).not.toHaveBeenCalled();
+    expect(fallbackConfigLoaderMock).not.toHaveBeenCalled();
   });
 
   it("reads logging config when test file logging is explicitly enabled", () => {
     process.env.DENNOU_TEST_FILE_LOG = "1";
-    const settings = logging.getResolvedLoggerSettings();
+    const settings = resolveSettings();
     expect(settings.level).toBe("info");
   });
 
@@ -73,9 +75,9 @@ describe("getResolvedLoggerSettings", () => {
     process.env.DENNOU_TEST_FILE_LOG = "1";
     shouldSkipMutatingLoggingConfigReadMock.mockReturnValue(true);
 
-    const settings = logging.getResolvedLoggerSettings();
+    const settings = resolveSettings();
 
     expect(settings.level).toBe("info");
-    expect(fallbackRequireMock).not.toHaveBeenCalled();
+    expect(fallbackConfigLoaderMock).not.toHaveBeenCalled();
   });
 });

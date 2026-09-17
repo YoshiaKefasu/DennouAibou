@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 179 files.
+# Current known-failure count: 169 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -148,7 +148,7 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (77 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (67 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
@@ -193,35 +193,25 @@ src/gateway/server.reload.test.ts
 src/gateway/server.sessions.gateway-server-sessions-a.test.ts
 src/gateway/sessions-resolve.test.ts
 src/gateway/tools-invoke-http.test.ts
-src/infra/channel-approval-auth.test.ts
 src/infra/exec-approval-surface.test.ts
 src/infra/exec-approvals-store.test.ts
 src/infra/gateway-processes.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
-src/infra/net/ssrf.dispatcher.test.ts
-src/infra/outbound/agent-delivery.test.ts
 src/infra/outbound/channel-resolution.test.ts
-src/infra/outbound/channel-selection.test.ts
 src/infra/outbound/deliver.test.ts
 src/infra/outbound/format.test.ts
 src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/outbound/message.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
 src/infra/windows-task-restart.test.ts
-src/logging/console-settings.test.ts
-src/logging/logger-settings.test.ts
 src/media-understanding/image.test.ts
-src/media-understanding/runtime.test.ts
-src/media-understanding/shared.test.ts
 src/media/host.test.ts
 src/memory-host-sdk/host/qmd-process.test.ts
 src/plugin-activation-boundary.test.ts
 src/plugin-sdk/browser-maintenance.test.ts
 src/plugins/runtime/runtime-taskflow.test.ts
 src/plugins/runtime/runtime-tasks.test.ts
-src/plugins/services.test.ts
 src/secrets/configure.test.ts
-src/secrets/runtime-web-tools.test.ts
 src/secrets/runtime.coverage.test.ts
 src/secrets/runtime.test.ts
 src/tasks/task-executor.test.ts
