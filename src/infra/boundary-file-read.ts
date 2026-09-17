@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   resolveBoundaryPath,
   resolveBoundaryPathSync,
+  type ResolveBoundaryPathParams,
   type ResolvedBoundaryPath,
 } from "./boundary-path.js";
 import type { PathAliasPolicy } from "./path-alias-guards.js";
@@ -53,6 +54,25 @@ type ResolvedBoundaryFilePath = {
   rootRealPath: string;
 };
 
+/**
+ * Only the canonical paths are consumed from boundary resolution, so tests can
+ * supply lightweight stubs instead of full `ResolvedBoundaryPath` records.
+ */
+type ResolvedBoundaryPathLike = Pick<ResolvedBoundaryPath, "canonicalPath" | "rootCanonicalPath">;
+
+/**
+ * Injectable seams for tests. Each defaults to the real module implementation.
+ */
+export type BoundaryFileReadDeps = {
+  resolveBoundaryPathSync?: (
+    params: ResolveBoundaryPathParams,
+  ) => ResolvedBoundaryPathLike | Promise<ResolvedBoundaryPathLike>;
+  resolveBoundaryPath?: (
+    params: ResolveBoundaryPathParams,
+  ) => ResolvedBoundaryPathLike | Promise<ResolvedBoundaryPathLike>;
+  openVerifiedFileSync?: typeof openVerifiedFileSync;
+};
+
 export function canUseBoundaryFileOpen(ioFs: typeof fs): boolean {
   return (
     typeof ioFs.openSync === "function" &&
@@ -66,12 +86,16 @@ export function canUseBoundaryFileOpen(ioFs: typeof fs): boolean {
   );
 }
 
-export function openBoundaryFileSync(params: OpenBoundaryFileSyncParams): BoundaryFileOpenResult {
+export function openBoundaryFileSync(
+  params: OpenBoundaryFileSyncParams,
+  deps: BoundaryFileReadDeps = {},
+): BoundaryFileOpenResult {
   const ioFs = params.ioFs ?? fs;
+  const resolveSync = deps.resolveBoundaryPathSync ?? resolveBoundaryPathSync;
   const resolved = resolveBoundaryFilePathGeneric({
     absolutePath: params.absolutePath,
     resolve: (absolutePath) =>
-      resolveBoundaryPathSync({
+      resolveSync({
         absolutePath,
         rootPath: params.rootPath,
         rootCanonicalPath: params.rootRealPath,
@@ -88,6 +112,7 @@ export function openBoundaryFileSync(params: OpenBoundaryFileSyncParams): Bounda
     rejectHardlinks: params.rejectHardlinks,
     allowedType: params.allowedType,
     ioFs,
+    deps,
   });
 }
 
@@ -118,8 +143,9 @@ function openBoundaryFileResolved(params: {
   rejectHardlinks?: boolean;
   allowedType?: SafeOpenSyncAllowedType;
   ioFs: BoundaryReadFs;
+  openVerified: typeof openVerifiedFileSync;
 }): BoundaryFileOpenResult {
-  const opened = openVerifiedFileSync({
+  const opened = params.openVerified({
     filePath: params.absolutePath,
     resolvedPath: params.resolvedPath,
     rejectHardlinks: params.rejectHardlinks ?? true,
@@ -145,6 +171,7 @@ function finalizeBoundaryFileOpen(params: {
   rejectHardlinks?: boolean;
   allowedType?: SafeOpenSyncAllowedType;
   ioFs: BoundaryReadFs;
+  deps: BoundaryFileReadDeps;
 }): BoundaryFileOpenResult {
   if ("ok" in params.resolved) {
     return params.resolved;
@@ -157,17 +184,20 @@ function finalizeBoundaryFileOpen(params: {
     rejectHardlinks: params.rejectHardlinks,
     allowedType: params.allowedType,
     ioFs: params.ioFs,
+    openVerified: params.deps.openVerifiedFileSync ?? openVerifiedFileSync,
   });
 }
 
 export async function openBoundaryFile(
   params: OpenBoundaryFileParams,
+  deps: BoundaryFileReadDeps = {},
 ): Promise<BoundaryFileOpenResult> {
   const ioFs = params.ioFs ?? fs;
+  const resolveAsync = deps.resolveBoundaryPath ?? resolveBoundaryPath;
   const maybeResolved = resolveBoundaryFilePathGeneric({
     absolutePath: params.absolutePath,
     resolve: (absolutePath) =>
-      resolveBoundaryPath({
+      resolveAsync({
         absolutePath,
         rootPath: params.rootPath,
         rootCanonicalPath: params.rootRealPath,
@@ -183,6 +213,7 @@ export async function openBoundaryFile(
     rejectHardlinks: params.rejectHardlinks,
     allowedType: params.allowedType,
     ioFs,
+    deps,
   });
 }
 
@@ -192,7 +223,7 @@ function toBoundaryValidationError(error: unknown): BoundaryFileOpenResult {
 
 function mapResolvedBoundaryPath(
   absolutePath: string,
-  resolved: ResolvedBoundaryPath,
+  resolved: ResolvedBoundaryPathLike,
 ): ResolvedBoundaryFilePath {
   return {
     absolutePath,
@@ -203,7 +234,7 @@ function mapResolvedBoundaryPath(
 
 function resolveBoundaryFilePathGeneric(params: {
   absolutePath: string;
-  resolve: (absolutePath: string) => ResolvedBoundaryPath | Promise<ResolvedBoundaryPath>;
+  resolve: (absolutePath: string) => ResolvedBoundaryPathLike | Promise<ResolvedBoundaryPathLike>;
 }):
   | ResolvedBoundaryFilePath
   | BoundaryFileOpenResult

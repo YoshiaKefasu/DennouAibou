@@ -1,105 +1,77 @@
-import type { Mock } from "vitest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DEFAULT_UNDICI_STREAM_TIMEOUT_MS,
+  ensureGlobalUndiciEnvProxyDispatcher,
+  ensureGlobalUndiciStreamTimeouts,
+  resetGlobalUndiciStreamTimeoutsForTests,
+  type UndiciDispatcherDeps,
+} from "./undici-global-dispatcher.js";
 
-const {
-  Agent,
-  EnvHttpProxyAgent,
-  ProxyAgent,
-  getGlobalDispatcher,
-  setGlobalDispatcher,
-  setCurrentDispatcher,
-  getCurrentDispatcher,
-  getDefaultAutoSelectFamily,
-} = vi.hoisted(() => {
-  class Agent {
-    constructor(public readonly options?: Record<string, unknown>) {}
-  }
+type DepsAgentCtor = NonNullable<UndiciDispatcherDeps["Agent"]>;
+type DepsEnvHttpProxyAgentCtor = NonNullable<UndiciDispatcherDeps["EnvHttpProxyAgent"]>;
+type DepsGetGlobalDispatcher = NonNullable<UndiciDispatcherDeps["getGlobalDispatcher"]>;
+type DepsSetGlobalDispatcher = NonNullable<UndiciDispatcherDeps["setGlobalDispatcher"]>;
 
-  class EnvHttpProxyAgent {
-    constructor(public readonly options?: Record<string, unknown>) {}
-  }
+class Agent {
+  constructor(public readonly options?: Record<string, unknown>) {}
+}
 
-  class ProxyAgent {
-    constructor(public readonly url: string) {}
-  }
+class EnvHttpProxyAgent {
+  constructor(public readonly options?: Record<string, unknown>) {}
+}
 
+class ProxyAgent {
+  constructor(public readonly url: string) {}
+}
+
+function createHarness() {
   let currentDispatcher: unknown = new Agent();
 
   const getGlobalDispatcher = vi.fn(() => currentDispatcher);
   const setGlobalDispatcher = vi.fn((next: unknown) => {
     currentDispatcher = next;
   });
-  const setCurrentDispatcher = (next: unknown) => {
-    currentDispatcher = next;
+  const getDefaultAutoSelectFamily = vi.fn<() => boolean | undefined>(() => undefined);
+  const hasEnvHttpProxyConfigured = vi.fn<(protocol?: "http" | "https") => boolean>(() => false);
+  const isWSL2Sync = vi.fn(() => false);
+
+  const deps: UndiciDispatcherDeps = {
+    Agent: Agent as unknown as DepsAgentCtor,
+    EnvHttpProxyAgent: EnvHttpProxyAgent as unknown as DepsEnvHttpProxyAgentCtor,
+    getGlobalDispatcher: getGlobalDispatcher as unknown as DepsGetGlobalDispatcher,
+    setGlobalDispatcher: setGlobalDispatcher as unknown as DepsSetGlobalDispatcher,
+    getDefaultAutoSelectFamily,
+    hasEnvHttpProxyConfigured,
+    isWSL2Sync,
   };
-  const getCurrentDispatcher = () => currentDispatcher;
-  const getDefaultAutoSelectFamily = vi.fn(() => undefined as boolean | undefined);
 
   return {
-    Agent,
-    EnvHttpProxyAgent,
-    ProxyAgent,
+    deps,
     getGlobalDispatcher,
     setGlobalDispatcher,
-    setCurrentDispatcher,
-    getCurrentDispatcher,
     getDefaultAutoSelectFamily,
+    hasEnvHttpProxyConfigured,
+    isWSL2Sync,
+    setCurrentDispatcher: (next: unknown) => {
+      currentDispatcher = next;
+    },
+    getCurrentDispatcher: () => currentDispatcher,
   };
-});
-
-const mockedModuleIds = ["node:net", "undici", "./proxy-env.js", "../wsl.js"] as const;
-
-vi.mock("undici", () => ({
-  Agent,
-  EnvHttpProxyAgent,
-  getGlobalDispatcher,
-  setGlobalDispatcher,
-}));
-
-vi.mock("node:net", () => ({
-  getDefaultAutoSelectFamily,
-}));
-
-vi.mock("./proxy-env.js", () => ({
-  hasEnvHttpProxyConfigured: vi.fn(() => false),
-}));
-
-vi.mock("../wsl.js", () => ({
-  isWSL2Sync: vi.fn(() => false),
-}));
-
-import { isWSL2Sync } from "../wsl.js";
-import { hasEnvHttpProxyConfigured } from "./proxy-env.js";
-let DEFAULT_UNDICI_STREAM_TIMEOUT_MS: typeof import("./undici-global-dispatcher.js").DEFAULT_UNDICI_STREAM_TIMEOUT_MS;
-let ensureGlobalUndiciEnvProxyDispatcher: typeof import("./undici-global-dispatcher.js").ensureGlobalUndiciEnvProxyDispatcher;
-let ensureGlobalUndiciStreamTimeouts: typeof import("./undici-global-dispatcher.js").ensureGlobalUndiciStreamTimeouts;
-let resetGlobalUndiciStreamTimeoutsForTests: typeof import("./undici-global-dispatcher.js").resetGlobalUndiciStreamTimeoutsForTests;
+}
 
 describe("ensureGlobalUndiciStreamTimeouts", () => {
-  beforeAll(async () => {
-    ({
-      DEFAULT_UNDICI_STREAM_TIMEOUT_MS,
-      ensureGlobalUndiciEnvProxyDispatcher,
-      ensureGlobalUndiciStreamTimeouts,
-      resetGlobalUndiciStreamTimeoutsForTests,
-    } = await import("./undici-global-dispatcher.js"));
-  });
-
   beforeEach(() => {
-    vi.clearAllMocks();
     resetGlobalUndiciStreamTimeoutsForTests();
-    setCurrentDispatcher(new Agent());
-    getDefaultAutoSelectFamily.mockReturnValue(undefined);
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(false);
   });
 
   it("replaces default Agent dispatcher with extended stream timeouts", () => {
-    getDefaultAutoSelectFamily.mockReturnValue(true);
+    const harness = createHarness();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(true);
 
-    ensureGlobalUndiciStreamTimeouts();
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
-    const next = getCurrentDispatcher() as { options?: Record<string, unknown> };
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    const next = harness.getCurrentDispatcher() as { options?: Record<string, unknown> };
     expect(next).toBeInstanceOf(Agent);
     expect(next.options?.bodyTimeout).toBe(DEFAULT_UNDICI_STREAM_TIMEOUT_MS);
     expect(next.options?.headersTimeout).toBe(DEFAULT_UNDICI_STREAM_TIMEOUT_MS);
@@ -110,13 +82,14 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
   });
 
   it("replaces EnvHttpProxyAgent dispatcher while preserving env-proxy mode", () => {
-    getDefaultAutoSelectFamily.mockReturnValue(false);
-    setCurrentDispatcher(new EnvHttpProxyAgent());
+    const harness = createHarness();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(false);
+    harness.setCurrentDispatcher(new EnvHttpProxyAgent());
 
-    ensureGlobalUndiciStreamTimeouts();
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
-    const next = getCurrentDispatcher() as { options?: Record<string, unknown> };
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    const next = harness.getCurrentDispatcher() as { options?: Record<string, unknown> };
     expect(next).toBeInstanceOf(EnvHttpProxyAgent);
     expect(next.options?.bodyTimeout).toBe(DEFAULT_UNDICI_STREAM_TIMEOUT_MS);
     expect(next.options?.headersTimeout).toBe(DEFAULT_UNDICI_STREAM_TIMEOUT_MS);
@@ -127,31 +100,34 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
   });
 
   it("does not override unsupported custom proxy dispatcher types", () => {
-    setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
+    const harness = createHarness();
+    harness.setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
 
-    ensureGlobalUndiciStreamTimeouts();
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).not.toHaveBeenCalled();
+    expect(harness.setGlobalDispatcher).not.toHaveBeenCalled();
   });
 
   it("is idempotent for unchanged dispatcher kind and network policy", () => {
-    getDefaultAutoSelectFamily.mockReturnValue(true);
+    const harness = createHarness();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(true);
 
-    ensureGlobalUndiciStreamTimeouts();
-    ensureGlobalUndiciStreamTimeouts();
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
   });
 
   it("re-applies when autoSelectFamily decision changes", () => {
-    getDefaultAutoSelectFamily.mockReturnValue(true);
-    ensureGlobalUndiciStreamTimeouts();
+    const harness = createHarness();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(true);
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    getDefaultAutoSelectFamily.mockReturnValue(false);
-    ensureGlobalUndiciStreamTimeouts();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(false);
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(2);
-    const next = getCurrentDispatcher() as { options?: Record<string, unknown> };
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(2);
+    const next = harness.getCurrentDispatcher() as { options?: Record<string, unknown> };
     expect(next.options?.connect).toEqual({
       autoSelectFamily: false,
       autoSelectFamilyAttemptTimeout: 300,
@@ -159,13 +135,14 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
   });
 
   it("disables autoSelectFamily on WSL2 to avoid IPv6 connectivity issues", () => {
-    getDefaultAutoSelectFamily.mockReturnValue(true);
-    (isWSL2Sync as Mock).mockReturnValue(true);
+    const harness = createHarness();
+    harness.getDefaultAutoSelectFamily.mockReturnValue(true);
+    harness.isWSL2Sync.mockReturnValue(true);
 
-    ensureGlobalUndiciStreamTimeouts();
+    ensureGlobalUndiciStreamTimeouts(undefined, harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
-    const next = getCurrentDispatcher() as { options?: Record<string, unknown> };
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    const next = harness.getCurrentDispatcher() as { options?: Record<string, unknown> };
     expect(next).toBeInstanceOf(Agent);
     expect(next.options?.connect).toEqual({
       autoSelectFamily: false,
@@ -176,69 +153,65 @@ describe("ensureGlobalUndiciStreamTimeouts", () => {
 
 describe("ensureGlobalUndiciEnvProxyDispatcher", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     resetGlobalUndiciStreamTimeoutsForTests();
-    setCurrentDispatcher(new Agent());
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(false);
   });
 
   it("installs EnvHttpProxyAgent when env HTTP proxy is configured on a default Agent", () => {
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
+    const harness = createHarness();
+    harness.hasEnvHttpProxyConfigured.mockReturnValue(true);
 
-    ensureGlobalUndiciEnvProxyDispatcher();
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
-    expect(getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    expect(harness.getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
   });
 
   it("does not override unsupported custom proxy dispatcher types", () => {
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
-    setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
+    const harness = createHarness();
+    harness.hasEnvHttpProxyConfigured.mockReturnValue(true);
+    harness.setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
 
-    ensureGlobalUndiciEnvProxyDispatcher();
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
 
-    expect(setGlobalDispatcher).not.toHaveBeenCalled();
+    expect(harness.setGlobalDispatcher).not.toHaveBeenCalled();
   });
 
   it("retries proxy bootstrap after an unsupported dispatcher later becomes a default Agent", () => {
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
-    setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
+    const harness = createHarness();
+    harness.hasEnvHttpProxyConfigured.mockReturnValue(true);
+    harness.setCurrentDispatcher(new ProxyAgent("http://proxy.test:8080"));
 
-    ensureGlobalUndiciEnvProxyDispatcher();
-    expect(setGlobalDispatcher).not.toHaveBeenCalled();
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
+    expect(harness.setGlobalDispatcher).not.toHaveBeenCalled();
 
-    setCurrentDispatcher(new Agent());
-    ensureGlobalUndiciEnvProxyDispatcher();
+    harness.setCurrentDispatcher(new Agent());
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
-    expect(getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    expect(harness.getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
   });
 
   it("is idempotent after proxy bootstrap succeeds", () => {
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
+    const harness = createHarness();
+    harness.hasEnvHttpProxyConfigured.mockReturnValue(true);
 
-    ensureGlobalUndiciEnvProxyDispatcher();
-    ensureGlobalUndiciEnvProxyDispatcher();
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
   });
 
   it("reinstalls env proxy if an external change later reverts the dispatcher to Agent", () => {
-    (hasEnvHttpProxyConfigured as Mock).mockReturnValue(true);
+    const harness = createHarness();
+    harness.hasEnvHttpProxyConfigured.mockReturnValue(true);
 
-    ensureGlobalUndiciEnvProxyDispatcher();
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(1);
 
-    setCurrentDispatcher(new Agent());
-    ensureGlobalUndiciEnvProxyDispatcher();
+    harness.setCurrentDispatcher(new Agent());
+    ensureGlobalUndiciEnvProxyDispatcher(harness.deps);
 
-    expect(setGlobalDispatcher).toHaveBeenCalledTimes(2);
-    expect(getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
+    expect(harness.setGlobalDispatcher).toHaveBeenCalledTimes(2);
+    expect(harness.getCurrentDispatcher()).toBeInstanceOf(EnvHttpProxyAgent);
   });
-});
-
-afterAll(() => {
-  for (const id of mockedModuleIds) {
-    vi.doUnmock(id);
-  }
 });

@@ -1,26 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { expectGeneratedTokenPersistedToGatewayAuth } from "../test-utils/auth-token-assertions.js";
+import {
+  assertHooksTokenSeparateFromGatewayAuth,
+  ensureGatewayStartupAuth as ensureGatewayStartupAuthImpl,
+} from "./startup-auth.js";
 
-const mocks = vi.hoisted(() => ({
-  replaceConfigFile: vi.fn(async (_params: { nextConfig: OpenClawConfig }) => {}),
-}));
+const replaceConfigFile = vi.fn(async (_params: { nextConfig: OpenClawConfig }) => {});
 
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    replaceConfigFile: mocks.replaceConfigFile,
-  };
-});
+type StartupAuthParams = Parameters<typeof ensureGatewayStartupAuthImpl>[0];
 
-let assertHooksTokenSeparateFromGatewayAuth: typeof import("./startup-auth.js").assertHooksTokenSeparateFromGatewayAuth;
-let ensureGatewayStartupAuth: typeof import("./startup-auth.js").ensureGatewayStartupAuth;
-
-async function loadFreshStartupAuthModuleForTest() {
-  vi.resetModules();
-  ({ assertHooksTokenSeparateFromGatewayAuth, ensureGatewayStartupAuth } =
-    await import("./startup-auth.js"));
+/** Invoke the real entry point with the config writer seam injected. */
+function ensureGatewayStartupAuth(params: Omit<StartupAuthParams, "replaceConfigFile">) {
+  return ensureGatewayStartupAuthImpl({ ...params, replaceConfigFile });
 }
 
 describe("ensureGatewayStartupAuth", () => {
@@ -36,13 +28,11 @@ describe("ensureGatewayStartupAuth", () => {
     expect(result.persistedGeneratedToken).toBe(false);
     expect(result.auth.mode).toBe("token");
     expect(result.auth.token).toBe(result.generatedToken);
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   }
 
-  beforeEach(async () => {
-    vi.restoreAllMocks();
-    mocks.replaceConfigFile.mockClear();
-    await loadFreshStartupAuthModuleForTest();
+  beforeEach(() => {
+    replaceConfigFile.mockClear();
   });
 
   async function expectNoTokenGeneration(cfg: OpenClawConfig, mode: string) {
@@ -55,7 +45,7 @@ describe("ensureGatewayStartupAuth", () => {
     expect(result.generatedToken).toBeUndefined();
     expect(result.persistedGeneratedToken).toBe(false);
     expect(result.auth.mode).toBe(mode);
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   }
 
   async function expectResolvedToken(params: {
@@ -77,7 +67,7 @@ describe("ensureGatewayStartupAuth", () => {
     if ("expectedConfiguredToken" in params) {
       expect(result.cfg.gateway?.auth?.token).toEqual(params.expectedConfiguredToken);
     }
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   }
 
   function createMissingGatewayTokenSecretRefConfig(): OpenClawConfig {
@@ -106,8 +96,8 @@ describe("ensureGatewayStartupAuth", () => {
     expect(result.generatedToken).toMatch(/^[0-9a-f]{48}$/);
     expect(result.persistedGeneratedToken).toBe(true);
     expect(result.auth.mode).toBe("token");
-    expect(mocks.replaceConfigFile).toHaveBeenCalledTimes(1);
-    const persistedParams = mocks.replaceConfigFile.mock.calls[0]?.[0] as
+    expect(replaceConfigFile).toHaveBeenCalledTimes(1);
+    const persistedParams = replaceConfigFile.mock.calls[0]?.[0] as
       | { nextConfig: OpenClawConfig }
       | undefined;
     expectGeneratedTokenPersistedToGatewayAuth({
@@ -239,7 +229,7 @@ describe("ensureGatewayStartupAuth", () => {
         persist: true,
       }),
     ).rejects.toThrow(/MISSING_GW_TOKEN/i);
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   });
 
   it("requires explicit gateway.auth.mode when token and password are both configured", async () => {
@@ -257,7 +247,7 @@ describe("ensureGatewayStartupAuth", () => {
         persist: true,
       }),
     ).rejects.toThrow(/gateway\.auth\.mode is unset/i);
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   });
 
   it("uses DENNOU_GATEWAY_PASSWORD without resolving configured password SecretRef", async () => {
@@ -360,7 +350,7 @@ describe("ensureGatewayStartupAuth", () => {
     expect(result.persistedGeneratedToken).toBe(false);
     expect(result.auth.mode).toBe("token");
     expect(result.auth.token).toBe("from-config");
-    expect(mocks.replaceConfigFile).not.toHaveBeenCalled();
+    expect(replaceConfigFile).not.toHaveBeenCalled();
   });
 
   it("keeps generated token ephemeral when runtime override flips explicit non-token mode", async () => {

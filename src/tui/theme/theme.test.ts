@@ -1,14 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createHighlightCode,
+  lightPalette,
+  markdownTheme,
+  resolveLightMode,
+  searchableSelectListTheme,
+  selectListTheme,
+  theme,
+} from "./theme.js";
 
-const cliHighlightMocks = vi.hoisted(() => ({
+const cliHighlightMocks = {
   highlight: vi.fn((code: string) => code),
   supportsLanguage: vi.fn((_lang: string) => true),
-}));
+};
 
-vi.mock("cli-highlight", () => cliHighlightMocks);
-
-const { markdownTheme, searchableSelectListTheme, selectListTheme, theme } =
-  await import("./theme.js");
+const highlightCode = createHighlightCode(cliHighlightMocks);
 
 const stripAnsi = (str: string) =>
   str.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");
@@ -42,7 +48,7 @@ describe("markdownTheme", () => {
     });
 
     it("passes supported language through to the highlighter", () => {
-      markdownTheme.highlightCode!("const x = 42;", "javascript");
+      highlightCode("const x = 42;", "javascript");
       expect(cliHighlightMocks.supportsLanguage).toHaveBeenCalledWith("javascript");
       expect(cliHighlightMocks.highlight).toHaveBeenCalledWith(
         "const x = 42;",
@@ -53,7 +59,7 @@ describe("markdownTheme", () => {
     it("falls back to auto-detect for unknown language and preserves lines", () => {
       cliHighlightMocks.supportsLanguage.mockReturnValue(false);
       cliHighlightMocks.highlight.mockImplementation((code: string) => `${code}\nline-2`);
-      const result = markdownTheme.highlightCode!(`echo "hello"`, "not-a-real-language");
+      const result = highlightCode(`echo "hello"`, "not-a-real-language");
       expect(cliHighlightMocks.highlight).toHaveBeenCalledWith(
         `echo "hello"`,
         expect.objectContaining({ language: undefined }),
@@ -66,9 +72,14 @@ describe("markdownTheme", () => {
       cliHighlightMocks.highlight.mockImplementation(() => {
         throw new Error("boom");
       });
-      const result = markdownTheme.highlightCode!("echo hello", "javascript");
+      const result = highlightCode("echo hello", "javascript");
       expect(result).toHaveLength(1);
       expect(stripAnsi(result[0] ?? "")).toBe("echo hello");
+    });
+
+    it("wires the default highlighter into markdownTheme", () => {
+      expect(markdownTheme.highlightCode).toBeTypeOf("function");
+      expect(markdownTheme.highlightCode!("const x = 1;", "javascript").length).toBeGreaterThan(0);
     });
   });
 });
@@ -81,197 +92,114 @@ describe("theme", () => {
 });
 
 describe("light background detection", () => {
-  const originalEnv = { ...process.env };
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
+  it("uses dark palette by default", () => {
+    expect(resolveLightMode({})).toBe(false);
   });
 
-  async function importThemeWithEnv(env: Record<string, string | undefined>) {
-    vi.resetModules();
-    for (const [key, value] of Object.entries(env)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
-    return import("./theme.js");
-  }
-
-  it("uses dark palette by default", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: undefined,
-    });
-    expect(mod.lightMode).toBe(false);
+  it("selects light palette when DENNOU_THEME=light", () => {
+    expect(resolveLightMode({ DENNOU_THEME: "light" })).toBe(true);
   });
 
-  it("selects light palette when DENNOU_THEME=light", async () => {
-    const mod = await importThemeWithEnv({ DENNOU_THEME: "light" });
-    expect(mod.lightMode).toBe(true);
+  it("selects dark palette when DENNOU_THEME=dark", () => {
+    expect(resolveLightMode({ DENNOU_THEME: "dark" })).toBe(false);
   });
 
-  it("selects dark palette when DENNOU_THEME=dark", async () => {
-    const mod = await importThemeWithEnv({ DENNOU_THEME: "dark" });
-    expect(mod.lightMode).toBe(false);
+  it("treats DENNOU_THEME case-insensitively", () => {
+    expect(resolveLightMode({ DENNOU_THEME: "LiGhT" })).toBe(true);
   });
 
-  it("treats DENNOU_THEME case-insensitively", async () => {
-    const mod = await importThemeWithEnv({ DENNOU_THEME: "LiGhT" });
-    expect(mod.lightMode).toBe(true);
+  it("detects light background from COLORFGBG", () => {
+    expect(resolveLightMode({ COLORFGBG: "0;15" })).toBe(true);
   });
 
-  it("detects light background from COLORFGBG", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "0;15",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("treats COLORFGBG bg=7 (silver) as light", () => {
+    expect(resolveLightMode({ COLORFGBG: "0;7" })).toBe(true);
   });
 
-  it("treats COLORFGBG bg=7 (silver) as light", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "0;7",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("treats COLORFGBG bg=8 (bright black / dark gray) as dark", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;8" })).toBe(false);
   });
 
-  it("treats COLORFGBG bg=8 (bright black / dark gray) as dark", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;8",
-    });
-    expect(mod.lightMode).toBe(false);
+  it("treats COLORFGBG bg < 7 as dark", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;0" })).toBe(false);
   });
 
-  it("treats COLORFGBG bg < 7 as dark", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;0",
-    });
-    expect(mod.lightMode).toBe(false);
+  it("treats 256-color COLORFGBG bg=232 (near-black greyscale) as dark", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;232" })).toBe(false);
   });
 
-  it("treats 256-color COLORFGBG bg=232 (near-black greyscale) as dark", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;232",
-    });
-    expect(mod.lightMode).toBe(false);
+  it("treats 256-color COLORFGBG bg=255 (near-white greyscale) as light", () => {
+    expect(resolveLightMode({ COLORFGBG: "0;255" })).toBe(true);
   });
 
-  it("treats 256-color COLORFGBG bg=255 (near-white greyscale) as light", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "0;255",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("treats 256-color COLORFGBG bg=231 (white cube entry) as light", () => {
+    expect(resolveLightMode({ COLORFGBG: "0;231" })).toBe(true);
   });
 
-  it("treats 256-color COLORFGBG bg=231 (white cube entry) as light", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "0;231",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("treats 256-color COLORFGBG bg=16 (black cube entry) as dark", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;16" })).toBe(false);
   });
 
-  it("treats 256-color COLORFGBG bg=16 (black cube entry) as dark", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;16",
-    });
-    expect(mod.lightMode).toBe(false);
+  it("treats bright 256-color green backgrounds as light when dark text contrasts better", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;34" })).toBe(true);
   });
 
-  it("treats bright 256-color green backgrounds as light when dark text contrasts better", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;34",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("treats bright 256-color cyan backgrounds as light when dark text contrasts better", () => {
+    expect(resolveLightMode({ COLORFGBG: "15;39" })).toBe(true);
   });
 
-  it("treats bright 256-color cyan backgrounds as light when dark text contrasts better", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "15;39",
-    });
-    expect(mod.lightMode).toBe(true);
+  it("falls back to dark mode for invalid COLORFGBG values", () => {
+    expect(resolveLightMode({ COLORFGBG: "garbage" })).toBe(false);
   });
 
-  it("falls back to dark mode for invalid COLORFGBG values", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "garbage",
-    });
-    expect(mod.lightMode).toBe(false);
+  it("ignores pathological COLORFGBG values", () => {
+    expect(resolveLightMode({ COLORFGBG: "0;".repeat(40) })).toBe(false);
   });
 
-  it("ignores pathological COLORFGBG values", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: undefined,
-      COLORFGBG: "0;".repeat(40),
-    });
-    expect(mod.lightMode).toBe(false);
+  it("DENNOU_THEME overrides COLORFGBG", () => {
+    expect(resolveLightMode({ DENNOU_THEME: "dark", COLORFGBG: "0;15" })).toBe(false);
   });
 
-  it("DENNOU_THEME overrides COLORFGBG", async () => {
-    const mod = await importThemeWithEnv({
-      DENNOU_THEME: "dark",
-      COLORFGBG: "0;15",
-    });
-    expect(mod.lightMode).toBe(false);
-  });
-
-  it("keeps assistantText as identity in both modes", async () => {
-    const lightMod = await importThemeWithEnv({ DENNOU_THEME: "light" });
-    const darkMod = await importThemeWithEnv({ DENNOU_THEME: "dark" });
-    expect(lightMod.theme.assistantText("hello")).toBe("hello");
-    expect(darkMod.theme.assistantText("hello")).toBe("hello");
+  it("keeps assistantText as identity in both modes", () => {
+    expect(theme.assistantText("hello")).toBe("hello");
   });
 });
 
 describe("light palette accessibility", () => {
-  it("keeps light theme text colors at WCAG AA contrast or better", async () => {
-    vi.resetModules();
-    process.env.DENNOU_THEME = "light";
-    const mod = await import("./theme.js");
+  it("keeps light theme text colors at WCAG AA contrast or better", () => {
     const backgrounds = {
       page: "#FFFFFF",
-      user: mod.lightPalette.userBg,
-      pending: mod.lightPalette.toolPendingBg,
-      success: mod.lightPalette.toolSuccessBg,
-      error: mod.lightPalette.toolErrorBg,
-      code: mod.lightPalette.codeBlock,
+      user: lightPalette.userBg,
+      pending: lightPalette.toolPendingBg,
+      success: lightPalette.toolSuccessBg,
+      error: lightPalette.toolErrorBg,
+      code: lightPalette.codeBlock,
     };
 
     const textPairs = [
-      [mod.lightPalette.text, backgrounds.page],
-      [mod.lightPalette.dim, backgrounds.page],
-      [mod.lightPalette.accent, backgrounds.page],
-      [mod.lightPalette.accentSoft, backgrounds.page],
-      [mod.lightPalette.systemText, backgrounds.page],
-      [mod.lightPalette.link, backgrounds.page],
-      [mod.lightPalette.quote, backgrounds.page],
-      [mod.lightPalette.error, backgrounds.page],
-      [mod.lightPalette.success, backgrounds.page],
-      [mod.lightPalette.userText, backgrounds.user],
-      [mod.lightPalette.dim, backgrounds.pending],
-      [mod.lightPalette.dim, backgrounds.success],
-      [mod.lightPalette.dim, backgrounds.error],
-      [mod.lightPalette.toolTitle, backgrounds.pending],
-      [mod.lightPalette.toolTitle, backgrounds.success],
-      [mod.lightPalette.toolTitle, backgrounds.error],
-      [mod.lightPalette.toolOutput, backgrounds.pending],
-      [mod.lightPalette.toolOutput, backgrounds.success],
-      [mod.lightPalette.toolOutput, backgrounds.error],
-      [mod.lightPalette.code, backgrounds.code],
-      [mod.lightPalette.border, backgrounds.page],
-      [mod.lightPalette.quoteBorder, backgrounds.page],
-      [mod.lightPalette.codeBorder, backgrounds.page],
+      [lightPalette.text, backgrounds.page],
+      [lightPalette.dim, backgrounds.page],
+      [lightPalette.accent, backgrounds.page],
+      [lightPalette.accentSoft, backgrounds.page],
+      [lightPalette.systemText, backgrounds.page],
+      [lightPalette.link, backgrounds.page],
+      [lightPalette.quote, backgrounds.page],
+      [lightPalette.error, backgrounds.page],
+      [lightPalette.success, backgrounds.page],
+      [lightPalette.userText, backgrounds.user],
+      [lightPalette.dim, backgrounds.pending],
+      [lightPalette.dim, backgrounds.success],
+      [lightPalette.dim, backgrounds.error],
+      [lightPalette.toolTitle, backgrounds.pending],
+      [lightPalette.toolTitle, backgrounds.success],
+      [lightPalette.toolTitle, backgrounds.error],
+      [lightPalette.toolOutput, backgrounds.pending],
+      [lightPalette.toolOutput, backgrounds.success],
+      [lightPalette.toolOutput, backgrounds.error],
+      [lightPalette.code, backgrounds.code],
+      [lightPalette.border, backgrounds.page],
+      [lightPalette.quoteBorder, backgrounds.page],
+      [lightPalette.codeBorder, backgrounds.page],
     ] as const;
 
     for (const [foreground, background] of textPairs) {

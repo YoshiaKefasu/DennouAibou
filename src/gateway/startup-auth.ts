@@ -215,6 +215,14 @@ async function resolveGatewayPasswordSecretRef(
   });
 }
 
+/**
+ * Injectable seam for persisting a generated gateway token.
+ */
+export type ReplaceConfigFile = (params: {
+  nextConfig: OpenClawConfig;
+  baseHash?: string;
+}) => Promise<unknown>;
+
 export async function ensureGatewayStartupAuth(params: {
   cfg: OpenClawConfig;
   env?: NodeJS.ProcessEnv;
@@ -222,6 +230,7 @@ export async function ensureGatewayStartupAuth(params: {
   tailscaleOverride?: GatewayTailscaleConfig;
   persist?: boolean;
   baseHash?: string;
+  replaceConfigFile?: ReplaceConfigFile;
 }): Promise<{
   cfg: OpenClawConfig;
   auth: ReturnType<typeof resolveGatewayAuth>;
@@ -271,7 +280,7 @@ export async function ensureGatewayStartupAuth(params: {
     resolvedAuth: resolved,
   });
   if (persist) {
-    await replaceConfigFile({
+    await (params.replaceConfigFile ?? replaceConfigFile)({
       nextConfig: nextCfg,
       baseHash: params.baseHash,
     });

@@ -1,60 +1,33 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { withEnv } from "../test-utils/env.js";
+import { describe, expect, it, vi } from "vitest";
+import { isTruthyEnvValue, logAcceptedEnvOption, normalizeEnv, normalizeZaiEnv } from "./env.js";
 
-const loggerMocks = vi.hoisted(() => ({
-  info: vi.fn(),
-}));
-
-vi.mock("../logging/subsystem.js", () => ({
-  createSubsystemLogger: () => ({
-    info: loggerMocks.info,
-  }),
-}));
-
-type EnvModule = typeof import("./env.js");
-
-let isTruthyEnvValue: EnvModule["isTruthyEnvValue"];
-let logAcceptedEnvOption: EnvModule["logAcceptedEnvOption"];
-let normalizeEnv: EnvModule["normalizeEnv"];
-let normalizeZaiEnv: EnvModule["normalizeZaiEnv"];
-
-beforeAll(async () => {
-  vi.resetModules();
-  ({ isTruthyEnvValue, logAcceptedEnvOption, normalizeEnv, normalizeZaiEnv } =
-    await import("./env.js"));
-});
-
-beforeEach(() => {
-  loggerMocks.info.mockClear();
-});
+function createLog() {
+  return { info: vi.fn<(message: string) => void>() };
+}
 
 describe("normalizeZaiEnv", () => {
   it("copies Z_AI_API_KEY to ZAI_API_KEY when missing", () => {
-    withEnv({ ZAI_API_KEY: "", Z_AI_API_KEY: "zai-legacy" }, () => {
-      normalizeZaiEnv();
-      expect(process.env.ZAI_API_KEY).toBe("zai-legacy");
-    });
+    const env: NodeJS.ProcessEnv = { ZAI_API_KEY: "", Z_AI_API_KEY: "zai-legacy" };
+    normalizeZaiEnv(env);
+    expect(env.ZAI_API_KEY).toBe("zai-legacy");
   });
 
   it("does not override existing ZAI_API_KEY", () => {
-    withEnv({ ZAI_API_KEY: "zai-current", Z_AI_API_KEY: "zai-legacy" }, () => {
-      normalizeZaiEnv();
-      expect(process.env.ZAI_API_KEY).toBe("zai-current");
-    });
+    const env: NodeJS.ProcessEnv = { ZAI_API_KEY: "zai-current", Z_AI_API_KEY: "zai-legacy" };
+    normalizeZaiEnv(env);
+    expect(env.ZAI_API_KEY).toBe("zai-current");
   });
 
   it("ignores blank legacy Z_AI_API_KEY values", () => {
-    withEnv({ ZAI_API_KEY: "", Z_AI_API_KEY: "   " }, () => {
-      normalizeZaiEnv();
-      expect(process.env.ZAI_API_KEY).toBe("");
-    });
+    const env: NodeJS.ProcessEnv = { ZAI_API_KEY: "", Z_AI_API_KEY: "   " };
+    normalizeZaiEnv(env);
+    expect(env.ZAI_API_KEY).toBe("");
   });
 
   it("does not copy when legacy Z_AI_API_KEY is unset", () => {
-    withEnv({ ZAI_API_KEY: "", Z_AI_API_KEY: undefined }, () => {
-      normalizeZaiEnv();
-      expect(process.env.ZAI_API_KEY).toBe("");
-    });
+    const env: NodeJS.ProcessEnv = { ZAI_API_KEY: "" };
+    normalizeZaiEnv(env);
+    expect(env.ZAI_API_KEY).toBe("");
   });
 });
 
@@ -76,72 +49,40 @@ describe("isTruthyEnvValue", () => {
 
 describe("logAcceptedEnvOption", () => {
   it("logs accepted env options once with redaction and formatting", () => {
-    loggerMocks.info.mockClear();
+    const log = createLog();
+    const env: NodeJS.ProcessEnv = {
+      NODE_ENV: "development",
+      DENNOU_TEST_ENV: "  line one\nline two  ",
+    };
+    const option = { key: "DENNOU_TEST_ENV", description: "test option", redact: true };
 
-    withEnv(
-      {
-        VITEST: "",
-        NODE_ENV: "development",
-        DENNOU_TEST_ENV: "  line one\nline two  ",
-      },
-      () => {
-        logAcceptedEnvOption({
-          key: "DENNOU_TEST_ENV",
-          description: "test option",
-          redact: true,
-        });
-        logAcceptedEnvOption({
-          key: "DENNOU_TEST_ENV",
-          description: "test option",
-          redact: true,
-        });
-      },
-    );
+    logAcceptedEnvOption(option, { env, log });
+    logAcceptedEnvOption(option, { env, log });
 
-    expect(loggerMocks.info).toHaveBeenCalledTimes(1);
-    expect(loggerMocks.info).toHaveBeenCalledWith("env: DENNOU_TEST_ENV=<redacted> (test option)");
+    expect(log.info).toHaveBeenCalledTimes(1);
+    expect(log.info).toHaveBeenCalledWith("env: DENNOU_TEST_ENV=<redacted> (test option)");
   });
 
   it("skips blank values and test-mode logging", () => {
-    loggerMocks.info.mockClear();
+    const log = createLog();
 
-    withEnv(
-      {
-        VITEST: "1",
-        NODE_ENV: "development",
-        DENNOU_BLANK_ENV: "value",
-      },
-      () => {
-        logAcceptedEnvOption({
-          key: "DENNOU_BLANK_ENV",
-          description: "skipped in vitest",
-        });
-      },
+    logAcceptedEnvOption(
+      { key: "DENNOU_BLANK_ENV", description: "skipped in test" },
+      { env: { VITEST: "1", NODE_ENV: "development", DENNOU_BLANK_ENV: "value" }, log },
+    );
+    logAcceptedEnvOption(
+      { key: "DENNOU_BLANK_ENV", description: "blank value" },
+      { env: { NODE_ENV: "development", DENNOU_BLANK_ENV: "   " }, log },
     );
 
-    withEnv(
-      {
-        VITEST: "",
-        NODE_ENV: "development",
-        DENNOU_BLANK_ENV: "   ",
-      },
-      () => {
-        logAcceptedEnvOption({
-          key: "DENNOU_BLANK_ENV",
-          description: "blank value",
-        });
-      },
-    );
-
-    expect(loggerMocks.info).not.toHaveBeenCalled();
+    expect(log.info).not.toHaveBeenCalled();
   });
 });
 
 describe("normalizeEnv", () => {
   it("normalizes the legacy ZAI env alias", () => {
-    withEnv({ ZAI_API_KEY: "", Z_AI_API_KEY: "zai-legacy" }, () => {
-      normalizeEnv();
-      expect(process.env.ZAI_API_KEY).toBe("zai-legacy");
-    });
+    const env: NodeJS.ProcessEnv = { ZAI_API_KEY: "", Z_AI_API_KEY: "zai-legacy" };
+    normalizeEnv(env);
+    expect(env.ZAI_API_KEY).toBe("zai-legacy");
   });
 });

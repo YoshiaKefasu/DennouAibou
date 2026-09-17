@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 189 files.
+# Current known-failure count: 179 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -85,7 +85,7 @@ src/agents/pi-tools.read.host-edit-access.test.ts
 # reset/dynamic-mock+conditional (1 file)
 src/agents/sandbox/ssh.spawn-env.test.ts
 
-# reset/dynamic-mock (27 additional files; measured after the first 250)
+# reset/dynamic-mock (18 additional files; measured after the first 250)
 src/commands/gateway-status.test.ts
 src/commands/models/list.list-command.forward-compat.test.ts
 src/commands/models/list.status.test.ts
@@ -95,11 +95,6 @@ src/config/zod-schema.providers.lazy-runtime.test.ts
 src/gateway/client.test.ts
 src/gateway/gateway-misc.test.ts
 src/gateway/server-methods/send.test.ts
-src/gateway/startup-auth.test.ts
-src/infra/boundary-file-read.test.ts
-src/infra/env.test.ts
-src/infra/net/proxy-fetch.test.ts
-src/infra/net/undici-global-dispatcher.test.ts
 src/infra/outbound/outbound-send-service.test.ts
 src/infra/session-maintenance-warning.test.ts
 src/media-understanding/apply.echo-transcript.test.ts
@@ -108,11 +103,7 @@ src/media-understanding/runner.vision-skip.test.ts
 src/media/server.outside-workspace.test.ts
 src/plugins/contracts/runtime-import-side-effects.contract.test.ts
 src/plugins/conversation-binding.test.ts
-src/process/exec.no-output-timer.test.ts
-src/process/exec.windows.test.ts
 src/process/supervisor/supervisor.test.ts
-src/secrets/provider-env-vars.dynamic.test.ts
-src/tui/theme/theme.test.ts
 
 # wait/import (2 additional files; measured after the first 250)
 src/entry.test.ts
@@ -151,8 +142,7 @@ src/gateway/call.test.ts
 src/gateway/server-plugins.test.ts
 src/plugins/wired-hooks-after-tool-call.e2e.test.ts
 
-# runtime/lifecycle (5 files; measured failures not covered by the API categories above)
-src/infra/retry.test.ts
+# runtime/lifecycle (4 files; measured failures not covered by the API categories above)
 src/tasks/task-registry.test.ts
 ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts

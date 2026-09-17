@@ -1,14 +1,25 @@
-import { createSubsystemLogger } from "../logging/subsystem.js";
+import { createSubsystemLogger, type SubsystemLogger } from "../logging/subsystem.js";
 
-let log: ReturnType<typeof createSubsystemLogger> | null = null;
+let log: SubsystemLogger | null = null;
 const loggedEnv = new Set<string>();
 
-function getLog(): ReturnType<typeof createSubsystemLogger> {
+function getLog(): SubsystemLogger {
   if (!log) {
     log = createSubsystemLogger("env");
   }
   return log;
 }
+
+/**
+ * Injectable seams for tests.
+ *
+ * `env` replaces `process.env` and `log` replaces the lazily created subsystem
+ * logger so callers can assert behaviour without module mocking.
+ */
+export type EnvDeps = {
+  env?: NodeJS.ProcessEnv;
+  log?: Pick<SubsystemLogger, "info">;
+};
 
 type AcceptedEnvOption = {
   key: string;
@@ -28,26 +39,27 @@ function formatEnvValue(value: string, redact?: boolean): string {
   return `${singleLine.slice(0, 160)}…`;
 }
 
-export function logAcceptedEnvOption(option: AcceptedEnvOption): void {
-  if (process.env.VITEST || process.env.NODE_ENV === "test") {
+export function logAcceptedEnvOption(option: AcceptedEnvOption, deps: EnvDeps = {}): void {
+  const env = deps.env ?? process.env;
+  if (env.VITEST || env.NODE_ENV === "test") {
     return;
   }
   if (loggedEnv.has(option.key)) {
     return;
   }
-  const rawValue = option.value ?? process.env[option.key];
+  const rawValue = option.value ?? env[option.key];
   if (!rawValue || !rawValue.trim()) {
     return;
   }
   loggedEnv.add(option.key);
-  getLog().info(
+  (deps.log ?? getLog()).info(
     `env: ${option.key}=${formatEnvValue(rawValue, option.redact)} (${option.description})`,
   );
 }
 
-export function normalizeZaiEnv(): void {
-  if (!process.env.ZAI_API_KEY?.trim() && process.env.Z_AI_API_KEY?.trim()) {
-    process.env.ZAI_API_KEY = process.env.Z_AI_API_KEY;
+export function normalizeZaiEnv(env: NodeJS.ProcessEnv = process.env): void {
+  if (!env.ZAI_API_KEY?.trim() && env.Z_AI_API_KEY?.trim()) {
+    env.ZAI_API_KEY = env.Z_AI_API_KEY;
   }
 }
 
@@ -66,6 +78,6 @@ export function isTruthyEnvValue(value?: string): boolean {
   }
 }
 
-export function normalizeEnv(): void {
-  normalizeZaiEnv();
+export function normalizeEnv(env: NodeJS.ProcessEnv = process.env): void {
+  normalizeZaiEnv(env);
 }

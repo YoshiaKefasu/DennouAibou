@@ -19,6 +19,24 @@ type ProviderEnvVarLookupParams = {
   env?: NodeJS.ProcessEnv;
 };
 
+/**
+ * Narrow view of the plugin manifest registry: only plugin auth env vars are
+ * consumed here, so the seam stays small and easy to stub in tests.
+ */
+type ProviderManifestRegistryLike = {
+  plugins: Array<{ providerAuthEnvVars?: Record<string, string[]> }>;
+  diagnostics?: unknown[];
+};
+
+/**
+ * Injectable seams for tests. Defaults to the real plugin manifest registry.
+ */
+export type ProviderEnvVarDeps = {
+  loadPluginManifestRegistry?: (
+    params: Parameters<typeof loadPluginManifestRegistry>[0],
+  ) => ProviderManifestRegistryLike;
+};
+
 function appendUniqueEnvVarCandidates(
   target: Record<string, string[]>,
   providerId: string,
@@ -42,8 +60,10 @@ function appendUniqueEnvVarCandidates(
 
 function resolveManifestProviderAuthEnvVarCandidates(
   params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
 ): Record<string, string[]> {
-  const registry = loadPluginManifestRegistry({
+  const loadRegistry = deps.loadPluginManifestRegistry ?? loadPluginManifestRegistry;
+  const registry = loadRegistry({
     config: params?.config,
     workspaceDir: params?.workspaceDir,
     env: params?.env,
@@ -64,18 +84,20 @@ function resolveManifestProviderAuthEnvVarCandidates(
 
 export function resolveProviderAuthEnvVarCandidates(
   params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
 ): Record<string, readonly string[]> {
   return {
-    ...resolveManifestProviderAuthEnvVarCandidates(params),
+    ...resolveManifestProviderAuthEnvVarCandidates(params, deps),
     ...CORE_PROVIDER_AUTH_ENV_VAR_CANDIDATES,
   };
 }
 
 export function resolveProviderEnvVars(
   params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
 ): Record<string, readonly string[]> {
   return {
-    ...resolveProviderAuthEnvVarCandidates(params),
+    ...resolveProviderAuthEnvVarCandidates(params, deps),
     ...CORE_PROVIDER_SETUP_ENV_VAR_OVERRIDES,
   };
 }
@@ -107,8 +129,9 @@ export const PROVIDER_ENV_VARS: Record<string, readonly string[]> = {
 export function getProviderEnvVars(
   providerId: string,
   params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
 ): string[] {
-  const providerEnvVars = resolveProviderEnvVars(params);
+  const providerEnvVars = resolveProviderEnvVars(params, deps);
   const envVars = Object.hasOwn(providerEnvVars, providerId)
     ? providerEnvVars[providerId]
     : undefined;
@@ -119,18 +142,24 @@ const EXTRA_PROVIDER_AUTH_ENV_VARS = ["MINIMAX_CODE_PLAN_KEY", "MINIMAX_CODING_A
 
 // DENNOU_API_KEY authenticates the local OpenClaw bridge itself and must
 // remain available to child bridge/runtime processes.
-export function listKnownProviderAuthEnvVarNames(params?: ProviderEnvVarLookupParams): string[] {
+export function listKnownProviderAuthEnvVarNames(
+  params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
+): string[] {
   return [
     ...new Set([
-      ...Object.values(resolveProviderAuthEnvVarCandidates(params)).flatMap((keys) => keys),
-      ...Object.values(resolveProviderEnvVars(params)).flatMap((keys) => keys),
+      ...Object.values(resolveProviderAuthEnvVarCandidates(params, deps)).flatMap((keys) => keys),
+      ...Object.values(resolveProviderEnvVars(params, deps)).flatMap((keys) => keys),
       ...EXTRA_PROVIDER_AUTH_ENV_VARS,
     ]),
   ];
 }
 
-export function listKnownSecretEnvVarNames(params?: ProviderEnvVarLookupParams): string[] {
-  return [...new Set(Object.values(resolveProviderEnvVars(params)).flatMap((keys) => keys))];
+export function listKnownSecretEnvVarNames(
+  params?: ProviderEnvVarLookupParams,
+  deps: ProviderEnvVarDeps = {},
+): string[] {
+  return [...new Set(Object.values(resolveProviderEnvVars(params, deps)).flatMap((keys) => keys))];
 }
 
 export function omitEnvKeysCaseInsensitive(

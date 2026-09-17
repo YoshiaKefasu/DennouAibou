@@ -1,33 +1,32 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  canUseBoundaryFileOpen,
+  matchBoundaryFileOpenFailure,
+  openBoundaryFile,
+  openBoundaryFileSync,
+} from "./boundary-file-read.js";
+import type { ResolveBoundaryPathParams } from "./boundary-path.js";
+import type { SafeOpenSyncResult } from "./safe-open-sync.js";
 
-const resolveBoundaryPathSyncMock = vi.hoisted(() => vi.fn());
-const resolveBoundaryPathMock = vi.hoisted(() => vi.fn());
-const openVerifiedFileSyncMock = vi.hoisted(() => vi.fn());
+type ResolvedBoundaryPathLike = { canonicalPath: string; rootCanonicalPath: string };
 
-vi.mock("./boundary-path.js", () => ({
-  resolveBoundaryPathSync: (...args: unknown[]) => resolveBoundaryPathSyncMock(...args),
-  resolveBoundaryPath: (...args: unknown[]) => resolveBoundaryPathMock(...args),
-}));
-
-vi.mock("./safe-open-sync.js", () => ({
-  openVerifiedFileSync: (...args: unknown[]) => openVerifiedFileSyncMock(...args),
-}));
-
-let canUseBoundaryFileOpen: typeof import("./boundary-file-read.js").canUseBoundaryFileOpen;
-let matchBoundaryFileOpenFailure: typeof import("./boundary-file-read.js").matchBoundaryFileOpenFailure;
-let openBoundaryFile: typeof import("./boundary-file-read.js").openBoundaryFile;
-let openBoundaryFileSync: typeof import("./boundary-file-read.js").openBoundaryFileSync;
+const resolveBoundaryPathSyncMock =
+  vi.fn<
+    (
+      params: ResolveBoundaryPathParams,
+    ) => ResolvedBoundaryPathLike | Promise<ResolvedBoundaryPathLike>
+  >();
+const resolveBoundaryPathMock =
+  vi.fn<
+    (
+      params: ResolveBoundaryPathParams,
+    ) => ResolvedBoundaryPathLike | Promise<ResolvedBoundaryPathLike>
+  >();
+const openVerifiedFileSyncMock = vi.fn<() => SafeOpenSyncResult>();
 
 describe("boundary-file-read", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    ({
-      canUseBoundaryFileOpen,
-      matchBoundaryFileOpenFailure,
-      openBoundaryFile,
-      openBoundaryFileSync,
-    } = await import("./boundary-file-read.js"));
+  beforeEach(() => {
     resolveBoundaryPathSyncMock.mockReset();
     resolveBoundaryPathMock.mockReset();
     openVerifiedFileSyncMock.mockReset();
@@ -75,12 +74,18 @@ describe("boundary-file-read", () => {
       stat,
     });
 
-    const opened = openBoundaryFileSync({
-      absolutePath: "plugin.json",
-      rootPath: "/workspace",
-      boundaryLabel: "plugin root",
-      ioFs,
-    });
+    const opened = openBoundaryFileSync(
+      {
+        absolutePath: "plugin.json",
+        rootPath: "/workspace",
+        boundaryLabel: "plugin root",
+        ioFs,
+      },
+      {
+        resolveBoundaryPathSync: resolveBoundaryPathSyncMock,
+        openVerifiedFileSync: openVerifiedFileSyncMock,
+      },
+    );
 
     expect(resolveBoundaryPathSyncMock).toHaveBeenCalledWith({
       absolutePath,
@@ -112,11 +117,17 @@ describe("boundary-file-read", () => {
       throw error;
     });
 
-    const opened = openBoundaryFileSync({
-      absolutePath: "plugin.json",
-      rootPath: "/workspace",
-      boundaryLabel: "plugin root",
-    });
+    const opened = openBoundaryFileSync(
+      {
+        absolutePath: "plugin.json",
+        rootPath: "/workspace",
+        boundaryLabel: "plugin root",
+      },
+      {
+        resolveBoundaryPathSync: resolveBoundaryPathSyncMock,
+        openVerifiedFileSync: openVerifiedFileSyncMock,
+      },
+    );
 
     expect(opened).toEqual({
       ok: false,
@@ -134,11 +145,17 @@ describe("boundary-file-read", () => {
       }),
     );
 
-    const opened = openBoundaryFileSync({
-      absolutePath: "plugin.json",
-      rootPath: "/workspace",
-      boundaryLabel: "plugin root",
-    });
+    const opened = openBoundaryFileSync(
+      {
+        absolutePath: "plugin.json",
+        rootPath: "/workspace",
+        boundaryLabel: "plugin root",
+      },
+      {
+        resolveBoundaryPathSync: resolveBoundaryPathSyncMock,
+        openVerifiedFileSync: openVerifiedFileSyncMock,
+      },
+    );
 
     expect(opened.ok).toBe(false);
     if (opened.ok) {
@@ -162,13 +179,19 @@ describe("boundary-file-read", () => {
       error: new Error("blocked"),
     });
 
-    const opened = await openBoundaryFile({
-      absolutePath: "notes.txt",
-      rootPath: "/workspace",
-      boundaryLabel: "workspace",
-      aliasPolicy: { allowFinalSymlinkForUnlink: true },
-      ioFs,
-    });
+    const opened = await openBoundaryFile(
+      {
+        absolutePath: "notes.txt",
+        rootPath: "/workspace",
+        boundaryLabel: "workspace",
+        aliasPolicy: { allowFinalSymlinkForUnlink: true },
+        ioFs,
+      },
+      {
+        resolveBoundaryPath: resolveBoundaryPathMock,
+        openVerifiedFileSync: openVerifiedFileSyncMock,
+      },
+    );
 
     expect(resolveBoundaryPathMock).toHaveBeenCalledWith({
       absolutePath,
@@ -197,11 +220,17 @@ describe("boundary-file-read", () => {
     const error = new Error("escaped");
     resolveBoundaryPathMock.mockRejectedValue(error);
 
-    const opened = await openBoundaryFile({
-      absolutePath: "notes.txt",
-      rootPath: "/workspace",
-      boundaryLabel: "workspace",
-    });
+    const opened = await openBoundaryFile(
+      {
+        absolutePath: "notes.txt",
+        rootPath: "/workspace",
+        boundaryLabel: "workspace",
+      },
+      {
+        resolveBoundaryPath: resolveBoundaryPathMock,
+        openVerifiedFileSync: openVerifiedFileSyncMock,
+      },
+    );
 
     expect(opened).toEqual({
       ok: false,

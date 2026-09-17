@@ -1,47 +1,34 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import {
+  getProviderEnvVars,
+  listKnownProviderAuthEnvVarNames,
+  listKnownSecretEnvVarNames,
+} from "./provider-env-vars.js";
 
-type MockManifestRegistry = {
-  plugins: Array<{
-    id: string;
-    origin: string;
-    providerAuthEnvVars?: Record<string, string[]>;
-  }>;
-  diagnostics: unknown[];
+const externalFireworksPlugin = {
+  id: "external-fireworks",
+  origin: "global",
+  providerAuthEnvVars: {
+    fireworks: ["FIREWORKS_ALT_API_KEY"],
+  },
 };
 
-const loadPluginManifestRegistry = vi.hoisted(() =>
-  vi.fn<() => MockManifestRegistry>(() => ({ plugins: [], diagnostics: [] })),
-);
-
-vi.mock("../plugins/manifest-registry.js", () => ({
-  loadPluginManifestRegistry,
-}));
-
 describe("provider env vars dynamic manifest metadata", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    loadPluginManifestRegistry.mockReset();
-    loadPluginManifestRegistry.mockReturnValue({ plugins: [], diagnostics: [] });
+  it("includes later-installed plugin env vars without a bundled generated map", () => {
+    const loadPluginManifestRegistry = vi.fn(() => ({
+      plugins: [externalFireworksPlugin],
+      diagnostics: [],
+    }));
+    const deps = { loadPluginManifestRegistry };
+
+    expect(getProviderEnvVars("fireworks", undefined, deps)).toEqual(["FIREWORKS_ALT_API_KEY"]);
+    expect(listKnownProviderAuthEnvVarNames(undefined, deps)).toContain("FIREWORKS_ALT_API_KEY");
+    expect(listKnownSecretEnvVarNames(undefined, deps)).toContain("FIREWORKS_ALT_API_KEY");
   });
 
-  it("includes later-installed plugin env vars without a bundled generated map", async () => {
-    loadPluginManifestRegistry.mockReturnValue({
-      plugins: [
-        {
-          id: "external-fireworks",
-          origin: "global",
-          providerAuthEnvVars: {
-            fireworks: ["FIREWORKS_ALT_API_KEY"],
-          },
-        },
-      ],
-      diagnostics: [],
-    });
+  it("returns no env vars when the manifest registry is empty", () => {
+    const loadPluginManifestRegistry = vi.fn(() => ({ plugins: [], diagnostics: [] }));
 
-    const mod = await import("./provider-env-vars.js");
-
-    expect(mod.getProviderEnvVars("fireworks")).toEqual(["FIREWORKS_ALT_API_KEY"]);
-    expect(mod.listKnownProviderAuthEnvVarNames()).toContain("FIREWORKS_ALT_API_KEY");
-    expect(mod.listKnownSecretEnvVarNames()).toContain("FIREWORKS_ALT_API_KEY");
+    expect(getProviderEnvVars("fireworks", undefined, { loadPluginManifestRegistry })).toEqual([]);
   });
 });

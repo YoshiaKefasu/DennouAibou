@@ -1,5 +1,5 @@
-import { sleep } from "../utils.js";
-import { generateSecureFraction } from "./secure-random.js";
+import { sleep as defaultSleep } from "../utils.js";
+import { generateSecureFraction as defaultGenerateSecureFraction } from "./secure-random.js";
 
 export type RetryConfig = {
   attempts?: number;
@@ -14,6 +14,15 @@ export type RetryInfo = {
   delayMs: number;
   err: unknown;
   label?: string;
+};
+
+/**
+ * Injectable seams for tests so retry timing and jitter can be exercised without
+ * fake timers or module mocking.
+ */
+export type RetryDeps = {
+  sleep?: (delayMs: number) => Promise<void>;
+  generateSecureFraction?: () => number;
 };
 
 export type RetryOptions = RetryConfig & {
@@ -60,7 +69,11 @@ export function resolveRetryConfig(
   return { attempts, minDelayMs, maxDelayMs, jitter };
 }
 
-function applyJitter(delayMs: number, jitter: number): number {
+function applyJitter(
+  delayMs: number,
+  jitter: number,
+  generateSecureFraction: () => number,
+): number {
   if (jitter <= 0) {
     return delayMs;
   }
@@ -72,7 +85,9 @@ export async function retryAsync<T>(
   fn: () => Promise<T>,
   attemptsOrOptions: number | RetryOptions = 3,
   initialDelayMs = 300,
+  deps: RetryDeps = {},
 ): Promise<T> {
+  const sleep = deps.sleep ?? defaultSleep;
   if (typeof attemptsOrOptions === "number") {
     const attempts = Math.max(1, Math.round(attemptsOrOptions));
     let lastErr: unknown;
@@ -101,6 +116,7 @@ export async function retryAsync<T>(
       ? resolved.maxDelayMs
       : Number.POSITIVE_INFINITY;
   const jitter = resolved.jitter;
+  const generateSecureFraction = deps.generateSecureFraction ?? defaultGenerateSecureFraction;
   const shouldRetry = options.shouldRetry ?? (() => true);
   let lastErr: unknown;
 
@@ -119,7 +135,7 @@ export async function retryAsync<T>(
         ? Math.max(retryAfterMs, minDelayMs)
         : minDelayMs * 2 ** (attempt - 1);
       let delay = Math.min(baseDelay, maxDelayMs);
-      delay = applyJitter(delay, jitter);
+      delay = applyJitter(delay, jitter, generateSecureFraction);
       delay = Math.min(Math.max(delay, minDelayMs), maxDelayMs);
 
       options.onRetry?.({

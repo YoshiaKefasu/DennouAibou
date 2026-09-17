@@ -45,8 +45,14 @@ function pickHigherContrastText(r: number, g: number, b: number): boolean {
   return contrastRatio(background, LIGHT_TEXT) >= contrastRatio(background, DARK_TEXT);
 }
 
-function isLightBackground(): boolean {
-  const explicit = process.env.DENNOU_THEME?.toLowerCase();
+/**
+ * Whether the terminal has a light background.
+ *
+ * Exported so tests can evaluate the resolution for an explicit environment
+ * instead of re-importing the module with a mutated `process.env`.
+ */
+export function resolveLightMode(env: NodeJS.ProcessEnv = process.env): boolean {
+  const explicit = env.DENNOU_THEME?.toLowerCase();
   if (explicit === "light") {
     return true;
   }
@@ -54,7 +60,7 @@ function isLightBackground(): boolean {
     return false;
   }
 
-  const colorfgbg = process.env.COLORFGBG;
+  const colorfgbg = env.COLORFGBG;
   if (colorfgbg && colorfgbg.length <= 64) {
     const sep = colorfgbg.lastIndexOf(";");
     const bg = Number.parseInt(sep >= 0 ? colorfgbg.slice(sep + 1) : colorfgbg, 10);
@@ -76,7 +82,7 @@ function isLightBackground(): boolean {
 }
 
 /** Whether the terminal has a light background. Exported for testing only. */
-export const lightMode = isLightBackground();
+export const lightMode = resolveLightMode();
 
 export const darkPalette = {
   text: "#E8E3D5",
@@ -134,24 +140,39 @@ const bg = (hex: string) => (text: string) => chalk.bgHex(hex)(text);
 const syntaxTheme = createSyntaxTheme(fg(palette.code), lightMode);
 
 /**
- * Highlight code with syntax coloring.
+ * Injectable seams for tests so syntax highlighting can be stubbed instead of
+ * mocking the `cli-highlight` module.
+ */
+export type HighlightCodeDeps = {
+  highlight?: typeof highlight;
+  supportsLanguage?: typeof supportsLanguage;
+};
+
+/**
+ * Build a `highlightCode` implementation with optional highlighter seams.
  * Returns an array of lines with ANSI escape codes.
  */
-function highlightCode(code: string, lang?: string): string[] {
-  try {
-    // Auto-detect can be slow for very large blocks; prefer explicit language when available.
-    // Check if language is supported, fall back to auto-detect
-    const language = lang && supportsLanguage(lang) ? lang : undefined;
-    const highlighted = highlight(code, {
-      language,
-      theme: syntaxTheme,
-      ignoreIllegals: true,
-    });
-    return highlighted.split("\n");
-  } catch {
-    // If highlighting fails, return plain code
-    return code.split("\n").map((line) => fg(palette.code)(line));
-  }
+export function createHighlightCode(
+  deps: HighlightCodeDeps = {},
+): (code: string, lang?: string) => string[] {
+  const highlightImpl = deps.highlight ?? highlight;
+  const supportsLanguageImpl = deps.supportsLanguage ?? supportsLanguage;
+  return (code: string, lang?: string): string[] => {
+    try {
+      // Auto-detect can be slow for very large blocks; prefer explicit language when available.
+      // Check if language is supported, fall back to auto-detect
+      const language = lang && supportsLanguageImpl(lang) ? lang : undefined;
+      const highlighted = highlightImpl(code, {
+        language,
+        theme: syntaxTheme,
+        ignoreIllegals: true,
+      });
+      return highlighted.split("\n");
+    } catch {
+      // If highlighting fails, return plain code
+      return code.split("\n").map((line) => fg(palette.code)(line));
+    }
+  };
 }
 
 export const theme = {
@@ -191,7 +212,7 @@ export const markdownTheme: MarkdownTheme = {
   italic: (text) => chalk.italic(text),
   strikethrough: (text) => chalk.strikethrough(text),
   underline: (text) => chalk.underline(text),
-  highlightCode,
+  highlightCode: createHighlightCode(),
 };
 
 const baseSelectListTheme: SelectListTheme = {

@@ -1,20 +1,9 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runCommandWithTimeout } from "./exec.js";
 
-const spawnMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const actual = await import("node:child_process");
-  return {
-    ...actual,
-    spawn: spawnMock,
-  };
-});
-
-type ExecModule = typeof import("./exec.js");
-
-let runCommandWithTimeout: ExecModule["runCommandWithTimeout"];
+const spawnMock = vi.fn();
 
 function createFakeSpawnedChild() {
   const child = new EventEmitter() as EventEmitter & ChildProcess;
@@ -40,6 +29,8 @@ function createFakeSpawnedChild() {
   return { child, stdout, stderr, kill };
 }
 
+const noOutputTimerDeps = { spawn: spawnMock, platform: "linux" } as const;
+
 function emitProcessExit(
   fake: ReturnType<typeof createFakeSpawnedChild>,
   params?: {
@@ -54,11 +45,6 @@ function emitProcessExit(
 }
 
 describe("runCommandWithTimeout no-output timer", () => {
-  beforeAll(async () => {
-    vi.resetModules();
-    ({ runCommandWithTimeout } = await import("./exec.js"));
-  });
-
   beforeEach(() => {
     spawnMock.mockClear();
   });
@@ -73,17 +59,21 @@ describe("runCommandWithTimeout no-output timer", () => {
     const fake = createFakeSpawnedChild();
     spawnMock.mockReturnValue(fake.child);
 
-    const runPromise = runCommandWithTimeout(["node", "-e", "ignored"], {
-      timeoutMs: 1_000,
-      noOutputTimeoutMs: 80,
-    });
+    const runPromise = runCommandWithTimeout(
+      ["node", "-e", "ignored"],
+      {
+        timeoutMs: 1_000,
+        noOutputTimeoutMs: 80,
+      },
+      noOutputTimerDeps,
+    );
 
     fake.stdout.emit("data", Buffer.from("."));
-    await vi.advanceTimersByTimeAsync(40);
+    vi.advanceTimersByTime(40);
     fake.stdout.emit("data", Buffer.from("."));
-    await vi.advanceTimersByTimeAsync(40);
+    vi.advanceTimersByTime(40);
     fake.stdout.emit("data", Buffer.from("."));
-    await vi.advanceTimersByTimeAsync(20);
+    vi.advanceTimersByTime(20);
 
     fake.child.emit("close", 0, null);
     const result = await runPromise;
@@ -100,12 +90,16 @@ describe("runCommandWithTimeout no-output timer", () => {
     const fake = createFakeSpawnedChild();
     spawnMock.mockReturnValue(fake.child);
 
-    const runPromise = runCommandWithTimeout(["node", "-e", "ignored"], {
-      timeoutMs: 1_000,
-      noOutputTimeoutMs: 80,
-    });
+    const runPromise = runCommandWithTimeout(
+      ["node", "-e", "ignored"],
+      {
+        timeoutMs: 1_000,
+        noOutputTimeoutMs: 80,
+      },
+      noOutputTimerDeps,
+    );
 
-    await vi.advanceTimersByTimeAsync(81);
+    vi.advanceTimersByTime(81);
     expect(fake.kill).toHaveBeenCalledWith("SIGKILL");
 
     emitProcessExit(fake, { signal: "SIGKILL" });
@@ -121,11 +115,15 @@ describe("runCommandWithTimeout no-output timer", () => {
     const fake = createFakeSpawnedChild();
     spawnMock.mockReturnValue(fake.child);
 
-    const runPromise = runCommandWithTimeout(["node", "-e", "ignored"], {
-      timeoutMs: 80,
-    });
+    const runPromise = runCommandWithTimeout(
+      ["node", "-e", "ignored"],
+      {
+        timeoutMs: 80,
+      },
+      noOutputTimerDeps,
+    );
 
-    await vi.advanceTimersByTimeAsync(81);
+    vi.advanceTimersByTime(81);
     expect(fake.kill).toHaveBeenCalledWith("SIGKILL");
 
     emitProcessExit(fake, { signal: "SIGKILL" });

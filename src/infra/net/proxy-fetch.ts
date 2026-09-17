@@ -8,21 +8,34 @@ type ProxyFetchWithMetadata = typeof fetch & {
 };
 
 /**
+ * Injectable seams for tests. Every entry defaults to the real undici / proxy-env
+ * implementation so production callers keep the existing behaviour.
+ */
+export type ProxyFetchDeps = {
+  EnvHttpProxyAgent?: typeof EnvHttpProxyAgent;
+  ProxyAgent?: typeof ProxyAgent;
+  fetch?: typeof undiciFetch;
+  hasEnvHttpProxyConfigured?: (protocol?: "http" | "https", env?: NodeJS.ProcessEnv) => boolean;
+};
+
+/**
  * Create a fetch function that routes requests through the given HTTP proxy.
  * Uses undici's ProxyAgent under the hood.
  */
-export function makeProxyFetch(proxyUrl: string): typeof fetch {
+export function makeProxyFetch(proxyUrl: string, deps: ProxyFetchDeps = {}): typeof fetch {
+  const ProxyAgentCtor = deps.ProxyAgent ?? ProxyAgent;
+  const fetchImpl = deps.fetch ?? undiciFetch;
   let agent: ProxyAgent | null = null;
   const resolveAgent = (): ProxyAgent => {
     if (!agent) {
-      agent = new ProxyAgent(proxyUrl);
+      agent = new ProxyAgentCtor(proxyUrl);
     }
     return agent;
   };
   // undici's fetch is runtime-compatible with global fetch but the types diverge
   // on stream/body internals. Single cast at the boundary keeps the rest type-safe.
   const proxyFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    undiciFetch(input as string | URL, {
+    fetchImpl(input as string | URL, {
       ...(init as Record<string, unknown>),
       dispatcher: resolveAgent(),
     }) as unknown as Promise<Response>) as ProxyFetchWithMetadata;
@@ -53,14 +66,18 @@ export function getProxyUrlFromFetch(fetchImpl?: typeof fetch): string | undefin
  */
 export function resolveProxyFetchFromEnv(
   env: NodeJS.ProcessEnv = process.env,
+  deps: ProxyFetchDeps = {},
 ): typeof fetch | undefined {
-  if (!hasEnvHttpProxyConfigured("https", env)) {
+  const hasProxyConfigured = deps.hasEnvHttpProxyConfigured ?? hasEnvHttpProxyConfigured;
+  if (!hasProxyConfigured("https", env)) {
     return undefined;
   }
+  const EnvHttpProxyAgentCtor = deps.EnvHttpProxyAgent ?? EnvHttpProxyAgent;
+  const fetchImpl = deps.fetch ?? undiciFetch;
   try {
-    const agent = new EnvHttpProxyAgent();
+    const agent = new EnvHttpProxyAgentCtor();
     return ((input: RequestInfo | URL, init?: RequestInit) =>
-      undiciFetch(input as string | URL, {
+      fetchImpl(input as string | URL, {
         ...(init as Record<string, unknown>),
         dispatcher: agent,
       }) as unknown as Promise<Response>) as typeof fetch;
