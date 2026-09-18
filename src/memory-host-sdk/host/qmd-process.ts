@@ -16,17 +16,53 @@ export type QmdBinaryAvailability = {
   error?: string;
 };
 
+/**
+ * Injectable seams for the OS/process boundaries this module touches. Tests
+ * supply fixtures instead of mocking `node:child_process` and patching
+ * `process.platform` at module level.
+ */
+export type QmdProcessDeps = {
+  platform?: NodeJS.Platform;
+  execPath?: string;
+  spawn?: typeof spawn;
+  cwd?: () => string;
+  setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
+};
+
+type ResolvedQmdProcessDeps = {
+  platform: NodeJS.Platform;
+  execPath: string;
+  spawn: typeof spawn;
+  cwd: () => string;
+  setTimer: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer: (handle: ReturnType<typeof setTimeout>) => void;
+};
+
+function resolveQmdProcessDeps(deps: QmdProcessDeps = {}): ResolvedQmdProcessDeps {
+  return {
+    platform: deps.platform ?? process.platform,
+    execPath: deps.execPath ?? process.execPath,
+    spawn: deps.spawn ?? spawn,
+    cwd: deps.cwd ?? (() => process.cwd()),
+    setTimer: deps.setTimer ?? ((callback, ms) => setTimeout(callback, ms)),
+    clearTimer: deps.clearTimer ?? ((handle) => clearTimeout(handle)),
+  };
+}
+
 export function resolveCliSpawnInvocation(params: {
   command: string;
   args: string[];
   env: NodeJS.ProcessEnv;
   packageName: string;
+  deps?: Pick<QmdProcessDeps, "platform" | "execPath">;
 }): CliSpawnInvocation {
+  const deps = resolveQmdProcessDeps(params.deps);
   const program = resolveWindowsSpawnProgram({
     command: params.command,
-    platform: process.platform,
+    platform: deps.platform,
     env: params.env,
-    execPath: process.execPath,
+    execPath: deps.execPath,
     packageName: params.packageName,
     allowShellFallback: false,
   });
@@ -38,7 +74,9 @@ export async function checkQmdBinaryAvailability(params: {
   env: NodeJS.ProcessEnv;
   cwd?: string;
   timeoutMs?: number;
+  deps?: QmdProcessDeps;
 }): Promise<QmdBinaryAvailability> {
+  const deps = resolveQmdProcessDeps(params.deps);
   let spawnInvocation: CliSpawnInvocation;
   try {
     spawnInvocation = resolveCliSpawnInvocation({
@@ -46,6 +84,7 @@ export async function checkQmdBinaryAvailability(params: {
       args: [],
       env: params.env,
       packageName: "qmd",
+      deps,
     });
   } catch (err) {
     return { available: false, error: formatQmdAvailabilityError(err) };
@@ -54,25 +93,26 @@ export async function checkQmdBinaryAvailability(params: {
   return await new Promise((resolve) => {
     let settled = false;
     let didSpawn = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const finish = (result: QmdBinaryAvailability) => {
       if (settled) {
         return;
       }
       settled = true;
       if (timer) {
-        clearTimeout(timer);
+        deps.clearTimer(timer);
       }
       resolve(result);
     };
 
-    const child = spawn(spawnInvocation.command, spawnInvocation.argv, {
+    const child = deps.spawn(spawnInvocation.command, spawnInvocation.argv, {
       env: params.env,
-      cwd: params.cwd ?? process.cwd(),
+      cwd: params.cwd ?? deps.cwd(),
       shell: spawnInvocation.shell,
       windowsHide: spawnInvocation.windowsHide,
       stdio: "ignore",
     });
-    const timer = setTimeout(() => {
+    timer = deps.setTimer(() => {
       child.kill("SIGKILL");
       finish({
         available: false,

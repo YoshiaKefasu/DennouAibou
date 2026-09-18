@@ -38,6 +38,37 @@ import {
 } from "../plugins/provider-thinking.js";
 
 /**
+ * Test-only seams for the config + provider-thinking lookups. Production never
+ * sets this; tests inject fixtures instead of `vi.resetModules()` + `vi.doMock`,
+ * which Bun's runner does not support.
+ */
+export type ThinkingDeps = {
+  loadConfig?: typeof loadConfig;
+  resolveProviderBinaryThinking?: typeof resolveProviderBinaryThinking;
+  resolveProviderDefaultThinkingLevel?: typeof resolveProviderDefaultThinkingLevel;
+};
+const THINKING_DEPS_OVERRIDE_KEY = Symbol.for("dennou.thinkingDepsOverride");
+type ThinkingGlobalWithDepsOverride = typeof globalThis & {
+  [THINKING_DEPS_OVERRIDE_KEY]?: ThinkingDeps | null;
+};
+
+/** Test-only override for the thinking config/provider lookups. */
+export function setThinkingDepsForTests(deps: ThinkingDeps | null): void {
+  (globalThis as ThinkingGlobalWithDepsOverride)[THINKING_DEPS_OVERRIDE_KEY] = deps;
+}
+
+function resolveThinkingDeps(): Required<ThinkingDeps> {
+  const override = (globalThis as ThinkingGlobalWithDepsOverride)[THINKING_DEPS_OVERRIDE_KEY] ?? {};
+  return {
+    loadConfig: override.loadConfig ?? loadConfig,
+    resolveProviderBinaryThinking:
+      override.resolveProviderBinaryThinking ?? resolveProviderBinaryThinking,
+    resolveProviderDefaultThinkingLevel:
+      override.resolveProviderDefaultThinkingLevel ?? resolveProviderDefaultThinkingLevel,
+  };
+}
+
+/**
  * PI-style canonical order for non-base thinking levels. The map-driven
  * `listThinkingLevels` walks this order, dropping entries whose value is
  * `null` (or missing) in the resolved `reasoningEffortMap`.
@@ -69,7 +100,7 @@ export function isBinaryThinkingProvider(provider?: string | null, model?: strin
     return false;
   }
 
-  const pluginDecision = resolveProviderBinaryThinking({
+  const pluginDecision = resolveThinkingDeps().resolveProviderBinaryThinking({
     provider: normalizedProvider,
     context: {
       provider: normalizedProvider,
@@ -102,7 +133,7 @@ function lookupModelReasoningEffortMap(
   const target = trimmedModel.toLowerCase();
   const fromConfig = (): ReasoningEffortMap | undefined => {
     try {
-      const cfg = loadConfig();
+      const cfg = resolveThinkingDeps().loadConfig();
       const providerEntry = (cfg.models?.providers ?? {})[trimmedProvider];
       const models = providerEntry?.models;
       if (!Array.isArray(models)) {
@@ -246,7 +277,7 @@ export function resolveThinkingDefaultForModel(params: {
   const candidate = params.catalog?.find(
     (entry) => entry.provider === params.provider && entry.id === params.model,
   );
-  const pluginDecision = resolveProviderDefaultThinkingLevel({
+  const pluginDecision = resolveThinkingDeps().resolveProviderDefaultThinkingLevel({
     provider: normalizedProvider,
     context: {
       provider: normalizedProvider,

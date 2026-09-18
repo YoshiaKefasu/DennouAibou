@@ -44,6 +44,16 @@ type FetchMediaOptions = {
   lookupFn?: LookupFn;
   dispatcherAttempts?: FetchDispatcherAttempt[];
   shouldRetryFetchError?: (error: unknown) => boolean;
+  deps?: FetchRemoteMediaDeps;
+};
+
+/**
+ * Injectable seams for the guarded-fetch boundary. Tests supply fixtures
+ * instead of mocking `../infra/net/fetch-guard.js` at module level.
+ */
+export type FetchRemoteMediaDeps = {
+  fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
+  withStrictGuardedFetchMode?: typeof withStrictGuardedFetchMode;
 };
 
 function stripQuotes(value: string): string {
@@ -107,6 +117,9 @@ export async function fetchRemoteMedia(options: FetchMediaOptions): Promise<Fetc
     dispatcherAttempts,
     shouldRetryFetchError,
   } = options;
+  const fetchWithSsrFGuardImpl = options.deps?.fetchWithSsrFGuard ?? fetchWithSsrFGuard;
+  const withStrictGuardedFetchModeImpl =
+    options.deps?.withStrictGuardedFetchMode ?? withStrictGuardedFetchMode;
   const sourceUrl = redactMediaUrl(url);
 
   let res: Response;
@@ -117,8 +130,8 @@ export async function fetchRemoteMedia(options: FetchMediaOptions): Promise<Fetc
       ? dispatcherAttempts
       : [{ dispatcherPolicy: undefined, lookupFn }];
   const runGuardedFetch = async (attempt: FetchDispatcherAttempt) =>
-    await fetchWithSsrFGuard(
-      withStrictGuardedFetchMode({
+    await fetchWithSsrFGuardImpl(
+      withStrictGuardedFetchModeImpl({
         url,
         fetchImpl,
         init: requestInit,

@@ -1,50 +1,40 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { withEnvAsync } from "../test-utils/env.js";
+import {
+  installPluginFromMarketplace,
+  listMarketplacePlugins,
+  resolveMarketplaceInstallShortcut,
+  setMarketplaceDepsForTests,
+  type MarketplaceDepsOverride,
+} from "./marketplace.js";
 
 const installPluginFromPathMock = vi.fn();
-const fetchWithSsrFGuardMock = vi.hoisted(() =>
-  vi.fn(async (params: { url: string; init?: RequestInit }) => {
-    // Keep unit tests focused on guarded call sites, not AbortSignal timer behavior.
-    const { signal: _signal, ...init } = params.init ?? {};
-    const response = await fetch(params.url, init);
-    return {
-      response,
-      finalUrl: params.url,
-      release: async () => {
-        await response.body?.cancel().catch(() => undefined);
-      },
-    };
-  }),
-);
-const runCommandWithTimeoutMock = vi.hoisted(() => vi.fn());
-let installPluginFromMarketplace: typeof import("./marketplace.js").installPluginFromMarketplace;
-let listMarketplacePlugins: typeof import("./marketplace.js").listMarketplacePlugins;
-let resolveMarketplaceInstallShortcut: typeof import("./marketplace.js").resolveMarketplaceInstallShortcut;
-const tempOutsideDirs: string[] = [];
-
-vi.mock("./install.js", () => ({
-  installPluginFromPath: (...args: unknown[]) => installPluginFromPathMock(...args),
-}));
-
-vi.mock("../infra/net/fetch-guard.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../infra/net/fetch-guard.js")>();
+const fetchWithSsrFGuardMock = vi.fn(async (params: { url: string; init?: RequestInit }) => {
+  // Keep unit tests focused on guarded call sites, not AbortSignal timer behavior.
+  const { signal: _signal, ...init } = params.init ?? {};
+  const response = await fetch(params.url, init);
   return {
-    ...actual,
-    fetchWithSsrFGuard: (params: { url: string; init?: RequestInit }) =>
-      fetchWithSsrFGuardMock(params),
+    response,
+    finalUrl: params.url,
+    release: async () => {
+      await response.body?.cancel().catch(() => undefined);
+    },
   };
 });
+const runCommandWithTimeoutMock = vi.fn();
+const tempOutsideDirs: string[] = [];
 
-vi.mock("../process/exec.js", () => ({
-  runCommandWithTimeout: (...args: unknown[]) => runCommandWithTimeoutMock(...args),
-}));
-
-beforeAll(async () => {
-  ({ installPluginFromMarketplace, listMarketplacePlugins, resolveMarketplaceInstallShortcut } =
-    await import("./marketplace.js"));
+// Inject the boundary calls instead of module-level mocks (unsupported on Bun).
+setMarketplaceDepsForTests({
+  installPluginFromPath:
+    installPluginFromPathMock as unknown as MarketplaceDepsOverride["installPluginFromPath"],
+  fetchWithSsrFGuard:
+    fetchWithSsrFGuardMock as unknown as MarketplaceDepsOverride["fetchWithSsrFGuard"],
+  runCommandWithTimeout:
+    runCommandWithTimeoutMock as unknown as MarketplaceDepsOverride["runCommandWithTimeout"],
 });
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
@@ -501,7 +491,7 @@ describe("marketplace plugins", () => {
     });
   });
 
-  it.runIf(process.platform !== "win32")(
+  (process.platform !== "win32" ? it : it.skip)(
     "rejects remote marketplace plugin paths that resolve through symlinks outside the cloned repo",
     async () => {
       mockRemoteMarketplaceCloneWithOutsideSymlink({
@@ -985,7 +975,7 @@ describe("marketplace plugins", () => {
     await expectRemoteMarketplaceError({ manifest, expectedError });
   });
 
-  it.runIf(process.platform !== "win32")(
+  (process.platform !== "win32" ? it : it.skip)(
     "rejects remote marketplace symlink plugin paths during manifest validation",
     async () => {
       mockRemoteMarketplaceCloneWithOutsideSymlink({

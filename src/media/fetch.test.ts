@@ -1,15 +1,22 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchRemoteMedia, type FetchRemoteMediaDeps } from "./fetch.js";
 
-const fetchWithSsrFGuardMock = vi.hoisted(() => vi.fn());
+type LookupFn = NonNullable<Parameters<typeof fetchRemoteMedia>[0]["lookupFn"]>;
 
-vi.mock("../infra/net/fetch-guard.js", () => ({
-  fetchWithSsrFGuard: (...args: unknown[]) => fetchWithSsrFGuardMock(...args),
-  withStrictGuardedFetchMode: <T>(params: T) => params,
-}));
+const guardedFetchMock = vi.fn();
 
-type FetchRemoteMedia = typeof import("./fetch.js").fetchRemoteMedia;
-type LookupFn = NonNullable<Parameters<FetchRemoteMedia>[0]["lookupFn"]>;
-let fetchRemoteMedia: FetchRemoteMedia;
+/**
+ * Injected guard boundary: mirrors the old module mock so the media pipeline is
+ * exercised without mocking `../infra/net/fetch-guard.js` at module level.
+ */
+const DEP_OVERRIDES: FetchRemoteMediaDeps = {
+  fetchWithSsrFGuard: guardedFetchMock as unknown as NonNullable<
+    FetchRemoteMediaDeps["fetchWithSsrFGuard"]
+  >,
+  withStrictGuardedFetchMode: ((params: unknown) => params) as NonNullable<
+    FetchRemoteMediaDeps["withStrictGuardedFetchMode"]
+  >,
+};
 
 function makeStream(chunks: Uint8Array[]) {
   return new ReadableStream<Uint8Array>({
@@ -49,6 +56,7 @@ async function expectRemoteMediaMaxBytesError(params: {
       fetchImpl: params.fetchImpl,
       maxBytes: params.maxBytes,
       lookupFn: makeLookupFn(),
+      deps: DEP_OVERRIDES,
     }),
   ).rejects.toThrow("exceeds maxBytes");
 }
@@ -68,6 +76,7 @@ async function expectRedactedTelegramFetchError(params: {
       allowedHostnames: ["api.telegram.org"],
       allowRfc2544BenchmarkRange: true,
     },
+    deps: DEP_OVERRIDES,
   }).catch((err: unknown) => err as Error);
 
   expect(error).toBeInstanceOf(Error);
@@ -90,6 +99,7 @@ async function expectFetchRemoteMediaRejected(params: {
       fetchImpl: params.fetchImpl,
       lookupFn: params.lookupFn ?? makeLookupFn(),
       maxBytes: params.maxBytes ?? 1024,
+      deps: DEP_OVERRIDES,
       ...(params.readIdleTimeoutMs ? { readIdleTimeoutMs: params.readIdleTimeoutMs } : {}),
     }),
   ).rejects;
@@ -117,21 +127,14 @@ async function expectFetchRemoteMediaIdleTimeoutCase(params: {
   readIdleTimeoutMs: number;
   expectedError: Record<string, unknown>;
 }) {
-  vi.useFakeTimers();
-  try {
-    const rejection = expectFetchRemoteMediaRejected({
-      url: "https://example.com/file.bin",
-      fetchImpl: params.fetchImpl,
-      lookupFn: params.lookupFn,
-      readIdleTimeoutMs: params.readIdleTimeoutMs,
-      expectedError: params.expectedError,
-    });
-
-    await vi.advanceTimersByTimeAsync(params.readIdleTimeoutMs + 5);
-    await rejection;
-  } finally {
-    vi.useRealTimers();
-  }
+  // Real timers: the guarded read aborts once the idle window elapses.
+  await expectFetchRemoteMediaRejected({
+    url: "https://example.com/file.bin",
+    fetchImpl: params.fetchImpl,
+    lookupFn: params.lookupFn,
+    readIdleTimeoutMs: params.readIdleTimeoutMs,
+    expectedError: params.expectedError,
+  });
 }
 
 async function expectBoundedErrorBodyCase(
@@ -163,6 +166,7 @@ function createFetchRemoteMediaParams(
   return {
     lookupFn: params.lookupFn ?? makeLookupFn(),
     maxBytes: 1024,
+    deps: DEP_OVERRIDES,
     ...params,
   };
 }
@@ -172,13 +176,8 @@ describe("fetchRemoteMedia", () => {
   const redactedTelegramToken = `${telegramToken.slice(0, 6)}…${telegramToken.slice(-4)}`;
   const telegramFileUrl = `https://api.telegram.org/file/bot${telegramToken}/photos/1.jpg`;
 
-  beforeAll(async () => {
-    ({ fetchRemoteMedia } = await import("./fetch.js"));
-  });
-
   beforeEach(() => {
-    vi.useRealTimers();
-    fetchWithSsrFGuardMock.mockReset().mockImplementation(async (paramsUnknown: unknown) => {
+    guardedFetchMock.mockReset().mockImplementation(async (paramsUnknown: unknown) => {
       const params = paramsUnknown as {
         url: string;
         fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;

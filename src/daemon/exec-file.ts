@@ -1,6 +1,19 @@
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import { execFile as nodeExecFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 
 export type ExecResult = { stdout: string; stderr: string; code: number };
+
+type ExecFileFn = typeof nodeExecFile;
+
+let execFileImpl: ExecFileFn = nodeExecFile;
+
+/**
+ * Test-only override for the `node:child_process` execFile boundary. Tests
+ * inject a fixture instead of mocking `node:child_process` at module level,
+ * which Bun's runner does not support for ESM imports.
+ */
+export function setExecFileForTests(impl: ExecFileFn | null): void {
+  execFileImpl = impl ?? nodeExecFile;
+}
 
 export async function execFileUtf8(
   command: string,
@@ -8,7 +21,7 @@ export async function execFileUtf8(
   options: Omit<ExecFileOptionsWithStringEncoding, "encoding"> = {},
 ): Promise<ExecResult> {
   return await new Promise<ExecResult>((resolve) => {
-    execFile(command, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
+    execFileImpl(command, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
       if (!error) {
         resolve({
           stdout: String(stdout ?? ""),

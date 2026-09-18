@@ -367,9 +367,12 @@ export function createHooksRequestHandler(
     port: number;
     logHooks: SubsystemLogger;
     getClientIpConfig?: () => HookClientIpConfig;
+    /** Test-only seam: replaces the `./hooks.js` `readJsonBody` lookup. */
+    readJsonBody?: typeof readJsonBody;
   } & HookDispatchers,
 ): HooksRequestHandler {
   const { getHooksConfig, logHooks, dispatchAgentHook, dispatchWakeHook, getClientIpConfig } = opts;
+  const readJsonBodyImpl = opts.readJsonBody ?? readJsonBody;
   const hookReplayCache = new Map<string, HookReplayEntry>();
   const hookAuthLimiter = createAuthRateLimiter({
     maxAttempts: HOOK_AUTH_FAILURE_LIMIT,
@@ -510,7 +513,7 @@ export function createHooksRequestHandler(
       return true;
     }
 
-    const body = await readJsonBody(req, hooksConfig.maxBodyBytes);
+    const body = await readJsonBodyImpl(req, hooksConfig.maxBodyBytes);
     if (!body.ok) {
       const status =
         body.error === "payload too large"

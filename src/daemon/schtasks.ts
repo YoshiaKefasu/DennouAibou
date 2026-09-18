@@ -1,19 +1,19 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn as spawnImpl, spawnSync as spawnSyncImpl } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { isGatewayArgv } from "../infra/gateway-process-argv.js";
-import { findVerifiedGatewayListenerPidsOnPortSync } from "../infra/gateway-processes.js";
-import { inspectPortUsage } from "../infra/ports.js";
+import { findVerifiedGatewayListenerPidsOnPortSync as findVerifiedGatewayListenerPidsOnPortSyncImpl } from "../infra/gateway-processes.js";
+import { inspectPortUsage as inspectPortUsageImpl } from "../infra/ports.js";
 import { getWindowsInstallRoots } from "../infra/windows-install-roots.js";
-import { killProcessTree } from "../process/kill-tree.js";
-import { sleep } from "../utils.js";
+import { killProcessTree as killProcessTreeImpl } from "../process/kill-tree.js";
+import { sleep as sleepImpl } from "../utils.js";
 import { parseCmdScriptCommandLine, quoteCmdScriptArg } from "./cmd-argv.js";
 import { assertNoCmdLineBreak, parseCmdSetAssignment, renderCmdSetAssignment } from "./cmd-set.js";
 import { resolveGatewayServiceDescription, resolveGatewayWindowsTaskName } from "./constants.js";
 import { formatLine, writeFormattedLines } from "./output.js";
 import { resolveGatewayStateDir } from "./paths.js";
 import { parseKeyValueOutput } from "./runtime-parse.js";
-import { execSchtasks } from "./schtasks-exec.js";
+import { execSchtasks as execSchtasksImpl } from "./schtasks-exec.js";
 import type { GatewayServiceRuntime } from "./service-runtime.js";
 import type {
   GatewayServiceCommandConfig,
@@ -25,6 +25,59 @@ import type {
   GatewayServiceRenderArgs,
   GatewayServiceRestartResult,
 } from "./service-types.js";
+
+/**
+ * Test-only seams for the OS/process/scheduler boundaries schtasks touches.
+ * Production never sets this; tests inject fixtures instead of mocking the
+ * modules at module level, which Bun's runner does not support for ESM imports.
+ */
+export type SchtasksTestDeps = {
+  execSchtasks?: typeof execSchtasksImpl;
+  inspectPortUsage?: typeof inspectPortUsageImpl;
+  killProcessTree?: typeof killProcessTreeImpl;
+  findVerifiedGatewayListenerPidsOnPortSync?: typeof findVerifiedGatewayListenerPidsOnPortSyncImpl;
+  spawn?: typeof spawnImpl;
+  spawnSync?: typeof spawnSyncImpl;
+  sleep?: typeof sleepImpl;
+  platform?: NodeJS.Platform;
+  now?: () => number;
+};
+const SCHTASKS_TEST_DEPS_KEY = Symbol.for("dennou.schtasksTestDeps");
+type SchtasksGlobalWithTestDeps = typeof globalThis & {
+  [SCHTASKS_TEST_DEPS_KEY]?: SchtasksTestDeps | null;
+};
+
+/** Test-only override for the schtasks OS/process boundaries. */
+export function setSchtasksTestDeps(deps: SchtasksTestDeps | null): void {
+  (globalThis as SchtasksGlobalWithTestDeps)[SCHTASKS_TEST_DEPS_KEY] = deps;
+}
+
+function resolveSchtasksDeps(): Required<SchtasksTestDeps> {
+  const override = (globalThis as SchtasksGlobalWithTestDeps)[SCHTASKS_TEST_DEPS_KEY] ?? {};
+  return {
+    execSchtasks: override.execSchtasks ?? execSchtasksImpl,
+    inspectPortUsage: override.inspectPortUsage ?? inspectPortUsageImpl,
+    killProcessTree: override.killProcessTree ?? killProcessTreeImpl,
+    findVerifiedGatewayListenerPidsOnPortSync:
+      override.findVerifiedGatewayListenerPidsOnPortSync ??
+      findVerifiedGatewayListenerPidsOnPortSyncImpl,
+    spawn: override.spawn ?? spawnImpl,
+    spawnSync: override.spawnSync ?? spawnSyncImpl,
+    sleep: override.sleep ?? sleepImpl,
+    platform: override.platform ?? process.platform,
+    now: override.now ?? (() => Date.now()),
+  };
+}
+
+// Thin wrappers keep the existing call sites; each resolves the current override.
+const execSchtasks = (args: string[]) => resolveSchtasksDeps().execSchtasks(args);
+const inspectPortUsage = (port: number) => resolveSchtasksDeps().inspectPortUsage(port);
+const killProcessTree = (pid: number, opts?: { graceMs?: number }) => {
+  resolveSchtasksDeps().killProcessTree(pid, opts);
+};
+const findVerifiedGatewayListenerPidsOnPortSync = (port: number) =>
+  resolveSchtasksDeps().findVerifiedGatewayListenerPidsOnPortSync(port);
+const sleep = (ms: number) => resolveSchtasksDeps().sleep(ms);
 
 function resolveTaskName(env: GatewayServiceEnv): string {
   const override = env.DENNOU_WINDOWS_TASK_NAME?.trim();
@@ -306,7 +359,7 @@ async function isRegisteredScheduledTask(env: GatewayServiceEnv): Promise<boolea
 }
 
 function launchFallbackTaskScript(scriptPath: string): void {
-  const child = spawn("cmd.exe", ["/d", "/s", "/c", quoteCmdScriptArg(scriptPath)], {
+  const child = resolveSchtasksDeps().spawn("cmd.exe", ["/d", "/s", "/c", quoteCmdScriptArg(scriptPath)], {
     detached: true,
     stdio: "ignore",
     windowsHide: true,
@@ -424,8 +477,8 @@ function isProcessAlive(pid: number): boolean {
 }
 
 async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = resolveSchtasksDeps().now() + timeoutMs;
+  while (resolveSchtasksDeps().now() < deadline) {
     if (!isProcessAlive(pid)) {
       return true;
     }
@@ -435,12 +488,12 @@ async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boole
 }
 
 async function terminateGatewayProcessTree(pid: number, graceMs: number): Promise<void> {
-  if (process.platform !== "win32") {
+  if (resolveSchtasksDeps().platform !== "win32") {
     killProcessTree(pid, { graceMs });
     return;
   }
   const taskkillPath = path.join(getWindowsInstallRoots().systemRoot, "System32", "taskkill.exe");
-  spawnSync(taskkillPath, ["/T", "/PID", String(pid)], {
+  resolveSchtasksDeps().spawnSync(taskkillPath, ["/T", "/PID", String(pid)], {
     stdio: "ignore",
     timeout: 5_000,
     windowsHide: true,
@@ -448,7 +501,7 @@ async function terminateGatewayProcessTree(pid: number, graceMs: number): Promis
   if (await waitForProcessExit(pid, graceMs)) {
     return;
   }
-  spawnSync(taskkillPath, ["/F", "/T", "/PID", String(pid)], {
+  resolveSchtasksDeps().spawnSync(taskkillPath, ["/F", "/T", "/PID", String(pid)], {
     stdio: "ignore",
     timeout: 5_000,
     windowsHide: true,
@@ -457,8 +510,8 @@ async function terminateGatewayProcessTree(pid: number, graceMs: number): Promis
 }
 
 async function waitForGatewayPortRelease(port: number, timeoutMs = 5_000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = resolveSchtasksDeps().now() + timeoutMs;
+  while (resolveSchtasksDeps().now() < deadline) {
     const diagnostics = await inspectPortUsage(port).catch(() => null);
     if (diagnostics?.status === "free") {
       return true;

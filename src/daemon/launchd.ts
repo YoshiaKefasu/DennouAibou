@@ -589,10 +589,45 @@ async function ensureLaunchAgentLoadedAfterFailure(params: {
   }
 }
 
+/**
+ * Injectable seams for the restart boundaries (`launchd-restart-handoff` and
+ * stale-PID cleanup). Production uses the real implementations; tests set a
+ * process-wide override so restart coverage does not need module-level mocks.
+ */
+export type LaunchdRestartDeps = {
+  isCurrentProcessLaunchdServiceLabel?: typeof isCurrentProcessLaunchdServiceLabel;
+  scheduleDetachedLaunchdRestartHandoff?: typeof scheduleDetachedLaunchdRestartHandoff;
+  cleanStaleGatewayProcessesSync?: typeof cleanStaleGatewayProcessesSync;
+};
+
+const LAUNCHD_RESTART_DEPS_OVERRIDE_KEY = Symbol.for("dennou.launchdRestartDepsOverride");
+type LaunchdGlobalWithRestartDepsOverride = typeof globalThis & {
+  [LAUNCHD_RESTART_DEPS_OVERRIDE_KEY]?: LaunchdRestartDeps | null;
+};
+
+/** Test-only override for the restart handoff / stale-PID cleanup seams. */
+export function setLaunchdRestartDepsForTests(deps: LaunchdRestartDeps | null): void {
+  (globalThis as LaunchdGlobalWithRestartDepsOverride)[LAUNCHD_RESTART_DEPS_OVERRIDE_KEY] = deps;
+}
+
+function resolveLaunchdRestartDeps(): Required<LaunchdRestartDeps> {
+  const override =
+    (globalThis as LaunchdGlobalWithRestartDepsOverride)[LAUNCHD_RESTART_DEPS_OVERRIDE_KEY] ?? {};
+  return {
+    isCurrentProcessLaunchdServiceLabel:
+      override.isCurrentProcessLaunchdServiceLabel ?? isCurrentProcessLaunchdServiceLabel,
+    scheduleDetachedLaunchdRestartHandoff:
+      override.scheduleDetachedLaunchdRestartHandoff ?? scheduleDetachedLaunchdRestartHandoff,
+    cleanStaleGatewayProcessesSync:
+      override.cleanStaleGatewayProcessesSync ?? cleanStaleGatewayProcessesSync,
+  };
+}
+
 export async function restartLaunchAgent({
   stdout,
   env,
 }: GatewayServiceControlArgs): Promise<GatewayServiceRestartResult> {
+  const restartDeps = resolveLaunchdRestartDeps();
   const serviceEnv = env ?? (process.env as GatewayServiceEnv);
   const domain = resolveGuiDomain();
   const label = resolveLaunchAgentLabel({ env: serviceEnv });
@@ -602,8 +637,8 @@ export async function restartLaunchAgent({
   // Restart requests issued from inside the managed gateway process tree need a
   // detached handoff. A direct `kickstart -k` would terminate the caller before
   // it can finish the restart command.
-  if (isCurrentProcessLaunchdServiceLabel(label)) {
-    const handoff = scheduleDetachedLaunchdRestartHandoff({
+  if (restartDeps.isCurrentProcessLaunchdServiceLabel(label)) {
+    const handoff = restartDeps.scheduleDetachedLaunchdRestartHandoff({
       env: serviceEnv,
       mode: "kickstart",
       waitForPid: process.pid,
@@ -617,7 +652,7 @@ export async function restartLaunchAgent({
 
   const cleanupPort = await resolveLaunchAgentGatewayPort(serviceEnv);
   if (cleanupPort !== null) {
-    cleanStaleGatewayProcessesSync(cleanupPort);
+    restartDeps.cleanStaleGatewayProcessesSync(cleanupPort);
   }
 
   const start = await execLaunchctl(["kickstart", "-k", serviceTarget]);

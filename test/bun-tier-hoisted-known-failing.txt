@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 140 files.
+# Current known-failure count: 130 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -21,7 +21,7 @@
 #   conditional: it.runIf is not exposed by bun:test
 #   hook-hang: beforeEach/afterEach hook hangs to a fixed 120s timeout; CLI --timeout is ignored for hooks
 #
-# reset/dynamic-mock (43 files)
+# reset/dynamic-mock (42 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
 extensions/line/src/monitor.lifecycle.test.ts
 extensions/line/src/send.test.ts
@@ -63,7 +63,6 @@ src/auto-reply/reply/get-reply.reset-hooks-fallback.test.ts
 src/auto-reply/reply/session-hooks-context.test.ts
 src/auto-reply/reply/session-updates.lifecycle.test.ts
 src/auto-reply/status.test.ts
-src/auto-reply/thinking.test.ts
 src/cli/route.test.ts
 
 # hook-hang (1 file)
@@ -95,9 +94,6 @@ src/media-understanding/runner.vision-skip.test.ts
 src/plugins/contracts/runtime-import-side-effects.contract.test.ts
 src/plugins/conversation-binding.test.ts
 
-# wait/import (1 additional file; measured after the first 250)
-src/plugins/marketplace.test.ts
-
 # conditional (1 additional file; measured after the first 250)
 src/config/io.write-config.test.ts
 
@@ -105,7 +101,7 @@ src/config/io.write-config.test.ts
 src/gateway/server-channels.test.ts
 src/gateway/server-methods/nodes.invoke-wake.test.ts
 
-# timeout (10 files; no conclusive result within the 40s process guard)
+# timeout (9 files; no conclusive result within the 40s process guard)
 src/commands/models.set.e2e.test.ts
 src/commands/onboard-channels.e2e.test.ts
 src/cron/isolated-agent/subagent-followup.test.ts
@@ -113,7 +109,6 @@ src/cron/service.runs-one-shot-main-job-disables-it.test.ts
 src/gateway/server-restart-sentinel.test.ts
 src/infra/bonjour.test.ts
 src/infra/outbound/message-action-runner.media.test.ts
-src/media/fetch.test.ts
 test/scripts/test-report-utils.test.ts
 ui/src/ui/app-gateway.node.test.ts
 
@@ -128,7 +123,7 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (56 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (49 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
@@ -149,14 +144,9 @@ src/commands/onboard-remote.test.ts
 src/commands/sessions.default-agent-store.test.ts
 src/commands/status.test.ts
 src/config/validation.channel-metadata.test.ts
-src/daemon/launchd.test.ts
-src/daemon/schtasks.startup-fallback.test.ts
-src/daemon/schtasks.stop.test.ts
-src/daemon/systemd.test.ts
 src/entry.version-fast-path.test.ts
 src/gateway/mcp-http.test.ts
 src/gateway/server-cron.test.ts
-src/gateway/server-http.hooks-request-timeout.test.ts
 src/gateway/server-methods/agent.test.ts
 src/gateway/server-methods/agents-mutate.test.ts
 src/gateway/server-methods/chat.abort-persistence.test.ts
@@ -170,7 +160,6 @@ src/gateway/server.sessions.gateway-server-sessions-a.test.ts
 src/gateway/sessions-resolve.test.ts
 src/gateway/tools-invoke-http.test.ts
 src/infra/exec-approvals-store.test.ts
-src/infra/gateway-processes.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
 src/infra/outbound/channel-resolution.test.ts
 src/infra/outbound/deliver.test.ts
@@ -179,7 +168,6 @@ src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/outbound/message.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
 src/media-understanding/image.test.ts
-src/memory-host-sdk/host/qmd-process.test.ts
 src/plugin-activation-boundary.test.ts
 src/plugin-sdk/browser-maintenance.test.ts
 src/secrets/runtime.test.ts

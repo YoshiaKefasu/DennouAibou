@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { quoteCmdScriptArg } from "./cmd-argv.js";
 import "./test-helpers/schtasks-base-mocks.js";
 import {
+  baseSchtasksTestDeps,
   inspectPortUsage,
   killProcessTree,
   resetSchtasksBaseMocks,
@@ -12,41 +13,20 @@ import {
   withWindowsEnv,
   writeGatewayScript,
 } from "./test-helpers/schtasks-fixtures.js";
-const timeState = vi.hoisted(() => ({ now: 0 }));
-const sleepMock = vi.hoisted(() =>
-  vi.fn(async (ms: number) => {
-    timeState.now += ms;
-  }),
-);
-const childUnref = vi.hoisted(() => vi.fn());
-const spawn = vi.hoisted(() => vi.fn(() => ({ unref: childUnref })));
-const spawnSync = vi.hoisted(() =>
-  vi.fn(() => ({
-    pid: 0,
-    output: [null, "", ""],
-    stdout: "",
-    stderr: "",
-    status: 0,
-    signal: null,
-  })),
-);
-
-vi.mock("../utils.js", async () => {
-  const actual = await import("../utils.js");
-  return {
-    ...actual,
-    sleep: (ms: number) => sleepMock(ms),
-  };
+const timeState = { now: 0 };
+const sleepMock = vi.fn(async (ms: number) => {
+  timeState.now += ms;
 });
-
-vi.mock("node:child_process", async () => {
-  const actual = await import("node:child_process");
-  return {
-    ...actual,
-    spawn,
-    spawnSync,
-  };
-});
+const childUnref = vi.fn();
+const spawn = vi.fn(() => ({ unref: childUnref }));
+const spawnSync = vi.fn(() => ({
+  pid: 0,
+  output: [null, "", ""],
+  stdout: "",
+  stderr: "",
+  status: 0,
+  signal: null,
+}));
 
 const {
   installScheduledTask,
@@ -54,8 +34,10 @@ const {
   readScheduledTaskRuntime,
   restartScheduledTask,
   resolveTaskScriptPath,
+  setSchtasksTestDeps,
   stopScheduledTask,
 } = await import("./schtasks.js");
+type SchtasksDeps = NonNullable<Parameters<typeof setSchtasksTestDeps>[0]>;
 
 function resolveStartupEntryPath(env: Record<string, string>) {
   return path.join(
@@ -111,6 +93,14 @@ beforeEach(() => {
   sleepMock.mockReset();
   sleepMock.mockImplementation(async (ms: number) => {
     timeState.now += ms;
+  });
+  setSchtasksTestDeps({
+    ...baseSchtasksTestDeps(),
+    spawn: spawn as unknown as SchtasksDeps["spawn"],
+    spawnSync: spawnSync as unknown as SchtasksDeps["spawnSync"],
+    sleep: sleepMock as unknown as SchtasksDeps["sleep"],
+    findVerifiedGatewayListenerPidsOnPortSync:
+      (() => []) as unknown as SchtasksDeps["findVerifiedGatewayListenerPidsOnPortSync"],
   });
 });
 
@@ -171,7 +161,7 @@ describe("Windows startup fallback", () => {
         environment: { DENNOU_GATEWAY_PORT: "18789" },
       });
 
-      await expect(fs.access(resolveStartupEntryPath(env))).resolves.toBeUndefined();
+      await fs.access(resolveStartupEntryPath(env));
       expectStartupFallbackSpawn(env);
     });
   });

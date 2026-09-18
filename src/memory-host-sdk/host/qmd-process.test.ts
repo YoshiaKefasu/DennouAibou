@@ -3,18 +3,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const spawnMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const actual = await import("node:child_process");
-  return {
-    ...actual,
-    spawn: spawnMock,
-  };
-});
-
-import { checkQmdBinaryAvailability, resolveCliSpawnInvocation } from "./qmd-process.js";
+import {
+  checkQmdBinaryAvailability,
+  resolveCliSpawnInvocation,
+  type QmdProcessDeps,
+} from "./qmd-process.js";
 
 function createMockChild() {
   const child = new EventEmitter() as EventEmitter & {
@@ -25,20 +18,27 @@ function createMockChild() {
 }
 
 let tempDir = "";
-let platformSpy: { mockRestore(): void } | null = null;
 const originalPath = process.env.PATH;
-const originalPathExt = process.env.PATHEXT;
+
+/**
+ * Inject the Windows platform boundary so these cases stay host-OS independent
+ * without patching `process.platform` or mocking `node:child_process`.
+ */
+const WIN_DEPS: QmdProcessDeps = { platform: "win32" };
+
+function winEnv(extraPath: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    PATH: `${extraPath};${originalPath ?? ""}`,
+    PATHEXT: ".CMD;.EXE",
+  };
+}
 
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-qmd-win-spawn-"));
-  platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
 });
 
 afterEach(async () => {
-  platformSpy?.mockRestore();
-  process.env.PATH = originalPath;
-  process.env.PATHEXT = originalPathExt;
-  spawnMock.mockReset();
   if (tempDir) {
     await fs.rm(tempDir, { recursive: true, force: true });
     tempDir = "";
@@ -60,14 +60,12 @@ describe("resolveCliSpawnInvocation", () => {
     );
     await fs.writeFile(scriptPath, "module.exports = {};\n", "utf8");
 
-    process.env.PATH = `${binDir};${originalPath ?? ""}`;
-    process.env.PATHEXT = ".CMD;.EXE";
-
     const invocation = resolveCliSpawnInvocation({
       command: "qmd",
       args: ["query", "hello"],
-      env: process.env,
+      env: winEnv(binDir),
       packageName: "qmd",
+      deps: WIN_DEPS,
     });
 
     expect(invocation.command).toBe(process.execPath);
@@ -81,28 +79,24 @@ describe("resolveCliSpawnInvocation", () => {
     await fs.mkdir(binDir, { recursive: true });
     await fs.writeFile(path.join(binDir, "qmd.cmd"), "@echo off\r\nREM no entrypoint\r\n", "utf8");
 
-    process.env.PATH = `${binDir};${originalPath ?? ""}`;
-    process.env.PATHEXT = ".CMD;.EXE";
-
     expect(() =>
       resolveCliSpawnInvocation({
         command: "qmd",
         args: ["query", "hello"],
-        env: process.env,
+        env: winEnv(binDir),
         packageName: "qmd",
+        deps: WIN_DEPS,
       }),
     ).toThrow(/without shell execution/);
   });
 
   it("keeps bare commands bare when no Windows wrapper exists on PATH", () => {
-    process.env.PATH = originalPath ?? "";
-    process.env.PATHEXT = ".CMD;.EXE";
-
     const invocation = resolveCliSpawnInvocation({
       command: "qmd",
       args: ["query", "hello"],
-      env: process.env,
+      env: winEnv(""),
       packageName: "qmd",
+      deps: WIN_DEPS,
     });
 
     expect(invocation.command).toBe("qmd");
@@ -114,13 +108,18 @@ describe("resolveCliSpawnInvocation", () => {
 describe("checkQmdBinaryAvailability", () => {
   it("returns available when the qmd process spawns successfully", async () => {
     const child = createMockChild();
-    spawnMock.mockImplementationOnce(() => {
+    const spawnMock = vi.fn(() => {
       queueMicrotask(() => child.emit("spawn"));
       return child;
     });
 
     await expect(
-      checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
+      checkQmdBinaryAvailability({
+        command: "qmd",
+        env: process.env,
+        cwd: tempDir,
+        deps: { ...WIN_DEPS, spawn: spawnMock as unknown as QmdProcessDeps["spawn"] },
+      }),
     ).resolves.toEqual({ available: true });
     expect(child.kill).toHaveBeenCalled();
   });
@@ -128,27 +127,37 @@ describe("checkQmdBinaryAvailability", () => {
   it("returns unavailable when the qmd process cannot be spawned", async () => {
     const child = createMockChild();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
-    spawnMock.mockImplementationOnce(() => {
+    const spawnMock = vi.fn(() => {
       queueMicrotask(() => child.emit("error", err));
       return child;
     });
 
     await expect(
-      checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
+      checkQmdBinaryAvailability({
+        command: "qmd",
+        env: process.env,
+        cwd: tempDir,
+        deps: { ...WIN_DEPS, spawn: spawnMock as unknown as QmdProcessDeps["spawn"] },
+      }),
     ).resolves.toEqual({ available: false, error: "spawn qmd ENOENT" });
   });
 
   it("does not treat close-before-spawn as a successful availability probe", async () => {
     const child = createMockChild();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
-    spawnMock.mockImplementationOnce(() => {
+    const spawnMock = vi.fn(() => {
       queueMicrotask(() => child.emit("close"));
       queueMicrotask(() => child.emit("error", err));
       return child;
     });
 
     await expect(
-      checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
+      checkQmdBinaryAvailability({
+        command: "qmd",
+        env: process.env,
+        cwd: tempDir,
+        deps: { ...WIN_DEPS, spawn: spawnMock as unknown as QmdProcessDeps["spawn"] },
+      }),
     ).resolves.toEqual({ available: false, error: "spawn qmd ENOENT" });
   });
 });

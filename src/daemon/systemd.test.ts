@@ -1,19 +1,8 @@
 import fs from "node:fs/promises";
 import os from "node:os";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const execFileMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    execFile: Object.assign(execFileMock, {
-      __promisify__: vi.fn(),
-    }) as typeof import("node:child_process").execFile,
-  });
-});
-
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { splitArgsPreservingQuotes } from "./arg-split.js";
+import { setExecFileForTests } from "./exec-file.js";
 import { parseSystemdExecStart } from "./systemd-unit.js";
 import {
   isNonFatalSystemdInstallProbeError,
@@ -25,6 +14,18 @@ import {
   resolveSystemdUserUnitPath,
   stopSystemdService,
 } from "./systemd.js";
+
+const execFileMock = vi.fn();
+
+// Inject the exec boundary so Bun's runner does not need module-level mocking
+// of `node:child_process`.
+beforeAll(() => {
+  setExecFileForTests(execFileMock as unknown as Parameters<typeof setExecFileForTests>[0]);
+});
+
+afterAll(() => {
+  setExecFileForTests(null);
+});
 
 type ExecFileError = Error & {
   stderr?: string;

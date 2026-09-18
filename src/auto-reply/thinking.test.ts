@@ -1,34 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  isElevatedThinkingDenied,
+  listThinkingLevelLabels,
+  listThinkingLevels,
+  normalizeReasoningLevel,
+  normalizeThinkLevel,
+  resolveThinkingDefaultForModel,
+  setThinkingDepsForTests,
+  type ThinkingDeps,
+} from "./thinking.js";
 
-const providerRuntimeMocks = vi.hoisted(() => ({
+const providerRuntimeMocks = {
   resolveProviderBinaryThinking: vi.fn(),
   resolveProviderDefaultThinkingLevel: vi.fn(),
-}));
+};
 
-const configMocks = vi.hoisted(() => ({
+const configMocks = {
   loadConfig: vi.fn(),
-}));
+};
 
-let isElevatedThinkingDenied: typeof import("./thinking.js").isElevatedThinkingDenied;
-let listThinkingLevelLabels: typeof import("./thinking.js").listThinkingLevelLabels;
-let listThinkingLevels: typeof import("./thinking.js").listThinkingLevels;
-let normalizeReasoningLevel: typeof import("./thinking.js").normalizeReasoningLevel;
-let normalizeThinkLevel: typeof import("./thinking.js").normalizeThinkLevel;
-let resolveThinkingDefaultForModel: typeof import("./thinking.js").resolveThinkingDefaultForModel;
-
-async function loadFreshThinkingModuleForTest() {
-  vi.resetModules();
-  vi.doMock("../plugins/provider-thinking.js", () => ({
-    resolveProviderBinaryThinking: providerRuntimeMocks.resolveProviderBinaryThinking,
-    resolveProviderDefaultThinkingLevel: providerRuntimeMocks.resolveProviderDefaultThinkingLevel,
-  }));
-  vi.doMock("../config/config.js", () => ({
-    loadConfig: configMocks.loadConfig,
-  }));
-  return await import("./thinking.js");
-}
-
-beforeEach(async () => {
+beforeEach(() => {
   providerRuntimeMocks.resolveProviderBinaryThinking.mockReset();
   providerRuntimeMocks.resolveProviderBinaryThinking.mockReturnValue(undefined);
   providerRuntimeMocks.resolveProviderDefaultThinkingLevel.mockReset();
@@ -37,14 +28,13 @@ beforeEach(async () => {
   configMocks.loadConfig.mockReset();
   configMocks.loadConfig.mockReturnValue({});
 
-  ({
-    isElevatedThinkingDenied,
-    listThinkingLevelLabels,
-    listThinkingLevels,
-    normalizeReasoningLevel,
-    normalizeThinkLevel,
-    resolveThinkingDefaultForModel,
-  } = await loadFreshThinkingModuleForTest());
+  setThinkingDepsForTests({
+    loadConfig: configMocks.loadConfig as unknown as ThinkingDeps["loadConfig"],
+    resolveProviderBinaryThinking:
+      providerRuntimeMocks.resolveProviderBinaryThinking as unknown as ThinkingDeps["resolveProviderBinaryThinking"],
+    resolveProviderDefaultThinkingLevel:
+      providerRuntimeMocks.resolveProviderDefaultThinkingLevel as unknown as ThinkingDeps["resolveProviderDefaultThinkingLevel"],
+  });
 });
 
 describe("normalizeThinkLevel", () => {

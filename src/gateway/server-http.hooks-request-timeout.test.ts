@@ -3,19 +3,18 @@ import {
   createHookRequest,
   createHooksHandler,
   createResponse,
+  type HooksHandlerDeps,
 } from "./server-http.test-harness.js";
 
-const { readJsonBodyMock } = vi.hoisted(() => ({
-  readJsonBodyMock: vi.fn(),
-}));
+const readJsonBodyMock = vi.fn();
 
-vi.mock("./hooks.js", async () => {
-  const actual = await import("./hooks.js");
-  return {
-    ...actual,
-    readJsonBody: readJsonBodyMock,
-  };
-});
+/**
+ * Injected so the handler exercises timeout/error mapping without mocking the
+ * whole `./hooks.js` module (unsupported on Bun for ESM imports).
+ */
+const readJsonBodyDeps = {
+  readJsonBody: readJsonBodyMock as unknown as HooksHandlerDeps["readJsonBody"],
+};
 
 describe("createHooksRequestHandler timeout status mapping", () => {
   beforeEach(() => {
@@ -26,7 +25,7 @@ describe("createHooksRequestHandler timeout status mapping", () => {
     readJsonBodyMock.mockResolvedValue({ ok: false, error: "request body timeout" });
     const dispatchWakeHook = vi.fn();
     const dispatchAgentHook = vi.fn(() => "run-1");
-    const handler = createHooksHandler({ dispatchWakeHook, dispatchAgentHook });
+    const handler = createHooksHandler({ ...readJsonBodyDeps, dispatchWakeHook, dispatchAgentHook });
     const req = createHookRequest();
     const { res, end } = createResponse();
 
@@ -40,7 +39,7 @@ describe("createHooksRequestHandler timeout status mapping", () => {
   });
 
   test("shares hook auth rate-limit bucket across ipv4 and ipv4-mapped ipv6 forms", async () => {
-    const handler = createHooksHandler({ bindHost: "127.0.0.1" });
+    const handler = createHooksHandler({ ...readJsonBodyDeps, bindHost: "127.0.0.1" });
 
     for (let i = 0; i < 20; i++) {
       const req = createHookRequest({
@@ -67,6 +66,7 @@ describe("createHooksRequestHandler timeout status mapping", () => {
 
   test("uses trusted proxy forwarded client ip for hook auth throttling", async () => {
     const handler = createHooksHandler({
+      ...readJsonBodyDeps,
       getClientIpConfig: () => ({ trustedProxies: ["10.0.0.1"] }),
     });
 
@@ -98,7 +98,7 @@ describe("createHooksRequestHandler timeout status mapping", () => {
   test.each(["0.0.0.0", "::"])(
     "does not throw when bindHost=%s while parsing non-hook request URL",
     async (bindHost) => {
-      const handler = createHooksHandler({ bindHost });
+      const handler = createHooksHandler({ ...readJsonBodyDeps, bindHost });
       const req = createHookRequest({ url: "/" });
       const { res, end } = createResponse();
 

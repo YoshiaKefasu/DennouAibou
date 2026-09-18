@@ -9,7 +9,7 @@ import { withTempConfig } from "./test-temp-config.js";
 
 export type GatewayHttpServer = ReturnType<typeof createGatewayHttpServer>;
 export type GatewayServerOptions = Partial<Parameters<typeof createGatewayHttpServer>[0]>;
-type HooksHandlerDeps = Parameters<typeof createHooksRequestHandler>[0];
+export type HooksHandlerDeps = Parameters<typeof createHooksRequestHandler>[0];
 
 export const AUTH_NONE: ResolvedGatewayAuth = {
   mode: "none",
@@ -189,6 +189,7 @@ export function createHooksHandler(
         dispatchAgentHook?: HooksHandlerDeps["dispatchAgentHook"];
         bindHost?: string;
         getClientIpConfig?: HooksHandlerDeps["getClientIpConfig"];
+        readJsonBody?: HooksHandlerDeps["readJsonBody"];
       },
 ) {
   const options = typeof params === "string" ? { bindHost: params } : params;
@@ -203,6 +204,7 @@ export function createHooksHandler(
       error: vi.fn(),
     } as unknown as ReturnType<typeof createSubsystemLogger>,
     getClientIpConfig: options.getClientIpConfig,
+    readJsonBody: options.readJsonBody,
     dispatchWakeHook: options.dispatchWakeHook ?? (() => {}),
     dispatchAgentHook: options.dispatchAgentHook ?? (() => "run-1"),
   });

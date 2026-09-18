@@ -16,6 +16,38 @@ import { installPluginFromPath, type InstallPluginResult } from "./install.js";
 const DEFAULT_GIT_TIMEOUT_MS = 120_000;
 const DEFAULT_MARKETPLACE_DOWNLOAD_TIMEOUT_MS = 120_000;
 const MAX_MARKETPLACE_ARCHIVE_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Test-only seams for the marketplace boundary calls (git clone, guarded
+ * fetch, plugin install). Production never sets this; tests inject fixtures
+ * instead of mocking the modules at module level, which Bun's runner does not
+ * support for ESM imports.
+ */
+export type MarketplaceDepsOverride = {
+  fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
+  runCommandWithTimeout?: typeof runCommandWithTimeout;
+  installPluginFromPath?: typeof installPluginFromPath;
+};
+const MARKETPLACE_DEPS_OVERRIDE_KEY = Symbol.for("dennou.marketplaceDepsOverride");
+type MarketplaceGlobalWithDepsOverride = typeof globalThis & {
+  [MARKETPLACE_DEPS_OVERRIDE_KEY]?: MarketplaceDepsOverride | null;
+};
+
+/** Test-only override for the marketplace boundary calls. */
+export function setMarketplaceDepsForTests(deps: MarketplaceDepsOverride | null): void {
+  (globalThis as MarketplaceGlobalWithDepsOverride)[MARKETPLACE_DEPS_OVERRIDE_KEY] = deps;
+}
+
+function resolveMarketplaceDeps(): Required<MarketplaceDepsOverride> {
+  const override =
+    (globalThis as MarketplaceGlobalWithDepsOverride)[MARKETPLACE_DEPS_OVERRIDE_KEY] ?? {};
+  return {
+    fetchWithSsrFGuard: override.fetchWithSsrFGuard ?? fetchWithSsrFGuard,
+    runCommandWithTimeout: override.runCommandWithTimeout ?? runCommandWithTimeout,
+    installPluginFromPath: override.installPluginFromPath ?? installPluginFromPath,
+  };
+}
+
 const MARKETPLACE_MANIFEST_CANDIDATES = [
   path.join(".claude-plugin", "marketplace.json"),
   "marketplace.json",
@@ -452,7 +484,7 @@ async function cloneMarketplaceRepo(params: {
   }
   argv.push(normalized.url, repoDir);
   params.logger?.info?.(`Cloning marketplace source ${normalized.label}...`);
-  const res = await runCommandWithTimeout(argv, {
+  const res = await resolveMarketplaceDeps().runCommandWithTimeout(argv, {
     timeoutMs: params.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS,
   });
   if (res.code !== 0) {
@@ -735,7 +767,7 @@ async function downloadUrlToTempFile(
   try {
     sourceFileName = resolveSafeMarketplaceDownloadFileName(url, sourceFileName);
     const downloadTimeoutMs = resolveMarketplaceDownloadTimeoutMs(timeoutMs);
-    const { response, finalUrl, release } = await fetchWithSsrFGuard({
+    const { response, finalUrl, release } = await resolveMarketplaceDeps().fetchWithSsrFGuard({
       url,
       timeoutMs: downloadTimeoutMs,
       auditContext: "marketplace-plugin-download",
@@ -1145,7 +1177,7 @@ export async function installPluginFromMarketplace(
     }
     installCleanup = resolved.cleanup;
 
-    const result = await installPluginFromPath({
+    const result = await resolveMarketplaceDeps().installPluginFromPath({
       dangerouslyForceUnsafeInstall: params.dangerouslyForceUnsafeInstall,
       path: resolved.path,
       logger: params.logger,

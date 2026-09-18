@@ -2,6 +2,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./test-helpers/schtasks-base-mocks.js";
 import {
+  baseSchtasksTestDeps,
   inspectPortUsage,
   killProcessTree,
   resetSchtasksBaseMocks,
@@ -10,29 +11,14 @@ import {
   withWindowsEnv,
   writeGatewayScript,
 } from "./test-helpers/schtasks-fixtures.js";
-const findVerifiedGatewayListenerPidsOnPortSync = vi.hoisted(() =>
-  vi.fn<(port: number) => number[]>(() => []),
-);
-const timeState = vi.hoisted(() => ({ now: 0 }));
-const sleepMock = vi.hoisted(() =>
-  vi.fn(async (ms: number) => {
-    timeState.now += ms;
-  }),
-);
-
-vi.mock("../infra/gateway-processes.js", () => ({
-  findVerifiedGatewayListenerPidsOnPortSync: (port: number) =>
-    findVerifiedGatewayListenerPidsOnPortSync(port),
-}));
-vi.mock("../utils.js", async () => {
-  const actual = await import("../utils.js");
-  return {
-    ...actual,
-    sleep: (ms: number) => sleepMock(ms),
-  };
+const findVerifiedGatewayListenerPidsOnPortSync = vi.fn<(port: number) => number[]>(() => []);
+const timeState = { now: 0 };
+const sleepMock = vi.fn(async (ms: number) => {
+  timeState.now += ms;
 });
 
-const { restartScheduledTask, stopScheduledTask } = await import("./schtasks.js");
+const { restartScheduledTask, setSchtasksTestDeps, stopScheduledTask } = await import("./schtasks.js");
+type SchtasksDeps = NonNullable<Parameters<typeof setSchtasksTestDeps>[0]>;
 const GATEWAY_PORT = 18789;
 const SUCCESS_RESPONSE = { code: 0, stdout: "", stderr: "" } as const;
 
@@ -99,6 +85,12 @@ beforeEach(() => {
   sleepMock.mockReset();
   sleepMock.mockImplementation(async (ms: number) => {
     timeState.now += ms;
+  });
+  setSchtasksTestDeps({
+    ...baseSchtasksTestDeps(),
+    findVerifiedGatewayListenerPidsOnPortSync:
+      findVerifiedGatewayListenerPidsOnPortSync as unknown as SchtasksDeps["findVerifiedGatewayListenerPidsOnPortSync"],
+    sleep: sleepMock as unknown as SchtasksDeps["sleep"],
   });
   inspectPortUsage.mockResolvedValue(freePortUsage());
 });

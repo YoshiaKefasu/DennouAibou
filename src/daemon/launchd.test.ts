@@ -1,5 +1,7 @@
+import fs from "node:fs/promises";
 import { PassThrough } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { setExecFileForTests } from "./exec-file.js";
 import {
   LAUNCH_AGENT_THROTTLE_INTERVAL_SECONDS,
   LAUNCH_AGENT_UMASK_DECIMAL,
@@ -11,6 +13,7 @@ import {
   repairLaunchAgentBootstrap,
   restartLaunchAgent,
   resolveLaunchAgentPlistPath,
+  setLaunchdRestartDepsForTests,
 } from "./launchd.js";
 
 const state = vi.hoisted(() => ({
@@ -66,59 +69,76 @@ function normalizeLaunchctlArgs(file: string, args: string[]): string[] {
   return args;
 }
 
-vi.mock("./exec-file.js", () => ({
-  execFileUtf8: vi.fn(async (file: string, args: string[]) => {
+const execFileMock = vi.fn(
+  (
+    file: string,
+    args: string[],
+    _opts: unknown,
+    callback: (error: unknown, stdout: string, stderr: string) => void,
+  ) => {
     const call = normalizeLaunchctlArgs(file, args);
     state.launchctlCalls.push(call);
-    if (call[0] === "list") {
-      return { stdout: state.listOutput, stderr: "", code: 0 };
+    const result = resolveLaunchctlResult(call);
+    if (result.code === 0) {
+      callback(null, result.stdout, result.stderr);
+      return;
     }
-    if (call[0] === "print") {
-      if (state.printNotLoadedRemaining > 0) {
-        state.printNotLoadedRemaining -= 1;
-        return { stdout: "", stderr: "Could not find service", code: 113 };
-      }
-      return { stdout: state.printOutput, stderr: "", code: 0 };
-    }
-    if (call[0] === "bootstrap" && state.bootstrapError) {
-      return { stdout: "", stderr: state.bootstrapError, code: state.bootstrapCode };
-    }
-    if (call[0] === "kickstart" && state.kickstartError && state.kickstartFailuresRemaining > 0) {
-      state.kickstartFailuresRemaining -= 1;
-      return { stdout: "", stderr: state.kickstartError, code: 1 };
-    }
-    return { stdout: "", stderr: "", code: 0 };
-  }),
-}));
+    callback(
+      Object.assign(new Error(result.stderr), { code: result.code }),
+      result.stdout,
+      result.stderr,
+    );
+  },
+);
 
-vi.mock("./launchd-restart-handoff.js", () => ({
-  isCurrentProcessLaunchdServiceLabel: (label: string) =>
-    launchdRestartHandoffState.isCurrentProcessLaunchdServiceLabel(label),
-  scheduleDetachedLaunchdRestartHandoff: (params: unknown) =>
-    launchdRestartHandoffState.scheduleDetachedLaunchdRestartHandoff(params),
-}));
+function resolveLaunchctlResult(call: string[]): { stdout: string; stderr: string; code: number } {
+  if (call[0] === "list") {
+    return { stdout: state.listOutput, stderr: "", code: 0 };
+  }
+  if (call[0] === "print") {
+    if (state.printNotLoadedRemaining > 0) {
+      state.printNotLoadedRemaining -= 1;
+      return { stdout: "", stderr: "Could not find service", code: 113 };
+    }
+    return { stdout: state.printOutput, stderr: "", code: 0 };
+  }
+  if (call[0] === "bootstrap" && state.bootstrapError) {
+    return { stdout: "", stderr: state.bootstrapError, code: state.bootstrapCode };
+  }
+  if (call[0] === "kickstart" && state.kickstartError && state.kickstartFailuresRemaining > 0) {
+    state.kickstartFailuresRemaining -= 1;
+    return { stdout: "", stderr: state.kickstartError, code: 1 };
+  }
+  return { stdout: "", stderr: "", code: 0 };
+}
 
-vi.mock("../infra/restart-stale-pids.js", () => ({
-  cleanStaleGatewayProcessesSync: (port?: number) => cleanStaleGatewayProcessesSync(port),
-}));
+/** Narrow view of `node:fs/promises` for the in-memory fixture spies. */
+const fsMock = fs as unknown as {
+  access: (path: string) => Promise<void>;
+  mkdir: (path: string, opts?: { mode?: number }) => Promise<void>;
+  stat: (path: string) => Promise<{ mode: number }>;
+  chmod: (path: string, mode: number) => Promise<void>;
+  unlink: (path: string) => Promise<void>;
+  writeFile: (path: string, data: string, opts?: { mode?: number }) => Promise<void>;
+};
 
-vi.mock("node:fs/promises", async () => {
-  const actual = await import("node:fs/promises");
-  const wrapped = {
-    ...actual,
-    access: vi.fn(async (p: string) => {
+let fsSpies: Array<{ mockRestore: () => void }> = [];
+
+function installFsSpies(): void {
+  fsSpies = [
+    vi.spyOn(fsMock, "access").mockImplementation(async (p) => {
       const key = String(p);
       if (state.files.has(key) || state.dirs.has(key)) {
         return;
       }
       throw new Error(`ENOENT: no such file or directory, access '${key}'`);
     }),
-    mkdir: vi.fn(async (p: string, opts?: { mode?: number }) => {
+    vi.spyOn(fsMock, "mkdir").mockImplementation(async (p, opts) => {
       const key = String(p);
       state.dirs.add(key);
       state.dirModes.set(key, opts?.mode ?? 0o777);
     }),
-    stat: vi.fn(async (p: string) => {
+    vi.spyOn(fsMock, "stat").mockImplementation(async (p) => {
       const key = String(p);
       if (state.dirs.has(key)) {
         return { mode: state.dirModes.get(key) ?? 0o777 };
@@ -128,7 +148,7 @@ vi.mock("node:fs/promises", async () => {
       }
       throw new Error(`ENOENT: no such file or directory, stat '${key}'`);
     }),
-    chmod: vi.fn(async (p: string, mode: number) => {
+    vi.spyOn(fsMock, "chmod").mockImplementation(async (p, mode) => {
       const key = String(p);
       if (state.dirs.has(key)) {
         state.dirModes.set(key, mode);
@@ -140,17 +160,31 @@ vi.mock("node:fs/promises", async () => {
       }
       throw new Error(`ENOENT: no such file or directory, chmod '${key}'`);
     }),
-    unlink: vi.fn(async (p: string) => {
+    vi.spyOn(fsMock, "unlink").mockImplementation(async (p) => {
       state.files.delete(String(p));
     }),
-    writeFile: vi.fn(async (p: string, data: string, opts?: { mode?: number }) => {
+    vi.spyOn(fsMock, "writeFile").mockImplementation(async (p, data, opts) => {
       const key = String(p);
-      state.files.set(key, data);
+      state.files.set(key, String(data));
       state.dirs.add(String(key.split("/").slice(0, -1).join("/")));
       state.fileModes.set(key, opts?.mode ?? 0o666);
     }),
-  };
-  return { ...wrapped, default: wrapped };
+  ];
+}
+
+beforeAll(() => {
+  setExecFileForTests(execFileMock as unknown as Parameters<typeof setExecFileForTests>[0]);
+});
+
+afterAll(() => {
+  setExecFileForTests(null);
+});
+
+afterEach(() => {
+  for (const spy of fsSpies) {
+    spy.mockRestore();
+  }
+  fsSpies = [];
 });
 
 beforeEach(() => {
@@ -175,6 +209,14 @@ beforeEach(() => {
     ok: true,
     pid: 7331,
   });
+  setLaunchdRestartDepsForTests({
+    isCurrentProcessLaunchdServiceLabel:
+      launchdRestartHandoffState.isCurrentProcessLaunchdServiceLabel,
+    scheduleDetachedLaunchdRestartHandoff:
+      launchdRestartHandoffState.scheduleDetachedLaunchdRestartHandoff,
+    cleanStaleGatewayProcessesSync,
+  });
+  installFsSpies();
   vi.clearAllMocks();
 });
 

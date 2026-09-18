@@ -13,6 +13,19 @@ export const schtasksCalls: string[][] = [];
 export const inspectPortUsage: MockFn<(port: number) => Promise<PortUsage>> = vi.fn();
 export const killProcessTree: MockFn<typeof killProcessTreeImpl> = vi.fn();
 
+async function defaultExecSchtasks(args: string[]) {
+  schtasksCalls.push(args);
+  return schtasksResponses.shift() ?? { code: 0, stdout: "", stderr: "" };
+}
+
+export const execSchtasks: MockFn<(args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>> =
+  vi.fn(defaultExecSchtasks);
+
+/** The scheduler/port/process stubs every schtasks suite starts from. */
+export function baseSchtasksTestDeps() {
+  return { execSchtasks, inspectPortUsage, killProcessTree };
+}
+
 export async function withWindowsEnv(
   prefix: string,
   run: (params: { tmpDir: string; env: Record<string, string> }) => Promise<void>,
@@ -36,6 +49,8 @@ export function resetSchtasksBaseMocks() {
   schtasksCalls.length = 0;
   inspectPortUsage.mockReset();
   killProcessTree.mockReset();
+  execSchtasks.mockReset();
+  execSchtasks.mockImplementation(defaultExecSchtasks);
 }
 
 export async function writeGatewayScript(
