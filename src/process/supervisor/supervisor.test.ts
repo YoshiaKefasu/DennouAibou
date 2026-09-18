@@ -1,20 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { createChildAdapter } from "./adapters/child.js";
+import type { createPtyAdapter } from "./adapters/pty.js";
+import { createProcessSupervisor, type ProcessSupervisorDeps } from "./supervisor.js";
 import type { SpawnProcessAdapter } from "./types.js";
 
-const { createChildAdapterMock, createPtyAdapterMock } = vi.hoisted(() => ({
-  createChildAdapterMock: vi.fn(),
-  createPtyAdapterMock: vi.fn(),
-}));
-
-vi.mock("./adapters/child.js", () => ({
-  createChildAdapter: createChildAdapterMock,
-}));
-
-vi.mock("./adapters/pty.js", () => ({
-  createPtyAdapter: createPtyAdapterMock,
-}));
-
-let createProcessSupervisor: typeof import("./supervisor.js").createProcessSupervisor;
+const createChildAdapterMock = vi.fn<typeof createChildAdapter>();
+const createPtyAdapterMock = vi.fn<typeof createPtyAdapter>();
 
 type ProcessSupervisor = ReturnType<typeof createProcessSupervisor>;
 type SpawnOptions = Parameters<ProcessSupervisor["spawn"]>[0];
@@ -27,6 +18,40 @@ type StubChildAdapter = ChildAdapter & {
   killMock: ReturnType<typeof vi.fn>;
   disposeMock: ReturnType<typeof vi.fn>;
 };
+
+/**
+ * Manual timer seam so the supervisor's timeout paths can be driven without
+ * fake timers (Bun does not expose `vi.advanceTimersByTimeAsync`).
+ */
+function createManualTimers() {
+  let nextHandle = 1;
+  let nowMs = 0;
+  const pending = new Map<number, { callback: () => void; dueAtMs: number }>();
+
+  return {
+    deps: {
+      setTimeout: (callback: () => void, delayMs: number) => {
+        const handle = nextHandle++;
+        pending.set(handle, { callback, dueAtMs: nowMs + delayMs });
+        return handle as unknown as NodeJS.Timeout;
+      },
+      clearTimeout: (handle: NodeJS.Timeout) => {
+        pending.delete(handle as unknown as number);
+      },
+      now: () => nowMs,
+    },
+    advance(ms: number) {
+      nowMs += ms;
+      // Snapshot so timers registered by a firing callback only run on the next advance.
+      for (const [handle, timer] of Array.from(pending)) {
+        if (timer.dueAtMs <= nowMs) {
+          pending.delete(handle);
+          timer.callback();
+        }
+      }
+    },
+  };
+}
 
 function createWriteStdoutArgv(output: string): string[] {
   if (process.platform === "win32") {
@@ -95,7 +120,10 @@ function createStubChildAdapter(options?: {
   return adapter;
 }
 
-async function spawnChild(supervisor: ProcessSupervisor, options: ChildSpawnOptions) {
+async function spawnChild(
+  supervisor: ProcessSupervisor,
+  options: ChildSpawnOptions,
+): Promise<Awaited<ReturnType<ProcessSupervisor["spawn"]>>> {
   return supervisor.spawn({
     ...options,
     backendId: "test",
@@ -103,17 +131,24 @@ async function spawnChild(supervisor: ProcessSupervisor, options: ChildSpawnOpti
   });
 }
 
+function createTestSupervisor(extraDeps: Partial<ProcessSupervisorDeps> = {}) {
+  const timers = createManualTimers();
+  const deps: ProcessSupervisorDeps = {
+    createChildAdapter: createChildAdapterMock,
+    createPtyAdapter: createPtyAdapterMock,
+    ...timers.deps,
+    ...extraDeps,
+  };
+  return { supervisor: createProcessSupervisor(deps), timers };
+}
+
 describe("process supervisor", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    ({ createProcessSupervisor } = await import("./supervisor.js"));
+  beforeEach(() => {
     createChildAdapterMock.mockReset();
     createPtyAdapterMock.mockReset();
-    vi.useRealTimers();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -121,7 +156,7 @@ describe("process supervisor", () => {
     const adapter = createStubChildAdapter();
     createChildAdapterMock.mockResolvedValue(adapter);
 
-    const supervisor = createProcessSupervisor();
+    const { supervisor } = createTestSupervisor();
     const run = await spawnChild(supervisor, {
       sessionId: "s1",
       argv: createWriteStdoutArgv("ok"),
@@ -140,7 +175,6 @@ describe("process supervisor", () => {
   });
 
   it("enforces no-output timeout for silent processes", async () => {
-    vi.useFakeTimers();
     const adapter = createStubChildAdapter({
       onKill: (signal, current) => {
         current.settle(null, signal ?? "SIGKILL");
@@ -148,7 +182,7 @@ describe("process supervisor", () => {
     });
     createChildAdapterMock.mockResolvedValue(adapter);
 
-    const supervisor = createProcessSupervisor();
+    const { supervisor, timers } = createTestSupervisor();
     const run = await spawnChild(supervisor, {
       sessionId: "s1",
       argv: createSilentIdleArgv(),
@@ -158,7 +192,7 @@ describe("process supervisor", () => {
     });
 
     const exitPromise = run.wait();
-    await vi.advanceTimersByTimeAsync(5);
+    timers.advance(5);
 
     const exit = await exitPromise;
     expect(adapter.killMock).toHaveBeenCalledWith("SIGKILL");
@@ -176,7 +210,7 @@ describe("process supervisor", () => {
     const second = createStubChildAdapter();
     createChildAdapterMock.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
 
-    const supervisor = createProcessSupervisor();
+    const { supervisor } = createTestSupervisor();
     const firstRun = await spawnChild(supervisor, {
       sessionId: "s1",
       scopeKey: "scope:a",
@@ -206,7 +240,6 @@ describe("process supervisor", () => {
   });
 
   it("applies overall timeout even for near-immediate timer firing", async () => {
-    vi.useFakeTimers();
     const adapter = createStubChildAdapter({
       onKill: (signal, current) => {
         current.settle(null, signal ?? "SIGKILL");
@@ -214,7 +247,7 @@ describe("process supervisor", () => {
     });
     createChildAdapterMock.mockResolvedValue(adapter);
 
-    const supervisor = createProcessSupervisor();
+    const { supervisor, timers } = createTestSupervisor();
     const run = await spawnChild(supervisor, {
       sessionId: "s-timeout",
       argv: createSilentIdleArgv(),
@@ -223,7 +256,7 @@ describe("process supervisor", () => {
     });
 
     const exitPromise = run.wait();
-    await vi.advanceTimersByTimeAsync(1);
+    timers.advance(1);
 
     const exit = await exitPromise;
     expect(adapter.killMock).toHaveBeenCalledWith("SIGKILL");
@@ -235,7 +268,7 @@ describe("process supervisor", () => {
     const adapter = createStubChildAdapter();
     createChildAdapterMock.mockResolvedValue(adapter);
 
-    const supervisor = createProcessSupervisor();
+    const { supervisor } = createTestSupervisor();
     let streamed = "";
     const run = await spawnChild(supervisor, {
       sessionId: "s-capture",

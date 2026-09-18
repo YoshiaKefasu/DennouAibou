@@ -15,10 +15,24 @@ const ChannelModelByChannelSchema = z
 
 let directChannelRuntimeSchemasCache: ReadonlyMap<string, ChannelConfigRuntimeSchema> | undefined;
 
+let bundledPluginMetadataSource: typeof listBundledPluginMetadata = listBundledPluginMetadata;
+
+/**
+ * Injectable seam for tests. Passing `null` restores the real bundled metadata
+ * loader. Overriding the source also drops the memoized direct channel runtime
+ * schemas so the next parse rebuilds them from the new source.
+ */
+export function setBundledPluginMetadataSourceForTests(
+  source: typeof listBundledPluginMetadata | null,
+): void {
+  bundledPluginMetadataSource = source ?? listBundledPluginMetadata;
+  directChannelRuntimeSchemasCache = undefined;
+}
+
 function getDirectChannelRuntimeSchemas(): ReadonlyMap<string, ChannelConfigRuntimeSchema> {
   if (!directChannelRuntimeSchemasCache) {
     const runtimeMap = new Map<string, ChannelConfigRuntimeSchema>();
-    for (const entry of listBundledPluginMetadata({
+    for (const entry of bundledPluginMetadataSource({
       includeChannelConfigs: true,
       includeSyntheticChannelConfigs: true,
     })) {

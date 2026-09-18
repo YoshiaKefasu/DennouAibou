@@ -16,9 +16,12 @@ type MarkdownConfigSection = MarkdownConfigEntry & {
   accounts?: Record<string, MarkdownConfigEntry>;
 };
 
-function buildDefaultTableModes(): Map<string, MarkdownTableMode> {
+function buildDefaultTableModes(
+  source: MarkdownTableRegistrySource,
+): Map<string, MarkdownTableMode> {
   return new Map(
-    listChannelPlugins()
+    source
+      .listChannelPlugins()
       .flatMap((plugin) => {
         const defaultMarkdownTableMode = plugin.messaging?.defaultMarkdownTableMode;
         return defaultMarkdownTableMode ? [[plugin.id, defaultMarkdownTableMode] as const] : [];
@@ -27,13 +30,46 @@ function buildDefaultTableModes(): Map<string, MarkdownTableMode> {
   );
 }
 
+/**
+ * Narrow structural view of the channel-plugin registry used by this module.
+ * Keeping it structural lets tests supply a fixture registry without mocking
+ * `../channels/plugins/registry.js` and `../plugins/runtime.js`.
+ */
+export type MarkdownTableRegistrySource = {
+  listChannelPlugins: () => ReadonlyArray<{
+    id: string;
+    messaging?: { defaultMarkdownTableMode?: MarkdownTableMode };
+  }>;
+  getActivePluginChannelRegistryVersion: () => number;
+};
+
+const liveRegistrySource: MarkdownTableRegistrySource = {
+  listChannelPlugins,
+  getActivePluginChannelRegistryVersion,
+};
+
+let registrySource: MarkdownTableRegistrySource = liveRegistrySource;
+
+/**
+ * Injectable seam for tests. Passing `null` restores the live plugin registry.
+ * Overriding the source also drops the memoized default table modes so the next
+ * read rebuilds them from the new source.
+ */
+export function setMarkdownTableRegistrySourceForTests(
+  source: MarkdownTableRegistrySource | null,
+): void {
+  registrySource = source ?? liveRegistrySource;
+  cachedDefaultTableModes = null;
+  cachedDefaultTableModesRegistryVersion = null;
+}
+
 let cachedDefaultTableModes: Map<string, MarkdownTableMode> | null = null;
 let cachedDefaultTableModesRegistryVersion: number | null = null;
 
 function getDefaultTableModes(): Map<string, MarkdownTableMode> {
-  const registryVersion = getActivePluginChannelRegistryVersion();
+  const registryVersion = registrySource.getActivePluginChannelRegistryVersion();
   if (!cachedDefaultTableModes || cachedDefaultTableModesRegistryVersion !== registryVersion) {
-    cachedDefaultTableModes = buildDefaultTableModes();
+    cachedDefaultTableModes = buildDefaultTableModes(registrySource);
     cachedDefaultTableModesRegistryVersion = registryVersion;
   }
   return cachedDefaultTableModes;

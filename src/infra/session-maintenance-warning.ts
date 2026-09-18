@@ -2,7 +2,11 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { SessionMaintenanceWarning } from "../config/sessions/store-maintenance.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import { deliveryContextFromSession } from "../utils/delivery-context.js";
+import {
+  deliveryContextFromSession,
+  type DeliveryContext,
+  type DeliveryContextSessionSource,
+} from "../utils/delivery-context.js";
 import { isDeliverableMessageChannel, normalizeMessageChannel } from "../utils/message-channel.js";
 import { buildOutboundSessionContext } from "./outbound/session-context.js";
 import { enqueueSystemEvent } from "./system-events.js";
@@ -12,6 +16,21 @@ type WarningParams = {
   sessionKey: string;
   entry: SessionEntry;
   warning: SessionMaintenanceWarning;
+};
+
+/**
+ * Injectable seams for tests. Defaults mirror production so callers keep the
+ * existing behaviour.
+ */
+export type SessionMaintenanceWarningDeps = {
+  deliveryContextFromSession?: (
+    entry?: DeliveryContextSessionSource,
+  ) => DeliveryContext | undefined;
+  normalizeMessageChannel?: (raw?: string | null) => string | undefined;
+  isDeliverableMessageChannel?: (value: string) => boolean;
+  buildOutboundSessionContext?: typeof buildOutboundSessionContext;
+  enqueueSystemEvent?: typeof enqueueSystemEvent;
+  deliverOutboundPayloads?: typeof import("./outbound/deliver-runtime.js").deliverOutboundPayloads;
 };
 
 const warnedContexts = new Map<string, string>();
@@ -82,25 +101,35 @@ function buildWarningText(warning: SessionMaintenanceWarning): string {
   );
 }
 
-function resolveWarningDeliveryTarget(entry: SessionEntry): {
+function resolveWarningDeliveryTarget(
+  entry: SessionEntry,
+  deps: SessionMaintenanceWarningDeps,
+): {
   channel?: string;
   to?: string;
   accountId?: string;
   threadId?: string | number;
 } {
-  const context = deliveryContextFromSession(entry);
+  const resolveDeliveryContext = deps.deliveryContextFromSession ?? deliveryContextFromSession;
+  const normalizeChannel = deps.normalizeMessageChannel ?? normalizeMessageChannel;
+  const isDeliverable = deps.isDeliverableMessageChannel ?? isDeliverableMessageChannel;
+  const context = resolveDeliveryContext(entry);
   const channel = context?.channel
-    ? (normalizeMessageChannel(context.channel) ?? context.channel)
+    ? (normalizeChannel(context.channel) ?? context.channel)
     : undefined;
   return {
-    channel: channel && isDeliverableMessageChannel(channel) ? channel : undefined,
+    channel: channel && isDeliverable(channel) ? channel : undefined,
     to: context?.to,
     accountId: context?.accountId,
     threadId: context?.threadId,
   };
 }
 
-export async function deliverSessionMaintenanceWarning(params: WarningParams): Promise<void> {
+export async function deliverSessionMaintenanceWarning(
+  params: WarningParams,
+  deps: SessionMaintenanceWarningDeps = {},
+): Promise<void> {
+  const enqueueEvent = deps.enqueueSystemEvent ?? enqueueSystemEvent;
   if (!shouldSendWarning()) {
     return;
   }
@@ -112,26 +141,30 @@ export async function deliverSessionMaintenanceWarning(params: WarningParams): P
   warnedContexts.set(params.sessionKey, contextKey);
 
   const text = buildWarningText(params.warning);
-  const target = resolveWarningDeliveryTarget(params.entry);
+  const target = resolveWarningDeliveryTarget(params.entry, deps);
+  const isDeliverable = deps.isDeliverableMessageChannel ?? isDeliverableMessageChannel;
 
   if (!target.channel || !target.to) {
-    enqueueSystemEvent(text, { sessionKey: params.sessionKey });
+    enqueueEvent(text, { sessionKey: params.sessionKey });
     return;
   }
 
-  const channel = normalizeMessageChannel(target.channel) ?? target.channel;
-  if (!isDeliverableMessageChannel(channel)) {
-    enqueueSystemEvent(text, { sessionKey: params.sessionKey });
+  const normalizeChannel = deps.normalizeMessageChannel ?? normalizeMessageChannel;
+  const channel = normalizeChannel(target.channel) ?? target.channel;
+  if (!isDeliverable(channel)) {
+    enqueueEvent(text, { sessionKey: params.sessionKey });
     return;
   }
 
   try {
-    const { deliverOutboundPayloads } = await loadDeliverRuntime();
-    const outboundSession = buildOutboundSessionContext({
+    const deliverPayloads =
+      deps.deliverOutboundPayloads ?? (await loadDeliverRuntime()).deliverOutboundPayloads;
+    const buildSessionContext = deps.buildOutboundSessionContext ?? buildOutboundSessionContext;
+    const outboundSession = buildSessionContext({
       cfg: params.cfg,
       sessionKey: params.sessionKey,
     });
-    await deliverOutboundPayloads({
+    await deliverPayloads({
       cfg: params.cfg,
       channel,
       to: target.to,
@@ -142,6 +175,6 @@ export async function deliverSessionMaintenanceWarning(params: WarningParams): P
     });
   } catch (err) {
     log.warn(`Failed to deliver session maintenance warning: ${String(err)}`);
-    enqueueSystemEvent(text, { sessionKey: params.sessionKey });
+    enqueueEvent(text, { sessionKey: params.sessionKey });
   }
 }

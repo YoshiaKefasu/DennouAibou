@@ -1,33 +1,24 @@
 import fs from "node:fs/promises";
-import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fetch as realFetch } from "undici";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { SafeOpenError } from "../infra/fs-safe.js";
 import { withEnvAsync } from "../test-utils/env.js";
+import { startMediaServer, type MediaServerRuntimeDeps } from "./server.js";
 
-const mocks = vi.hoisted(() => ({
-  readFileWithinRoot: vi.fn(),
-  cleanOldMedia: vi.fn().mockResolvedValue(undefined),
-  isSafeOpenError: vi.fn(
-    (error: unknown) => typeof error === "object" && error !== null && "code" in error,
-  ),
-}));
+const readFileWithinRoot = vi.fn<NonNullable<MediaServerRuntimeDeps["readFileWithinRoot"]>>();
+const cleanOldMedia = vi.fn(async () => {});
 
 let mediaDir = "";
 
-vi.mock("./server.runtime.js", () => {
-  return {
-    MEDIA_MAX_BYTES: 5 * 1024 * 1024,
-    readFileWithinRoot: mocks.readFileWithinRoot,
-    isSafeOpenError: mocks.isSafeOpenError,
-    getMediaDir: () => mediaDir,
-    cleanOldMedia: mocks.cleanOldMedia,
-  };
-});
+const deps: MediaServerRuntimeDeps = {
+  readFileWithinRoot,
+  getMediaDir: () => mediaDir,
+  cleanOldMedia,
+};
 
-let startMediaServer: typeof import("./server.js").startMediaServer;
-let realFetch: typeof import("undici").fetch;
 const LOOPBACK_FETCH_ENV = {
   HTTP_PROXY: undefined,
   HTTPS_PROXY: undefined,
@@ -51,14 +42,9 @@ describe("media server outside-workspace mapping", () => {
   let port = 0;
 
   beforeAll(async () => {
-    vi.useRealTimers();
-    vi.doUnmock("undici");
-    const require = createRequire(import.meta.url);
-    ({ startMediaServer } = await import("./server.js"));
-    ({ fetch: realFetch } = require("undici") as typeof import("undici"));
     mediaDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-media-outside-workspace-"));
     try {
-      server = await startMediaServer(0, 1_000);
+      server = await startMediaServer(0, 1_000, undefined, deps);
     } catch (error) {
       if (
         error instanceof Error &&
@@ -78,8 +64,8 @@ describe("media server outside-workspace mapping", () => {
   });
 
   beforeEach(() => {
-    mocks.readFileWithinRoot.mockReset();
-    mocks.cleanOldMedia.mockClear();
+    readFileWithinRoot.mockReset();
+    cleanOldMedia.mockClear();
   });
 
   afterAll(async () => {
@@ -95,10 +81,9 @@ describe("media server outside-workspace mapping", () => {
     if (listenBlocked) {
       return;
     }
-    mocks.readFileWithinRoot.mockRejectedValueOnce({
-      code: "outside-workspace",
-      message: "file is outside workspace root",
-    });
+    readFileWithinRoot.mockRejectedValueOnce(
+      new SafeOpenError("outside-workspace", "file is outside workspace root"),
+    );
 
     await expectOutsideWorkspaceServerResponse(`http://127.0.0.1:${port}/media/ok-id`);
   });

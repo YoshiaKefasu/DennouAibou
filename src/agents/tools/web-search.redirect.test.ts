@@ -1,21 +1,11 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveCitationRedirectUrl } from "./web-search-citation-redirect.js";
 
-const { withStrictWebToolsEndpointMock } = vi.hoisted(() => ({
-  withStrictWebToolsEndpointMock: vi.fn(),
-}));
+const withStrictWebToolsEndpointMock = vi.fn();
 
-vi.mock("./web-guarded-fetch.js", () => ({
-  withStrictWebToolsEndpoint: withStrictWebToolsEndpointMock,
-}));
-
-let resolveCitationRedirectUrl: typeof import("./web-search-citation-redirect.js").resolveCitationRedirectUrl;
+const deps = { withStrictWebToolsEndpoint: withStrictWebToolsEndpointMock };
 
 describe("web_search redirect resolution hardening", () => {
-  beforeAll(async () => {
-    vi.resetModules();
-    ({ resolveCitationRedirectUrl } = await import("./web-search-citation-redirect.js"));
-  });
-
   beforeEach(() => {
     withStrictWebToolsEndpointMock.mockReset();
   });
@@ -28,7 +18,7 @@ describe("web_search redirect resolution hardening", () => {
       });
     });
 
-    const resolved = await resolveCitationRedirectUrl("https://example.com/start");
+    const resolved = await resolveCitationRedirectUrl("https://example.com/start", deps);
     expect(resolved).toBe("https://example.com/final");
     expect(withStrictWebToolsEndpointMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -42,7 +32,7 @@ describe("web_search redirect resolution hardening", () => {
 
   it("falls back to the original URL when guarded resolution fails", async () => {
     withStrictWebToolsEndpointMock.mockRejectedValue(new Error("blocked"));
-    await expect(resolveCitationRedirectUrl("https://example.com/start")).resolves.toBe(
+    await expect(resolveCitationRedirectUrl("https://example.com/start", deps)).resolves.toBe(
       "https://example.com/start",
     );
   });

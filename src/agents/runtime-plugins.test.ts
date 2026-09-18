@@ -1,43 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ensureRuntimePluginsLoaded } from "./runtime-plugins.js";
 
-const hoisted = vi.hoisted(() => ({
-  resolveRuntimePluginRegistry: vi.fn(),
-}));
+const resolveRuntimePluginRegistry = vi.fn();
+// Keep the expectations independent of the host platform's path resolution.
+const resolveUserPath = (value: string) => value;
 
-vi.mock("../plugins/loader.js", () => ({
-  resolveRuntimePluginRegistry: hoisted.resolveRuntimePluginRegistry,
-}));
+const deps = { resolveRuntimePluginRegistry, resolveUserPath };
 
 describe("ensureRuntimePluginsLoaded", () => {
-  let ensureRuntimePluginsLoaded: typeof import("./runtime-plugins.js").ensureRuntimePluginsLoaded;
-
-  beforeEach(async () => {
-    hoisted.resolveRuntimePluginRegistry.mockReset();
-    hoisted.resolveRuntimePluginRegistry.mockReturnValue(undefined);
-    vi.resetModules();
-    ({ ensureRuntimePluginsLoaded } = await import("./runtime-plugins.js"));
+  beforeEach(() => {
+    resolveRuntimePluginRegistry.mockReset();
+    resolveRuntimePluginRegistry.mockReturnValue(undefined);
   });
 
   it("does not reactivate plugins when a process already has an active registry", async () => {
-    hoisted.resolveRuntimePluginRegistry.mockReturnValue({});
+    resolveRuntimePluginRegistry.mockReturnValue({});
 
-    ensureRuntimePluginsLoaded({
-      config: {} as never,
-      workspaceDir: "/tmp/workspace",
-      allowGatewaySubagentBinding: true,
-    });
+    ensureRuntimePluginsLoaded(
+      {
+        config: {} as never,
+        workspaceDir: "/tmp/workspace",
+        allowGatewaySubagentBinding: true,
+      },
+      deps,
+    );
 
-    expect(hoisted.resolveRuntimePluginRegistry).toHaveBeenCalledTimes(1);
+    expect(resolveRuntimePluginRegistry).toHaveBeenCalledTimes(1);
   });
 
   it("resolves runtime plugins through the shared runtime helper", async () => {
-    ensureRuntimePluginsLoaded({
-      config: {} as never,
-      workspaceDir: "/tmp/workspace",
-      allowGatewaySubagentBinding: true,
-    });
+    ensureRuntimePluginsLoaded(
+      {
+        config: {} as never,
+        workspaceDir: "/tmp/workspace",
+        allowGatewaySubagentBinding: true,
+      },
+      deps,
+    );
 
-    expect(hoisted.resolveRuntimePluginRegistry).toHaveBeenCalledWith({
+    expect(resolveRuntimePluginRegistry).toHaveBeenCalledWith({
       config: {} as never,
       workspaceDir: "/tmp/workspace",
       runtimeOptions: {

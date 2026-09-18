@@ -3,32 +3,17 @@ import { EventEmitter } from "node:events";
 import process from "node:process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DENNOU_CLI_ENV_VALUE } from "../infra/openclaw-exec-env.js";
+import { attachChildProcessBridge } from "./child-process-bridge.js";
+import {
+  resolveCommandEnv,
+  resolveProcessExitCode,
+  runCommandWithTimeout,
+  shouldSpawnWithShell,
+  type ExecDeps,
+} from "./exec.js";
 
-const spawnMock = vi.hoisted(() => vi.fn());
-
-let attachChildProcessBridge: typeof import("./child-process-bridge.js").attachChildProcessBridge;
-let resolveCommandEnv: typeof import("./exec.js").resolveCommandEnv;
-let resolveProcessExitCode: typeof import("./exec.js").resolveProcessExitCode;
-let runCommandWithTimeout: typeof import("./exec.js").runCommandWithTimeout;
-let shouldSpawnWithShell: typeof import("./exec.js").shouldSpawnWithShell;
-
-async function loadExecModules(options?: { mockSpawn?: boolean }) {
-  vi.resetModules();
-  if (options?.mockSpawn) {
-    vi.doMock("node:child_process", async () => {
-      const actual = await import("node:child_process");
-      return {
-        ...actual,
-        spawn: spawnMock,
-      };
-    });
-  } else {
-    vi.doUnmock("node:child_process");
-  }
-  ({ attachChildProcessBridge } = await import("./child-process-bridge.js"));
-  ({ resolveCommandEnv, resolveProcessExitCode, runCommandWithTimeout, shouldSpawnWithShell } =
-    await import("./exec.js"));
-}
+const spawnMock = vi.fn();
+const execDeps: ExecDeps = { spawn: spawnMock };
 
 describe("runCommandWithTimeout", () => {
   function createSilentIdleArgv(): string[] {
@@ -79,15 +64,12 @@ describe("runCommandWithTimeout", () => {
     return child;
   }
 
-  beforeEach(async () => {
-    vi.useRealTimers();
+  beforeEach(() => {
     spawnMock.mockReset();
-    await loadExecModules();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.doUnmock("node:child_process");
+    spawnMock.mockReset();
   });
 
   it("never enables shell execution (Windows cmd.exe injection hardening)", () => {
@@ -155,46 +137,40 @@ describe("runCommandWithTimeout", () => {
     ).toBeNull();
   });
 
-  it.runIf(process.platform !== "win32")(
-    "kills command when no output timeout elapses",
-    { timeout: 5_000 },
-    async () => {
-      vi.useFakeTimers();
-      const child = createKilledChild();
-      spawnMock.mockReturnValue(child);
-      await loadExecModules({ mockSpawn: true });
-      const resultPromise = runCommandWithTimeout(createSilentIdleArgv(), {
+  it("kills command when no output timeout elapses", async () => {
+    const child = createKilledChild();
+    spawnMock.mockReturnValue(child);
+
+    const result = await runCommandWithTimeout(
+      createSilentIdleArgv(),
+      {
         timeoutMs: 2_000,
         noOutputTimeoutMs: 200,
-      });
+      },
+      execDeps,
+    );
 
-      await vi.advanceTimersByTimeAsync(250);
-      const result = await resultPromise;
-      expect(result.termination).toBe("no-output-timeout");
-      expect(result.noOutputTimedOut).toBe(true);
-      expect(result.code).not.toBe(0);
-    },
-  );
+    expect(result.termination).toBe("no-output-timeout");
+    expect(result.noOutputTimedOut).toBe(true);
+    expect(result.code).not.toBe(0);
+  });
 
-  it.runIf(process.platform !== "win32")(
-    "reports global timeout termination when overall timeout elapses",
-    { timeout: 5_000 },
-    async () => {
-      vi.useFakeTimers();
-      const child = createKilledChild();
-      spawnMock.mockReturnValue(child);
-      await loadExecModules({ mockSpawn: true });
-      const resultPromise = runCommandWithTimeout(createSilentIdleArgv(), {
+  it("reports global timeout termination when overall timeout elapses", async () => {
+    const child = createKilledChild();
+    spawnMock.mockReturnValue(child);
+
+    const result = await runCommandWithTimeout(
+      createSilentIdleArgv(),
+      {
         timeoutMs: 200,
-      });
+      },
+      execDeps,
+    );
 
-      await vi.advanceTimersByTimeAsync(250);
-      const result = await resultPromise;
-      expect(result.termination).toBe("timeout");
-      expect(result.noOutputTimedOut).toBe(false);
-      expect(result.code).not.toBe(0);
-    },
-  );
+    expect(result.termination).toBe("timeout");
+    expect(result.noOutputTimedOut).toBe(false);
+    expect(result.code).not.toBe(0);
+  });
 });
 
 describe("attachChildProcessBridge", () => {

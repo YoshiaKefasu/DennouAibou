@@ -17,6 +17,18 @@ type ActiveRun = {
   scopeKey?: string;
 };
 
+/**
+ * Injectable seams for tests so adapter creation and timer scheduling can be
+ * exercised without module mocking or fake timers.
+ */
+export type ProcessSupervisorDeps = {
+  createChildAdapter?: typeof createChildAdapter;
+  createPtyAdapter?: typeof createPtyAdapter;
+  setTimeout?: (callback: () => void, delayMs: number) => NodeJS.Timeout;
+  clearTimeout?: (handle: NodeJS.Timeout) => void;
+  now?: () => number;
+};
+
 function clampTimeout(value?: number): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return undefined;
@@ -28,9 +40,16 @@ function isTimeoutReason(reason: TerminationReason) {
   return reason === "overall-timeout" || reason === "no-output-timeout";
 }
 
-export function createProcessSupervisor(): ProcessSupervisor {
+export function createProcessSupervisor(deps: ProcessSupervisorDeps = {}): ProcessSupervisor {
   const registry = createRunRegistry();
   const active = new Map<string, ActiveRun>();
+  const spawnChildAdapter = deps.createChildAdapter ?? createChildAdapter;
+  const spawnPtyAdapter = deps.createPtyAdapter ?? createPtyAdapter;
+  const startTimer: (callback: () => void, delayMs: number) => NodeJS.Timeout =
+    deps.setTimeout ?? ((callback, delayMs) => setTimeout(callback, delayMs));
+  const stopTimer: (handle: NodeJS.Timeout) => void =
+    deps.clearTimeout ?? ((handle) => clearTimeout(handle));
+  const now = deps.now ?? (() => Date.now());
 
   const cancel = (runId: string, reason: TerminationReason = "manual-cancel") => {
     const current = active.get(runId);
@@ -60,7 +79,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
     if (input.replaceExistingScope && input.scopeKey?.trim()) {
       cancelScope(input.scopeKey, "manual-cancel");
     }
-    const startedAtMs = Date.now();
+    const startedAtMs = now();
     const record: RunRecord = {
       runId,
       sessionId: input.sessionId,
@@ -106,9 +125,9 @@ export function createProcessSupervisor(): ProcessSupervisor {
         return;
       }
       if (noOutputTimer) {
-        clearTimeout(noOutputTimer);
+        stopTimer(noOutputTimer);
       }
-      noOutputTimer = setTimeout(() => {
+      noOutputTimer = startTimer(() => {
         requestCancel("no-output-timeout");
       }, noOutputTimeoutMs);
     };
@@ -125,14 +144,14 @@ export function createProcessSupervisor(): ProcessSupervisor {
               if (!ptyCommand) {
                 throw new Error("PTY command cannot be empty");
               }
-              return await createPtyAdapter({
+              return await spawnPtyAdapter({
                 shell,
                 args: [...shellArgs, ptyCommand],
                 cwd: input.cwd,
                 env: input.env,
               });
             })()
-          : await createChildAdapter({
+          : await spawnChildAdapter({
               argv: input.argv,
               cwd: input.cwd,
               env: input.env,
@@ -145,11 +164,11 @@ export function createProcessSupervisor(): ProcessSupervisor {
 
       const clearTimers = () => {
         if (timeoutTimer) {
-          clearTimeout(timeoutTimer);
+          stopTimer(timeoutTimer);
           timeoutTimer = null;
         }
         if (noOutputTimer) {
-          clearTimeout(noOutputTimer);
+          stopTimer(noOutputTimer);
           noOutputTimer = null;
         }
       };
@@ -162,12 +181,12 @@ export function createProcessSupervisor(): ProcessSupervisor {
       };
 
       if (overallTimeoutMs) {
-        timeoutTimer = setTimeout(() => {
+        timeoutTimer = startTimer(() => {
           requestCancel("overall-timeout");
         }, overallTimeoutMs);
       }
       if (noOutputTimeoutMs) {
-        noOutputTimer = setTimeout(() => {
+        noOutputTimer = startTimer(() => {
           requestCancel("no-output-timeout");
         }, noOutputTimeoutMs);
       }
@@ -194,7 +213,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
             reason: forcedReason ?? "exit",
             exitCode: result.code,
             exitSignal: result.signal,
-            durationMs: Date.now() - startedAtMs,
+            durationMs: now() - startedAtMs,
             stdout,
             stderr,
             timedOut: isTimeoutReason(forcedReason ?? "exit"),
@@ -212,7 +231,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
           reason,
           exitCode: result.code,
           exitSignal: result.signal,
-          durationMs: Date.now() - startedAtMs,
+          durationMs: now() - startedAtMs,
           stdout,
           stderr,
           timedOut: isTimeoutReason(forcedReason ?? reason),

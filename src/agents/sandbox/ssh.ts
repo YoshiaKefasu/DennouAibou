@@ -37,6 +37,14 @@ export type RunSshSandboxCommandParams = {
   tty?: boolean;
 };
 
+/**
+ * Injectable seams for tests. Defaults mirror production so callers keep the
+ * existing behaviour.
+ */
+export type SshSandboxDeps = {
+  spawn?: typeof spawn;
+};
+
 function normalizeInlineSshMaterial(contents: string, filename: string): string {
   const withoutBom = contents.replace(/^\uFEFF/, "");
   const normalizedNewlines = withoutBom.replace(/\r\n?/g, "\n");
@@ -208,7 +216,9 @@ export async function disposeSshSandboxSession(session: SshSandboxSession): Prom
 
 export async function runSshSandboxCommand(
   params: RunSshSandboxCommandParams,
+  deps: SshSandboxDeps = {},
 ): Promise<SandboxBackendCommandResult> {
+  const spawnImpl = deps.spawn ?? spawn;
   const argv = buildSshSandboxArgv({
     session: params.session,
     remoteCommand: params.remoteCommand,
@@ -216,7 +226,7 @@ export async function runSshSandboxCommand(
   });
   const sshEnv = sanitizeEnvVars(process.env).allowed;
   return await new Promise<SandboxBackendCommandResult>((resolve, reject) => {
-    const child = spawn(argv[0], argv.slice(1), {
+    const child = spawnImpl(argv[0], argv.slice(1), {
       stdio: ["pipe", "pipe", "pipe"],
       env: sshEnv,
       signal: params.signal,
@@ -252,12 +262,16 @@ export async function runSshSandboxCommand(
   });
 }
 
-export async function uploadDirectoryToSshTarget(params: {
-  session: SshSandboxSession;
-  localDir: string;
-  remoteDir: string;
-  signal?: AbortSignal;
-}): Promise<void> {
+export async function uploadDirectoryToSshTarget(
+  params: {
+    session: SshSandboxSession;
+    localDir: string;
+    remoteDir: string;
+    signal?: AbortSignal;
+  },
+  deps: SshSandboxDeps = {},
+): Promise<void> {
+  const spawnImpl = deps.spawn ?? spawn;
   await assertSafeUploadSymlinks(params.localDir);
   const remoteCommand = buildRemoteCommand([
     "/bin/sh",
@@ -272,11 +286,11 @@ export async function uploadDirectoryToSshTarget(params: {
   });
   const sshEnv = sanitizeEnvVars(process.env).allowed;
   await new Promise<void>((resolve, reject) => {
-    const tar = spawn("tar", ["-C", params.localDir, "-cf", "-", "."], {
+    const tar = spawnImpl("tar", ["-C", params.localDir, "-cf", "-", "."], {
       stdio: ["ignore", "pipe", "pipe"],
       signal: params.signal,
     });
-    const ssh = spawn(sshArgv[0], sshArgv.slice(1), {
+    const ssh = spawnImpl(sshArgv[0], sshArgv.slice(1), {
       stdio: ["pipe", "pipe", "pipe"],
       env: sshEnv,
       signal: params.signal,

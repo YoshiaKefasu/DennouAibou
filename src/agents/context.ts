@@ -162,7 +162,17 @@ function shouldEagerWarmContextWindowCache(argv: string[] = process.argv): boole
   return Boolean(primary) && !SKIP_EAGER_WARMUP_PRIMARY_COMMANDS.has(primary);
 }
 
-function primeConfiguredContextWindows(): OpenClawConfig | undefined {
+/**
+ * Injectable seams for tests. Defaults mirror production so the import-time
+ * warmup keeps its existing behaviour.
+ */
+export type ContextEagerWarmupDeps = {
+  loadConfig?: typeof loadConfig;
+};
+
+function primeConfiguredContextWindows(
+  deps: ContextEagerWarmupDeps = {},
+): OpenClawConfig | undefined {
   if (CONTEXT_WINDOW_RUNTIME_STATE.configuredConfig) {
     applyConfiguredContextWindows({
       cache: MODEL_CONTEXT_TOKEN_CACHE,
@@ -176,7 +186,7 @@ function primeConfiguredContextWindows(): OpenClawConfig | undefined {
     return undefined;
   }
   try {
-    const cfg = loadConfig();
+    const cfg = (deps.loadConfig ?? loadConfig)();
     applyConfiguredContextWindows({
       cache: MODEL_CONTEXT_TOKEN_CACHE,
       modelsConfig: cfg.models as ModelsConfig | undefined,
@@ -197,12 +207,12 @@ function primeConfiguredContextWindows(): OpenClawConfig | undefined {
   }
 }
 
-function ensureContextWindowCacheLoaded(): Promise<void> {
+function ensureContextWindowCacheLoaded(deps: ContextEagerWarmupDeps = {}): Promise<void> {
   if (CONTEXT_WINDOW_RUNTIME_STATE.loadPromise) {
     return CONTEXT_WINDOW_RUNTIME_STATE.loadPromise;
   }
 
-  const cfg = primeConfiguredContextWindows();
+  const cfg = primeConfiguredContextWindows(deps);
   if (!cfg) {
     return Promise.resolve();
   }
@@ -263,11 +273,25 @@ export function lookupContextTokens(
   return lookupCachedContextTokens(modelId);
 }
 
-if (shouldEagerWarmContextWindowCache()) {
-  // Keep startup warmth for the real CLI, but avoid import-time side effects
-  // when this module is pulled in through library/plugin-sdk surfaces.
-  void ensureContextWindowCacheLoaded();
+/**
+ * Run the import-time eager warmup for `argv`. Returns whether the warmup was
+ * triggered, i.e. whether the command line targets an OpenClaw CLI command that
+ * needs the context window cache warmed ahead of the first lookup.
+ */
+export function runContextEagerWarmup(
+  argv: string[] = process.argv,
+  deps: ContextEagerWarmupDeps = {},
+): boolean {
+  if (!shouldEagerWarmContextWindowCache(argv)) {
+    return false;
+  }
+  void ensureContextWindowCacheLoaded(deps);
+  return true;
 }
+
+// Keep startup warmth for the real CLI, but avoid import-time side effects
+// when this module is pulled in through library/plugin-sdk surfaces.
+runContextEagerWarmup();
 
 function resolveConfiguredModelParams(
   cfg: OpenClawConfig | undefined,

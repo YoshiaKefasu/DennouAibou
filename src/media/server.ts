@@ -17,6 +17,16 @@ const MAX_MEDIA_ID_CHARS = 200;
 const MEDIA_ID_PATTERN = /^[\p{L}\p{N}._-]+$/u;
 const MAX_MEDIA_BYTES = MEDIA_MAX_BYTES;
 
+/**
+ * Injectable seams for tests. Defaults mirror production so callers keep the
+ * existing behaviour.
+ */
+export type MediaServerRuntimeDeps = {
+  readFileWithinRoot?: typeof readFileWithinRoot;
+  getMediaDir?: typeof getMediaDir;
+  cleanOldMedia?: typeof cleanOldMedia;
+};
+
 const isValidMediaId = (id: string) => {
   if (!id) {
     return false;
@@ -34,8 +44,12 @@ export function attachMediaRoutes(
   app: Express,
   ttlMs = DEFAULT_TTL_MS,
   _runtime: RuntimeEnv = defaultRuntime,
+  deps: MediaServerRuntimeDeps = {},
 ) {
-  const mediaDir = getMediaDir();
+  const resolveMediaDir = deps.getMediaDir ?? getMediaDir;
+  const readWithinRoot = deps.readFileWithinRoot ?? readFileWithinRoot;
+  const cleanMedia = deps.cleanOldMedia ?? cleanOldMedia;
+  const mediaDir = resolveMediaDir();
 
   app.get("/media/:id", async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -49,7 +63,7 @@ export function attachMediaRoutes(
         buffer: data,
         realPath,
         stat,
-      } = await readFileWithinRoot({
+      } = await readWithinRoot({
         rootDir: mediaDir,
         relativePath: id,
         maxBytes: MAX_MEDIA_BYTES,
@@ -101,7 +115,7 @@ export function attachMediaRoutes(
 
   // periodic cleanup
   setInterval(() => {
-    void cleanOldMedia(ttlMs, { recursive: false });
+    void cleanMedia(ttlMs, { recursive: false });
   }, ttlMs).unref();
 }
 
@@ -109,9 +123,10 @@ export async function startMediaServer(
   port: number,
   ttlMs = DEFAULT_TTL_MS,
   runtime: RuntimeEnv = defaultRuntime,
+  deps: MediaServerRuntimeDeps = {},
 ): Promise<Server> {
   const app = express();
-  attachMediaRoutes(app, ttlMs, runtime);
+  attachMediaRoutes(app, ttlMs, runtime, deps);
   return await new Promise((resolve, reject) => {
     const server = app.listen(port, "127.0.0.1");
     server.once("listening", () => resolve(server));

@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 169 files.
+# Current known-failure count: 159 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -21,7 +21,7 @@
 #   conditional: it.runIf is not exposed by bun:test
 #   hook-hang: beforeEach/afterEach hook hangs to a fixed 120s timeout; CLI --timeout is ignored for hooks
 #
-# reset/dynamic-mock (46 files)
+# reset/dynamic-mock (43 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
 extensions/line/src/monitor.lifecycle.test.ts
 extensions/line/src/send.test.ts
@@ -33,7 +33,6 @@ src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
 src/agents/bash-tools.exec.pty-cleanup.test.ts
 src/agents/bash-tools.exec.pty-fallback-failure.test.ts
 src/agents/compaction.tool-result-details.test.ts
-src/agents/context.eager-warmup.test.ts
 src/agents/model-fallback.run-embedded.e2e.test.ts
 src/agents/models-config.write-serialization.test.ts
 src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
@@ -41,7 +40,6 @@ src/agents/pi-embedded-runner/tool-result-truncation.test.ts
 src/agents/pi-embedded-runner/transcript-rewrite.test.ts
 src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
 src/agents/pi-tools.read.workspace-root-guard.test.ts
-src/agents/runtime-plugins.test.ts
 src/agents/sandbox/browser.create.test.ts
 src/agents/sandbox/docker.config-hash-recreate.test.ts
 src/agents/sandbox/manage.test.ts
@@ -51,7 +49,6 @@ src/agents/subagent-registry.persistence.resume.test.ts
 src/agents/subagent-registry.test.ts
 src/agents/subagent-spawn.test.ts
 src/agents/subagent-spawn.workspace.test.ts
-src/agents/tools/web-search.redirect.test.ts
 src/auto-reply/reply.block-streaming.test.ts
 src/auto-reply/reply.directive.directive-behavior.applies-inline-reasoning-mixed-messages-acks-immediately.test.ts
 src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox-workspace.test.ts
@@ -82,37 +79,29 @@ extensions/telegram/src/bot-native-commands.session-meta.test.ts
 # conditional (1 file)
 src/agents/pi-tools.read.host-edit-access.test.ts
 
-# reset/dynamic-mock+conditional (1 file)
-src/agents/sandbox/ssh.spawn-env.test.ts
-
-# reset/dynamic-mock (18 additional files; measured after the first 250)
+# reset/dynamic-mock (14 additional files; measured after the first 250)
 src/commands/gateway-status.test.ts
 src/commands/models/list.list-command.forward-compat.test.ts
 src/commands/models/list.status.test.ts
 src/commands/onboard-non-interactive.gateway.test.ts
 src/commands/onboard-non-interactive.provider-auth.test.ts
-src/config/zod-schema.providers.lazy-runtime.test.ts
 src/gateway/client.test.ts
 src/gateway/gateway-misc.test.ts
 src/gateway/server-methods/send.test.ts
 src/infra/outbound/outbound-send-service.test.ts
-src/infra/session-maintenance-warning.test.ts
 src/media-understanding/apply.echo-transcript.test.ts
 src/media-understanding/apply.test.ts
 src/media-understanding/runner.vision-skip.test.ts
-src/media/server.outside-workspace.test.ts
 src/plugins/contracts/runtime-import-side-effects.contract.test.ts
 src/plugins/conversation-binding.test.ts
-src/process/supervisor/supervisor.test.ts
 
 # wait/import (2 additional files; measured after the first 250)
 src/entry.test.ts
 src/plugins/marketplace.test.ts
 
-# conditional (3 additional files; measured after the first 250)
+# conditional (2 additional files; measured after the first 250)
 src/config/io.write-config.test.ts
 src/infra/restart.test.ts
-src/process/exec.test.ts
 
 # async-timer (8 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 src/dennou-soul/idle-prune-watcher.test.ts
@@ -148,7 +137,7 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (67 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (66 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
@@ -169,7 +158,6 @@ src/commands/onboard-remote.test.ts
 src/commands/sessions.default-agent-store.test.ts
 src/commands/status.summary.test.ts
 src/commands/status.test.ts
-src/config/markdown-tables.test.ts
 src/config/runtime-schema.test.ts
 src/config/validation.channel-metadata.test.ts
 src/daemon/launchd.test.ts

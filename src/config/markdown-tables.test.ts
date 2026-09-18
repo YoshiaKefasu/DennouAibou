@@ -1,31 +1,32 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DEFAULT_TABLE_MODES,
+  resolveMarkdownTableMode,
+  setMarkdownTableRegistrySourceForTests,
+  type MarkdownTableRegistrySource,
+} from "./markdown-tables.js";
 
-const listChannelPluginsMock = vi.hoisted(() =>
-  vi.fn(() => [
-    { id: "mattermost", messaging: { defaultMarkdownTableMode: "off" as const } },
-    { id: "signal", messaging: { defaultMarkdownTableMode: "bullets" as const } },
-    { id: "whatsapp", messaging: { defaultMarkdownTableMode: "bullets" as const } },
-  ]),
-);
-const getActivePluginChannelRegistryVersionMock = vi.hoisted(() => vi.fn(() => 1));
+const listChannelPlugins = vi.fn(() => [
+  { id: "mattermost", messaging: { defaultMarkdownTableMode: "off" as const } },
+  { id: "signal", messaging: { defaultMarkdownTableMode: "bullets" as const } },
+  { id: "whatsapp", messaging: { defaultMarkdownTableMode: "bullets" as const } },
+]);
+const getActivePluginChannelRegistryVersion = vi.fn(() => 1);
 
-vi.mock("../channels/plugins/registry.js", async () => {
-  const actual = await import("../channels/plugins/registry.js");
-  return {
-    ...actual,
-    listChannelPlugins: () => listChannelPluginsMock(),
-  };
+const registrySource: MarkdownTableRegistrySource = {
+  listChannelPlugins,
+  getActivePluginChannelRegistryVersion,
+};
+
+beforeEach(() => {
+  listChannelPlugins.mockClear();
+  getActivePluginChannelRegistryVersion.mockClear();
+  setMarkdownTableRegistrySourceForTests(registrySource);
 });
 
-vi.mock("../plugins/runtime.js", async () => {
-  const actual = await import("../plugins/runtime.js");
-  return {
-    ...actual,
-    getActivePluginChannelRegistryVersion: () => getActivePluginChannelRegistryVersionMock(),
-  };
+afterEach(() => {
+  setMarkdownTableRegistrySourceForTests(null);
 });
-
-import { DEFAULT_TABLE_MODES, resolveMarkdownTableMode } from "./markdown-tables.js";
 
 describe("DEFAULT_TABLE_MODES", () => {
   it("mattermost mode is off", () => {
@@ -42,6 +43,14 @@ describe("DEFAULT_TABLE_MODES", () => {
 
   it("slack has no special default in this seam-only slice", () => {
     expect(DEFAULT_TABLE_MODES.get("slack")).toBeUndefined();
+  });
+
+  it("memoizes the default modes per registry version", () => {
+    expect(DEFAULT_TABLE_MODES.get("signal")).toBe("bullets");
+    expect(DEFAULT_TABLE_MODES.get("signal")).toBe("bullets");
+
+    expect(listChannelPlugins).toHaveBeenCalledTimes(1);
+    expect(getActivePluginChannelRegistryVersion).toHaveBeenCalled();
   });
 });
 

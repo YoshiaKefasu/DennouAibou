@@ -4,9 +4,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runSshSandboxCommand, uploadDirectoryToSshTarget, type SshSandboxDeps } from "./ssh.js";
 
-const spawnMock = vi.hoisted(() => vi.fn());
+const spawnMock = vi.fn();
+const deps: SshSandboxDeps = { spawn: spawnMock };
 
 type MockChildProcess = EventEmitter & {
   stdin: PassThrough;
@@ -24,28 +26,26 @@ function createMockChildProcess(): MockChildProcess {
   return child;
 }
 
-vi.mock("node:child_process", async () => {
-  const actual = await import("node:child_process");
-  return {
-    ...actual,
-    spawn: spawnMock,
-  };
-});
+function createClosingChild(): ChildProcess {
+  const child = createMockChildProcess();
+  process.nextTick(() => {
+    child.emit("close", 0);
+  });
+  return child as unknown as ChildProcess;
+}
 
-let runSshSandboxCommand: typeof import("./ssh.js").runSshSandboxCommand;
-let uploadDirectoryToSshTarget: typeof import("./ssh.js").uploadDirectoryToSshTarget;
+const SESSION = {
+  command: "ssh",
+  configPath: "/tmp/openclaw-test-ssh-config",
+  host: "openclaw-sandbox",
+};
 
 describe("ssh subprocess env sanitization", () => {
   const originalEnv = { ...process.env };
   const tempDirs: string[] = [];
 
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    ({ runSshSandboxCommand, uploadDirectoryToSshTarget } = await import("./ssh.js"));
-  });
-
   afterEach(async () => {
+    spawnMock.mockReset();
     await Promise.all(
       tempDirs.splice(0).map(async (dir) => {
         await fs.rm(dir, { recursive: true, force: true });
@@ -60,27 +60,18 @@ describe("ssh subprocess env sanitization", () => {
   });
 
   it("filters blocked secrets before spawning ssh commands", async () => {
-    spawnMock.mockImplementationOnce(
-      (_command: string, _args: readonly string[], _options: SpawnOptions): ChildProcess => {
-        const child = createMockChildProcess();
-        process.nextTick(() => {
-          child.emit("close", 0);
-        });
-        return child as unknown as ChildProcess;
-      },
-    );
+    spawnMock.mockImplementationOnce(() => createClosingChild());
 
     process.env.OPENAI_API_KEY = "sk-test-secret";
     process.env.LANG = "en_US.UTF-8";
 
-    await runSshSandboxCommand({
-      session: {
-        command: "ssh",
-        configPath: "/tmp/openclaw-test-ssh-config",
-        host: "openclaw-sandbox",
+    await runSshSandboxCommand(
+      {
+        session: SESSION,
+        remoteCommand: "true",
       },
-      remoteCommand: "true",
-    });
+      deps,
+    );
 
     const spawnOptions = spawnMock.mock.calls[0]?.[2] as SpawnOptions | undefined;
     const env = spawnOptions?.env;
@@ -89,40 +80,21 @@ describe("ssh subprocess env sanitization", () => {
   });
 
   it("filters blocked secrets before spawning ssh uploads", async () => {
-    spawnMock
-      .mockImplementationOnce(
-        (_command: string, _args: readonly string[], _options: SpawnOptions): ChildProcess => {
-          const child = createMockChildProcess();
-          process.nextTick(() => {
-            child.emit("close", 0);
-          });
-          return child as unknown as ChildProcess;
-        },
-      )
-      .mockImplementationOnce(
-        (_command: string, _args: readonly string[], _options: SpawnOptions): ChildProcess => {
-          const child = createMockChildProcess();
-          process.nextTick(() => {
-            child.emit("close", 0);
-          });
-          return child as unknown as ChildProcess;
-        },
-      );
+    spawnMock.mockImplementation(() => createClosingChild());
 
     process.env.ANTHROPIC_API_KEY = "sk-test-secret";
     process.env.NODE_ENV = "test";
     const localDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-ssh-upload-env-"));
     tempDirs.push(localDir);
 
-    await uploadDirectoryToSshTarget({
-      session: {
-        command: "ssh",
-        configPath: "/tmp/openclaw-test-ssh-config",
-        host: "openclaw-sandbox",
+    await uploadDirectoryToSshTarget(
+      {
+        session: SESSION,
+        localDir,
+        remoteDir: "/remote/workspace",
       },
-      localDir,
-      remoteDir: "/remote/workspace",
-    });
+      deps,
+    );
 
     const sshSpawnOptions = spawnMock.mock.calls[1]?.[2] as SpawnOptions | undefined;
     const env = sshSpawnOptions?.env;
@@ -130,28 +102,10 @@ describe("ssh subprocess env sanitization", () => {
     expect(env?.NODE_ENV).toBe("test");
   });
 
-  it.runIf(process.platform !== "win32")(
+  it.skipIf(process.platform === "win32")(
     "allows in-workspace symlinks to upload normally",
     async () => {
-      spawnMock
-        .mockImplementationOnce(
-          (_command: string, _args: readonly string[], _options: SpawnOptions): ChildProcess => {
-            const child = createMockChildProcess();
-            process.nextTick(() => {
-              child.emit("close", 0);
-            });
-            return child as unknown as ChildProcess;
-          },
-        )
-        .mockImplementationOnce(
-          (_command: string, _args: readonly string[], _options: SpawnOptions): ChildProcess => {
-            const child = createMockChildProcess();
-            process.nextTick(() => {
-              child.emit("close", 0);
-            });
-            return child as unknown as ChildProcess;
-          },
-        );
+      spawnMock.mockImplementation(() => createClosingChild());
 
       const localDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-ssh-upload-safe-"));
       tempDirs.push(localDir);
@@ -159,15 +113,14 @@ describe("ssh subprocess env sanitization", () => {
       await fs.writeFile(path.join(localDir, "real", "payload.txt"), "ok\n", "utf8");
       await fs.symlink("real", path.join(localDir, "linked-dir"));
 
-      await uploadDirectoryToSshTarget({
-        session: {
-          command: "ssh",
-          configPath: "/tmp/openclaw-test-ssh-config",
-          host: "openclaw-sandbox",
+      await uploadDirectoryToSshTarget(
+        {
+          session: SESSION,
+          localDir,
+          remoteDir: "/remote/workspace",
         },
-        localDir,
-        remoteDir: "/remote/workspace",
-      });
+        deps,
+      );
 
       expect(spawnMock).toHaveBeenCalledTimes(2);
     },

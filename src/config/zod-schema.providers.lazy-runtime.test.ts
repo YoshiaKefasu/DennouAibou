@@ -1,26 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { importFreshModule } from "../../test/helpers/import-fresh.ts";
+import type { listBundledPluginMetadata as listBundledPluginMetadataType } from "../plugins/bundled-plugin-metadata.js";
 import type { BundledPluginMetadata } from "../plugins/bundled-plugin-metadata.js";
+import { ChannelsSchema, setBundledPluginMetadataSourceForTests } from "./zod-schema.providers.js";
 
-const listBundledPluginMetadataMock = vi.hoisted(() =>
-  vi.fn<(options?: unknown) => readonly BundledPluginMetadata[]>(() => []),
-);
+const listBundledPluginMetadataMock = vi.fn<typeof listBundledPluginMetadataType>();
 
 describe("ChannelsSchema bundled runtime loading", () => {
   beforeEach(() => {
-    listBundledPluginMetadataMock.mockClear();
-    vi.doMock("../plugins/bundled-plugin-metadata.js", () => ({
-      listBundledPluginMetadata: (options?: unknown) => listBundledPluginMetadataMock(options),
-    }));
+    listBundledPluginMetadataMock.mockReset();
+    listBundledPluginMetadataMock.mockReturnValue([]);
+    setBundledPluginMetadataSourceForTests(listBundledPluginMetadataMock);
   });
 
-  it("skips bundled channel runtime discovery when only core channel keys are present", async () => {
-    const runtime = await importFreshModule<typeof import("./zod-schema.providers.js")>(
-      import.meta.url,
-      "./zod-schema.providers.js?scope=channels-core-only",
-    );
-
-    const parsed = runtime.ChannelsSchema.parse({
+  it("skips bundled channel runtime discovery when only core channel keys are present", () => {
+    const parsed = ChannelsSchema.parse({
       defaults: {
         groupPolicy: "open",
       },
@@ -39,7 +32,7 @@ describe("ChannelsSchema bundled runtime loading", () => {
     );
   });
 
-  it("loads bundled channel runtime discovery only when plugin-owned channel config is present", async () => {
+  it("loads bundled channel runtime discovery only when plugin-owned channel config is present", () => {
     listBundledPluginMetadataMock.mockReturnValueOnce([
       {
         manifest: {
@@ -54,12 +47,7 @@ describe("ChannelsSchema bundled runtime loading", () => {
       } as unknown as BundledPluginMetadata,
     ]);
 
-    const runtime = await importFreshModule<typeof import("./zod-schema.providers.js")>(
-      import.meta.url,
-      "./zod-schema.providers.js?scope=channels-plugin-owned",
-    );
-
-    runtime.ChannelsSchema.parse({
+    ChannelsSchema.parse({
       discord: {},
     });
 
