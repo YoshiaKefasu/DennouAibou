@@ -32,6 +32,34 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+type ManualTimer = { callback: () => void; ms: number; cancelled: boolean; fired: boolean };
+
+/**
+ * Manual timer queue so approval expiry is driven deterministically. Bun's test
+ * runner does not expose `vi.advanceTimersByTimeAsync`.
+ */
+function createManualTimers() {
+  const timers: ManualTimer[] = [];
+  return {
+    setTimer: (callback: () => void, ms: number) => {
+      const timer: ManualTimer = { callback, ms, cancelled: false, fired: false };
+      timers.push(timer);
+      return timer as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimer: (handle: ReturnType<typeof setTimeout>) => {
+      (handle as unknown as ManualTimer).cancelled = true;
+    },
+    runAll() {
+      for (const timer of timers.splice(0)) {
+        if (!timer.cancelled && !timer.fired) {
+          timer.fired = true;
+          timer.callback();
+        }
+      }
+    },
+  };
+}
+
 beforeEach(() => {
   mockGatewayClientStarts.mockReset();
   mockGatewayClientStops.mockReset();
@@ -48,7 +76,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.useRealTimers();
 });
 
 beforeAll(async () => {
@@ -73,7 +100,7 @@ describe("createExecApprovalChannelRuntime", () => {
   });
 
   it("tracks pending requests and only expires the matching approval id", async () => {
-    vi.useFakeTimers();
+    const timers = createManualTimers();
     const finalizedExpired = vi.fn(async () => undefined);
     const finalizedResolved = vi.fn(async () => undefined);
     const runtime = createExecApprovalChannelRuntime({
@@ -81,6 +108,8 @@ describe("createExecApprovalChannelRuntime", () => {
       clientDisplayName: "Test Exec Approvals",
       cfg: {} as never,
       nowMs: () => 1000,
+      setTimer: timers.setTimer,
+      clearTimer: timers.clearTimer,
       isConfigured: () => true,
       shouldHandle: () => true,
       deliverRequested: async (request) => [{ id: request.id }],
@@ -290,7 +319,7 @@ describe("createExecApprovalChannelRuntime", () => {
   });
 
   it("logs async expiration handling failures", async () => {
-    vi.useFakeTimers();
+    const timers = createManualTimers();
     const runtime = createExecApprovalChannelRuntime<
       { id: string },
       PluginApprovalRequest,
@@ -300,6 +329,8 @@ describe("createExecApprovalChannelRuntime", () => {
       clientDisplayName: "Test Plugin Approvals",
       cfg: {} as never,
       nowMs: () => 1000,
+      setTimer: timers.setTimer,
+      clearTimer: timers.clearTimer,
       eventKinds: ["plugin"],
       isConfigured: () => true,
       shouldHandle: () => true,
@@ -319,11 +350,13 @@ describe("createExecApprovalChannelRuntime", () => {
       createdAtMs: 1000,
       expiresAtMs: 1001,
     });
-    await vi.advanceTimersByTimeAsync(1);
+    timers.runAll();
 
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "error handling approval expiration: expire failed",
-    );
+    await pollUntilAssert(() => {
+      expect(loggerMocks.error).toHaveBeenCalledWith(
+        "error handling approval expiration: expire failed",
+      );
+    });
   });
 
   it("subscribes to plugin approval events when requested", async () => {

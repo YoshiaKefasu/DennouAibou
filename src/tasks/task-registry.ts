@@ -57,10 +57,21 @@ const tasksWithPendingDelivery = new Set<string>();
 let listenerStarted = false;
 let listenerStop: (() => void) | null = null;
 let restoreAttempted = false;
+type TaskRegistryControlRuntime = Pick<
+  typeof import("./task-registry-control.runtime.js"),
+  "killSubagentRunAdmin"
+>;
 type TaskRegistryDeliveryRuntime = Pick<
   typeof import("./task-registry-delivery-runtime.js"),
   "sendMessage"
->;
+> & {
+  /**
+   * Test-only seam for the lazily loaded control graph (task cancellation).
+   * Production never sets this; tests inject a stub so cancellation coverage
+   * does not need a module-level mock of `../agents/subagent-control.js`.
+   */
+  control?: TaskRegistryControlRuntime;
+};
 const TASK_REGISTRY_DELIVERY_RUNTIME_OVERRIDE_KEY = Symbol.for(
   "openclaw.taskRegistry.deliveryRuntimeOverride",
 );
@@ -382,6 +393,12 @@ function loadTaskRegistryDeliveryRuntime() {
 }
 
 function loadTaskRegistryControlRuntime() {
+  const controlOverride = (globalThis as TaskRegistryGlobalWithDeliveryOverride)[
+    TASK_REGISTRY_DELIVERY_RUNTIME_OVERRIDE_KEY
+  ]?.control;
+  if (controlOverride) {
+    return Promise.resolve(controlOverride);
+  }
   // Registry reads happen far more often than task cancellation, so keep the ACP/subagent
   // control graph off the default import path until a cancellation flow actually needs it.
   controlRuntimePromise ??= import("./task-registry-control.runtime.js");

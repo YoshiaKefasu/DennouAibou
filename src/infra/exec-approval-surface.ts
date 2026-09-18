@@ -16,7 +16,39 @@ export type ExecApprovalInitiatingSurfaceState =
   | { kind: "disabled"; channel: string; channelLabel: string; accountId?: string }
   | { kind: "unsupported"; channel: string; channelLabel: string; accountId?: string };
 
-function labelForChannel(channel?: string): string {
+/**
+ * Injectable seams for the channel-catalog / config lookups this module
+ * performs. Tests supply fixtures instead of mocking `../config/config.js`,
+ * `../channels/plugins/index.js`, and `../utils/message-channel.js` at module
+ * level.
+ */
+export type ExecApprovalSurfaceDeps = {
+  loadConfig?: typeof loadConfig;
+  getChannelPlugin?: typeof getChannelPlugin;
+  listChannelPlugins?: typeof listChannelPlugins;
+  normalizeMessageChannel?: typeof normalizeMessageChannel;
+  /**
+   * Loosened from the real type predicate so tests can inject a plain mock.
+   */
+  isDeliverableMessageChannel?: (value: string) => boolean;
+};
+
+type ResolvedExecApprovalSurfaceDeps = Required<ExecApprovalSurfaceDeps>;
+
+function resolveDeps(deps: ExecApprovalSurfaceDeps = {}): ResolvedExecApprovalSurfaceDeps {
+  return {
+    loadConfig: deps.loadConfig ?? loadConfig,
+    getChannelPlugin: deps.getChannelPlugin ?? getChannelPlugin,
+    listChannelPlugins: deps.listChannelPlugins ?? listChannelPlugins,
+    normalizeMessageChannel: deps.normalizeMessageChannel ?? normalizeMessageChannel,
+    isDeliverableMessageChannel: deps.isDeliverableMessageChannel ?? isDeliverableMessageChannel,
+  };
+}
+
+function labelForChannel(
+  channel: string | undefined,
+  getChannelPluginImpl: typeof getChannelPlugin,
+): string {
   if (channel === "tui") {
     return "terminal UI";
   }
@@ -24,31 +56,38 @@ function labelForChannel(channel?: string): string {
     return "Web UI";
   }
   return (
-    getChannelPlugin(channel ?? "")?.meta.label ??
+    getChannelPluginImpl(channel ?? "")?.meta.label ??
     (channel ? channel[0]?.toUpperCase() + channel.slice(1) : "this platform")
   );
 }
 
-function hasNativeExecApprovalCapability(channel?: string): boolean {
-  const capability = resolveChannelApprovalCapability(getChannelPlugin(channel ?? ""));
+function hasNativeExecApprovalCapability(
+  channel: string | undefined,
+  getChannelPluginImpl: typeof getChannelPlugin,
+): boolean {
+  const capability = resolveChannelApprovalCapability(getChannelPluginImpl(channel ?? ""));
   return Boolean(capability?.native && capability.getActionAvailabilityState);
 }
 
-export function resolveExecApprovalInitiatingSurfaceState(params: {
-  channel?: string | null;
-  accountId?: string | null;
-  cfg?: OpenClawConfig;
-}): ExecApprovalInitiatingSurfaceState {
-  const channel = normalizeMessageChannel(params.channel);
-  const channelLabel = labelForChannel(channel);
+export function resolveExecApprovalInitiatingSurfaceState(
+  params: {
+    channel?: string | null;
+    accountId?: string | null;
+    cfg?: OpenClawConfig;
+  },
+  deps: ExecApprovalSurfaceDeps = {},
+): ExecApprovalInitiatingSurfaceState {
+  const resolved = resolveDeps(deps);
+  const channel = resolved.normalizeMessageChannel(params.channel);
+  const channelLabel = labelForChannel(channel, resolved.getChannelPlugin);
   const accountId = params.accountId?.trim() || undefined;
   if (!channel || channel === INTERNAL_MESSAGE_CHANNEL || channel === "tui") {
     return { kind: "enabled", channel, channelLabel, accountId };
   }
 
-  const cfg = params.cfg ?? loadConfig();
+  const cfg = params.cfg ?? resolved.loadConfig();
   const state = resolveChannelApprovalCapability(
-    getChannelPlugin(channel),
+    resolved.getChannelPlugin(channel),
   )?.getActionAvailabilityState?.({
     cfg,
     accountId: params.accountId,
@@ -57,45 +96,61 @@ export function resolveExecApprovalInitiatingSurfaceState(params: {
   if (state) {
     return { ...state, channel, channelLabel, accountId };
   }
-  if (isDeliverableMessageChannel(channel)) {
+  if (resolved.isDeliverableMessageChannel(channel)) {
     return { kind: "enabled", channel, channelLabel, accountId };
   }
   return { kind: "unsupported", channel, channelLabel, accountId };
 }
 
-export function supportsNativeExecApprovalClient(channel?: string | null): boolean {
-  const normalized = normalizeMessageChannel(channel);
+export function supportsNativeExecApprovalClient(
+  channel?: string | null,
+  deps: ExecApprovalSurfaceDeps = {},
+): boolean {
+  const resolved = resolveDeps(deps);
+  const normalized = resolved.normalizeMessageChannel(channel);
   if (!normalized || normalized === INTERNAL_MESSAGE_CHANNEL || normalized === "tui") {
     return true;
   }
-  return hasNativeExecApprovalCapability(normalized);
+  return hasNativeExecApprovalCapability(normalized, resolved.getChannelPlugin);
 }
 
-export function listNativeExecApprovalClientLabels(params?: {
-  excludeChannel?: string | null;
-}): string[] {
-  const excludeChannel = normalizeMessageChannel(params?.excludeChannel);
-  return listChannelPlugins()
+export function listNativeExecApprovalClientLabels(
+  params?: {
+    excludeChannel?: string | null;
+  },
+  deps: ExecApprovalSurfaceDeps = {},
+): string[] {
+  const resolved = resolveDeps(deps);
+  const excludeChannel = resolved.normalizeMessageChannel(params?.excludeChannel);
+  return resolved
+    .listChannelPlugins()
     .filter((plugin) => plugin.id !== excludeChannel)
-    .filter((plugin) => hasNativeExecApprovalCapability(plugin.id))
+    .filter((plugin) => hasNativeExecApprovalCapability(plugin.id, resolved.getChannelPlugin))
     .map((plugin) => plugin.meta.label?.trim())
     .filter((label): label is string => Boolean(label))
     .toSorted((a, b) => a.localeCompare(b));
 }
 
-export function describeNativeExecApprovalClientSetup(params: {
-  channel?: string | null;
-  channelLabel?: string | null;
-  accountId?: string | null;
-}): string | null {
-  const channel = normalizeMessageChannel(params.channel);
+export function describeNativeExecApprovalClientSetup(
+  params: {
+    channel?: string | null;
+    channelLabel?: string | null;
+    accountId?: string | null;
+  },
+  deps: ExecApprovalSurfaceDeps = {},
+): string | null {
+  const resolved = resolveDeps(deps);
+  const channel = resolved.normalizeMessageChannel(params.channel);
   if (!channel || channel === INTERNAL_MESSAGE_CHANNEL || channel === "tui") {
     return null;
   }
-  const channelLabel = params.channelLabel?.trim() || labelForChannel(channel);
+  const channelLabel =
+    params.channelLabel?.trim() || labelForChannel(channel, resolved.getChannelPlugin);
   const accountId = params.accountId?.trim() || undefined;
   return (
-    resolveChannelApprovalCapability(getChannelPlugin(channel))?.describeExecApprovalSetup?.({
+    resolveChannelApprovalCapability(
+      resolved.getChannelPlugin(channel),
+    )?.describeExecApprovalSetup?.({
       channel,
       channelLabel,
       accountId,
@@ -103,9 +158,14 @@ export function describeNativeExecApprovalClientSetup(params: {
   );
 }
 
-export function hasConfiguredExecApprovalDmRoute(cfg: OpenClawConfig): boolean {
-  return listChannelPlugins().some(
-    (plugin) =>
-      resolveChannelApprovalAdapter(plugin)?.delivery?.hasConfiguredDmRoute?.({ cfg }) ?? false,
-  );
+export function hasConfiguredExecApprovalDmRoute(
+  cfg: OpenClawConfig,
+  deps: ExecApprovalSurfaceDeps = {},
+): boolean {
+  return resolveDeps(deps)
+    .listChannelPlugins()
+    .some(
+      (plugin) =>
+        resolveChannelApprovalAdapter(plugin)?.delivery?.hasConfiguredDmRoute?.({ cfg }) ?? false,
+    );
 }

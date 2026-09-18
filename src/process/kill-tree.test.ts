@@ -1,139 +1,125 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { killProcessTree, type KillProcessTreeDeps } from "./kill-tree.js";
 
-const { spawnMock } = vi.hoisted(() => ({
-  spawnMock: vi.fn(),
-}));
+type TimerEntry = { callback: () => void; ms: number; fired: boolean };
 
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    spawn: (...args: unknown[]) => spawnMock(...args),
-  });
-});
+/**
+ * Manual timer queue + fake kill/spawn so the grace-period behavior can be
+ * asserted deterministically without `vi.useFakeTimers` (unsupported by Bun)
+ * or patching `process.platform` / `process.kill` globally.
+ */
+function createHarness(params: { platform: NodeJS.Platform; alivePids?: number[] }) {
+  const alivePids = new Set(params.alivePids ?? []);
+  const spawnMock = vi.fn(() => ({ unref: vi.fn() }));
+  const killCalls: Array<[number, NodeJS.Signals | number | undefined]> = [];
+  const timers: TimerEntry[] = [];
 
-let killProcessTree: typeof import("./kill-tree.js").killProcessTree;
-
-async function withPlatform<T>(platform: NodeJS.Platform, run: () => Promise<T> | T): Promise<T> {
-  const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
-  Object.defineProperty(process, "platform", { value: platform, configurable: true });
-  try {
-    return await run();
-  } finally {
-    if (originalPlatform) {
-      Object.defineProperty(process, "platform", originalPlatform);
+  const kill = ((pid: number, signal?: NodeJS.Signals | number) => {
+    killCalls.push([pid, signal]);
+    if (signal === 0 && !alivePids.has(pid)) {
+      throw new Error("ESRCH");
     }
-  }
+    return true;
+  }) as unknown as typeof process.kill;
+
+  const deps: KillProcessTreeDeps = {
+    spawn: spawnMock as unknown as KillProcessTreeDeps["spawn"],
+    kill,
+    platform: params.platform,
+    setTimer: (callback: () => void, ms: number) => {
+      timers.push({ callback, ms, fired: false });
+      return { unref: vi.fn() };
+    },
+  };
+
+  const advanceTimers = (ms: number) => {
+    for (const entry of timers.splice(0)) {
+      if (entry.ms <= ms) {
+        entry.callback();
+      }
+    }
+  };
+
+  return { spawnMock, killCalls, deps, advanceTimers };
 }
 
 describe("killProcessTree", () => {
-  let killSpy: ReturnType<typeof vi.spyOn>;
+  it("on Windows skips delayed force-kill when PID is already gone", () => {
+    const { spawnMock, deps, advanceTimers } = createHarness({ platform: "win32" });
 
-  beforeAll(async () => {
-    ({ killProcessTree } = await import("./kill-tree.js"));
+    killProcessTree(4242, { graceMs: 25, deps });
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      1,
+      "taskkill",
+      ["/T", "/PID", "4242"],
+      expect.objectContaining({ detached: true, stdio: "ignore" }),
+    );
+
+    advanceTimers(25);
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
-  beforeEach(() => {
-    spawnMock.mockClear();
-    killSpy = vi.spyOn(process, "kill");
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    killSpy.mockRestore();
-    vi.useRealTimers();
-    vi.clearAllMocks();
-  });
-
-  it("on Windows skips delayed force-kill when PID is already gone", async () => {
-    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
-      if (pid === 4242 && signal === 0) {
-        throw new Error("ESRCH");
-      }
-      return true;
-    }) as typeof process.kill);
-
-    await withPlatform("win32", async () => {
-      killProcessTree(4242, { graceMs: 25 });
-
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-      expect(spawnMock).toHaveBeenNthCalledWith(
-        1,
-        "taskkill",
-        ["/T", "/PID", "4242"],
-        expect.objectContaining({ detached: true, stdio: "ignore" }),
-      );
-
-      await vi.advanceTimersByTimeAsync(25);
-      expect(spawnMock).toHaveBeenCalledTimes(1);
+  it("on Windows force-kills after grace period only when PID still exists", () => {
+    const { spawnMock, deps, advanceTimers } = createHarness({
+      platform: "win32",
+      alivePids: [5252],
     });
+
+    killProcessTree(5252, { graceMs: 10, deps });
+
+    advanceTimers(10);
+
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      1,
+      "taskkill",
+      ["/T", "/PID", "5252"],
+      expect.objectContaining({ detached: true, stdio: "ignore" }),
+    );
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      2,
+      "taskkill",
+      ["/F", "/T", "/PID", "5252"],
+      expect.objectContaining({ detached: true, stdio: "ignore" }),
+    );
   });
 
-  it("on Windows force-kills after grace period only when PID still exists", async () => {
-    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
-      if (pid === 5252 && signal === 0) {
-        return true;
-      }
-      return true;
-    }) as typeof process.kill);
+  it("on Unix sends SIGTERM first and skips SIGKILL when process exits", () => {
+    const { killCalls, deps, advanceTimers } = createHarness({ platform: "linux" });
 
-    await withPlatform("win32", async () => {
-      killProcessTree(5252, { graceMs: 10 });
+    killProcessTree(3333, { graceMs: 10, deps });
 
-      await vi.advanceTimersByTimeAsync(10);
+    advanceTimers(10);
 
-      expect(spawnMock).toHaveBeenCalledTimes(2);
-      expect(spawnMock).toHaveBeenNthCalledWith(
-        1,
-        "taskkill",
-        ["/T", "/PID", "5252"],
-        expect.objectContaining({ detached: true, stdio: "ignore" }),
-      );
-      expect(spawnMock).toHaveBeenNthCalledWith(
-        2,
-        "taskkill",
-        ["/F", "/T", "/PID", "5252"],
-        expect.objectContaining({ detached: true, stdio: "ignore" }),
-      );
-    });
+    expect(killCalls).toContainEqual([-3333, "SIGTERM"]);
+    expect(killCalls).not.toContainEqual([-3333, "SIGKILL"]);
+    expect(killCalls).not.toContainEqual([3333, "SIGKILL"]);
   });
 
-  it("on Unix sends SIGTERM first and skips SIGKILL when process exits", async () => {
-    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
-      if (pid === -3333 && signal === 0) {
-        throw new Error("ESRCH");
-      }
-      if (pid === 3333 && signal === 0) {
-        throw new Error("ESRCH");
-      }
-      return true;
-    }) as typeof process.kill);
-
-    await withPlatform("linux", async () => {
-      killProcessTree(3333, { graceMs: 10 });
-
-      await vi.advanceTimersByTimeAsync(10);
-
-      expect(killSpy).toHaveBeenCalledWith(-3333, "SIGTERM");
-      expect(killSpy).not.toHaveBeenCalledWith(-3333, "SIGKILL");
-      expect(killSpy).not.toHaveBeenCalledWith(3333, "SIGKILL");
+  it("on Unix sends SIGKILL after grace period when process is still alive", () => {
+    const { killCalls, deps, advanceTimers } = createHarness({
+      platform: "linux",
+      alivePids: [-4444],
     });
+
+    killProcessTree(4444, { graceMs: 5, deps });
+
+    advanceTimers(5);
+
+    expect(killCalls).toContainEqual([-4444, "SIGTERM"]);
+    expect(killCalls).toContainEqual([-4444, "SIGKILL"]);
   });
 
-  it("on Unix sends SIGKILL after grace period when process is still alive", async () => {
-    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
-      if (pid === -4444 && signal === 0) {
-        return true;
-      }
-      return true;
-    }) as typeof process.kill);
+  it("ignores non-positive or non-finite pids without touching OS boundaries", () => {
+    const { spawnMock, killCalls, deps } = createHarness({ platform: "win32" });
 
-    await withPlatform("linux", async () => {
-      killProcessTree(4444, { graceMs: 5 });
+    killProcessTree(0, { deps });
+    killProcessTree(-1, { deps });
+    killProcessTree(Number.NaN, { deps });
 
-      await vi.advanceTimersByTimeAsync(5);
-
-      expect(killSpy).toHaveBeenCalledWith(-4444, "SIGTERM");
-      expect(killSpy).toHaveBeenCalledWith(-4444, "SIGKILL");
-    });
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(killCalls).toEqual([]);
   });
 });

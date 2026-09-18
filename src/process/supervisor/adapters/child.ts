@@ -20,6 +20,16 @@ function isServiceManagedRuntime(): boolean {
   return Boolean(process.env.DENNOU_SERVICE_MARKER?.trim());
 }
 
+/**
+ * Injectable timer seams. Tests drive a manual timer queue so the SIGKILL wait
+ * fallback can be asserted deterministically without Vitest fake timers (Bun's
+ * runner does not expose `vi.advanceTimersByTimeAsync`).
+ */
+export type ChildAdapterDeps = {
+  setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
+};
+
 export async function createChildAdapter(params: {
   argv: string[];
   cwd?: string;
@@ -27,6 +37,7 @@ export async function createChildAdapter(params: {
   windowsVerbatimArguments?: boolean;
   input?: string;
   stdinMode?: "inherit" | "pipe-open" | "pipe-closed";
+  deps?: ChildAdapterDeps;
 }): Promise<ChildAdapter> {
   const resolvedArgv = [...params.argv];
   resolvedArgv[0] = resolveCommand(resolvedArgv[0] ?? "");
@@ -122,12 +133,15 @@ export async function createChildAdapter(params: {
   let rejectWait: ((reason?: unknown) => void) | null = null;
   let waitPromise: Promise<{ code: number | null; signal: NodeJS.Signals | null }> | null = null;
   let forceKillWaitFallbackTimer: NodeJS.Timeout | null = null;
+  const setTimer =
+    params.deps?.setTimer ?? ((callback: () => void, ms: number) => setTimeout(callback, ms));
+  const clearTimer = params.deps?.clearTimer ?? ((handle: NodeJS.Timeout) => clearTimeout(handle));
 
   const clearForceKillWaitFallback = () => {
     if (!forceKillWaitFallbackTimer) {
       return;
     }
-    clearTimeout(forceKillWaitFallbackTimer);
+    clearTimer(forceKillWaitFallbackTimer);
     forceKillWaitFallbackTimer = null;
   };
 
@@ -162,7 +176,7 @@ export async function createChildAdapter(params: {
   const scheduleForceKillWaitFallback = (signal: NodeJS.Signals) => {
     clearForceKillWaitFallback();
     // Some Windows child processes never emit `close` after a hard kill.
-    forceKillWaitFallbackTimer = setTimeout(() => {
+    forceKillWaitFallbackTimer = setTimer(() => {
       settleWait({ code: null, signal });
     }, FORCE_KILL_WAIT_FALLBACK_MS);
     forceKillWaitFallbackTimer.unref?.();

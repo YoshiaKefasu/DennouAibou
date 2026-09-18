@@ -8,38 +8,19 @@ import {
 } from "../../tasks/task-registry.js";
 import { createRuntimeTaskFlow } from "./runtime-taskflow.js";
 
-const hoisted = vi.hoisted(() => {
-  const sendMessageMock = vi.fn();
-  const cancelSessionMock = vi.fn();
-  const killSubagentRunAdminMock = vi.fn();
-  return {
-    sendMessageMock,
-    cancelSessionMock,
-    killSubagentRunAdminMock,
-  };
-});
-
-vi.mock("../../acp/control-plane/manager.js", () => ({
-  getAcpSessionManager: () => ({
-    cancelSession: hoisted.cancelSessionMock,
-  }),
-}));
-
-vi.mock("../../agents/subagent-control.js", () => ({
-  killSubagentRunAdmin: (params: unknown) => hoisted.killSubagentRunAdminMock(params),
-}));
+const sendMessageMock = vi.fn();
 
 afterEach(() => {
   resetTaskRegistryDeliveryRuntimeForTests();
   resetTaskRegistryForTests();
   resetTaskFlowRegistryForTests({ persist: false });
-  vi.clearAllMocks();
+  sendMessageMock.mockReset();
 });
 
 describe("runtime TaskFlow", () => {
   beforeEach(() => {
     setTaskRegistryDeliveryRuntimeForTests({
-      sendMessage: hoisted.sendMessageMock,
+      sendMessage: sendMessageMock,
     });
   });
 
@@ -136,21 +117,18 @@ describe("runtime TaskFlow", () => {
       lastEventAt: 10,
     });
 
-    expect(child).toMatchObject({
-      created: true,
-      flow: expect.objectContaining({
-        flowId: created.flowId,
-      }),
-      task: expect.objectContaining({
-        parentFlowId: created.flowId,
-        ownerKey: "agent:main:main",
-        runId: "runtime-taskflow-child",
-      }),
-    });
+    // Bun's `toMatchObject` mutates nested values when the expectation uses
+    // `expect.objectContaining`, so assert field-by-field before the task id is
+    // read back out of the same object.
     if (!child.created) {
       throw new Error("expected child task creation to succeed");
     }
-    expect(getTaskById(child.task.taskId)).toMatchObject({
+    const childTaskId = child.task.taskId;
+    expect(child.flow.flowId).toBe(created.flowId);
+    expect(child.task.parentFlowId).toBe(created.flowId);
+    expect(child.task.ownerKey).toBe("agent:main:main");
+    expect(child.task.runId).toBe("runtime-taskflow-child");
+    expect(getTaskById(childTaskId)).toMatchObject({
       parentFlowId: created.flowId,
       ownerKey: "agent:main:main",
     });

@@ -1,7 +1,52 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChildAdapterDeps } from "./child.js";
+
+type ManualTimer = {
+  callback: () => void;
+  ms: number;
+  cancelled: boolean;
+  fired: boolean;
+  unref: () => void;
+};
+
+/**
+ * Manual timer queue so the SIGKILL wait fallback is driven deterministically.
+ * Bun's test runner does not expose `vi.advanceTimersByTimeAsync`.
+ */
+function createManualTimers() {
+  let elapsedMs = 0;
+  const timers: ManualTimer[] = [];
+  return {
+    deps: {
+      setTimer: (callback: () => void, ms: number) => {
+        const timer: ManualTimer = {
+          callback,
+          ms,
+          cancelled: false,
+          fired: false,
+          unref: () => {},
+        };
+        timers.push(timer);
+        return timer as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: (handle: ReturnType<typeof setTimeout>) => {
+        (handle as unknown as ManualTimer).cancelled = true;
+      },
+    } satisfies ChildAdapterDeps,
+    advanceBy(ms: number) {
+      elapsedMs += ms;
+      for (const timer of timers) {
+        if (!timer.cancelled && !timer.fired && timer.ms <= elapsedMs) {
+          timer.fired = true;
+          timer.callback();
+        }
+      }
+    },
+  };
+}
 
 const { spawnWithFallbackMock, killProcessTreeMock } = vi.hoisted(() => ({
   spawnWithFallbackMock: vi.fn(),
@@ -37,6 +82,7 @@ async function createAdapterHarness(params?: {
   pid?: number;
   argv?: string[];
   env?: NodeJS.ProcessEnv;
+  deps?: ChildAdapterDeps;
 }) {
   const { child, killMock } = createStubChild(params?.pid);
   spawnWithFallbackMock.mockResolvedValue({
@@ -47,6 +93,7 @@ async function createAdapterHarness(params?: {
     argv: params?.argv ?? ["node", "-e", "setTimeout(() => {}, 1000)"],
     env: params?.env,
     stdinMode: "pipe-open",
+    deps: params?.deps,
   });
   return { adapter, killMock };
 }
@@ -62,7 +109,6 @@ describe("createChildAdapter", () => {
     spawnWithFallbackMock.mockClear();
     killProcessTreeMock.mockClear();
     delete process.env.DENNOU_SERVICE_MARKER;
-    vi.useRealTimers();
   });
 
   afterAll(() => {
@@ -71,10 +117,6 @@ describe("createChildAdapter", () => {
     } else {
       process.env.DENNOU_SERVICE_MARKER = originalServiceMarker;
     }
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("uses process-tree kill for default SIGKILL", async () => {
@@ -110,8 +152,8 @@ describe("createChildAdapter", () => {
   });
 
   it("wait does not settle immediately on SIGKILL", async () => {
-    vi.useFakeTimers();
-    const { adapter } = await createAdapterHarness({ pid: 4567 });
+    const timers = createManualTimers();
+    const { adapter } = await createAdapterHarness({ pid: 4567, deps: timers.deps });
 
     const waitPromise = adapter.wait();
     const settled = vi.fn();
@@ -122,15 +164,15 @@ describe("createChildAdapter", () => {
     await Promise.resolve();
     expect(settled).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(3999);
+    timers.advanceBy(3999);
     expect(settled).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1);
+    timers.advanceBy(1);
     await expect(waitPromise).resolves.toEqual({ code: null, signal: "SIGKILL" });
   });
 
   it("prefers real child close over the SIGKILL fallback settle", async () => {
-    vi.useFakeTimers();
+    const timers = createManualTimers();
     const { adapter, emitClose, killMock } = await (async () => {
       const stub = createStubChild(2468);
       spawnWithFallbackMock.mockResolvedValue({
@@ -140,6 +182,7 @@ describe("createChildAdapter", () => {
       const adapter = await createChildAdapter({
         argv: ["node", "-e", "setTimeout(() => {}, 1000)"],
         stdinMode: "pipe-open",
+        deps: timers.deps,
       });
       return { ...stub, adapter };
     })();
@@ -150,7 +193,7 @@ describe("createChildAdapter", () => {
 
     await expect(waitPromise).resolves.toEqual({ code: 0, signal: "SIGKILL" });
 
-    await vi.advanceTimersByTimeAsync(4_001);
+    timers.advanceBy(4_001);
     await expect(adapter.wait()).resolves.toEqual({ code: 0, signal: "SIGKILL" });
     expect(killMock).toHaveBeenCalledWith("SIGKILL");
   });

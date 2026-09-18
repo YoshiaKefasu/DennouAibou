@@ -1,4 +1,49 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PtyAdapterDeps } from "./pty.js";
+
+type ManualTimer = {
+  callback: () => void;
+  ms: number;
+  cancelled: boolean;
+  fired: boolean;
+  unref: () => void;
+};
+
+/**
+ * Manual timer queue so the SIGKILL wait fallback is driven deterministically.
+ * Bun's test runner does not expose `vi.advanceTimersByTimeAsync`.
+ */
+function createManualTimers() {
+  let elapsedMs = 0;
+  const timers: ManualTimer[] = [];
+  return {
+    deps: {
+      setTimer: (callback: () => void, ms: number) => {
+        const timer: ManualTimer = {
+          callback,
+          ms,
+          cancelled: false,
+          fired: false,
+          unref: () => {},
+        };
+        timers.push(timer);
+        return timer as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: (handle: ReturnType<typeof setTimeout>) => {
+        (handle as unknown as ManualTimer).cancelled = true;
+      },
+    } satisfies PtyAdapterDeps,
+    advanceBy(ms: number) {
+      elapsedMs += ms;
+      for (const timer of timers) {
+        if (!timer.cancelled && !timer.fired && timer.ms <= elapsedMs) {
+          timer.fired = true;
+          timer.callback();
+        }
+      }
+    },
+  };
+}
 
 const { spawnMock, ptyKillMock, killProcessTreeMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -47,11 +92,9 @@ describe("createPtyAdapter", () => {
     spawnMock.mockClear();
     ptyKillMock.mockClear();
     killProcessTreeMock.mockClear();
-    vi.useRealTimers();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -90,12 +133,13 @@ describe("createPtyAdapter", () => {
   });
 
   it("wait does not settle immediately on SIGKILL", async () => {
-    vi.useFakeTimers();
+    const timers = createManualTimers();
     spawnMock.mockReturnValue(createStubPty());
 
     const adapter = await createPtyAdapter({
       shell: "bash",
       args: ["-lc", "sleep 10"],
+      deps: timers.deps,
     });
 
     const waitPromise = adapter.wait();
@@ -107,21 +151,22 @@ describe("createPtyAdapter", () => {
     await Promise.resolve();
     expect(settled).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(3999);
+    timers.advanceBy(3999);
     expect(settled).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1);
+    timers.advanceBy(1);
     await expect(waitPromise).resolves.toEqual({ code: null, signal: "SIGKILL" });
   });
 
   it("prefers real PTY exit over SIGKILL fallback settle", async () => {
-    vi.useFakeTimers();
+    const timers = createManualTimers();
     const stub = createStubPty();
     spawnMock.mockReturnValue(stub);
 
     const adapter = await createPtyAdapter({
       shell: "bash",
       args: ["-lc", "sleep 10"],
+      deps: timers.deps,
     });
 
     const waitPromise = adapter.wait();
@@ -130,7 +175,7 @@ describe("createPtyAdapter", () => {
 
     await expect(waitPromise).resolves.toEqual({ code: 0, signal: 9 });
 
-    await vi.advanceTimersByTimeAsync(4_001);
+    timers.advanceBy(4_001);
     await expect(adapter.wait()).resolves.toEqual({ code: 0, signal: 9 });
   });
 

@@ -34,6 +34,16 @@ type PtyModule = {
 
 export type PtyAdapter = SpawnProcessAdapter;
 
+/**
+ * Injectable timer seams. Tests drive a manual timer queue so the SIGKILL wait
+ * fallback can be asserted deterministically without Vitest fake timers (Bun's
+ * runner does not expose `vi.advanceTimersByTimeAsync`).
+ */
+export type PtyAdapterDeps = {
+  setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
+};
+
 export async function createPtyAdapter(params: {
   shell: string;
   args: string[];
@@ -42,6 +52,7 @@ export async function createPtyAdapter(params: {
   cols?: number;
   rows?: number;
   name?: string;
+  deps?: PtyAdapterDeps;
 }): Promise<PtyAdapter> {
   const module = (await import("@lydell/node-pty")) as unknown as PtyModule;
   const spawn = module.spawn ?? module.default?.spawn;
@@ -65,12 +76,15 @@ export async function createPtyAdapter(params: {
   let waitPromise: Promise<{ code: number | null; signal: NodeJS.Signals | number | null }> | null =
     null;
   let forceKillWaitFallbackTimer: NodeJS.Timeout | null = null;
+  const setTimer =
+    params.deps?.setTimer ?? ((callback: () => void, ms: number) => setTimeout(callback, ms));
+  const clearTimer = params.deps?.clearTimer ?? ((handle: NodeJS.Timeout) => clearTimeout(handle));
 
   const clearForceKillWaitFallback = () => {
     if (!forceKillWaitFallbackTimer) {
       return;
     }
-    clearTimeout(forceKillWaitFallbackTimer);
+    clearTimer(forceKillWaitFallbackTimer);
     forceKillWaitFallbackTimer = null;
   };
 
@@ -91,7 +105,7 @@ export async function createPtyAdapter(params: {
     clearForceKillWaitFallback();
     // Some PTY hosts fail to emit onExit after kill; use a delayed fallback
     // so callers can still unblock without marking termination immediately.
-    forceKillWaitFallbackTimer = setTimeout(() => {
+    forceKillWaitFallbackTimer = setTimer(() => {
       settleWait({ code: null, signal });
     }, FORCE_KILL_WAIT_FALLBACK_MS);
     forceKillWaitFallbackTimer.unref();

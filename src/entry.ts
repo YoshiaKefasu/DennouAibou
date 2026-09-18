@@ -160,6 +160,12 @@ export function tryHandleRootHelpFastPath(
   argv: string[],
   deps: {
     outputRootHelp?: () => void | Promise<void>;
+    /**
+     * Injectable seam for `./cli/root-help-metadata.js`. Tests supply a stub
+     * instead of mocking the module so the precomputed-help branch can be
+     * asserted without a dynamic import.
+     */
+    loadPrecomputedRootHelpText?: () => Promise<() => boolean>;
     onError?: (error: unknown) => void;
     env?: NodeJS.ProcessEnv;
   } = {},
@@ -185,13 +191,15 @@ export function tryHandleRootHelpFastPath(
       .catch(handleError);
     return true;
   }
-  import("./cli/root-help-metadata.js")
-    .then(async ({ outputPrecomputedRootHelpText }) => {
+  const loadPrecomputedRootHelpText =
+    deps.loadPrecomputedRootHelpText ??
+    (async () => (await import("./cli/root-help-metadata.js")).outputPrecomputedRootHelpText);
+  loadPrecomputedRootHelpText()
+    .then((outputPrecomputedRootHelpText) => {
       if (outputPrecomputedRootHelpText()) {
         return;
       }
-      const { outputRootHelp } = await import("./cli/program/root-help.js");
-      await outputRootHelp();
+      return import("./cli/program/root-help.js").then(({ outputRootHelp }) => outputRootHelp());
     })
     .catch(handleError);
   return true;

@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 149 files.
+# Current known-failure count: 140 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -95,22 +95,17 @@ src/media-understanding/runner.vision-skip.test.ts
 src/plugins/contracts/runtime-import-side-effects.contract.test.ts
 src/plugins/conversation-binding.test.ts
 
-# wait/import (2 additional files; measured after the first 250)
-src/entry.test.ts
+# wait/import (1 additional file; measured after the first 250)
 src/plugins/marketplace.test.ts
 
 # conditional (1 additional file; measured after the first 250)
 src/config/io.write-config.test.ts
 
-# async-timer (6 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
+# async-timer (2 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 src/gateway/server-channels.test.ts
 src/gateway/server-methods/nodes.invoke-wake.test.ts
-src/infra/exec-approval-channel-runtime.test.ts
-src/process/command-queue.test.ts
-src/process/supervisor/adapters/child.test.ts
-src/process/supervisor/adapters/pty.test.ts
 
-# timeout (11 files; no conclusive result within the 40s process guard)
+# timeout (10 files; no conclusive result within the 40s process guard)
 src/commands/models.set.e2e.test.ts
 src/commands/onboard-channels.e2e.test.ts
 src/cron/isolated-agent/subagent-followup.test.ts
@@ -119,7 +114,6 @@ src/gateway/server-restart-sentinel.test.ts
 src/infra/bonjour.test.ts
 src/infra/outbound/message-action-runner.media.test.ts
 src/media/fetch.test.ts
-src/process/kill-tree.test.ts
 test/scripts/test-report-utils.test.ts
 ui/src/ui/app-gateway.node.test.ts
 
@@ -134,7 +128,7 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (59 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (56 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
@@ -175,7 +169,6 @@ src/gateway/server.reload.test.ts
 src/gateway/server.sessions.gateway-server-sessions-a.test.ts
 src/gateway/sessions-resolve.test.ts
 src/gateway/tools-invoke-http.test.ts
-src/infra/exec-approval-surface.test.ts
 src/infra/exec-approvals-store.test.ts
 src/infra/gateway-processes.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
@@ -189,8 +182,6 @@ src/media-understanding/image.test.ts
 src/memory-host-sdk/host/qmd-process.test.ts
 src/plugin-activation-boundary.test.ts
 src/plugin-sdk/browser-maintenance.test.ts
-src/plugins/runtime/runtime-taskflow.test.ts
-src/plugins/runtime/runtime-tasks.test.ts
 src/secrets/runtime.test.ts
 src/tasks/task-executor.test.ts
 src/wizard/setup.gateway-config.test.ts

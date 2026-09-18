@@ -29,8 +29,10 @@ let getActiveTaskCount: CommandQueueModule["getActiveTaskCount"];
 let getQueueSize: CommandQueueModule["getQueueSize"];
 let markGatewayDraining: CommandQueueModule["markGatewayDraining"];
 let resetAllLanes: CommandQueueModule["resetAllLanes"];
+let resetCommandQueueRuntimeForTests: CommandQueueModule["resetCommandQueueRuntimeForTests"];
 let resetCommandQueueStateForTest: CommandQueueModule["resetCommandQueueStateForTest"];
 let setCommandLaneConcurrency: CommandQueueModule["setCommandLaneConcurrency"];
+let setCommandQueueRuntimeForTests: CommandQueueModule["setCommandQueueRuntimeForTests"];
 let waitForActiveTasks: CommandQueueModule["waitForActiveTasks"];
 
 function createDeferred(): { promise: Promise<void>; resolve: () => void } {
@@ -67,14 +69,16 @@ describe("command queue", () => {
       getQueueSize,
       markGatewayDraining,
       resetAllLanes,
+      resetCommandQueueRuntimeForTests,
       resetCommandQueueStateForTest,
       setCommandLaneConcurrency,
+      setCommandQueueRuntimeForTests,
       waitForActiveTasks,
     } = await import("./command-queue.js"));
   });
 
   beforeEach(() => {
-    vi.useRealTimers();
+    resetCommandQueueRuntimeForTests();
     resetCommandQueueStateForTest();
     // Queue state is global across module instances, so reset main lane
     // concurrency explicitly to avoid cross-file leakage.
@@ -87,7 +91,7 @@ describe("command queue", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    resetCommandQueueRuntimeForTests();
   });
 
   it("resetAllLanes is safe when no lanes have been created", () => {
@@ -134,35 +138,31 @@ describe("command queue", () => {
   it("invokes onWait callback when a task waits past the threshold", async () => {
     let waited: number | null = null;
     let queuedAhead: number | null = null;
+    let currentMs = 1_000;
+    setCommandQueueRuntimeForTests({ now: () => currentMs });
 
-    vi.useFakeTimers();
-    try {
-      let releaseFirst!: () => void;
-      const blocker = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
-      const first = enqueueCommand(async () => {
-        await blocker;
-      });
+    let releaseFirst!: () => void;
+    const blocker = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const first = enqueueCommand(async () => {
+      await blocker;
+    });
 
-      const second = enqueueCommand(async () => {}, {
-        warnAfterMs: 5,
-        onWait: (ms, ahead) => {
-          waited = ms;
-          queuedAhead = ahead;
-        },
-      });
+    const second = enqueueCommand(async () => {}, {
+      warnAfterMs: 5,
+      onWait: (ms, ahead) => {
+        waited = ms;
+        queuedAhead = ahead;
+      },
+    });
 
-      await vi.advanceTimersByTimeAsync(6);
-      releaseFirst();
-      await Promise.all([first, second]);
+    currentMs += 6;
+    releaseFirst();
+    await Promise.all([first, second]);
 
-      expect(waited).not.toBeNull();
-      expect(waited as unknown as number).toBeGreaterThanOrEqual(5);
-      expect(queuedAhead).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(waited).toBe(6);
+    expect(queuedAhead).toBe(0);
   });
 
   it("demotes live model switch lane failures to debug noise", async () => {
@@ -199,21 +199,12 @@ describe("command queue", () => {
   it("waitForActiveTasks waits for active tasks to finish", async () => {
     const { task, release } = enqueueBlockedMainTask();
 
-    vi.useFakeTimers();
-    try {
-      const drainPromise = waitForActiveTasks(5000);
+    const drainPromise = waitForActiveTasks(5000);
+    release();
+    await task;
 
-      await vi.advanceTimersByTimeAsync(50);
-      release();
-      await vi.advanceTimersByTimeAsync(50);
-
-      const { drained } = await drainPromise;
-      expect(drained).toBe(true);
-
-      await task;
-    } finally {
-      vi.useRealTimers();
-    }
+    const { drained } = await drainPromise;
+    expect(drained).toBe(true);
   });
 
   it("waitForActiveTasks returns drained=false when timeout is zero and tasks are active", async () => {
@@ -228,19 +219,23 @@ describe("command queue", () => {
 
   it("waitForActiveTasks returns drained=false on timeout", async () => {
     const { task, release } = enqueueBlockedMainTask();
+    const pendingTimeouts: Array<() => void> = [];
+    setCommandQueueRuntimeForTests({
+      setTimer: (callback) => {
+        pendingTimeouts.push(callback);
+        return {} as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: () => {},
+    });
 
-    vi.useFakeTimers();
-    try {
-      const waitPromise = waitForActiveTasks(50);
-      await vi.advanceTimersByTimeAsync(100);
-      const { drained } = await waitPromise;
-      expect(drained).toBe(false);
+    const waitPromise = waitForActiveTasks(50);
+    expect(pendingTimeouts).toHaveLength(1);
+    pendingTimeouts[0]?.();
+    const { drained } = await waitPromise;
+    expect(drained).toBe(false);
 
-      release();
-      await task;
-    } finally {
-      vi.useRealTimers();
-    }
+    release();
+    await task;
   });
 
   it("resetAllLanes drains queued work immediately after reset", async () => {

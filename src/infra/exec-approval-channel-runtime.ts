@@ -43,6 +43,13 @@ export type ExecApprovalChannelRuntimeAdapter<
   }) => Promise<void>;
   finalizeExpired?: (params: { request: TRequest; entries: TPending[] }) => Promise<void>;
   nowMs?: () => number;
+  /**
+   * Injectable timer seams. Tests drive a manual timer queue so approval expiry
+   * can be asserted deterministically without Vitest fake timers (Bun's runner
+   * does not expose `vi.advanceTimersByTimeAsync`).
+   */
+  setTimer?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
 };
 
 export type ExecApprovalChannelRuntime<
@@ -66,6 +73,9 @@ export function createExecApprovalChannelRuntime<
 ): ExecApprovalChannelRuntime<TRequest, TResolved> {
   const log = createSubsystemLogger(adapter.label);
   const nowMs = adapter.nowMs ?? Date.now;
+  const setTimer =
+    adapter.setTimer ?? ((callback: () => void, ms: number) => setTimeout(callback, ms));
+  const clearTimer = adapter.clearTimer ?? ((handle: NodeJS.Timeout) => clearTimeout(handle));
   const eventKinds = new Set<ExecApprovalChannelRuntimeEventKind>(adapter.eventKinds ?? ["exec"]);
   const pending = new Map<string, PendingApprovalEntry<TPending, TRequest, TResolved>>();
   let gatewayClient: GatewayClient | null = null;
@@ -89,7 +99,7 @@ export function createExecApprovalChannelRuntime<
     }
     pending.delete(approvalId);
     if (entry.timeoutId) {
-      clearTimeout(entry.timeoutId);
+      clearTimer(entry.timeoutId);
     }
     return entry;
   };
@@ -114,7 +124,7 @@ export function createExecApprovalChannelRuntime<
     log.debug(`received request ${request.id}`);
     const existing = pending.get(request.id);
     if (existing?.timeoutId) {
-      clearTimeout(existing.timeoutId);
+      clearTimer(existing.timeoutId);
     }
     const entry: PendingApprovalEntry<TPending, TRequest, TResolved> = {
       request,
@@ -155,7 +165,7 @@ export function createExecApprovalChannelRuntime<
     }
 
     const timeoutMs = Math.max(0, request.expiresAtMs - nowMs());
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimer(() => {
       spawn("error handling approval expiration", handleExpired(request.id));
     }, timeoutMs);
     timeoutId.unref?.();
@@ -259,7 +269,7 @@ export function createExecApprovalChannelRuntime<
       started = false;
       for (const entry of pending.values()) {
         if (entry.timeoutId) {
-          clearTimeout(entry.timeoutId);
+          clearTimer(entry.timeoutId);
         }
       }
       pending.clear();

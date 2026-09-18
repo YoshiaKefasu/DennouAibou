@@ -72,6 +72,55 @@ function getQueueState() {
   }));
 }
 
+const COMMAND_QUEUE_RUNTIME_OVERRIDE_KEY = Symbol.for("dennou.commandQueueRuntimeOverride");
+
+type CommandQueueTimer = ReturnType<typeof setTimeout>;
+type CommandQueueRuntime = {
+  now: () => number;
+  setTimer: (callback: () => void, ms: number) => CommandQueueTimer;
+  clearTimer: (handle: CommandQueueTimer) => void;
+};
+type CommandQueueGlobalWithRuntimeOverride = typeof globalThis & {
+  [COMMAND_QUEUE_RUNTIME_OVERRIDE_KEY]?: Partial<CommandQueueRuntime> | null;
+};
+
+/**
+ * Injectable clock/timer seams. Production uses the real implementations;
+ * tests override them so lane wait thresholds and active-task timeouts can be
+ * asserted deterministically without Vitest fake timers (Bun's runner does not
+ * expose `vi.advanceTimersByTimeAsync`).
+ */
+const DEFAULT_QUEUE_RUNTIME: CommandQueueRuntime = {
+  now: () => Date.now(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (handle) => clearTimeout(handle),
+};
+
+function getQueueRuntime(): CommandQueueRuntime {
+  const override = (globalThis as CommandQueueGlobalWithRuntimeOverride)[
+    COMMAND_QUEUE_RUNTIME_OVERRIDE_KEY
+  ];
+  if (!override) {
+    return DEFAULT_QUEUE_RUNTIME;
+  }
+  return {
+    now: override.now ?? DEFAULT_QUEUE_RUNTIME.now,
+    setTimer: override.setTimer ?? DEFAULT_QUEUE_RUNTIME.setTimer,
+    clearTimer: override.clearTimer ?? DEFAULT_QUEUE_RUNTIME.clearTimer,
+  };
+}
+
+/** Test-only override for the queue clock/timer seams. */
+export function setCommandQueueRuntimeForTests(runtime: Partial<CommandQueueRuntime>): void {
+  (globalThis as CommandQueueGlobalWithRuntimeOverride)[COMMAND_QUEUE_RUNTIME_OVERRIDE_KEY] =
+    runtime;
+}
+
+/** Test-only reset for the queue clock/timer seams. */
+export function resetCommandQueueRuntimeForTests(): void {
+  (globalThis as CommandQueueGlobalWithRuntimeOverride)[COMMAND_QUEUE_RUNTIME_OVERRIDE_KEY] = null;
+}
+
 function normalizeLane(lane: string): string {
   return lane.trim() || CommandLane.Main;
 }
@@ -124,7 +173,7 @@ function resolveActiveTaskWaiter(waiter: ActiveTaskWaiter, result: { drained: bo
     return;
   }
   if (waiter.timeout) {
-    clearTimeout(waiter.timeout);
+    getQueueRuntime().clearTimer(waiter.timeout);
   }
   waiter.resolve(result);
 }
@@ -154,7 +203,7 @@ function drainLane(lane: string) {
     try {
       while (state.activeTaskIds.size < state.maxConcurrent && state.queue.length > 0) {
         const entry = state.queue.shift() as QueueEntry;
-        const waitedMs = Date.now() - entry.enqueuedAt;
+        const waitedMs = getQueueRuntime().now() - entry.enqueuedAt;
         if (waitedMs >= entry.warnAfterMs) {
           try {
             entry.onWait?.(waitedMs, state.queue.length);
@@ -170,14 +219,14 @@ function drainLane(lane: string) {
         const taskGeneration = state.generation;
         state.activeTaskIds.add(taskId);
         void (async () => {
-          const startTime = Date.now();
+          const startTime = getQueueRuntime().now();
           try {
             const result = await entry.task();
             const completedCurrentGeneration = completeTask(state, taskId, taskGeneration);
             if (completedCurrentGeneration) {
               notifyActiveTaskWaiters();
               diag.debug(
-                `lane task done: lane=${lane} durationMs=${Date.now() - startTime} active=${state.activeTaskIds.size} queued=${state.queue.length}`,
+                `lane task done: lane=${lane} durationMs=${getQueueRuntime().now() - startTime} active=${state.activeTaskIds.size} queued=${state.queue.length}`,
               );
               pump();
             }
@@ -187,11 +236,11 @@ function drainLane(lane: string) {
             const isProbeLane = lane.startsWith("auth-probe:") || lane.startsWith("session:probe-");
             if (!isProbeLane && !isExpectedNonErrorLaneFailure(err)) {
               diag.error(
-                `lane task error: lane=${lane} durationMs=${Date.now() - startTime} error="${String(err)}"`,
+                `lane task error: lane=${lane} durationMs=${getQueueRuntime().now() - startTime} error="${String(err)}"`,
               );
             } else if (!isProbeLane) {
               diag.debug(
-                `lane task interrupted: lane=${lane} durationMs=${Date.now() - startTime} reason="${String(err)}"`,
+                `lane task interrupted: lane=${lane} durationMs=${getQueueRuntime().now() - startTime} reason="${String(err)}"`,
               );
             }
             if (completedCurrentGeneration) {
@@ -245,7 +294,7 @@ export function enqueueCommandInLane<T>(
       task: () => task(),
       resolve: (value) => resolve(value as T),
       reject,
-      enqueuedAt: Date.now(),
+      enqueuedAt: getQueueRuntime().now(),
       warnAfterMs,
       onWait: opts?.onWait,
     });
@@ -385,7 +434,7 @@ export function waitForActiveTasks(timeoutMs: number): Promise<{ drained: boolea
       activeTaskIds: activeAtStart,
       resolve,
     };
-    waiter.timeout = setTimeout(() => {
+    waiter.timeout = getQueueRuntime().setTimer(() => {
       resolveActiveTaskWaiter(waiter, { drained: false });
     }, timeoutMs);
     queueState.activeTaskWaiters.add(waiter);
