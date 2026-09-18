@@ -35,6 +35,31 @@ type IdleTimerEntry = {
   sessionId?: string;
 };
 
+/**
+ * Injectable seams for the config and timer boundaries. Tests supply a config
+ * fixture and a manual timer queue instead of mocking `./config.js` and driving
+ * vitest fake timers (Bun does not expose `vi.advanceTimersByTimeAsync`).
+ */
+export type IdlePruneWatcherDeps = {
+  getDennouConfig?: typeof getDennouConfig;
+  setTimeout?: typeof setTimeout;
+  clearTimeout?: typeof clearTimeout;
+};
+
+type ResolvedIdlePruneWatcherDeps = {
+  getDennouConfig: typeof getDennouConfig;
+  setTimeout: typeof setTimeout;
+  clearTimeout: typeof clearTimeout;
+};
+
+function resolveIdlePruneWatcherDeps(deps: IdlePruneWatcherDeps): ResolvedIdlePruneWatcherDeps {
+  return {
+    getDennouConfig: deps.getDennouConfig ?? getDennouConfig,
+    setTimeout: deps.setTimeout ?? globalThis.setTimeout,
+    clearTimeout: deps.clearTimeout ?? globalThis.clearTimeout,
+  };
+}
+
 const idleTimers = new Map<string, IdleTimerEntry>();
 
 /**
@@ -71,7 +96,8 @@ function buildSessionFilePath(agentId: string, sessionId: string): string {
  */
 function handleIdleEvent(
   evt: DiagnosticEventPayload & { type: "session.state" },
-  protection?: DennouPruneProtectionConfig,
+  protection: DennouPruneProtectionConfig | undefined,
+  deps: ResolvedIdlePruneWatcherDeps,
 ): void {
   const sessionKey = evt.sessionKey;
   if (!sessionKey) return;
@@ -87,7 +113,7 @@ function handleIdleEvent(
   if (evt.state !== "idle") return;
 
   // configを都度読み込み（hot-reload対応）
-  const dennocfg = getDennouConfig();
+  const dennocfg = deps.getDennouConfig();
   const config = dennocfg.activeSessionToolsPrune;
   if (!config.enabled) return;
 
@@ -100,12 +126,12 @@ function handleIdleEvent(
     return;
   }
   if (existing) {
-    clearTimeout(existing.timer);
+    deps.clearTimeout(existing.timer);
   }
 
   // 新しいIdleタイマーを起動
   const delayMs = config.idleDelayMinutes * 60_000;
-  const timer = setTimeout(() => {
+  const timer = deps.setTimeout(() => {
     idleTimers.delete(sessionKey);
 
     const agentId = extractAgentId(sessionKey);
@@ -159,8 +185,12 @@ function handleIdleEvent(
  * @param protection - 保護設定（ワークスペースパス自動解決済み）
  * @returns クリーンアップ関数（テストやシャットダウン時に呼び出す）
  */
-export function startIdlePruneWatcher(protection?: DennouPruneProtectionConfig): () => void {
-  const dennocfg = getDennouConfig();
+export function startIdlePruneWatcher(
+  protection?: DennouPruneProtectionConfig,
+  deps: IdlePruneWatcherDeps = {},
+): () => void {
+  const resolvedDeps = resolveIdlePruneWatcherDeps(deps);
+  const dennocfg = resolvedDeps.getDennouConfig();
   const config = dennocfg.activeSessionToolsPrune;
   if (!config.enabled) {
     logDebug("[DennouAibou] Idle prune watcher disabled by config");
@@ -179,12 +209,12 @@ export function startIdlePruneWatcher(protection?: DennouPruneProtectionConfig):
       };
 
       if (stateEvt.state === "idle") {
-        handleIdleEvent(stateEvt, protection);
+        handleIdleEvent(stateEvt, protection, resolvedDeps);
       } else if (stateEvt.state === "processing" || stateEvt.state === "waiting") {
         // セッションがアクティブに戻った → タイマーキャンセル
         const sessionKey = stateEvt.sessionKey;
         if (sessionKey && idleTimers.has(sessionKey)) {
-          clearTimeout(idleTimers.get(sessionKey)!.timer);
+          resolvedDeps.clearTimeout(idleTimers.get(sessionKey)!.timer);
           idleTimers.delete(sessionKey);
         }
       }
@@ -200,7 +230,7 @@ export function startIdlePruneWatcher(protection?: DennouPruneProtectionConfig):
     removeListener();
     // 全タイマーをクリア
     for (const [key, entry] of idleTimers) {
-      clearTimeout(entry.timer);
+      resolvedDeps.clearTimeout(entry.timer);
     }
     idleTimers.clear();
     logDebug("[DennouAibou] Idle prune watcher stopped");

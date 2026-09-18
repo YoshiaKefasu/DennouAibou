@@ -1,37 +1,59 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emitDiagnosticEvent, resetDiagnosticEventsForTest } from "../infra/diagnostic-events.js";
+import { startIdlePruneWatcher } from "./idle-prune-watcher.js";
 
-const configMocks = vi.hoisted(() => ({
-  delayMs: 61,
-  getDennouConfig: vi.fn(() => ({
-    activeSessionToolsPrune: {
-      enabled: true,
-      minPrunableToolChars: 1200,
-      keepLastAssistants: 12,
-      placeholder: "[pruned]",
-      dryRun: false,
-      idleDelayMinutes: 0.001,
-    },
-  })),
+type ManualTimer = { run: () => void; cancelled: boolean };
+
+let timers: ManualTimer[] = [];
+
+const scheduleTimeout = vi.fn((callback: () => void) => {
+  const entry: ManualTimer = { run: callback, cancelled: false };
+  timers.push(entry);
+  return entry as unknown as ReturnType<typeof setTimeout>;
+});
+const cancelTimeout = vi.fn((timer: ReturnType<typeof setTimeout>) => {
+  (timer as unknown as ManualTimer).cancelled = true;
+});
+const getDennouConfig = vi.fn(() => ({
+  activeSessionToolsPrune: {
+    enabled: true,
+    minPrunableToolChars: 1200,
+    keepLastAssistants: 12,
+    placeholder: "[pruned]",
+    dryRun: false,
+    idleDelayMinutes: 0.001,
+  },
 }));
 
-vi.mock("./config.js", () => ({
-  getDennouConfig: configMocks.getDennouConfig,
-}));
+/** Runs the pending (non-cancelled) timers in creation order. */
+function runPendingTimers() {
+  for (const timer of timers.filter((entry) => !entry.cancelled)) {
+    timer.run();
+  }
+}
 
 describe("startIdlePruneWatcher", () => {
   let stop: (() => void) | undefined;
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(async () => {
-    vi.useFakeTimers();
+  beforeEach(() => {
+    timers = [];
     resetDiagnosticEventsForTest();
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { startIdlePruneWatcher } = await import("./idle-prune-watcher.js");
-    stop = startIdlePruneWatcher({
-      protectedContentKeywords: [],
-      resolvedWorkspacePaths: [],
-    });
+    getDennouConfig.mockClear();
+    scheduleTimeout.mockClear();
+    cancelTimeout.mockClear();
+    stop = startIdlePruneWatcher(
+      {
+        protectedContentKeywords: [],
+        resolvedWorkspacePaths: [],
+      },
+      {
+        getDennouConfig: getDennouConfig as never,
+        setTimeout: scheduleTimeout as unknown as typeof setTimeout,
+        clearTimeout: cancelTimeout as unknown as typeof clearTimeout,
+      },
+    );
   });
 
   afterEach(() => {
@@ -39,10 +61,9 @@ describe("startIdlePruneWatcher", () => {
     stop = undefined;
     warnSpy.mockRestore();
     resetDiagnosticEventsForTest();
-    vi.useRealTimers();
   });
 
-  it("does not replace a sessionId-backed idle timer with a sessionId-less idle event", async () => {
+  it("does not replace a sessionId-backed idle timer with a sessionId-less idle event", () => {
     emitDiagnosticEvent({
       type: "session.state",
       sessionKey: "agent:main:telegram:slash:8000537189",
@@ -57,7 +78,7 @@ describe("startIdlePruneWatcher", () => {
       reason: "message_completed",
     });
 
-    await vi.advanceTimersByTimeAsync(configMocks.delayMs);
+    runPendingTimers();
 
     expect(warnSpy).not.toHaveBeenCalledWith(
       expect.stringContaining("missing agentId or sessionId"),
@@ -65,7 +86,7 @@ describe("startIdlePruneWatcher", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("session-for-prune.jsonl"));
   });
 
-  it("replaces an existing timer when a newer idle event has a different sessionId", async () => {
+  it("replaces an existing timer when a newer idle event has a different sessionId", () => {
     emitDiagnosticEvent({
       type: "session.state",
       sessionKey: "agent:main:telegram:slash:8000537189",
@@ -81,13 +102,14 @@ describe("startIdlePruneWatcher", () => {
       reason: "run_completed",
     });
 
-    await vi.advanceTimersByTimeAsync(configMocks.delayMs);
+    runPendingTimers();
 
+    expect(cancelTimeout).toHaveBeenCalledTimes(1);
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("old-session.jsonl"));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("new-session.jsonl"));
   });
 
-  it("skips prune when only a sessionId-less idle event is available", async () => {
+  it("skips prune when only a sessionId-less idle event is available", () => {
     emitDiagnosticEvent({
       type: "session.state",
       sessionKey: "agent:main:telegram:slash:8000537189",
@@ -95,7 +117,7 @@ describe("startIdlePruneWatcher", () => {
       reason: "message_completed",
     });
 
-    await vi.advanceTimersByTimeAsync(configMocks.delayMs);
+    runPendingTimers();
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("missing agentId or sessionId"));
   });

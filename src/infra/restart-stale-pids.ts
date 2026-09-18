@@ -36,6 +36,27 @@ const restartLog = createSubsystemLogger("restart");
 let sleepSyncOverride: ((ms: number) => void) | null = null;
 let dateNowOverride: (() => number) | null = null;
 
+/**
+ * Injectable seams for the OS/process boundaries this module touches.
+ * Tests supply fixtures instead of mocking `node:child_process`,
+ * `./ports-lsof.js`, and `../config/paths.js` at module level.
+ */
+export type RestartStalePidsDeps = {
+  platform?: NodeJS.Platform;
+  spawnSync?: typeof spawnSync;
+  resolveLsofCommandSync?: typeof resolveLsofCommandSync;
+  resolveGatewayPort?: typeof resolveGatewayPort;
+};
+
+function resolveDeps(deps: RestartStalePidsDeps) {
+  return {
+    platform: deps.platform ?? process.platform,
+    spawnSync: deps.spawnSync ?? spawnSync,
+    resolveLsofCommandSync: deps.resolveLsofCommandSync ?? resolveLsofCommandSync,
+    resolveGatewayPort: deps.resolveGatewayPort ?? resolveGatewayPort,
+  };
+}
+
 function getTimeMs(): number {
   return dateNowOverride ? dateNowOverride() : Date.now();
 }
@@ -142,14 +163,20 @@ function findVerifiedWindowsGatewayPidsOnPortResultSync(port: number): WindowsLi
 export function findGatewayPidsOnPortSync(
   port: number,
   spawnTimeoutMs = SPAWN_TIMEOUT_MS,
+  deps: RestartStalePidsDeps = {},
 ): number[] {
-  if (process.platform === "win32") {
+  const {
+    platform,
+    spawnSync: spawnSyncImpl,
+    resolveLsofCommandSync: resolveLsof,
+  } = resolveDeps(deps);
+  if (platform === "win32") {
     // Use the shared Windows port inspection (PowerShell / netstat) with
     // command-line verification to find only openclaw gateway processes.
     return findVerifiedWindowsGatewayPidsOnPortSync(port);
   }
-  const lsof = resolveLsofCommandSync();
-  const res = spawnSync(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
+  const lsof = resolveLsof();
+  const res = spawnSyncImpl(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
     encoding: "utf8",
     timeout: spawnTimeoutMs,
   });
@@ -197,13 +224,18 @@ export function findGatewayPidsOnPortSync(
  */
 type PollResult = { free: true } | { free: false } | { free: null; permanent: boolean };
 
-function pollPortOnce(port: number): PollResult {
-  if (process.platform === "win32") {
+function pollPortOnce(port: number, deps: RestartStalePidsDeps): PollResult {
+  const {
+    platform,
+    spawnSync: spawnSyncImpl,
+    resolveLsofCommandSync: resolveLsof,
+  } = resolveDeps(deps);
+  if (platform === "win32") {
     return pollPortOnceWindows(port);
   }
   try {
-    const lsof = resolveLsofCommandSync();
-    const res = spawnSync(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
+    const lsof = resolveLsof();
+    const res = spawnSyncImpl(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
       encoding: "utf8",
       timeout: POLL_SPAWN_TIMEOUT_MS,
     });
@@ -266,8 +298,8 @@ function pollPortOnceWindows(port: number): PollResult {
  * On Unix: sends SIGTERM, waits briefly, then SIGKILL for survivors.
  * On Windows: uses taskkill (graceful first, then /F for force-kill).
  */
-function terminateStaleProcessesSync(pids: number[]): number[] {
-  if (process.platform === "win32") {
+function terminateStaleProcessesSync(pids: number[], deps: RestartStalePidsDeps): number[] {
+  if (resolveDeps(deps).platform === "win32") {
     return terminateStaleProcessesWindows(pids);
   }
   const killed: number[] = [];
@@ -364,10 +396,10 @@ function isProcessAlive(pid: number): boolean {
  *   - `pollPortOnce` returns `{ free: null, permanent: false }`  → transient error, sleep + retry
  *   - Wall-clock deadline exceeded                               → log warning, proceed anyway
  */
-function waitForPortFreeSync(port: number): void {
+function waitForPortFreeSync(port: number, deps: RestartStalePidsDeps): void {
   const deadline = getTimeMs() + PORT_FREE_TIMEOUT_MS;
   while (getTimeMs() < deadline) {
-    const result = pollPortOnce(port);
+    const result = pollPortOnce(port, deps);
     if (result.free === true) {
       return;
     }
@@ -391,36 +423,40 @@ function waitForPortFreeSync(port: number): void {
  *
  * Called before service restart commands to prevent port conflicts.
  */
-export function cleanStaleGatewayProcessesSync(portOverride?: number): number[] {
+export function cleanStaleGatewayProcessesSync(
+  portOverride?: number,
+  deps: RestartStalePidsDeps = {},
+): number[] {
+  const { platform, resolveGatewayPort: resolveGatewayPortImpl } = resolveDeps(deps);
   try {
     const port =
       typeof portOverride === "number" && Number.isFinite(portOverride) && portOverride > 0
         ? Math.floor(portOverride)
-        : resolveGatewayPort(undefined, process.env);
+        : resolveGatewayPortImpl(undefined, process.env);
     const stalePids =
-      process.platform === "win32"
+      platform === "win32"
         ? (() => {
             const result = findVerifiedWindowsGatewayPidsOnPortResultSync(port);
             if (result.ok) {
               return result.pids;
             }
-            waitForPortFreeSync(port);
+            waitForPortFreeSync(port, deps);
             return [];
           })()
-        : findGatewayPidsOnPortSync(port);
+        : findGatewayPidsOnPortSync(port, SPAWN_TIMEOUT_MS, deps);
     if (stalePids.length === 0) {
       return [];
     }
     restartLog.warn(
       `killing ${stalePids.length} stale gateway process(es) before restart: ${stalePids.join(", ")}`,
     );
-    const killed = terminateStaleProcessesSync(stalePids);
+    const killed = terminateStaleProcessesSync(stalePids, deps);
     // Wait for the port to be released before returning — called unconditionally
     // even when `killed` is empty (all pids were already dead before SIGTERM).
     // A process can exit before our signal arrives yet still leave its socket
     // in TIME_WAIT / FIN_WAIT; polling is the only reliable way to confirm the
     // kernel has fully released the port before systemd fires the new process.
-    waitForPortFreeSync(port);
+    waitForPortFreeSync(port, deps);
     return killed;
   } catch {
     return [];

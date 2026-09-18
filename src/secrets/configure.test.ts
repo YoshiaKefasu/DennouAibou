@@ -1,40 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const selectMock = vi.hoisted(() => vi.fn());
-const createSecretsConfigIOMock = vi.hoisted(() => vi.fn());
-const readJsonObjectIfExistsMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  select: (...args: unknown[]) => selectMock(...args),
-  text: vi.fn(),
-}));
-
-vi.mock("./config-io.js", () => ({
-  createSecretsConfigIO: (...args: unknown[]) => createSecretsConfigIOMock(...args),
-}));
-
-vi.mock("./storage-scan.js", () => ({
-  readJsonObjectIfExists: (...args: unknown[]) => readJsonObjectIfExistsMock(...args),
-}));
-
-const { runSecretsConfigureInteractive } = await import("./configure.js");
+import { describe, expect, it, vi } from "vitest";
+import type { createSecretsConfigIO } from "./config-io.js";
+import { runSecretsConfigureInteractive, type SecretsConfigureDeps } from "./configure.js";
 
 describe("runSecretsConfigureInteractive", () => {
-  beforeEach(() => {
-    selectMock.mockReset();
-    createSecretsConfigIOMock.mockReset();
-    readJsonObjectIfExistsMock.mockReset();
-  });
-
   it("does not load auth-profiles when running providers-only", async () => {
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,
       configurable: true,
     });
 
-    selectMock.mockResolvedValue("continue");
-    createSecretsConfigIOMock.mockReturnValue({
+    const readJsonObjectIfExistsMock = vi.fn(() => ({
+      error: "boom",
+      value: null,
+    }));
+    const createSecretsConfigIOMock = vi.fn(() => ({
       readConfigFileSnapshotForWrite: async () => ({
         snapshot: {
           valid: true,
@@ -42,15 +21,24 @@ describe("runSecretsConfigureInteractive", () => {
           resolved: {},
         },
       }),
-    });
-    readJsonObjectIfExistsMock.mockReturnValue({
-      error: "boom",
-      value: null,
-    });
+    }));
+    const selectMock = vi.fn(async () => "continue");
 
-    await expect(runSecretsConfigureInteractive({ providersOnly: true })).rejects.toThrow(
-      "No secrets changes were selected.",
-    );
+    await expect(
+      runSecretsConfigureInteractive(
+        { providersOnly: true },
+        {
+          createSecretsConfigIO:
+            createSecretsConfigIOMock as unknown as typeof createSecretsConfigIO,
+          readJsonObjectIfExists: readJsonObjectIfExistsMock,
+          prompts: {
+            select: selectMock as unknown as NonNullable<SecretsConfigureDeps["prompts"]>["select"],
+          },
+        },
+      ),
+    ).rejects.toThrow("No secrets changes were selected.");
     expect(readJsonObjectIfExistsMock).not.toHaveBeenCalled();
+    expect(createSecretsConfigIOMock).toHaveBeenCalledTimes(1);
+    expect(selectMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type {
@@ -6,28 +6,26 @@ import type {
   PluginWebSearchProviderEntry,
 } from "../plugins/types.js";
 import { getPath, setPathCreateStrict } from "./path-utils.js";
+import type { RuntimeWebToolsDeps } from "./runtime-web-tools.js";
+import { clearSecretsRuntimeSnapshot, prepareSecretsRuntimeSnapshot } from "./runtime.js";
 import { canonicalizeSecretTargetCoverageId } from "./target-registry-test-helpers.js";
 import { listSecretTargetRegistryEntries } from "./target-registry.js";
 
 type SecretRegistryEntry = ReturnType<typeof listSecretTargetRegistryEntries>[number];
 
-const { resolvePluginWebSearchProvidersMock } = vi.hoisted(() => ({
-  resolvePluginWebSearchProvidersMock: vi.fn(() => buildTestWebSearchProviders()),
-}));
-const { resolvePluginWebFetchProvidersMock } = vi.hoisted(() => ({
-  resolvePluginWebFetchProvidersMock: vi.fn(() => buildTestWebFetchProviders()),
-}));
-
-let clearSecretsRuntimeSnapshot: typeof import("./runtime.js").clearSecretsRuntimeSnapshot;
-let prepareSecretsRuntimeSnapshot: typeof import("./runtime.js").prepareSecretsRuntimeSnapshot;
-
-vi.mock("../plugins/web-search-providers.runtime.js", () => ({
-  resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
-}));
-
-vi.mock("../plugins/web-fetch-providers.runtime.js", () => ({
-  resolvePluginWebFetchProviders: resolvePluginWebFetchProvidersMock,
-}));
+/**
+ * Web-search/web-fetch providers are supplied through the runtime seam instead
+ * of mocking `../plugins/web-search-providers.runtime.js` and
+ * `../plugins/web-fetch-providers.runtime.js` at module level.
+ */
+function createRuntimeWebToolsDeps(): Partial<RuntimeWebToolsDeps> {
+  return {
+    resolvePluginWebSearchProviders: (() =>
+      buildTestWebSearchProviders()) as unknown as RuntimeWebToolsDeps["resolvePluginWebSearchProviders"],
+    resolvePluginWebFetchProviders: (() =>
+      buildTestWebFetchProviders()) as unknown as RuntimeWebToolsDeps["resolvePluginWebFetchProviders"],
+  };
+}
 
 function createTestProvider(params: {
   id: "brave" | "gemini" | "grok" | "kimi" | "minimax" | "perplexity" | "firecrawl" | "tavily";
@@ -325,14 +323,8 @@ function buildAuthStoreForTarget(entry: SecretRegistryEntry, envId: string): Aut
 }
 
 describe("secrets runtime target coverage", () => {
-  beforeAll(async () => {
-    ({ clearSecretsRuntimeSnapshot, prepareSecretsRuntimeSnapshot } = await import("./runtime.js"));
-  });
-
   afterEach(() => {
     clearSecretsRuntimeSnapshot();
-    resolvePluginWebSearchProvidersMock.mockReset();
-    resolvePluginWebFetchProvidersMock.mockReset();
   });
 
   beforeEach(() => {
@@ -352,6 +344,7 @@ describe("secrets runtime target coverage", () => {
         env: { [runtimeEnvId]: expectedValue },
         agentDirs: ["/tmp/openclaw-agent-main"],
         loadAuthStore: () => ({ version: 1, profiles: {} }),
+        runtimeWebToolsDeps: createRuntimeWebToolsDeps(),
       });
       const resolved = getPath(
         snapshot.config,
@@ -379,6 +372,7 @@ describe("secrets runtime target coverage", () => {
         env: { [envId]: expectedValue },
         agentDirs: ["/tmp/openclaw-agent-main"],
         loadAuthStore: () => buildAuthStoreForTarget(entry, envId),
+        runtimeWebToolsDeps: createRuntimeWebToolsDeps(),
       });
       const store = snapshot.authStores[0]?.store;
       expect(store).toBeDefined();

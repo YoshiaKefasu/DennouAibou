@@ -1,31 +1,29 @@
-import fs from "node:fs/promises";
 import type { Server } from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PortInUseError } from "../infra/ports.js";
+import { ensureMediaHosted, type MediaHostDeps } from "./host.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   saveMediaSource: vi.fn(),
   getTailnetHostname: vi.fn(),
   ensurePortAvailable: vi.fn(),
   startMediaServer: vi.fn(),
   logInfo: vi.fn(),
-}));
+  removeFile: vi.fn(async () => undefined),
+};
 const { saveMediaSource, getTailnetHostname, ensurePortAvailable, startMediaServer, logInfo } =
   mocks;
 
-vi.mock("./store.js", () => ({ saveMediaSource }));
-vi.mock("../infra/tailscale.js", () => ({ getTailnetHostname }));
-vi.mock("../infra/ports.js", async () => {
-  const actual = await import("../infra/ports.js");
-  return { ensurePortAvailable, PortInUseError: actual.PortInUseError };
-});
-vi.mock("./server.js", () => ({ startMediaServer }));
-vi.mock("../logger.js", async () => {
-  const actual = await import("../logger.js");
-  return { ...actual, logInfo };
-});
-
-const { ensureMediaHosted } = await import("./host.js");
-const { PortInUseError } = await import("../infra/ports.js");
+function createDeps(): MediaHostDeps {
+  return {
+    saveMediaSource,
+    getTailnetHostname,
+    ensurePortAvailable,
+    startMediaServer,
+    logInfo,
+    removeFile: mocks.removeFile,
+  };
+}
 
 describe("ensureMediaHosted", () => {
   function mockSavedMedia(id: string, size: number) {
@@ -65,13 +63,11 @@ describe("ensureMediaHosted", () => {
         size: params.savedMedia.size,
       });
       ensurePortAvailable.mockResolvedValue(undefined);
-      const rmSpy = vi.spyOn(fs, "rm").mockResolvedValue(undefined);
 
       await expect(
-        ensureMediaHosted(params.filePath, { startServer: params.startServer }),
+        ensureMediaHosted(params.filePath, { startServer: params.startServer, deps: createDeps() }),
       ).rejects.toThrow(params.expectedError);
-      expect(rmSpy).toHaveBeenCalledWith(params.expectedCleanupPath);
-      rmSpy.mockRestore();
+      expect(mocks.removeFile).toHaveBeenCalledWith(params.expectedCleanupPath);
       return;
     }
 
@@ -86,6 +82,7 @@ describe("ensureMediaHosted", () => {
     const result = await ensureMediaHosted(params.filePath, {
       startServer: params.startServer,
       port: params.port,
+      deps: createDeps(),
     });
 
     if (params.expectServerStart) {

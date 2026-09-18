@@ -1,45 +1,48 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureFullEnv } from "../test-utils/env.js";
-
-const spawnMock = vi.hoisted(() => vi.fn());
-const resolvePreferredOpenClawTmpDirMock = vi.hoisted(() => vi.fn(() => os.tmpdir()));
-const resolveTaskScriptPathMock = vi.hoisted(() =>
-  vi.fn((env: Record<string, string | undefined>) => {
-    const home = env.USERPROFILE || env.HOME || os.homedir();
-    return path.join(home, ".openclaw", "gateway.cmd");
-  }),
-);
-
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    spawn: (...args: unknown[]) => spawnMock(...args),
-  });
-});
-vi.mock("./tmp-openclaw-dir.js", () => ({
-  resolvePreferredOpenClawTmpDir: () => resolvePreferredOpenClawTmpDirMock(),
-}));
-vi.mock("../daemon/schtasks.js", () => ({
-  resolveTaskScriptPath: (env: Record<string, string | undefined>) =>
-    resolveTaskScriptPathMock(env),
-}));
-
-type WindowsTaskRestartModule = typeof import("./windows-task-restart.js");
-
-let relaunchGatewayScheduledTask: WindowsTaskRestartModule["relaunchGatewayScheduledTask"];
+import { relaunchGatewayScheduledTask } from "./windows-task-restart.js";
 
 const envSnapshot = captureFullEnv();
 const createdScriptPaths = new Set<string>();
 const createdTmpDirs = new Set<string>();
+
+let spawnMock: ReturnType<typeof vi.fn>;
+let tmpDirRoot: string;
+let taskScriptPathOverride: string | null;
+
+function defaultTaskScriptPath(env: Record<string, string | undefined>): string {
+  const home = env.USERPROFILE || env.HOME || os.homedir();
+  return path.join(home, ".openclaw", "gateway.cmd");
+}
+
+function relaunch(
+  env: Record<string, string | undefined>,
+  spawnImpl: ReturnType<typeof vi.fn> = spawnMock,
+) {
+  return relaunchGatewayScheduledTask(env, {
+    spawn: spawnImpl as unknown as typeof import("node:child_process").spawn,
+    resolvePreferredOpenClawTmpDir: () => tmpDirRoot,
+    resolveTaskScriptPath: (taskEnv) =>
+      taskScriptPathOverride ?? defaultTaskScriptPath(taskEnv ?? {}),
+  });
+}
 
 function decodeCmdPathArg(value: string): string {
   const trimmed = value.trim();
   const withoutQuotes =
     trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1) : trimmed;
   return withoutQuotes.replace(/\^!/g, "!").replace(/%%/g, "%");
+}
+
+function captureSpawnedScript(): ReturnType<typeof vi.fn> {
+  const spawnImpl = vi.fn((_file: string, args: string[]) => {
+    createdScriptPaths.add(decodeCmdPathArg(args[3]));
+    return { unref: vi.fn() };
+  });
+  return spawnImpl;
 }
 
 afterEach(() => {
@@ -63,19 +66,10 @@ afterEach(() => {
 });
 
 describe("relaunchGatewayScheduledTask", () => {
-  beforeAll(async () => {
-    ({ relaunchGatewayScheduledTask } = await import("./windows-task-restart.js"));
-  });
-
   beforeEach(() => {
-    spawnMock.mockReset();
-    resolvePreferredOpenClawTmpDirMock.mockReset();
-    resolvePreferredOpenClawTmpDirMock.mockReturnValue(os.tmpdir());
-    resolveTaskScriptPathMock.mockReset();
-    resolveTaskScriptPathMock.mockImplementation((env: Record<string, string | undefined>) => {
-      const home = env.USERPROFILE || env.HOME || os.homedir();
-      return path.join(home, ".openclaw", "gateway.cmd");
-    });
+    spawnMock = vi.fn();
+    tmpDirRoot = os.tmpdir();
+    taskScriptPathOverride = null;
   });
 
   it("writes a detached schtasks relaunch helper", () => {
@@ -87,14 +81,18 @@ describe("relaunchGatewayScheduledTask", () => {
       return { unref };
     });
 
-    const result = relaunchGatewayScheduledTask({ DENNOU_PROFILE: "work" });
+    const result = relaunch({ DENNOU_PROFILE: "work" });
 
     expect(result).toMatchObject({
       ok: true,
       method: "schtasks",
-      tried: expect.arrayContaining(['schtasks /Run /TN "OpenClaw Gateway (work)"']),
     });
-    expect(result.tried).toContain(`cmd.exe /d /s /c ${seenCommandArg}`);
+    // NOTE: Bun's `toMatchObject` corrupts an array when the expectation uses
+    // `expect.arrayContaining`, so `tried` is asserted with explicit checks.
+    const tried = result.tried ?? [];
+    expect(tried).toHaveLength(2);
+    expect(tried[0]).toBe('schtasks /Run /TN "OpenClaw Gateway (work)"');
+    expect(tried).toContain(`cmd.exe /d /s /c ${seenCommandArg}`);
     expect(spawnMock).toHaveBeenCalledWith(
       "cmd.exe",
       ["/d", "/s", "/c", expect.any(String)],
@@ -115,12 +113,9 @@ describe("relaunchGatewayScheduledTask", () => {
   });
 
   it("prefers DENNOU_WINDOWS_TASK_NAME overrides", () => {
-    spawnMock.mockImplementation((_file: string, args: string[]) => {
-      createdScriptPaths.add(decodeCmdPathArg(args[3]));
-      return { unref: vi.fn() };
-    });
+    spawnMock = captureSpawnedScript();
 
-    relaunchGatewayScheduledTask({
+    relaunch({
       DENNOU_PROFILE: "work",
       DENNOU_WINDOWS_TASK_NAME: "OpenClaw Gateway (custom)",
     });
@@ -135,7 +130,7 @@ describe("relaunchGatewayScheduledTask", () => {
       throw new Error("spawn failed");
     });
 
-    const result = relaunchGatewayScheduledTask({ DENNOU_PROFILE: "work" });
+    const result = relaunch({ DENNOU_PROFILE: "work" });
 
     expect(result.ok).toBe(false);
     expect(result.method).toBe("schtasks");
@@ -146,10 +141,10 @@ describe("relaunchGatewayScheduledTask", () => {
     const unref = vi.fn();
     const metacharTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw&(restart)-"));
     createdTmpDirs.add(metacharTmpDir);
-    resolvePreferredOpenClawTmpDirMock.mockReturnValue(metacharTmpDir);
+    tmpDirRoot = metacharTmpDir;
     spawnMock.mockReturnValue({ unref });
 
-    relaunchGatewayScheduledTask({ DENNOU_PROFILE: "work" });
+    relaunch({ DENNOU_PROFILE: "work" });
 
     expect(spawnMock).toHaveBeenCalledWith(
       "cmd.exe",
@@ -163,14 +158,10 @@ describe("relaunchGatewayScheduledTask", () => {
     createdTmpDirs.add(taskScriptDir);
     const taskScriptPath = path.join(taskScriptDir, "gateway.cmd");
     fs.writeFileSync(taskScriptPath, "@echo off\r\nrem placeholder\r\n", "utf8");
-    resolveTaskScriptPathMock.mockReturnValue(taskScriptPath);
+    taskScriptPathOverride = taskScriptPath;
+    spawnMock = captureSpawnedScript();
 
-    spawnMock.mockImplementation((_file: string, args: string[]) => {
-      createdScriptPaths.add(decodeCmdPathArg(args[3]));
-      return { unref: vi.fn() };
-    });
-
-    const result = relaunchGatewayScheduledTask({ DENNOU_PROFILE: "work" });
+    const result = relaunch({ DENNOU_PROFILE: "work" });
 
     expect(result.ok).toBe(true);
     const scriptPath = [...createdScriptPaths][0];

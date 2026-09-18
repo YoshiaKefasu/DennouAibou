@@ -33,11 +33,18 @@ const ROOT_PREFIX = "/";
 const CONTROL_UI_ASSETS_MISSING_MESSAGE =
   "Control UI assets not found. Build them with `pnpm ui:build` (auto-installs UI deps), or run `pnpm ui:dev` during development.";
 
+export type ControlUiRuntimeDeps = {
+  resolveControlUiRootSync?: typeof resolveControlUiRootSync;
+  isPackageProvenControlUiRootSync?: typeof isPackageProvenControlUiRootSync;
+};
+
 export type ControlUiRequestOptions = {
   basePath?: string;
   config?: OpenClawConfig;
   agentId?: string;
   root?: ControlUiRootState;
+  /** Injectable seams for the control-UI asset discovery boundary. */
+  deps?: ControlUiRuntimeDeps;
 };
 
 export type ControlUiRootState =
@@ -378,10 +385,13 @@ export function handleControlUiHttpRequest(
     return true;
   }
 
+  const resolveControlUiRoot = opts?.deps?.resolveControlUiRootSync ?? resolveControlUiRootSync;
+  const isPackageProvenRoot =
+    opts?.deps?.isPackageProvenControlUiRootSync ?? isPackageProvenControlUiRootSync;
   const root =
     rootState?.kind === "resolved" || rootState?.kind === "bundled"
       ? rootState.path
-      : resolveControlUiRootSync({
+      : resolveControlUiRoot({
           moduleUrl: import.meta.url,
           argv1: process.argv[1],
           cwd: process.cwd(),
@@ -434,7 +444,7 @@ export function handleControlUiHttpRequest(
   const isBundledRoot =
     rootState?.kind === "bundled" ||
     (rootState === undefined &&
-      isPackageProvenControlUiRootSync(root, {
+      isPackageProvenRoot(root, {
         moduleUrl: import.meta.url,
         argv1: process.argv[1],
         cwd: process.cwd(),

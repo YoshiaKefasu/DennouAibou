@@ -3,23 +3,31 @@ import type { IncomingMessage } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { handleControlUiHttpRequest, type ControlUiRuntimeDeps } from "./control-ui.js";
+import { makeMockHttpResponse } from "./test-http-response.js";
 
-const { resolveControlUiRootSyncMock, isPackageProvenControlUiRootSyncMock } = vi.hoisted(() => ({
-  resolveControlUiRootSyncMock: vi.fn(),
-  isPackageProvenControlUiRootSyncMock: vi.fn().mockReturnValue(true),
-}));
+const resolveControlUiRootSyncMock = vi.fn();
+const isPackageProvenControlUiRootSyncMock = vi.fn().mockReturnValue(true);
 
-vi.mock("../infra/control-ui-assets.js", async () => {
-  const actual = await import("../infra/control-ui-assets.js");
+function createDeps(): ControlUiRuntimeDeps {
   return {
-    ...actual,
-    resolveControlUiRootSync: resolveControlUiRootSyncMock,
-    isPackageProvenControlUiRootSync: isPackageProvenControlUiRootSyncMock,
+    resolveControlUiRootSync: resolveControlUiRootSyncMock as unknown as NonNullable<
+      ControlUiRuntimeDeps["resolveControlUiRootSync"]
+    >,
+    isPackageProvenControlUiRootSync:
+      isPackageProvenControlUiRootSyncMock as unknown as NonNullable<
+        ControlUiRuntimeDeps["isPackageProvenControlUiRootSync"]
+      >,
   };
-});
+}
 
-const { handleControlUiHttpRequest } = await import("./control-ui.js");
-const { makeMockHttpResponse } = await import("./test-http-response.js");
+function handle(url: string) {
+  const { res, end } = makeMockHttpResponse();
+  const handled = handleControlUiHttpRequest({ url, method: "GET" } as IncomingMessage, res, {
+    deps: createDeps(),
+  });
+  return { handled, res, end };
+}
 
 async function withControlUiRoot<T>(fn: (tmp: string) => Promise<T>) {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-ui-auto-root-"));
@@ -46,11 +54,7 @@ describe("handleControlUiHttpRequest auto-detected root", () => {
       await fs.link(path.join(assetsDir, "app.js"), path.join(assetsDir, "app.hl.js"));
       resolveControlUiRootSyncMock.mockReturnValue(tmp);
 
-      const { res, end } = makeMockHttpResponse();
-      const handled = handleControlUiHttpRequest(
-        { url: "/assets/app.hl.js", method: "GET" } as IncomingMessage,
-        res,
-      );
+      const { handled, res, end } = handle("/assets/app.hl.js");
 
       expect(handled).toBe(true);
       expect(res.statusCode).toBe(200);
@@ -67,11 +71,7 @@ describe("handleControlUiHttpRequest auto-detected root", () => {
       await fs.link(sourceIndex, indexPath);
       resolveControlUiRootSyncMock.mockReturnValue(tmp);
 
-      const { res, end } = makeMockHttpResponse();
-      const handled = handleControlUiHttpRequest(
-        { url: "/dashboard", method: "GET" } as IncomingMessage,
-        res,
-      );
+      const { handled, res, end } = handle("/dashboard");
 
       expect(handled).toBe(true);
       expect(res.statusCode).toBe(200);
@@ -88,11 +88,7 @@ describe("handleControlUiHttpRequest auto-detected root", () => {
       await fs.link(path.join(assetsDir, "app.js"), path.join(assetsDir, "app.hl.js"));
       resolveControlUiRootSyncMock.mockReturnValue(tmp);
 
-      const { res } = makeMockHttpResponse();
-      const handled = handleControlUiHttpRequest(
-        { url: "/assets/app.hl.js", method: "GET" } as IncomingMessage,
-        res,
-      );
+      const { handled, res } = handle("/assets/app.hl.js");
 
       expect(handled).toBe(true);
       expect(res.statusCode).toBe(404);

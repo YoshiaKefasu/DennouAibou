@@ -1,25 +1,22 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  loadGatewayRuntimeConfigSchema,
+  readBestEffortRuntimeConfigSchema,
+  type RuntimeConfigSchemaDeps,
+} from "./runtime-schema.js";
 import type { ConfigFileSnapshot, OpenClawConfig } from "./types.js";
 
-const mockLoadConfig = vi.hoisted(() => vi.fn<() => OpenClawConfig>());
-const mockReadConfigFileSnapshot = vi.hoisted(() => vi.fn<() => Promise<ConfigFileSnapshot>>());
-const mockLoadPluginManifestRegistry = vi.hoisted(() => vi.fn());
+const mockLoadConfig = vi.fn<() => OpenClawConfig>(() => ({}));
+const mockReadConfigFileSnapshot = vi.fn<() => Promise<ConfigFileSnapshot>>();
+const mockLoadPluginManifestRegistry = vi.fn();
 
-let readBestEffortRuntimeConfigSchema: typeof import("./runtime-schema.js").readBestEffortRuntimeConfigSchema;
-let loadGatewayRuntimeConfigSchema: typeof import("./runtime-schema.js").loadGatewayRuntimeConfigSchema;
-
-vi.mock("./config.js", async () => {
-  const actual = await import("./config.js");
+function createDeps(): RuntimeConfigSchemaDeps {
   return {
-    ...actual,
-    loadConfig: () => mockLoadConfig(),
-    readConfigFileSnapshot: () => mockReadConfigFileSnapshot(),
+    loadConfig: mockLoadConfig as never,
+    readConfigFileSnapshot: mockReadConfigFileSnapshot as never,
+    loadPluginManifestRegistry: mockLoadPluginManifestRegistry as never,
   };
-});
-
-vi.mock("../plugins/manifest-registry.js", () => ({
-  loadPluginManifestRegistry: (...args: unknown[]) => mockLoadPluginManifestRegistry(...args),
-}));
+}
 
 function makeSnapshot(params: { valid: boolean; config?: OpenClawConfig }): ConfigFileSnapshot {
   return {
@@ -130,7 +127,7 @@ function makeManifestRegistry() {
 }
 
 async function readSchemaNodes() {
-  const result = await readBestEffortRuntimeConfigSchema();
+  const result = await readBestEffortRuntimeConfigSchema(createDeps());
   const schema = result.schema as { properties?: Record<string, unknown> };
   const channelsNode = schema.properties?.channels as Record<string, unknown> | undefined;
   const channelProps = channelsNode?.properties as Record<string, unknown> | undefined;
@@ -140,11 +137,6 @@ async function readSchemaNodes() {
   const entryProps = entriesNode?.properties as Record<string, unknown> | undefined;
   return { channelProps, entryProps };
 }
-
-beforeAll(async () => {
-  ({ readBestEffortRuntimeConfigSchema, loadGatewayRuntimeConfigSchema } =
-    await import("./runtime-schema.js"));
-});
 
 describe("readBestEffortRuntimeConfigSchema", () => {
   beforeEach(() => {
@@ -199,7 +191,7 @@ describe("loadGatewayRuntimeConfigSchema", () => {
   });
 
   it("uses manifest metadata instead of booting plugin runtime", async () => {
-    const result = loadGatewayRuntimeConfigSchema();
+    const result = loadGatewayRuntimeConfigSchema(createDeps());
     const schema = result.schema as { properties?: Record<string, unknown> };
     const channelsNode = schema.properties?.channels as Record<string, unknown> | undefined;
     const channelProps = channelsNode?.properties as Record<string, unknown> | undefined;

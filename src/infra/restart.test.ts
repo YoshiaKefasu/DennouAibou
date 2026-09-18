@@ -1,47 +1,36 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-const spawnSyncMock = vi.hoisted(() => vi.fn());
-const resolveLsofCommandSyncMock = vi.hoisted(() => vi.fn());
-const resolveGatewayPortMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
-  });
-});
-
-vi.mock("./ports-lsof.js", () => ({
-  resolveLsofCommandSync: (...args: unknown[]) => resolveLsofCommandSyncMock(...args),
-}));
-
-vi.mock("../config/paths.js", async () => {
-  const actual = await import("../config/paths.js");
-  return {
-    ...actual,
-    resolveGatewayPort: (...args: unknown[]) => resolveGatewayPortMock(...args),
-  };
-});
-
-let __testing: typeof import("./restart-stale-pids.js").__testing;
-let cleanStaleGatewayProcessesSync: typeof import("./restart-stale-pids.js").cleanStaleGatewayProcessesSync;
-let findGatewayPidsOnPortSync: typeof import("./restart-stale-pids.js").findGatewayPidsOnPortSync;
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  __testing,
+  cleanStaleGatewayProcessesSync,
+  findGatewayPidsOnPortSync,
+  type RestartStalePidsDeps,
+} from "./restart-stale-pids.js";
 
 let currentTimeMs = 0;
+let spawnSyncMock: ReturnType<typeof vi.fn>;
+let resolveGatewayPortMock: ReturnType<typeof vi.fn>;
 
-beforeAll(async () => {
-  ({ __testing, cleanStaleGatewayProcessesSync, findGatewayPidsOnPortSync } =
-    await import("./restart-stale-pids.js"));
-});
+/**
+ * The lsof-backed code paths are POSIX-only in production, but they only ever
+ * touch injected seams here, so the platform is pinned to `linux` and the tests
+ * run on every host OS instead of being skipped on Windows.
+ */
+function createDeps(overrides: Partial<RestartStalePidsDeps> = {}): RestartStalePidsDeps {
+  return {
+    platform: "linux",
+    spawnSync: spawnSyncMock as unknown as RestartStalePidsDeps["spawnSync"],
+    resolveLsofCommandSync: () => "/usr/sbin/lsof",
+    resolveGatewayPort:
+      resolveGatewayPortMock as unknown as RestartStalePidsDeps["resolveGatewayPort"],
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
-  spawnSyncMock.mockReset();
-  resolveLsofCommandSyncMock.mockReset();
-  resolveGatewayPortMock.mockReset();
+  spawnSyncMock = vi.fn();
+  resolveGatewayPortMock = vi.fn(() => 18789);
 
   currentTimeMs = 0;
-  resolveLsofCommandSyncMock.mockReturnValue("/usr/sbin/lsof");
-  resolveGatewayPortMock.mockReturnValue(18789);
   __testing.setSleepSyncOverride((ms) => {
     currentTimeMs += ms;
   });
@@ -54,7 +43,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe.runIf(process.platform !== "win32")("findGatewayPidsOnPortSync", () => {
+describe("findGatewayPidsOnPortSync", () => {
   it("parses lsof output and filters non-openclaw/current processes", () => {
     const gatewayPidA = process.pid + 1000;
     const gatewayPidB = process.pid + 2000;
@@ -74,7 +63,7 @@ describe.runIf(process.platform !== "win32")("findGatewayPidsOnPortSync", () => 
       ].join("\n"),
     });
 
-    const pids = findGatewayPidsOnPortSync(18789);
+    const pids = findGatewayPidsOnPortSync(18789, undefined, createDeps());
 
     expect(pids).toEqual([gatewayPidA, gatewayPidB]);
     expect(spawnSyncMock).toHaveBeenCalledWith(
@@ -92,11 +81,11 @@ describe.runIf(process.platform !== "win32")("findGatewayPidsOnPortSync", () => 
       stderr: "lsof failed",
     });
 
-    expect(findGatewayPidsOnPortSync(18789)).toEqual([]);
+    expect(findGatewayPidsOnPortSync(18789, undefined, createDeps())).toEqual([]);
   });
 });
 
-describe.runIf(process.platform !== "win32")("cleanStaleGatewayProcessesSync", () => {
+describe("cleanStaleGatewayProcessesSync", () => {
   it("kills stale gateway pids discovered on the gateway port", () => {
     const stalePidA = process.pid + 1000;
     const stalePidB = process.pid + 2000;
@@ -113,7 +102,7 @@ describe.runIf(process.platform !== "win32")("cleanStaleGatewayProcessesSync", (
       });
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
 
-    const killed = cleanStaleGatewayProcessesSync();
+    const killed = cleanStaleGatewayProcessesSync(undefined, createDeps());
 
     expect(killed).toEqual([stalePidA, stalePidB]);
     expect(resolveGatewayPortMock).toHaveBeenCalledWith(undefined, process.env);
@@ -138,7 +127,7 @@ describe.runIf(process.platform !== "win32")("cleanStaleGatewayProcessesSync", (
       });
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
 
-    const killed = cleanStaleGatewayProcessesSync(19999);
+    const killed = cleanStaleGatewayProcessesSync(19999, createDeps());
 
     expect(killed).toEqual([stalePid]);
     expect(resolveGatewayPortMock).not.toHaveBeenCalled();
@@ -159,7 +148,7 @@ describe.runIf(process.platform !== "win32")("cleanStaleGatewayProcessesSync", (
     });
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
 
-    const killed = cleanStaleGatewayProcessesSync();
+    const killed = cleanStaleGatewayProcessesSync(undefined, createDeps());
 
     expect(killed).toEqual([]);
     expect(killSpy).not.toHaveBeenCalled();

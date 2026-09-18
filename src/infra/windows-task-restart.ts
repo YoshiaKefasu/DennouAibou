@@ -44,13 +44,27 @@ function buildScheduledTaskRestartScript(taskName: string, taskScriptPath?: stri
   return lines.join("\r\n");
 }
 
-export function relaunchGatewayScheduledTask(env: NodeJS.ProcessEnv = process.env): RestartAttempt {
+/**
+ * Injectable seams for the OS/process boundaries this module touches.
+ * Tests supply fixtures instead of mocking `node:child_process`,
+ * `./tmp-openclaw-dir.js`, and `../daemon/schtasks.js` at module level.
+ */
+export type WindowsTaskRestartDeps = {
+  spawn?: typeof spawn;
+  resolveTaskScriptPath?: typeof resolveTaskScriptPath;
+  resolvePreferredOpenClawTmpDir?: typeof resolvePreferredOpenClawTmpDir;
+};
+
+export function relaunchGatewayScheduledTask(
+  env: NodeJS.ProcessEnv = process.env,
+  deps: WindowsTaskRestartDeps = {},
+): RestartAttempt {
+  const spawnProcess = deps.spawn ?? spawn;
+  const resolveTaskScriptPathImpl = deps.resolveTaskScriptPath ?? resolveTaskScriptPath;
+  const resolveTmpDir = deps.resolvePreferredOpenClawTmpDir ?? resolvePreferredOpenClawTmpDir;
   const taskName = resolveWindowsTaskName(env);
-  const taskScriptPath = resolveTaskScriptPath(env);
-  const scriptPath = path.join(
-    resolvePreferredOpenClawTmpDir(),
-    `openclaw-schtasks-restart-${randomUUID()}.cmd`,
-  );
+  const taskScriptPath = resolveTaskScriptPathImpl(env);
+  const scriptPath = path.join(resolveTmpDir(), `openclaw-schtasks-restart-${randomUUID()}.cmd`);
   const quotedScriptPath = quoteCmdScriptArg(scriptPath);
   try {
     fs.writeFileSync(
@@ -58,7 +72,7 @@ export function relaunchGatewayScheduledTask(env: NodeJS.ProcessEnv = process.en
       `${buildScheduledTaskRestartScript(taskName, taskScriptPath)}\r\n`,
       "utf8",
     );
-    const child = spawn("cmd.exe", ["/d", "/s", "/c", quotedScriptPath], {
+    const child = spawnProcess("cmd.exe", ["/d", "/s", "/c", quotedScriptPath], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,

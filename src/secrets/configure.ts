@@ -1,6 +1,6 @@
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { confirm, select, text } from "@clack/prompts";
+import { confirm as clackConfirm, select as clackSelect, text as clackText } from "@clack/prompts";
 import { listAgentIds, resolveAgentDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import { AUTH_STORE_VERSION } from "../agents/auth-profiles/constants.js";
@@ -38,6 +38,34 @@ export type SecretsConfigureResult = {
 };
 
 const ENV_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,127}$/;
+
+/**
+ * Injectable seam for the interactive prompt surface. `runSecretsConfigureInteractive`
+ * swaps the active prompt set for the duration of one run so tests can drive the
+ * wizard without mocking `@clack/prompts` at module level.
+ */
+export type SecretsConfigurePrompts = {
+  confirm: typeof clackConfirm;
+  select: typeof clackSelect;
+  text: typeof clackText;
+};
+
+const defaultPrompts: SecretsConfigurePrompts = {
+  confirm: clackConfirm,
+  select: clackSelect,
+  text: clackText,
+};
+
+let activePrompts: SecretsConfigurePrompts = defaultPrompts;
+
+// Prompt helpers below keep their original call shape (`text(...)`, `select(...)`,
+// `confirm(...)`) while routing through the active prompt set.
+const text = ((...args: unknown[]) =>
+  (activePrompts.text as (...inner: unknown[]) => unknown)(...args)) as typeof clackText;
+const select = ((...args: unknown[]) =>
+  (activePrompts.select as (...inner: unknown[]) => unknown)(...args)) as typeof clackSelect;
+const confirm = ((...args: unknown[]) =>
+  (activePrompts.confirm as (...inner: unknown[]) => unknown)(...args)) as typeof clackConfirm;
 const WINDOWS_ABS_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
 const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
 
@@ -300,10 +328,11 @@ function normalizeAuthStoreForConfigure(
 function loadAuthProfileStoreForConfigure(params: {
   config: OpenClawConfig;
   agentId: string;
+  readJsonObjectIfExists: typeof readJsonObjectIfExists;
 }): AuthProfileStore {
   const agentDir = resolveAgentDir(params.config, params.agentId);
   const storePath = resolveAuthStorePath(agentDir);
-  const parsed = readJsonObjectIfExists(storePath);
+  const parsed = params.readJsonObjectIfExists(storePath);
   if (parsed.error) {
     throw new Error(
       `Cannot run interactive secrets configure because ${storePath} could not be read: ${parsed.error}`,
@@ -743,6 +772,12 @@ async function configureProvidersInteractive(config: OpenClawConfig): Promise<vo
   }
 }
 
+export type SecretsConfigureDeps = {
+  createSecretsConfigIO?: typeof createSecretsConfigIO;
+  readJsonObjectIfExists?: typeof readJsonObjectIfExists;
+  prompts?: Partial<SecretsConfigurePrompts>;
+};
+
 export async function runSecretsConfigureInteractive(
   params: {
     env?: NodeJS.ProcessEnv;
@@ -751,7 +786,11 @@ export async function runSecretsConfigureInteractive(
     agentId?: string;
     allowExecInPreflight?: boolean;
   } = {},
+  deps: SecretsConfigureDeps = {},
 ): Promise<SecretsConfigureResult> {
+  const createIO = deps.createSecretsConfigIO ?? createSecretsConfigIO;
+  const readJsonObject = deps.readJsonObjectIfExists ?? readJsonObjectIfExists;
+  activePrompts = { ...defaultPrompts, ...deps.prompts };
   if (!process.stdin.isTTY) {
     throw new Error("secrets configure requires an interactive TTY.");
   }
@@ -761,7 +800,7 @@ export async function runSecretsConfigureInteractive(
 
   const env = params.env ?? process.env;
   const allowExecInPreflight = Boolean(params.allowExecInPreflight);
-  const io = createSecretsConfigIO({ env });
+  const io = createIO({ env });
   const { snapshot } = await io.readConfigFileSnapshotForWrite();
   if (!snapshot.valid) {
     throw new Error("Cannot run interactive secrets configure because config is invalid.");
@@ -783,6 +822,7 @@ export async function runSecretsConfigureInteractive(
     const authStore = loadAuthProfileStoreForConfigure({
       config: snapshot.config,
       agentId: configureAgentId,
+      readJsonObjectIfExists: readJsonObject,
     });
     const candidates = buildConfigureCandidatesForScope({
       config: stagedConfig,

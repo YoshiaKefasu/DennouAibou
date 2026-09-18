@@ -1,56 +1,34 @@
 import type { Mock } from "vitest";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { StatusSummaryDeps } from "./status.summary.js";
+import { getStatusSummary } from "./status.summary.js";
 
-const statusSummaryMocks = vi.hoisted(() => ({
+const statusSummaryMocks = {
   hasPotentialConfiguredChannels: vi.fn(() => true),
   buildChannelSummary: vi.fn(async () => ["ok"]),
-}));
-
-vi.mock("../channels/config-presence.js", () => ({
-  hasPotentialConfiguredChannels: statusSummaryMocks.hasPotentialConfiguredChannels,
-}));
-
-vi.mock("./status.summary.runtime.js", () => ({
-  statusSummaryRuntime: {
-    classifySessionKey: vi.fn(() => "direct"),
-    resolveConfiguredStatusModelRef: vi.fn(() => ({
-      provider: "openai",
-      model: "gpt-5.4",
-    })),
-    resolveSessionModelRef: vi.fn(() => ({
-      provider: "openai",
-      model: "gpt-5.4",
-    })),
-    resolveContextTokensForModel: vi.fn(() => 200_000),
-  },
-}));
-
-vi.mock("../agents/defaults.js", () => ({
-  DEFAULT_CONTEXT_TOKENS: 200_000,
-  DEFAULT_MODEL: "gpt-5.4",
-  DEFAULT_PROVIDER: "openai",
-}));
-
-vi.mock("../config/io.js", () => ({
-  loadConfig: vi.fn(() => ({})),
-}));
-
-vi.mock("../gateway/agent-list.js", () => ({
+  resolveLinkChannelContext: vi.fn(async () => undefined),
   listGatewayAgentsBasic: vi.fn(() => ({
     defaultId: "main",
     agents: [{ id: "main" }],
   })),
-}));
-
-vi.mock("../infra/channel-summary.js", () => ({
-  buildChannelSummary: statusSummaryMocks.buildChannelSummary,
-}));
-
-vi.mock("../infra/system-events.js", () => ({
   peekSystemEvents: vi.fn(() => []),
-}));
+  resolveRuntimeServiceVersion: vi.fn(() => "2026.3.8"),
+};
 
-vi.mock("../tasks/task-registry.maintenance.js", () => ({
+const statusSummaryRuntimeMock = {
+  classifySessionKey: vi.fn(() => "direct"),
+  resolveConfiguredStatusModelRef: vi.fn(() => ({
+    provider: "openai",
+    model: "gpt-5.4",
+  })),
+  resolveSessionModelRef: vi.fn(() => ({
+    provider: "openai",
+    model: "gpt-5.4",
+  })),
+  resolveContextTokensForModel: vi.fn(() => 200_000),
+};
+
+const taskMaintenanceModuleMock = {
   getInspectableTaskRegistrySummary: vi.fn(() => ({
     total: 0,
     active: 0,
@@ -85,37 +63,29 @@ vi.mock("../tasks/task-registry.maintenance.js", () => ({
       inconsistent_timestamps: 0,
     },
   })),
-}));
+} as unknown as NonNullable<StatusSummaryDeps["taskMaintenanceModule"]>;
 
-vi.mock("../routing/session-key.js", () => ({
-  normalizeAgentId: vi.fn((value: string) => value),
-  normalizeMainKey: vi.fn((value?: string) => value ?? "main"),
-  parseAgentSessionKey: vi.fn(() => null),
-}));
-
-vi.mock("../version.js", async () => {
-  const actual = await import("../version.js");
+function createDeps(): StatusSummaryDeps {
   return {
-    ...actual,
-    resolveRuntimeServiceVersion: vi.fn(() => "2026.3.8"),
+    statusSummaryRuntime:
+      statusSummaryRuntimeMock as unknown as StatusSummaryDeps["statusSummaryRuntime"],
+    taskMaintenanceModule: taskMaintenanceModuleMock,
+    loadConfig: () => ({}),
+    hasPotentialConfiguredChannels: statusSummaryMocks.hasPotentialConfiguredChannels as never,
+    resolveLinkChannelContext:
+      statusSummaryMocks.resolveLinkChannelContext as unknown as StatusSummaryDeps["resolveLinkChannelContext"],
+    buildChannelSummary:
+      statusSummaryMocks.buildChannelSummary as unknown as StatusSummaryDeps["buildChannelSummary"],
+    listGatewayAgentsBasic:
+      statusSummaryMocks.listGatewayAgentsBasic as unknown as StatusSummaryDeps["listGatewayAgentsBasic"],
+    peekSystemEvents:
+      statusSummaryMocks.peekSystemEvents as unknown as StatusSummaryDeps["peekSystemEvents"],
+    resolveRuntimeServiceVersion:
+      statusSummaryMocks.resolveRuntimeServiceVersion as unknown as StatusSummaryDeps["resolveRuntimeServiceVersion"],
   };
-});
-
-vi.mock("./status.link-channel.js", () => ({
-  resolveLinkChannelContext: vi.fn(async () => undefined),
-}));
-
-const { buildChannelSummary } = await import("../infra/channel-summary.js");
-const { resolveLinkChannelContext } = await import("./status.link-channel.js");
-let getStatusSummary: typeof import("./status.summary.js").getStatusSummary;
-let statusSummaryRuntime: typeof import("./status.summary.runtime.js").statusSummaryRuntime;
+}
 
 describe("getStatusSummary", () => {
-  beforeAll(async () => {
-    ({ getStatusSummary } = await import("./status.summary.js"));
-    ({ statusSummaryRuntime } = await import("./status.summary.runtime.js"));
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     statusSummaryMocks.hasPotentialConfiguredChannels.mockReturnValue(true);
@@ -123,7 +93,7 @@ describe("getStatusSummary", () => {
   });
 
   it("includes runtimeVersion in the status payload", async () => {
-    const summary = await getStatusSummary();
+    const summary = await getStatusSummary({}, createDeps());
 
     expect(summary.runtimeVersion).toBe("2026.3.8");
     expect(summary.heartbeat.defaultAgentId).toBe("main");
@@ -135,18 +105,18 @@ describe("getStatusSummary", () => {
   it("skips channel summary imports when no channels are configured", async () => {
     statusSummaryMocks.hasPotentialConfiguredChannels.mockReturnValue(false);
 
-    const summary = await getStatusSummary();
+    const summary = await getStatusSummary({}, createDeps());
 
     expect(summary.channelSummary).toEqual([]);
     expect(summary.linkChannel).toBeUndefined();
-    expect(buildChannelSummary).not.toHaveBeenCalled();
-    expect(resolveLinkChannelContext).not.toHaveBeenCalled();
+    expect(statusSummaryMocks.buildChannelSummary).not.toHaveBeenCalled();
+    expect(statusSummaryMocks.resolveLinkChannelContext).not.toHaveBeenCalled();
   });
 
   it("does not trigger async context warmup while building status summaries", async () => {
-    await getStatusSummary();
+    await getStatusSummary({}, createDeps());
 
-    expect(statusSummaryRuntime.resolveContextTokensForModel as Mock).toHaveBeenCalledWith(
+    expect(statusSummaryRuntimeMock.resolveContextTokensForModel as Mock).toHaveBeenCalledWith(
       expect.objectContaining({ allowAsyncLoad: false }),
     );
   });

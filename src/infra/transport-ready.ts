@@ -18,8 +18,23 @@ export type WaitForTransportReadyParams = {
   check: () => Promise<TransportReadyResult>;
 };
 
-export async function waitForTransportReady(params: WaitForTransportReadyParams): Promise<void> {
-  const started = Date.now();
+/**
+ * Injectable seams for the timer boundary. Tests supply a virtual clock instead
+ * of mocking `./backoff.js` and driving vitest fake timers (Bun does not expose
+ * `vi.advanceTimersByTimeAsync`).
+ */
+export type TransportReadyDeps = {
+  sleepWithAbort?: typeof sleepWithAbort;
+  now?: () => number;
+};
+
+export async function waitForTransportReady(
+  params: WaitForTransportReadyParams,
+  deps: TransportReadyDeps = {},
+): Promise<void> {
+  const sleep = deps.sleepWithAbort ?? sleepWithAbort;
+  const clock = deps.now ?? Date.now;
+  const started = clock();
   const timeoutMs = Math.max(0, params.timeoutMs);
   const deadline = started + timeoutMs;
   const logAfterMs = Math.max(0, params.logAfterMs ?? timeoutMs);
@@ -38,7 +53,7 @@ export async function waitForTransportReady(params: WaitForTransportReadyParams)
     }
     lastError = res.error ?? null;
 
-    const now = Date.now();
+    const now = clock();
     if (now >= deadline) {
       break;
     }
@@ -51,7 +66,7 @@ export async function waitForTransportReady(params: WaitForTransportReadyParams)
     }
 
     try {
-      await sleepWithAbort(pollIntervalMs, params.abortSignal);
+      await sleep(pollIntervalMs, params.abortSignal);
     } catch (err) {
       if (params.abortSignal?.aborted) {
         return;

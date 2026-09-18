@@ -101,12 +101,36 @@ export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSumm
   };
 }
 
+/**
+ * Injectable seams for the status-summary boundaries (config IO, channel
+ * presence/summary, session store, task maintenance, and clock). Tests supply
+ * fixtures instead of replacing whole modules with `vi.mock`.
+ */
+export type StatusSummaryDeps = {
+  statusSummaryRuntime?: typeof import("./status.summary.runtime.js").statusSummaryRuntime;
+  taskMaintenanceModule?: typeof import("../tasks/task-registry.maintenance.js");
+  loadConfig?: () => OpenClawConfig;
+  hasPotentialConfiguredChannels?: typeof hasPotentialConfiguredChannels;
+  resolveLinkChannelContext?: typeof import("./status.link-channel.js").resolveLinkChannelContext;
+  buildChannelSummary?: typeof import("../infra/channel-summary.js").buildChannelSummary;
+  listGatewayAgentsBasic?: typeof listGatewayAgentsBasic;
+  resolveMainSessionKey?: typeof resolveMainSessionKey;
+  peekSystemEvents?: typeof peekSystemEvents;
+  readSessionStoreReadOnly?: typeof readSessionStoreReadOnly;
+  resolveStorePath?: typeof resolveStorePath;
+  parseAgentSessionKey?: typeof parseAgentSessionKey;
+  resolveRuntimeServiceVersion?: typeof resolveRuntimeServiceVersion;
+  resolveFreshSessionTotalTokens?: typeof resolveFreshSessionTotalTokens;
+  now?: () => number;
+};
+
 export async function getStatusSummary(
   options: {
     includeSensitive?: boolean;
     config?: OpenClawConfig;
     sourceConfig?: OpenClawConfig;
   } = {},
+  deps: StatusSummaryDeps = {},
 ): Promise<StatusSummary> {
   const { includeSensitive = true } = options;
   const {
@@ -114,15 +138,25 @@ export async function getStatusSummary(
     resolveConfiguredStatusModelRef,
     resolveContextTokensForModel,
     resolveSessionModelRef,
-  } = await loadStatusSummaryRuntimeModule();
-  const cfg = options.config ?? (await loadConfigIoModule()).loadConfig();
-  const needsChannelPlugins = hasPotentialConfiguredChannels(cfg);
+  } = deps.statusSummaryRuntime ?? (await loadStatusSummaryRuntimeModule());
+  const loadConfig = deps.loadConfig ?? (await loadConfigIoModule()).loadConfig;
+  const hasConfiguredChannels =
+    deps.hasPotentialConfiguredChannels ?? hasPotentialConfiguredChannels;
+  const resolveStorePathImpl = deps.resolveStorePath ?? resolveStorePath;
+  const parseAgentSessionKeyImpl = deps.parseAgentSessionKey ?? parseAgentSessionKey;
+  const peekSystemEventsImpl = deps.peekSystemEvents ?? peekSystemEvents;
+  const readSessionStore = deps.readSessionStoreReadOnly ?? readSessionStoreReadOnly;
+  const resolveVersion = deps.resolveRuntimeServiceVersion ?? resolveRuntimeServiceVersion;
+  const resolveTotalTokens = deps.resolveFreshSessionTotalTokens ?? resolveFreshSessionTotalTokens;
+  const nowFn = deps.now ?? Date.now;
+  const cfg = options.config ?? loadConfig();
+  const needsChannelPlugins = hasConfiguredChannels(cfg);
   const linkContext = needsChannelPlugins
-    ? await loadLinkChannelModule().then(({ resolveLinkChannelContext }) =>
-        resolveLinkChannelContext(cfg),
-      )
+    ? await (
+        deps.resolveLinkChannelContext ?? (await loadLinkChannelModule()).resolveLinkChannelContext
+      )(cfg)
     : null;
-  const agentList = listGatewayAgentsBasic(cfg);
+  const agentList = (deps.listGatewayAgentsBasic ?? listGatewayAgentsBasic)(cfg);
   const heartbeatAgents: HeartbeatStatus[] = agentList.agents.map((agent) => ({
     agentId: agent.id,
     enabled: false,
@@ -130,17 +164,19 @@ export async function getStatusSummary(
     everyMs: null,
   }));
   const channelSummary = needsChannelPlugins
-    ? await loadChannelSummaryModule().then(({ buildChannelSummary }) =>
-        buildChannelSummary(cfg, {
+    ? await (deps.buildChannelSummary ?? (await loadChannelSummaryModule()).buildChannelSummary)(
+        cfg,
+        {
           colorize: true,
           includeAllowFrom: true,
           sourceConfig: options.sourceConfig,
-        }),
+        },
       )
     : [];
-  const mainSessionKey = resolveMainSessionKey(cfg);
-  const queuedSystemEvents = peekSystemEvents(mainSessionKey);
-  const taskMaintenanceModule = await loadTaskRegistryMaintenanceModule();
+  const mainSessionKey = (deps.resolveMainSessionKey ?? resolveMainSessionKey)(cfg);
+  const queuedSystemEvents = peekSystemEventsImpl(mainSessionKey);
+  const taskMaintenanceModule =
+    deps.taskMaintenanceModule ?? (await loadTaskRegistryMaintenanceModule());
   const tasks = taskMaintenanceModule.getInspectableTaskRegistrySummary();
   const taskAudit = taskMaintenanceModule.getInspectableTaskAuditSummary();
 
@@ -162,14 +198,14 @@ export async function getStatusSummary(
       allowAsyncLoad: false,
     }) ?? DEFAULT_CONTEXT_TOKENS;
 
-  const now = Date.now();
+  const now = nowFn();
   const storeCache = new Map<string, Record<string, SessionEntry | undefined>>();
   const loadStore = (storePath: string) => {
     const cached = storeCache.get(storePath);
     if (cached) {
       return cached;
     }
-    const store = readSessionStoreReadOnly(storePath);
+    const store = readSessionStore(storePath);
     storeCache.set(storePath, store);
     return store;
   };
@@ -193,7 +229,7 @@ export async function getStatusSummary(
             fallbackContextTokens: configContextTokens ?? undefined,
             allowAsyncLoad: false,
           }) ?? null;
-        const total = resolveFreshSessionTotalTokens(entry);
+        const total = resolveTotalTokens(entry);
         const totalTokensFresh =
           typeof entry?.totalTokens === "number" ? entry?.totalTokensFresh !== false : false;
         const remaining =
@@ -202,7 +238,7 @@ export async function getStatusSummary(
           contextTokens && contextTokens > 0 && total !== undefined
             ? Math.min(999, Math.round((total / contextTokens) * 100))
             : null;
-        const parsedAgentId = parseAgentSessionKey(key)?.agentId;
+        const parsedAgentId = parseAgentSessionKeyImpl(key)?.agentId;
         const agentId = opts.agentIdOverride ?? parsedAgentId;
 
         return {
@@ -236,7 +272,7 @@ export async function getStatusSummary(
 
   const paths = new Set<string>();
   const byAgent = agentList.agents.map((agent) => {
-    const storePath = resolveStorePath(cfg.session?.store, { agentId: agent.id });
+    const storePath = resolveStorePathImpl(cfg.session?.store, { agentId: agent.id });
     paths.add(storePath);
     const store = loadStore(storePath);
     const sessions = buildSessionRows(store, { agentIdOverride: agent.id });
@@ -255,7 +291,7 @@ export async function getStatusSummary(
   const totalSessions = allSessions.length;
 
   const summary: StatusSummary = {
-    runtimeVersion: resolveRuntimeServiceVersion(process.env),
+    runtimeVersion: resolveVersion(process.env),
     linkChannel: linkContext
       ? {
           id: linkContext.plugin.id,

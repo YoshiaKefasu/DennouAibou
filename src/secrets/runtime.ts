@@ -37,7 +37,11 @@ import {
   getActiveRuntimeWebToolsMetadata as getActiveRuntimeWebToolsMetadataFromState,
   setActiveRuntimeWebToolsMetadata,
 } from "./runtime-web-tools-state.js";
-import { resolveRuntimeWebTools, type RuntimeWebToolsMetadata } from "./runtime-web-tools.js";
+import {
+  resolveRuntimeWebTools,
+  type RuntimeWebToolsDeps,
+  type RuntimeWebToolsMetadata,
+} from "./runtime-web-tools.js";
 
 export type { SecretResolverWarning } from "./runtime-shared.js";
 
@@ -171,6 +175,8 @@ export async function prepareSecretsRuntimeSnapshot(params: {
   loadAuthStore?: (agentDir?: string) => AuthProfileStore;
   /** Test override for discovered loadable plugins and their origins. */
   loadablePluginOrigins?: ReadonlyMap<string, PluginOrigin>;
+  /** Test override for the web-search/web-fetch provider registries. */
+  runtimeWebToolsDeps?: Partial<RuntimeWebToolsDeps>;
 }): Promise<PreparedSecretsRuntimeSnapshot> {
   const runtimeEnv = mergeSecretsRuntimeEnv(params.env);
   const sourceConfig = structuredClone(params.config);
@@ -225,11 +231,14 @@ export async function prepareSecretsRuntimeSnapshot(params: {
     config: resolvedConfig,
     authStores,
     warnings: context.warnings,
-    webTools: await resolveRuntimeWebTools({
-      sourceConfig,
-      resolvedConfig,
-      context,
-    }),
+    webTools: await resolveRuntimeWebTools(
+      {
+        sourceConfig,
+        resolvedConfig,
+        context,
+      },
+      params.runtimeWebToolsDeps,
+    ),
   };
   preparedSnapshotRefreshContext.set(snapshot, {
     env: runtimeEnv,
