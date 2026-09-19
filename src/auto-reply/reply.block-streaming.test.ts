@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { getReplyFromConfig, type GetReplyDeps } from "./reply/get-reply.js";
 import { createMockTypingController } from "./reply/reply.test-helpers.js";
 import type { MsgContext } from "./templating.js";
 
@@ -10,23 +11,61 @@ const mocks = vi.hoisted(() => ({
   runPreparedReply: vi.fn(),
 }));
 
-vi.mock("../agents/agent-scope.js", async () => {
-  const actual = await import("../agents/agent-scope.js");
-  return {
-    ...actual,
-    resolveAgentDir: vi.fn(() => "/tmp/agent"),
-    resolveAgentWorkspaceDir: vi.fn(() => "/tmp/workspace"),
-    resolveSessionAgentId: vi.fn(() => "main"),
-    resolveAgentSkillsFilter: vi.fn(() => undefined),
-  };
-});
-vi.mock("../agents/model-selection.js", async () => {
-  const actual = await import("../agents/model-selection.js");
-  return {
-    ...actual,
-    resolveModelRefFromString: vi.fn(() => null),
-  };
-});
+// Bun cannot resolve partial self-import factories, so these seams use full
+// factories that export the complete module surface.
+vi.mock("../agents/agent-scope.js", () => ({
+  listAgentEntries: () => [],
+  listAgentIds: () => ["main"],
+  resolveDefaultAgentId: () => "main",
+  resolveSessionAgentIds: ({ agentId }: { agentId?: string }) => ({
+    sessionAgentId: agentId ?? "main",
+  }),
+  resolveSessionAgentId: () => "main",
+  resolveAgentConfig: () => undefined,
+  resolveAgentSkillsFilter: () => undefined,
+  resolveAgentDir: () => "/tmp/agent",
+  resolveAgentWorkspaceDir: () => "/tmp/workspace",
+  resolveAgentExplicitModelPrimary: () => undefined,
+  resolveAgentEffectiveModelPrimary: () => undefined,
+  resolveAgentModelPrimary: () => undefined,
+  resolveAgentModelFallbacksOverride: () => undefined,
+  resolveFallbackAgentId: () => undefined,
+  resolveRunModelFallbacksOverride: () => undefined,
+  hasConfiguredModelFallbacks: () => false,
+  resolveEffectiveModelFallbacks: () => undefined,
+  resolveAgentIdsByWorkspacePath: () => [],
+  resolveAgentIdByWorkspacePath: () => undefined,
+}));
+vi.mock("../agents/model-selection.js", () => ({
+  modelKey: (provider: string, model: string) => `${provider}/${model}`,
+  legacyModelKey: () => null,
+  findNormalizedProviderKey: (value: unknown) => value,
+  findNormalizedProviderValue: (value: unknown) => value,
+  normalizeProviderId: (id?: string) =>
+    typeof id === "string" ? id.trim().toLowerCase() : undefined,
+  normalizeProviderIdForAuth: (id?: string) =>
+    typeof id === "string" ? id.trim().toLowerCase() : undefined,
+  normalizeModelRef: (value: unknown) => value,
+  parseModelRef: () => null,
+  resolvePersistedModelRef: async () => null,
+  inferUniqueProviderFromConfiguredModels: () => undefined,
+  resolveAllowlistModelKey: () => null,
+  buildConfiguredAllowlistKeys: () => [],
+  buildModelAliasIndex: () => new Map(),
+  resolveModelRefFromString: () => null,
+  resolveConfiguredModelRef: () => null,
+  resolveDefaultModelForAgent: () => ({ provider: "openai", model: "gpt-5" }),
+  resolveSubagentConfiguredModelSelection: () => undefined,
+  resolveSubagentSpawnModelSelection: () => undefined,
+  buildAllowedModelSet: () => undefined,
+  buildConfiguredModelCatalog: () => [],
+  getModelRefStatus: () => undefined,
+  resolveAllowedModelRef: () => null,
+  resolveThinkingDefault: () => undefined,
+  resolveReasoningDefault: () => undefined,
+  resolveHooksGmailModel: () => undefined,
+  normalizeModelSelection: (value: unknown) => value,
+}));
 vi.mock("../agents/timeout.js", () => ({
   resolveAgentTimeoutMs: vi.fn(() => 60_000),
 }));
@@ -80,12 +119,12 @@ vi.mock("./reply/get-reply-run.js", () => ({
   runPreparedReply: (...args: unknown[]) => mocks.runPreparedReply(...args),
 }));
 
-let getReplyFromConfig: typeof import("./reply/get-reply.js").getReplyFromConfig;
-
-async function loadFreshGetReplyModuleForTest() {
-  vi.resetModules();
-  ({ getReplyFromConfig } = await import("./reply/get-reply.js"));
-}
+const deps: Partial<GetReplyDeps> = {
+  resolveReplyDirectives: mocks.resolveReplyDirectives as GetReplyDeps["resolveReplyDirectives"],
+  handleInlineActions: mocks.handleInlineActions as GetReplyDeps["handleInlineActions"],
+  initSessionState: mocks.initSessionState as GetReplyDeps["initSessionState"],
+  runPreparedReply: mocks.runPreparedReply as GetReplyDeps["runPreparedReply"],
+};
 
 function createTelegramMessage(messageSid: string): MsgContext {
   return {
@@ -163,8 +202,7 @@ function createContinueDirectivesResult() {
 }
 
 describe("block streaming", () => {
-  beforeEach(async () => {
-    await loadFreshGetReplyModuleForTest();
+  beforeEach(() => {
     setTestEnv("DENNOU_TEST_FAST", "1");
     mocks.resolveReplyDirectives.mockReset();
     mocks.handleInlineActions.mockReset();
@@ -218,6 +256,7 @@ describe("block streaming", () => {
         disableBlockStreaming: false,
       },
       createReplyConfig(),
+      deps,
     );
 
     expect(res).toBeUndefined();
@@ -234,6 +273,7 @@ describe("block streaming", () => {
         onBlockReply: onBlockReplyStreamMode,
       },
       createReplyConfig("block"),
+      deps,
     );
 
     const streamPayload = Array.isArray(resStreamMode) ? resStreamMode[0] : resStreamMode;

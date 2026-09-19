@@ -14,7 +14,22 @@ vi.mock("../../channels/plugins/index.js", () => ({
 }));
 
 vi.mock("../../agents/agent-scope.js", () => ({
+  listAgentEntries: () => [],
+  listAgentIds: () => ["main"],
   resolveDefaultAgentId: () => "main",
+  resolveSessionAgentIds: ({ agentId }: { agentId?: string }) => ({
+    sessionAgentId: agentId ?? "main",
+  }),
+  resolveAgentConfig: () => undefined,
+  resolveAgentSkillsFilter: () => undefined,
+  resolveAgentExplicitModelPrimary: () => undefined,
+  resolveAgentEffectiveModelPrimary: () => undefined,
+  resolveAgentModelPrimary: () => undefined,
+  resolveAgentModelFallbacksOverride: () => undefined,
+  resolveFallbackAgentId: () => undefined,
+  resolveRunModelFallbacksOverride: () => undefined,
+  hasConfiguredModelFallbacks: () => false,
+  resolveEffectiveModelFallbacks: () => undefined,
   resolveSessionAgentId: ({
     sessionKey,
   }: {
@@ -26,6 +41,9 @@ vi.mock("../../agents/agent-scope.js", () => ({
     return match?.[1] ?? "main";
   },
   resolveAgentWorkspaceDir: () => "/tmp/openclaw-test-workspace",
+  resolveAgentIdsByWorkspacePath: () => [],
+  resolveAgentIdByWorkspacePath: () => undefined,
+  resolveAgentDir: () => "/tmp/openclaw-agent",
 }));
 
 vi.mock("../../config/plugin-auto-enable.js", () => ({
@@ -33,6 +51,7 @@ vi.mock("../../config/plugin-auto-enable.js", () => ({
 }));
 
 vi.mock("../../plugins/loader.js", () => ({
+  loadOpenClawPlugins: () => undefined,
   resolveRuntimePluginRegistry: mocks.resolveRuntimePluginRegistry,
 }));
 

@@ -121,19 +121,19 @@ let modelsListCommand: typeof import("./list.list-command.js").modelsListCommand
 let listRegistryModule: typeof import("./list.registry.js");
 
 function installModelsListCommandForwardCompatMocks() {
-  vi.doMock("./load-config.js", () => ({
+  vi.mock("./load-config.js", () => ({
     loadModelsConfigWithSource: mocks.loadModelsConfigWithSource,
   }));
 
-  vi.doMock("./list.configured.js", () => ({
+  vi.mock("./list.configured.js", () => ({
     resolveConfiguredEntries: mocks.resolveConfiguredEntries,
   }));
 
-  vi.doMock("./list.table.js", () => ({
+  vi.mock("./list.table.js", () => ({
     printModelTable: mocks.printModelTable,
   }));
 
-  vi.doMock("./list.runtime.js", () => ({
+  vi.mock("./list.runtime.js", () => ({
     ensureOpenClawModelsJson: mocks.ensureOpenClawModelsJson,
     ensureAuthProfileStore: mocks.ensureAuthProfileStore,
     listProfilesForProvider: mocks.listProfilesForProvider,
@@ -142,6 +142,9 @@ function installModelsListCommandForwardCompatMocks() {
     resolveEnvApiKey: vi.fn().mockReturnValue(undefined),
     resolveAwsSdkEnvVarName: vi.fn().mockReturnValue(undefined),
     hasUsableCustomProviderApiKey: vi.fn().mockReturnValue(false),
+    resolveOpenClawAgentDir: vi.fn(() => "/tmp/openclaw-agent"),
+    discoverAuthStorage: vi.fn(async () => ({})),
+    discoverModels: vi.fn(async () => ({})),
   }));
 }
 
@@ -286,7 +289,9 @@ describe("modelsListCommand forward-compat", () => {
         await modelsListCommand({ json: true }, runtime as never);
         observedExitCode = process.exitCode;
       } finally {
-        process.exitCode = previousExitCode;
+        // Bun does not treat `process.exitCode = undefined` as success, so fall
+        // back to 0 to keep the runner exit code clean.
+        process.exitCode = previousExitCode ?? 0;
       }
 
       expect(runtime.error).toHaveBeenCalledWith("Model registry unavailable.");

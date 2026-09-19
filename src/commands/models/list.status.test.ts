@@ -108,56 +108,114 @@ const mocks = vi.hoisted(() => {
 
 let modelsStatusCommand: typeof import("./list.status-command.js").modelsStatusCommand;
 
+vi.mock("../../agents/agent-paths.js", () => ({
+  resolveOpenClawAgentDir: mocks.resolveOpenClawAgentDir,
+}));
+vi.mock("../../agents/agent-scope.js", () => ({
+  listAgentEntries: vi.fn(() => []),
+  listAgentIds: mocks.listAgentIds,
+  resolveDefaultAgentId: vi.fn(() => "main"),
+  resolveSessionAgentIds: vi.fn(({ agentId }: { agentId?: string }) => ({
+    sessionAgentId: agentId ?? "main",
+  })),
+  resolveSessionAgentId: vi.fn(() => "main"),
+  resolveAgentConfig: vi.fn(() => undefined),
+  resolveAgentSkillsFilter: vi.fn(() => undefined),
+  resolveAgentDir: mocks.resolveAgentDir,
+  resolveAgentWorkspaceDir: mocks.resolveAgentWorkspaceDir,
+  resolveAgentExplicitModelPrimary: mocks.resolveAgentExplicitModelPrimary,
+  resolveAgentEffectiveModelPrimary: mocks.resolveAgentEffectiveModelPrimary,
+  resolveAgentModelPrimary: vi.fn(() => undefined),
+  resolveAgentModelFallbacksOverride: mocks.resolveAgentModelFallbacksOverride,
+  resolveFallbackAgentId: vi.fn(() => undefined),
+  resolveRunModelFallbacksOverride: vi.fn(() => undefined),
+  hasConfiguredModelFallbacks: vi.fn(() => false),
+  resolveEffectiveModelFallbacks: vi.fn(() => undefined),
+  resolveAgentIdsByWorkspacePath: vi.fn(() => []),
+  resolveAgentIdByWorkspacePath: vi.fn(() => undefined),
+}));
+vi.mock("../../agents/auth-profiles.js", () => ({
+  CODEX_CLI_PROFILE_ID: "codex-cli",
+  resolveAuthProfileDisplayLabel: mocks.resolveAuthProfileDisplayLabel,
+  resolveAuthStorePathForDisplay: mocks.resolveAuthStorePathForDisplay,
+  resolveProfileUnusableUntilForDisplay: mocks.resolveProfileUnusableUntilForDisplay,
+  ensureAuthProfileStore: mocks.ensureAuthProfileStore,
+  listProfilesForProvider: mocks.listProfilesForProvider,
+  resolveApiKeyForProfile: vi.fn(async () => null),
+  resolveAuthProfileEligibility: vi.fn(() => null),
+  resolveAuthProfileOrder: vi.fn(() => []),
+  formatAuthDoctorHint: vi.fn(() => undefined),
+  dedupeProfileIds: vi.fn((ids: string[]) => ids),
+  markAuthProfileGood: vi.fn(),
+  setAuthProfileOrder: vi.fn(),
+  upsertAuthProfile: vi.fn(),
+  upsertAuthProfileWithLock: vi.fn(async () => null),
+  repairOAuthProfileIdMismatch: vi.fn(() => null),
+  suggestOAuthProfileIdForLegacyDefault: vi.fn(() => undefined),
+  clearRuntimeAuthProfileStoreSnapshots: vi.fn(),
+  loadAuthProfileStore: vi.fn(
+    () => ({ version: 1, profiles: {} }) as unknown as Record<string, unknown>,
+  ),
+  loadAuthProfileStoreForSecretsRuntime: vi.fn(
+    () => ({ version: 1, profiles: {} }) as unknown as Record<string, unknown>,
+  ),
+  loadAuthProfileStoreForRuntime: vi.fn(
+    () => ({ version: 1, profiles: {} }) as unknown as Record<string, unknown>,
+  ),
+  replaceRuntimeAuthProfileStoreSnapshots: vi.fn(),
+  saveAuthProfileStore: vi.fn(),
+  calculateAuthProfileCooldownMs: vi.fn(() => 0),
+  clearAuthProfileCooldown: vi.fn(),
+  clearExpiredCooldowns: vi.fn(),
+  getSoonestCooldownExpiry: vi.fn(() => undefined),
+  isProfileInCooldown: vi.fn(() => false),
+  markAuthProfileCooldown: vi.fn(),
+  markAuthProfileFailure: vi.fn(),
+  markAuthProfileUsed: vi.fn(),
+  resolveProfilesUnavailableReason: vi.fn(() => null),
+}));
+vi.mock("../../agents/model-auth.js", () => ({
+  resolveEnvApiKey: mocks.resolveEnvApiKey,
+  hasUsableCustomProviderApiKey: mocks.hasUsableCustomProviderApiKey,
+  resolveUsableCustomProviderApiKey: mocks.resolveUsableCustomProviderApiKey,
+  getCustomProviderApiKey: mocks.getCustomProviderApiKey,
+}));
+vi.mock("../../agents/model-auth-env-vars.js", () => ({
+  resolveProviderEnvApiKeyCandidates: mocks.resolveProviderEnvApiKeyCandidates,
+  listKnownProviderEnvApiKeyNames: mocks.listKnownProviderEnvApiKeyNames,
+}));
+vi.mock("../../infra/shell-env.js", () => ({
+  getShellEnvAppliedKeys: mocks.getShellEnvAppliedKeys,
+  shouldEnableShellEnvFallback: mocks.shouldEnableShellEnvFallback,
+}));
+// Full factory: Bun cannot resolve the partial self-import for config.js.
+vi.mock("../../config/config.js", () => ({
+  createConfigIO: mocks.createConfigIO,
+  loadConfig: mocks.loadConfig,
+  getRuntimeConfigSourceSnapshot: vi.fn(() => null),
+  projectConfigOntoRuntimeSourceSnapshot: vi.fn((value: unknown) => value),
+  clearConfigCache: vi.fn(),
+  clearRuntimeConfigSnapshot: vi.fn(),
+  readConfigFileSnapshot: vi.fn(async () => ({ valid: false })),
+  replaceConfigFile: vi.fn(),
+  mutateConfigFile: vi.fn(),
+  ConfigMutationConflictError: class ConfigMutationConflictError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "ConfigMutationConflictError";
+    }
+  },
+}));
+vi.mock("./load-config.js", () => ({
+  loadModelsConfig: vi.fn(async () => mocks.loadConfig()),
+}));
+vi.mock("../../infra/provider-usage.js", () => ({
+  formatUsageWindowSummary: vi.fn().mockReturnValue("-"),
+  loadProviderUsageSummary: mocks.loadProviderUsageSummary,
+  resolveUsageProviderId: vi.fn((providerId: string) => providerId),
+}));
+
 async function loadFreshModelsStatusCommandModuleForTest() {
-  vi.resetModules();
-  vi.doMock("../../agents/agent-paths.js", () => ({
-    resolveOpenClawAgentDir: mocks.resolveOpenClawAgentDir,
-  }));
-  vi.doMock("../../agents/agent-scope.js", () => ({
-    resolveAgentDir: mocks.resolveAgentDir,
-    resolveAgentWorkspaceDir: mocks.resolveAgentWorkspaceDir,
-    resolveAgentExplicitModelPrimary: mocks.resolveAgentExplicitModelPrimary,
-    resolveAgentEffectiveModelPrimary: mocks.resolveAgentEffectiveModelPrimary,
-    resolveAgentModelFallbacksOverride: mocks.resolveAgentModelFallbacksOverride,
-    listAgentIds: mocks.listAgentIds,
-  }));
-  vi.doMock("../../agents/auth-profiles.js", () => ({
-    ensureAuthProfileStore: mocks.ensureAuthProfileStore,
-    listProfilesForProvider: mocks.listProfilesForProvider,
-    resolveAuthProfileDisplayLabel: mocks.resolveAuthProfileDisplayLabel,
-    resolveAuthStorePathForDisplay: mocks.resolveAuthStorePathForDisplay,
-    resolveProfileUnusableUntilForDisplay: mocks.resolveProfileUnusableUntilForDisplay,
-  }));
-  vi.doMock("../../agents/model-auth.js", () => ({
-    resolveEnvApiKey: mocks.resolveEnvApiKey,
-    hasUsableCustomProviderApiKey: mocks.hasUsableCustomProviderApiKey,
-    resolveUsableCustomProviderApiKey: mocks.resolveUsableCustomProviderApiKey,
-    getCustomProviderApiKey: mocks.getCustomProviderApiKey,
-  }));
-  vi.doMock("../../agents/model-auth-env-vars.js", () => ({
-    resolveProviderEnvApiKeyCandidates: mocks.resolveProviderEnvApiKeyCandidates,
-    listKnownProviderEnvApiKeyNames: mocks.listKnownProviderEnvApiKeyNames,
-  }));
-  vi.doMock("../../infra/shell-env.js", () => ({
-    getShellEnvAppliedKeys: mocks.getShellEnvAppliedKeys,
-    shouldEnableShellEnvFallback: mocks.shouldEnableShellEnvFallback,
-  }));
-  vi.doMock("../../config/config.js", async () => {
-    const actual = await import("../../config/config.js");
-    return {
-      ...actual,
-      createConfigIO: mocks.createConfigIO,
-      loadConfig: mocks.loadConfig,
-    };
-  });
-  vi.doMock("./load-config.js", () => ({
-    loadModelsConfig: vi.fn(async () => mocks.loadConfig()),
-  }));
-  vi.doMock("../../infra/provider-usage.js", () => ({
-    formatUsageWindowSummary: vi.fn().mockReturnValue("-"),
-    loadProviderUsageSummary: mocks.loadProviderUsageSummary,
-    resolveUsageProviderId: vi.fn((providerId: string) => providerId),
-  }));
   ({ modelsStatusCommand } = await import("./list.status-command.js"));
 }
 

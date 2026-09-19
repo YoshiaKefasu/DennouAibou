@@ -36,6 +36,22 @@ import {
 } from "./session.js";
 import { createTypingController } from "./typing.js";
 
+export type GetReplyDeps = {
+  resolveReplyDirectives: typeof resolveReplyDirectives;
+  handleInlineActions: typeof handleInlineActions;
+  initSessionState: typeof initSessionState;
+  resolveSessionModelOverrideSnapshot: typeof resolveSessionModelOverrideSnapshot;
+  runPreparedReply: typeof runPreparedReply;
+};
+
+const defaultGetReplyDeps: GetReplyDeps = {
+  resolveReplyDirectives,
+  handleInlineActions,
+  initSessionState,
+  resolveSessionModelOverrideSnapshot,
+  runPreparedReply,
+};
+
 type ResetCommandAction = "new" | "reset";
 
 let sessionResetModelRuntimePromise: Promise<
@@ -235,7 +251,9 @@ export async function getReplyFromConfig(
   ctx: MsgContext,
   opts?: GetReplyOptions,
   configOverride?: OpenClawConfig,
+  deps: Partial<GetReplyDeps> = {},
 ): Promise<ReplyPayload | ReplyPayload[] | undefined> {
+  const resolvedDeps = { ...defaultGetReplyDeps, ...deps };
   const isFastTestEnv = process.env.DENNOU_TEST_FAST === "1";
   const cfg =
     configOverride == null
@@ -311,7 +329,7 @@ export async function getReplyFromConfig(
     // (`skipAudio`) is decided against the model the session is actually
     // using, not the global default. See #native-audio.
     const sessionModelOverrideSnapshot = hasInboundMedia(finalized)
-      ? resolveSessionModelOverrideSnapshot({
+      ? resolvedDeps.resolveSessionModelOverrideSnapshot({
           ctx: finalized,
           cfg,
         })
@@ -351,7 +369,7 @@ export async function getReplyFromConfig(
     cfg,
     commandAuthorized,
   });
-  const sessionState = await initSessionState({
+  const sessionState = await resolvedDeps.initSessionState({
     ctx: finalized,
     cfg,
     commandAuthorized,
@@ -425,7 +443,7 @@ export async function getReplyFromConfig(
     }
   }
 
-  const directiveResult = await resolveReplyDirectives({
+  const directiveResult = await resolvedDeps.resolveReplyDirectives({
     ctx: finalized,
     cfg,
     agentId,
@@ -509,7 +527,7 @@ export async function getReplyFromConfig(
     });
   };
 
-  const inlineActionResult = await handleInlineActions({
+  const inlineActionResult = await resolvedDeps.handleInlineActions({
     ctx,
     sessionCtx,
     cfg,
@@ -594,7 +612,7 @@ export async function getReplyFromConfig(
     });
   }
 
-  return runPreparedReply({
+  return resolvedDeps.runPreparedReply({
     ctx,
     sessionCtx,
     cfg,

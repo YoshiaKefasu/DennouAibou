@@ -14,6 +14,14 @@ import type { WorkspaceBootstrapFile } from "../../agents/workspace.js";
 import { getRemoteSkillEligibility } from "../../infra/skills-remote.js";
 import type { HandleCommandsParams } from "./commands-types.js";
 
+export type CommandsSystemPromptDeps = {
+  createOpenClawCodingTools: typeof createOpenClawCodingTools;
+};
+
+const defaultCommandsSystemPromptDeps: CommandsSystemPromptDeps = {
+  createOpenClawCodingTools,
+};
+
 export type CommandsSystemPromptBundle = {
   systemPrompt: string;
   tools: AgentTool[];
@@ -25,7 +33,9 @@ export type CommandsSystemPromptBundle = {
 
 export async function resolveCommandsSystemPromptBundle(
   params: HandleCommandsParams,
+  deps: Partial<CommandsSystemPromptDeps> = {},
 ): Promise<CommandsSystemPromptBundle> {
+  const resolvedDeps = { ...defaultCommandsSystemPromptDeps, ...deps };
   const workspaceDir = params.workspaceDir;
   const { sessionAgentId } = resolveSessionAgentIds({
     sessionKey: params.sessionKey,
@@ -66,7 +76,7 @@ export async function resolveCommandsSystemPromptBundle(
   const skillsPrompt = skillsSnapshot.prompt ?? "";
   const tools = (() => {
     try {
-      return createOpenClawCodingTools({
+      return resolvedDeps.createOpenClawCodingTools({
         config: params.cfg,
         agentId: params.agentId,
         workspaceDir,

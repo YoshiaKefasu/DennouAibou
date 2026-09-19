@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  resolveCommandsSystemPromptBundle,
+  type CommandsSystemPromptDeps,
+} from "./commands-system-prompt.js";
 import type { HandleCommandsParams } from "./commands-types.js";
 
-const { createOpenClawCodingToolsMock } = vi.hoisted(() => ({
-  createOpenClawCodingToolsMock: vi.fn(() => []),
-}));
+const createOpenClawCodingToolsMock = vi.fn(() => []);
 
 vi.mock("../../agents/bootstrap-files.js", () => ({
   resolveBootstrapContextForRun: vi.fn(async () => ({
@@ -25,8 +27,25 @@ vi.mock("../../agents/skills/refresh.js", () => ({
 }));
 
 vi.mock("../../agents/agent-scope.js", () => ({
-  resolveAgentConfig: vi.fn(() => undefined),
-  resolveSessionAgentIds: vi.fn(() => ({ sessionAgentId: "main" })),
+  listAgentEntries: () => [],
+  listAgentIds: () => ["main"],
+  resolveDefaultAgentId: () => "main",
+  resolveSessionAgentIds: () => ({ sessionAgentId: "main" }),
+  resolveSessionAgentId: () => "main",
+  resolveAgentConfig: () => undefined,
+  resolveAgentSkillsFilter: () => undefined,
+  resolveAgentDir: () => "/tmp/agent",
+  resolveAgentWorkspaceDir: () => "/tmp/workspace",
+  resolveAgentExplicitModelPrimary: () => undefined,
+  resolveAgentEffectiveModelPrimary: () => undefined,
+  resolveAgentModelPrimary: () => undefined,
+  resolveAgentModelFallbacksOverride: () => undefined,
+  resolveFallbackAgentId: () => undefined,
+  resolveRunModelFallbacksOverride: () => undefined,
+  hasConfiguredModelFallbacks: () => false,
+  resolveEffectiveModelFallbacks: () => undefined,
+  resolveAgentIdsByWorkspacePath: () => [],
+  resolveAgentIdByWorkspacePath: () => undefined,
 }));
 
 vi.mock("../../agents/model-selection.js", () => ({
@@ -94,20 +113,20 @@ function makeParams(): HandleCommandsParams {
 }
 
 describe("resolveCommandsSystemPromptBundle", () => {
-  beforeEach(async () => {
-    vi.restoreAllMocks();
-    vi.resetModules();
+  beforeEach(() => {
     createOpenClawCodingToolsMock.mockClear();
     createOpenClawCodingToolsMock.mockReturnValue([]);
-    const piTools = await import("../../agents/pi-tools.js");
-    vi.spyOn(piTools, "createOpenClawCodingTools").mockImplementation(
-      createOpenClawCodingToolsMock,
-    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("opts command tool builds into gateway subagent binding", async () => {
-    const { resolveCommandsSystemPromptBundle } = await import("./commands-system-prompt.js");
-    await resolveCommandsSystemPromptBundle(makeParams());
+    const deps: CommandsSystemPromptDeps = {
+      createOpenClawCodingTools: createOpenClawCodingToolsMock,
+    };
+    await resolveCommandsSystemPromptBundle(makeParams(), deps);
 
     expect(createOpenClawCodingToolsMock).toHaveBeenCalledWith(
       expect.objectContaining({

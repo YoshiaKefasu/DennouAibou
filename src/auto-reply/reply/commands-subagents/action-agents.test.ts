@@ -1,42 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  handleSubagentsAgentsAction as handleSubagentsAgentsActionImpl,
+  type HandleSubagentsAgentsActionDeps,
+} from "./action-agents.js";
 
 const THREAD_CHANNEL = "thread-chat";
 const ROOM_CHANNEL = "room-chat";
 
-const { listBySessionMock, getChannelPluginMock, normalizeChannelIdMock } = vi.hoisted(() => ({
-  listBySessionMock: vi.fn(),
-  getChannelPluginMock: vi.fn((channel: string) =>
-    channel === "thread-chat" || channel === "room-chat"
-      ? {
-          config: {
-            hasPersistedAuthState: () => false,
-          },
-          conversationBindings: {
-            supportsCurrentConversationBinding: true,
-          },
-        }
-      : null,
-  ),
-  normalizeChannelIdMock: vi.fn((channel: string) => channel),
-}));
-
-vi.mock("../../../infra/outbound/session-binding-service.js", () => ({
-  getSessionBindingService: () => ({
-    listBySession: listBySessionMock,
-  }),
-}));
-
-vi.mock("../../../channels/plugins/index.js", () => ({
+const listBySessionMock = vi.fn();
+const getChannelPluginMock = vi.fn((channel: string) =>
+  channel === "thread-chat" || channel === "room-chat"
+    ? {
+        config: {
+          hasPersistedAuthState: () => false,
+        },
+        conversationBindings: {
+          supportsCurrentConversationBinding: true,
+        },
+      }
+    : null,
+);
+const normalizeChannelIdMock = vi.fn((channel: string) => channel);
+const getSessionBindingServiceMock = vi.fn(() => ({ listBySession: listBySessionMock }));
+const deps = {
   getChannelPlugin: getChannelPluginMock,
   normalizeChannelId: normalizeChannelIdMock,
-}));
+  getSessionBindingService: getSessionBindingServiceMock,
+} as unknown as HandleSubagentsAgentsActionDeps;
 
-let handleSubagentsAgentsAction: typeof import("./action-agents.js").handleSubagentsAgentsAction;
+const handleSubagentsAgentsAction = (ctx: Parameters<typeof handleSubagentsAgentsActionImpl>[0]) =>
+  handleSubagentsAgentsActionImpl(ctx, deps);
 
 describe("handleSubagentsAgentsAction", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    ({ handleSubagentsAgentsAction } = await import("./action-agents.js"));
+  beforeEach(() => {
     listBySessionMock.mockReset();
     getChannelPluginMock.mockClear();
     normalizeChannelIdMock.mockClear();

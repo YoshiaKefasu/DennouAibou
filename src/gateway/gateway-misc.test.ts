@@ -47,18 +47,6 @@ vi.mock("ws", () => ({
 let GatewayClient: typeof import("./client.js").GatewayClient;
 
 async function loadFreshGatewayClientModuleForTest() {
-  vi.resetModules();
-  vi.doMock("ws", () => ({
-    WebSocket: class MockWebSocket {
-      on = vi.fn();
-      close = vi.fn();
-      send = vi.fn();
-
-      constructor(url: unknown, opts: unknown) {
-        wsMockState.last = { url, opts };
-      }
-    },
-  }));
   ({ GatewayClient } = await import("./client.js"));
 }
 

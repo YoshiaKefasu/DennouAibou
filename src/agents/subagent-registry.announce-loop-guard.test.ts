@@ -1,4 +1,5 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import * as registry from "./subagent-registry.js";
 
 /**
  * Regression test for #18264: Gateway announcement delivery loop.
@@ -71,13 +72,6 @@ vi.mock("./timeout.js", () => ({
 }));
 
 describe("announce loop guard (#18264)", () => {
-  let registry: typeof import("./subagent-registry.js");
-
-  beforeAll(async () => {
-    vi.resetModules();
-    registry = await import("./subagent-registry.js");
-  });
-
   beforeEach(() => {
     vi.useFakeTimers();
     mocks.callGateway.mockClear();
@@ -93,6 +87,15 @@ describe("announce loop guard (#18264)", () => {
     mocks.runSubagentAnnounceFlow.mockReset();
     mocks.runSubagentAnnounceFlow.mockResolvedValue(false);
     mocks.saveSubagentRegistryToDisk.mockClear();
+    registry.__testing.setDepsForTest({
+      callGateway: mocks.callGateway,
+      captureSubagentCompletionReply: mocks.captureSubagentCompletionReply,
+      loadConfig: mocks.loadConfig,
+      onAgentEvent: mocks.onAgentEvent,
+      runSubagentAnnounceFlow: mocks.runSubagentAnnounceFlow,
+      persistSubagentRunsToDisk: mocks.saveSubagentRegistryToDisk,
+      resolveAgentTimeoutMs: mocks.resolveAgentTimeoutMs,
+    });
     mocks.updateSessionStore.mockClear();
     registry.resetSubagentRegistryForTests({ persist: false });
   });

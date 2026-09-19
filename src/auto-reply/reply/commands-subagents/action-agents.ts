@@ -1,6 +1,18 @@
 import { countPendingDescendantRuns } from "../../../agents/subagent-registry.js";
 import { getChannelPlugin, normalizeChannelId } from "../../../channels/plugins/index.js";
 import { getSessionBindingService } from "../../../infra/outbound/session-binding-service.js";
+
+export type HandleSubagentsAgentsActionDeps = {
+  getChannelPlugin: typeof getChannelPlugin;
+  normalizeChannelId: typeof normalizeChannelId;
+  getSessionBindingService: typeof getSessionBindingService;
+};
+
+const defaultHandleSubagentsAgentsActionDeps: HandleSubagentsAgentsActionDeps = {
+  getChannelPlugin,
+  normalizeChannelId,
+  getSessionBindingService,
+};
 import type { CommandHandlerResult } from "../commands-types.js";
 import { formatRunLabel, sortSubagentRuns } from "../subagents-utils.js";
 import {
@@ -15,22 +27,30 @@ function formatConversationBindingText(params: { conversationId: string }): stri
   return `binding:${params.conversationId}`;
 }
 
-function supportsConversationBindings(channel: string): boolean {
-  const channelId = normalizeChannelId(channel);
+function supportsConversationBindings(
+  channel: string,
+  deps: Pick<HandleSubagentsAgentsActionDeps, "getChannelPlugin" | "normalizeChannelId">,
+): boolean {
+  const channelId = deps.normalizeChannelId(channel);
   if (!channelId) {
     return false;
   }
   return (
-    getChannelPlugin(channelId)?.conversationBindings?.supportsCurrentConversationBinding === true
+    deps.getChannelPlugin(channelId)?.conversationBindings?.supportsCurrentConversationBinding ===
+    true
   );
 }
 
-export function handleSubagentsAgentsAction(ctx: SubagentsCommandContext): CommandHandlerResult {
+export function handleSubagentsAgentsAction(
+  ctx: SubagentsCommandContext,
+  deps: Partial<HandleSubagentsAgentsActionDeps> = {},
+): CommandHandlerResult {
+  const resolvedDeps = { ...defaultHandleSubagentsAgentsActionDeps, ...deps };
   const { params, requesterKey, runs } = ctx;
   const channel = resolveCommandSurfaceChannel(params);
   const accountId = resolveChannelAccountId(params);
-  const currentConversationBindingsSupported = supportsConversationBindings(channel);
-  const bindingService = getSessionBindingService();
+  const currentConversationBindingsSupported = supportsConversationBindings(channel, resolvedDeps);
+  const bindingService = resolvedDeps.getSessionBindingService();
   const bindingsBySession = new Map<string, ReturnType<typeof bindingService.listBySession>>();
 
   const resolveSessionBindings = (sessionKey: string) => {
