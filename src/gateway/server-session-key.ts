@@ -34,7 +34,14 @@ function setResolvedSessionKeyCache(runId: string, sessionKey: string | null): v
   });
 }
 
-export function resolveSessionKeyForRun(runId: string) {
+export type ResolveSessionKeyForRunDeps = {
+  /** Injectable config loader so tests do not mock `../config/config.js`. */
+  loadConfig?: typeof loadConfig;
+  /** Injectable gateway session store loader so tests do not mock `./session-utils.js`. */
+  loadCombinedSessionStoreForGateway?: typeof loadCombinedSessionStoreForGateway;
+};
+
+export function resolveSessionKeyForRun(runId: string, deps: ResolveSessionKeyForRunDeps = {}) {
   const cached = getAgentRunContext(runId)?.sessionKey;
   if (cached) {
     return cached;
@@ -49,8 +56,11 @@ export function resolveSessionKeyForRun(runId: string) {
     }
     resolvedSessionKeyByRunId.delete(runId);
   }
-  const cfg = loadConfig();
-  const { store } = loadCombinedSessionStoreForGateway(cfg);
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
+  const loadCombinedSessionStoreImpl =
+    deps.loadCombinedSessionStoreForGateway ?? loadCombinedSessionStoreForGateway;
+  const cfg = loadConfigImpl();
+  const { store } = loadCombinedSessionStoreImpl(cfg);
   const matches = Object.entries(store).filter(
     (entry): entry is [string, SessionEntry] => entry[1]?.sessionId === runId,
   );

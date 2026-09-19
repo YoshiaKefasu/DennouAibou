@@ -29,8 +29,17 @@ type OutboundDeliveryMeta = {
   meta?: Record<string, unknown>;
 };
 
-const resolveChannelLabel = (channel: string) => {
-  const pluginLabel = getChannelPlugin(channel as ChannelId)?.meta.label;
+export type OutboundFormatDeps = {
+  /**
+   * Injectable channel-plugin lookup. Production uses the bundled registry; tests
+   * inject a fixture so the label resolution can be exercised without module mocks.
+   */
+  getChannelPlugin?: typeof getChannelPlugin;
+};
+
+const resolveChannelLabel = (channel: string, deps?: OutboundFormatDeps) => {
+  const lookupChannelPlugin = deps?.getChannelPlugin ?? getChannelPlugin;
+  const pluginLabel = lookupChannelPlugin(channel as ChannelId)?.meta.label;
   if (pluginLabel) {
     return pluginLabel;
   }
@@ -44,12 +53,13 @@ const resolveChannelLabel = (channel: string) => {
 export function formatOutboundDeliverySummary(
   channel: string,
   result?: OutboundDeliveryResult,
+  deps?: OutboundFormatDeps,
 ): string {
   if (!result) {
-    return `✅ Sent via ${resolveChannelLabel(channel)}. Message ID: unknown`;
+    return `✅ Sent via ${resolveChannelLabel(channel, deps)}. Message ID: unknown`;
   }
 
-  const label = resolveChannelLabel(result.channel);
+  const label = resolveChannelLabel(result.channel, deps);
   const base = `✅ Sent via ${label}. Message ID: ${result.messageId}`;
 
   if ("chatId" in result) {

@@ -1,33 +1,41 @@
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { normalizeExecApprovals } from "../infra/exec-approvals.js";
+import {
+  noteSecurityWarnings as runNoteSecurityWarnings,
+  type DoctorSecurityDeps,
+} from "./doctor-security.js";
 
-const note = vi.hoisted(() => vi.fn());
-const pluginRegistry = vi.hoisted(() => ({ list: [] as unknown[] }));
+const note = vi.fn();
+const pluginRegistry = { list: [] as unknown[] };
 
-vi.mock("../terminal/note.js", () => ({
+/** exec-approvals file served through the `loadExecApprovals` seam. */
+let execApprovalsFile: Record<string, unknown> = { version: 1, agents: {} };
+
+/**
+ * Explicit seams replacing the module-level `../terminal/note.js` and
+ * `../channels/plugins/index.js` mocks, plus the on-disk exec-approvals fixture.
+ */
+const doctorSecurityDeps: DoctorSecurityDeps = {
   note,
-}));
+  listChannelPlugins: () => pluginRegistry.list as never,
+  loadExecApprovals: () => normalizeExecApprovals(execApprovalsFile as never),
+};
 
-vi.mock("../channels/plugins/index.js", () => ({
-  listChannelPlugins: () => pluginRegistry.list,
-}));
-
-import { noteSecurityWarnings } from "./doctor-security.js";
+async function noteSecurityWarnings(cfg: OpenClawConfig) {
+  return await runNoteSecurityWarnings(cfg, doctorSecurityDeps);
+}
 
 describe("noteSecurityWarnings gateway exposure", () => {
   let prevToken: string | undefined;
   let prevPassword: string | undefined;
-  let prevHome: string | undefined;
 
   beforeEach(() => {
     note.mockClear();
     pluginRegistry.list = [];
+    execApprovalsFile = { version: 1, agents: {} };
     prevToken = process.env.DENNOU_GATEWAY_TOKEN;
     prevPassword = process.env.DENNOU_GATEWAY_PASSWORD;
-    prevHome = process.env.HOME;
     delete process.env.DENNOU_GATEWAY_TOKEN;
     delete process.env.DENNOU_GATEWAY_PASSWORD;
   });
@@ -43,11 +51,6 @@ describe("noteSecurityWarnings gateway exposure", () => {
     } else {
       process.env.DENNOU_GATEWAY_PASSWORD = prevPassword;
     }
-    if (prevHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = prevHome;
-    }
   });
 
   const lastMessage = () => String(note.mock.calls.at(-1)?.[0] ?? "");
@@ -56,14 +59,12 @@ describe("noteSecurityWarnings gateway exposure", () => {
     file: Record<string, unknown>,
     run: () => Promise<void>,
   ): Promise<void> {
-    const home = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-doctor-security-"));
-    process.env.HOME = home;
-    await fs.mkdir(path.join(home, ".openclaw"), { recursive: true });
-    await fs.writeFile(
-      path.join(home, ".openclaw", "exec-approvals.json"),
-      JSON.stringify(file, null, 2),
-    );
-    await run();
+    execApprovalsFile = file;
+    try {
+      await run();
+    } finally {
+      execApprovalsFile = { version: 1, agents: {} };
+    }
   }
 
   it("warns when exposed without auth", async () => {

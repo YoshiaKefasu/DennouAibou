@@ -5,14 +5,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import type { HookRunner } from "../../plugins/hooks.js";
+import { incrementCompactionCount, type SessionUpdatesDeps } from "./session-updates.js";
 
-const hookRunnerMocks = vi.hoisted(() => ({
+const hookRunnerMocks = {
   hasHooks: vi.fn<HookRunner["hasHooks"]>(),
   runSessionEnd: vi.fn<HookRunner["runSessionEnd"]>(),
   runSessionStart: vi.fn<HookRunner["runSessionStart"]>(),
-}));
+};
 
-let incrementCompactionCount: typeof import("./session-updates.js").incrementCompactionCount;
+/**
+ * Explicit seam replacing the module-level `hook-runner-global` doMock: the
+ * update helpers accept the global hook runner they should use.
+ */
+const sessionUpdatesDeps: SessionUpdatesDeps = {
+  getGlobalHookRunner: () =>
+    ({
+      hasHooks: hookRunnerMocks.hasHooks,
+      runSessionEnd: hookRunnerMocks.runSessionEnd,
+      runSessionStart: hookRunnerMocks.runSessionStart,
+    }) as unknown as HookRunner,
+};
+
 const tempDirs: string[] = [];
 
 async function createFixture() {
@@ -36,16 +49,7 @@ async function createFixture() {
 }
 
 describe("session-updates lifecycle hooks", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.doMock("../../plugins/hook-runner-global.js", () => ({
-      getGlobalHookRunner: () =>
-        ({
-          hasHooks: hookRunnerMocks.hasHooks,
-          runSessionEnd: hookRunnerMocks.runSessionEnd,
-          runSessionStart: hookRunnerMocks.runSessionStart,
-        }) as unknown as HookRunner,
-    }));
+  beforeEach(() => {
     hookRunnerMocks.hasHooks.mockReset();
     hookRunnerMocks.runSessionEnd.mockReset();
     hookRunnerMocks.runSessionStart.mockReset();
@@ -54,7 +58,6 @@ describe("session-updates lifecycle hooks", () => {
     );
     hookRunnerMocks.runSessionEnd.mockResolvedValue(undefined);
     hookRunnerMocks.runSessionStart.mockResolvedValue(undefined);
-    ({ incrementCompactionCount } = await import("./session-updates.js"));
   });
 
   afterEach(async () => {
@@ -68,14 +71,17 @@ describe("session-updates lifecycle hooks", () => {
     const { storePath, sessionKey, sessionStore, entry, transcriptPath } = await createFixture();
     const cfg = { session: { store: storePath } } as OpenClawConfig;
 
-    await incrementCompactionCount({
-      cfg,
-      sessionEntry: entry,
-      sessionStore,
-      sessionKey,
-      storePath,
-      newSessionId: "s2",
-    });
+    await incrementCompactionCount(
+      {
+        cfg,
+        sessionEntry: entry,
+        sessionStore,
+        sessionKey,
+        storePath,
+        newSessionId: "s2",
+      },
+      sessionUpdatesDeps,
+    );
 
     expect(hookRunnerMocks.runSessionEnd).toHaveBeenCalledTimes(1);
     expect(hookRunnerMocks.runSessionStart).toHaveBeenCalledTimes(1);

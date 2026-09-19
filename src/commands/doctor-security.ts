@@ -12,6 +12,15 @@ import { resolveDmAllowState } from "../security/dm-policy-shared.js";
 import { note } from "../terminal/note.js";
 import { resolveDefaultChannelAccountContext } from "./channel-account-context.js";
 
+export type DoctorSecurityDeps = {
+  /** Injectable terminal note writer so tests do not mock `../terminal/note.js`. */
+  note?: typeof note;
+  /** Injectable channel plugin catalog so tests do not mock the plugin registry. */
+  listChannelPlugins?: typeof listChannelPlugins;
+  /** Injectable host exec-approvals loader so tests do not touch the real state dir. */
+  loadExecApprovals?: typeof loadExecApprovals;
+};
+
 function collectImplicitHeartbeatDirectPolicyWarnings(cfg: OpenClawConfig): string[] {
   const warnings: string[] = [];
 
@@ -72,9 +81,12 @@ function execAskRank(value: ExecAsk): number {
   }
 }
 
-function collectExecPolicyConflictWarnings(cfg: OpenClawConfig): string[] {
+function collectExecPolicyConflictWarnings(
+  cfg: OpenClawConfig,
+  deps: DoctorSecurityDeps = {},
+): string[] {
   const warnings: string[] = [];
-  const approvals = loadExecApprovals();
+  const approvals = (deps.loadExecApprovals ?? loadExecApprovals)();
   const defaultRequestedSecuritySource = "OpenClaw default (full)";
   const defaultRequestedAskSource = "OpenClaw default (off)";
 
@@ -161,7 +173,9 @@ function collectDurableExecApprovalWarnings(cfg: OpenClawConfig): string[] {
   return [];
 }
 
-export async function noteSecurityWarnings(cfg: OpenClawConfig) {
+export async function noteSecurityWarnings(cfg: OpenClawConfig, deps: DoctorSecurityDeps = {}) {
+  const emitNote = deps.note ?? note;
+  const listPlugins = deps.listChannelPlugins ?? listChannelPlugins;
   const warnings: string[] = [];
   const auditHint = `- Run: ${formatCliCommand("openclaw security audit --deep")}`;
 
@@ -174,7 +188,7 @@ export async function noteSecurityWarnings(cfg: OpenClawConfig) {
   }
 
   warnings.push(...collectImplicitHeartbeatDirectPolicyWarnings(cfg));
-  warnings.push(...collectExecPolicyConflictWarnings(cfg));
+  warnings.push(...collectExecPolicyConflictWarnings(cfg, deps));
   warnings.push(...collectDurableExecApprovalWarnings(cfg));
 
   // ===========================================
@@ -300,7 +314,7 @@ export async function noteSecurityWarnings(cfg: OpenClawConfig) {
     }
   };
 
-  for (const plugin of listChannelPlugins()) {
+  for (const plugin of listPlugins()) {
     if (!plugin.security) {
       continue;
     }
@@ -350,5 +364,5 @@ export async function noteSecurityWarnings(cfg: OpenClawConfig) {
 
   const lines = warnings.length > 0 ? warnings : ["- No channel security warnings detected."];
   lines.push(auditHint);
-  note(lines.join("\n"), "Security");
+  emitNote(lines.join("\n"), "Security");
 }

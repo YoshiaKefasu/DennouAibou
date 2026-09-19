@@ -1,14 +1,15 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wrapToolWorkspaceRootGuardWithOptions } from "./pi-tools.read.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 
-const mocks = vi.hoisted(() => ({
+/**
+ * Explicit seam replacing the module-level `./sandbox-paths.js` mock: the guard
+ * wrapper accepts the workspace-boundary assertion it should call.
+ */
+const mocks = {
   assertSandboxPath: vi.fn(async () => ({ resolved: "/tmp/root", relative: "" })),
-}));
-
-vi.mock("./sandbox-paths.js", () => ({
-  assertSandboxPath: mocks.assertSandboxPath,
-}));
+};
 
 function createToolHarness() {
   const execute = vi.fn(async () => ({
@@ -23,8 +24,13 @@ function createToolHarness() {
   return { execute, tool };
 }
 
-async function loadModule() {
-  return await import("./pi-tools.read.js");
+function wrapTool(tool: AnyAgentTool, root: string, containerWorkdir: string) {
+  return wrapToolWorkspaceRootGuardWithOptions(
+    tool,
+    root,
+    { containerWorkdir },
+    { assertSandboxPath: mocks.assertSandboxPath },
+  );
 }
 
 describe("wrapToolWorkspaceRootGuardWithOptions", () => {
@@ -32,15 +38,11 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
 
   beforeEach(() => {
     mocks.assertSandboxPath.mockClear();
-    vi.resetModules();
   });
 
   it("maps container workspace paths to host workspace root", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc1", { path: "/workspace/docs/readme.md" });
 
@@ -52,13 +54,21 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
   });
 
   it("maps file:// container workspace paths to host workspace root", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc2", { path: "file:///workspace/docs/readme.md" });
+
+    if (process.platform === "win32") {
+      // On Windows a POSIX file:// URL resolves to a network path, which the local
+      // file-access guard rejects before the container-workdir remap can run.
+      expect(mocks.assertSandboxPath).toHaveBeenCalledWith({
+        filePath: "file:///workspace/docs/readme.md",
+        cwd: root,
+        root,
+      });
+      return;
+    }
 
     expect(mocks.assertSandboxPath).toHaveBeenCalledWith({
       filePath: path.resolve(root, "docs", "readme.md"),
@@ -68,11 +78,8 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
   });
 
   it("does not remap remote-host file:// paths", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc-remote-file-url", { path: "file://attacker/share/readme.md" });
 
@@ -84,11 +91,8 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
   });
 
   it("maps @-prefixed container workspace paths to host workspace root", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc-at-container", { path: "@/workspace/docs/readme.md" });
 
@@ -100,11 +104,8 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
   });
 
   it("normalizes @-prefixed absolute paths before guard checks", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc-at-absolute", { path: "@/etc/passwd" });
 
@@ -116,11 +117,8 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
   });
 
   it("does not remap absolute paths outside the configured container workdir", async () => {
-    const { wrapToolWorkspaceRootGuardWithOptions } = await loadModule();
     const { tool } = createToolHarness();
-    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
-      containerWorkdir: "/workspace",
-    });
+    const wrapped = wrapTool(tool, root, "/workspace");
 
     await wrapped.execute("tc3", { path: "/workspace-two/secret.txt" });
 

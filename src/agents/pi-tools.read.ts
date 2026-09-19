@@ -546,13 +546,22 @@ export function wrapToolMemoryFlushAppendOnlyWrite(
   };
 }
 
+export type WrapToolWorkspaceRootGuardDeps = {
+  /**
+   * Injectable workspace-boundary assertion so tests do not need module mocks.
+   */
+  assertSandboxPath?: typeof assertSandboxPath;
+};
+
 export function wrapToolWorkspaceRootGuardWithOptions(
   tool: AnyAgentTool,
   root: string,
   options?: {
     containerWorkdir?: string;
   },
+  deps?: WrapToolWorkspaceRootGuardDeps,
 ): AnyAgentTool {
+  const assertWorkspacePath = deps?.assertSandboxPath ?? assertSandboxPath;
   return {
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
@@ -564,7 +573,7 @@ export function wrapToolWorkspaceRootGuardWithOptions(
           root,
           containerWorkdir: options?.containerWorkdir,
         });
-        await assertSandboxPath({ filePath: sandboxPath, cwd: root, root });
+        await assertWorkspacePath({ filePath: sandboxPath, cwd: root, root });
       }
       return tool.execute(toolCallId, args, signal, onUpdate);
     },

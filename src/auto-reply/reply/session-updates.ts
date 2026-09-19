@@ -46,14 +46,25 @@ async function persistSessionEntryUpdate(params: {
   });
 }
 
-function emitCompactionSessionLifecycleHooks(params: {
-  cfg: OpenClawConfig;
-  sessionKey: string;
-  storePath?: string;
-  previousEntry: SessionEntry;
-  nextEntry: SessionEntry;
-}) {
-  const hookRunner = getGlobalHookRunner();
+export type SessionUpdatesDeps = {
+  /**
+   * Injectable global hook-runner lookup. Tests pass a fixture instead of mocking
+   * `../../plugins/hook-runner-global.js` at module level.
+   */
+  getGlobalHookRunner?: typeof getGlobalHookRunner;
+};
+
+function emitCompactionSessionLifecycleHooks(
+  params: {
+    cfg: OpenClawConfig;
+    sessionKey: string;
+    storePath?: string;
+    previousEntry: SessionEntry;
+    nextEntry: SessionEntry;
+  },
+  deps?: SessionUpdatesDeps,
+) {
+  const hookRunner = (deps?.getGlobalHookRunner ?? getGlobalHookRunner)();
   if (!hookRunner) {
     return;
   }
@@ -206,19 +217,22 @@ export async function ensureSkillSnapshot(params: {
   return { sessionEntry: nextEntry, skillsSnapshot, systemSent };
 }
 
-export async function incrementCompactionCount(params: {
-  sessionEntry?: SessionEntry;
-  sessionStore?: Record<string, SessionEntry>;
-  sessionKey?: string;
-  storePath?: string;
-  cfg?: OpenClawConfig;
-  now?: number;
-  amount?: number;
-  /** Token count after compaction - if provided, updates session token counts */
-  tokensAfter?: number;
-  /** Session id after compaction, when the runtime rotated transcripts. */
-  newSessionId?: string;
-}): Promise<number | undefined> {
+export async function incrementCompactionCount(
+  params: {
+    sessionEntry?: SessionEntry;
+    sessionStore?: Record<string, SessionEntry>;
+    sessionKey?: string;
+    storePath?: string;
+    cfg?: OpenClawConfig;
+    now?: number;
+    amount?: number;
+    /** Token count after compaction - if provided, updates session token counts */
+    tokensAfter?: number;
+    /** Session id after compaction, when the runtime rotated transcripts. */
+    newSessionId?: string;
+  },
+  deps?: SessionUpdatesDeps,
+): Promise<number | undefined> {
   const {
     sessionEntry,
     sessionStore,
@@ -276,13 +290,16 @@ export async function incrementCompactionCount(params: {
     });
   }
   if (newSessionId && newSessionId !== entry.sessionId && cfg) {
-    emitCompactionSessionLifecycleHooks({
-      cfg,
-      sessionKey,
-      storePath,
-      previousEntry: entry,
-      nextEntry: sessionStore[sessionKey],
-    });
+    emitCompactionSessionLifecycleHooks(
+      {
+        cfg,
+        sessionKey,
+        storePath,
+        previousEntry: entry,
+        nextEntry: sessionStore[sessionKey],
+      },
+      deps,
+    );
   }
   return nextCount;
 }

@@ -14,6 +14,16 @@ import {
   resolveGatewaySessionStoreTarget,
 } from "./session-utils.js";
 
+export type SessionsResolveDeps = {
+  /** Injectable session store readers so tests do not mock `../config/sessions.js`. */
+  loadSessionStore?: typeof loadSessionStore;
+  updateSessionStore?: typeof updateSessionStore;
+  /** Injectable gateway session helpers so tests do not mock `./session-utils.js`. */
+  listSessionsFromStore?: typeof listSessionsFromStore;
+  migrateAndPruneGatewaySessionStoreKey?: typeof migrateAndPruneGatewaySessionStoreKey;
+  resolveGatewaySessionStoreTarget?: typeof resolveGatewaySessionStoreTarget;
+};
+
 export type SessionsResolveResult = { ok: true; key: string } | { ok: false; error: ErrorShape };
 
 function resolveSessionVisibilityFilterOptions(p: SessionsResolveParams) {
@@ -38,23 +48,34 @@ function isResolvedSessionKeyVisible(params: {
   storePath: string;
   store: ReturnType<typeof loadSessionStore>;
   key: string;
+  listSessionsFromStore: typeof listSessionsFromStore;
 }) {
   if (typeof params.p.spawnedBy !== "string" || params.p.spawnedBy.trim().length === 0) {
     return true;
   }
-  return listSessionsFromStore({
-    cfg: params.cfg,
-    storePath: params.storePath,
-    store: params.store,
-    opts: resolveSessionVisibilityFilterOptions(params.p),
-  }).sessions.some((session) => session.key === params.key);
+  return params
+    .listSessionsFromStore({
+      cfg: params.cfg,
+      storePath: params.storePath,
+      store: params.store,
+      opts: resolveSessionVisibilityFilterOptions(params.p),
+    })
+    .sessions.some((session) => session.key === params.key);
 }
 
 export async function resolveSessionKeyFromResolveParams(params: {
   cfg: OpenClawConfig;
   p: SessionsResolveParams;
+  deps?: SessionsResolveDeps;
 }): Promise<SessionsResolveResult> {
   const { cfg, p } = params;
+  const loadStore = params.deps?.loadSessionStore ?? loadSessionStore;
+  const updateStore = params.deps?.updateSessionStore ?? updateSessionStore;
+  const listFromStore = params.deps?.listSessionsFromStore ?? listSessionsFromStore;
+  const migrateKey =
+    params.deps?.migrateAndPruneGatewaySessionStoreKey ?? migrateAndPruneGatewaySessionStoreKey;
+  const resolveTarget =
+    params.deps?.resolveGatewaySessionStoreTarget ?? resolveGatewaySessionStoreTarget;
 
   const key = typeof p.key === "string" ? p.key.trim() : "";
   const hasKey = key.length > 0;
@@ -79,8 +100,8 @@ export async function resolveSessionKeyFromResolveParams(params: {
   }
 
   if (hasKey) {
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
-    const store = loadSessionStore(target.storePath);
+    const target = resolveTarget({ cfg, key });
+    const store = loadStore(target.storePath);
     if (store[target.canonicalKey]) {
       if (
         !isResolvedSessionKeyVisible({
@@ -89,6 +110,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
           storePath: target.storePath,
           store,
           key: target.canonicalKey,
+          listSessionsFromStore: listFromStore,
         })
       ) {
         return noSessionFoundResult(key);
@@ -99,8 +121,8 @@ export async function resolveSessionKeyFromResolveParams(params: {
     if (!legacyKey) {
       return noSessionFoundResult(key);
     }
-    await updateSessionStore(target.storePath, (s) => {
-      const { primaryKey } = migrateAndPruneGatewaySessionStoreKey({ cfg, key, store: s });
+    await updateStore(target.storePath, (s) => {
+      const { primaryKey } = migrateKey({ cfg, key, store: s });
       if (!s[primaryKey] && s[legacyKey]) {
         s[primaryKey] = s[legacyKey];
       }
@@ -110,8 +132,9 @@ export async function resolveSessionKeyFromResolveParams(params: {
         cfg,
         p,
         storePath: target.storePath,
-        store: loadSessionStore(target.storePath),
+        store: loadStore(target.storePath),
         key: target.canonicalKey,
+        listSessionsFromStore: listFromStore,
       })
     ) {
       return noSessionFoundResult(key);
@@ -121,7 +144,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
 
   if (hasSessionId) {
     const { storePath, store } = loadCombinedSessionStoreForGateway(cfg);
-    const list = listSessionsFromStore({
+    const list = listFromStore({
       cfg,
       storePath,
       store,
@@ -163,7 +186,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
   }
 
   const { storePath, store } = loadCombinedSessionStoreForGateway(cfg);
-  const list = listSessionsFromStore({
+  const list = listFromStore({
     cfg,
     storePath,
     store,

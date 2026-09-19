@@ -1,15 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ChannelId } from "../../channels/plugins/types.js";
 import {
   buildOutboundDeliveryJson,
   formatGatewaySummary,
   formatOutboundDeliverySummary,
+  type OutboundFormatDeps,
 } from "./format.js";
 
-const getChannelPluginMock = vi.hoisted(() => vi.fn((_channel: unknown) => undefined));
+const CHANNEL_LABELS: Partial<Record<ChannelId, string>> = {
+  telegram: "Telegram",
+  imessage: "iMessage",
+  discord: "Discord",
+  slack: "Slack",
+  msteams: "msteams",
+};
 
-vi.mock("../../channels/plugins/index.js", () => ({
-  getChannelPlugin: getChannelPluginMock,
-}));
+/**
+ * Explicit seam replacing the module-level `getChannelPlugin` mock: the summary
+ * formatter accepts the channel-plugin lookup it should use for labels.
+ */
+const formatDeps: OutboundFormatDeps = {
+  getChannelPlugin: ((channel: ChannelId) =>
+    CHANNEL_LABELS[channel]
+      ? { meta: { label: CHANNEL_LABELS[channel] } }
+      : undefined) as unknown as OutboundFormatDeps["getChannelPlugin"],
+};
+
 describe("formatOutboundDeliverySummary", () => {
   it.each([
     {
@@ -59,7 +75,7 @@ describe("formatOutboundDeliverySummary", () => {
       expected: "✅ Sent via msteams. Message ID: t1 (conversation conv-1)",
     },
   ])("formats delivery summary for %j", ({ channel, result, expected }) => {
-    expect(formatOutboundDeliverySummary(channel, result)).toBe(expected);
+    expect(formatOutboundDeliverySummary(channel, result, formatDeps)).toBe(expected);
   });
 });
 

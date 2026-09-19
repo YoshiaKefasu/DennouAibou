@@ -1,35 +1,42 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "../config/sessions/types.js";
 import { ErrorCodes } from "./protocol/index.js";
+import {
+  resolveSessionKeyFromResolveParams as resolveSessionKeyFromResolveParamsWithDeps,
+  type SessionsResolveDeps,
+} from "./sessions-resolve.js";
 
-const hoisted = vi.hoisted(() => ({
+const hoisted = {
   loadSessionStoreMock: vi.fn(),
   updateSessionStoreMock: vi.fn(),
   listSessionsFromStoreMock: vi.fn(),
   migrateAndPruneGatewaySessionStoreKeyMock: vi.fn(),
   resolveGatewaySessionStoreTargetMock: vi.fn(),
-}));
+};
 
-vi.mock("../config/sessions.js", async () => {
-  const actual = await import("../config/sessions.js");
-  return {
-    ...actual,
-    loadSessionStore: hoisted.loadSessionStoreMock,
-    updateSessionStore: hoisted.updateSessionStoreMock,
-  };
-});
+/**
+ * Explicit seams replacing the module-level `../config/sessions.js` and
+ * `./session-utils.js` mocks.
+ */
+const sessionsResolveDeps = {
+  loadSessionStore: (...args: unknown[]) => hoisted.loadSessionStoreMock(...args),
+  updateSessionStore: (...args: unknown[]) => hoisted.updateSessionStoreMock(...args),
+  listSessionsFromStore: (...args: unknown[]) => hoisted.listSessionsFromStoreMock(...args),
+  migrateAndPruneGatewaySessionStoreKey: (...args: unknown[]) =>
+    hoisted.migrateAndPruneGatewaySessionStoreKeyMock(...args),
+  resolveGatewaySessionStoreTarget: (...args: unknown[]) =>
+    hoisted.resolveGatewaySessionStoreTargetMock(...args),
+} as unknown as SessionsResolveDeps;
 
-vi.mock("./session-utils.js", async () => {
-  const actual = await import("./session-utils.js");
-  return {
-    ...actual,
-    listSessionsFromStore: hoisted.listSessionsFromStoreMock,
-    migrateAndPruneGatewaySessionStoreKey: hoisted.migrateAndPruneGatewaySessionStoreKeyMock,
-    resolveGatewaySessionStoreTarget: hoisted.resolveGatewaySessionStoreTargetMock,
-  };
-});
-
-const { resolveSessionKeyFromResolveParams } = await import("./sessions-resolve.js");
+async function resolveSessionKeyFromResolveParams(params: {
+  cfg: Record<string, unknown>;
+  p: Record<string, unknown>;
+}) {
+  return await resolveSessionKeyFromResolveParamsWithDeps({
+    ...params,
+    deps: sessionsResolveDeps,
+  } as never);
+}
 
 describe("resolveSessionKeyFromResolveParams", () => {
   const canonicalKey = "agent:main:canon";

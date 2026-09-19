@@ -158,9 +158,11 @@ export function resolveConfigOpenCommand(
   };
 }
 
-function execConfigOpenCommand(command: ConfigOpenCommand): Promise<void> {
+type ConfigOpenFileRunner = (command: string, args: readonly string[]) => Promise<void>;
+
+function runConfigOpenFileCommand(command: string, args: readonly string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    execFile(command.command, command.args, (error) => {
+    execFile(command, [...args], (error) => {
       if (error) {
         reject(error);
         return;
@@ -168,6 +170,21 @@ function execConfigOpenCommand(command: ConfigOpenCommand): Promise<void> {
       resolve();
     });
   });
+}
+
+let configOpenFileRunnerForTests: ConfigOpenFileRunner | undefined;
+
+/**
+ * Test-only seam so unit tests can observe the resolved open command without
+ * mocking `node:child_process` at module level.
+ */
+export function setConfigOpenFileRunnerForTests(runner?: ConfigOpenFileRunner): void {
+  configOpenFileRunnerForTests = runner;
+}
+
+function execConfigOpenCommand(command: ConfigOpenCommand): Promise<void> {
+  const runner = configOpenFileRunnerForTests ?? runConfigOpenFileCommand;
+  return runner(command.command, command.args);
 }
 
 function formatConfigOpenError(error: unknown): string {

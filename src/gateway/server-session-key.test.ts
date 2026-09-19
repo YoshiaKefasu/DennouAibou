@@ -1,27 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { resetAgentRunContextForTest } from "../infra/agent-events.js";
+import {
+  type ResolveSessionKeyForRunDeps,
+  resetResolvedSessionKeyForRunCacheForTest,
+  resolveSessionKeyForRun as resolveSessionKeyForRunWithDeps,
+} from "./server-session-key.js";
 
-const hoisted = vi.hoisted(() => ({
+const hoisted = {
   loadConfigMock: vi.fn<() => OpenClawConfig>(),
   loadCombinedSessionStoreForGatewayMock: vi.fn(),
-}));
+};
 
-vi.mock("../config/config.js", () => ({
+/**
+ * Explicit seams replacing the module-level `../config/config.js` and
+ * `./session-utils.js` mocks.
+ */
+const sessionKeyDeps = {
   loadConfig: () => hoisted.loadConfigMock(),
-}));
+  loadCombinedSessionStoreForGateway: (cfg: OpenClawConfig) =>
+    hoisted.loadCombinedSessionStoreForGatewayMock(cfg),
+} as unknown as ResolveSessionKeyForRunDeps;
 
-vi.mock("./session-utils.js", async () => {
-  const actual = await import("./session-utils.js");
-  return {
-    ...actual,
-    loadCombinedSessionStoreForGateway: (cfg: OpenClawConfig) =>
-      hoisted.loadCombinedSessionStoreForGatewayMock(cfg),
-  };
-});
-
-const { resolveSessionKeyForRun, resetResolvedSessionKeyForRunCacheForTest } =
-  await import("./server-session-key.js");
+function resolveSessionKeyForRun(runId: string) {
+  return resolveSessionKeyForRunWithDeps(runId, sessionKeyDeps);
+}
 
 describe("resolveSessionKeyForRun", () => {
   beforeEach(() => {

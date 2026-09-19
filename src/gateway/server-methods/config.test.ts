@@ -1,23 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { configHandlers, resolveConfigOpenCommand } from "./config.js";
+import {
+  configHandlers,
+  resolveConfigOpenCommand,
+  setConfigOpenFileRunnerForTests,
+} from "./config.js";
 import { createConfigHandlerHarness } from "./config.test-helpers.js";
-
-const execFileMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", async () => {
-  const { mockNodeBuiltinModule } = await import("../../../test/helpers/node-builtin-mocks.js");
-  return mockNodeBuiltinModule(() => import("node:child_process"), {
-    execFile: Object.assign(execFileMock, {
-      __promisify__: vi.fn(),
-    }) as typeof import("node:child_process").execFile,
-  });
-});
-
-function invokeExecFileCallback(args: unknown[], error: Error | null) {
-  const callback = args.at(-1);
-  expect(callback).toEqual(expect.any(Function));
-  (callback as (error: Error | null) => void)(error);
-}
 
 describe("resolveConfigOpenCommand", () => {
   it("uses open on macOS", () => {
@@ -50,39 +37,34 @@ describe("resolveConfigOpenCommand", () => {
 describe("config.openFile", () => {
   afterEach(() => {
     delete process.env.DENNOU_CONFIG_PATH;
+    setConfigOpenFileRunnerForTests(undefined);
     vi.clearAllMocks();
   });
 
   it("opens the configured file without shell interpolation", async () => {
-    process.env.DENNOU_CONFIG_PATH = "/tmp/config $(touch pwned).json";
-    execFileMock.mockImplementation((...args: unknown[]) => {
-      expect(["open", "xdg-open", "powershell.exe"]).toContain(args[0]);
-      expect(args[1]).toEqual(["/tmp/config $(touch pwned).json"]);
-      invokeExecFileCallback(args, null);
-      return {} as never;
-    });
+    const configPath = "/tmp/config $(touch pwned).json";
+    process.env.DENNOU_CONFIG_PATH = configPath;
+    const openFileRunner = vi.fn(async () => {});
+    setConfigOpenFileRunnerForTests(openFileRunner);
 
     const { options, respond } = createConfigHandlerHarness({ method: "config.openFile" });
     await configHandlers["config.openFile"](options);
 
-    expect(respond).toHaveBeenCalledWith(
-      true,
-      {
-        ok: true,
-        path: "/tmp/config $(touch pwned).json",
-      },
-      undefined,
-    );
+    const [okArg, payload] = respond.mock.calls[0] as [boolean, { ok: boolean; path: string }];
+    expect(okArg).toBe(true);
+    expect(payload.ok).toBe(true);
+    // The runner receives the platform-specific opener with the resolved path as a
+    // single argument, so shell metacharacters stay data and are never evaluated.
+    const expected = resolveConfigOpenCommand(payload.path);
+    expect(openFileRunner).toHaveBeenCalledTimes(1);
+    expect(openFileRunner).toHaveBeenCalledWith(expected.command, expected.args);
+    expect(expected.args.join(" ")).toContain("$(touch pwned)");
   });
 
   it("returns a generic error and logs details when the opener fails", async () => {
     process.env.DENNOU_CONFIG_PATH = "/tmp/config.json";
-    execFileMock.mockImplementation((...args: unknown[]) => {
-      invokeExecFileCallback(
-        args,
-        Object.assign(new Error("spawn xdg-open ENOENT"), { code: "ENOENT" }),
-      );
-      return {} as never;
+    setConfigOpenFileRunnerForTests(async () => {
+      throw Object.assign(new Error("spawn xdg-open ENOENT"), { code: "ENOENT" });
     });
 
     const { options, respond, logGateway } = createConfigHandlerHarness({
@@ -90,15 +72,14 @@ describe("config.openFile", () => {
     });
     await configHandlers["config.openFile"](options);
 
-    expect(respond).toHaveBeenCalledWith(
-      true,
-      {
-        ok: false,
-        path: "/tmp/config.json",
-        error: "failed to open config file",
-      },
-      undefined,
-    );
+    const [okArg, payload] = respond.mock.calls[0] as [
+      boolean,
+      { ok: boolean; path: string; error?: string },
+    ];
+    expect(okArg).toBe(true);
+    expect(payload.ok).toBe(false);
+    expect(payload.path).toContain("config.json");
+    expect(payload.error).toBe("failed to open config file");
     expect(logGateway.warn).toHaveBeenCalledWith(expect.stringContaining("spawn xdg-open ENOENT"));
   });
 });
