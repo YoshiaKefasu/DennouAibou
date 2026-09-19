@@ -47,6 +47,19 @@ type ToolResultTruncationOptions = {
   minKeepChars?: number;
 };
 
+type SessionManagerLike = ReturnType<typeof SessionManager.open>;
+
+/**
+ * Injectable seams for the tool-result truncation I/O boundaries. Tests supply a
+ * fake write lock and an in-memory session manager instead of mocking
+ * `../session-write-lock.js` and spying on `SessionManager.open` at module level
+ * (Bun cannot intercept ESM imports).
+ */
+export type ToolResultTruncationDeps = {
+  acquireSessionWriteLock?: typeof acquireSessionWriteLock;
+  openSessionManager?: (sessionFile: string) => SessionManagerLike;
+};
+
 /**
  * Marker inserted between head and tail when using head+tail truncation.
  */
@@ -212,19 +225,25 @@ export function truncateToolResultMessage(
  *
  * @returns Object indicating whether any truncation was performed
  */
-export async function truncateOversizedToolResultsInSession(params: {
-  sessionFile: string;
-  contextWindowTokens: number;
-  sessionId?: string;
-  sessionKey?: string;
-}): Promise<{ truncated: boolean; truncatedCount: number; reason?: string }> {
+export async function truncateOversizedToolResultsInSession(
+  params: {
+    sessionFile: string;
+    contextWindowTokens: number;
+    sessionId?: string;
+    sessionKey?: string;
+  },
+  deps: ToolResultTruncationDeps = {},
+): Promise<{ truncated: boolean; truncatedCount: number; reason?: string }> {
   const { sessionFile, contextWindowTokens } = params;
   const maxChars = calculateMaxToolResultChars(contextWindowTokens);
+  const acquireSessionWriteLockImpl = deps.acquireSessionWriteLock ?? acquireSessionWriteLock;
+  const openSessionManagerImpl =
+    deps.openSessionManager ?? ((file: string) => SessionManager.open(file) as SessionManagerLike);
   let sessionLock: Awaited<ReturnType<typeof acquireSessionWriteLock>> | undefined;
 
   try {
-    sessionLock = await acquireSessionWriteLock({ sessionFile });
-    const sessionManager = SessionManager.open(sessionFile);
+    sessionLock = await acquireSessionWriteLockImpl({ sessionFile });
+    const sessionManager = openSessionManagerImpl(sessionFile);
     const branch = sessionManager.getBranch();
 
     if (branch.length === 0) {

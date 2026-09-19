@@ -8,6 +8,7 @@ import {
   readMcpHttpBody,
   resolveMcpRequestContext,
   validateMcpLoopbackRequest,
+  type McpRequestContextDeps,
 } from "./mcp-http.request.js";
 import {
   clearActiveMcpLoopbackRuntime,
@@ -15,16 +16,31 @@ import {
   getActiveMcpLoopbackRuntime,
   McpLoopbackToolCache,
   setActiveMcpLoopbackRuntime,
+  type McpLoopbackToolCacheDeps,
 } from "./mcp-http.runtime.js";
 
 export { createMcpLoopbackServerConfig, getActiveMcpLoopbackRuntime } from "./mcp-http.runtime.js";
 
-export async function startMcpLoopbackServer(port = 0): Promise<{
+export type McpLoopbackServerDeps = {
+  loadConfig?: typeof loadConfig;
+  resolveMainSessionKey?: McpRequestContextDeps["resolveMainSessionKey"];
+  resolveGatewayScopedTools?: McpLoopbackToolCacheDeps["resolveGatewayScopedTools"];
+};
+
+export async function startMcpLoopbackServer(
+  port = 0,
+  deps: McpLoopbackServerDeps = {},
+): Promise<{
   port: number;
   close: () => Promise<void>;
 }> {
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
   const token = crypto.randomBytes(32).toString("hex");
-  const toolCache = new McpLoopbackToolCache();
+  const toolCache = new McpLoopbackToolCache(
+    deps.resolveGatewayScopedTools
+      ? { resolveGatewayScopedTools: deps.resolveGatewayScopedTools }
+      : {},
+  );
 
   const httpServer = createHttpServer((req, res) => {
     if (!validateMcpLoopbackRequest({ req, res, token })) {
@@ -35,8 +51,12 @@ export async function startMcpLoopbackServer(port = 0): Promise<{
       try {
         const body = await readMcpHttpBody(req);
         const parsed: JsonRpcRequest | JsonRpcRequest[] = JSON.parse(body);
-        const cfg = loadConfig();
-        const requestContext = resolveMcpRequestContext(req, cfg);
+        const cfg = loadConfigImpl();
+        const requestContext = resolveMcpRequestContext(req, cfg, {
+          ...(deps.resolveMainSessionKey
+            ? { resolveMainSessionKey: deps.resolveMainSessionKey }
+            : {}),
+        });
         const scopedTools = toolCache.resolve({
           cfg,
           sessionKey: requestContext.sessionKey,

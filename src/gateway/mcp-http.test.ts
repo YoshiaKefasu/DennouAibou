@@ -1,40 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getFreePortBlockWithPermissionFallback } from "../test-utils/ports.js";
-
-const resolveGatewayScopedToolsMock = vi.hoisted(() =>
-  vi.fn(() => ({
-    agentId: "main",
-    tools: [
-      {
-        name: "message",
-        description: "send a message",
-        parameters: { type: "object", properties: {} },
-        execute: async () => ({
-          content: [{ type: "text", text: "ok" }],
-        }),
-      },
-    ],
-  })),
-);
-
-vi.mock("../config/config.js", () => ({
-  loadConfig: () => ({ session: { mainKey: "main" } }),
-}));
-
-vi.mock("../config/sessions.js", () => ({
-  resolveMainSessionKey: () => "agent:main:main",
-}));
-
-vi.mock("./tool-resolution.js", () => ({
-  resolveGatewayScopedTools: (...args: Parameters<typeof resolveGatewayScopedToolsMock>) =>
-    resolveGatewayScopedToolsMock(...args),
-}));
-
 import {
   createMcpLoopbackServerConfig,
   getActiveMcpLoopbackRuntime,
   startMcpLoopbackServer,
+  type McpLoopbackServerDeps,
 } from "./mcp-http.js";
+
+// Explicit dependency injection replaces the module-level `vi.mock` of
+// `../config/config.js`, `../config/sessions.js`, and `./tool-resolution.js`
+// (Bun cannot intercept ESM imports).
+const loadConfigMock = vi.fn(() => ({ session: { mainKey: "main" } }));
+const resolveMainSessionKeyMock = vi.fn(() => "agent:main:main");
+const resolveGatewayScopedToolsMock = vi.fn();
+
+const serverDeps: McpLoopbackServerDeps = {
+  loadConfig: loadConfigMock as unknown as NonNullable<McpLoopbackServerDeps["loadConfig"]>,
+  resolveMainSessionKey: resolveMainSessionKeyMock as unknown as NonNullable<
+    McpLoopbackServerDeps["resolveMainSessionKey"]
+  >,
+  resolveGatewayScopedTools: resolveGatewayScopedToolsMock as unknown as NonNullable<
+    McpLoopbackServerDeps["resolveGatewayScopedTools"]
+  >,
+};
+
+function startServer(port: number) {
+  return startMcpLoopbackServer(port, serverDeps);
+}
 
 let server: Awaited<ReturnType<typeof startMcpLoopbackServer>> | undefined;
 
@@ -82,7 +74,7 @@ describe("mcp loopback server", () => {
       offsets: [0],
       fallbackBase: 53_000,
     });
-    server = await startMcpLoopbackServer(port);
+    server = await startServer(port);
     const runtime = getActiveMcpLoopbackRuntime();
 
     const response = await sendRaw({
@@ -108,7 +100,7 @@ describe("mcp loopback server", () => {
   });
 
   it("tracks the active runtime only while the server is running", async () => {
-    server = await startMcpLoopbackServer(0);
+    server = await startServer(0);
     const active = getActiveMcpLoopbackRuntime();
     expect(active?.port).toBe(server.port);
     expect(active?.token).toMatch(/^[0-9a-f]{64}$/);
@@ -119,7 +111,7 @@ describe("mcp loopback server", () => {
   });
 
   it("returns 401 when the bearer token is missing", async () => {
-    server = await startMcpLoopbackServer(0);
+    server = await startServer(0);
     const response = await sendRaw({
       port: server.port,
       headers: { "content-type": "application/json" },
@@ -129,7 +121,7 @@ describe("mcp loopback server", () => {
   });
 
   it("returns 415 when the content type is not JSON", async () => {
-    server = await startMcpLoopbackServer(0);
+    server = await startServer(0);
     const runtime = getActiveMcpLoopbackRuntime();
     const response = await sendRaw({
       port: server.port,

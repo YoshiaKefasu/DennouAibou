@@ -21,10 +21,23 @@ type CachedScopedTools = {
   time: number;
 };
 
+export type McpLoopbackToolCacheDeps = {
+  resolveGatewayScopedTools: typeof resolveGatewayScopedTools;
+};
+
+const defaultMcpLoopbackToolCacheDeps: McpLoopbackToolCacheDeps = {
+  resolveGatewayScopedTools,
+};
+
 let activeRuntime: McpLoopbackRuntime | undefined;
 
 export class McpLoopbackToolCache {
   #entries = new Map<string, CachedScopedTools>();
+  #deps: McpLoopbackToolCacheDeps;
+
+  constructor(deps: Partial<McpLoopbackToolCacheDeps> = {}) {
+    this.#deps = { ...defaultMcpLoopbackToolCacheDeps, ...deps };
+  }
 
   resolve(params: {
     cfg: ReturnType<typeof loadConfig>;
@@ -41,7 +54,7 @@ export class McpLoopbackToolCache {
       return cached;
     }
 
-    const next = resolveGatewayScopedTools({
+    const next = this.#deps.resolveGatewayScopedTools({
       cfg: params.cfg,
       sessionKey: params.sessionKey,
       messageProvider: params.messageProvider,

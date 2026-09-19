@@ -34,6 +34,7 @@ import {
   markExited,
   tail,
 } from "./bash-process-registry.js";
+import type { ExecRuntimeDeps } from "./bash-tools.exec-types.js";
 import {
   buildDockerExecArgs,
   chunkString,
@@ -524,30 +525,33 @@ export function buildExecRuntimeErrorOutcome(params: {
   };
 }
 
-export async function runExecProcess(opts: {
-  command: string;
-  // Execute this instead of `command` (which is kept for display/session/logging).
-  // Used to sanitize safeBins execution while preserving the original user input.
-  execCommand?: string;
-  workdir: string;
-  env: Record<string, string>;
-  sandbox?: BashSandboxConfig;
-  containerWorkdir?: string | null;
-  usePty: boolean;
-  warnings: string[];
-  maxOutput: number;
-  pendingMaxOutput: number;
-  notifyOnExit: boolean;
-  notifyOnExitEmptySuccess?: boolean;
-  scopeKey?: string;
-  sessionKey?: string;
-  timeoutSec: number | null;
-  onUpdate?: (partialResult: AgentToolResult<ExecToolDetails>) => void;
-}): Promise<ExecProcessHandle> {
+export async function runExecProcess(
+  opts: {
+    command: string;
+    // Execute this instead of `command` (which is kept for display/session/logging).
+    // Used to sanitize safeBins execution while preserving the original user input.
+    execCommand?: string;
+    workdir: string;
+    env: Record<string, string>;
+    sandbox?: BashSandboxConfig;
+    containerWorkdir?: string | null;
+    usePty: boolean;
+    warnings: string[];
+    maxOutput: number;
+    pendingMaxOutput: number;
+    notifyOnExit: boolean;
+    notifyOnExitEmptySuccess?: boolean;
+    scopeKey?: string;
+    sessionKey?: string;
+    timeoutSec: number | null;
+    onUpdate?: (partialResult: AgentToolResult<ExecToolDetails>) => void;
+  },
+  deps: ExecRuntimeDeps = {},
+): Promise<ExecProcessHandle> {
   const startedAt = Date.now();
   const sessionId = createSessionSlug();
   const execCommand = opts.execCommand ?? opts.command;
-  const supervisor = getProcessSupervisor();
+  const supervisor = (deps.getProcessSupervisor ?? getProcessSupervisor)();
   const shellRuntimeEnv: Record<string, string> = {
     ...opts.env,
     DENNOU_SHELL: "exec",

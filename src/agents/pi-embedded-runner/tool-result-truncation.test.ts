@@ -1,64 +1,54 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildSessionWriteLockModuleMock,
-  resetModulesWithSessionWriteLockDoMock,
-} from "../../test-utils/session-write-lock-module-mock.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import { makeAgentAssistantMessage } from "../test-helpers/agent-message-fixtures.js";
+import {
+  calculateMaxToolResultChars,
+  DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS,
+  getToolResultTextLength,
+  HARD_MAX_TOOL_RESULT_CHARS,
+  isOversizedToolResult,
+  sessionLikelyHasOversizedToolResults,
+  truncateOversizedToolResultsInMessages,
+  truncateOversizedToolResultsInSession,
+  truncateToolResultMessage,
+  truncateToolResultText,
+  type ToolResultTruncationDeps,
+} from "./tool-result-truncation.js";
 
-const acquireSessionWriteLockReleaseMock = vi.hoisted(() => vi.fn(async () => {}));
-const acquireSessionWriteLockMock = vi.hoisted(() =>
-  vi.fn(async (_params?: unknown) => ({ release: acquireSessionWriteLockReleaseMock })),
-);
+// Inject the write-lock and session-manager boundaries instead of mocking
+// `../session-write-lock.js` and spying on `SessionManager.open` with
+// `vi.resetModules()` (Bun's runner supports neither the ESM module mock nor the
+// per-test module lifecycle here).
+const acquireSessionWriteLockReleaseMock = vi.fn(async () => {});
+const acquireSessionWriteLockMock = vi.fn(async (_params?: unknown) => ({
+  release: acquireSessionWriteLockReleaseMock,
+}));
 
-vi.mock("../session-write-lock.js", () =>
-  buildSessionWriteLockModuleMock(
-    () => import("../session-write-lock.js"),
-    (params) => acquireSessionWriteLockMock(params),
-  ),
-);
-
-let truncateToolResultText: typeof import("./tool-result-truncation.js").truncateToolResultText;
-let truncateToolResultMessage: typeof import("./tool-result-truncation.js").truncateToolResultMessage;
-let calculateMaxToolResultChars: typeof import("./tool-result-truncation.js").calculateMaxToolResultChars;
-let getToolResultTextLength: typeof import("./tool-result-truncation.js").getToolResultTextLength;
-let truncateOversizedToolResultsInMessages: typeof import("./tool-result-truncation.js").truncateOversizedToolResultsInMessages;
-let truncateOversizedToolResultsInSession: typeof import("./tool-result-truncation.js").truncateOversizedToolResultsInSession;
-let isOversizedToolResult: typeof import("./tool-result-truncation.js").isOversizedToolResult;
-let sessionLikelyHasOversizedToolResults: typeof import("./tool-result-truncation.js").sessionLikelyHasOversizedToolResults;
-let DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS: typeof import("./tool-result-truncation.js").DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS;
-let HARD_MAX_TOOL_RESULT_CHARS: typeof import("./tool-result-truncation.js").HARD_MAX_TOOL_RESULT_CHARS;
-let onSessionTranscriptUpdate: typeof import("../../sessions/transcript-events.js").onSessionTranscriptUpdate;
-
-async function loadFreshToolResultTruncationModuleForTest() {
-  resetModulesWithSessionWriteLockDoMock("../session-write-lock.js", (params) =>
-    acquireSessionWriteLockMock(params),
-  );
-  ({ onSessionTranscriptUpdate } = await import("../../sessions/transcript-events.js"));
-  ({
-    truncateToolResultText,
-    truncateToolResultMessage,
-    calculateMaxToolResultChars,
-    getToolResultTextLength,
-    truncateOversizedToolResultsInMessages,
-    truncateOversizedToolResultsInSession,
-    isOversizedToolResult,
-    sessionLikelyHasOversizedToolResults,
-    DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS,
-    HARD_MAX_TOOL_RESULT_CHARS,
-  } = await import("./tool-result-truncation.js"));
+function createDeps(sessionManager: SessionManager): ToolResultTruncationDeps {
+  return {
+    acquireSessionWriteLock: acquireSessionWriteLockMock as unknown as NonNullable<
+      ToolResultTruncationDeps["acquireSessionWriteLock"]
+    >,
+    openSessionManager: (() => sessionManager) as unknown as NonNullable<
+      ToolResultTruncationDeps["openSessionManager"]
+    >,
+  };
 }
 
 let testTimestamp = 1;
 const nextTimestamp = () => testTimestamp++;
 
-beforeEach(async () => {
+beforeEach(() => {
   testTimestamp = 1;
   acquireSessionWriteLockMock.mockClear();
   acquireSessionWriteLockReleaseMock.mockClear();
-  await loadFreshToolResultTruncationModuleForTest();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function makeToolResult(text: string, toolCallId = "call_1"): ToolResultMessage {
@@ -304,18 +294,18 @@ describe("truncateOversizedToolResultsInSession", () => {
     sessionManager.appendMessage(makeAssistantMessage("reading file"));
     sessionManager.appendMessage(makeToolResult("x".repeat(500_000)));
 
-    const openSpy = vi
-      .spyOn(SessionManager, "open")
-      .mockReturnValue(sessionManager as unknown as ReturnType<typeof SessionManager.open>);
     const listener = vi.fn();
     const cleanup = onSessionTranscriptUpdate(listener);
 
     try {
-      const result = await truncateOversizedToolResultsInSession({
-        sessionFile,
-        contextWindowTokens: 128_000,
-        sessionKey: "agent:main:test",
-      });
+      const result = await truncateOversizedToolResultsInSession(
+        {
+          sessionFile,
+          contextWindowTokens: 128_000,
+          sessionKey: "agent:main:test",
+        },
+        createDeps(sessionManager),
+      );
 
       expect(result.truncated).toBe(true);
       expect(result.truncatedCount).toBe(1);
@@ -339,7 +329,6 @@ describe("truncateOversizedToolResultsInSession", () => {
       expect(rewrittenText).toContain("truncated");
     } finally {
       cleanup();
-      openSpy.mockRestore();
     }
   });
 });

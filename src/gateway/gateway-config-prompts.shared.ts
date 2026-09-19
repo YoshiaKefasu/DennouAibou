@@ -63,15 +63,23 @@ export function appendAllowedOrigin(existing: string[] | undefined, origin: stri
   return [...current, origin];
 }
 
-export async function maybeAddTailnetOriginToControlUiAllowedOrigins(params: {
-  config: OpenClawConfig;
-  tailscaleMode: string;
-  tailscaleBin?: string | null;
-}): Promise<OpenClawConfig> {
+export type TailnetOriginDeps = {
+  getTailnetHostname?: typeof getTailnetHostname;
+};
+
+export async function maybeAddTailnetOriginToControlUiAllowedOrigins(
+  params: {
+    config: OpenClawConfig;
+    tailscaleMode: string;
+    tailscaleBin?: string | null;
+  },
+  deps: TailnetOriginDeps = {},
+): Promise<OpenClawConfig> {
   if (params.tailscaleMode !== "serve" && params.tailscaleMode !== "funnel") {
     return params.config;
   }
-  const tsOrigin = await getTailnetHostname(undefined, params.tailscaleBin ?? undefined)
+  const getTailnetHostnameImpl = deps.getTailnetHostname ?? getTailnetHostname;
+  const tsOrigin = await getTailnetHostnameImpl(undefined, params.tailscaleBin ?? undefined)
     .then((host) => buildTailnetHttpsOrigin(host))
     .catch(() => null);
   if (!tsOrigin) {

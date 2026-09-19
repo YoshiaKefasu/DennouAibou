@@ -12,12 +12,17 @@ export type McpRequestContext = {
   accountId: string | undefined;
 };
 
+export type McpRequestContextDeps = {
+  resolveMainSessionKey: typeof resolveMainSessionKey;
+};
+
 function resolveScopedSessionKey(
   cfg: ReturnType<typeof loadConfig>,
   rawSessionKey: string | undefined,
+  resolveMainSessionKeyImpl: typeof resolveMainSessionKey,
 ): string {
   const trimmed = rawSessionKey?.trim();
-  return !trimmed || trimmed === "main" ? resolveMainSessionKey(cfg) : trimmed;
+  return !trimmed || trimmed === "main" ? resolveMainSessionKeyImpl(cfg) : trimmed;
 }
 
 export function validateMcpLoopbackRequest(params: {
@@ -90,9 +95,15 @@ export async function readMcpHttpBody(req: IncomingMessage): Promise<string> {
 export function resolveMcpRequestContext(
   req: IncomingMessage,
   cfg: ReturnType<typeof loadConfig>,
+  deps: Partial<McpRequestContextDeps> = {},
 ): McpRequestContext {
+  const resolveMainSessionKeyImpl = deps.resolveMainSessionKey ?? resolveMainSessionKey;
   return {
-    sessionKey: resolveScopedSessionKey(cfg, getHeader(req, "x-session-key")),
+    sessionKey: resolveScopedSessionKey(
+      cfg,
+      getHeader(req, "x-session-key"),
+      resolveMainSessionKeyImpl,
+    ),
     messageProvider:
       normalizeMessageChannel(getHeader(req, "x-dennou-message-channel")) ?? undefined,
     accountId: getHeader(req, "x-dennou-account-id")?.trim() || undefined,

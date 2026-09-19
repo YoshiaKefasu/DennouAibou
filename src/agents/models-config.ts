@@ -13,6 +13,14 @@ import { planOpenClawModelsJson } from "./models-config.plan.js";
 
 export { resetModelsJsonReadyCacheForTest } from "./models-config-state.js";
 
+export type ModelsConfigDeps = {
+  planOpenClawModelsJson: typeof planOpenClawModelsJson;
+};
+
+const defaultModelsConfigDeps: ModelsConfigDeps = {
+  planOpenClawModelsJson,
+};
+
 async function readFileMtimeMs(pathname: string): Promise<number | null> {
   try {
     const stat = await fs.stat(pathname);
@@ -135,8 +143,10 @@ async function withModelsJsonWriteLock<T>(targetPath: string, run: () => Promise
 export async function ensureOpenClawModelsJson(
   config?: OpenClawConfig,
   agentDirOverride?: string,
+  deps: Partial<ModelsConfigDeps> = {},
 ): Promise<{ agentDir: string; wrote: boolean }> {
   const resolved = resolveModelsConfigInput(config);
+  const modelsConfigDeps = { ...defaultModelsConfigDeps, ...deps };
   const cfg = resolved.config;
   const agentDir = agentDirOverride?.trim() ? agentDirOverride.trim() : resolveOpenClawAgentDir();
   const targetPath = path.join(agentDir, "models.json");
@@ -159,7 +169,7 @@ export async function ensureOpenClawModelsJson(
     // are available to provider discovery without mutating process.env.
     const env = createConfigRuntimeEnv(cfg);
     const existingModelsFile = await readExistingModelsFile(targetPath);
-    const plan = await planOpenClawModelsJson({
+    const plan = await modelsConfigDeps.planOpenClawModelsJson({
       cfg,
       sourceConfigForSecrets: resolved.sourceConfigForSecrets,
       agentDir,

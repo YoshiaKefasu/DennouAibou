@@ -1,28 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deviceHandlers } from "./devices.js";
+import { createDeviceHandlers, type DeviceHandlersDeps } from "./devices.js";
 import type { GatewayRequestHandlerOptions } from "./types.js";
 
-const {
-  getPairedDeviceMock,
-  removePairedDeviceMock,
-  revokeDeviceTokenMock,
-  rotateDeviceTokenMock,
-} = vi.hoisted(() => ({
-  getPairedDeviceMock: vi.fn(),
-  removePairedDeviceMock: vi.fn(),
-  revokeDeviceTokenMock: vi.fn(),
-  rotateDeviceTokenMock: vi.fn(),
-}));
+// Explicit dependency injection replaces the module-level `vi.mock` of
+// `../../infra/device-pairing.js` (Bun cannot intercept ESM imports).
+const getPairedDeviceMock = vi.fn();
+const removePairedDeviceMock = vi.fn();
+const revokeDeviceTokenMock = vi.fn();
+const rotateDeviceTokenMock = vi.fn();
 
-vi.mock("../../infra/device-pairing.js", async () => {
-  const actual = await import("../../infra/device-pairing.js");
-  return {
-    ...actual,
-    getPairedDevice: getPairedDeviceMock,
-    removePairedDevice: removePairedDeviceMock,
-    revokeDeviceToken: revokeDeviceTokenMock,
-    rotateDeviceToken: rotateDeviceTokenMock,
-  };
+const deviceHandlers = createDeviceHandlers({
+  getPairedDevice: getPairedDeviceMock as unknown as DeviceHandlersDeps["getPairedDevice"],
+  removePairedDevice: removePairedDeviceMock as unknown as DeviceHandlersDeps["removePairedDevice"],
+  revokeDeviceToken: revokeDeviceTokenMock as unknown as DeviceHandlersDeps["revokeDeviceToken"],
+  rotateDeviceToken: rotateDeviceTokenMock as unknown as DeviceHandlersDeps["rotateDeviceToken"],
 });
 
 function createClient(scopes: string[], deviceId?: string) {

@@ -45,17 +45,29 @@ function validateGatewayWebSocketUrl(value: string): string | undefined {
   return undefined;
 }
 
+export type RemoteGatewayDeps = {
+  detectBinary?: typeof detectBinary;
+  resolveWideAreaDiscoveryDomain?: typeof resolveWideAreaDiscoveryDomain;
+  discoverGatewayBeacons?: typeof discoverGatewayBeacons;
+};
+
 export async function promptRemoteGatewayConfig(
   cfg: OpenClawConfig,
   prompter: WizardPrompter,
   options?: { secretInputMode?: SecretInputMode },
+  deps: RemoteGatewayDeps = {},
 ): Promise<OpenClawConfig> {
+  const detectBinaryImpl = deps.detectBinary ?? detectBinary;
+  const resolveWideAreaDiscoveryDomainImpl =
+    deps.resolveWideAreaDiscoveryDomain ?? resolveWideAreaDiscoveryDomain;
+  const discoverGatewayBeaconsImpl = deps.discoverGatewayBeacons ?? discoverGatewayBeacons;
   let selectedBeacon: GatewayBonjourBeacon | null = null;
   let suggestedUrl = cfg.gateway?.remote?.url ?? DEFAULT_GATEWAY_URL;
   let discoveryTlsFingerprint: string | undefined;
   let trustedDiscoveryUrl: string | undefined;
 
-  const hasBonjourTool = (await detectBinary("dns-sd")) || (await detectBinary("avahi-browse"));
+  const hasBonjourTool =
+    (await detectBinaryImpl("dns-sd")) || (await detectBinaryImpl("avahi-browse"));
   const wantsDiscover = hasBonjourTool
     ? await prompter.confirm({
         message: "Discover gateway on LAN (Bonjour)?",
@@ -74,11 +86,11 @@ export async function promptRemoteGatewayConfig(
   }
 
   if (wantsDiscover) {
-    const wideAreaDomain = resolveWideAreaDiscoveryDomain({
+    const wideAreaDomain = resolveWideAreaDiscoveryDomainImpl({
       configDomain: cfg.discovery?.wideArea?.domain,
     });
     const spin = prompter.progress("Searching for gateways…");
-    const beacons = await discoverGatewayBeacons({ timeoutMs: 2000, wideAreaDomain });
+    const beacons = await discoverGatewayBeaconsImpl({ timeoutMs: 2000, wideAreaDomain });
     spin.stop(beacons.length > 0 ? `Found ${beacons.length} gateway(s)` : "No gateways found");
 
     if (beacons.length > 0) {

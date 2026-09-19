@@ -13,6 +13,17 @@ import { log } from "./logger.js";
 type SessionManagerLike = ReturnType<typeof SessionManager.open>;
 type SessionBranchEntry = ReturnType<SessionManagerLike["getBranch"]>[number];
 
+/**
+ * Injectable seams for the transcript-rewrite I/O boundaries. Tests supply a
+ * fake write lock and an in-memory session manager instead of mocking
+ * `../session-write-lock.js` and spying on `SessionManager.open` at module level
+ * (Bun cannot intercept ESM imports).
+ */
+export type TranscriptRewriteDeps = {
+  acquireSessionWriteLock?: typeof acquireSessionWriteLock;
+  openSessionManager?: (sessionFile: string) => SessionManagerLike;
+};
+
 function estimateMessageBytes(message: AgentMessage): number {
   return Buffer.byteLength(JSON.stringify(message), "utf8");
 }
@@ -191,18 +202,25 @@ export function rewriteTranscriptEntriesInSessionManager(params: {
  * Open a transcript file, rewrite message entries on the active branch, and
  * emit a transcript update when the active branch changed.
  */
-export async function rewriteTranscriptEntriesInSessionFile(params: {
-  sessionFile: string;
-  sessionId?: string;
-  sessionKey?: string;
-  request: TranscriptRewriteRequest;
-}): Promise<TranscriptRewriteResult> {
+export async function rewriteTranscriptEntriesInSessionFile(
+  params: {
+    sessionFile: string;
+    sessionId?: string;
+    sessionKey?: string;
+    request: TranscriptRewriteRequest;
+  },
+  deps: TranscriptRewriteDeps = {},
+): Promise<TranscriptRewriteResult> {
+  const acquireSessionWriteLockImpl = deps.acquireSessionWriteLock ?? acquireSessionWriteLock;
+  const openSessionManagerImpl =
+    deps.openSessionManager ??
+    ((sessionFile: string) => SessionManager.open(sessionFile) as SessionManagerLike);
   let sessionLock: Awaited<ReturnType<typeof acquireSessionWriteLock>> | undefined;
   try {
-    sessionLock = await acquireSessionWriteLock({
+    sessionLock = await acquireSessionWriteLockImpl({
       sessionFile: params.sessionFile,
     });
-    const sessionManager = SessionManager.open(params.sessionFile);
+    const sessionManager = openSessionManagerImpl(params.sessionFile);
     const result = rewriteTranscriptEntriesInSessionManager({
       sessionManager,
       replacements: params.request.replacements,

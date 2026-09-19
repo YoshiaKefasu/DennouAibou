@@ -1,7 +1,17 @@
 import type { ExecApprovalDecision } from "../infra/exec-approvals.js";
 import type { ExecAsk, ExecHost, ExecSecurity, ExecTarget } from "../infra/exec-approvals.js";
 import type { SafeBinProfileFixture } from "../infra/exec-safe-bin-policy.js";
+import type { ProcessSupervisor } from "../process/supervisor/types.js";
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
+
+/**
+ * Injectable seams for the exec runtime boundaries. Tests supply a fake process
+ * supervisor instead of mocking `../process/supervisor/index.js` (or the
+ * `@lydell/node-pty` adapter) at module level.
+ */
+export type ExecRuntimeDeps = {
+  getProcessSupervisor?: () => ProcessSupervisor;
+};
 
 export type ExecToolDefaults = {
   hasCronTool?: boolean;
@@ -31,6 +41,7 @@ export type ExecToolDefaults = {
   notifyOnExit?: boolean;
   notifyOnExitEmptySuccess?: boolean;
   cwd?: string;
+  execRuntimeDeps?: ExecRuntimeDeps;
 };
 
 export type ExecElevatedDefaults = {

@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
+import {
+  promptGatewayConfig as promptGatewayConfigImpl,
+  type PromptGatewayConfigDeps,
+} from "./configure.gateway.js";
 
-const mocks = vi.hoisted(() => ({
+// Explicit dependency injection replaces the module-level `vi.mock` calls
+// (Bun cannot intercept ESM imports).
+const mocks = {
   text: vi.fn(),
   select: vi.fn(),
   confirm: vi.fn(),
@@ -11,44 +17,29 @@ const mocks = vi.hoisted(() => ({
   note: vi.fn(),
   randomToken: vi.fn(),
   getTailnetHostname: vi.fn(),
-}));
+};
+const findTailscaleBinary = vi.fn(async () => undefined);
 
-vi.mock("../config/config.js", async (importActual) => {
-  const actual = await importActual<typeof import("../config/config.js")>();
-  return {
-    ...actual,
-    resolveGatewayPort: mocks.resolveGatewayPort,
-  };
-});
+const gatewayDeps: PromptGatewayConfigDeps = {
+  text: mocks.text as unknown as PromptGatewayConfigDeps["text"],
+  select: mocks.select as unknown as PromptGatewayConfigDeps["select"],
+  confirm: mocks.confirm as unknown as PromptGatewayConfigDeps["confirm"],
+  resolveGatewayPort:
+    mocks.resolveGatewayPort as unknown as PromptGatewayConfigDeps["resolveGatewayPort"],
+  buildGatewayAuthConfig:
+    mocks.buildGatewayAuthConfig as unknown as PromptGatewayConfigDeps["buildGatewayAuthConfig"],
+  note: mocks.note as unknown as PromptGatewayConfigDeps["note"],
+  randomToken: mocks.randomToken as unknown as PromptGatewayConfigDeps["randomToken"],
+  findTailscaleBinary:
+    findTailscaleBinary as unknown as PromptGatewayConfigDeps["findTailscaleBinary"],
+  getTailnetHostname: mocks.getTailnetHostname as unknown as NonNullable<
+    PromptGatewayConfigDeps["getTailnetHostname"]
+  >,
+};
 
-vi.mock("./configure.shared.js", () => ({
-  text: mocks.text,
-  select: mocks.select,
-  confirm: mocks.confirm,
-}));
-
-vi.mock("../terminal/note.js", () => ({
-  note: mocks.note,
-}));
-
-vi.mock("./configure.gateway-auth.js", () => ({
-  buildGatewayAuthConfig: mocks.buildGatewayAuthConfig,
-}));
-
-vi.mock("../infra/tailscale.js", () => ({
-  findTailscaleBinary: vi.fn(async () => undefined),
-  getTailnetHostname: mocks.getTailnetHostname,
-}));
-
-vi.mock("./onboard-helpers.js", async (importActual) => {
-  const actual = await importActual<typeof import("./onboard-helpers.js")>();
-  return {
-    ...actual,
-    randomToken: mocks.randomToken,
-  };
-});
-
-import { promptGatewayConfig } from "./configure.gateway.js";
+function promptGatewayConfig(cfg: OpenClawConfig, runtime: RuntimeEnv) {
+  return promptGatewayConfigImpl(cfg, runtime, gatewayDeps);
+}
 
 function makeRuntime(): RuntimeEnv {
   return {

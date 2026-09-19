@@ -1,25 +1,43 @@
 import type { OpenClawConfig } from "../config/config.js";
-import { resolveGatewayPort } from "../config/config.js";
+import { resolveGatewayPort as resolveGatewayPortImpl } from "../config/config.js";
 import { isValidEnvSecretRefId, type SecretInput } from "../config/types.secrets.js";
 import {
   maybeAddTailnetOriginToControlUiAllowedOrigins,
+  type TailnetOriginDeps,
   TAILSCALE_DOCS_LINES,
   TAILSCALE_EXPOSURE_OPTIONS,
   TAILSCALE_MISSING_BIN_NOTE_LINES,
 } from "../gateway/gateway-config-prompts.shared.js";
-import { findTailscaleBinary } from "../infra/tailscale.js";
+import { findTailscaleBinary as findTailscaleBinaryImpl } from "../infra/tailscale.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { resolveDefaultSecretProviderAlias } from "../secrets/ref-contract.js";
 import { validateIPv4AddressInput } from "../shared/net/ipv4.js";
-import { note } from "../terminal/note.js";
-import { buildGatewayAuthConfig } from "./configure.gateway-auth.js";
-import { confirm, select, text } from "./configure.shared.js";
+import { note as noteImpl } from "../terminal/note.js";
+import { buildGatewayAuthConfig as buildGatewayAuthConfigImpl } from "./configure.gateway-auth.js";
+import {
+  confirm as confirmModule,
+  select as selectModule,
+  text as textModule,
+} from "./configure.shared.js";
 import {
   guardCancel,
   normalizeGatewayTokenInput,
-  randomToken,
+  randomToken as randomTokenImpl,
   validateGatewayPasswordInput,
 } from "./onboard-helpers.js";
+
+export type PromptGatewayConfigDeps = {
+  text?: typeof textModule;
+  select?: typeof selectModule;
+  confirm?: typeof confirmModule;
+  note?: typeof noteImpl;
+  resolveGatewayPort?: typeof resolveGatewayPortImpl;
+  randomToken?: typeof randomTokenImpl;
+  buildGatewayAuthConfig?: typeof buildGatewayAuthConfigImpl;
+  findTailscaleBinary?: typeof findTailscaleBinaryImpl;
+  getTailnetHostname?: TailnetOriginDeps["getTailnetHostname"];
+  maybeAddTailnetOriginToControlUiAllowedOrigins?: typeof maybeAddTailnetOriginToControlUiAllowedOrigins;
+};
 
 type GatewayAuthChoice = "token" | "password" | "trusted-proxy";
 type GatewayTokenInputMode = "plaintext" | "ref";
@@ -27,11 +45,25 @@ type GatewayTokenInputMode = "plaintext" | "ref";
 export async function promptGatewayConfig(
   cfg: OpenClawConfig,
   runtime: RuntimeEnv,
+  deps: PromptGatewayConfigDeps = {},
 ): Promise<{
   config: OpenClawConfig;
   port: number;
   token?: string;
 }> {
+  // Injectable boundaries so tests do not mock these modules at import time
+  // (Bun cannot intercept ESM imports). Production callers omit `deps`.
+  const text = deps.text ?? textModule;
+  const select = deps.select ?? selectModule;
+  const confirm = deps.confirm ?? confirmModule;
+  const note = deps.note ?? noteImpl;
+  const resolveGatewayPort = deps.resolveGatewayPort ?? resolveGatewayPortImpl;
+  const randomToken = deps.randomToken ?? randomTokenImpl;
+  const buildGatewayAuthConfig = deps.buildGatewayAuthConfig ?? buildGatewayAuthConfigImpl;
+  const findTailscaleBinary = deps.findTailscaleBinary ?? findTailscaleBinaryImpl;
+  const maybeAddTailnetOrigin =
+    deps.maybeAddTailnetOriginToControlUiAllowedOrigins ??
+    maybeAddTailnetOriginToControlUiAllowedOrigins;
   const portRaw = guardCancel(
     await text({
       message: "Gateway port",
@@ -343,11 +375,10 @@ export async function promptGatewayConfig(
     },
   };
 
-  next = await maybeAddTailnetOriginToControlUiAllowedOrigins({
-    config: next,
-    tailscaleMode,
-    tailscaleBin,
-  });
+  next = await maybeAddTailnetOrigin(
+    { config: next, tailscaleMode, tailscaleBin },
+    deps.getTailnetHostname ? { getTailnetHostname: deps.getTailnetHostname } : {},
+  );
 
   return { config: next, port, token: gatewayTokenForCalls };
 }

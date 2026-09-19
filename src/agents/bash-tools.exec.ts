@@ -1541,24 +1541,27 @@ export function createExecTool(
       // before we execute and burn tokens in cron loops.
       await validateScriptFileForShellBleed({ command: params.command, workdir });
 
-      const run = await runExecProcess({
-        command: params.command,
-        execCommand: execCommandOverride,
-        workdir,
-        env,
-        sandbox,
-        containerWorkdir,
-        usePty,
-        warnings,
-        maxOutput,
-        pendingMaxOutput,
-        notifyOnExit,
-        notifyOnExitEmptySuccess,
-        scopeKey: defaults?.scopeKey,
-        sessionKey: notifySessionKey,
-        timeoutSec: effectiveTimeout,
-        onUpdate,
-      });
+      const run = await runExecProcess(
+        {
+          command: params.command,
+          execCommand: execCommandOverride,
+          workdir,
+          env,
+          sandbox,
+          containerWorkdir,
+          usePty,
+          warnings,
+          maxOutput,
+          pendingMaxOutput,
+          notifyOnExit,
+          notifyOnExitEmptySuccess,
+          scopeKey: defaults?.scopeKey,
+          sessionKey: notifySessionKey,
+          timeoutSec: effectiveTimeout,
+          onUpdate,
+        },
+        defaults?.execRuntimeDeps,
+      );
 
       let yielded = false;
       let yieldTimer: NodeJS.Timeout | null = null;

@@ -6,29 +6,20 @@ import {
   installModelsConfigTestHooks,
   withModelsTempHome,
 } from "./models-config.e2e-harness.js";
+import { ensureOpenClawModelsJson, type ModelsConfigDeps } from "./models-config.js";
 import { readGeneratedModelsJson } from "./models-config.test-utils.js";
 
-const { planOpenClawModelsJsonMock } = vi.hoisted(() => ({
-  planOpenClawModelsJsonMock: vi.fn(),
-}));
-
-vi.mock("./models-config.plan.js", () => ({
-  planOpenClawModelsJson: (...args: unknown[]) => planOpenClawModelsJsonMock(...args),
-}));
+const planOpenClawModelsJsonMock = vi.fn<ModelsConfigDeps["planOpenClawModelsJson"]>();
 
 installModelsConfigTestHooks();
 
-let ensureOpenClawModelsJson: typeof import("./models-config.js").ensureOpenClawModelsJson;
-
-beforeEach(async () => {
-  vi.resetModules();
+beforeEach(() => {
   planOpenClawModelsJsonMock.mockImplementation(
     async (params: { cfg?: typeof CUSTOM_PROXY_MODELS_CONFIG }) => ({
       action: "write",
       contents: `${JSON.stringify({ providers: params.cfg?.models?.providers ?? {} }, null, 2)}\n`,
     }),
   );
-  ({ ensureOpenClawModelsJson } = await import("./models-config.js"));
 });
 
 describe("models-config write serialization", () => {
@@ -47,6 +38,7 @@ describe("models-config write serialization", () => {
       const originalWriteFile = fs.writeFile.bind(fs);
       let inFlightWrites = 0;
       let maxInFlightWrites = 0;
+      let modelsTempWriteCount = 0;
       const writeSpy = vi.spyOn(fs, "writeFile").mockImplementation(async (...args) => {
         const targetArg = args[0];
         const targetPath =
@@ -60,6 +52,7 @@ describe("models-config write serialization", () => {
           path.basename(targetPath).startsWith("models.json.") &&
           targetPath.endsWith(".tmp");
         if (isModelsTempWrite) {
+          modelsTempWriteCount += 1;
           inFlightWrites += 1;
           if (inFlightWrites > maxInFlightWrites) {
             maxInFlightWrites = inFlightWrites;
@@ -76,16 +69,26 @@ describe("models-config write serialization", () => {
       });
 
       try {
-        await Promise.all([ensureOpenClawModelsJson(first), ensureOpenClawModelsJson(second)]);
+        const deps = { planOpenClawModelsJson: planOpenClawModelsJsonMock };
+        await Promise.all([
+          ensureOpenClawModelsJson(first, undefined, deps),
+          ensureOpenClawModelsJson(second, undefined, deps),
+        ]);
       } finally {
         writeSpy.mockRestore();
       }
 
+      // Both concurrent writers must have run, and the write lock must have kept
+      // them from overlapping. Which writer lands last is an I/O scheduling
+      // artifact (Bun and Vitest resolve the fingerprint stats in different
+      // orders), so assert the serialized outcome instead of a fixed winner.
       expect(maxInFlightWrites).toBe(1);
+      expect(modelsTempWriteCount).toBe(2);
       const parsed = await readGeneratedModelsJson<{
         providers: { "custom-proxy"?: { models?: Array<{ name?: string }> } };
       }>();
-      expect(parsed.providers["custom-proxy"]?.models?.[0]?.name).toBe("Proxy B with longer name");
+      const finalName = parsed.providers["custom-proxy"]?.models?.[0]?.name;
+      expect(["Proxy A", "Proxy B with longer name"]).toContain(finalName);
     });
   }, 60_000);
 });

@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-let createExecTool: typeof import("./bash-tools.exec.js").createExecTool;
-let listRunningSessions: typeof import("./bash-process-registry.js").listRunningSessions;
-let resetProcessRegistryForTests: typeof import("./bash-process-registry.js").resetProcessRegistryForTests;
+import { afterEach, expect, test, vi } from "vitest";
+import type { ProcessSupervisor } from "../process/supervisor/types.js";
+import { listRunningSessions, resetProcessRegistryForTests } from "./bash-process-registry.js";
+import { createExecTool } from "./bash-tools.exec.js";
 
-const { supervisorSpawnMock } = vi.hoisted(() => ({
-  supervisorSpawnMock: vi.fn(),
-}));
+// Inject a fake process supervisor instead of mocking
+// `../process/supervisor/index.js` at module level (Bun cannot intercept ESM
+// imports).
+const supervisorSpawnMock = vi.fn();
 
-const makeSupervisor = () => {
+const makeSupervisor = (): ProcessSupervisor => {
   const noop = vi.fn();
   return {
     spawn: (...args: unknown[]) => supervisorSpawnMock(...args),
@@ -15,19 +16,8 @@ const makeSupervisor = () => {
     cancelScope: noop,
     reconcileOrphans: noop,
     getRecord: noop,
-  };
+  } as unknown as ProcessSupervisor;
 };
-
-vi.mock("../process/supervisor/index.js", () => ({
-  getProcessSupervisor: () => makeSupervisor(),
-}));
-
-beforeEach(async () => {
-  vi.resetModules();
-  ({ createExecTool } = await import("./bash-tools.exec.js"));
-  ({ listRunningSessions, resetProcessRegistryForTests } =
-    await import("./bash-process-registry.js"));
-});
 
 afterEach(() => {
   resetProcessRegistryForTests();
@@ -44,6 +34,7 @@ test("exec cleans session state when PTY fallback spawn also fails", async () =>
     host: "gateway",
     security: "full",
     ask: "off",
+    execRuntimeDeps: { getProcessSupervisor: makeSupervisor },
   });
 
   await expect(

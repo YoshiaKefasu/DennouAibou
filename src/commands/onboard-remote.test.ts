@@ -3,28 +3,33 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { GatewayBonjourBeacon } from "../infra/bonjour-discovery.js";
 import { captureEnv } from "../test-utils/env.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
-import { promptRemoteGatewayConfig } from "./onboard-remote.js";
+import {
+  promptRemoteGatewayConfig as promptRemoteGatewayConfigImpl,
+  type RemoteGatewayDeps,
+} from "./onboard-remote.js";
 import { createWizardPrompter } from "./test-wizard-helpers.js";
 
-const discoverGatewayBeacons = vi.hoisted(() => vi.fn<() => Promise<GatewayBonjourBeacon[]>>());
-const resolveWideAreaDiscoveryDomain = vi.hoisted(() => vi.fn(() => undefined));
-const detectBinary = vi.hoisted(() => vi.fn<(name: string) => Promise<boolean>>());
+// Explicit dependency injection replaces the module-level `vi.mock` calls
+// (Bun cannot intercept ESM imports).
+const discoverGatewayBeacons = vi.fn<() => Promise<GatewayBonjourBeacon[]>>();
+const resolveWideAreaDiscoveryDomain = vi.fn(() => undefined);
+const detectBinary = vi.fn<(name: string) => Promise<boolean>>();
 
-vi.mock("../infra/bonjour-discovery.js", async () => {
-  const actual = await import("../infra/bonjour-discovery.js");
-  return {
-    ...actual,
-    discoverGatewayBeacons,
-  };
-});
+const remoteDeps: RemoteGatewayDeps = {
+  discoverGatewayBeacons:
+    discoverGatewayBeacons as unknown as RemoteGatewayDeps["discoverGatewayBeacons"],
+  resolveWideAreaDiscoveryDomain:
+    resolveWideAreaDiscoveryDomain as unknown as RemoteGatewayDeps["resolveWideAreaDiscoveryDomain"],
+  detectBinary: detectBinary as unknown as RemoteGatewayDeps["detectBinary"],
+};
 
-vi.mock("../infra/widearea-dns.js", () => ({
-  resolveWideAreaDiscoveryDomain,
-}));
-
-vi.mock("./onboard-helpers.js", () => ({
-  detectBinary,
-}));
+function promptRemoteGatewayConfig(
+  cfg: OpenClawConfig,
+  prompter: WizardPrompter,
+  options?: Parameters<typeof promptRemoteGatewayConfigImpl>[2],
+) {
+  return promptRemoteGatewayConfigImpl(cfg, prompter, options, remoteDeps);
+}
 
 function createPrompter(overrides: Partial<WizardPrompter>): WizardPrompter {
   return createWizardPrompter(overrides, { defaultSelect: "" });

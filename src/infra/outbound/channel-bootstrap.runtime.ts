@@ -10,20 +10,47 @@ import type { DeliverableMessageChannel } from "../../utils/message-channel.js";
 
 const bootstrapAttempts = new Set<string>();
 
+/**
+ * Injectable seams for the outbound channel bootstrap boundaries. Tests supply
+ * fake registry/auto-enable/agent-scope helpers instead of mocking the source
+ * modules at module level (Bun cannot intercept ESM imports).
+ */
+export type OutboundChannelBootstrapDeps = {
+  getActivePluginChannelRegistry: typeof getActivePluginChannelRegistry;
+  getActivePluginChannelRegistryVersion: typeof getActivePluginChannelRegistryVersion;
+  applyPluginAutoEnable: typeof applyPluginAutoEnable;
+  resolveRuntimePluginRegistry: typeof resolveRuntimePluginRegistry;
+  resolveDefaultAgentId: typeof resolveDefaultAgentId;
+  resolveAgentWorkspaceDir: typeof resolveAgentWorkspaceDir;
+};
+
+const defaultOutboundChannelBootstrapDeps: OutboundChannelBootstrapDeps = {
+  getActivePluginChannelRegistry,
+  getActivePluginChannelRegistryVersion,
+  applyPluginAutoEnable,
+  resolveRuntimePluginRegistry,
+  resolveDefaultAgentId,
+  resolveAgentWorkspaceDir,
+};
+
 export function resetOutboundChannelBootstrapStateForTests(): void {
   bootstrapAttempts.clear();
 }
 
-export function bootstrapOutboundChannelPlugin(params: {
-  channel: DeliverableMessageChannel;
-  cfg?: OpenClawConfig;
-}): void {
+export function bootstrapOutboundChannelPlugin(
+  params: {
+    channel: DeliverableMessageChannel;
+    cfg?: OpenClawConfig;
+  },
+  deps: Partial<OutboundChannelBootstrapDeps> = {},
+): void {
+  const resolvedDeps = { ...defaultOutboundChannelBootstrapDeps, ...deps };
   const cfg = params.cfg;
   if (!cfg) {
     return;
   }
 
-  const activeChannelRegistry = getActivePluginChannelRegistry();
+  const activeChannelRegistry = resolvedDeps.getActivePluginChannelRegistry();
   const activeHasRequestedChannel = activeChannelRegistry?.channels?.some(
     (entry) => entry?.plugin?.id === params.channel,
   );
@@ -31,17 +58,17 @@ export function bootstrapOutboundChannelPlugin(params: {
     return;
   }
 
-  const attemptKey = `${getActivePluginChannelRegistryVersion()}:${params.channel}`;
+  const attemptKey = `${resolvedDeps.getActivePluginChannelRegistryVersion()}:${params.channel}`;
   if (bootstrapAttempts.has(attemptKey)) {
     return;
   }
   bootstrapAttempts.add(attemptKey);
 
-  const autoEnabled = applyPluginAutoEnable({ config: cfg });
-  const defaultAgentId = resolveDefaultAgentId(autoEnabled.config);
-  const workspaceDir = resolveAgentWorkspaceDir(autoEnabled.config, defaultAgentId);
+  const autoEnabled = resolvedDeps.applyPluginAutoEnable({ config: cfg });
+  const defaultAgentId = resolvedDeps.resolveDefaultAgentId(autoEnabled.config);
+  const workspaceDir = resolvedDeps.resolveAgentWorkspaceDir(autoEnabled.config, defaultAgentId);
   try {
-    resolveRuntimePluginRegistry({
+    resolvedDeps.resolveRuntimePluginRegistry({
       config: autoEnabled.config,
       activationSourceConfig: cfg,
       autoEnabledReasons: autoEnabled.autoEnabledReasons,

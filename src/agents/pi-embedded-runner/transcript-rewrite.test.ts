@@ -1,36 +1,32 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { onSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
+import { installSessionToolResultGuard } from "../session-tool-result-guard.js";
 import {
-  buildSessionWriteLockModuleMock,
-  resetModulesWithSessionWriteLockDoMock,
-} from "../../test-utils/session-write-lock-module-mock.js";
+  rewriteTranscriptEntriesInSessionFile,
+  rewriteTranscriptEntriesInSessionManager,
+  type TranscriptRewriteDeps,
+} from "./transcript-rewrite.js";
 
-const acquireSessionWriteLockReleaseMock = vi.hoisted(() => vi.fn(async () => {}));
-const acquireSessionWriteLockMock = vi.hoisted(() =>
-  vi.fn(async (_params?: unknown) => ({ release: acquireSessionWriteLockReleaseMock })),
-);
+// Inject the write-lock and session-manager boundaries instead of mocking
+// `../session-write-lock.js` and spying on `SessionManager.open` with
+// `vi.resetModules()` (Bun's runner supports neither the ESM module mock nor the
+// per-test module lifecycle here).
+const acquireSessionWriteLockReleaseMock = vi.fn(async () => {});
+const acquireSessionWriteLockMock = vi.fn(async (_params?: unknown) => ({
+  release: acquireSessionWriteLockReleaseMock,
+}));
 
-vi.mock("../session-write-lock.js", () =>
-  buildSessionWriteLockModuleMock(
-    () => import("../session-write-lock.js"),
-    (params) => acquireSessionWriteLockMock(params),
-  ),
-);
-
-let rewriteTranscriptEntriesInSessionFile: typeof import("./transcript-rewrite.js").rewriteTranscriptEntriesInSessionFile;
-let rewriteTranscriptEntriesInSessionManager: typeof import("./transcript-rewrite.js").rewriteTranscriptEntriesInSessionManager;
-let onSessionTranscriptUpdate: typeof import("../../sessions/transcript-events.js").onSessionTranscriptUpdate;
-let installSessionToolResultGuard: typeof import("../session-tool-result-guard.js").installSessionToolResultGuard;
-
-async function loadFreshTranscriptRewriteModuleForTest() {
-  resetModulesWithSessionWriteLockDoMock("../session-write-lock.js", (params) =>
-    acquireSessionWriteLockMock(params),
-  );
-  ({ onSessionTranscriptUpdate } = await import("../../sessions/transcript-events.js"));
-  ({ installSessionToolResultGuard } = await import("../session-tool-result-guard.js"));
-  ({ rewriteTranscriptEntriesInSessionFile, rewriteTranscriptEntriesInSessionManager } =
-    await import("./transcript-rewrite.js"));
+function createDeps(sessionManager: SessionManager): TranscriptRewriteDeps {
+  return {
+    acquireSessionWriteLock: acquireSessionWriteLockMock as unknown as NonNullable<
+      TranscriptRewriteDeps["acquireSessionWriteLock"]
+    >,
+    openSessionManager: (() => sessionManager) as unknown as NonNullable<
+      TranscriptRewriteDeps["openSessionManager"]
+    >,
+  };
 }
 
 type AppendMessage = Parameters<SessionManager["appendMessage"]>[0];
@@ -142,10 +138,13 @@ function findAssistantEntryByText(sessionManager: SessionManager, text: string) 
     );
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   acquireSessionWriteLockMock.mockClear();
   acquireSessionWriteLockReleaseMock.mockClear();
-  await loadFreshTranscriptRewriteModuleForTest();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("rewriteTranscriptEntriesInSessionManager", () => {
@@ -282,25 +281,25 @@ describe("rewriteTranscriptEntriesInSessionFile", () => {
     const sessionFile = "/tmp/session.jsonl";
     const { sessionManager, toolResultEntryId } = createExecRewriteSession();
 
-    const openSpy = vi
-      .spyOn(SessionManager, "open")
-      .mockReturnValue(sessionManager as unknown as ReturnType<typeof SessionManager.open>);
     const listener = vi.fn();
     const cleanup = onSessionTranscriptUpdate(listener);
 
     try {
-      const result = await rewriteTranscriptEntriesInSessionFile({
-        sessionFile,
-        sessionKey: "agent:main:test",
-        request: {
-          replacements: [
-            {
-              entryId: toolResultEntryId,
-              message: createToolResultReplacement("exec", "[file_ref:file_abc]", 2),
-            },
-          ],
+      const result = await rewriteTranscriptEntriesInSessionFile(
+        {
+          sessionFile,
+          sessionKey: "agent:main:test",
+          request: {
+            replacements: [
+              {
+                entryId: toolResultEntryId,
+                message: createToolResultReplacement("exec", "[file_ref:file_abc]", 2),
+              },
+            ],
+          },
         },
-      });
+        createDeps(sessionManager),
+      );
 
       expect(result.changed).toBe(true);
       expect(acquireSessionWriteLockMock).toHaveBeenCalledWith({
@@ -316,7 +315,6 @@ describe("rewriteTranscriptEntriesInSessionFile", () => {
       expect(rewrittenToolResult.content).toEqual([{ type: "text", text: "[file_ref:file_abc]" }]);
     } finally {
       cleanup();
-      openSpy.mockRestore();
     }
   });
 });
