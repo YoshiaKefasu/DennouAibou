@@ -1,5 +1,7 @@
 import type { TelegramGroupConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { TelegramNetworkConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { fetchWithTimeout } from "openclaw/plugin-sdk/text-runtime";
+import type { resolveTelegramApiBase, resolveTelegramFetch } from "./fetch.js";
 
 export type TelegramGroupMembershipAuditEntry = {
   chatId: string;
@@ -78,8 +80,22 @@ function loadAuditMembershipRuntime() {
   return auditMembershipRuntimePromise;
 }
 
+/**
+ * Injectable seams for the Telegram membership audit boundaries. Tests supply
+ * fixtures instead of mocking `openclaw/plugin-sdk/text-runtime` and `./fetch.js`
+ * at module level (Bun cannot intercept ESM imports).
+ */
+export type TelegramGroupMembershipAuditDeps = {
+  fetchWithTimeout?: typeof fetchWithTimeout;
+  isRecord?: (value: unknown) => value is Record<string, unknown>;
+  resolveTelegramApiBase?: typeof resolveTelegramApiBase;
+  resolveTelegramFetch?: typeof resolveTelegramFetch;
+  loadAuditMembershipRuntime?: typeof loadAuditMembershipRuntime;
+};
+
 export async function auditTelegramGroupMembership(
   params: AuditTelegramGroupMembershipParams,
+  deps: TelegramGroupMembershipAuditDeps = {},
 ): Promise<TelegramGroupMembershipAudit> {
   const started = Date.now();
   const token = params.token?.trim() ?? "";
@@ -96,11 +112,15 @@ export async function auditTelegramGroupMembership(
 
   // Lazy import to avoid pulling `undici` (ProxyAgent) into cold-path callers that only need
   // `collectTelegramUnmentionedGroupIds` (e.g. config audits).
-  const { auditTelegramGroupMembershipImpl } = await loadAuditMembershipRuntime();
-  const result = await auditTelegramGroupMembershipImpl({
-    ...params,
-    token,
-  });
+  const loadRuntime = deps.loadAuditMembershipRuntime ?? loadAuditMembershipRuntime;
+  const { auditTelegramGroupMembershipImpl } = await loadRuntime();
+  const result = await auditTelegramGroupMembershipImpl(
+    {
+      ...params,
+      token,
+    },
+    deps,
+  );
   return {
     ...result,
     elapsedMs: Date.now() - started,

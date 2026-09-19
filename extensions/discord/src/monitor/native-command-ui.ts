@@ -219,17 +219,22 @@ function buildDiscordModelPickerNoticePayload(message: string): { components: Co
   };
 }
 
-async function resolveDiscordModelPickerRouteState(params: {
-  interaction:
-    | CommandInteraction
-    | ButtonInteraction
-    | StringSelectMenuInteraction
-    | AutocompleteInteraction;
-  cfg: ReturnType<typeof loadConfig>;
-  accountId: string;
-  threadBindings: ThreadBindingManager;
-  enforceConfiguredBindingReadiness?: boolean;
-}) {
+async function resolveDiscordModelPickerRouteState(
+  params: {
+    interaction:
+      | CommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | AutocompleteInteraction;
+    cfg: ReturnType<typeof loadConfig>;
+    accountId: string;
+    threadBindings: ThreadBindingManager;
+    enforceConfiguredBindingReadiness?: boolean;
+  },
+  deps: DiscordNativeChoiceContextDeps = {},
+) {
+  const resolveRouteStateImpl =
+    deps.resolveDiscordNativeInteractionRouteState ?? resolveDiscordNativeInteractionRouteState;
   const { interaction, cfg, accountId } = params;
   const channel = interaction.channel;
   const channelType = channel?.type;
@@ -262,7 +267,7 @@ async function resolveDiscordModelPickerRouteState(params: {
   const threadBinding = isThreadChannel
     ? params.threadBindings.getByThreadId(rawChannelId)
     : undefined;
-  return await resolveDiscordNativeInteractionRouteState({
+  return await resolveRouteStateImpl({
     cfg,
     accountId,
     guildId: interaction.guild?.id ?? undefined,
@@ -291,32 +296,55 @@ async function resolveDiscordModelPickerRoute(params: {
   return resolved.effectiveRoute;
 }
 
-export async function resolveDiscordNativeChoiceContext(params: {
-  interaction: AutocompleteInteraction;
-  cfg: ReturnType<typeof loadConfig>;
-  accountId: string;
-  threadBindings: ThreadBindingManager;
-}): Promise<{ provider?: string; model?: string } | null> {
+/**
+ * Injectable seams for the native-choice context resolution boundaries. Tests
+ * supply fixtures instead of mocking `openclaw/plugin-sdk/conversation-runtime`,
+ * `openclaw/plugin-sdk/agent-runtime`, and `openclaw/plugin-sdk/config-runtime` at
+ * module level (Bun cannot intercept ESM imports).
+ */
+export type DiscordNativeChoiceContextDeps = {
+  resolveDiscordNativeInteractionRouteState?: typeof resolveDiscordNativeInteractionRouteState;
+  resolveDefaultModelForAgent?: typeof resolveDefaultModelForAgent;
+  resolveStorePath?: typeof resolveStorePath;
+  loadSessionStore?: typeof loadSessionStore;
+};
+
+export async function resolveDiscordNativeChoiceContext(
+  params: {
+    interaction: AutocompleteInteraction;
+    cfg: ReturnType<typeof loadConfig>;
+    accountId: string;
+    threadBindings: ThreadBindingManager;
+  },
+  deps: DiscordNativeChoiceContextDeps = {},
+): Promise<{ provider?: string; model?: string } | null> {
   try {
-    const resolved = await resolveDiscordModelPickerRouteState({
-      interaction: params.interaction,
-      cfg: params.cfg,
-      accountId: params.accountId,
-      threadBindings: params.threadBindings,
-      enforceConfiguredBindingReadiness: true,
-    });
+    const resolved = await resolveDiscordModelPickerRouteState(
+      {
+        interaction: params.interaction,
+        cfg: params.cfg,
+        accountId: params.accountId,
+        threadBindings: params.threadBindings,
+        enforceConfiguredBindingReadiness: true,
+      },
+      deps,
+    );
     if (resolved.bindingReadiness && !resolved.bindingReadiness.ok) {
       return null;
     }
     const route = resolved.effectiveRoute;
-    const fallback = resolveDefaultModelForAgent({
+    const resolveDefaultModelForAgentImpl =
+      deps.resolveDefaultModelForAgent ?? resolveDefaultModelForAgent;
+    const resolveStorePathImpl = deps.resolveStorePath ?? resolveStorePath;
+    const loadSessionStoreImpl = deps.loadSessionStore ?? loadSessionStore;
+    const fallback = resolveDefaultModelForAgentImpl({
       cfg: params.cfg,
       agentId: route.agentId,
     });
-    const storePath = resolveStorePath(params.cfg.session?.store, {
+    const storePath = resolveStorePathImpl(params.cfg.session?.store, {
       agentId: route.agentId,
     });
-    const sessionStore = loadSessionStore(storePath);
+    const sessionStore = loadSessionStoreImpl(storePath);
     const sessionEntry = sessionStore[route.sessionKey];
     const override = resolveStoredModelOverride({
       sessionEntry,

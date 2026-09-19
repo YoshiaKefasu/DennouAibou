@@ -528,13 +528,16 @@ function buildTelegramSentHookContext(params: EmitMessageSentHookParams) {
   });
 }
 
-export function emitInternalMessageSentHook(params: EmitMessageSentHookParams): void {
+export function emitInternalMessageSentHook(
+  params: EmitMessageSentHookParams,
+  triggerInternalHookImpl: typeof triggerInternalHook = triggerInternalHook,
+): void {
   if (!params.sessionKeyForInternalHooks) {
     return;
   }
   const canonical = buildTelegramSentHookContext(params);
   fireAndForgetHook(
-    triggerInternalHook(
+    triggerInternalHookImpl(
       createInternalHookEvent(
         "message",
         "sent",
@@ -550,6 +553,7 @@ function emitMessageSentHooks(
   params: EmitMessageSentHookParams & {
     hookRunner: ReturnType<typeof getGlobalHookRunner>;
     enabled: boolean;
+    triggerInternalHook?: typeof triggerInternalHook;
   },
 ): void {
   if (!params.enabled && !params.sessionKeyForInternalHooks) {
@@ -567,7 +571,7 @@ function emitMessageSentHooks(
       "telegram: message_sent plugin hook failed",
     );
   }
-  emitInternalMessageSentHook(params);
+  emitInternalMessageSentHook(params, params.triggerInternalHook);
 }
 
 export function emitTelegramMessageSentHooks(params: EmitMessageSentHookParams): void {
@@ -605,6 +609,13 @@ export async function deliverReplies(params: {
   replyQuoteText?: string;
   /** Override media loader (tests). */
   mediaLoader?: typeof loadWebMedia;
+  /**
+   * Override the global plugin hook runner (tests). Production reads the global
+   * runner set during plugin initialization.
+   */
+  hookRunner?: ReturnType<typeof getGlobalHookRunner>;
+  /** Override the internal `message:sent` hook trigger (tests). */
+  triggerInternalHook?: typeof triggerInternalHook;
 }): Promise<{ delivered: boolean }> {
   const progress: DeliveryProgress = {
     hasReplied: false,
@@ -612,7 +623,7 @@ export async function deliverReplies(params: {
     deliveredCount: 0,
   };
   const mediaLoader = params.mediaLoader ?? loadWebMedia;
-  const hookRunner = getGlobalHookRunner();
+  const hookRunner = params.hookRunner ?? getGlobalHookRunner();
   const hasMessageSendingHooks = hookRunner?.hasHooks("message_sending") ?? false;
   const hasMessageSentHooks = hookRunner?.hasHooks("message_sent") ?? false;
   const chunkText = buildChunkTextResolver({
@@ -722,6 +733,7 @@ export async function deliverReplies(params: {
       emitMessageSentHooks({
         hookRunner,
         enabled: hasMessageSentHooks,
+        triggerInternalHook: params.triggerInternalHook,
         sessionKeyForInternalHooks: params.sessionKeyForInternalHooks,
         chatId: params.chatId,
         accountId: params.accountId,
@@ -735,6 +747,7 @@ export async function deliverReplies(params: {
       emitMessageSentHooks({
         hookRunner,
         enabled: hasMessageSentHooks,
+        triggerInternalHook: params.triggerInternalHook,
         sessionKeyForInternalHooks: params.sessionKeyForInternalHooks,
         chatId: params.chatId,
         accountId: params.accountId,

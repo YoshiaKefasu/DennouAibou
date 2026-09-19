@@ -1,8 +1,13 @@
 import { ChannelType } from "discord-api-types/v10";
 import type { NativeCommandSpec } from "openclaw/plugin-sdk/command-auth";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
-import { clearPluginCommands, registerPluginCommand } from "openclaw/plugin-sdk/plugin-runtime";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearPluginCommands,
+  executePluginCommand as realExecutePluginCommand,
+  matchPluginCommand as realMatchPluginCommand,
+  registerPluginCommand,
+} from "openclaw/plugin-sdk/plugin-runtime";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTestRegistry,
   setActivePluginRegistry,
@@ -11,33 +16,21 @@ import {
   createMockCommandInteraction,
   type MockCommandInteraction,
 } from "./native-command.test-helpers.js";
+import {
+  __testing as discordNativeCommandTesting,
+  createDiscordNativeCommand,
+} from "./native-command.js";
 import { createNoopThreadBindingManager } from "./thread-bindings.js";
-
-let createDiscordNativeCommand: typeof import("./native-command.js").createDiscordNativeCommand;
-let discordNativeCommandTesting: typeof import("./native-command.js").__testing;
-const runtimeModuleMocks = vi.hoisted(() => ({
+// Inject the plugin-dispatch boundaries through the module's existing
+// `__testing` seams instead of mocking `openclaw/plugin-sdk/plugin-runtime` and
+// `openclaw/plugin-sdk/reply-runtime` at module level, and avoid
+// `vi.importActual` (Bun's runner exposes neither vi.mock ESM interception nor
+// the Vitest import-actual helper for this scope).
+const runtimeModuleMocks = {
   matchPluginCommand: vi.fn(),
   executePluginCommand: vi.fn(),
   dispatchReplyWithDispatcher: vi.fn(),
-}));
-
-vi.mock("openclaw/plugin-sdk/plugin-runtime", async () => {
-  const actual = await import("openclaw/plugin-sdk/plugin-runtime");
-  return {
-    ...actual,
-    matchPluginCommand: (...args: unknown[]) => runtimeModuleMocks.matchPluginCommand(...args),
-    executePluginCommand: (...args: unknown[]) => runtimeModuleMocks.executePluginCommand(...args),
-  };
-});
-
-vi.mock("openclaw/plugin-sdk/reply-runtime", async () => {
-  const actual = await import("openclaw/plugin-sdk/reply-runtime");
-  return {
-    ...actual,
-    dispatchReplyWithDispatcher: (...args: unknown[]) =>
-      runtimeModuleMocks.dispatchReplyWithDispatcher(...args),
-  };
-});
+};
 
 function createInteraction(params?: {
   channelType?: ChannelType;
@@ -260,26 +253,14 @@ async function expectBoundStatusCommandDispatch(params: {
 }
 
 describe("Discord native plugin command dispatch", () => {
-  beforeAll(async () => {
-    ({ createDiscordNativeCommand, __testing: discordNativeCommandTesting } =
-      await import("./native-command.js"));
-  });
-
   beforeEach(async () => {
     vi.clearAllMocks();
     clearPluginCommands();
     setActivePluginRegistry(createTestRegistry());
-    const actualPluginRuntime = await vi.importActual<
-      typeof import("openclaw/plugin-sdk/plugin-runtime")
-    >("openclaw/plugin-sdk/plugin-runtime");
     runtimeModuleMocks.matchPluginCommand.mockReset();
-    runtimeModuleMocks.matchPluginCommand.mockImplementation(
-      actualPluginRuntime.matchPluginCommand,
-    );
+    runtimeModuleMocks.matchPluginCommand.mockImplementation(realMatchPluginCommand);
     runtimeModuleMocks.executePluginCommand.mockReset();
-    runtimeModuleMocks.executePluginCommand.mockImplementation(
-      actualPluginRuntime.executePluginCommand,
-    );
+    runtimeModuleMocks.executePluginCommand.mockImplementation(realExecutePluginCommand);
     runtimeModuleMocks.dispatchReplyWithDispatcher.mockReset();
     runtimeModuleMocks.dispatchReplyWithDispatcher.mockResolvedValue({
       counts: {

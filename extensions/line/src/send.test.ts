@@ -1,107 +1,68 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LineSendDeps } from "./send.js";
+import * as sendModule from "./send.js";
 
-const {
-  pushMessageMock,
-  replyMessageMock,
-  showLoadingAnimationMock,
-  getProfileMock,
-  MessagingApiClientMock,
-  loadConfigMock,
-  resolveLineAccountMock,
-  resolveLineChannelAccessTokenMock,
-  recordChannelActivityMock,
-  logVerboseMock,
-} = vi.hoisted(() => {
-  const pushMessageMock = vi.fn();
-  const replyMessageMock = vi.fn();
-  const showLoadingAnimationMock = vi.fn();
-  const getProfileMock = vi.fn();
-  const MessagingApiClientMock = vi.fn(function () {
-    return {
-      pushMessage: pushMessageMock,
-      replyMessage: replyMessageMock,
-      showLoadingAnimation: showLoadingAnimationMock,
-      getProfile: getProfileMock,
-    };
-  });
-  const loadConfigMock = vi.fn(() => ({}));
-  const resolveLineAccountMock = vi.fn(() => ({ accountId: "default" }));
-  const resolveLineChannelAccessTokenMock = vi.fn(() => "line-token");
-  const recordChannelActivityMock = vi.fn();
-  const logVerboseMock = vi.fn();
-  return {
-    pushMessageMock,
-    replyMessageMock,
-    showLoadingAnimationMock,
-    getProfileMock,
-    MessagingApiClientMock,
-    loadConfigMock,
-    resolveLineAccountMock,
-    resolveLineChannelAccessTokenMock,
-    recordChannelActivityMock,
-    logVerboseMock,
-  };
-});
-
-vi.mock("@line/bot-sdk", () => ({
-  messagingApi: { MessagingApiClient: MessagingApiClientMock },
+// Inject the LINE send boundaries instead of mocking `@line/bot-sdk`, the
+// plugin-sdk modules, `./accounts.js`, and `./channel-access-token.js` at module
+// level (Bun cannot intercept ESM imports, so those mocks fail under `bun test`).
+const pushMessageMock = vi.fn();
+const replyMessageMock = vi.fn();
+const showLoadingAnimationMock = vi.fn();
+const getProfileMock = vi.fn();
+const loadConfigMock = vi.fn(() => ({}));
+const resolveLineAccountMock = vi.fn(() => ({ accountId: "default" }));
+const resolveLineChannelAccessTokenMock = vi.fn(() => "line-token");
+const recordChannelActivityMock = vi.fn();
+const logVerboseMock = vi.fn();
+const createMessagingApiClientMock = vi.fn(() => ({
+  pushMessage: pushMessageMock,
+  replyMessage: replyMessageMock,
+  showLoadingAnimation: showLoadingAnimationMock,
+  getProfile: getProfileMock,
 }));
 
-vi.mock("openclaw/plugin-sdk/config-runtime", () => ({
-  loadConfig: loadConfigMock,
-}));
-
-vi.mock("./accounts.js", () => ({
-  resolveLineAccount: resolveLineAccountMock,
-}));
-
-vi.mock("./channel-access-token.js", () => ({
-  resolveLineChannelAccessToken: resolveLineChannelAccessTokenMock,
-}));
-
-vi.mock("openclaw/plugin-sdk/infra-runtime", () => ({
-  recordChannelActivity: recordChannelActivityMock,
-}));
-
-vi.mock("openclaw/plugin-sdk/runtime-env", async () => {
-  const actual = await import("openclaw/plugin-sdk/runtime-env");
-  return {
-    ...actual,
-    logVerbose: logVerboseMock,
-  };
-});
-
-let sendModule: typeof import("./send.js");
+const deps: LineSendDeps = {
+  loadConfig: loadConfigMock as unknown as NonNullable<LineSendDeps["loadConfig"]>,
+  resolveLineAccount: resolveLineAccountMock as unknown as NonNullable<
+    LineSendDeps["resolveLineAccount"]
+  >,
+  resolveLineChannelAccessToken: resolveLineChannelAccessTokenMock as unknown as NonNullable<
+    LineSendDeps["resolveLineChannelAccessToken"]
+  >,
+  recordChannelActivity: recordChannelActivityMock as unknown as NonNullable<
+    LineSendDeps["recordChannelActivity"]
+  >,
+  logVerbose: logVerboseMock as unknown as NonNullable<LineSendDeps["logVerbose"]>,
+  createMessagingApiClient: createMessagingApiClientMock as unknown as NonNullable<
+    LineSendDeps["createMessagingApiClient"]
+  >,
+};
 
 describe("LINE send helpers", () => {
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     pushMessageMock.mockReset();
     replyMessageMock.mockReset();
     showLoadingAnimationMock.mockReset();
     getProfileMock.mockReset();
-    MessagingApiClientMock.mockReset();
     loadConfigMock.mockReset();
     resolveLineAccountMock.mockReset();
     resolveLineChannelAccessTokenMock.mockReset();
     recordChannelActivityMock.mockReset();
     logVerboseMock.mockReset();
+    createMessagingApiClientMock.mockReset();
 
-    MessagingApiClientMock.mockImplementation(function () {
-      return {
-        pushMessage: pushMessageMock,
-        replyMessage: replyMessageMock,
-        showLoadingAnimation: showLoadingAnimationMock,
-        getProfile: getProfileMock,
-      };
-    });
     loadConfigMock.mockReturnValue({});
     resolveLineAccountMock.mockReturnValue({ accountId: "default" });
     resolveLineChannelAccessTokenMock.mockReturnValue("line-token");
+    createMessagingApiClientMock.mockImplementation(() => ({
+      pushMessage: pushMessageMock,
+      replyMessage: replyMessageMock,
+      showLoadingAnimation: showLoadingAnimationMock,
+      getProfile: getProfileMock,
+    }));
     pushMessageMock.mockResolvedValue({});
     replyMessageMock.mockResolvedValue({});
     showLoadingAnimationMock.mockResolvedValue({});
-    sendModule = await import("./send.js");
   });
 
   afterEach(() => {
@@ -120,7 +81,7 @@ describe("LINE send helpers", () => {
       "line:user:U123",
       "https://example.com/original.jpg",
       undefined,
-      { verbose: true },
+      { verbose: true, deps },
     );
 
     expect(pushMessageMock).toHaveBeenCalledWith({
@@ -147,6 +108,7 @@ describe("LINE send helpers", () => {
       replyToken: "reply-token",
       mediaUrl: "https://example.com/media.jpg",
       verbose: true,
+      deps,
     });
 
     expect(replyMessageMock).toHaveBeenCalledTimes(1);
@@ -175,6 +137,7 @@ describe("LINE send helpers", () => {
       mediaKind: "video",
       previewImageUrl: "https://example.com/preview.jpg",
       trackingId: "track-1",
+      deps,
     });
 
     expect(pushMessageMock).toHaveBeenCalledWith({
@@ -199,6 +162,7 @@ describe("LINE send helpers", () => {
       sendModule.sendMessageLine("line:user:U200", "Video", {
         mediaUrl: "https://example.com/video.mp4",
         mediaKind: "video",
+        deps,
       }),
     ).rejects.toThrow(/require previewimageurl/i);
   });
@@ -209,6 +173,7 @@ describe("LINE send helpers", () => {
       mediaKind: "video",
       previewImageUrl: "https://example.com/preview.jpg",
       trackingId: "track-group",
+      deps,
     });
 
     expect(pushMessageMock).toHaveBeenCalledWith({
@@ -228,7 +193,7 @@ describe("LINE send helpers", () => {
   });
 
   it("throws when push messages are empty", async () => {
-    await expect(sendModule.pushMessagesLine("U123", [])).rejects.toThrow(
+    await expect(sendModule.pushMessagesLine("U123", [], { deps })).rejects.toThrow(
       "Message must be non-empty for LINE sends",
     );
   });
@@ -245,7 +210,7 @@ describe("LINE send helpers", () => {
     pushMessageMock.mockRejectedValueOnce(err);
 
     await expect(
-      sendModule.pushMessagesLine("U999", [{ type: "text", text: "hello" }]),
+      sendModule.pushMessagesLine("U999", [{ type: "text", text: "hello" }], { deps }),
     ).rejects.toThrow("LINE push failed");
 
     expect(logVerboseMock).toHaveBeenCalledWith(
@@ -259,8 +224,8 @@ describe("LINE send helpers", () => {
       pictureUrl: "https://example.com/peter.jpg",
     });
 
-    const first = await sendModule.getUserProfile("U-cache");
-    const second = await sendModule.getUserProfile("U-cache");
+    const first = await sendModule.getUserProfile("U-cache", { deps });
+    const second = await sendModule.getUserProfile("U-cache", { deps });
 
     expect(first).toEqual({
       displayName: "Peter",
@@ -273,7 +238,9 @@ describe("LINE send helpers", () => {
   it("continues when loading animation is unsupported", async () => {
     showLoadingAnimationMock.mockRejectedValueOnce(new Error("unsupported"));
 
-    await expect(sendModule.showLoadingAnimation("line:room:R1")).resolves.toBeUndefined();
+    await expect(
+      sendModule.showLoadingAnimation("line:room:R1", { deps }),
+    ).resolves.toBeUndefined();
 
     expect(logVerboseMock).toHaveBeenCalledWith(
       expect.stringContaining("line: loading animation failed (non-fatal)"),
@@ -285,6 +252,7 @@ describe("LINE send helpers", () => {
       "U-quick",
       "Pick one",
       Array.from({ length: 20 }, (_, index) => `Choice ${index + 1}`),
+      { deps },
     );
 
     expect(pushMessageMock).toHaveBeenCalledTimes(1);

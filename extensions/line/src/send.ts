@@ -6,6 +6,22 @@ import { resolveLineAccount } from "./accounts.js";
 import { resolveLineChannelAccessToken } from "./channel-access-token.js";
 import type { LineSendResult } from "./types.js";
 
+/**
+ * Injectable seams for the LINE send boundaries. Tests supply fixtures instead
+ * of mocking `@line/bot-sdk`, the plugin-sdk modules, and the account helpers at
+ * module level (Bun cannot intercept ESM imports).
+ */
+export type LineSendDeps = {
+  loadConfig?: typeof loadConfig;
+  resolveLineAccount?: typeof resolveLineAccount;
+  resolveLineChannelAccessToken?: typeof resolveLineChannelAccessToken;
+  recordChannelActivity?: typeof recordChannelActivity;
+  logVerbose?: typeof logVerbose;
+  createMessagingApiClient?: (params: {
+    channelAccessToken: string;
+  }) => messagingApi.MessagingApiClient;
+};
+
 type Message = messagingApi.Message;
 type TextMessage = messagingApi.TextMessage;
 type ImageMessage = messagingApi.ImageMessage;
@@ -35,10 +51,14 @@ interface LineSendOpts {
   durationMs?: number;
   trackingId?: string;
   replyToken?: string;
+  deps?: LineSendDeps;
 }
 
-type LineClientOpts = Pick<LineSendOpts, "cfg" | "channelAccessToken" | "accountId">;
-type LinePushOpts = Pick<LineSendOpts, "cfg" | "channelAccessToken" | "accountId" | "verbose">;
+type LineClientOpts = Pick<LineSendOpts, "cfg" | "channelAccessToken" | "accountId" | "deps">;
+type LinePushOpts = Pick<
+  LineSendOpts,
+  "cfg" | "channelAccessToken" | "accountId" | "verbose" | "deps"
+>;
 
 interface LinePushBehavior {
   errorContext?: string;
@@ -76,15 +96,21 @@ function createLineMessagingClient(opts: LineClientOpts): {
   account: ReturnType<typeof resolveLineAccount>;
   client: messagingApi.MessagingApiClient;
 } {
-  const cfg = opts.cfg ?? loadConfig();
-  const account = resolveLineAccount({
+  const deps = opts.deps ?? {};
+  const cfg = opts.cfg ?? (deps.loadConfig ?? loadConfig)();
+  const account = (deps.resolveLineAccount ?? resolveLineAccount)({
     cfg,
     accountId: opts.accountId,
   });
-  const token = resolveLineChannelAccessToken(opts.channelAccessToken, account);
-  const client = new messagingApi.MessagingApiClient({
-    channelAccessToken: token,
-  });
+  const token = (deps.resolveLineChannelAccessToken ?? resolveLineChannelAccessToken)(
+    opts.channelAccessToken,
+    account,
+  );
+  const createClient =
+    deps.createMessagingApiClient ??
+    ((params: { channelAccessToken: string }) =>
+      new messagingApi.MessagingApiClient({ channelAccessToken: params.channelAccessToken }));
+  const client = createClient({ channelAccessToken: token });
   return { account, client };
 }
 
@@ -152,7 +178,7 @@ export function createLocationMessage(location: {
   };
 }
 
-function logLineHttpError(err: unknown, context: string): void {
+function logLineHttpError(err: unknown, context: string, deps: LineSendDeps = {}): void {
   if (!err || typeof err !== "object") {
     return;
   }
@@ -163,12 +189,12 @@ function logLineHttpError(err: unknown, context: string): void {
   };
   if (typeof body === "string") {
     const summary = status ? `${status} ${statusText ?? ""}`.trim() : "unknown status";
-    logVerbose(`line: ${context} failed (${summary}): ${body}`);
+    (deps.logVerbose ?? logVerbose)(`line: ${context} failed (${summary}): ${body}`);
   }
 }
 
-function recordLineOutboundActivity(accountId: string): void {
-  recordChannelActivity({
+function recordLineOutboundActivity(accountId: string, deps: LineSendDeps = {}): void {
+  (deps.recordChannelActivity ?? recordChannelActivity)({
     channel: "line",
     accountId,
     direction: "outbound",
@@ -193,20 +219,20 @@ async function pushLineMessages(
 
   if (behavior.errorContext) {
     await pushRequest.catch((err) => {
-      logLineHttpError(err, behavior.errorContext!);
+      logLineHttpError(err, behavior.errorContext!, opts.deps);
       throw err;
     });
   } else {
     await pushRequest;
   }
 
-  recordLineOutboundActivity(account.accountId);
+  recordLineOutboundActivity(account.accountId, opts.deps);
 
   if (opts.verbose) {
     const logMessage =
       behavior.verboseMessage?.(chatId, messages.length) ??
       `line: pushed ${messages.length} messages to ${chatId}`;
-    logVerbose(logMessage);
+    (opts.deps?.logVerbose ?? logVerbose)(logMessage);
   }
 
   return {
@@ -228,10 +254,10 @@ async function replyLineMessages(
     messages,
   });
 
-  recordLineOutboundActivity(account.accountId);
+  recordLineOutboundActivity(account.accountId, opts.deps);
 
   if (opts.verbose) {
-    logVerbose(
+    (opts.deps?.logVerbose ?? logVerbose)(
       behavior.verboseMessage?.(messages.length) ??
         `line: replied with ${messages.length} messages`,
     );
@@ -422,26 +448,38 @@ export function createTextMessageWithQuickReplies(
 
 export async function showLoadingAnimation(
   chatId: string,
-  opts: { channelAccessToken?: string; accountId?: string; loadingSeconds?: number } = {},
+  opts: {
+    channelAccessToken?: string;
+    accountId?: string;
+    loadingSeconds?: number;
+    deps?: LineSendDeps;
+  } = {},
 ): Promise<void> {
   const { client } = createLineMessagingClient(opts);
+  const log = opts.deps?.logVerbose ?? logVerbose;
 
   try {
     await client.showLoadingAnimation({
       chatId: normalizeTarget(chatId),
       loadingSeconds: opts.loadingSeconds ?? 20,
     });
-    logVerbose(`line: showing loading animation to ${chatId}`);
+    log(`line: showing loading animation to ${chatId}`);
   } catch (err) {
-    logVerbose(`line: loading animation failed (non-fatal): ${String(err)}`);
+    log(`line: loading animation failed (non-fatal): ${String(err)}`);
   }
 }
 
 export async function getUserProfile(
   userId: string,
-  opts: { channelAccessToken?: string; accountId?: string; useCache?: boolean } = {},
+  opts: {
+    channelAccessToken?: string;
+    accountId?: string;
+    useCache?: boolean;
+    deps?: LineSendDeps;
+  } = {},
 ): Promise<{ displayName: string; pictureUrl?: string } | null> {
   const useCache = opts.useCache ?? true;
+  const log = opts.deps?.logVerbose ?? logVerbose;
 
   if (useCache) {
     const cached = userProfileCache.get(userId);
@@ -466,14 +504,14 @@ export async function getUserProfile(
 
     return result;
   } catch (err) {
-    logVerbose(`line: failed to fetch profile for ${userId}: ${String(err)}`);
+    log(`line: failed to fetch profile for ${userId}: ${String(err)}`);
     return null;
   }
 }
 
 export async function getUserDisplayName(
   userId: string,
-  opts: { channelAccessToken?: string; accountId?: string } = {},
+  opts: { channelAccessToken?: string; accountId?: string; deps?: LineSendDeps } = {},
 ): Promise<string> {
   const profile = await getUserProfile(userId, opts);
   return profile?.displayName ?? userId;

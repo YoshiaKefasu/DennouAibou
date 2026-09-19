@@ -3,95 +3,43 @@ import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 import { WEBHOOK_IN_FLIGHT_DEFAULTS } from "openclaw/plugin-sdk/webhook-request-guards";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getLineRuntimeState,
+  monitorLineProvider,
+  resetLineRuntimeStateForTests,
+  type MonitorLineProviderDeps,
+} from "./monitor.js";
 
 type LineNodeWebhookHandler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 
-const {
-  createLineBotMock,
-  createLineNodeWebhookHandlerMock,
-  registerPluginHttpRouteMock,
-  unregisterHttpMock,
-} = vi.hoisted(() => ({
-  createLineBotMock: vi.fn(() => ({
-    account: { accountId: "default" },
-    handleWebhook: vi.fn(),
-  })),
-  createLineNodeWebhookHandlerMock: vi.fn<() => LineNodeWebhookHandler>(() =>
-    vi.fn<LineNodeWebhookHandler>(async () => {}),
-  ),
-  registerPluginHttpRouteMock: vi.fn(),
-  unregisterHttpMock: vi.fn(),
+// Inject the monitor boundaries instead of mocking `./bot.js`, `./webhook-node.js`,
+// and `openclaw/plugin-sdk/webhook-ingress` at module level (Bun cannot intercept
+// ESM imports).
+const createLineBotMock = vi.fn(() => ({
+  account: { accountId: "default" },
+  handleWebhook: vi.fn(),
 }));
-
-let monitorLineProvider: typeof import("./monitor.js").monitorLineProvider;
-let getLineRuntimeState: typeof import("./monitor.js").getLineRuntimeState;
 let innerLineWebhookHandlerMock: ReturnType<typeof vi.fn<LineNodeWebhookHandler>>;
+const createLineNodeWebhookHandlerMock = vi.fn(() => innerLineWebhookHandlerMock);
+const registerPluginHttpRouteMock = vi.fn();
+const unregisterHttpMock = vi.fn();
 
-vi.mock("./bot.js", () => ({
-  createLineBot: createLineBotMock,
-}));
-
-vi.mock("openclaw/plugin-sdk/reply-runtime", () => ({
-  chunkMarkdownText: vi.fn(),
-  dispatchReplyWithBufferedBlockDispatcher: vi.fn(),
-}));
-
-vi.mock("openclaw/plugin-sdk/runtime-env", async () => {
-  const actual = await import("openclaw/plugin-sdk/runtime-env");
-  return {
-    ...actual,
-    danger: (value: unknown) => String(value),
-    logVerbose: vi.fn(),
-    waitForAbortSignal: vi.fn(),
-  };
-});
-
-vi.mock("openclaw/plugin-sdk/channel-reply-pipeline", () => ({
-  createChannelReplyPipeline: vi.fn(() => ({})),
-}));
-
-vi.mock("openclaw/plugin-sdk/webhook-ingress", () => ({
-  normalizePluginHttpPath: (_path: string | undefined, fallback: string) => fallback,
-  registerPluginHttpRoute: registerPluginHttpRouteMock,
-}));
-
-vi.mock("./webhook-node.js", () => ({
-  createLineNodeWebhookHandler: createLineNodeWebhookHandlerMock,
-}));
-
-vi.mock("./auto-reply-delivery.js", () => ({
-  deliverLineAutoReply: vi.fn(),
-}));
-
-vi.mock("./markdown-to-line.js", () => ({
-  processLineMessage: vi.fn(),
-}));
-
-vi.mock("./reply-chunks.js", () => ({
-  sendLineReplyChunks: vi.fn(),
-}));
-
-vi.mock("./send.js", () => ({
-  createFlexMessage: vi.fn(),
-  createImageMessage: vi.fn(),
-  createLocationMessage: vi.fn(),
-  createQuickReplyItems: vi.fn(),
-  createTextMessageWithQuickReplies: vi.fn(),
-  getUserDisplayName: vi.fn(),
-  pushMessageLine: vi.fn(),
-  pushMessagesLine: vi.fn(),
-  pushTextMessageWithQuickReplies: vi.fn(),
-  replyMessageLine: vi.fn(),
-  showLoadingAnimation: vi.fn(),
-}));
-
-vi.mock("./template-messages.js", () => ({
-  buildTemplateMessageFromPayload: vi.fn(),
-}));
+const deps: MonitorLineProviderDeps = {
+  createLineBot: createLineBotMock as unknown as NonNullable<
+    MonitorLineProviderDeps["createLineBot"]
+  >,
+  createLineNodeWebhookHandler: createLineNodeWebhookHandlerMock as unknown as NonNullable<
+    MonitorLineProviderDeps["createLineNodeWebhookHandler"]
+  >,
+  registerPluginHttpRoute: registerPluginHttpRouteMock as unknown as NonNullable<
+    MonitorLineProviderDeps["registerPluginHttpRoute"]
+  >,
+  logVerbose: (() => {}) as unknown as NonNullable<MonitorLineProviderDeps["logVerbose"]>,
+};
 
 describe("monitorLineProvider lifecycle", () => {
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
+    resetLineRuntimeStateForTests();
     createLineBotMock.mockReset();
     createLineBotMock.mockReturnValue({
       account: { accountId: "default" },
@@ -103,7 +51,6 @@ describe("monitorLineProvider lifecycle", () => {
       .mockImplementation(() => innerLineWebhookHandlerMock);
     unregisterHttpMock.mockReset();
     registerPluginHttpRouteMock.mockReset().mockReturnValue(unregisterHttpMock);
-    ({ monitorLineProvider, getLineRuntimeState } = await import("./monitor.js"));
   });
 
   const createRouteResponse = () => {
@@ -122,13 +69,16 @@ describe("monitorLineProvider lifecycle", () => {
     const abort = new AbortController();
     let resolved = false;
 
-    const task = monitorLineProvider({
-      channelAccessToken: "token",
-      channelSecret: "secret", // pragma: allowlist secret
-      config: {} as OpenClawConfig,
-      runtime: {} as RuntimeEnv,
-      abortSignal: abort.signal,
-    }).then((monitor) => {
+    const task = monitorLineProvider(
+      {
+        channelAccessToken: "token",
+        channelSecret: "secret", // pragma: allowlist secret
+        config: {} as OpenClawConfig,
+        runtime: {} as RuntimeEnv,
+        abortSignal: abort.signal,
+      },
+      deps,
+    ).then((monitor) => {
       resolved = true;
       return monitor;
     });
@@ -148,24 +98,30 @@ describe("monitorLineProvider lifecycle", () => {
     const abort = new AbortController();
     abort.abort();
 
-    await monitorLineProvider({
-      channelAccessToken: "token",
-      channelSecret: "secret", // pragma: allowlist secret
-      config: {} as OpenClawConfig,
-      runtime: {} as RuntimeEnv,
-      abortSignal: abort.signal,
-    });
+    await monitorLineProvider(
+      {
+        channelAccessToken: "token",
+        channelSecret: "secret", // pragma: allowlist secret
+        config: {} as OpenClawConfig,
+        runtime: {} as RuntimeEnv,
+        abortSignal: abort.signal,
+      },
+      deps,
+    );
 
     expect(unregisterHttpMock).toHaveBeenCalledTimes(1);
   });
 
   it("returns immediately without abort signal and stop is idempotent", async () => {
-    const monitor = await monitorLineProvider({
-      channelAccessToken: "token",
-      channelSecret: "secret", // pragma: allowlist secret
-      config: {} as OpenClawConfig,
-      runtime: {} as RuntimeEnv,
-    });
+    const monitor = await monitorLineProvider(
+      {
+        channelAccessToken: "token",
+        channelSecret: "secret", // pragma: allowlist secret
+        config: {} as OpenClawConfig,
+        runtime: {} as RuntimeEnv,
+      },
+      deps,
+    );
 
     expect(unregisterHttpMock).not.toHaveBeenCalled();
     monitor.stop();
@@ -174,24 +130,27 @@ describe("monitorLineProvider lifecycle", () => {
   });
 
   it("records startup state under configured defaultAccount when accountId is omitted", async () => {
-    const monitor = await monitorLineProvider({
-      channelAccessToken: "token",
-      channelSecret: "secret", // pragma: allowlist secret
-      config: {
-        channels: {
-          line: {
-            defaultAccount: "work",
-            accounts: {
-              work: {
-                channelAccessToken: "work-token",
-                channelSecret: "work-secret",
+    const monitor = await monitorLineProvider(
+      {
+        channelAccessToken: "token",
+        channelSecret: "secret", // pragma: allowlist secret
+        config: {
+          channels: {
+            line: {
+              defaultAccount: "work",
+              accounts: {
+                work: {
+                  channelAccessToken: "work-token",
+                  channelSecret: "work-secret",
+                },
               },
             },
           },
-        },
-      } as OpenClawConfig,
-      runtime: {} as RuntimeEnv,
-    });
+        } as OpenClawConfig,
+        runtime: {} as RuntimeEnv,
+      },
+      deps,
+    );
 
     expect(getLineRuntimeState("work")).toEqual(
       expect.objectContaining({
@@ -224,12 +183,15 @@ describe("monitorLineProvider lifecycle", () => {
       },
     );
 
-    const monitor = await monitorLineProvider({
-      channelAccessToken: "token",
-      channelSecret: "secret", // pragma: allowlist secret
-      config: {} as OpenClawConfig,
-      runtime: {} as RuntimeEnv,
-    });
+    const monitor = await monitorLineProvider(
+      {
+        channelAccessToken: "token",
+        channelSecret: "secret", // pragma: allowlist secret
+        config: {} as OpenClawConfig,
+        runtime: {} as RuntimeEnv,
+      },
+      deps,
+    );
 
     const route = registerPluginHttpRouteMock.mock.calls[0]?.[0] as
       | { handler: (req: IncomingMessage, res: ServerResponse) => Promise<void> }

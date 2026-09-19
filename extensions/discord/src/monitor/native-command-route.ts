@@ -25,19 +25,31 @@ export type DiscordNativeInteractionRouteState = {
   > | null;
 };
 
-export async function resolveDiscordNativeInteractionRouteState(params: {
-  cfg: OpenClawConfig;
-  accountId: string;
-  guildId?: string;
-  memberRoleIds?: string[];
-  isDirectMessage: boolean;
-  isGroupDm: boolean;
-  directUserId?: string;
-  conversationId: string;
-  parentConversationId?: string;
-  threadBinding?: ThreadBindingRecord;
-  enforceConfiguredBindingReadiness?: boolean;
-}): Promise<DiscordNativeInteractionRouteState> {
+export type DiscordNativeInteractionRouteStateDeps = {
+  resolveConfiguredBindingRoute?: typeof conversationRuntime.resolveConfiguredBindingRoute;
+  ensureConfiguredBindingRouteReady?: typeof conversationRuntime.ensureConfiguredBindingRouteReady;
+};
+
+export async function resolveDiscordNativeInteractionRouteState(
+  params: {
+    cfg: OpenClawConfig;
+    accountId: string;
+    guildId?: string;
+    memberRoleIds?: string[];
+    isDirectMessage: boolean;
+    isGroupDm: boolean;
+    directUserId?: string;
+    conversationId: string;
+    parentConversationId?: string;
+    threadBinding?: ThreadBindingRecord;
+    enforceConfiguredBindingReadiness?: boolean;
+  },
+  deps: DiscordNativeInteractionRouteStateDeps = {},
+): Promise<DiscordNativeInteractionRouteState> {
+  const resolveConfiguredBindingRouteImpl =
+    deps.resolveConfiguredBindingRoute ?? conversationRuntime.resolveConfiguredBindingRoute;
+  const ensureConfiguredBindingRouteReadyImpl =
+    deps.ensureConfiguredBindingRouteReady ?? conversationRuntime.ensureConfiguredBindingRouteReady;
   const route = resolveDiscordBoundConversationRoute({
     cfg: params.cfg,
     accountId: params.accountId,
@@ -51,7 +63,7 @@ export async function resolveDiscordNativeInteractionRouteState(params: {
   });
   const configuredRoute =
     params.threadBinding == null
-      ? conversationRuntime.resolveConfiguredBindingRoute({
+      ? resolveConfiguredBindingRouteImpl({
           cfg: params.cfg,
           route,
           conversation: {
@@ -74,7 +86,7 @@ export async function resolveDiscordNativeInteractionRouteState(params: {
   });
   const bindingReadiness =
     params.enforceConfiguredBindingReadiness && configuredBinding
-      ? await conversationRuntime.ensureConfiguredBindingRouteReady({
+      ? await ensureConfiguredBindingRouteReadyImpl({
           cfg: params.cfg,
           bindingResolution: configuredBinding,
         })

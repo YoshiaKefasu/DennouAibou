@@ -1,16 +1,21 @@
 import type { Bot } from "grammy";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { deliverReplies } from "./delivery.js";
 
-const { loadWebMedia } = vi.hoisted(() => ({
-  loadWebMedia: vi.fn(),
-}));
-const triggerInternalHook = vi.hoisted(() => vi.fn(async () => {}));
-const messageHookRunner = vi.hoisted(() => ({
+// Inject the web-media, hook-runner, and internal-hook boundaries through the
+// `deliverReplies` parameters instead of mocking `openclaw/plugin-sdk/web-media`,
+// `../../../../src/plugins/hook-runner-global.js`, and
+// `../../../../src/hooks/internal-hooks.js` at module level. `vi.resetModules()`
+// plus a fresh dynamic import is unsupported by Bun's runner, and Bun cannot
+// intercept the ESM module mocks either.
+const loadWebMedia = vi.fn();
+const triggerInternalHook = vi.fn(async () => {});
+const messageHookRunner = {
   hasHooks: vi.fn<(name: string) => boolean>(() => false),
   runMessageSending: vi.fn(),
   runMessageSent: vi.fn(),
-}));
+};
 const baseDeliveryParams = {
   chatId: "123",
   token: "tok",
@@ -24,44 +29,6 @@ type DeliverWithParams = Omit<
 > &
   Partial<Pick<DeliverRepliesParams, "replyToMode" | "textLimit" | "mediaLoader">>;
 type RuntimeStub = Pick<RuntimeEnv, "error" | "log" | "exit">;
-
-vi.mock("openclaw/plugin-sdk/web-media", () => ({
-  loadWebMedia: (...args: unknown[]) => loadWebMedia(...args),
-}));
-vi.mock("openclaw/plugin-sdk/web-media.js", () => ({
-  loadWebMedia: (...args: unknown[]) => loadWebMedia(...args),
-}));
-
-vi.mock("../../../../src/plugins/hook-runner-global.js", () => ({
-  getGlobalHookRunner: () => messageHookRunner,
-}));
-
-vi.mock("../../../../src/hooks/internal-hooks.js", async () => {
-  const actual = await import("../../../../src/hooks/internal-hooks.js");
-  return {
-    ...actual,
-    triggerInternalHook,
-  };
-});
-
-vi.resetModules();
-const { deliverReplies } = await import("./delivery.js");
-
-vi.mock("grammy", () => ({
-  API_CONSTANTS: {
-    DEFAULT_UPDATE_TYPES: ["message"],
-    ALL_UPDATE_TYPES: ["message"],
-  },
-  InputFile: class {
-    constructor(
-      public buffer: Buffer,
-      public fileName?: string,
-    ) {}
-  },
-  GrammyError: class GrammyError extends Error {
-    description = "";
-  },
-}));
 
 function createRuntime(withLog = true): RuntimeStub {
   return {
@@ -80,6 +47,10 @@ async function deliverWith(params: DeliverWithParams) {
     ...baseDeliveryParams,
     ...params,
     mediaLoader: params.mediaLoader ?? loadWebMedia,
+    hookRunner: messageHookRunner as unknown as NonNullable<DeliverRepliesParams["hookRunner"]>,
+    triggerInternalHook: triggerInternalHook as unknown as NonNullable<
+      DeliverRepliesParams["triggerInternalHook"]
+    >,
   });
 }
 
@@ -130,6 +101,7 @@ describe("deliverReplies", () => {
   beforeEach(() => {
     loadWebMedia.mockClear();
     triggerInternalHook.mockReset();
+    triggerInternalHook.mockImplementation(async () => {});
     messageHookRunner.hasHooks.mockReset();
     messageHookRunner.hasHooks.mockReturnValue(false);
     messageHookRunner.runMessageSending.mockReset();
@@ -861,6 +833,7 @@ describe("deliverReplies", () => {
       bot,
       replyToMode: "first",
       textLimit: 4000,
+      mediaLoader: loadWebMedia as unknown as DeliverRepliesParams["mediaLoader"],
     });
 
     expect(sendPhoto).toHaveBeenCalledTimes(2);

@@ -1,16 +1,29 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  auditTelegramGroupMembership,
+  collectTelegramUnmentionedGroupIds,
+  type TelegramGroupMembershipAuditDeps,
+} from "./audit.js";
 
-let collectTelegramUnmentionedGroupIds: typeof import("./audit.js").collectTelegramUnmentionedGroupIds;
-let auditTelegramGroupMembership: typeof import("./audit.js").auditTelegramGroupMembership;
-const fetchWithTimeoutMock = vi.hoisted(() => vi.fn());
-const resolveTelegramFetchMock = vi.hoisted(() => vi.fn(() => fetchWithTimeoutMock));
-const resolveTelegramApiBaseMock = vi.hoisted(() => vi.fn(() => "https://api.telegram.org"));
+// Inject the audit boundaries instead of mocking `openclaw/plugin-sdk/text-runtime`
+// and `./fetch.js` at module level (Bun cannot intercept ESM imports).
+const fetchWithTimeoutMock = vi.fn();
+const resolveTelegramFetchMock = vi.fn(() => fetchWithTimeoutMock);
+const resolveTelegramApiBaseMock = vi.fn(() => "https://api.telegram.org");
 
-vi.mock("openclaw/plugin-sdk/text-runtime", () => ({
-  fetchWithTimeout: fetchWithTimeoutMock,
+const deps: TelegramGroupMembershipAuditDeps = {
+  fetchWithTimeout: fetchWithTimeoutMock as unknown as NonNullable<
+    TelegramGroupMembershipAuditDeps["fetchWithTimeout"]
+  >,
   isRecord: (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null,
-}));
+  resolveTelegramFetch: resolveTelegramFetchMock as unknown as NonNullable<
+    TelegramGroupMembershipAuditDeps["resolveTelegramFetch"]
+  >,
+  resolveTelegramApiBase: resolveTelegramApiBaseMock as unknown as NonNullable<
+    TelegramGroupMembershipAuditDeps["resolveTelegramApiBase"]
+  >,
+};
 
 function mockGetChatMemberStatus(status: string) {
   fetchWithTimeoutMock.mockResolvedValueOnce(
@@ -22,24 +35,18 @@ function mockGetChatMemberStatus(status: string) {
 }
 
 async function auditSingleGroup() {
-  return auditTelegramGroupMembership({
-    token: "t",
-    botId: 123,
-    groupIds: ["-1001"],
-    timeoutMs: 5000,
-  });
+  return auditTelegramGroupMembership(
+    {
+      token: "t",
+      botId: 123,
+      groupIds: ["-1001"],
+      timeoutMs: 5000,
+    },
+    deps,
+  );
 }
 
 describe("telegram audit", () => {
-  beforeAll(async () => {
-    vi.doMock("./fetch.js", () => ({
-      resolveTelegramApiBase: resolveTelegramApiBaseMock,
-      resolveTelegramFetch: resolveTelegramFetchMock,
-    }));
-    ({ collectTelegramUnmentionedGroupIds, auditTelegramGroupMembership } =
-      await import("./audit.js"));
-  });
-
   beforeEach(() => {
     fetchWithTimeoutMock.mockReset();
     resolveTelegramFetchMock.mockClear();

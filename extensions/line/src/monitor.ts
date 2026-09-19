@@ -97,6 +97,24 @@ export function getLineRuntimeState(accountId: string) {
   return runtimeState.get(`line:${accountId}`);
 }
 
+/** Test-only: clear the in-memory LINE runtime state map. */
+export function resetLineRuntimeStateForTests(): void {
+  runtimeState.clear();
+}
+
+/**
+ * Injectable seams for the LINE monitor boundaries. Tests supply fixtures
+ * instead of mocking `./bot.js`, `./webhook-node.js`, and
+ * `openclaw/plugin-sdk/webhook-ingress` at module level (Bun cannot intercept
+ * ESM imports).
+ */
+export type MonitorLineProviderDeps = {
+  createLineBot?: typeof createLineBot;
+  createLineNodeWebhookHandler?: typeof createLineNodeWebhookHandler;
+  registerPluginHttpRoute?: typeof registerPluginHttpRoute;
+  logVerbose?: typeof logVerbose;
+};
+
 function startLineLoadingKeepalive(params: {
   userId: string;
   accountId?: string;
@@ -131,6 +149,7 @@ function startLineLoadingKeepalive(params: {
 
 export async function monitorLineProvider(
   opts: MonitorLineProviderOptions,
+  deps: MonitorLineProviderDeps = {},
 ): Promise<LineProviderMonitor> {
   const {
     channelAccessToken,
@@ -141,6 +160,11 @@ export async function monitorLineProvider(
     abortSignal,
     webhookPath,
   } = opts;
+  const createLineBotImpl = deps.createLineBot ?? createLineBot;
+  const createLineNodeWebhookHandlerImpl =
+    deps.createLineNodeWebhookHandler ?? createLineNodeWebhookHandler;
+  const registerPluginHttpRouteImpl = deps.registerPluginHttpRoute ?? registerPluginHttpRoute;
+  const logVerboseImpl = deps.logVerbose ?? logVerbose;
   const resolvedAccountId = accountId ?? resolveDefaultLineAccountId(config);
   const token = channelAccessToken.trim();
   const secret = channelSecret.trim();
@@ -161,7 +185,7 @@ export async function monitorLineProvider(
     },
   });
 
-  const bot = createLineBot({
+  const bot = createLineBotImpl({
     channelAccessToken: token,
     channelSecret: secret,
     accountId,
@@ -193,7 +217,7 @@ export async function monitorLineProvider(
         : null;
 
       const displayName = await displayNamePromise;
-      logVerbose(`line: received message from ${displayName} (${ctxPayload.From})`);
+      logVerboseImpl(`line: received message from ${displayName} (${ctxPayload.From})`);
 
       try {
         const textLimit = 5000;
@@ -240,7 +264,7 @@ export async function monitorLineProvider(
                   createImageMessage,
                   createLocationMessage,
                   onReplyError: (replyErr) => {
-                    logVerbose(
+                    logVerboseImpl(
                       `line: reply token failed, falling back to push: ${String(replyErr)}`,
                     );
                   },
@@ -266,7 +290,7 @@ export async function monitorLineProvider(
         });
 
         if (!queuedFinal) {
-          logVerbose(`line: no response generated for message from ${ctxPayload.From}`);
+          logVerboseImpl(`line: no response generated for message from ${ctxPayload.From}`);
         }
       } catch (err) {
         runtime.error?.(danger(`line: auto-reply failed: ${String(err)}`));
@@ -290,19 +314,19 @@ export async function monitorLineProvider(
 
   const normalizedPath = normalizePluginHttpPath(webhookPath, "/line/webhook") ?? "/line/webhook";
   const createScopedLineWebhookHandler = (onRequestAuthenticated?: () => void) =>
-    createLineNodeWebhookHandler({
+    createLineNodeWebhookHandlerImpl({
       channelSecret: secret,
       bot,
       runtime,
       onRequestAuthenticated,
     });
-  const unregisterHttp = registerPluginHttpRoute({
+  const unregisterHttp = registerPluginHttpRouteImpl({
     path: normalizedPath,
     auth: "plugin",
     replaceExisting: true,
     pluginId: "line",
     accountId: resolvedAccountId,
-    log: (msg) => logVerbose(msg),
+    log: (msg) => logVerboseImpl(msg),
     handler: async (req, res) => {
       if (req.method !== "POST") {
         await createScopedLineWebhookHandler()(req, res);
@@ -327,7 +351,7 @@ export async function monitorLineProvider(
     },
   });
 
-  logVerbose(`line: registered webhook handler at ${normalizedPath}`);
+  logVerboseImpl(`line: registered webhook handler at ${normalizedPath}`);
 
   let stopped = false;
   const stopHandler = () => {
@@ -335,7 +359,7 @@ export async function monitorLineProvider(
       return;
     }
     stopped = true;
-    logVerbose(`line: stopping provider for account ${resolvedAccountId}`);
+    logVerboseImpl(`line: stopping provider for account ${resolvedAccountId}`);
     unregisterHttp();
     recordChannelRuntimeState({
       channel: "line",
