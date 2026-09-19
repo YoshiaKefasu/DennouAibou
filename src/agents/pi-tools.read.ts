@@ -614,8 +614,20 @@ export function createHostWorkspaceWriteTool(root: string, options?: { workspace
   return wrapToolParamValidation(base, REQUIRED_PARAM_GROUPS.write);
 }
 
-export function createHostWorkspaceEditTool(root: string, options?: { workspaceOnly?: boolean }) {
-  const base = createEditTool(root, {
+export function createHostWorkspaceEditTool(
+  root: string,
+  options?: {
+    workspaceOnly?: boolean;
+    /**
+     * Injectable seam for the upstream `createEditTool` factory. Tests supply a
+     * stub that captures the edit operations instead of mocking
+     * `@earendil-works/pi-coding-agent` at module level.
+     */
+    createEditTool?: typeof createEditTool;
+  },
+) {
+  const createEditToolImpl = options?.createEditTool ?? createEditTool;
+  const base = createEditToolImpl(root, {
     operations: createHostEditOperations(root, options),
   }) as unknown as AnyAgentTool;
   const withRecovery = wrapEditToolWithRecovery(base, {

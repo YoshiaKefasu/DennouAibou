@@ -291,8 +291,14 @@ export async function initSessionState(params: {
   ctx: MsgContext;
   cfg: OpenClawConfig;
   commandAuthorized: boolean;
+  /**
+   * Test-only seam for `getGlobalHookRunner`. Defaults to the process-global
+   * runner; tests inject a stub instead of mocking the module at module level.
+   */
+  getGlobalHookRunner?: typeof getGlobalHookRunner;
 }): Promise<SessionInitResult> {
   const { ctx, cfg, commandAuthorized } = params;
+  const getGlobalHookRunnerImpl = params.getGlobalHookRunner ?? getGlobalHookRunner;
   const {
     sessionCtxForState,
     sessionCfg,
@@ -764,7 +770,7 @@ export async function initSessionState(params: {
   };
 
   // Run session plugin hooks (fire-and-forget)
-  const hookRunner = getGlobalHookRunner();
+  const hookRunner = getGlobalHookRunnerImpl();
   if (hookRunner && isNewSession) {
     const effectiveSessionId = sessionId ?? "";
 

@@ -46,6 +46,20 @@ type PluginHandledResult = {
   toolResult: AgentToolResult<unknown>;
 };
 
+/**
+ * Injectable seams for the outbound-send boundaries this module calls. Tests
+ * supply fixtures instead of mocking `./message.js`, `../../media/read-capability.js`,
+ * `../../config/sessions.js`, and the channel action dispatcher at module level
+ * (Bun cannot intercept ESM imports).
+ */
+export type OutboundSendServiceDeps = {
+  dispatchChannelMessageAction?: typeof dispatchChannelMessageAction;
+  resolveAgentScopedOutboundMediaAccess?: typeof resolveAgentScopedOutboundMediaAccess;
+  appendAssistantMessageToSessionTranscript?: typeof appendAssistantMessageToSessionTranscript;
+  sendMessage?: typeof sendMessage;
+  sendPoll?: typeof sendPoll;
+};
+
 function collectActionMediaSources(params: Record<string, unknown>): string[] {
   const sources: string[] = [];
   for (const key of ["media", "mediaUrl", "path", "filePath", "fileUrl"] as const) {
@@ -57,22 +71,29 @@ function collectActionMediaSources(params: Record<string, unknown>): string[] {
   return sources;
 }
 
-async function tryHandleWithPluginAction(params: {
-  ctx: OutboundSendContext;
-  action: "send" | "poll";
-  onHandled?: () => Promise<void> | void;
-}): Promise<PluginHandledResult | null> {
+async function tryHandleWithPluginAction(
+  params: {
+    ctx: OutboundSendContext;
+    action: "send" | "poll";
+    onHandled?: () => Promise<void> | void;
+  },
+  deps: OutboundSendServiceDeps = {},
+): Promise<PluginHandledResult | null> {
   if (params.ctx.dryRun) {
     return null;
   }
-  const mediaAccess = resolveAgentScopedOutboundMediaAccess({
+  const resolveAgentScopedOutboundMediaAccessImpl =
+    deps.resolveAgentScopedOutboundMediaAccess ?? resolveAgentScopedOutboundMediaAccess;
+  const dispatchChannelMessageActionImpl =
+    deps.dispatchChannelMessageAction ?? dispatchChannelMessageAction;
+  const mediaAccess = resolveAgentScopedOutboundMediaAccessImpl({
     cfg: params.ctx.cfg,
     agentId: params.ctx.agentId ?? params.ctx.mirror?.agentId,
     mediaSources: collectActionMediaSources(params.ctx.params),
     mediaAccess: params.ctx.mediaAccess,
     mediaReadFile: params.ctx.mediaReadFile,
   });
-  const handled = await dispatchChannelMessageAction({
+  const handled = await dispatchChannelMessageActionImpl({
     channel: params.ctx.channel,
     action: params.action,
     cfg: params.ctx.cfg,
@@ -96,51 +117,60 @@ async function tryHandleWithPluginAction(params: {
   };
 }
 
-export async function executeSendAction(params: {
-  ctx: OutboundSendContext;
-  to: string;
-  message: string;
-  mediaUrl?: string;
-  mediaUrls?: string[];
-  gifPlayback?: boolean;
-  forceDocument?: boolean;
-  bestEffort?: boolean;
-  replyToId?: string;
-  threadId?: string | number;
-}): Promise<{
+export async function executeSendAction(
+  params: {
+    ctx: OutboundSendContext;
+    to: string;
+    message: string;
+    mediaUrl?: string;
+    mediaUrls?: string[];
+    gifPlayback?: boolean;
+    forceDocument?: boolean;
+    bestEffort?: boolean;
+    replyToId?: string;
+    threadId?: string | number;
+  },
+  deps: OutboundSendServiceDeps = {},
+): Promise<{
   handledBy: "plugin" | "core";
   payload: unknown;
   toolResult?: AgentToolResult<unknown>;
   sendResult?: MessageSendResult;
 }> {
   throwIfAborted(params.ctx.abortSignal);
-  const pluginHandled = await tryHandleWithPluginAction({
-    ctx: params.ctx,
-    action: "send",
-    onHandled: async () => {
-      if (!params.ctx.mirror) {
-        return;
-      }
-      const mirrorText = params.ctx.mirror.text ?? params.message;
-      const mirrorMediaUrls =
-        params.ctx.mirror.mediaUrls ??
-        params.mediaUrls ??
-        (params.mediaUrl ? [params.mediaUrl] : undefined);
-      await appendAssistantMessageToSessionTranscript({
-        agentId: params.ctx.mirror.agentId,
-        sessionKey: params.ctx.mirror.sessionKey,
-        text: mirrorText,
-        mediaUrls: mirrorMediaUrls,
-        idempotencyKey: params.ctx.mirror.idempotencyKey,
-      });
+  const appendAssistantMessageToSessionTranscriptImpl =
+    deps.appendAssistantMessageToSessionTranscript ?? appendAssistantMessageToSessionTranscript;
+  const sendMessageImpl = deps.sendMessage ?? sendMessage;
+  const pluginHandled = await tryHandleWithPluginAction(
+    {
+      ctx: params.ctx,
+      action: "send",
+      onHandled: async () => {
+        if (!params.ctx.mirror) {
+          return;
+        }
+        const mirrorText = params.ctx.mirror.text ?? params.message;
+        const mirrorMediaUrls =
+          params.ctx.mirror.mediaUrls ??
+          params.mediaUrls ??
+          (params.mediaUrl ? [params.mediaUrl] : undefined);
+        await appendAssistantMessageToSessionTranscriptImpl({
+          agentId: params.ctx.mirror.agentId,
+          sessionKey: params.ctx.mirror.sessionKey,
+          text: mirrorText,
+          mediaUrls: mirrorMediaUrls,
+          idempotencyKey: params.ctx.mirror.idempotencyKey,
+        });
+      },
     },
-  });
+    deps,
+  );
   if (pluginHandled) {
     return pluginHandled;
   }
 
   throwIfAborted(params.ctx.abortSignal);
-  const result: MessageSendResult = await sendMessage({
+  const result: MessageSendResult = await sendMessageImpl({
     cfg: params.ctx.cfg,
     to: params.to,
     content: params.message,
@@ -169,34 +199,41 @@ export async function executeSendAction(params: {
   };
 }
 
-export async function executePollAction(params: {
-  ctx: OutboundSendContext;
-  resolveCorePoll: () => {
-    to: string;
-    question: string;
-    options: string[];
-    maxSelections: number;
-    durationSeconds?: number;
-    durationHours?: number;
-    threadId?: string;
-    isAnonymous?: boolean;
-  };
-}): Promise<{
+export async function executePollAction(
+  params: {
+    ctx: OutboundSendContext;
+    resolveCorePoll: () => {
+      to: string;
+      question: string;
+      options: string[];
+      maxSelections: number;
+      durationSeconds?: number;
+      durationHours?: number;
+      threadId?: string;
+      isAnonymous?: boolean;
+    };
+  },
+  deps: OutboundSendServiceDeps = {},
+): Promise<{
   handledBy: "plugin" | "core";
   payload: unknown;
   toolResult?: AgentToolResult<unknown>;
   pollResult?: MessagePollResult;
 }> {
-  const pluginHandled = await tryHandleWithPluginAction({
-    ctx: params.ctx,
-    action: "poll",
-  });
+  const sendPollImpl = deps.sendPoll ?? sendPoll;
+  const pluginHandled = await tryHandleWithPluginAction(
+    {
+      ctx: params.ctx,
+      action: "poll",
+    },
+    deps,
+  );
   if (pluginHandled) {
     return pluginHandled;
   }
 
   const corePoll = params.resolveCorePoll();
-  const result: MessagePollResult = await sendPoll({
+  const result: MessagePollResult = await sendPollImpl({
     cfg: params.ctx.cfg,
     to: corePoll.to,
     question: corePoll.question,

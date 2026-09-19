@@ -99,29 +99,6 @@ if (
     return true;
   }
 
-  function tryHandleRootVersionFastPath(argv: string[]): boolean {
-    if (resolveCliContainerTarget(argv)) {
-      return false;
-    }
-    if (!isRootVersionInvocation(argv)) {
-      return false;
-    }
-    Promise.all([import("./version.js"), import("./infra/git-commit.js")])
-      .then(([{ VERSION }, { resolveCommitHash }]) => {
-        const commit = resolveCommitHash({ moduleUrl: import.meta.url });
-        console.log(commit ? `OpenClaw ${VERSION} (${commit})` : `OpenClaw ${VERSION}`);
-        process.exit(0);
-      })
-      .catch((error) => {
-        console.error(
-          "[openclaw] Failed to resolve version:",
-          error instanceof Error ? (error.stack ?? error.message) : error,
-        );
-        process.exitCode = 1;
-      });
-    return true;
-  }
-
   process.argv = normalizeWindowsArgv(process.argv);
 
   if (!ensureCliRespawnReady()) {
@@ -154,6 +131,65 @@ if (
       runMainOrRootHelp(process.argv);
     }
   }
+}
+
+export type RootVersionFastPathDeps = {
+  isRootVersionInvocation?: typeof isRootVersionInvocation;
+  resolveCliContainerTarget?: typeof resolveCliContainerTarget;
+  /** Returns the product version string. Defaults to importing `./version.js`. */
+  loadVersion?: () => Promise<string>;
+  /** Returns the build commit hash, or null when unavailable. Defaults to `./infra/git-commit.js`. */
+  loadCommitHash?: () => Promise<string | null>;
+  log?: (message: string) => void;
+  exit?: (code?: number) => void;
+  onError?: (error: unknown) => void;
+};
+
+function reportVersionFastPathError(error: unknown): void {
+  console.error(
+    "[openclaw] Failed to resolve version:",
+    error instanceof Error ? (error.stack ?? error.message) : error,
+  );
+  process.exitCode = 1;
+}
+
+/**
+ * Handles `openclaw --version` before the full CLI program loads.
+ *
+ * Boundaries are injectable so the fast path can be unit tested without mocking
+ * `./cli/argv.js`, `./cli/container-target.js`, `./version.js`, and
+ * `./infra/git-commit.js` at module level (Bun cannot intercept ESM imports).
+ * The surrounding entry-point side effects stay in the main-module branch.
+ */
+export function tryHandleRootVersionFastPath(
+  argv: string[],
+  deps: RootVersionFastPathDeps = {},
+): boolean {
+  const isRootVersionInvocationImpl = deps.isRootVersionInvocation ?? isRootVersionInvocation;
+  const resolveCliContainerTargetImpl = deps.resolveCliContainerTarget ?? resolveCliContainerTarget;
+  if (resolveCliContainerTargetImpl(argv)) {
+    return false;
+  }
+  if (!isRootVersionInvocationImpl(argv)) {
+    return false;
+  }
+  const log = deps.log ?? ((message: string) => console.log(message));
+  const exit = deps.exit ?? ((code?: number) => process.exit(code));
+  const onError = deps.onError ?? reportVersionFastPathError;
+  const loadVersion = deps.loadVersion ?? (async () => (await import("./version.js")).VERSION);
+  const loadCommitHash =
+    deps.loadCommitHash ??
+    (async () => {
+      const { resolveCommitHash } = await import("./infra/git-commit.js");
+      return resolveCommitHash({ moduleUrl: import.meta.url });
+    });
+  Promise.all([loadVersion(), loadCommitHash()])
+    .then(([version, commit]) => {
+      log(commit ? `OpenClaw ${version} (${commit})` : `OpenClaw ${version}`);
+      exit(0);
+    })
+    .catch(onError);
+  return true;
 }
 
 export function tryHandleRootHelpFastPath(

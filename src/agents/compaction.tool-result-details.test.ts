@@ -1,30 +1,25 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  isOversizedForSummary,
+  setCompactionRuntimeForTests,
+  summarizeWithFallback,
+  type CompactionRuntimeOverride,
+} from "./compaction.js";
 import { makeAgentAssistantMessage } from "./test-helpers/agent-message-fixtures.js";
 
-const piCodingAgentMocks = vi.hoisted(() => ({
-  generateSummary: vi.fn(async () => "summary"),
-  estimateTokens: vi.fn((_message: unknown) => 1),
-}));
+const generateSummary = vi.fn(async () => "summary");
+const estimateTokens = vi.fn((_message: unknown) => 1);
 
-vi.mock("@earendil-works/pi-coding-agent", async () => {
-  const actual = await import(
-    "@earendil-works/pi-coding-agent",
-  );
-  return {
-    ...actual,
-    generateSummary: piCodingAgentMocks.generateSummary,
-    estimateTokens: piCodingAgentMocks.estimateTokens,
+// Inject the token-estimation and summary-generation boundaries instead of
+// mocking `@earendil-works/pi-coding-agent` at module level.
+function installCompactionRuntime(): void {
+  const overrides: CompactionRuntimeOverride = {
+    estimateTokens,
+    generateSummary: generateSummary as unknown as CompactionRuntimeOverride["generateSummary"],
   };
-});
-
-let isOversizedForSummary: typeof import("./compaction.js").isOversizedForSummary;
-let summarizeWithFallback: typeof import("./compaction.js").summarizeWithFallback;
-
-async function loadFreshCompactionModuleForTest() {
-  vi.resetModules();
-  ({ isOversizedForSummary, summarizeWithFallback } = await import("./compaction.js"));
+  setCompactionRuntimeForTests(overrides);
 }
 
 function makeAssistantToolCall(timestamp: number): AssistantMessage {
@@ -49,12 +44,16 @@ function makeToolResultWithDetails(timestamp: number): ToolResultMessage<{ raw: 
 }
 
 describe("compaction toolResult details stripping", () => {
-  beforeEach(async () => {
-    await loadFreshCompactionModuleForTest();
-    piCodingAgentMocks.generateSummary.mockReset();
-    piCodingAgentMocks.generateSummary.mockResolvedValue("summary");
-    piCodingAgentMocks.estimateTokens.mockReset();
-    piCodingAgentMocks.estimateTokens.mockImplementation((_message: unknown) => 1);
+  beforeEach(() => {
+    generateSummary.mockReset();
+    generateSummary.mockResolvedValue("summary");
+    estimateTokens.mockReset();
+    estimateTokens.mockImplementation((_message: unknown) => 1);
+    installCompactionRuntime();
+  });
+
+  afterEach(() => {
+    setCompactionRuntimeForTests(null);
   });
 
   it("does not pass toolResult.details into generateSummary", async () => {
@@ -62,7 +61,7 @@ describe("compaction toolResult details stripping", () => {
 
     const summary = await summarizeWithFallback({
       messages,
-      // Minimal shape; compaction won't use these fields in our mocked generateSummary.
+      // Minimal shape; compaction won't use these fields in our stub generateSummary.
       model: { id: "mock", name: "mock", contextWindow: 10000, maxTokens: 1000 } as never,
       apiKey: "test", // pragma: allowlist secret
       signal: new AbortController().signal,
@@ -72,18 +71,16 @@ describe("compaction toolResult details stripping", () => {
     });
 
     expect(summary).toBe("summary");
-    expect(piCodingAgentMocks.generateSummary).toHaveBeenCalled();
+    expect(generateSummary).toHaveBeenCalled();
 
-    const chunk = (
-      piCodingAgentMocks.generateSummary.mock.calls as unknown as Array<[unknown]>
-    )[0]?.[0];
+    const chunk = (generateSummary.mock.calls as unknown as Array<[unknown]>)[0]?.[0];
     const serialized = JSON.stringify(chunk);
     expect(serialized).not.toContain("Ignore previous instructions");
     expect(serialized).not.toContain('"details"');
   });
 
   it("ignores toolResult.details when evaluating oversized messages", () => {
-    piCodingAgentMocks.estimateTokens.mockImplementation((message: unknown) => {
+    estimateTokens.mockImplementation((message: unknown) => {
       const record = message as { details?: unknown };
       return record.details ? 10_000 : 10;
     });

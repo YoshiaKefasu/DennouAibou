@@ -16,12 +16,28 @@ import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { buildMessageCliJson, formatMessageCliText } from "./message-format.js";
 
+/**
+ * Injectable seams for the command-level boundaries this module calls. Tests
+ * supply fixtures instead of intercepting these modules at module level, which
+ * Bun's runner does not support for ESM imports.
+ */
+export type MessageCommandOverrides = {
+  loadConfig?: typeof loadConfig;
+  resolveCommandSecretRefsViaGateway?: typeof resolveCommandSecretRefsViaGateway;
+  runMessageAction?: typeof runMessageAction;
+};
+
 export async function messageCommand(
   opts: Record<string, unknown>,
   deps: CliDeps,
   runtime: RuntimeEnv,
+  overrides: MessageCommandOverrides = {},
 ) {
-  const loadedRaw = loadConfig();
+  const loadConfigImpl = overrides.loadConfig ?? loadConfig;
+  const resolveCommandSecretRefsViaGatewayImpl =
+    overrides.resolveCommandSecretRefsViaGateway ?? resolveCommandSecretRefsViaGateway;
+  const runMessageActionImpl = overrides.runMessageAction ?? runMessageAction;
+  const loadedRaw = loadConfigImpl();
   const scope = resolveMessageSecretScope({
     channel: opts.channel,
     target: opts.target,
@@ -33,7 +49,7 @@ export async function messageCommand(
     channel: scope.channel,
     accountId: scope.accountId,
   });
-  const { resolvedConfig, diagnostics } = await resolveCommandSecretRefsViaGateway({
+  const { resolvedConfig, diagnostics } = await resolveCommandSecretRefsViaGatewayImpl({
     config: loadedRaw,
     commandName: "message",
     targetIds: scopedTargets.targetIds,
@@ -59,7 +75,7 @@ export async function messageCommand(
   const outboundDeps: OutboundSendDeps = createOutboundSendDeps(deps);
 
   const run = async () =>
-    await runMessageAction({
+    await runMessageActionImpl({
       cfg,
       action,
       params: opts,

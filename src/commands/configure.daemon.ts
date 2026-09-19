@@ -15,12 +15,38 @@ import { resolveGatewayInstallToken } from "./gateway-install-token.js";
 import { guardCancel } from "./onboard-helpers.js";
 import { ensureSystemdUserLingerInteractive } from "./systemd-linger.js";
 
-export async function maybeInstallDaemon(params: {
-  runtime: RuntimeEnv;
-  port: number;
-  daemonRuntime?: GatewayDaemonRuntime;
-}) {
-  const service = resolveGatewayService();
+export type MaybeInstallDaemonDeps = {
+  resolveGatewayService?: typeof resolveGatewayService;
+  loadConfig?: typeof loadConfig;
+  resolveGatewayInstallToken?: typeof resolveGatewayInstallToken;
+  buildGatewayInstallPlan?: typeof buildGatewayInstallPlan;
+  note?: typeof note;
+  select?: typeof select;
+  confirm?: typeof confirm;
+  withProgress?: typeof withProgress;
+  ensureSystemdUserLingerInteractive?: typeof ensureSystemdUserLingerInteractive;
+};
+
+export async function maybeInstallDaemon(
+  params: {
+    runtime: RuntimeEnv;
+    port: number;
+    daemonRuntime?: GatewayDaemonRuntime;
+  },
+  deps: MaybeInstallDaemonDeps = {},
+) {
+  const service = (deps.resolveGatewayService ?? resolveGatewayService)();
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
+  const resolveGatewayInstallTokenImpl =
+    deps.resolveGatewayInstallToken ?? resolveGatewayInstallToken;
+  const buildGatewayInstallPlanImpl = deps.buildGatewayInstallPlan ?? buildGatewayInstallPlan;
+  const noteImpl = deps.note ?? note;
+  const selectImpl = deps.select ?? select;
+  const confirmImpl = deps.confirm ?? confirm;
+  const withProgressImpl = deps.withProgress ?? withProgress;
+  const ensureSystemdUserLingerInteractiveImpl =
+    deps.ensureSystemdUserLingerInteractive ?? ensureSystemdUserLingerInteractive;
+
   let loaded = false;
   try {
     loaded = await service.isLoaded({ env: process.env });
@@ -35,7 +61,7 @@ export async function maybeInstallDaemon(params: {
   let daemonRuntime = params.daemonRuntime ?? DEFAULT_GATEWAY_DAEMON_RUNTIME;
   if (loaded) {
     const action = guardCancel(
-      await select({
+      await selectImpl({
         message: "Gateway service already installed",
         options: [
           { value: "restart", label: "Restart" },
@@ -46,7 +72,7 @@ export async function maybeInstallDaemon(params: {
       params.runtime,
     );
     if (action === "restart") {
-      await withProgress(
+      await withProgressImpl(
         { label: "Gateway service", indeterminate: true, delayMs: 0 },
         async (progress) => {
           progress.setLabel("Restarting Gateway service…");
@@ -66,7 +92,7 @@ export async function maybeInstallDaemon(params: {
       return;
     }
     if (action === "reinstall") {
-      await withProgress(
+      await withProgressImpl(
         { label: "Gateway service", indeterminate: true, delayMs: 0 },
         async (progress) => {
           progress.setLabel("Uninstalling Gateway service…");
@@ -84,7 +110,7 @@ export async function maybeInstallDaemon(params: {
         daemonRuntime = GATEWAY_DAEMON_RUNTIME_OPTIONS[0]?.value ?? DEFAULT_GATEWAY_DAEMON_RUNTIME;
       } else {
         daemonRuntime = guardCancel(
-          await select({
+          await selectImpl({
             message: "Gateway service runtime",
             options: GATEWAY_DAEMON_RUNTIME_OPTIONS,
             initialValue: DEFAULT_GATEWAY_DAEMON_RUNTIME,
@@ -93,18 +119,18 @@ export async function maybeInstallDaemon(params: {
         ) as GatewayDaemonRuntime;
       }
     }
-    await withProgress(
+    await withProgressImpl(
       { label: "Gateway service", indeterminate: true, delayMs: 0 },
       async (progress) => {
         progress.setLabel("Preparing Gateway service…");
 
-        const cfg = loadConfig();
-        const tokenResolution = await resolveGatewayInstallToken({
+        const cfg = loadConfigImpl();
+        const tokenResolution = await resolveGatewayInstallTokenImpl({
           config: cfg,
           env: process.env,
         });
         for (const warning of tokenResolution.warnings) {
-          note(warning, "Gateway");
+          noteImpl(warning, "Gateway");
         }
         if (tokenResolution.unavailableReason) {
           installError = [
@@ -115,13 +141,14 @@ export async function maybeInstallDaemon(params: {
           progress.setLabel("Gateway service install blocked.");
           return;
         }
-        const { programArguments, workingDirectory, environment } = await buildGatewayInstallPlan({
-          env: process.env,
-          port: params.port,
-          runtime: daemonRuntime,
-          warn: (message, title) => note(message, title),
-          config: cfg,
-        });
+        const { programArguments, workingDirectory, environment } =
+          await buildGatewayInstallPlanImpl({
+            env: process.env,
+            port: params.port,
+            runtime: daemonRuntime,
+            warn: (message, title) => noteImpl(message, title),
+            config: cfg,
+          });
 
         progress.setLabel("Installing Gateway service…");
         try {
@@ -140,19 +167,19 @@ export async function maybeInstallDaemon(params: {
       },
     );
     if (installError) {
-      note("Gateway service install failed: " + installError, "Gateway");
-      note(gatewayInstallErrorHint(), "Gateway");
+      noteImpl("Gateway service install failed: " + installError, "Gateway");
+      noteImpl(gatewayInstallErrorHint(), "Gateway");
       return;
     }
     shouldCheckLinger = true;
   }
 
   if (shouldCheckLinger) {
-    await ensureSystemdUserLingerInteractive({
+    await ensureSystemdUserLingerInteractiveImpl({
       runtime: params.runtime,
       prompter: {
-        confirm: async (p) => guardCancel(await confirm(p), params.runtime),
-        note,
+        confirm: async (p) => guardCancel(await confirmImpl(p), params.runtime),
+        note: noteImpl,
       },
       reason:
         "Linux installs use a systemd user service. Without lingering, systemd stops the user session on logout/idle and kills the Gateway.",

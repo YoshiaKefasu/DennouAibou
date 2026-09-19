@@ -65,6 +65,34 @@ type GenerateSummaryCompat = {
 
 const generateSummaryCompat = piGenerateSummary as unknown as GenerateSummaryCompat;
 
+/**
+ * Test-only seams for the `@earendil-works/pi-coding-agent` token-estimation
+ * and summary-generation boundaries. Production never sets these; tests inject
+ * fixtures instead of mocking the package at module level, which Bun's runner
+ * cannot intercept for ESM imports.
+ *
+ * Note: these two calls are reached from several internal helpers
+ * (`estimateMessagesTokens`, chunk splitting, staged summarization), so a
+ * module-scoped override is used instead of threading a deps object through the
+ * whole compaction pipeline. Call with `null` to restore production behavior.
+ */
+export type CompactionRuntimeOverride = {
+  estimateTokens?: (message: AgentMessage) => number;
+  generateSummary?: GenerateSummaryCompat;
+};
+
+let estimateTokensOverride: ((message: AgentMessage) => number) | null = null;
+let generateSummaryOverride: GenerateSummaryCompat | null = null;
+
+export function setCompactionRuntimeForTests(overrides: CompactionRuntimeOverride | null): void {
+  estimateTokensOverride = overrides?.estimateTokens ?? null;
+  generateSummaryOverride = overrides?.generateSummary ?? null;
+}
+
+function estimateTokensImpl(message: AgentMessage): number {
+  return (estimateTokensOverride ?? estimateTokens)(message);
+}
+
 function resolveIdentifierPreservationInstructions(
   instructions?: CompactionSummarizationInstructions,
 ): string | undefined {
@@ -100,7 +128,7 @@ export function buildCompactionSummarizationInstructions(
 export function estimateMessagesTokens(messages: AgentMessage[]): number {
   // SECURITY: toolResult.details can contain untrusted/verbose payloads; never include in LLM-facing compaction.
   const safe = stripToolResultDetails(messages);
-  return safe.reduce((sum, message) => sum + estimateTokens(message), 0);
+  return safe.reduce((sum, message) => sum + estimateTokensImpl(message), 0);
 }
 
 function estimateCompactionMessageTokens(message: AgentMessage): number {
@@ -347,8 +375,9 @@ function generateSummary(
   customInstructions?: string,
   previousSummary?: string,
 ): Promise<string> {
+  const impl = generateSummaryOverride ?? generateSummaryCompat;
   if (piGenerateSummary.length >= 8) {
-    return generateSummaryCompat(
+    return impl(
       currentMessages,
       model,
       reserveTokens,
@@ -359,7 +388,7 @@ function generateSummary(
       previousSummary,
     );
   }
-  return generateSummaryCompat(
+  return impl(
     currentMessages,
     model,
     reserveTokens,

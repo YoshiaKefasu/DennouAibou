@@ -3,26 +3,12 @@ import { createWizardPrompter as buildWizardPrompter } from "../../test/helpers/
 import { DEFAULT_DANGEROUS_NODE_COMMANDS } from "../gateway/node-command-policy.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter, WizardSelectParams } from "./prompts.js";
+import { configureGatewayForSetup, type ConfigureGatewayDeps } from "./setup.gateway-config.js";
 
-const mocks = vi.hoisted(() => ({
-  randomToken: vi.fn(),
-  getTailnetHostname: vi.fn(),
-}));
-
-vi.mock("../commands/onboard-helpers.js", async (importActual) => {
-  const actual = await importActual<typeof import("../commands/onboard-helpers.js")>();
-  return {
-    ...actual,
-    randomToken: mocks.randomToken,
-  };
-});
-
-vi.mock("../infra/tailscale.js", () => ({
-  findTailscaleBinary: vi.fn(async () => undefined),
-  getTailnetHostname: mocks.getTailnetHostname,
-}));
-
-import { configureGatewayForSetup } from "./setup.gateway-config.js";
+// The token generator boundary is injected so this suite does not mock the
+// onboard-helpers module at module level (Bun cannot intercept ESM imports).
+let generatedToken = "generated-token";
+const configureDeps: ConfigureGatewayDeps = { randomToken: () => generatedToken };
 
 describe("configureGatewayForSetup", () => {
   function createPrompter(params: { selectQueue: string[]; textQueue: Array<string | undefined> }) {
@@ -78,19 +64,22 @@ describe("configureGatewayForSetup", () => {
       textQueue: params?.textQueue ?? ["18789", undefined],
     });
     const runtime = createRuntime();
-    return configureGatewayForSetup({
-      flow: params?.flow ?? "advanced",
-      baseConfig: {},
-      nextConfig: params?.nextConfig ?? {},
-      localPort: 18789,
-      quickstartGateway: createQuickstartGateway(authChoice),
-      prompter,
-      runtime,
-    });
+    return configureGatewayForSetup(
+      {
+        flow: params?.flow ?? "advanced",
+        baseConfig: {},
+        nextConfig: params?.nextConfig ?? {},
+        localPort: 18789,
+        quickstartGateway: createQuickstartGateway(authChoice),
+        prompter,
+        runtime,
+      },
+      configureDeps,
+    );
   }
 
   it("generates a token when the prompt returns undefined", async () => {
-    mocks.randomToken.mockReturnValue("generated-token");
+    generatedToken = "generated-token";
     const result = await runGatewayConfig();
 
     expect(result.settings.gatewayToken).toBe("generated-token");
@@ -100,8 +89,7 @@ describe("configureGatewayForSetup", () => {
   it("prefers DENNOU_GATEWAY_TOKEN during quickstart token setup", async () => {
     const prevToken = process.env.DENNOU_GATEWAY_TOKEN;
     process.env.DENNOU_GATEWAY_TOKEN = "token-from-env";
-    mocks.randomToken.mockReturnValue("generated-token");
-    mocks.randomToken.mockClear();
+    generatedToken = "generated-token";
 
     try {
       const result = await runGatewayConfig({
@@ -120,7 +108,7 @@ describe("configureGatewayForSetup", () => {
   });
 
   it("enables insecure local control ui auth for fresh quickstart loopback setups", async () => {
-    mocks.randomToken.mockReturnValue("generated-token");
+    generatedToken = "generated-token";
 
     const result = await runGatewayConfig({
       flow: "quickstart",
@@ -131,7 +119,7 @@ describe("configureGatewayForSetup", () => {
   });
 
   it("preserves explicit control ui auth policy in quickstart", async () => {
-    mocks.randomToken.mockReturnValue("generated-token");
+    generatedToken = "generated-token";
 
     const result = await runGatewayConfig({
       flow: "quickstart",
@@ -149,36 +137,39 @@ describe("configureGatewayForSetup", () => {
   });
 
   it("enables insecure local control ui auth when quickstart reuses an existing loopback config", async () => {
-    mocks.randomToken.mockReturnValue("generated-token");
+    generatedToken = "generated-token";
     const prompter = createPrompter({
       selectQueue: [],
       textQueue: [],
     });
     const runtime = createRuntime();
 
-    const result = await configureGatewayForSetup({
-      flow: "quickstart",
-      baseConfig: {},
-      nextConfig: {
-        gateway: {
-          port: 18789,
-          bind: "loopback",
+    const result = await configureGatewayForSetup(
+      {
+        flow: "quickstart",
+        baseConfig: {},
+        nextConfig: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+          },
         },
+        localPort: 18789,
+        quickstartGateway: {
+          ...createQuickstartGateway("token"),
+          hasExisting: true,
+        },
+        prompter,
+        runtime,
       },
-      localPort: 18789,
-      quickstartGateway: {
-        ...createQuickstartGateway("token"),
-        hasExisting: true,
-      },
-      prompter,
-      runtime,
-    });
+      configureDeps,
+    );
 
     expect(result.nextConfig.gateway?.controlUi?.allowInsecureAuth).toBe(true);
   });
 
   it("does not set password to literal 'undefined' when prompt returns undefined", async () => {
-    mocks.randomToken.mockReturnValue("unused");
+    generatedToken = "unused";
     const result = await runGatewayConfig({
       authChoice: "password",
     });
@@ -190,7 +181,7 @@ describe("configureGatewayForSetup", () => {
   });
 
   it("seeds control UI allowed origins for non-loopback binds", async () => {
-    mocks.randomToken.mockReturnValue("generated-token");
+    generatedToken = "generated-token";
     const result = await runGatewayConfig({
       bindChoice: "lan",
     });
@@ -211,16 +202,19 @@ describe("configureGatewayForSetup", () => {
       });
       const runtime = createRuntime();
 
-      const result = await configureGatewayForSetup({
-        flow: "advanced",
-        baseConfig: {},
-        nextConfig: {},
-        localPort: 18789,
-        quickstartGateway: createQuickstartGateway("password"),
-        secretInputMode: "ref", // pragma: allowlist secret
-        prompter,
-        runtime,
-      });
+      const result = await configureGatewayForSetup(
+        {
+          flow: "advanced",
+          baseConfig: {},
+          nextConfig: {},
+          localPort: 18789,
+          quickstartGateway: createQuickstartGateway("password"),
+          secretInputMode: "ref", // pragma: allowlist secret
+          prompter,
+          runtime,
+        },
+        configureDeps,
+      );
 
       expect(result.nextConfig.gateway?.auth?.mode).toBe("password");
       expect(result.nextConfig.gateway?.auth?.password).toEqual({
@@ -247,16 +241,19 @@ describe("configureGatewayForSetup", () => {
       });
       const runtime = createRuntime();
 
-      const result = await configureGatewayForSetup({
-        flow: "advanced",
-        baseConfig: {},
-        nextConfig: {},
-        localPort: 18789,
-        quickstartGateway: createQuickstartGateway("token"),
-        secretInputMode: "ref", // pragma: allowlist secret
-        prompter,
-        runtime,
-      });
+      const result = await configureGatewayForSetup(
+        {
+          flow: "advanced",
+          baseConfig: {},
+          nextConfig: {},
+          localPort: 18789,
+          quickstartGateway: createQuickstartGateway("token"),
+          secretInputMode: "ref", // pragma: allowlist secret
+          prompter,
+          runtime,
+        },
+        configureDeps,
+      );
 
       expect(result.nextConfig.gateway?.auth?.mode).toBe("token");
       expect(result.nextConfig.gateway?.auth?.token).toEqual({
@@ -289,30 +286,33 @@ describe("configureGatewayForSetup", () => {
       textQueue: [],
     });
 
-    const result = await configureGatewayForSetup({
-      flow: "quickstart",
-      baseConfig: {},
-      nextConfig: {
-        secrets: {
-          providers: {
-            gatewayTokens: {
-              source: "exec",
-              command: process.execPath,
-              allowInsecurePath: true,
-              allowSymlinkCommand: true,
-              args: [
-                "-e",
-                "let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',d=>input+=d);process.stdin.on('end',()=>{const req=JSON.parse(input||'{}');const values={};for(const id of req.ids||[]){values[id]='token-from-exec';}process.stdout.write(JSON.stringify({protocolVersion:1,values}));});",
-              ],
+    const result = await configureGatewayForSetup(
+      {
+        flow: "quickstart",
+        baseConfig: {},
+        nextConfig: {
+          secrets: {
+            providers: {
+              gatewayTokens: {
+                source: "exec",
+                command: process.execPath,
+                allowInsecurePath: true,
+                allowSymlinkCommand: true,
+                args: [
+                  "-e",
+                  "let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',d=>input+=d);process.stdin.on('end',()=>{const req=JSON.parse(input||'{}');const values={};for(const id of req.ids||[]){values[id]='token-from-exec';}process.stdout.write(JSON.stringify({protocolVersion:1,values}));});",
+                ],
+              },
             },
           },
         },
+        localPort: 18789,
+        quickstartGateway,
+        prompter,
+        runtime,
       },
-      localPort: 18789,
-      quickstartGateway,
-      prompter,
-      runtime,
-    });
+      configureDeps,
+    );
 
     expect(result.nextConfig.gateway?.auth?.token).toEqual(quickstartGateway.token);
     expect(result.settings.gatewayToken).toBe("token-from-exec");

@@ -53,6 +53,24 @@ let cachedBoundaryResolvedConfig:
     }
   | undefined;
 
+type BundledPluginPublicSurfaceLoader = (params: {
+  dirName: string;
+  artifactBasename: string;
+}) => unknown;
+
+let bundledPublicSurfaceLoaderOverride: BundledPluginPublicSurfaceLoader | null = null;
+
+/**
+ * Test-only seam: overrides the bundled-plugin public-surface loader so suites
+ * can assert that hot runtime/config import paths stay cold without mocking this
+ * module at module level (Bun cannot intercept ESM imports).
+ */
+export function setBundledPluginPublicSurfaceLoaderForTests(
+  loader: BundledPluginPublicSurfaceLoader | null,
+): void {
+  bundledPublicSurfaceLoaderOverride = loader;
+}
+
 function resolveSourceFirstPublicSurfacePath(params: {
   bundledPluginsDir?: string;
   dirName: string;
@@ -362,6 +380,9 @@ export function loadBundledPluginPublicSurfaceModuleSync<T extends object>(param
   dirName: string;
   artifactBasename: string;
 }): T {
+  if (bundledPublicSurfaceLoaderOverride) {
+    return bundledPublicSurfaceLoaderOverride(params) as T;
+  }
   const location = resolveFacadeModuleLocation(params);
   if (!location) {
     throw new Error(
@@ -464,4 +485,5 @@ export function resetFacadeRuntimeStateForTest(): void {
   jitiLoaders.clear();
   cachedBoundaryRawConfig = undefined;
   cachedBoundaryResolvedConfig = undefined;
+  bundledPublicSurfaceLoaderOverride = null;
 }

@@ -47,9 +47,20 @@ type ConfigureGatewayResult = {
   settings: GatewayWizardSettings;
 };
 
+/**
+ * Injectable seams for the wizard boundaries this module calls. Tests supply a
+ * stub token generator instead of intercepting `../commands/onboard-helpers.js`
+ * at module level.
+ */
+export type ConfigureGatewayDeps = {
+  randomToken?: typeof randomToken;
+};
+
 export async function configureGatewayForSetup(
   opts: ConfigureGatewayOptions,
+  deps: ConfigureGatewayDeps = {},
 ): Promise<ConfigureGatewayResult> {
+  const randomTokenImpl = deps.randomToken ?? randomToken;
   const { flow, localPort, quickstartGateway, prompter } = opts;
   let { nextConfig } = opts;
 
@@ -204,7 +215,7 @@ export async function configureGatewayForSetup(
     } else if (flow === "quickstart") {
       gatewayToken =
         (quickstartTokenString ?? normalizeGatewayTokenInput(process.env.DENNOU_GATEWAY_TOKEN)) ||
-        randomToken();
+        randomTokenImpl();
       gatewayTokenInput = gatewayToken;
     } else {
       const tokenInput = await prompter.text({
@@ -215,7 +226,7 @@ export async function configureGatewayForSetup(
           normalizeGatewayTokenInput(process.env.DENNOU_GATEWAY_TOKEN) ??
           "",
       });
-      gatewayToken = normalizeGatewayTokenInput(tokenInput) || randomToken();
+      gatewayToken = normalizeGatewayTokenInput(tokenInput) || randomTokenImpl();
       gatewayTokenInput = gatewayToken;
     }
   }

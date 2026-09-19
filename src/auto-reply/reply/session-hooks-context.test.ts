@@ -1,18 +1,25 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import type { HookRunner } from "../../plugins/hooks.js";
+import { initSessionState } from "./session.js";
 
-const hookRunnerMocks = vi.hoisted(() => ({
-  hasHooks: vi.fn<HookRunner["hasHooks"]>(),
-  runSessionStart: vi.fn<HookRunner["runSessionStart"]>(),
-  runSessionEnd: vi.fn<HookRunner["runSessionEnd"]>(),
-}));
+const hasHooks = vi.fn<HookRunner["hasHooks"]>();
+const runSessionStart = vi.fn<HookRunner["runSessionStart"]>();
+const runSessionEnd = vi.fn<HookRunner["runSessionEnd"]>();
 
-let initSessionState: typeof import("./session.js").initSessionState;
+// Inject the global hook-runner lookup instead of mocking
+// `../../plugins/hook-runner-global.js` at module level.
+function createHookRunner(): HookRunner {
+  return {
+    hasHooks,
+    runSessionStart,
+    runSessionEnd,
+  } as unknown as HookRunner;
+}
 
 async function createStorePath(prefix: string): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
@@ -46,29 +53,15 @@ async function writeTranscript(
 }
 
 describe("session hook context wiring", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.doMock("../../plugins/hook-runner-global.js", () => ({
-      getGlobalHookRunner: () =>
-        ({
-          hasHooks: hookRunnerMocks.hasHooks,
-          runSessionStart: hookRunnerMocks.runSessionStart,
-          runSessionEnd: hookRunnerMocks.runSessionEnd,
-        }) as unknown as HookRunner,
-    }));
-    hookRunnerMocks.hasHooks.mockReset();
-    hookRunnerMocks.runSessionStart.mockReset();
-    hookRunnerMocks.runSessionEnd.mockReset();
-    hookRunnerMocks.runSessionStart.mockResolvedValue(undefined);
-    hookRunnerMocks.runSessionEnd.mockResolvedValue(undefined);
-    hookRunnerMocks.hasHooks.mockImplementation(
+  beforeEach(() => {
+    hasHooks.mockReset();
+    runSessionStart.mockReset();
+    runSessionEnd.mockReset();
+    runSessionStart.mockResolvedValue(undefined);
+    runSessionEnd.mockResolvedValue(undefined);
+    hasHooks.mockImplementation(
       (hookName) => hookName === "session_start" || hookName === "session_end",
     );
-    ({ initSessionState } = await import("./session.js"));
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("passes sessionKey to session_start hook context", async () => {
@@ -81,10 +74,11 @@ describe("session hook context wiring", () => {
       ctx: { Body: "hello", SessionKey: sessionKey },
       cfg,
       commandAuthorized: true,
+      getGlobalHookRunner: createHookRunner,
     });
 
-    expect(hookRunnerMocks.runSessionStart).toHaveBeenCalledTimes(1);
-    const [event, context] = hookRunnerMocks.runSessionStart.mock.calls[0] ?? [];
+    expect(runSessionStart).toHaveBeenCalledTimes(1);
+    const [event, context] = runSessionStart.mock.calls[0] ?? [];
     expect(event).toMatchObject({ sessionKey });
     expect(context).toMatchObject({ sessionKey, agentId: "main" });
     expect(context).toMatchObject({ sessionId: event?.sessionId });
@@ -107,11 +101,12 @@ describe("session hook context wiring", () => {
       ctx: { Body: "/new", SessionKey: sessionKey },
       cfg,
       commandAuthorized: true,
+      getGlobalHookRunner: createHookRunner,
     });
 
-    expect(hookRunnerMocks.runSessionEnd).toHaveBeenCalledTimes(1);
-    expect(hookRunnerMocks.runSessionStart).toHaveBeenCalledTimes(1);
-    const [event, context] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
+    expect(runSessionEnd).toHaveBeenCalledTimes(1);
+    expect(runSessionStart).toHaveBeenCalledTimes(1);
+    const [event, context] = runSessionEnd.mock.calls[0] ?? [];
     expect(event).toMatchObject({
       sessionKey,
       reason: "new",
@@ -121,7 +116,7 @@ describe("session hook context wiring", () => {
     expect(context).toMatchObject({ sessionId: event?.sessionId });
     expect(event?.sessionFile).toContain(".jsonl.reset.");
 
-    const [startEvent, startContext] = hookRunnerMocks.runSessionStart.mock.calls[0] ?? [];
+    const [startEvent, startContext] = runSessionStart.mock.calls[0] ?? [];
     expect(startEvent).toMatchObject({ resumedFrom: "old-session" });
     expect(event?.nextSessionId).toBe(startEvent?.sessionId);
     expect(startContext).toMatchObject({ sessionId: startEvent?.sessionId });
@@ -144,9 +139,10 @@ describe("session hook context wiring", () => {
       ctx: { Body: "/reset", SessionKey: sessionKey },
       cfg,
       commandAuthorized: true,
+      getGlobalHookRunner: createHookRunner,
     });
 
-    const [event] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
+    const [event] = runSessionEnd.mock.calls[0] ?? [];
     expect(event).toMatchObject({ reason: "reset" });
   });
 
@@ -172,9 +168,10 @@ describe("session hook context wiring", () => {
       ctx: { Body: "/fresh", SessionKey: sessionKey },
       cfg,
       commandAuthorized: true,
+      getGlobalHookRunner: createHookRunner,
     });
 
-    const [event] = hookRunnerMocks.runSessionEnd.mock.calls[0] ?? [];
+    const [event] = runSessionEnd.mock.calls[0] ?? [];
     expect(event).toMatchObject({ reason: "new" });
   });
 

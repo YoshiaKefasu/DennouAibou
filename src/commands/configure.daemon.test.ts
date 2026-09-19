@@ -1,100 +1,101 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { maybeInstallDaemon } from "./configure.daemon.js";
+import type { resolveGatewayService } from "../daemon/service.js";
+import { maybeInstallDaemon, type MaybeInstallDaemonDeps } from "./configure.daemon.js";
 
-const progressSetLabel = vi.hoisted(() => vi.fn());
-const withProgress = vi.hoisted(() =>
-  vi.fn(async (_opts, run) => run({ setLabel: progressSetLabel })),
+const serviceIsLoaded = vi.fn(async () => false);
+const serviceInstall = vi.fn(async () => {});
+const serviceUninstall = vi.fn(async () => {});
+const serviceRestart = vi.fn<() => Promise<{ outcome: "completed" | "scheduled" }>>(async () => ({
+  outcome: "completed",
+}));
+const progressSetLabel = vi.fn();
+const loadConfig = vi.fn();
+const resolveGatewayInstallToken = vi.fn();
+const buildGatewayInstallPlan = vi.fn();
+const note = vi.fn();
+const select = vi.fn(async () => "node");
+const confirm = vi.fn(async () => true);
+const ensureSystemdUserLingerInteractive = vi.fn(async () => {});
+const withProgress = vi.fn(
+  async (_opts: unknown, run: (progress: { setLabel: typeof progressSetLabel }) => Promise<void>) =>
+    run({ setLabel: progressSetLabel }),
 );
-const loadConfig = vi.hoisted(() => vi.fn());
-const resolveGatewayInstallToken = vi.hoisted(() => vi.fn());
-const buildGatewayInstallPlan = vi.hoisted(() => vi.fn());
-const note = vi.hoisted(() => vi.fn());
-const serviceIsLoaded = vi.hoisted(() => vi.fn(async () => false));
-const serviceInstall = vi.hoisted(() => vi.fn(async () => {}));
-const serviceRestart = vi.hoisted(() =>
-  vi.fn<() => Promise<{ outcome: "completed" } | { outcome: "scheduled" }>>(async () => ({
-    outcome: "completed",
-  })),
-);
-const ensureSystemdUserLingerInteractive = vi.hoisted(() => vi.fn(async () => {}));
-const select = vi.hoisted(() => vi.fn(async () => "node"));
 
-vi.mock("../cli/progress.js", () => ({
-  withProgress,
-}));
-
-vi.mock("../config/config.js", () => ({
-  loadConfig,
-}));
-
-vi.mock("./gateway-install-token.js", () => ({
-  resolveGatewayInstallToken,
-}));
-
-vi.mock("./daemon-install-helpers.js", () => ({
-  buildGatewayInstallPlan,
-  gatewayInstallErrorHint: vi.fn(() => "hint"),
-}));
-
-vi.mock("../terminal/note.js", () => ({
-  note,
-}));
-
-vi.mock("./configure.shared.js", () => ({
-  confirm: vi.fn(async () => true),
-  select,
-}));
-
-vi.mock("./daemon-runtime.js", () => ({
-  DEFAULT_GATEWAY_DAEMON_RUNTIME: "node",
-  GATEWAY_DAEMON_RUNTIME_OPTIONS: [{ value: "node", label: "Node" }],
-}));
-
-vi.mock("../daemon/service.js", async () => {
-  const actual = await import("../daemon/service.js");
+/**
+ * Inject every daemon-install boundary instead of mocking the CLI progress,
+ * config, daemon service, terminal, and systemd-linger modules at module level
+ * (Bun cannot intercept ESM imports).
+ */
+function createDeps(): MaybeInstallDaemonDeps {
   return {
-    ...actual,
-    resolveGatewayService: vi.fn(() => ({
-      isLoaded: serviceIsLoaded,
+    resolveGatewayService: (() => ({
+      label: "test-service",
+      loadedText: "loaded",
+      notLoadedText: "not loaded",
+      stage: async () => {},
       install: serviceInstall,
+      uninstall: serviceUninstall,
+      stop: async () => {},
       restart: serviceRestart,
-    })),
+      isLoaded: serviceIsLoaded,
+      readRuntime: async () => ({ status: "stopped", pid: null }),
+      readCommand: async () => ({ programArguments: [], sourcePath: "/tmp/test.plist" }),
+    })) as unknown as typeof resolveGatewayService,
+    loadConfig: loadConfig as unknown as MaybeInstallDaemonDeps["loadConfig"],
+    resolveGatewayInstallToken:
+      resolveGatewayInstallToken as unknown as MaybeInstallDaemonDeps["resolveGatewayInstallToken"],
+    buildGatewayInstallPlan:
+      buildGatewayInstallPlan as unknown as MaybeInstallDaemonDeps["buildGatewayInstallPlan"],
+    note: note as unknown as MaybeInstallDaemonDeps["note"],
+    select: select as unknown as MaybeInstallDaemonDeps["select"],
+    confirm: confirm as unknown as MaybeInstallDaemonDeps["confirm"],
+    withProgress: withProgress as unknown as MaybeInstallDaemonDeps["withProgress"],
+    ensureSystemdUserLingerInteractive:
+      ensureSystemdUserLingerInteractive as unknown as MaybeInstallDaemonDeps["ensureSystemdUserLingerInteractive"],
   };
-});
+}
 
-vi.mock("./onboard-helpers.js", () => ({
-  guardCancel: (value: unknown) => value,
-}));
-
-vi.mock("./systemd-linger.js", () => ({
-  ensureSystemdUserLingerInteractive,
-}));
+function createRuntime() {
+  return { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
+}
 
 describe("maybeInstallDaemon", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     progressSetLabel.mockReset();
+    serviceIsLoaded.mockReset();
     serviceIsLoaded.mockResolvedValue(false);
+    serviceInstall.mockReset();
     serviceInstall.mockResolvedValue(undefined);
+    serviceUninstall.mockReset();
+    serviceUninstall.mockResolvedValue(undefined);
+    serviceRestart.mockReset();
     serviceRestart.mockResolvedValue({ outcome: "completed" });
+    select.mockReset();
+    select.mockResolvedValue("node");
+    confirm.mockReset();
+    confirm.mockResolvedValue(true);
+    ensureSystemdUserLingerInteractive.mockReset();
+    ensureSystemdUserLingerInteractive.mockResolvedValue(undefined);
+    loadConfig.mockReset();
     loadConfig.mockReturnValue({});
+    resolveGatewayInstallToken.mockReset();
     resolveGatewayInstallToken.mockResolvedValue({
       token: undefined,
       tokenRefConfigured: true,
       warnings: [],
     });
+    buildGatewayInstallPlan.mockReset();
     buildGatewayInstallPlan.mockResolvedValue({
       programArguments: ["openclaw", "gateway", "run"],
       workingDirectory: "/tmp",
       environment: {},
     });
+    note.mockReset();
   });
 
   it("does not serialize SecretRef token into service environment", async () => {
-    await maybeInstallDaemon({
-      runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-      port: 18789,
-    });
+    await maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps());
 
     expect(resolveGatewayInstallToken).toHaveBeenCalledTimes(1);
     expect(buildGatewayInstallPlan).toHaveBeenCalledTimes(1);
@@ -110,10 +111,7 @@ describe("maybeInstallDaemon", () => {
       warnings: [],
     });
 
-    await maybeInstallDaemon({
-      runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-      port: 18789,
-    });
+    await maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps());
 
     expect(note).toHaveBeenCalledWith(
       expect.stringContaining("Gateway install blocked"),
@@ -129,10 +127,7 @@ describe("maybeInstallDaemon", () => {
     );
 
     await expect(
-      maybeInstallDaemon({
-        runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-        port: 18789,
-      }),
+      maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps()),
     ).resolves.toBeUndefined();
 
     expect(serviceInstall).toHaveBeenCalledTimes(1);
@@ -144,10 +139,7 @@ describe("maybeInstallDaemon", () => {
     );
 
     await expect(
-      maybeInstallDaemon({
-        runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-        port: 18789,
-      }),
+      maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps()),
     ).rejects.toThrow("systemctl is-enabled unavailable: read-only file system");
 
     expect(serviceInstall).not.toHaveBeenCalled();
@@ -159,10 +151,7 @@ describe("maybeInstallDaemon", () => {
     );
 
     await expect(
-      maybeInstallDaemon({
-        runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-        port: 18789,
-      }),
+      maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps()),
     ).resolves.toBeUndefined();
 
     expect(serviceInstall).toHaveBeenCalledTimes(1);
@@ -173,10 +162,7 @@ describe("maybeInstallDaemon", () => {
     select.mockResolvedValueOnce("restart");
     serviceRestart.mockResolvedValueOnce({ outcome: "scheduled" });
 
-    await maybeInstallDaemon({
-      runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-      port: 18789,
-    });
+    await maybeInstallDaemon({ runtime: createRuntime(), port: 18789 }, createDeps());
 
     expect(serviceRestart).toHaveBeenCalledTimes(1);
     expect(serviceInstall).not.toHaveBeenCalled();

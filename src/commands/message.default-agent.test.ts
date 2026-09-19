@@ -1,43 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CliDeps } from "../cli/outbound-send-deps.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { messageCommand } from "./message.js";
+import { messageCommand, type MessageCommandOverrides } from "./message.js";
 
 let testConfig: Record<string, unknown> = {};
 
-const resolveCommandSecretRefsViaGateway = vi.hoisted(() =>
-  vi.fn(async ({ config }: { config: unknown }) => ({
-    resolvedConfig: config,
-    diagnostics: [] as string[],
-  })),
-);
-const runMessageAction = vi.hoisted(() =>
-  vi.fn(async () => ({
-    kind: "send" as const,
-    channel: "telegram" as const,
-    action: "send" as const,
-    to: "123456",
-    handledBy: "core" as const,
-    payload: { ok: true },
-    dryRun: false,
-  })),
-);
+const resolveCommandSecretRefsViaGateway = vi.fn(async ({ config }: { config: unknown }) => ({
+  resolvedConfig: config,
+  diagnostics: [] as string[],
+}));
+const runMessageAction = vi.fn(async () => ({
+  kind: "send" as const,
+  channel: "telegram" as const,
+  action: "send" as const,
+  to: "123456",
+  handledBy: "core" as const,
+  payload: { ok: true },
+  dryRun: false,
+}));
 
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
+/**
+ * Inject the command-level boundaries instead of mocking `../config/config.js`,
+ * `../cli/command-secret-gateway.js`, and the outbound runner at module level.
+ */
+function createOverrides(): MessageCommandOverrides {
   return {
-    ...actual,
-    loadConfig: () => testConfig,
+    loadConfig: () => testConfig as unknown as OpenClawConfig,
+    resolveCommandSecretRefsViaGateway:
+      resolveCommandSecretRefsViaGateway as unknown as MessageCommandOverrides["resolveCommandSecretRefsViaGateway"],
+    runMessageAction: runMessageAction as unknown as MessageCommandOverrides["runMessageAction"],
   };
-});
-
-vi.mock("../cli/command-secret-gateway.js", () => ({
-  resolveCommandSecretRefsViaGateway,
-}));
-
-vi.mock("../infra/outbound/message-action-runner.js", () => ({
-  runMessageAction,
-}));
+}
 
 describe("messageCommand agent routing", () => {
   beforeEach(() => {
@@ -68,6 +62,7 @@ describe("messageCommand agent routing", () => {
       },
       {} as CliDeps,
       runtime,
+      createOverrides(),
     );
 
     expect(runMessageAction).toHaveBeenCalledWith(

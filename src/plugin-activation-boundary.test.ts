@@ -1,18 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setBundledPluginPublicSurfaceLoaderForTests } from "./plugin-sdk/facade-runtime.js";
 
-const loadBundledPluginPublicSurfaceModuleSync = vi.hoisted(() => vi.fn());
-
-vi.mock("./plugin-sdk/facade-runtime.js", async () => {
-  const actual = await import("./plugin-sdk/facade-runtime.js");
-  return {
-    ...actual,
-    loadBundledPluginPublicSurfaceModuleSync,
-  };
-});
+const loadBundledPluginPublicSurfaceModuleSync = vi.fn();
 
 describe("plugin activation boundary", () => {
   beforeEach(() => {
     loadBundledPluginPublicSurfaceModuleSync.mockReset();
+    setBundledPluginPublicSurfaceLoaderForTests(loadBundledPluginPublicSurfaceModuleSync);
+  });
+
+  afterEach(() => {
+    setBundledPluginPublicSurfaceLoaderForTests(null);
   });
 
   let ambientImportsPromise: Promise<void> | undefined;

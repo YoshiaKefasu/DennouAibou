@@ -1,84 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../../utils/message-channel.js";
+import {
+  executePollAction,
+  executeSendAction,
+  type OutboundSendServiceDeps,
+} from "./outbound-send-service.js";
 
-const getDefaultMediaLocalRootsMock = vi.hoisted(() => vi.fn(() => []));
-const dispatchChannelMessageActionMock = vi.hoisted(() => vi.fn());
-const sendMessageMock = vi.hoisted(() => vi.fn());
-const sendPollMock = vi.hoisted(() => vi.fn());
-const getAgentScopedMediaLocalRootsForSourcesMock = vi.hoisted(() =>
-  vi.fn<(params: { cfg: unknown; agentId?: string; mediaSources?: readonly string[] }) => string[]>(
-    () => ["/tmp/agent-roots"],
-  ),
-);
-const createAgentScopedHostMediaReadFileMock = vi.hoisted(() =>
-  vi.fn<(params: { cfg: unknown; agentId?: string }) => (filePath: string) => Promise<Buffer>>(
-    () => async () => Buffer.from("capability"),
-  ),
-);
-const resolveAgentScopedOutboundMediaAccessMock = vi.hoisted(() =>
-  vi.fn<
-    (params: { cfg: unknown; agentId?: string; mediaSources?: readonly string[] }) => {
-      localRoots: string[];
-      readFile: (filePath: string) => Promise<Buffer>;
-    }
-  >((params) => ({
-    localRoots: getAgentScopedMediaLocalRootsForSourcesMock({
-      cfg: params.cfg,
-      agentId: params.agentId,
-      mediaSources: params.mediaSources ?? [],
-    }),
-    readFile: createAgentScopedHostMediaReadFileMock({
-      cfg: params.cfg,
-      agentId: params.agentId,
-    }),
-  })),
-);
-const appendAssistantMessageToSessionTranscriptMock = vi.hoisted(() =>
-  vi.fn(async () => ({ ok: true, sessionFile: "x" })),
-);
+const dispatchChannelMessageAction = vi.fn();
+const sendMessage = vi.fn();
+const sendPoll = vi.fn();
+const mediaReadFile = vi.fn(async () => Buffer.from("capability"));
+const appendAssistantMessageToSessionTranscript = vi.fn(async () => ({
+  ok: true,
+  sessionFile: "x",
+}));
+const resolveAgentScopedOutboundMediaAccess = vi.fn(() => ({
+  localRoots: ["/tmp/agent-roots"],
+  readFile: mediaReadFile,
+}));
 
-const mocks = {
-  getDefaultMediaLocalRoots: getDefaultMediaLocalRootsMock,
-  dispatchChannelMessageAction: dispatchChannelMessageActionMock,
-  sendMessage: sendMessageMock,
-  sendPoll: sendPollMock,
-  getAgentScopedMediaLocalRootsForSources: getAgentScopedMediaLocalRootsForSourcesMock,
-  createAgentScopedHostMediaReadFile: createAgentScopedHostMediaReadFileMock,
-  resolveAgentScopedOutboundMediaAccess: resolveAgentScopedOutboundMediaAccessMock,
-  appendAssistantMessageToSessionTranscript: appendAssistantMessageToSessionTranscriptMock,
+/**
+ * Inject the outbound-send boundaries instead of mocking `./message.js`,
+ * `../../media/read-capability.js`, `../../config/sessions.js`, and the channel
+ * action dispatcher at module level.
+ */
+const deps: OutboundSendServiceDeps = {
+  dispatchChannelMessageAction: dispatchChannelMessageAction as unknown as NonNullable<
+    OutboundSendServiceDeps["dispatchChannelMessageAction"]
+  >,
+  resolveAgentScopedOutboundMediaAccess:
+    resolveAgentScopedOutboundMediaAccess as unknown as NonNullable<
+      OutboundSendServiceDeps["resolveAgentScopedOutboundMediaAccess"]
+    >,
+  appendAssistantMessageToSessionTranscript:
+    appendAssistantMessageToSessionTranscript as unknown as NonNullable<
+      OutboundSendServiceDeps["appendAssistantMessageToSessionTranscript"]
+    >,
+  sendMessage: sendMessage as unknown as NonNullable<OutboundSendServiceDeps["sendMessage"]>,
+  sendPoll: sendPoll as unknown as NonNullable<OutboundSendServiceDeps["sendPoll"]>,
 };
-
-vi.mock("../../channels/plugins/message-action-dispatch.js", () => ({
-  dispatchChannelMessageAction: mocks.dispatchChannelMessageAction,
-}));
-
-vi.mock("./message.js", () => ({
-  sendMessage: mocks.sendMessage,
-  sendPoll: mocks.sendPoll,
-}));
-
-vi.mock("../../media/read-capability.js", () => ({
-  createAgentScopedHostMediaReadFile: mocks.createAgentScopedHostMediaReadFile,
-  resolveAgentScopedOutboundMediaAccess: mocks.resolveAgentScopedOutboundMediaAccess,
-}));
-
-vi.mock("../../media/local-roots.js", async () => {
-  const actual = await import("../../media/local-roots.js");
-  return {
-    ...actual,
-    getDefaultMediaLocalRoots: mocks.getDefaultMediaLocalRoots,
-    getAgentScopedMediaLocalRootsForSources: mocks.getAgentScopedMediaLocalRootsForSources,
-  };
-});
-
-vi.mock("../../config/sessions.js", () => ({
-  appendAssistantMessageToSessionTranscript: mocks.appendAssistantMessageToSessionTranscript,
-}));
-
-type OutboundSendServiceModule = typeof import("./outbound-send-service.js");
-
-let executePollAction: OutboundSendServiceModule["executePollAction"];
-let executeSendAction: OutboundSendServiceModule["executeSendAction"];
 
 describe("executeSendAction", () => {
   function pluginActionResult(messageId: string) {
@@ -102,7 +62,7 @@ describe("executeSendAction", () => {
       mediaUrls: string[];
     }>,
   ) {
-    expect(mocks.appendAssistantMessageToSessionTranscript).toHaveBeenCalledWith(
+    expect(appendAssistantMessageToSessionTranscript).toHaveBeenCalledWith(
       expect.objectContaining(expected),
     );
   }
@@ -115,60 +75,66 @@ describe("executeSendAction", () => {
     }>;
     mediaUrls?: string[];
   }) {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
+    dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
 
-    await executeSendAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: { to: "channel:123", message: "hello" },
-        dryRun: false,
-        mirror: {
-          sessionKey: "agent:main:demo-outbound:channel:123",
-          ...params.mirror,
+    await executeSendAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: { to: "channel:123", message: "hello" },
+          dryRun: false,
+          mirror: {
+            sessionKey: "agent:main:demo-outbound:channel:123",
+            ...params.mirror,
+          },
         },
+        to: "channel:123",
+        message: "hello",
+        mediaUrls: params.mediaUrls,
       },
-      to: "channel:123",
-      message: "hello",
-      mediaUrls: params.mediaUrls,
-    });
+      deps,
+    );
   }
 
-  beforeEach(async () => {
-    vi.resetModules();
-    ({ executePollAction, executeSendAction } = await import("./outbound-send-service.js"));
-    mocks.dispatchChannelMessageAction.mockClear();
-    mocks.sendMessage.mockClear();
-    mocks.sendPoll.mockClear();
-    mocks.getDefaultMediaLocalRoots.mockClear();
-    mocks.getAgentScopedMediaLocalRootsForSources.mockClear();
-    mocks.createAgentScopedHostMediaReadFile.mockClear();
-    mocks.resolveAgentScopedOutboundMediaAccess.mockClear();
-    mocks.appendAssistantMessageToSessionTranscript.mockClear();
+  beforeEach(() => {
+    dispatchChannelMessageAction.mockReset();
+    sendMessage.mockReset();
+    sendPoll.mockReset();
+    mediaReadFile.mockClear();
+    appendAssistantMessageToSessionTranscript.mockClear();
+    resolveAgentScopedOutboundMediaAccess.mockClear();
+    resolveAgentScopedOutboundMediaAccess.mockReturnValue({
+      localRoots: ["/tmp/agent-roots"],
+      readFile: mediaReadFile,
+    });
   });
 
   it("forwards ctx.agentId to sendMessage on core outbound path", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(null);
-    mocks.sendMessage.mockResolvedValue({
+    dispatchChannelMessageAction.mockResolvedValue(null);
+    sendMessage.mockResolvedValue({
       channel: "demo-outbound",
       to: "channel:123",
       via: "direct",
       mediaUrl: null,
     });
 
-    await executeSendAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {},
-        agentId: "work",
-        dryRun: false,
+    await executeSendAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {},
+          agentId: "work",
+          dryRun: false,
+        },
+        to: "channel:123",
+        message: "hello",
       },
-      to: "channel:123",
-      message: "hello",
-    });
+      deps,
+    );
 
-    expect(mocks.sendMessage).toHaveBeenCalledWith(
+    expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         agentId: "work",
         channel: "demo-outbound",
@@ -179,102 +145,114 @@ describe("executeSendAction", () => {
   });
 
   it("uses plugin poll action when available", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("poll-plugin"));
+    dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("poll-plugin"));
 
-    const result = await executePollAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {},
-        dryRun: false,
+    const result = await executePollAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {},
+          dryRun: false,
+        },
+        resolveCorePoll: () => ({
+          to: "channel:123",
+          question: "Lunch?",
+          options: ["Pizza", "Sushi"],
+          maxSelections: 1,
+        }),
       },
-      resolveCorePoll: () => ({
-        to: "channel:123",
-        question: "Lunch?",
-        options: ["Pizza", "Sushi"],
-        maxSelections: 1,
-      }),
-    });
+      deps,
+    );
 
     expect(result.handledBy).toBe("plugin");
-    expect(mocks.sendPoll).not.toHaveBeenCalled();
+    expect(sendPoll).not.toHaveBeenCalled();
   });
 
   it("does not invoke shared poll parsing before plugin poll dispatch", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("poll-plugin"));
+    dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("poll-plugin"));
     const resolveCorePoll = vi.fn(() => {
       throw new Error("shared poll fallback should not run");
     });
 
-    const result = await executePollAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {
-          pollQuestion: "Lunch?",
-          pollOption: ["Pizza", "Sushi"],
-          pollDurationSeconds: 90,
-          pollPublic: true,
+    const result = await executePollAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {
+            pollQuestion: "Lunch?",
+            pollOption: ["Pizza", "Sushi"],
+            pollDurationSeconds: 90,
+            pollPublic: true,
+          },
+          dryRun: false,
         },
-        dryRun: false,
+        resolveCorePoll,
       },
-      resolveCorePoll,
-    });
+      deps,
+    );
 
     expect(result.handledBy).toBe("plugin");
     expect(resolveCorePoll).not.toHaveBeenCalled();
-    expect(mocks.sendPoll).not.toHaveBeenCalled();
+    expect(sendPoll).not.toHaveBeenCalled();
   });
 
   it("passes agent-scoped media local roots to plugin dispatch", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
+    dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
 
-    await executeSendAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: { to: "channel:123", message: "hello" },
-        agentId: "agent-1",
-        dryRun: false,
+    await executeSendAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: { to: "channel:123", message: "hello" },
+          agentId: "agent-1",
+          dryRun: false,
+        },
+        to: "channel:123",
+        message: "hello",
       },
-      to: "channel:123",
-      message: "hello",
-    });
+      deps,
+    );
 
-    expect(mocks.getAgentScopedMediaLocalRootsForSources).toHaveBeenCalledWith({
+    expect(resolveAgentScopedOutboundMediaAccess).toHaveBeenCalledWith({
       cfg: {},
       agentId: "agent-1",
       mediaSources: [],
     });
-    expect(mocks.dispatchChannelMessageAction).toHaveBeenCalledWith(
+    expect(dispatchChannelMessageAction).toHaveBeenCalledWith(
       expect.objectContaining({
         mediaLocalRoots: ["/tmp/agent-roots"],
-        mediaReadFile: mocks.createAgentScopedHostMediaReadFile.mock.results[0]?.value,
+        mediaReadFile,
       }),
     );
   });
 
   it("passes concrete media sources when widening plugin dispatch roots", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
+    dispatchChannelMessageAction.mockResolvedValue(pluginActionResult("msg-plugin"));
 
-    await executeSendAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {
-          to: "channel:123",
-          message: "hello",
-          media: "/Users/peter/Pictures/photo.png",
+    await executeSendAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {
+            to: "channel:123",
+            message: "hello",
+            media: "/Users/peter/Pictures/photo.png",
+          },
+          agentId: "agent-1",
+          dryRun: false,
         },
-        agentId: "agent-1",
-        dryRun: false,
+        to: "channel:123",
+        message: "hello",
+        mediaUrl: "/Users/peter/Pictures/photo.png",
       },
-      to: "channel:123",
-      message: "hello",
-      mediaUrl: "/Users/peter/Pictures/photo.png",
-    });
+      deps,
+    );
 
-    expect(mocks.getAgentScopedMediaLocalRootsForSources).toHaveBeenCalledWith({
+    expect(resolveAgentScopedOutboundMediaAccess).toHaveBeenCalledWith({
       cfg: {},
       agentId: "agent-1",
       mediaSources: ["/Users/peter/Pictures/photo.png"],
@@ -312,34 +290,37 @@ describe("executeSendAction", () => {
   });
 
   it("skips plugin dispatch during dry-run sends and forwards gateway + silent to sendMessage", async () => {
-    mocks.sendMessage.mockResolvedValue({
+    sendMessage.mockResolvedValue({
       channel: "demo-outbound",
       to: "channel:123",
       via: "gateway",
       mediaUrl: null,
     });
 
-    await executeSendAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: { to: "channel:123", message: "hello" },
-        dryRun: true,
-        silent: true,
-        gateway: {
-          url: "http://127.0.0.1:18789",
-          token: "tok",
-          timeoutMs: 5000,
-          clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
-          mode: GATEWAY_CLIENT_MODES.BACKEND,
+    await executeSendAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: { to: "channel:123", message: "hello" },
+          dryRun: true,
+          silent: true,
+          gateway: {
+            url: "http://127.0.0.1:18789",
+            token: "tok",
+            timeoutMs: 5000,
+            clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
+            mode: GATEWAY_CLIENT_MODES.BACKEND,
+          },
         },
+        to: "channel:123",
+        message: "hello",
       },
-      to: "channel:123",
-      message: "hello",
-    });
+      deps,
+    );
 
-    expect(mocks.dispatchChannelMessageAction).not.toHaveBeenCalled();
-    expect(mocks.sendMessage).toHaveBeenCalledWith(
+    expect(dispatchChannelMessageAction).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "channel:123",
         content: "hello",
@@ -355,8 +336,8 @@ describe("executeSendAction", () => {
   });
 
   it("forwards poll args to sendPoll on core outbound path", async () => {
-    mocks.dispatchChannelMessageAction.mockResolvedValue(null);
-    mocks.sendPoll.mockResolvedValue({
+    dispatchChannelMessageAction.mockResolvedValue(null);
+    sendPoll.mockResolvedValue({
       channel: "demo-outbound",
       to: "channel:123",
       question: "Lunch?",
@@ -367,26 +348,29 @@ describe("executeSendAction", () => {
       via: "gateway",
     });
 
-    await executePollAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {},
-        accountId: "acc-1",
-        dryRun: false,
+    await executePollAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {},
+          accountId: "acc-1",
+          dryRun: false,
+        },
+        resolveCorePoll: () => ({
+          to: "channel:123",
+          question: "Lunch?",
+          options: ["Pizza", "Sushi"],
+          maxSelections: 1,
+          durationSeconds: 300,
+          threadId: "thread-1",
+          isAnonymous: true,
+        }),
       },
-      resolveCorePoll: () => ({
-        to: "channel:123",
-        question: "Lunch?",
-        options: ["Pizza", "Sushi"],
-        maxSelections: 1,
-        durationSeconds: 300,
-        threadId: "thread-1",
-        isAnonymous: true,
-      }),
-    });
+      deps,
+    );
 
-    expect(mocks.sendPoll).toHaveBeenCalledWith(
+    expect(sendPoll).toHaveBeenCalledWith(
       expect.objectContaining({
         channel: "demo-outbound",
         accountId: "acc-1",
@@ -402,7 +386,7 @@ describe("executeSendAction", () => {
   });
 
   it("skips plugin dispatch during dry-run polls and forwards durationHours + silent", async () => {
-    mocks.sendPoll.mockResolvedValue({
+    sendPoll.mockResolvedValue({
       channel: "demo-outbound",
       to: "channel:123",
       question: "Lunch?",
@@ -413,32 +397,35 @@ describe("executeSendAction", () => {
       via: "gateway",
     });
 
-    await executePollAction({
-      ctx: {
-        cfg: {},
-        channel: "demo-outbound",
-        params: {},
-        dryRun: true,
-        silent: true,
-        gateway: {
-          url: "http://127.0.0.1:18789",
-          token: "tok",
-          timeoutMs: 5000,
-          clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
-          mode: GATEWAY_CLIENT_MODES.BACKEND,
+    await executePollAction(
+      {
+        ctx: {
+          cfg: {},
+          channel: "demo-outbound",
+          params: {},
+          dryRun: true,
+          silent: true,
+          gateway: {
+            url: "http://127.0.0.1:18789",
+            token: "tok",
+            timeoutMs: 5000,
+            clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
+            mode: GATEWAY_CLIENT_MODES.BACKEND,
+          },
         },
+        resolveCorePoll: () => ({
+          to: "channel:123",
+          question: "Lunch?",
+          options: ["Pizza", "Sushi"],
+          maxSelections: 1,
+          durationHours: 6,
+        }),
       },
-      resolveCorePoll: () => ({
-        to: "channel:123",
-        question: "Lunch?",
-        options: ["Pizza", "Sushi"],
-        maxSelections: 1,
-        durationHours: 6,
-      }),
-    });
+      deps,
+    );
 
-    expect(mocks.dispatchChannelMessageAction).not.toHaveBeenCalled();
-    expect(mocks.sendPoll).toHaveBeenCalledWith(
+    expect(dispatchChannelMessageAction).not.toHaveBeenCalled();
+    expect(sendPoll).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "channel:123",
         question: "Lunch?",

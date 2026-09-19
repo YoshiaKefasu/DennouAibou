@@ -1,158 +1,126 @@
-import process from "node:process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { importFreshModule } from "../test/helpers/import-fresh.js";
-import { pollUntilAssert } from "../test/helpers/poll.js";
+import { describe, expect, it, vi } from "vitest";
+import { tryHandleRootVersionFastPath, type RootVersionFastPathDeps } from "./entry.js";
 
-const applyCliProfileEnvMock = vi.hoisted(() => vi.fn());
-const attachChildProcessBridgeMock = vi.hoisted(() => vi.fn());
-const installProcessWarningFilterMock = vi.hoisted(() => vi.fn());
-const isMainModuleMock = vi.hoisted(() => vi.fn(() => true));
-const isRootHelpInvocationMock = vi.hoisted(() => vi.fn(() => false));
-const isRootVersionInvocationMock = vi.hoisted(() => vi.fn(() => true));
-const normalizeEnvMock = vi.hoisted(() => vi.fn());
-const normalizeWindowsArgvMock = vi.hoisted(() => vi.fn((argv: string[]) => argv));
-const parseCliProfileArgsMock = vi.hoisted(() => vi.fn((argv: string[]) => ({ ok: true, argv })));
-const resolveCliContainerTargetMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
-const resolveCommitHashMock = vi.hoisted(() => vi.fn<() => string | null>(() => "abc1234"));
-const runCliMock = vi.hoisted(() => vi.fn(async () => {}));
-const shouldSkipRespawnForArgvMock = vi.hoisted(() => vi.fn(() => true));
+function flushAsyncWork(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
 
-vi.mock("./cli/argv.js", () => ({
-  isRootHelpInvocation: isRootHelpInvocationMock,
-  isRootVersionInvocation: isRootVersionInvocationMock,
-}));
-
-vi.mock("./cli/container-target.js", () => ({
-  parseCliContainerArgs: (argv: string[]) => ({ ok: true, container: null, argv }),
-  resolveCliContainerTarget: resolveCliContainerTargetMock,
-}));
-
-vi.mock("./cli/profile.js", () => ({
-  applyCliProfileEnv: applyCliProfileEnvMock,
-  parseCliProfileArgs: parseCliProfileArgsMock,
-}));
-
-vi.mock("./cli/run-main.js", () => ({
-  runCli: runCliMock,
-}));
-
-vi.mock("./cli/respawn-policy.js", () => ({
-  shouldSkipRespawnForArgv: shouldSkipRespawnForArgvMock,
-}));
-
-vi.mock("./cli/windows-argv.js", () => ({
-  normalizeWindowsArgv: normalizeWindowsArgvMock,
-}));
-
-vi.mock("./infra/env.js", () => ({
-  isTruthyEnvValue: () => false,
-  normalizeEnv: normalizeEnvMock,
-}));
-
-vi.mock("./infra/git-commit.js", () => ({
-  resolveCommitHash: resolveCommitHashMock,
-}));
-
-vi.mock("./infra/is-main.js", () => ({
-  isMainModule: isMainModuleMock,
-}));
-
-vi.mock("./infra/warning-filter.js", () => ({
-  installProcessWarningFilter: installProcessWarningFilterMock,
-}));
-
-vi.mock("./process/child-process-bridge.js", () => ({
-  attachChildProcessBridge: attachChildProcessBridgeMock,
-}));
-
-vi.mock("./version.js", () => ({
-  VERSION: "9.9.9-test",
-}));
-
-async function importEntry(scope: string) {
-  return await importFreshModule<typeof import("./entry.js")>(
-    import.meta.url,
-    `./entry.js?scope=${scope}`,
-  );
+/**
+ * Inject every boundary the root version fast path touches so the suite does not
+ * have to mock `./cli/argv.js`, `./cli/container-target.js`, `./version.js`,
+ * `./infra/git-commit.js`, or the entry-point respawn machinery.
+ */
+function createDeps(overrides: Partial<RootVersionFastPathDeps> = {}): RootVersionFastPathDeps {
+  return {
+    isRootVersionInvocation: () => true,
+    resolveCliContainerTarget: () => null,
+    loadVersion: async () => "9.9.9-test",
+    loadCommitHash: async () => "abc1234",
+    log: () => {},
+    exit: () => {},
+    ...overrides,
+  };
 }
 
 describe("entry root version fast path", () => {
-  let originalArgv: string[];
-  let originalGatewayToken: string | undefined;
-  let exitSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    originalArgv = [...process.argv];
-    originalGatewayToken = process.env.DENNOU_GATEWAY_TOKEN;
-    delete process.env.DENNOU_GATEWAY_TOKEN;
-    process.argv = ["node", "openclaw", "--version"];
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((_code?: number) => undefined) as typeof process.exit);
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    if (originalGatewayToken === undefined) {
-      delete process.env.DENNOU_GATEWAY_TOKEN;
-    } else {
-      process.env.DENNOU_GATEWAY_TOKEN = originalGatewayToken;
-    }
-    exitSpy.mockRestore();
-  });
-
   it("prints commit-tagged version output when commit metadata is available", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const log = vi.fn();
+    const exit = vi.fn();
 
-    await importEntry("commit-tagged");
-    await pollUntilAssert(() => {
-      expect(logSpy).toHaveBeenCalledWith("OpenClaw 9.9.9-test (abc1234)");
-      expect(exitSpy).toHaveBeenCalledWith(0);
-    });
+    const handled = tryHandleRootVersionFastPath(
+      ["node", "openclaw", "--version"],
+      createDeps({ log, exit }),
+    );
+    await flushAsyncWork();
 
-    logSpy.mockRestore();
+    expect(handled).toBe(true);
+    expect(log).toHaveBeenCalledWith("OpenClaw 9.9.9-test (abc1234)");
+    expect(exit).toHaveBeenCalledWith(0);
   });
 
   it("falls back to plain version output when commit metadata is unavailable", async () => {
-    resolveCommitHashMock.mockReturnValueOnce(null);
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const log = vi.fn();
+    const exit = vi.fn();
 
-    await importEntry("plain-version");
-    await pollUntilAssert(() => {
-      expect(logSpy).toHaveBeenCalledWith("OpenClaw 9.9.9-test");
-      expect(exitSpy).toHaveBeenCalledWith(0);
-    });
+    tryHandleRootVersionFastPath(
+      ["node", "openclaw", "--version"],
+      createDeps({ log, exit, loadCommitHash: async () => null }),
+    );
+    await flushAsyncWork();
 
-    logSpy.mockRestore();
+    expect(log).toHaveBeenCalledWith("OpenClaw 9.9.9-test");
+    expect(exit).toHaveBeenCalledWith(0);
   });
 
   it("skips the host version fast path when a container target is active", async () => {
-    resolveCliContainerTargetMock.mockReturnValue("demo");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const log = vi.fn();
+    const exit = vi.fn();
 
-    await importEntry("container-target");
-    await pollUntilAssert(() => {
-      expect(runCliMock).toHaveBeenCalledWith(["node", "openclaw", "--version"]);
-    });
-    expect(logSpy).not.toHaveBeenCalled();
-    expect(exitSpy).not.toHaveBeenCalled();
+    const handled = tryHandleRootVersionFastPath(
+      ["node", "openclaw", "--version"],
+      createDeps({ log, exit, resolveCliContainerTarget: () => "demo" }),
+    );
+    await flushAsyncWork();
 
-    logSpy.mockRestore();
+    expect(handled).toBe(false);
+    expect(log).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
   });
 
-  it("allows root version container mode when gateway override env vars are set", async () => {
-    resolveCliContainerTargetMock.mockReturnValue("demo");
+  it("still skips the fast path for a container target when gateway override env vars are set", async () => {
+    const originalGatewayToken = process.env.DENNOU_GATEWAY_TOKEN;
     process.env.DENNOU_GATEWAY_TOKEN = "demo-token";
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.fn();
+    const onError = vi.fn();
 
-    await importEntry("gateway-override");
-    await pollUntilAssert(() => {
-      expect(runCliMock).toHaveBeenCalledWith(["node", "openclaw", "--version"]);
-    });
-    expect(errorSpy).not.toHaveBeenCalled();
-    expect(exitSpy).not.toHaveBeenCalled();
+    try {
+      const handled = tryHandleRootVersionFastPath(
+        ["node", "openclaw", "--version"],
+        createDeps({ log, onError, resolveCliContainerTarget: () => "demo" }),
+      );
+      await flushAsyncWork();
 
-    errorSpy.mockRestore();
+      expect(handled).toBe(false);
+      expect(log).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+    } finally {
+      if (originalGatewayToken === undefined) {
+        delete process.env.DENNOU_GATEWAY_TOKEN;
+      } else {
+        process.env.DENNOU_GATEWAY_TOKEN = originalGatewayToken;
+      }
+    }
+  });
+
+  it("does not handle invocations that are not the root version flag", async () => {
+    const log = vi.fn();
+
+    const handled = tryHandleRootVersionFastPath(
+      ["node", "openclaw", "status"],
+      createDeps({ log, isRootVersionInvocation: () => false }),
+    );
+    await flushAsyncWork();
+
+    expect(handled).toBe(false);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("routes version resolution failures through the error handler", async () => {
+    const onError = vi.fn();
+
+    tryHandleRootVersionFastPath(
+      ["node", "openclaw", "--version"],
+      createDeps({
+        onError,
+        loadCommitHash: async () => {
+          throw new Error("boom");
+        },
+      }),
+    );
+    await flushAsyncWork();
+
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 });

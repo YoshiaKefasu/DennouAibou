@@ -4,26 +4,50 @@ import { defaultRuntime } from "../runtime.js";
 import { getCommandPathWithRootOptions, hasFlag, hasHelpOrVersion } from "./argv.js";
 import { findRoutedCommand } from "./program/routes.js";
 
-async function prepareRoutedCommand(params: {
-  argv: string[];
-  commandPath: string[];
-  loadPlugins?: boolean | ((argv: string[]) => boolean);
-}) {
+/**
+ * Injectable seams for the routed-command boundaries this module lazily loads.
+ * Tests supply fixtures instead of intercepting the lazily imported modules at
+ * module level, which Bun's runner does not support.
+ */
+export type RouteCliDeps = {
+  runtime?: typeof defaultRuntime;
+  findRoutedCommand?: typeof findRoutedCommand;
+  ensureConfigReady?: typeof import("./program/config-guard.js").ensureConfigReady;
+  ensurePluginRegistryLoaded?: typeof import("./plugin-registry.js").ensurePluginRegistryLoaded;
+  /** Banner emission seam. Defaults to lazily importing the banner module. */
+  emitBanner?: (argv: string[]) => void | Promise<void>;
+};
+
+async function prepareRoutedCommand(
+  params: {
+    argv: string[];
+    commandPath: string[];
+    loadPlugins?: boolean | ((argv: string[]) => boolean);
+  },
+  deps: RouteCliDeps = {},
+) {
+  const runtime = deps.runtime ?? defaultRuntime;
   const suppressDoctorStdout = hasFlag(params.argv, "--json");
   const skipConfigGuard =
     (params.commandPath[0] === "status" && suppressDoctorStdout) ||
     (params.commandPath[0] === "gateway" && params.commandPath[1] === "status");
   if (!suppressDoctorStdout && process.stdout.isTTY) {
-    const [{ emitCliBanner }, { VERSION }] = await Promise.all([
-      import("./banner.js"),
-      import("../version.js"),
-    ]);
-    emitCliBanner(VERSION, { argv: params.argv });
+    const emitBanner =
+      deps.emitBanner ??
+      (async (argv: string[]) => {
+        const [{ emitCliBanner }, { VERSION }] = await Promise.all([
+          import("./banner.js"),
+          import("../version.js"),
+        ]);
+        emitCliBanner(VERSION, { argv });
+      });
+    await emitBanner(params.argv);
   }
   if (!skipConfigGuard) {
-    const { ensureConfigReady } = await import("./program/config-guard.js");
+    const ensureConfigReady =
+      deps.ensureConfigReady ?? (await import("./program/config-guard.js")).ensureConfigReady;
     await ensureConfigReady({
-      runtime: defaultRuntime,
+      runtime,
       commandPath: params.commandPath,
       ...(suppressDoctorStdout ? { suppressDoctorStdout: true } : {}),
     });
@@ -31,7 +55,9 @@ async function prepareRoutedCommand(params: {
   const shouldLoadPlugins =
     typeof params.loadPlugins === "function" ? params.loadPlugins(params.argv) : params.loadPlugins;
   if (shouldLoadPlugins) {
-    const { ensurePluginRegistryLoaded } = await import("./plugin-registry.js");
+    const ensurePluginRegistryLoaded =
+      deps.ensurePluginRegistryLoaded ??
+      (await import("./plugin-registry.js")).ensurePluginRegistryLoaded;
     const prev = loggingState.forceConsoleToStderr;
     if (suppressDoctorStdout) {
       loggingState.forceConsoleToStderr = true;
@@ -49,7 +75,7 @@ async function prepareRoutedCommand(params: {
   }
 }
 
-export async function tryRouteCli(argv: string[]): Promise<boolean> {
+export async function tryRouteCli(argv: string[], deps: RouteCliDeps = {}): Promise<boolean> {
   if (isTruthyEnvValue(process.env.DENNOU_DISABLE_ROUTE_FIRST)) {
     return false;
   }
@@ -61,10 +87,11 @@ export async function tryRouteCli(argv: string[]): Promise<boolean> {
   if (!path[0]) {
     return false;
   }
-  const route = findRoutedCommand(path);
+  const findRoutedCommandImpl = deps.findRoutedCommand ?? findRoutedCommand;
+  const route = findRoutedCommandImpl(path);
   if (!route) {
     return false;
   }
-  await prepareRoutedCommand({ argv, commandPath: path, loadPlugins: route.loadPlugins });
+  await prepareRoutedCommand({ argv, commandPath: path, loadPlugins: route.loadPlugins }, deps);
   return route.run(argv);
 }
