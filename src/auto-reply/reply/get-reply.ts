@@ -42,6 +42,29 @@ export type GetReplyDeps = {
   initSessionState: typeof initSessionState;
   resolveSessionModelOverrideSnapshot: typeof resolveSessionModelOverrideSnapshot;
   runPreparedReply: typeof runPreparedReply;
+  // Optional test seams for dependencies that Bun's vi.mock cannot replace
+  // (async importOriginal factories hang the Bun runtime). When omitted,
+  // the production implementation is used exactly as before, so default
+  // behavior is unchanged.
+  emitResetCommandHooks?: typeof import("./commands-core.js").emitResetCommandHooks;
+  loadConfig?: typeof loadConfig;
+  resolveSessionAgentId?: typeof resolveSessionAgentId;
+  resolveAgentDir?: typeof resolveAgentDir;
+  resolveAgentWorkspaceDir?: typeof resolveAgentWorkspaceDir;
+  resolveAgentSkillsFilter?: typeof resolveAgentSkillsFilter;
+  resolveModelRefFromString?: typeof resolveModelRefFromString;
+  resolveAgentTimeoutMs?: typeof resolveAgentTimeoutMs;
+  ensureAgentWorkspace?: typeof ensureAgentWorkspace;
+  resolveChannelModelOverride?: typeof resolveChannelModelOverride;
+  resolveCommandAuthorization?: typeof resolveCommandAuthorization;
+  resolveDefaultModel?: typeof resolveDefaultModel;
+  finalizeInboundContext?: typeof finalizeInboundContext;
+  emitPreAgentMessageHooks?: typeof emitPreAgentMessageHooks;
+  getGlobalHookRunner?: typeof import("../../plugins/hook-runner-global.js").getGlobalHookRunner;
+  applyMediaUnderstanding?: typeof import("../../media-understanding/apply.runtime.js").applyMediaUnderstanding;
+  applyLinkUnderstanding?: typeof import("../../link-understanding/apply.runtime.js").applyLinkUnderstanding;
+  loadModelCatalog?: typeof import("../../agents/model-catalog.js").loadModelCatalog;
+  hasInlineableNativeAudio?: typeof import("../../media/native-audio.js").hasInlineableNativeAudio;
 };
 
 const defaultGetReplyDeps: GetReplyDeps = {
@@ -135,11 +158,16 @@ async function applyMediaUnderstandingIfNeeded(params: {
   cfg: OpenClawConfig;
   agentDir?: string;
   activeModel: { provider: string; model: string };
+  applyMediaUnderstanding?: GetReplyDeps["applyMediaUnderstanding"];
+  loadModelCatalog?: GetReplyDeps["loadModelCatalog"];
+  hasInlineableNativeAudio?: GetReplyDeps["hasInlineableNativeAudio"];
 }): Promise<boolean> {
   if (!hasInboundMedia(params.ctx)) {
     return false;
   }
-  const catalog = await loadModelCatalog({ config: params.cfg });
+  const loadModelCatalogFn = params.loadModelCatalog ?? loadModelCatalog;
+  const hasInlineableNativeAudioFn = params.hasInlineableNativeAudio ?? hasInlineableNativeAudio;
+  const catalog = await loadModelCatalogFn({ config: params.cfg });
   const modelEntry = findModelInCatalog(
     catalog,
     params.activeModel.provider,
@@ -148,14 +176,17 @@ async function applyMediaUnderstandingIfNeeded(params: {
   const audioPaths = params.ctx.MediaPaths ?? (params.ctx.MediaPath ? [params.ctx.MediaPath] : []);
   const audioTypes = params.ctx.MediaTypes;
   const nativeAudio = modelSupportsAudio(modelEntry)
-    ? await hasInlineableNativeAudio({
+    ? await hasInlineableNativeAudioFn({
         paths: audioPaths,
         types: audioTypes,
         fallbackType: params.ctx.MediaType,
         workspaceDir: params.agentDir,
       })
     : false;
-  const { applyMediaUnderstanding } = await import("../../media-understanding/apply.runtime.js");
+  const { applyMediaUnderstanding } =
+    params.applyMediaUnderstanding != null
+      ? { applyMediaUnderstanding: params.applyMediaUnderstanding }
+      : await import("../../media-understanding/apply.runtime.js");
   await applyMediaUnderstanding({ ...params, skipAudio: nativeAudio });
   return true;
 }
@@ -163,11 +194,15 @@ async function applyMediaUnderstandingIfNeeded(params: {
 async function applyLinkUnderstandingIfNeeded(params: {
   ctx: MsgContext;
   cfg: OpenClawConfig;
+  applyLinkUnderstanding?: GetReplyDeps["applyLinkUnderstanding"];
 }): Promise<boolean> {
   if (!hasLinkCandidate(params.ctx)) {
     return false;
   }
-  const { applyLinkUnderstanding } = await import("../../link-understanding/apply.runtime.js");
+  const { applyLinkUnderstanding } =
+    params.applyLinkUnderstanding != null
+      ? { applyLinkUnderstanding: params.applyLinkUnderstanding }
+      : await import("../../link-understanding/apply.runtime.js");
   await applyLinkUnderstanding(params);
   return true;
 }
@@ -193,8 +228,11 @@ function resolveEffectiveActiveMediaModel(params: {
   defaultProvider: string;
   aliasIndex: ModelAliasIndex;
   hasResolvedHeartbeatModelOverride: boolean;
+  resolveChannelModelOverride?: GetReplyDeps["resolveChannelModelOverride"];
 }): { provider: string; model: string } {
   const { provider, model } = params;
+  const resolveChannelModelOverrideFn =
+    params.resolveChannelModelOverride ?? resolveChannelModelOverride;
   if (params.hasResolvedHeartbeatModelOverride) {
     return { provider, model };
   }
@@ -218,7 +256,7 @@ function resolveEffectiveActiveMediaModel(params: {
     // path gating (`hasSessionModelOverride`).
     return { provider, model };
   }
-  const channelModelOverride = resolveChannelModelOverride({
+  const channelModelOverride = resolveChannelModelOverrideFn({
     cfg: params.cfg,
     channel:
       groupResolution?.channel ??
@@ -255,14 +293,31 @@ export async function getReplyFromConfig(
 ): Promise<ReplyPayload | ReplyPayload[] | undefined> {
   const resolvedDeps = { ...defaultGetReplyDeps, ...deps };
   const isFastTestEnv = process.env.DENNOU_TEST_FAST === "1";
+  const loadConfigFn = resolvedDeps.loadConfig ?? loadConfig;
+  const resolveSessionAgentIdFn = resolvedDeps.resolveSessionAgentId ?? resolveSessionAgentId;
+  const resolveAgentSkillsFilterFn =
+    resolvedDeps.resolveAgentSkillsFilter ?? resolveAgentSkillsFilter;
+  const resolveDefaultModelFn = resolvedDeps.resolveDefaultModel ?? resolveDefaultModel;
+  const resolveModelRefFromStringFn =
+    resolvedDeps.resolveModelRefFromString ?? resolveModelRefFromString;
+  const resolveAgentWorkspaceDirFn =
+    resolvedDeps.resolveAgentWorkspaceDir ?? resolveAgentWorkspaceDir;
+  const ensureAgentWorkspaceFn = resolvedDeps.ensureAgentWorkspace ?? ensureAgentWorkspace;
+  const resolveAgentDirFn = resolvedDeps.resolveAgentDir ?? resolveAgentDir;
+  const resolveAgentTimeoutMsFn = resolvedDeps.resolveAgentTimeoutMs ?? resolveAgentTimeoutMs;
+  const finalizeInboundContextFn = resolvedDeps.finalizeInboundContext ?? finalizeInboundContext;
+  const resolveCommandAuthorizationFn =
+    resolvedDeps.resolveCommandAuthorization ?? resolveCommandAuthorization;
+  const resolveChannelModelOverrideFn =
+    resolvedDeps.resolveChannelModelOverride ?? resolveChannelModelOverride;
   const cfg =
     configOverride == null
-      ? loadConfig()
-      : (applyMergePatch(loadConfig(), configOverride) as OpenClawConfig);
+      ? loadConfigFn()
+      : (applyMergePatch(loadConfigFn(), configOverride) as OpenClawConfig);
   const targetSessionKey =
     ctx.CommandSource === "native" ? ctx.CommandTargetSessionKey?.trim() : undefined;
   const agentSessionKey = targetSessionKey || ctx.SessionKey;
-  const agentId = resolveSessionAgentId({
+  const agentId = resolveSessionAgentIdFn({
     sessionKey: agentSessionKey,
     config: cfg,
   });
@@ -274,7 +329,7 @@ export async function getReplyFromConfig(
     mergedSkillFilter !== undefined ? { ...opts, skillFilter: mergedSkillFilter } : opts;
   const agentCfg = cfg.agents?.defaults;
   const sessionCfg = cfg.session;
-  const { defaultProvider, defaultModel, aliasIndex } = resolveDefaultModel({
+  const { defaultProvider, defaultModel, aliasIndex } = resolveDefaultModelFn({
     cfg,
     agentId,
   });
@@ -287,7 +342,7 @@ export async function getReplyFromConfig(
     const heartbeatRaw =
       opts.heartbeatModelOverride?.trim() ?? agentCfg?.heartbeat?.model?.trim() ?? "";
     const heartbeatRef = heartbeatRaw
-      ? resolveModelRefFromString({
+      ? resolveModelRefFromStringFn({
           raw: heartbeatRaw,
           defaultProvider,
           aliasIndex,
@@ -300,14 +355,14 @@ export async function getReplyFromConfig(
     }
   }
 
-  const workspaceDirRaw = resolveAgentWorkspaceDir(cfg, agentId) ?? DEFAULT_AGENT_WORKSPACE_DIR;
-  const workspace = await ensureAgentWorkspace({
+  const workspaceDirRaw = resolveAgentWorkspaceDirFn(cfg, agentId) ?? DEFAULT_AGENT_WORKSPACE_DIR;
+  const workspace = await ensureAgentWorkspaceFn({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
   });
   const workspaceDir = workspace.dir;
-  const agentDir = resolveAgentDir(cfg, agentId);
-  const timeoutMs = resolveAgentTimeoutMs({ cfg, overrideSeconds: opts?.timeoutOverrideSeconds });
+  const agentDir = resolveAgentDirFn(cfg, agentId);
+  const timeoutMs = resolveAgentTimeoutMsFn({ cfg, overrideSeconds: opts?.timeoutOverrideSeconds });
   const configuredTypingSeconds =
     agentCfg?.typingIntervalSeconds ?? sessionCfg?.typingIntervalSeconds;
   const typingIntervalSeconds =
@@ -321,7 +376,7 @@ export async function getReplyFromConfig(
   });
   opts?.onTypingController?.(typing);
 
-  const finalized = finalizeInboundContext(ctx);
+  const finalized = finalizeInboundContextFn(ctx);
 
   if (!isFastTestEnv) {
     // Resolve the effective active model (session-stored /model override,
@@ -344,6 +399,7 @@ export async function getReplyFromConfig(
           defaultProvider,
           aliasIndex,
           hasResolvedHeartbeatModelOverride,
+          resolveChannelModelOverride: resolvedDeps.resolveChannelModelOverride ?? undefined,
         })
       : { provider, model };
     await applyMediaUnderstandingIfNeeded({
@@ -351,20 +407,26 @@ export async function getReplyFromConfig(
       cfg,
       agentDir,
       activeModel: effectiveActiveModel,
+      applyMediaUnderstanding: resolvedDeps.applyMediaUnderstanding ?? undefined,
+      loadModelCatalog: resolvedDeps.loadModelCatalog ?? undefined,
+      hasInlineableNativeAudio: resolvedDeps.hasInlineableNativeAudio ?? undefined,
     });
     await applyLinkUnderstandingIfNeeded({
       ctx: finalized,
       cfg,
+      applyLinkUnderstanding: resolvedDeps.applyLinkUnderstanding ?? undefined,
     });
   }
-  emitPreAgentMessageHooks({
+  const emitPreAgentMessageHooksFn =
+    resolvedDeps.emitPreAgentMessageHooks ?? emitPreAgentMessageHooks;
+  emitPreAgentMessageHooksFn({
     ctx: finalized,
     cfg,
     isFastTestEnv,
   });
 
   const commandAuthorized = finalized.CommandAuthorized;
-  resolveCommandAuthorization({
+  resolveCommandAuthorizationFn({
     ctx: finalized,
     cfg,
     commandAuthorized,
@@ -412,7 +474,7 @@ export async function getReplyFromConfig(
     });
   }
 
-  const channelModelOverride = resolveChannelModelOverride({
+  const channelModelOverride = resolveChannelModelOverrideFn({
     cfg,
     channel:
       groupResolution?.channel ??
@@ -432,7 +494,7 @@ export async function getReplyFromConfig(
     sessionEntry.modelOverride?.trim() || sessionEntry.providerOverride?.trim(),
   );
   if (!hasResolvedHeartbeatModelOverride && !hasSessionModelOverride && channelModelOverride) {
-    const resolved = resolveModelRefFromString({
+    const resolved = resolveModelRefFromStringFn({
       raw: channelModelOverride.model,
       defaultProvider,
       aliasIndex,
@@ -513,7 +575,10 @@ export async function getReplyFromConfig(
     if (!resetMatch) {
       return;
     }
-    const { emitResetCommandHooks } = await import("./commands-core.runtime.js");
+    const { emitResetCommandHooks } =
+      resolvedDeps.emitResetCommandHooks != null
+        ? { emitResetCommandHooks: resolvedDeps.emitResetCommandHooks }
+        : await import("./commands-core.runtime.js");
     const action: ResetCommandAction = resetMatch[1] === "reset" ? "reset" : "new";
     await emitResetCommandHooks({
       action,
@@ -576,8 +641,9 @@ export async function getReplyFromConfig(
   abortedLastRun = inlineActionResult.abortedLastRun ?? abortedLastRun;
 
   // Allow plugins to intercept and return a synthetic reply before the LLM runs.
-  const { getGlobalHookRunner } = await loadHookRunnerGlobal();
-  const hookRunner = getGlobalHookRunner();
+  const getGlobalHookRunnerFn =
+    resolvedDeps.getGlobalHookRunner ?? (await loadHookRunnerGlobal()).getGlobalHookRunner;
+  const hookRunner = getGlobalHookRunnerFn();
   if (hookRunner?.hasHooks("before_agent_reply")) {
     const { resolveOriginMessageProvider } = await loadOriginRouting();
     const hookMessageProvider = resolveOriginMessageProvider({

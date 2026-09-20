@@ -6,10 +6,20 @@ import { resolveAllowFromMode, type AllowFromMode } from "./allow-from-mode.js";
 import { hasAllowFromEntries } from "./allowlist.js";
 import { asObjectRecord } from "./object.js";
 
-export async function maybeRepairAllowlistPolicyAllowFrom(cfg: OpenClawConfig): Promise<{
+export type AllowlistPolicyRepairDeps = {
+  readChannelAllowFromStore?: typeof readChannelAllowFromStore;
+  resolveAllowFromMode?: typeof resolveAllowFromMode;
+};
+
+export async function maybeRepairAllowlistPolicyAllowFrom(
+  cfg: OpenClawConfig,
+  deps: AllowlistPolicyRepairDeps = {},
+): Promise<{
   config: OpenClawConfig;
   changes: string[];
 }> {
+  const readChannelAllowFromStoreImpl = deps.readChannelAllowFromStore ?? readChannelAllowFromStore;
+  const resolveAllowFromModeImpl = deps.resolveAllowFromMode ?? resolveAllowFromMode;
   const channels = cfg.channels;
   if (!channels || typeof channels !== "object") {
     return { config: cfg, changes: [] };
@@ -93,7 +103,7 @@ export async function maybeRepairAllowlistPolicyAllowFrom(cfg: OpenClawConfig): 
       return;
     }
     const normalizedAccountId = normalizeAccountId(params.accountId) || DEFAULT_ACCOUNT_ID;
-    const fromStore = await readChannelAllowFromStore(
+    const fromStore = await readChannelAllowFromStoreImpl(
       normalizedChannelId,
       process.env,
       normalizedAccountId,
@@ -108,7 +118,7 @@ export async function maybeRepairAllowlistPolicyAllowFrom(cfg: OpenClawConfig): 
     applyRecoveredAllowFrom({
       account: params.account,
       allowFrom: recovered,
-      mode: resolveAllowFromMode(params.channelName),
+      mode: resolveAllowFromModeImpl(params.channelName),
       prefix: params.prefix,
     });
   };

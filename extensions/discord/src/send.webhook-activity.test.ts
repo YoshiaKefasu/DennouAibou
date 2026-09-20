@@ -1,50 +1,15 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-const recordChannelActivityMock = vi.hoisted(() => vi.fn());
-const loadConfigMock = vi.hoisted(() => vi.fn(() => ({ channels: { discord: {} } })));
-
-vi.mock("openclaw/plugin-sdk/config-runtime", async () => {
-  const actual = await import("openclaw/plugin-sdk/config-runtime");
-  return {
-    ...actual,
-    loadConfig: () => loadConfigMock(),
-  };
-});
-
-vi.mock("../../../src/infra/channel-activity.js", async () => {
-  const actual = await import("../../../src/infra/channel-activity.js");
-  return {
-    ...actual,
-    recordChannelActivity: (...args: unknown[]) => recordChannelActivityMock(...args),
-  };
-});
-
-let sendWebhookMessageDiscord: typeof import("./send.outbound.js").sendWebhookMessageDiscord;
+import { describe, expect, it, vi } from "vitest";
+import { sendWebhookMessageDiscord } from "./send.outbound.js";
 
 describe("sendWebhookMessageDiscord activity", () => {
-  beforeAll(async () => {
-    ({ sendWebhookMessageDiscord } = await import("./send.outbound.js"));
-  });
-
-  beforeEach(() => {
-    recordChannelActivityMock.mockClear();
-    loadConfigMock.mockClear();
-    setTestGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return new Response(JSON.stringify({ id: "msg-1", channel_id: "thread-1" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }),
-    );
-  });
-
-  afterEach(() => {
-    restoreTestGlobals();
-  });
-
   it("records outbound channel activity for webhook sends", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "msg-1", channel_id: "thread-1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const recordActivity = vi.fn();
     const cfg = {
       channels: {
         discord: {
@@ -58,17 +23,19 @@ describe("sendWebhookMessageDiscord activity", () => {
       webhookToken: "tok-1",
       accountId: "runtime",
       threadId: "thread-1",
+      fetchImpl,
+      recordActivity,
     });
 
     expect(result).toEqual({
       messageId: "msg-1",
       channelId: "thread-1",
     });
-    expect(recordChannelActivityMock).toHaveBeenCalledWith({
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(recordActivity).toHaveBeenCalledWith({
       channel: "discord",
       accountId: "runtime",
       direction: "outbound",
     });
-    expect(loadConfigMock).not.toHaveBeenCalled();
   });
 });

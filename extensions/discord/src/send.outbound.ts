@@ -339,6 +339,8 @@ type DiscordWebhookSendOpts = {
   username?: string;
   avatarUrl?: string;
   wait?: boolean;
+  fetchImpl?: typeof fetch;
+  recordActivity?: typeof recordChannelActivity;
 };
 
 function resolveWebhookExecutionUrl(params: {
@@ -377,7 +379,7 @@ export async function sendWebhookMessageDiscord(
     accountId: account.accountId,
   });
 
-  const response = await (proxyFetch ?? fetch)(
+  const response = await (opts.fetchImpl ?? proxyFetch ?? fetch)(
     resolveWebhookExecutionUrl({
       webhookId,
       webhookToken,
@@ -409,7 +411,7 @@ export async function sendWebhookMessageDiscord(
     channel_id?: string;
   };
   try {
-    recordChannelActivity({
+    (opts.recordActivity ?? recordChannelActivity)({
       channel: "discord",
       accountId: account.accountId,
       direction: "outbound",

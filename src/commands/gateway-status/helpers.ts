@@ -6,7 +6,7 @@ import { readGatewayPasswordEnv, readGatewayTokenEnv } from "../../gateway/crede
 import { isLoopbackHost } from "../../gateway/net.js";
 import type { GatewayProbeResult } from "../../gateway/probe.js";
 import { resolveConfiguredSecretInputString } from "../../gateway/resolve-configured-secret-input-string.js";
-import { inspectBestEffortPrimaryTailnetIPv4 } from "../../infra/network-discovery-display.js";
+import { pickPrimaryTailnetIPv4 } from "../../infra/tailnet.js";
 import { colorize, theme } from "../../terminal/theme.js";
 import { pickGatewaySelfPresence } from "../gateway-presence.js";
 
@@ -82,7 +82,12 @@ function normalizeWsUrl(value: string): string | null {
   return trimmed;
 }
 
-export function resolveTargets(cfg: OpenClawConfig, explicitUrl?: string): GatewayStatusTarget[] {
+export function resolveTargets(
+  cfg: OpenClawConfig,
+  explicitUrl?: string,
+  deps?: { resolveGatewayPort?: typeof resolveGatewayPort },
+): GatewayStatusTarget[] {
+  const resolvePort = deps?.resolveGatewayPort ?? resolveGatewayPort;
   const targets: GatewayStatusTarget[] = [];
   const add = (t: GatewayStatusTarget) => {
     if (!targets.some((x) => x.url === t.url)) {
@@ -106,7 +111,7 @@ export function resolveTargets(cfg: OpenClawConfig, explicitUrl?: string): Gatew
     });
   }
 
-  const port = resolveGatewayPort(cfg);
+  const port = resolvePort(cfg);
   add({
     id: "localLoopback",
     kind: "localLoopback",
@@ -323,9 +328,22 @@ export function extractConfigSummary(snapshotUnknown: unknown): GatewayConfigSum
   };
 }
 
-export function buildNetworkHints(cfg: OpenClawConfig) {
-  const { tailnetIPv4 } = inspectBestEffortPrimaryTailnetIPv4();
-  const port = resolveGatewayPort(cfg);
+export function buildNetworkHints(
+  cfg: OpenClawConfig,
+  deps?: {
+    resolveGatewayPort?: typeof resolveGatewayPort;
+    pickPrimaryTailnetIPv4?: () => string | undefined;
+  },
+) {
+  const resolvePort = deps?.resolveGatewayPort ?? resolveGatewayPort;
+  const pickTailnet = deps?.pickPrimaryTailnetIPv4 ?? pickPrimaryTailnetIPv4;
+  let tailnetIPv4: string | undefined;
+  try {
+    tailnetIPv4 = pickTailnet();
+  } catch {
+    tailnetIPv4 = undefined;
+  }
+  const port = resolvePort(cfg);
   return {
     localLoopbackUrl: `ws://127.0.0.1:${port}`,
     localTailnetUrl: tailnetIPv4 ? `ws://${tailnetIPv4}:${port}` : null,

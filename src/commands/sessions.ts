@@ -84,18 +84,29 @@ const formatKindCell = (kind: SessionRow["kind"], rich: boolean) => {
   return theme.muted(label);
 };
 
+export type SessionsCommandDeps = {
+  loadConfig?: typeof loadConfig;
+  loadSessionStore?: typeof loadSessionStore;
+  resolveSessionStoreTargetsOrExit?: typeof resolveSessionStoreTargetsOrExit;
+};
+
 export async function sessionsCommand(
   opts: { json?: boolean; store?: string; active?: string; agent?: string; allAgents?: boolean },
   runtime: RuntimeEnv,
+  deps: SessionsCommandDeps = {},
 ) {
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
+  const loadSessionStoreImpl = deps.loadSessionStore ?? loadSessionStore;
+  const resolveSessionStoreTargetsOrExitImpl =
+    deps.resolveSessionStoreTargetsOrExit ?? resolveSessionStoreTargetsOrExit;
   const aggregateAgents = opts.allAgents === true;
-  const cfg = loadConfig();
+  const cfg = loadConfigImpl();
   const displayDefaults = resolveSessionDisplayDefaults(cfg);
   const configContextTokens =
     cfg.agents?.defaults?.contextTokens ??
     lookupContextTokens(displayDefaults.model) ??
     DEFAULT_CONTEXT_TOKENS;
-  const targets = resolveSessionStoreTargetsOrExit({
+  const targets = resolveSessionStoreTargetsOrExitImpl({
     cfg,
     opts: {
       store: opts.store,
@@ -121,7 +132,7 @@ export async function sessionsCommand(
 
   const rows = targets
     .flatMap((target) => {
-      const store = loadSessionStore(target.storePath);
+      const store = loadSessionStoreImpl(target.storePath);
       return toSessionDisplayRows(store).map((row) => ({
         ...row,
         agentId: parseAgentSessionKey(row.key)?.agentId ?? target.agentId,

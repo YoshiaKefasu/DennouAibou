@@ -1,8 +1,6 @@
-import type { Mock } from "vitest";
 process.env.NO_COLOR = "1";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getChannelPlugin, listChannelPlugins } from "../../channels/plugins/index.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import { channelsCapabilitiesCommand } from "./capabilities.js";
@@ -10,36 +8,16 @@ import { channelsCapabilitiesCommand } from "./capabilities.js";
 const logs: string[] = [];
 const errors: string[] = [];
 const resolveDefaultAccountId = () => DEFAULT_ACCOUNT_ID;
-const mocks = vi.hoisted(() => ({
+const deps = {
+  listChannelPlugins: vi.fn(),
   readConfigFileSnapshot: vi.fn(),
   replaceConfigFile: vi.fn(),
   resolveInstallableChannelPlugin: vi.fn(),
-}));
-
-vi.mock("./shared.js", () => ({
   requireValidConfig: vi.fn(async () => ({ channels: {} })),
   formatChannelAccountLabel: vi.fn(
     ({ channel, accountId }: { channel: string; accountId: string }) => `${channel}:${accountId}`,
   ),
-}));
-
-vi.mock("../../channels/plugins/index.js", () => ({
-  listChannelPlugins: vi.fn(),
-  getChannelPlugin: vi.fn(),
-}));
-
-vi.mock("../../config/config.js", async () => {
-  const actual = await import("../../config/config.js");
-  return {
-    ...actual,
-    readConfigFileSnapshot: mocks.readConfigFileSnapshot,
-    replaceConfigFile: mocks.replaceConfigFile,
-  };
-});
-
-vi.mock("../channel-setup/channel-plugin-resolution.js", () => ({
-  resolveInstallableChannelPlugin: mocks.resolveInstallableChannelPlugin,
-}));
+};
 
 const runtime = {
   log: (...args: unknown[]) => {
@@ -98,9 +76,10 @@ describe("channelsCapabilitiesCommand", () => {
   beforeEach(() => {
     resetOutput();
     vi.clearAllMocks();
-    mocks.readConfigFileSnapshot.mockResolvedValue({ hash: "config-1" });
-    mocks.replaceConfigFile.mockResolvedValue(undefined);
-    mocks.resolveInstallableChannelPlugin.mockResolvedValue({
+    deps.readConfigFileSnapshot.mockResolvedValue({ hash: "config-1" });
+    deps.replaceConfigFile.mockResolvedValue(undefined);
+    deps.requireValidConfig.mockResolvedValue({ channels: {} });
+    deps.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: { channels: {} },
       configChanged: false,
     });
@@ -131,16 +110,15 @@ describe("channelsCapabilitiesCommand", () => {
         },
       }),
     };
-    (listChannelPlugins as Mock).mockReturnValue([plugin]);
-    (getChannelPlugin as Mock).mockReturnValue(plugin);
-    mocks.resolveInstallableChannelPlugin.mockResolvedValue({
+    deps.listChannelPlugins.mockReturnValue([plugin]);
+    deps.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: { channels: {} },
       channelId: "slack",
       plugin,
       configChanged: false,
     });
 
-    await channelsCapabilitiesCommand({ channel: "slack" }, runtime);
+    await channelsCapabilitiesCommand({ channel: "slack" }, runtime, deps);
 
     const output = logs.join("\n");
     expect(output).toContain("Bot scopes");
@@ -170,16 +148,15 @@ describe("channelsCapabilitiesCommand", () => {
         },
       ],
     };
-    (listChannelPlugins as Mock).mockReturnValue([plugin]);
-    (getChannelPlugin as Mock).mockReturnValue(plugin);
-    mocks.resolveInstallableChannelPlugin.mockResolvedValue({
+    deps.listChannelPlugins.mockReturnValue([plugin]);
+    deps.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: { channels: {} },
       channelId: "msteams",
       plugin,
       configChanged: false,
     });
 
-    await channelsCapabilitiesCommand({ channel: "msteams" }, runtime);
+    await channelsCapabilitiesCommand({ channel: "msteams" }, runtime, deps);
 
     const output = logs.join("\n");
     expect(output).toContain("ChannelMessage.Read.All (channel history)");
@@ -195,7 +172,7 @@ describe("channelsCapabilitiesCommand", () => {
       ...plugin.status,
       formatCapabilitiesProbe: () => [{ text: "Probe: linked" }],
     };
-    mocks.resolveInstallableChannelPlugin.mockResolvedValue({
+    deps.resolveInstallableChannelPlugin.mockResolvedValue({
       cfg: {
         channels: {},
         plugins: { entries: { whatsapp: { enabled: true } } },
@@ -204,18 +181,17 @@ describe("channelsCapabilitiesCommand", () => {
       plugin,
       configChanged: true,
     });
-    (listChannelPlugins as Mock).mockReturnValue([]);
-    (getChannelPlugin as Mock).mockReturnValue(undefined);
+    deps.listChannelPlugins.mockReturnValue([]);
 
-    await channelsCapabilitiesCommand({ channel: "whatsapp" }, runtime);
+    await channelsCapabilitiesCommand({ channel: "whatsapp" }, runtime, deps);
 
-    expect(mocks.resolveInstallableChannelPlugin).toHaveBeenCalledWith(
+    expect(deps.resolveInstallableChannelPlugin).toHaveBeenCalledWith(
       expect.objectContaining({
         rawChannel: "whatsapp",
         allowInstall: true,
       }),
     );
-    expect(mocks.replaceConfigFile).toHaveBeenCalledWith({
+    expect(deps.replaceConfigFile).toHaveBeenCalledWith({
       nextConfig: expect.objectContaining({
         plugins: { entries: { whatsapp: { enabled: true } } },
       }),

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MsgContext } from "../templating.js";
-import { registerGetReplyCommonMocks } from "./get-reply.test-mocks.js";
+import { getReplyFromConfig } from "./get-reply.js";
+import type { GetReplyDeps } from "./get-reply.js";
 
 // Native-audio (skipAudio) decision for inbound media:
 //
@@ -30,56 +31,41 @@ const mocks = vi.hoisted(() => ({
   hasInlineableNativeAudio: vi.fn(),
 }));
 
-registerGetReplyCommonMocks();
-
-vi.mock("../../globals.js", () => ({
-  logVerbose: vi.fn(),
-}));
 vi.mock("../../hooks/internal-hooks.js", () => ({
-  createInternalHookEvent: mocks.createInternalHookEvent,
-  triggerInternalHook: mocks.triggerInternalHook,
+  createInternalHookEvent: (...args: unknown[]) => mocks.createInternalHookEvent(...args),
+  triggerInternalHook: (...args: unknown[]) => mocks.triggerInternalHook(...args),
 }));
-vi.mock("../../link-understanding/apply.js", () => ({
-  applyLinkUnderstanding: mocks.applyLinkUnderstanding,
-}));
-vi.mock("../../link-understanding/apply.runtime.js", () => ({
-  applyLinkUnderstanding: mocks.applyLinkUnderstanding,
-}));
-vi.mock("../../media-understanding/apply.js", () => ({
-  applyMediaUnderstanding: mocks.applyMediaUnderstanding,
-}));
-vi.mock("../../media-understanding/apply.runtime.js", () => ({
-  applyMediaUnderstanding: mocks.applyMediaUnderstanding,
-}));
-vi.mock("../../media/native-audio.js", () => ({
-  hasInlineableNativeAudio: mocks.hasInlineableNativeAudio,
-}));
-vi.mock("../../agents/model-catalog.js", async () => {
-  const actual = await import("../../agents/model-catalog.js");
+
+function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {
-    ...actual,
-    loadModelCatalog: mocks.loadModelCatalog,
+    loadConfig: () => ({}),
+    resolveSessionAgentId: () => "main",
+    resolveAgentDir: () => "/tmp/agent",
+    resolveAgentWorkspaceDir: () => "/tmp/workspace",
+    resolveAgentSkillsFilter: () => undefined,
+    resolveModelRefFromString: () => null,
+    resolveAgentTimeoutMs: () => 60000,
+    ensureAgentWorkspace: async () => ({ dir: "/tmp/workspace" }),
+    resolveChannelModelOverride: () => null,
+    resolveCommandAuthorization: () =>
+      ({ isAuthorizedSender: true, ownerList: [], senderIsOwner: false }) as never,
+    resolveDefaultModel: () => ({
+      defaultProvider: "openai",
+      defaultModel: "gpt-4o-mini",
+      aliasIndex: { byAlias: new Map(), byKey: new Map() },
+    }),
+    finalizeInboundContext: (ctx: Record<string, unknown>) => ctx as never,
+    runPreparedReply: async () => undefined,
+    resolveReplyDirectives: mocks.resolveReplyDirectives as never,
+    handleInlineActions: (async () => ({ kind: "reply", reply: { text: "ok" } })) as never,
+    initSessionState: mocks.initSessionState as never,
+    resolveSessionModelOverrideSnapshot: mocks.resolveSessionModelOverrideSnapshot as never,
+    applyMediaUnderstanding: mocks.applyMediaUnderstanding as never,
+    applyLinkUnderstanding: mocks.applyLinkUnderstanding as never,
+    loadModelCatalog: mocks.loadModelCatalog as never,
+    hasInlineableNativeAudio: mocks.hasInlineableNativeAudio as never,
+    ...extra,
   };
-});
-vi.mock("./commands-core.js", () => ({
-  emitResetCommandHooks: vi.fn(async () => undefined),
-}));
-vi.mock("./get-reply-directives.js", () => ({
-  resolveReplyDirectives: mocks.resolveReplyDirectives,
-}));
-vi.mock("./get-reply-inline-actions.js", () => ({
-  handleInlineActions: vi.fn(async () => ({ kind: "reply", reply: { text: "ok" } })),
-}));
-vi.mock("./session.js", () => ({
-  initSessionState: mocks.initSessionState,
-  resolveSessionModelOverrideSnapshot: mocks.resolveSessionModelOverrideSnapshot,
-}));
-
-let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
-
-async function loadFreshGetReplyModuleForTest() {
-  vi.resetModules();
-  ({ getReplyFromConfig } = await import("./get-reply.js"));
 }
 
 function buildCtx(overrides: Partial<MsgContext> = {}): MsgContext {
@@ -127,8 +113,7 @@ const CATALOG_WITHOUT_AUDIO = [
 ];
 
 describe("getReplyFromConfig native audio (Deepgram skip)", () => {
-  beforeEach(async () => {
-    await loadFreshGetReplyModuleForTest();
+  beforeEach(() => {
     delete process.env.DENNOU_TEST_FAST;
     mocks.applyMediaUnderstanding.mockReset();
     mocks.applyLinkUnderstanding.mockReset();
@@ -180,7 +165,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
     // the SDK-facing models.json cannot.
     mocks.loadModelCatalog.mockResolvedValue(CATALOG_WITH_AUDIO);
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     // hasInlineableNativeAudio is consulted because modelSupportsAudio()
     // recognizes the declared audio modality on the catalog entry.
@@ -195,7 +180,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
     // keep the STT fallback: the decision is config-driven, never name-driven.
     mocks.loadModelCatalog.mockResolvedValue(CATALOG_WITHOUT_AUDIO);
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(mocks.hasInlineableNativeAudio).not.toHaveBeenCalled();
     expect(mocks.applyMediaUnderstanding).toHaveBeenCalledWith(
@@ -227,7 +212,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
       sessionKey: "agent:main:telegram:-100123",
     });
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(mocks.resolveSessionModelOverrideSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -265,7 +250,7 @@ describe("getReplyFromConfig native audio (Deepgram skip)", () => {
       sessionKey: "agent:main:telegram:-100123",
     });
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(mocks.applyMediaUnderstanding).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -37,6 +37,8 @@ function resolveProviderChoiceModelAllowlist(params: {
   config: OpenClawConfig;
   workspaceDir?: string;
   env?: NodeJS.ProcessEnv;
+  resolvePluginProviders?: typeof resolvePluginProviders;
+  resolveProviderPluginChoice?: typeof resolveProviderPluginChoice;
 }):
   | {
       allowedKeys?: string[];
@@ -44,13 +46,16 @@ function resolveProviderChoiceModelAllowlist(params: {
       message?: string;
     }
   | undefined {
-  const providers = resolvePluginProviders({
+  const resolvePluginProvidersFn = params.resolvePluginProviders ?? resolvePluginProviders;
+  const resolveProviderPluginChoiceFn =
+    params.resolveProviderPluginChoice ?? resolveProviderPluginChoice;
+  const providers = resolvePluginProvidersFn({
     config: params.config,
     workspaceDir: params.workspaceDir,
     env: params.env,
     mode: "setup",
   });
-  return resolveProviderPluginChoice({
+  return resolveProviderPluginChoiceFn({
     providers,
     choice: params.authChoice,
   })?.wizard?.modelAllowlist;
@@ -94,14 +99,41 @@ export function buildGatewayAuthConfig(params: {
   return base;
 }
 
+export type PromptAuthConfigDeps = {
+  ensureAuthProfileStore?: typeof ensureAuthProfileStore;
+  resolveDefaultAgentWorkspaceDir?: typeof resolveDefaultAgentWorkspaceDir;
+  resolveProviderPluginChoice?: typeof resolveProviderPluginChoice;
+  resolvePluginProviders?: typeof resolvePluginProviders;
+  promptAuthChoiceGrouped?: typeof promptAuthChoiceGrouped;
+  applyAuthChoice?: typeof applyAuthChoice;
+  resolvePreferredProviderForAuthChoice?: typeof resolvePreferredProviderForAuthChoice;
+  promptDefaultModel?: typeof promptDefaultModel;
+  promptModelAllowlist?: typeof promptModelAllowlist;
+  promptCustomApiConfig?: typeof promptCustomApiConfig;
+};
+
 export async function promptAuthConfig(
   cfg: OpenClawConfig,
   runtime: RuntimeEnv,
   prompter: WizardPrompter,
+  deps: PromptAuthConfigDeps = {},
 ): Promise<OpenClawConfig> {
-  const authChoice = await promptAuthChoiceGrouped({
+  const ensureAuthProfileStoreImpl = deps.ensureAuthProfileStore ?? ensureAuthProfileStore;
+  const resolveDefaultAgentWorkspaceDirImpl =
+    deps.resolveDefaultAgentWorkspaceDir ?? resolveDefaultAgentWorkspaceDir;
+  const resolveProviderPluginChoiceImpl =
+    deps.resolveProviderPluginChoice ?? resolveProviderPluginChoice;
+  const resolvePluginProvidersImpl = deps.resolvePluginProviders ?? resolvePluginProviders;
+  const promptAuthChoiceGroupedImpl = deps.promptAuthChoiceGrouped ?? promptAuthChoiceGrouped;
+  const applyAuthChoiceImpl = deps.applyAuthChoice ?? applyAuthChoice;
+  const resolvePreferredProviderForAuthChoiceImpl =
+    deps.resolvePreferredProviderForAuthChoice ?? resolvePreferredProviderForAuthChoice;
+  const promptDefaultModelImpl = deps.promptDefaultModel ?? promptDefaultModel;
+  const promptModelAllowlistImpl = deps.promptModelAllowlist ?? promptModelAllowlist;
+  const promptCustomApiConfigImpl = deps.promptCustomApiConfig ?? promptCustomApiConfig;
+  const authChoice = await promptAuthChoiceGroupedImpl({
     prompter,
-    store: ensureAuthProfileStore(undefined, {
+    store: ensureAuthProfileStoreImpl(undefined, {
       allowKeychainPrompt: false,
     }),
     includeSkip: true,
@@ -112,15 +144,15 @@ export async function promptAuthConfig(
   const preferredProvider =
     authChoice === "skip"
       ? undefined
-      : await resolvePreferredProviderForAuthChoice({
+      : await resolvePreferredProviderForAuthChoiceImpl({
           choice: authChoice,
           config: cfg,
         });
   if (authChoice === "custom-api-key") {
-    const customResult = await promptCustomApiConfig({ prompter, runtime, config: next });
+    const customResult = await promptCustomApiConfigImpl({ prompter, runtime, config: next });
     next = customResult.config;
   } else if (authChoice !== "skip") {
-    const applied = await applyAuthChoice({
+    const applied = await applyAuthChoiceImpl({
       authChoice,
       config: next,
       prompter,
@@ -129,14 +161,14 @@ export async function promptAuthConfig(
     });
     next = applied.config;
   } else {
-    const modelSelection = await promptDefaultModel({
+    const modelSelection = await promptDefaultModelImpl({
       config: next,
       prompter,
       allowKeep: true,
       ignoreAllowlist: true,
       includeProviderPluginSetups: true,
       preferredProvider,
-      workspaceDir: resolveDefaultAgentWorkspaceDir(),
+      workspaceDir: resolveDefaultAgentWorkspaceDirImpl(),
       runtime,
     });
     if (modelSelection.config) {
@@ -151,10 +183,12 @@ export async function promptAuthConfig(
     const modelAllowlist = resolveProviderChoiceModelAllowlist({
       authChoice,
       config: next,
-      workspaceDir: resolveDefaultAgentWorkspaceDir(),
+      workspaceDir: resolveDefaultAgentWorkspaceDirImpl(),
       env: process.env,
+      resolvePluginProviders: resolvePluginProvidersImpl,
+      resolveProviderPluginChoice: resolveProviderPluginChoiceImpl,
     });
-    const allowlistSelection = await promptModelAllowlist({
+    const allowlistSelection = await promptModelAllowlistImpl({
       config: next,
       prompter,
       allowedKeys: modelAllowlist?.allowedKeys,

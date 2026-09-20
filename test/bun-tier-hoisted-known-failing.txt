@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 89 files.
+# Current known-failure count: 85 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -96,20 +96,16 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (33 files; initial after-250 batch, with reason in beyond250-results)
+# measured-failure (29 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/channels.add.test.ts
 src/commands/channels.adds-non-default-telegram-account.test.ts
 src/commands/channels.remove.test.ts
-src/commands/channels/capabilities.test.ts
-src/commands/configure.gateway-auth.prompt-auth-config.test.ts
 src/commands/configure.wizard.test.ts
 src/commands/doctor-gateway-daemon-flow.test.ts
 src/commands/doctor-gateway-services.test.ts
 src/commands/doctor/shared/allowlist-policy-repair.test.ts
 src/commands/message.test.ts
-src/commands/models/auth.test.ts
 src/commands/onboard-non-interactive.workspace-provider-choice-guard.test.ts
-src/commands/sessions.default-agent-store.test.ts
 src/commands/status.test.ts
 src/config/validation.channel-metadata.test.ts
 src/gateway/server-cron.test.ts

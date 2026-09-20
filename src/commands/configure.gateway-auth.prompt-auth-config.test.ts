@@ -1,58 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
+import type { resolveProviderPluginChoice } from "../plugins/provider-wizard.js";
+import type { resolvePluginProviders } from "../plugins/providers.runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
+import type { MockFn } from "../test-utils/vitest-mock-fn.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
+import { promptAuthConfig } from "./configure.gateway-auth.js";
 
-const mocks = vi.hoisted(() => ({
-  promptAuthChoiceGrouped: vi.fn(),
-  applyAuthChoice: vi.fn(),
-  promptModelAllowlist: vi.fn(),
-  promptDefaultModel: vi.fn(),
-  promptCustomApiConfig: vi.fn(),
-  resolvePluginProviders: vi.fn(() => []),
-  resolveProviderPluginChoice: vi.fn<() => unknown>(() => null),
-  resolvePreferredProviderForAuthChoice: vi.fn<() => Promise<string | undefined>>(
-    async () => undefined,
-  ),
-}));
-
-vi.mock("../agents/auth-profiles.js", () => ({
+const deps = {
   ensureAuthProfileStore: vi.fn(() => ({
     version: 1,
     profiles: {},
   })),
-}));
-
-vi.mock("./auth-choice-prompt.js", () => ({
-  promptAuthChoiceGrouped: mocks.promptAuthChoiceGrouped,
-}));
-
-vi.mock("./auth-choice.js", () => ({
-  applyAuthChoice: mocks.applyAuthChoice,
-  resolvePreferredProviderForAuthChoice: mocks.resolvePreferredProviderForAuthChoice,
-}));
-
-vi.mock("./model-picker.js", async (importActual) => {
-  const actual = await importActual<typeof import("./model-picker.js")>();
-  return {
-    ...actual,
-    promptModelAllowlist: mocks.promptModelAllowlist,
-    promptDefaultModel: mocks.promptDefaultModel,
-  };
-});
-
-vi.mock("./onboard-custom.js", () => ({
-  promptCustomApiConfig: mocks.promptCustomApiConfig,
-}));
-
-vi.mock("../plugins/providers.runtime.js", () => ({
-  resolvePluginProviders: mocks.resolvePluginProviders,
-}));
-
-vi.mock("../plugins/provider-wizard.js", () => ({
-  resolveProviderPluginChoice: mocks.resolveProviderPluginChoice,
-}));
-
-import { promptAuthConfig } from "./configure.gateway-auth.js";
+  resolveDefaultAgentWorkspaceDir: vi.fn(() => "/tmp/workspace"),
+  promptAuthChoiceGrouped: vi.fn(),
+  applyAuthChoice: vi.fn(),
+  resolvePreferredProviderForAuthChoice: vi.fn<() => Promise<string | undefined>>(
+    async () => undefined,
+  ),
+  promptModelAllowlist: vi.fn(),
+  promptDefaultModel: vi.fn(),
+  promptCustomApiConfig: vi.fn(),
+  resolvePluginProviders: vi.fn() as MockFn<typeof resolvePluginProviders>,
+  resolveProviderPluginChoice: vi.fn(() => null) as MockFn<typeof resolveProviderPluginChoice>,
+};
 
 function makeRuntime(): RuntimeEnv {
   return {
@@ -102,15 +72,15 @@ function createApplyAuthChoiceConfig(includeMinimaxProvider = false) {
 }
 
 async function runPromptAuthConfigWithAllowlist(includeMinimaxProvider = false) {
-  mocks.promptAuthChoiceGrouped.mockResolvedValue("kilocode-api-key");
-  mocks.applyAuthChoice.mockResolvedValue(createApplyAuthChoiceConfig(includeMinimaxProvider));
-  mocks.promptModelAllowlist.mockResolvedValue({
+  deps.promptAuthChoiceGrouped.mockResolvedValue("kilocode-api-key");
+  deps.applyAuthChoice.mockResolvedValue(createApplyAuthChoiceConfig(includeMinimaxProvider));
+  deps.promptModelAllowlist.mockResolvedValue({
     models: ["kilocode/kilo/auto"],
   });
-  mocks.resolvePluginProviders.mockReturnValue([]);
-  mocks.resolveProviderPluginChoice.mockReturnValue(null);
+  deps.resolvePluginProviders.mockReturnValue([]);
+  deps.resolveProviderPluginChoice.mockReturnValue(null);
 
-  return promptAuthConfig({}, makeRuntime(), noopPrompter);
+  return promptAuthConfig({}, makeRuntime(), noopPrompter, deps);
 }
 
 describe("promptAuthConfig", () => {
@@ -135,12 +105,17 @@ describe("promptAuthConfig", () => {
   });
 
   it("uses plugin-owned allowlist metadata for provider auth choices", async () => {
-    mocks.promptAuthChoiceGrouped.mockResolvedValue("token");
-    mocks.applyAuthChoice.mockResolvedValue({ config: {} });
-    mocks.promptModelAllowlist.mockResolvedValue({ models: undefined });
-    mocks.resolveProviderPluginChoice.mockReturnValue({
+    deps.promptAuthChoiceGrouped.mockResolvedValue("token");
+    deps.applyAuthChoice.mockResolvedValue({ config: {} });
+    deps.promptModelAllowlist.mockResolvedValue({ models: undefined });
+    deps.resolveProviderPluginChoice.mockReturnValue({
       provider: { id: "anthropic", label: "Anthropic", auth: [] },
-      method: { id: "setup-token", label: "setup-token", kind: "token" },
+      method: {
+        id: "setup-token",
+        label: "setup-token",
+        kind: "token",
+        run: async () => ({ profiles: [] }),
+      },
       wizard: {
         modelAllowlist: {
           allowedKeys: ["anthropic/claude-sonnet-4-6"],
@@ -150,9 +125,9 @@ describe("promptAuthConfig", () => {
       },
     });
 
-    await promptAuthConfig({}, makeRuntime(), noopPrompter);
+    await promptAuthConfig({}, makeRuntime(), noopPrompter, deps);
 
-    expect(mocks.promptModelAllowlist).toHaveBeenCalledWith(
+    expect(deps.promptModelAllowlist).toHaveBeenCalledWith(
       expect.objectContaining({
         allowedKeys: ["anthropic/claude-sonnet-4-6"],
         initialSelections: ["anthropic/claude-sonnet-4-6"],
@@ -162,14 +137,14 @@ describe("promptAuthConfig", () => {
   });
 
   it("scopes the allowlist picker to the selected provider when available", async () => {
-    mocks.promptAuthChoiceGrouped.mockResolvedValue("openai-api-key");
-    mocks.resolvePreferredProviderForAuthChoice.mockResolvedValue("openai");
-    mocks.applyAuthChoice.mockResolvedValue({ config: {} });
-    mocks.promptModelAllowlist.mockResolvedValue({ models: undefined });
+    deps.promptAuthChoiceGrouped.mockResolvedValue("openai-api-key");
+    deps.resolvePreferredProviderForAuthChoice.mockResolvedValue("openai");
+    deps.applyAuthChoice.mockResolvedValue({ config: {} });
+    deps.promptModelAllowlist.mockResolvedValue({ models: undefined });
 
-    await promptAuthConfig({}, makeRuntime(), noopPrompter);
+    await promptAuthConfig({}, makeRuntime(), noopPrompter, deps);
 
-    expect(mocks.promptModelAllowlist).toHaveBeenCalledWith(
+    expect(deps.promptModelAllowlist).toHaveBeenCalledWith(
       expect.objectContaining({
         preferredProvider: "openai",
       }),

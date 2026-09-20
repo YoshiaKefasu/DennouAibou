@@ -82,12 +82,56 @@ function resolveDefaultTokenProfileId(provider: string): string {
   return `${normalizeProviderId(provider)}:manual`;
 }
 
+type ModelsAuthDeps = {
+  loadConfig?: typeof loadValidConfigOrThrow;
+  updateConfig?: typeof updateConfig;
+  resolveAgentId?: typeof resolveDefaultAgentId;
+  resolveAgentDir?: typeof resolveAgentDir;
+  resolveAgentWorkspaceDir?: typeof resolveAgentWorkspaceDir;
+  resolveDefaultWorkspaceDir?: typeof resolveDefaultAgentWorkspaceDir;
+  resolvePluginProviders?: typeof resolvePluginProviders;
+  upsertAuthProfile?: typeof upsertAuthProfile;
+  loadAuthProfileStore?: typeof loadAuthProfileStoreForRuntime;
+  listProfilesForProvider?: typeof listProfilesForProvider;
+  clearAuthProfileCooldown?: typeof clearAuthProfileCooldown;
+  logConfigUpdated?: typeof logConfigUpdated;
+  createPrompter?: typeof createClackPrompter;
+  checkInteractiveStdin?: () => boolean;
+  promptText?: typeof text;
+  promptSelect?: typeof select;
+  promptConfirm?: typeof confirm;
+  openUrl?: typeof openUrl;
+};
+
 type ResolvedModelsAuthContext = {
   config: OpenClawConfig;
   agentDir: string;
   workspaceDir: string;
   providers: ProviderPlugin[];
 };
+
+function resolveModelsAuthDeps(deps?: ModelsAuthDeps): Required<ModelsAuthDeps> {
+  return {
+    loadConfig: deps?.loadConfig ?? loadValidConfigOrThrow,
+    updateConfig: deps?.updateConfig ?? updateConfig,
+    resolveAgentId: deps?.resolveAgentId ?? resolveDefaultAgentId,
+    resolveAgentDir: deps?.resolveAgentDir ?? resolveAgentDir,
+    resolveAgentWorkspaceDir: deps?.resolveAgentWorkspaceDir ?? resolveAgentWorkspaceDir,
+    resolveDefaultWorkspaceDir: deps?.resolveDefaultWorkspaceDir ?? resolveDefaultAgentWorkspaceDir,
+    resolvePluginProviders: deps?.resolvePluginProviders ?? resolvePluginProviders,
+    upsertAuthProfile: deps?.upsertAuthProfile ?? upsertAuthProfile,
+    loadAuthProfileStore: deps?.loadAuthProfileStore ?? loadAuthProfileStoreForRuntime,
+    listProfilesForProvider: deps?.listProfilesForProvider ?? listProfilesForProvider,
+    clearAuthProfileCooldown: deps?.clearAuthProfileCooldown ?? clearAuthProfileCooldown,
+    logConfigUpdated: deps?.logConfigUpdated ?? logConfigUpdated,
+    createPrompter: deps?.createPrompter ?? createClackPrompter,
+    checkInteractiveStdin: deps?.checkInteractiveStdin ?? (() => Boolean(process.stdin.isTTY)),
+    promptText: deps?.promptText ?? text,
+    promptSelect: deps?.promptSelect ?? select,
+    promptConfirm: deps?.promptConfirm ?? confirm,
+    openUrl: deps?.openUrl ?? openUrl,
+  };
+}
 
 function listProvidersWithAuthMethods(providers: ProviderPlugin[]): ProviderPlugin[] {
   return providers.filter((provider) => provider.auth.length > 0);
@@ -101,15 +145,18 @@ function listProvidersWithTokenMethods(providers: ProviderPlugin[]): ProviderPlu
   return providers.filter((provider) => listTokenAuthMethods(provider).length > 0);
 }
 
-async function resolveModelsAuthContext(params?: {
-  requestedProvider?: string;
-}): Promise<ResolvedModelsAuthContext> {
-  const config = await loadValidConfigOrThrow();
-  const defaultAgentId = resolveDefaultAgentId(config);
-  const agentDir = resolveAgentDir(config, defaultAgentId);
+async function resolveModelsAuthContext(
+  params?: { requestedProvider?: string },
+  deps?: ModelsAuthDeps,
+): Promise<ResolvedModelsAuthContext> {
+  const resolved = resolveModelsAuthDeps(deps);
+  const config = await resolved.loadConfig();
+  const defaultAgentId = resolved.resolveAgentId(config);
+  const agentDir = resolved.resolveAgentDir(config, defaultAgentId);
   const workspaceDir =
-    resolveAgentWorkspaceDir(config, defaultAgentId) ?? resolveDefaultAgentWorkspaceDir();
-  const providers = resolvePluginProviders({
+    resolved.resolveAgentWorkspaceDir(config, defaultAgentId) ??
+    resolved.resolveDefaultWorkspaceDir();
+  const providers = resolved.resolvePluginProviders({
     config,
     workspaceDir,
     mode: "setup",
@@ -229,16 +276,18 @@ async function persistProviderAuthResult(params: {
   runtime: RuntimeEnv;
   prompter: ReturnType<typeof createClackPrompter>;
   setDefault?: boolean;
+  deps?: ModelsAuthDeps;
 }) {
+  const resolved = resolveModelsAuthDeps(params.deps);
   for (const profile of params.result.profiles) {
-    upsertAuthProfile({
+    resolved.upsertAuthProfile({
       profileId: profile.profileId,
       credential: profile.credential,
       agentDir: params.agentDir,
     });
   }
 
-  await updateConfig((cfg) => {
+  await resolved.updateConfig((cfg) => {
     let next = cfg;
     if (params.result.configPatch) {
       next = applyProviderAuthConfigPatch(next, params.result.configPatch);
@@ -256,7 +305,7 @@ async function persistProviderAuthResult(params: {
     return next;
   });
 
-  logConfigUpdated(params.runtime);
+  resolved.logConfigUpdated(params.runtime);
   for (const profile of params.result.profiles) {
     params.runtime.log(
       `Auth profile: ${profile.profileId} (${profile.credential.provider}/${credentialMode(profile.credential)})`,
@@ -283,8 +332,10 @@ async function runProviderAuthMethod(params: {
   runtime: RuntimeEnv;
   prompter: ReturnType<typeof createClackPrompter>;
   setDefault?: boolean;
+  deps?: ModelsAuthDeps;
 }) {
-  await clearStaleProfileLockouts(params.provider.id, params.agentDir);
+  const resolved = resolveModelsAuthDeps(params.deps);
+  await clearStaleProfileLockouts(params.provider.id, params.agentDir, params.deps);
 
   const result = await params.method.run({
     config: params.config,
@@ -296,7 +347,7 @@ async function runProviderAuthMethod(params: {
     allowSecretRefPrompt: false,
     isRemote: isRemoteEnvironment(),
     openUrl: async (url) => {
-      await openUrl(url);
+      await resolved.openUrl(url);
     },
     oauth: {
       createVpsAwareHandlers: (runtimeParams) => createVpsAwareOAuthHandlers(runtimeParams),
@@ -309,20 +360,26 @@ async function runProviderAuthMethod(params: {
     runtime: params.runtime,
     prompter: params.prompter,
     setDefault: params.setDefault,
+    deps: params.deps,
   });
 }
 
 export async function modelsAuthSetupTokenCommand(
   opts: { provider?: string; yes?: boolean },
   runtime: RuntimeEnv,
+  deps?: ModelsAuthDeps,
 ) {
-  if (!process.stdin.isTTY) {
+  const resolved = resolveModelsAuthDeps(deps);
+  if (!resolved.checkInteractiveStdin()) {
     throw new Error("setup-token requires an interactive TTY.");
   }
 
-  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext({
-    requestedProvider: opts.provider,
-  });
+  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext(
+    {
+      requestedProvider: opts.provider,
+    },
+    deps,
+  );
   const tokenProviders = listProvidersWithTokenMethods(providers);
   if (tokenProviders.length === 0) {
     throw new Error(
@@ -337,7 +394,7 @@ export async function modelsAuthSetupTokenCommand(
   }
 
   if (!opts.yes) {
-    const proceed = await confirm({
+    const proceed = await resolved.promptConfirm({
       message: `Continue with ${provider.label} token auth?`,
       initialValue: true,
     });
@@ -346,7 +403,7 @@ export async function modelsAuthSetupTokenCommand(
     }
   }
 
-  const prompter = createClackPrompter();
+  const prompter = resolved.createPrompter();
   const method = await pickProviderTokenMethod({ provider, prompter });
   if (!method) {
     throw new Error(`Provider "${provider.id}" does not expose a token auth method.`);
@@ -360,6 +417,7 @@ export async function modelsAuthSetupTokenCommand(
     method,
     runtime,
     prompter,
+    deps,
   });
 }
 
@@ -370,8 +428,10 @@ export async function modelsAuthPasteTokenCommand(
     expiresIn?: string;
   },
   runtime: RuntimeEnv,
+  deps?: ModelsAuthDeps,
 ) {
-  const { agentDir } = await resolveModelsAuthContext();
+  const resolved = resolveModelsAuthDeps(deps);
+  const { agentDir } = await resolveModelsAuthContext(undefined, deps);
   const rawProvider = opts.provider?.trim();
   if (!rawProvider) {
     throw new Error("Missing --provider.");
@@ -379,7 +439,7 @@ export async function modelsAuthPasteTokenCommand(
   const provider = normalizeProviderId(rawProvider);
   const profileId = opts.profileId?.trim() || resolveDefaultTokenProfileId(provider);
 
-  const tokenInput = await text({
+  const tokenInput = await resolved.promptText({
     message: `Paste token for ${provider}`,
     validate: (value) => {
       const trimmed = value?.trim();
@@ -404,7 +464,7 @@ export async function modelsAuthPasteTokenCommand(
       ? Date.now() + parseDurationMs(String(opts.expiresIn ?? "").trim(), { defaultUnit: "d" })
       : undefined;
 
-  upsertAuthProfile({
+  resolved.upsertAuthProfile({
     profileId,
     credential: {
       type: "token",
@@ -415,9 +475,11 @@ export async function modelsAuthPasteTokenCommand(
     agentDir,
   });
 
-  await updateConfig((cfg) => applyAuthProfileConfig(cfg, { profileId, provider, mode: "token" }));
+  await resolved.updateConfig((cfg) =>
+    applyAuthProfileConfig(cfg, { profileId, provider, mode: "token" }),
+  );
 
-  logConfigUpdated(runtime);
+  resolved.logConfigUpdated(runtime);
   runtime.log(`Auth profile: ${profileId} (${provider}/token)`);
   if (provider === "anthropic") {
     runtime.log("Anthropic setup-token auth is a legacy/manual path in OpenClaw.");
@@ -427,11 +489,19 @@ export async function modelsAuthPasteTokenCommand(
   }
 }
 
-export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime: RuntimeEnv) {
-  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext();
+export async function modelsAuthAddCommand(
+  _opts: Record<string, never>,
+  runtime: RuntimeEnv,
+  deps?: ModelsAuthDeps,
+) {
+  const resolved = resolveModelsAuthDeps(deps);
+  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext(
+    undefined,
+    deps,
+  );
   const tokenProviders = listProvidersWithTokenMethods(providers);
 
-  const provider = await select({
+  const provider = await resolved.promptSelect({
     message: "Token provider",
     options: [
       ...tokenProviders.map((providerPlugin) => ({
@@ -447,7 +517,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
     provider === "custom"
       ? normalizeProviderId(
           String(
-            await text({
+            await resolved.promptText({
               message: "Provider id",
               validate: (value) => (value?.trim() ? undefined : "Required"),
             }),
@@ -461,7 +531,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
     const tokenMethods = listTokenAuthMethods(providerPlugin);
     const methodId =
       tokenMethods.length > 0
-        ? await select({
+        ? await resolved.promptSelect({
             message: "Token method",
             options: [
               ...tokenMethods.map((method) => ({
@@ -474,7 +544,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
           })
         : "paste";
     if (methodId !== "paste") {
-      const prompter = createClackPrompter();
+      const prompter = resolved.createPrompter();
       const method = tokenMethods.find((candidate) => candidate.id === methodId);
       if (!method) {
         throw new Error(`Unknown token auth method "${String(methodId)}".`);
@@ -487,6 +557,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
         method,
         runtime,
         prompter,
+        deps,
       });
       return;
     }
@@ -494,20 +565,20 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
 
   const profileIdDefault = resolveDefaultTokenProfileId(providerId);
   const profileId = String(
-    await text({
+    await resolved.promptText({
       message: "Profile id",
       initialValue: profileIdDefault,
       validate: (value) => (value?.trim() ? undefined : "Required"),
     }),
   ).trim();
 
-  const wantsExpiry = await confirm({
+  const wantsExpiry = await resolved.promptConfirm({
     message: "Does this token expire?",
     initialValue: false,
   });
   const expiresIn = wantsExpiry
     ? String(
-        await text({
+        await resolved.promptText({
           message: "Expires in (duration)",
           initialValue: "365d",
           validate: (value) => {
@@ -522,7 +593,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
       ).trim()
     : undefined;
 
-  await modelsAuthPasteTokenCommand({ provider: providerId, profileId, expiresIn }, runtime);
+  await modelsAuthPasteTokenCommand({ provider: providerId, profileId, expiresIn }, runtime, deps);
 }
 
 type LoginOptions = {
@@ -538,12 +609,17 @@ type LoginOptions = {
  * stale `auth_permanent` / `billing` lockouts should not persist across
  * a deliberate re-authentication attempt.
  */
-async function clearStaleProfileLockouts(provider: string, agentDir: string): Promise<void> {
+async function clearStaleProfileLockouts(
+  provider: string,
+  agentDir: string,
+  deps?: ModelsAuthDeps,
+): Promise<void> {
+  const resolved = resolveModelsAuthDeps(deps);
   try {
-    const store = loadAuthProfileStoreForRuntime(agentDir);
-    const profileIds = listProfilesForProvider(store, provider);
+    const store = resolved.loadAuthProfileStore(agentDir);
+    const profileIds = resolved.listProfilesForProvider(store, provider);
     for (const profileId of profileIds) {
-      await clearAuthProfileCooldown({ store, profileId, agentDir });
+      await resolved.clearAuthProfileCooldown({ store, profileId, agentDir });
     }
   } catch {
     // Best-effort housekeeping — never block re-authentication.
@@ -575,15 +651,23 @@ function maybeLogOpenAICodexNativeSearchTip(runtime: RuntimeEnv, providerId: str
     "Tip: Codex-capable models can use native Codex web search. Enable it with openclaw configure --section web (recommended mode: cached). Docs: https://docs.openclaw.ai/tools/web",
   );
 }
-export async function modelsAuthLoginCommand(opts: LoginOptions, runtime: RuntimeEnv) {
-  if (!process.stdin.isTTY) {
+export async function modelsAuthLoginCommand(
+  opts: LoginOptions,
+  runtime: RuntimeEnv,
+  deps?: ModelsAuthDeps,
+) {
+  const resolved = resolveModelsAuthDeps(deps);
+  if (!resolved.checkInteractiveStdin()) {
     throw new Error("models auth login requires an interactive TTY.");
   }
 
-  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext({
-    requestedProvider: opts.provider,
-  });
-  const prompter = createClackPrompter();
+  const { config, agentDir, workspaceDir, providers } = await resolveModelsAuthContext(
+    {
+      requestedProvider: opts.provider,
+    },
+    deps,
+  );
+  const prompter = resolved.createPrompter();
   const authProviders = listProvidersWithAuthMethods(providers);
   if (authProviders.length === 0) {
     throw new Error(
@@ -627,6 +711,7 @@ export async function modelsAuthLoginCommand(opts: LoginOptions, runtime: Runtim
     runtime,
     prompter,
     setDefault: opts.setDefault,
+    deps,
   });
   maybeLogOpenAICodexNativeSearchTip(runtime, selectedProvider.id);
 }

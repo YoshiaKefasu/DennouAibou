@@ -37,6 +37,8 @@ export async function runGatewayStatusProbePass(params: {
   sshTarget: string | null;
   sshIdentity: string | null;
   loadSshTunnelModule: () => Promise<typeof import("../../infra/ssh-tunnel.js")>;
+  probeGatewayFn?: typeof probeGateway;
+  discoverGatewayBeaconsFn?: typeof discoverGatewayBeacons;
 }): Promise<{
   discovery: GatewayBonjourBeacon[];
   probed: GatewayStatusProbedTarget[];
@@ -44,7 +46,7 @@ export async function runGatewayStatusProbePass(params: {
   sshTunnelStarted: boolean;
   sshTunnelError: string | null;
 }> {
-  const discoveryPromise = discoverGatewayBeacons({
+  const discoveryPromise = (params.discoverGatewayBeaconsFn ?? discoverGatewayBeacons)({
     timeoutMs: params.discoveryTimeoutMs,
     wideAreaDomain: params.wideAreaDomain,
   });
@@ -118,7 +120,7 @@ export async function runGatewayStatusProbePass(params: {
           token: typeof params.opts.token === "string" ? params.opts.token : undefined,
           password: typeof params.opts.password === "string" ? params.opts.password : undefined,
         });
-        const probe = await probeGateway({
+        const probe = await (params.probeGatewayFn ?? probeGateway)({
           url: target.url,
           auth: {
             token: authResolution.token,

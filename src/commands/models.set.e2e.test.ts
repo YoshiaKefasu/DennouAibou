@@ -1,28 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const mocks = vi.hoisted(() => ({
-  currentConfig: {} as Record<string, unknown>,
-  writtenConfig: undefined as Record<string, unknown> | undefined,
-}));
-
-vi.mock("./models/shared.js", async () => {
-  const actual = await import("./models/shared.js");
-  return {
-    ...actual,
-    updateConfig: async (mutator: (cfg: Record<string, unknown>) => Record<string, unknown>) => {
-      const next = mutator(JSON.parse(JSON.stringify(mocks.currentConfig)));
-      mocks.writtenConfig = next;
-      return next;
-    },
-  };
-});
-
+import type { OpenClawConfig } from "../config/config.js";
 import { modelsFallbacksAddCommand } from "./models/fallbacks.js";
 import { modelsSetCommand } from "./models/set.js";
+import type { updateConfig as UpdateConfig } from "./models/shared.js";
 
-function mockConfigSnapshot(config: Record<string, unknown> = {}) {
-  mocks.currentConfig = config;
-  mocks.writtenConfig = undefined;
+let currentConfig: OpenClawConfig = {};
+let writtenConfig: OpenClawConfig | undefined;
+
+const fakeUpdateConfig: typeof UpdateConfig = async (mutator) => {
+  const next = mutator(structuredClone(currentConfig));
+  writtenConfig = next;
+  return next;
+};
+
+function mockConfigSnapshot(config: OpenClawConfig = {}) {
+  currentConfig = config;
+  writtenConfig = undefined;
 }
 
 function makeRuntime() {
@@ -30,11 +23,11 @@ function makeRuntime() {
 }
 
 function getWrittenConfig() {
-  return mocks.writtenConfig as Record<string, unknown>;
+  return writtenConfig as OpenClawConfig;
 }
 
 function expectWrittenPrimaryModel(model: string) {
-  expect(mocks.writtenConfig).toBeDefined();
+  expect(writtenConfig).toBeDefined();
   const written = getWrittenConfig();
   expect(written.agents).toEqual({
     defaults: {
@@ -46,15 +39,15 @@ function expectWrittenPrimaryModel(model: string) {
 
 describe("models set + fallbacks", () => {
   beforeEach(() => {
-    mocks.currentConfig = {};
-    mocks.writtenConfig = undefined;
+    currentConfig = {};
+    writtenConfig = undefined;
   });
 
   it("normalizes z.ai provider in models set", async () => {
     mockConfigSnapshot({});
     const runtime = makeRuntime();
 
-    await modelsSetCommand("z.ai/glm-4.7", runtime);
+    await modelsSetCommand("z.ai/glm-4.7", runtime, { updateConfig: fakeUpdateConfig });
 
     expectWrittenPrimaryModel("zai/glm-4.7");
   });
@@ -63,9 +56,9 @@ describe("models set + fallbacks", () => {
     mockConfigSnapshot({ agents: { defaults: { model: { fallbacks: [] } } } });
     const runtime = makeRuntime();
 
-    await modelsFallbacksAddCommand("z-ai/glm-4.7", runtime);
+    await modelsFallbacksAddCommand("z-ai/glm-4.7", runtime, { updateConfig: fakeUpdateConfig });
 
-    expect(mocks.writtenConfig).toBeDefined();
+    expect(writtenConfig).toBeDefined();
     const written = getWrittenConfig();
     expect(written.agents).toEqual({
       defaults: {
@@ -79,9 +72,11 @@ describe("models set + fallbacks", () => {
     mockConfigSnapshot({ agents: { defaults: { model: "openai/gpt-4.1-mini" } } });
     const runtime = makeRuntime();
 
-    await modelsFallbacksAddCommand("anthropic/claude-opus-4-6", runtime);
+    await modelsFallbacksAddCommand("anthropic/claude-opus-4-6", runtime, {
+      updateConfig: fakeUpdateConfig,
+    });
 
-    expect(mocks.writtenConfig).toBeDefined();
+    expect(writtenConfig).toBeDefined();
     const written = getWrittenConfig();
     expect(written.agents).toEqual({
       defaults: {
@@ -98,7 +93,7 @@ describe("models set + fallbacks", () => {
     mockConfigSnapshot({});
     const runtime = makeRuntime();
 
-    await modelsSetCommand("Z.AI/glm-4.7", runtime);
+    await modelsSetCommand("Z.AI/glm-4.7", runtime, { updateConfig: fakeUpdateConfig });
 
     expectWrittenPrimaryModel("zai/glm-4.7");
   });
@@ -107,7 +102,7 @@ describe("models set + fallbacks", () => {
     mockConfigSnapshot({});
     const runtime = makeRuntime();
 
-    await modelsSetCommand("openrouter/hunter-alpha", runtime);
+    await modelsSetCommand("openrouter/hunter-alpha", runtime, { updateConfig: fakeUpdateConfig });
 
     expectWrittenPrimaryModel("openrouter/hunter-alpha");
   });
@@ -126,9 +121,9 @@ describe("models set + fallbacks", () => {
     });
     const runtime = makeRuntime();
 
-    await modelsSetCommand("openrouter/hunter-alpha", runtime);
+    await modelsSetCommand("openrouter/hunter-alpha", runtime, { updateConfig: fakeUpdateConfig });
 
-    expect(mocks.writtenConfig).toBeDefined();
+    expect(writtenConfig).toBeDefined();
     const written = getWrittenConfig();
     expect(written.agents).toEqual({
       defaults: {
@@ -146,9 +141,11 @@ describe("models set + fallbacks", () => {
     mockConfigSnapshot({ agents: { defaults: { model: "openai/gpt-4.1-mini" } } });
     const runtime = makeRuntime();
 
-    await modelsSetCommand("anthropic/claude-opus-4-6", runtime);
+    await modelsSetCommand("anthropic/claude-opus-4-6", runtime, {
+      updateConfig: fakeUpdateConfig,
+    });
 
-    expect(mocks.writtenConfig).toBeDefined();
+    expect(writtenConfig).toBeDefined();
     const written = getWrittenConfig();
     expect(written.agents).toEqual({
       defaults: {

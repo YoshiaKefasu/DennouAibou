@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MsgContext } from "../templating.js";
-import "./get-reply.test-runtime-mocks.js";
+import { getReplyFromConfig } from "./get-reply.js";
+import type { GetReplyDeps } from "./get-reply.js";
 
 const mocks = vi.hoisted(() => ({
   resolveReplyDirectives: vi.fn(),
@@ -8,28 +9,35 @@ const mocks = vi.hoisted(() => ({
   emitResetCommandHooks: vi.fn(),
   initSessionState: vi.fn(),
 }));
-vi.mock("./commands-core.js", () => ({
-  emitResetCommandHooks: (...args: unknown[]) => mocks.emitResetCommandHooks(...args),
-}));
-vi.mock("./commands-core.runtime.js", () => ({
-  emitResetCommandHooks: (...args: unknown[]) => mocks.emitResetCommandHooks(...args),
-}));
-vi.mock("./get-reply-directives.js", () => ({
-  resolveReplyDirectives: (...args: unknown[]) => mocks.resolveReplyDirectives(...args),
-}));
-vi.mock("./get-reply-inline-actions.js", () => ({
-  handleInlineActions: (...args: unknown[]) => mocks.handleInlineActions(...args),
-}));
-vi.mock("./session.js", () => ({
-  initSessionState: (...args: unknown[]) => mocks.initSessionState(...args),
-  resolveSessionModelOverrideSnapshot: vi.fn(() => null),
-}));
 
-let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
-
-async function loadFreshGetReplyModuleForTest() {
-  vi.resetModules();
-  ({ getReplyFromConfig } = await import("./get-reply.js"));
+function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
+  return {
+    loadConfig: () => ({}),
+    resolveSessionAgentId: () => "main",
+    resolveAgentDir: () => "/tmp/agent",
+    resolveAgentWorkspaceDir: () => "/tmp/workspace",
+    resolveAgentSkillsFilter: () => undefined,
+    resolveModelRefFromString: () => null,
+    resolveAgentTimeoutMs: () => 60000,
+    ensureAgentWorkspace: async () => ({ dir: "/tmp/workspace" }),
+    resolveChannelModelOverride: () => null,
+    resolveCommandAuthorization: () =>
+      ({ isAuthorizedSender: true, ownerList: [], senderIsOwner: false }) as never,
+    resolveDefaultModel: () => ({
+      defaultProvider: "openai",
+      defaultModel: "gpt-4o-mini",
+      aliasIndex: { byAlias: new Map(), byKey: new Map() },
+    }),
+    finalizeInboundContext: (ctx: Record<string, unknown>) => ctx as never,
+    emitPreAgentMessageHooks: () => undefined,
+    resolveSessionModelOverrideSnapshot: () => null,
+    runPreparedReply: async () => undefined,
+    resolveReplyDirectives: mocks.resolveReplyDirectives as never,
+    handleInlineActions: mocks.handleInlineActions as never,
+    initSessionState: mocks.initSessionState as never,
+    emitResetCommandHooks: mocks.emitResetCommandHooks as never,
+    ...extra,
+  };
 }
 
 function buildNativeResetContext(): MsgContext {
@@ -100,8 +108,7 @@ function createContinueDirectivesResult(resetHookTriggered: boolean) {
 }
 
 describe("getReplyFromConfig reset-hook fallback", () => {
-  beforeEach(async () => {
-    await loadFreshGetReplyModuleForTest();
+  beforeEach(() => {
     mocks.resolveReplyDirectives.mockReset();
     mocks.handleInlineActions.mockReset();
     mocks.emitResetCommandHooks.mockReset();
@@ -132,7 +139,7 @@ describe("getReplyFromConfig reset-hook fallback", () => {
   it("emits reset hooks when inline actions return early without marking resetHookTriggered", async () => {
     mocks.handleInlineActions.mockResolvedValue({ kind: "reply", reply: undefined });
 
-    await getReplyFromConfig(buildNativeResetContext(), undefined, {});
+    await getReplyFromConfig(buildNativeResetContext(), undefined, {}, getTestDeps());
 
     expect(mocks.emitResetCommandHooks).toHaveBeenCalledTimes(1);
     expect(mocks.emitResetCommandHooks).toHaveBeenCalledWith(
@@ -147,7 +154,7 @@ describe("getReplyFromConfig reset-hook fallback", () => {
     mocks.handleInlineActions.mockResolvedValue({ kind: "reply", reply: undefined });
     mocks.resolveReplyDirectives.mockResolvedValue(createContinueDirectivesResult(true));
 
-    await getReplyFromConfig(buildNativeResetContext(), undefined, {});
+    await getReplyFromConfig(buildNativeResetContext(), undefined, {}, getTestDeps());
 
     expect(mocks.emitResetCommandHooks).not.toHaveBeenCalled();
   });

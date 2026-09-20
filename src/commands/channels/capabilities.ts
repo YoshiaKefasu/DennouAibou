@@ -207,12 +207,29 @@ async function resolveChannelReports(params: {
   return reports;
 }
 
+export type ChannelsCapabilitiesDeps = {
+  listChannelPlugins?: typeof listChannelPlugins;
+  readConfigFileSnapshot?: typeof readConfigFileSnapshot;
+  replaceConfigFile?: typeof replaceConfigFile;
+  resolveInstallableChannelPlugin?: typeof resolveInstallableChannelPlugin;
+  requireValidConfig?: typeof requireValidConfig;
+  formatChannelAccountLabel?: typeof formatChannelAccountLabel;
+};
+
 export async function channelsCapabilitiesCommand(
   opts: ChannelsCapabilitiesOptions,
   runtime: RuntimeEnv = defaultRuntime,
+  deps: ChannelsCapabilitiesDeps = {},
 ) {
-  const sourceSnapshotPromise = readConfigFileSnapshot().catch(() => null);
-  const loadedCfg = await requireValidConfig(runtime);
+  const listChannelPluginsImpl = deps.listChannelPlugins ?? listChannelPlugins;
+  const readConfigFileSnapshotImpl = deps.readConfigFileSnapshot ?? readConfigFileSnapshot;
+  const replaceConfigFileImpl = deps.replaceConfigFile ?? replaceConfigFile;
+  const resolveInstallableChannelPluginImpl =
+    deps.resolveInstallableChannelPlugin ?? resolveInstallableChannelPlugin;
+  const requireValidConfigImpl = deps.requireValidConfig ?? requireValidConfig;
+  const formatChannelAccountLabelImpl = deps.formatChannelAccountLabel ?? formatChannelAccountLabel;
+  const sourceSnapshotPromise = readConfigFileSnapshotImpl().catch(() => null);
+  const loadedCfg = await requireValidConfigImpl(runtime);
   if (!loadedCfg) {
     return;
   }
@@ -232,12 +249,12 @@ export async function channelsCapabilitiesCommand(
     return;
   }
 
-  const plugins = listChannelPlugins();
+  const plugins = listChannelPluginsImpl();
   const selected =
     !rawChannel || rawChannel === "all"
       ? plugins
       : await (async () => {
-          const resolved = await resolveInstallableChannelPlugin({
+          const resolved = await resolveInstallableChannelPluginImpl({
             cfg,
             runtime,
             rawChannel,
@@ -245,7 +262,7 @@ export async function channelsCapabilitiesCommand(
           });
           if (resolved.configChanged) {
             cfg = resolved.cfg;
-            await replaceConfigFile({
+            await replaceConfigFileImpl({
               nextConfig: cfg,
               baseHash: (await sourceSnapshotPromise)?.hash,
             });
@@ -280,7 +297,7 @@ export async function channelsCapabilitiesCommand(
 
   const lines: string[] = [];
   for (const report of reports) {
-    const label = formatChannelAccountLabel({
+    const label = formatChannelAccountLabelImpl({
       channel: report.channel,
       accountId: report.accountId,
       name: report.accountName,

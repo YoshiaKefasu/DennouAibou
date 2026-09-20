@@ -1,40 +1,48 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HookRunner } from "../../plugins/hooks.js";
 import type { MsgContext } from "../templating.js";
 import { SILENT_REPLY_TOKEN } from "../tokens.js";
-import "./get-reply.test-runtime-mocks.js";
+import { getReplyFromConfig } from "./get-reply.js";
+import type { GetReplyDeps } from "./get-reply.js";
 
 const mocks = vi.hoisted(() => ({
   resolveReplyDirectives: vi.fn(),
   handleInlineActions: vi.fn(),
   initSessionState: vi.fn(),
-  hasHooks: vi.fn<HookRunner["hasHooks"]>(),
-  runBeforeAgentReply: vi.fn<HookRunner["runBeforeAgentReply"]>(),
+  runBeforeAgentReply: vi.fn(),
 }));
 
-vi.mock("../../plugins/hook-runner-global.js", () => ({
-  getGlobalHookRunner: () =>
-    ({
-      hasHooks: mocks.hasHooks,
-      runBeforeAgentReply: mocks.runBeforeAgentReply,
-    }) as unknown as HookRunner,
-}));
-vi.mock("./get-reply-directives.js", () => ({
-  resolveReplyDirectives: (...args: unknown[]) => mocks.resolveReplyDirectives(...args),
-}));
-vi.mock("./get-reply-inline-actions.js", () => ({
-  handleInlineActions: (...args: unknown[]) => mocks.handleInlineActions(...args),
-}));
-vi.mock("./session.js", () => ({
-  initSessionState: (...args: unknown[]) => mocks.initSessionState(...args),
-  resolveSessionModelOverrideSnapshot: vi.fn(() => null),
-}));
-
-let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
-
-async function loadFreshGetReplyModuleForTest() {
-  vi.resetModules();
-  ({ getReplyFromConfig } = await import("./get-reply.js"));
+function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
+  return {
+    loadConfig: () => ({}),
+    resolveSessionAgentId: () => "main",
+    resolveAgentDir: () => "/tmp/agent",
+    resolveAgentWorkspaceDir: () => "/tmp/workspace",
+    resolveAgentSkillsFilter: () => undefined,
+    resolveModelRefFromString: () => null,
+    resolveAgentTimeoutMs: () => 60000,
+    ensureAgentWorkspace: async () => ({ dir: "/tmp/workspace" }),
+    resolveChannelModelOverride: () => null,
+    resolveCommandAuthorization: () =>
+      ({ isAuthorizedSender: true, ownerList: [], senderIsOwner: false }) as never,
+    resolveDefaultModel: () => ({
+      defaultProvider: "openai",
+      defaultModel: "gpt-4o-mini",
+      aliasIndex: { byAlias: new Map(), byKey: new Map() },
+    }),
+    finalizeInboundContext: (ctx: Record<string, unknown>) => ctx as never,
+    emitPreAgentMessageHooks: () => undefined,
+    resolveSessionModelOverrideSnapshot: () => null,
+    runPreparedReply: async () => undefined,
+    resolveReplyDirectives: mocks.resolveReplyDirectives as never,
+    handleInlineActions: mocks.handleInlineActions as never,
+    initSessionState: mocks.initSessionState as never,
+    getGlobalHookRunner: () =>
+      ({
+        hasHooks: (hookName: string) => hookName === "before_agent_reply",
+        runBeforeAgentReply: mocks.runBeforeAgentReply as never,
+      }) as never,
+    ...extra,
+  };
 }
 
 function buildCtx(overrides: Partial<MsgContext> = {}): MsgContext {
@@ -108,12 +116,10 @@ function createContinueDirectivesResult() {
 }
 
 describe("getReplyFromConfig before_agent_reply wiring", () => {
-  beforeEach(async () => {
-    await loadFreshGetReplyModuleForTest();
+  beforeEach(() => {
     mocks.resolveReplyDirectives.mockReset();
     mocks.handleInlineActions.mockReset();
     mocks.initSessionState.mockReset();
-    mocks.hasHooks.mockReset();
     mocks.runBeforeAgentReply.mockReset();
 
     mocks.initSessionState.mockResolvedValue({
@@ -143,7 +149,6 @@ describe("getReplyFromConfig before_agent_reply wiring", () => {
       directives: {},
       abortedLastRun: false,
     });
-    mocks.hasHooks.mockImplementation((hookName) => hookName === "before_agent_reply");
   });
 
   it("returns a plugin reply and invokes the hook after inline actions", async () => {
@@ -152,7 +157,7 @@ describe("getReplyFromConfig before_agent_reply wiring", () => {
       reply: { text: "plugin reply" },
     });
 
-    const result = await getReplyFromConfig(buildCtx(), undefined, {});
+    const result = await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(result).toEqual({ text: "plugin reply" });
     expect(mocks.runBeforeAgentReply).toHaveBeenCalledWith(
@@ -175,7 +180,7 @@ describe("getReplyFromConfig before_agent_reply wiring", () => {
   it("falls back to NO_REPLY when the hook claims without a reply payload", async () => {
     mocks.runBeforeAgentReply.mockResolvedValue({ handled: true });
 
-    const result = await getReplyFromConfig(buildCtx(), undefined, {});
+    const result = await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(result).toEqual({ text: SILENT_REPLY_TOKEN });
   });

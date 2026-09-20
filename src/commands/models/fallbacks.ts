@@ -5,6 +5,7 @@ import {
   listFallbacksCommand,
   removeFallbackCommand,
 } from "./fallbacks-shared.js";
+import type { ModelsCommandsDeps } from "./shared.js";
 
 export async function modelsFallbacksListCommand(
   opts: { json?: boolean; plain?: boolean },
@@ -13,11 +14,16 @@ export async function modelsFallbacksListCommand(
   return await listFallbacksCommand({ label: "Fallbacks", key: "model" }, opts, runtime);
 }
 
-export async function modelsFallbacksAddCommand(modelRaw: string, runtime: RuntimeEnv) {
+export async function modelsFallbacksAddCommand(
+  modelRaw: string,
+  runtime: RuntimeEnv,
+  deps?: ModelsCommandsDeps,
+) {
   return await addFallbackCommand(
     { label: "Fallbacks", key: "model", logPrefix: "Fallbacks" },
     modelRaw,
     runtime,
+    deps,
   );
 }
 

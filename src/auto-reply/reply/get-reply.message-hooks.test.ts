@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MsgContext } from "../templating.js";
-import { registerGetReplyCommonMocks } from "./get-reply.test-mocks.js";
+import { getReplyFromConfig } from "./get-reply.js";
+import type { GetReplyDeps } from "./get-reply.js";
 
 const mocks = vi.hoisted(() => ({
   applyMediaUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
@@ -11,46 +12,39 @@ const mocks = vi.hoisted(() => ({
   initSessionState: vi.fn(),
 }));
 
-registerGetReplyCommonMocks();
-
-vi.mock("../../globals.js", () => ({
-  logVerbose: vi.fn(),
-}));
 vi.mock("../../hooks/internal-hooks.js", () => ({
-  createInternalHookEvent: mocks.createInternalHookEvent,
-  triggerInternalHook: mocks.triggerInternalHook,
-}));
-vi.mock("../../link-understanding/apply.js", () => ({
-  applyLinkUnderstanding: mocks.applyLinkUnderstanding,
-}));
-vi.mock("../../link-understanding/apply.runtime.js", () => ({
-  applyLinkUnderstanding: mocks.applyLinkUnderstanding,
-}));
-vi.mock("../../media-understanding/apply.js", () => ({
-  applyMediaUnderstanding: mocks.applyMediaUnderstanding,
-}));
-vi.mock("../../media-understanding/apply.runtime.js", () => ({
-  applyMediaUnderstanding: mocks.applyMediaUnderstanding,
-}));
-vi.mock("./commands-core.js", () => ({
-  emitResetCommandHooks: vi.fn(async () => undefined),
-}));
-vi.mock("./get-reply-directives.js", () => ({
-  resolveReplyDirectives: mocks.resolveReplyDirectives,
-}));
-vi.mock("./get-reply-inline-actions.js", () => ({
-  handleInlineActions: vi.fn(async () => ({ kind: "reply", reply: { text: "ok" } })),
-}));
-vi.mock("./session.js", () => ({
-  initSessionState: mocks.initSessionState,
-  resolveSessionModelOverrideSnapshot: vi.fn(() => null),
+  createInternalHookEvent: (...args: unknown[]) => mocks.createInternalHookEvent(...args),
+  triggerInternalHook: (...args: unknown[]) => mocks.triggerInternalHook(...args),
 }));
 
-let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
-
-async function loadFreshGetReplyModuleForTest() {
-  vi.resetModules();
-  ({ getReplyFromConfig } = await import("./get-reply.js"));
+function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
+  return {
+    loadConfig: () => ({}),
+    resolveSessionAgentId: () => "main",
+    resolveAgentDir: () => "/tmp/agent",
+    resolveAgentWorkspaceDir: () => "/tmp/workspace",
+    resolveAgentSkillsFilter: () => undefined,
+    resolveModelRefFromString: () => null,
+    resolveAgentTimeoutMs: () => 60000,
+    ensureAgentWorkspace: async () => ({ dir: "/tmp/workspace" }),
+    resolveChannelModelOverride: () => null,
+    resolveCommandAuthorization: () =>
+      ({ isAuthorizedSender: true, ownerList: [], senderIsOwner: false }) as never,
+    resolveDefaultModel: () => ({
+      defaultProvider: "openai",
+      defaultModel: "gpt-4o-mini",
+      aliasIndex: { byAlias: new Map(), byKey: new Map() },
+    }),
+    finalizeInboundContext: (ctx: Record<string, unknown>) => ctx as never,
+    resolveSessionModelOverrideSnapshot: () => null,
+    runPreparedReply: async () => undefined,
+    resolveReplyDirectives: mocks.resolveReplyDirectives as never,
+    handleInlineActions: (async () => ({ kind: "reply", reply: { text: "ok" } })) as never,
+    initSessionState: mocks.initSessionState as never,
+    applyMediaUnderstanding: mocks.applyMediaUnderstanding as never,
+    applyLinkUnderstanding: mocks.applyLinkUnderstanding as never,
+    ...extra,
+  };
 }
 
 function buildCtx(overrides: Partial<MsgContext> = {}): MsgContext {
@@ -77,8 +71,7 @@ function buildCtx(overrides: Partial<MsgContext> = {}): MsgContext {
 }
 
 describe("getReplyFromConfig message hooks", () => {
-  beforeEach(async () => {
-    await loadFreshGetReplyModuleForTest();
+  beforeEach(() => {
     delete process.env.DENNOU_TEST_FAST;
     mocks.applyMediaUnderstanding.mockReset();
     mocks.applyLinkUnderstanding.mockReset();
@@ -129,7 +122,7 @@ describe("getReplyFromConfig message hooks", () => {
   it("emits transcribed + preprocessed hooks with enriched context", async () => {
     const ctx = buildCtx();
 
-    await getReplyFromConfig(ctx, undefined, {});
+    await getReplyFromConfig(ctx, undefined, {}, getTestDeps());
 
     expect(mocks.createInternalHookEvent).toHaveBeenCalledTimes(2);
     expect(mocks.createInternalHookEvent).toHaveBeenNthCalledWith(
@@ -165,7 +158,7 @@ describe("getReplyFromConfig message hooks", () => {
       ctx.BodyForAgent = "<media:audio>";
     });
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(mocks.createInternalHookEvent).toHaveBeenCalledTimes(1);
     expect(mocks.createInternalHookEvent).toHaveBeenCalledWith(
@@ -179,7 +172,7 @@ describe("getReplyFromConfig message hooks", () => {
   it("skips message hooks in fast test mode", async () => {
     process.env.DENNOU_TEST_FAST = "1";
 
-    await getReplyFromConfig(buildCtx(), undefined, {});
+    await getReplyFromConfig(buildCtx(), undefined, {}, getTestDeps());
 
     expect(mocks.applyMediaUnderstanding).not.toHaveBeenCalled();
     expect(mocks.applyLinkUnderstanding).not.toHaveBeenCalled();
@@ -188,7 +181,7 @@ describe("getReplyFromConfig message hooks", () => {
   });
 
   it("skips message hooks when SessionKey is unavailable", async () => {
-    await getReplyFromConfig(buildCtx({ SessionKey: undefined }), undefined, {});
+    await getReplyFromConfig(buildCtx({ SessionKey: undefined }), undefined, {}, getTestDeps());
 
     expect(mocks.createInternalHookEvent).not.toHaveBeenCalled();
     expect(mocks.triggerInternalHook).not.toHaveBeenCalled();
@@ -212,6 +205,7 @@ describe("getReplyFromConfig message hooks", () => {
       }),
       undefined,
       {},
+      getTestDeps(),
     );
 
     expect(mocks.applyMediaUnderstanding).not.toHaveBeenCalled();

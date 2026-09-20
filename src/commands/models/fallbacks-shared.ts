@@ -12,6 +12,7 @@ import {
   modelKey,
   resolveModelTarget,
   resolveModelKeysFromEntries,
+  type ModelsCommandsDeps,
   upsertCanonicalModelConfigEntry,
   updateConfig,
 } from "./shared.js";
@@ -78,8 +79,10 @@ export async function addFallbackCommand(
   },
   modelRaw: string,
   runtime: RuntimeEnv,
+  deps?: ModelsCommandsDeps,
 ) {
-  const updated = await updateConfig((cfg) => {
+  const update = deps?.updateConfig ?? updateConfig;
+  const updated = await update((cfg) => {
     const resolved = resolveModelTarget({ raw: modelRaw, cfg });
     const nextModels = {
       ...cfg.agents?.defaults?.models,

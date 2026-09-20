@@ -31,29 +31,47 @@ function loadSshTunnelModule() {
   return sshTunnelModulePromise;
 }
 
+export type GatewayStatusDeps = {
+  readBestEffortConfig?: typeof readBestEffortConfig;
+  resolveGatewayPort?: typeof resolveGatewayPort;
+  discoverGatewayBeaconsFn?: typeof import("../infra/bonjour-discovery.js").discoverGatewayBeacons;
+  pickPrimaryTailnetIPv4?: () => string | undefined;
+  probeGatewayFn?: typeof import("../gateway/probe.js").probeGateway;
+  resolveSshConfigFn?: typeof import("../infra/ssh-config.js").resolveSshConfig;
+  parseSshTargetFn?: typeof import("../infra/ssh-tunnel.js").parseSshTarget;
+  startSshPortForwardFn?: typeof import("../infra/ssh-tunnel.js").startSshPortForward;
+};
+
+export type GatewayStatusCommandOptions = {
+  url?: string;
+  token?: string;
+  password?: string;
+  timeout?: unknown;
+  json?: boolean;
+  ssh?: string;
+  sshIdentity?: string;
+  sshAuto?: boolean;
+};
+
 export async function gatewayStatusCommand(
-  opts: {
-    url?: string;
-    token?: string;
-    password?: string;
-    timeout?: unknown;
-    json?: boolean;
-    ssh?: string;
-    sshIdentity?: string;
-    sshAuto?: boolean;
-  },
+  opts: GatewayStatusCommandOptions,
   runtime: RuntimeEnv,
+  deps: GatewayStatusDeps = {},
 ) {
   const startedAt = Date.now();
-  const cfg = await readBestEffortConfig();
+  const cfg = await (deps.readBestEffortConfig ?? readBestEffortConfig)();
   const rich = isRich() && opts.json !== true;
   const overallTimeoutMs = parseTimeoutMs(opts.timeout, 3000);
   const wideAreaDomain = resolveWideAreaDiscoveryDomain({
     configDomain: cfg.discovery?.wideArea?.domain,
   });
-  const baseTargets = resolveTargets(cfg, opts.url);
-  const network = buildNetworkHints(cfg);
-  const remotePort = resolveGatewayPort(cfg);
+  const resolvePort = deps.resolveGatewayPort ?? resolveGatewayPort;
+  const baseTargets = resolveTargets(cfg, opts.url, { resolveGatewayPort: resolvePort });
+  const network = buildNetworkHints(cfg, {
+    resolveGatewayPort: resolvePort,
+    pickPrimaryTailnetIPv4: deps.pickPrimaryTailnetIPv4,
+  });
+  const remotePort = resolvePort(cfg);
   const discoveryTimeoutMs = Math.min(1200, overallTimeoutMs);
 
   let sshTarget = sanitizeSshTarget(opts.ssh) ?? sanitizeSshTarget(cfg.gateway?.remote?.sshTarget);
@@ -64,13 +82,30 @@ export async function gatewayStatusCommand(
     sshTarget = inferSshTargetFromRemoteUrl(cfg.gateway?.remote?.url);
   }
 
+  const loadSshConfig = deps.resolveSshConfigFn
+    ? async () => ({
+        ...(await loadSshConfigModule()),
+        resolveSshConfig: deps.resolveSshConfigFn!,
+      })
+    : loadSshConfigModule;
+  const loadSshTunnel =
+    deps.startSshPortForwardFn || deps.parseSshTargetFn
+      ? async () => ({
+          ...(await loadSshTunnelModule()),
+          ...(deps.parseSshTargetFn ? { parseSshTarget: deps.parseSshTargetFn } : {}),
+          ...(deps.startSshPortForwardFn
+            ? { startSshPortForward: deps.startSshPortForwardFn }
+            : {}),
+        })
+      : loadSshTunnelModule;
+
   if (sshTarget) {
     const resolved = await resolveSshTarget({
       rawTarget: sshTarget,
       identity: sshIdentity,
       overallTimeoutMs,
-      loadSshConfigModule,
-      loadSshTunnelModule,
+      loadSshConfigModule: loadSshConfig,
+      loadSshTunnelModule: loadSshTunnel,
     });
     if (resolved) {
       sshTarget = resolved.target;
@@ -97,7 +132,9 @@ export async function gatewayStatusCommand(
         remotePort,
         sshTarget,
         sshIdentity,
-        loadSshTunnelModule,
+        loadSshTunnelModule: loadSshTunnel,
+        probeGatewayFn: deps.probeGatewayFn,
+        discoverGatewayBeaconsFn: deps.discoverGatewayBeaconsFn,
       }),
   );
 
