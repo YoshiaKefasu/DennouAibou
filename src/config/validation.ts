@@ -451,11 +451,19 @@ function validateGatewayTailscaleBind(config: OpenClawConfig): ConfigValidationI
  * Validates config without applying runtime defaults.
  * Use this when you need the raw validated config (e.g., for writing back to file).
  */
+export type ConfigValidationDeps = {
+  loadPluginManifestRegistry?: typeof loadPluginManifestRegistry;
+  listPluginDoctorLegacyConfigRules?: typeof listPluginDoctorLegacyConfigRules;
+};
+
 export function validateConfigObjectRaw(
   raw: unknown,
+  params?: { deps?: ConfigValidationDeps },
 ): { ok: true; config: OpenClawConfig } | { ok: false; issues: ConfigValidationIssue[] } {
   const policyIssues = collectUnsupportedSecretRefPolicyIssues(raw);
-  const legacyIssues = findLegacyConfigIssues(raw, raw, listPluginDoctorLegacyConfigRules());
+  const listLegacyRules =
+    params?.deps?.listPluginDoctorLegacyConfigRules ?? listPluginDoctorLegacyConfigRules;
+  const legacyIssues = findLegacyConfigIssues(raw, raw, listLegacyRules());
   if (legacyIssues.length > 0) {
     return {
       ok: false,
@@ -505,8 +513,9 @@ export function validateConfigObjectRaw(
 
 export function validateConfigObject(
   raw: unknown,
+  params?: { deps?: ConfigValidationDeps },
 ): { ok: true; config: OpenClawConfig } | { ok: false; issues: ConfigValidationIssue[] } {
-  const result = validateConfigObjectRaw(raw);
+  const result = validateConfigObjectRaw(raw, params);
   if (!result.ok) {
     return result;
   }
@@ -528,25 +537,39 @@ type ValidateConfigWithPluginsResult =
       warnings: ConfigValidationIssue[];
     };
 
+type ConfigValidationParams = { env?: NodeJS.ProcessEnv; deps?: ConfigValidationDeps };
+
 export function validateConfigObjectWithPlugins(
   raw: unknown,
-  params?: { env?: NodeJS.ProcessEnv },
+  params?: ConfigValidationParams,
 ): ValidateConfigWithPluginsResult {
-  return validateConfigObjectWithPluginsBase(raw, { applyDefaults: true, env: params?.env });
+  return validateConfigObjectWithPluginsBase(raw, {
+    applyDefaults: true,
+    env: params?.env,
+    deps: params?.deps,
+  });
 }
 
 export function validateConfigObjectRawWithPlugins(
   raw: unknown,
-  params?: { env?: NodeJS.ProcessEnv },
+  params?: ConfigValidationParams,
 ): ValidateConfigWithPluginsResult {
-  return validateConfigObjectWithPluginsBase(raw, { applyDefaults: false, env: params?.env });
+  return validateConfigObjectWithPluginsBase(raw, {
+    applyDefaults: false,
+    env: params?.env,
+    deps: params?.deps,
+  });
 }
 
 function validateConfigObjectWithPluginsBase(
   raw: unknown,
-  opts: { applyDefaults: boolean; env?: NodeJS.ProcessEnv },
+  opts: { applyDefaults: boolean; env?: NodeJS.ProcessEnv; deps?: ConfigValidationDeps },
 ): ValidateConfigWithPluginsResult {
-  const base = opts.applyDefaults ? validateConfigObject(raw) : validateConfigObjectRaw(raw);
+  const loadPluginManifestRegistryImpl =
+    opts.deps?.loadPluginManifestRegistry ?? loadPluginManifestRegistry;
+  const base = opts.applyDefaults
+    ? validateConfigObject(raw, { deps: opts.deps })
+    : validateConfigObjectRaw(raw, { deps: opts.deps });
   if (!base.ok) {
     return { ok: false, issues: base.issues, warnings: [] };
   }
@@ -633,7 +656,7 @@ function validateConfigObjectWithPluginsBase(
       effectiveConfig,
       resolveDefaultAgentId(effectiveConfig),
     );
-    const registry = loadPluginManifestRegistry({
+    const registry = loadPluginManifestRegistryImpl({
       config: effectiveConfig,
       workspaceDir: workspaceDir ?? undefined,
       env: opts.env,

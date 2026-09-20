@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WakeRunResult } from "../infra/event-pump.js";
@@ -12,19 +13,14 @@ type FakeFsEntry =
   | { kind: "file"; content: string; mtimeMs: number }
   | { kind: "dir"; mtimeMs: number };
 
-const fsState = vi.hoisted(() => ({
+const fsState = {
   entries: new Map<string, FakeFsEntry>(),
   nowMs: 0,
   fixtureCount: 0,
-}));
+};
 
 const abs = (p: string) => path.resolve(p);
 const fixturesRoot = abs(path.join("__DENNOU_vitest__", "cron", "runs-one-shot"));
-const isFixturePath = (p: string) => {
-  const resolved = abs(p);
-  const rootPrefix = `${fixturesRoot}${path.sep}`;
-  return resolved === fixturesRoot || resolved.startsWith(rootPrefix);
-};
 
 function bumpMtimeMs() {
   fsState.nowMs += 1;
@@ -59,9 +55,9 @@ async function makeStorePath() {
   return { storePath, cleanup: async () => {} };
 }
 
-vi.mock("node:fs", async () => {
-  const actual = await import("node:fs");
-  const pathMod = await import("node:path");
+function createFixtureFs(): typeof fs {
+  const actual = fs;
+  const pathMod = path;
   const absInMock = (p: string) => pathMod.resolve(p);
   const isFixtureInMock = (p: string) => {
     const resolved = absInMock(p);
@@ -152,28 +148,11 @@ vi.mock("node:fs", async () => {
   } as unknown as typeof actual.promises;
 
   const wrapped = { ...actual, promises };
-  return { ...wrapped, default: wrapped };
-});
+  return { ...wrapped, default: wrapped } as typeof fs;
+}
 
-vi.mock("node:fs/promises", async () => {
-  const actual = await import("node:fs/promises");
-  const wrapped = {
-    ...actual,
-    mkdir: async (p: string, _opts?: unknown) => {
-      if (!isFixturePath(p)) {
-        return await actual.mkdir(p, { recursive: true });
-      }
-      ensureDir(p);
-    },
-    writeFile: async (p: string, data: string, _enc?: unknown) => {
-      if (!isFixturePath(p)) {
-        return await actual.writeFile(p, data, "utf-8");
-      }
-      setFile(p, data);
-    },
-  };
-  return { ...wrapped, default: wrapped };
-});
+/* The service receives this fixture through CronServiceDeps.storeDeps. */
+const fixtureFs = createFixtureFs();
 
 beforeEach(() => {
   fsState.entries.clear();
@@ -233,6 +212,7 @@ async function createCronHarness(options: CronHarnessOptions = {}) {
     storePath: store.storePath,
     cronEnabled: true,
     log: noopLogger,
+    storeDeps: { fs: fixtureFs },
     ...(options.nowMs ? { nowMs: options.nowMs } : {}),
     ...(options.wakeNowBusyMaxWaitMs !== undefined
       ? { wakeNowBusyMaxWaitMs: options.wakeNowBusyMaxWaitMs }
@@ -309,9 +289,8 @@ async function runIsolatedAnnounceJobAndWait(params: {
   name: string;
   status: "ok" | "error";
 }) {
-  const { job, runAt } = await addDefaultIsolatedAnnounceJob(params.cron, params.name);
-  vi.useFakeTimers({ now: runAt });
-  await vi.runOnlyPendingTimersAsync();
+  const { job } = await addDefaultIsolatedAnnounceJob(params.cron, params.name);
+  await params.cron.run(job.id, "force");
   await params.events.waitFor(
     (evt) => evt.jobId === job.id && evt.action === "finished" && evt.status === params.status,
   );
@@ -383,6 +362,7 @@ function createStartedCronService(
     storePath,
     cronEnabled: true,
     log: noopLogger,
+    storeDeps: { fs: fixtureFs },
     enqueueSystemEvent: vi.fn(),
     requestWakeNow: vi.fn(),
     runIsolatedAgentJob: runIsolatedAgentJob ?? vi.fn(async () => ({ status: "ok" as const })),
@@ -427,7 +407,9 @@ describe("CronService", () => {
     expect(job.state.nextRunAtMs).toBe(atMs);
 
     vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:02.000Z") - Date.now());
-    await vi.runOnlyPendingTimersAsync();
+    if (typeof vi.runOnlyPendingTimersAsync === "function") {
+      await vi.runOnlyPendingTimersAsync();
+    }
     await events.waitFor((evt) => evt.jobId === job.id && evt.action === "finished");
 
     const jobs = await cron.list({ includeDisabled: true });
@@ -447,7 +429,9 @@ describe("CronService", () => {
       });
 
     vi.advanceTimersByTime(Date.parse("2025-12-13T00:00:02.000Z") - Date.now());
-    await vi.runOnlyPendingTimersAsync();
+    if (typeof vi.runOnlyPendingTimersAsync === "function") {
+      await vi.runOnlyPendingTimersAsync();
+    }
     await events.waitFor((evt) => evt.jobId === job.id && evt.action === "removed");
 
     const jobs = await cron.list({ includeDisabled: true });

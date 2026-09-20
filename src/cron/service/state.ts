@@ -1,5 +1,6 @@
 import type { CronConfig } from "../../config/types.cron.js";
 import type { WakeRunResult } from "../../infra/event-pump.js";
+import type { CronStoreDeps } from "../store.js";
 import type {
   CronDeliveryStatus,
   CronJob,
@@ -37,6 +38,7 @@ export type Logger = {
 
 export type CronServiceDeps = {
   nowMs?: () => number;
+  storeDeps?: CronStoreDeps;
   log: Logger;
   storePath: string;
   cronEnabled: boolean;

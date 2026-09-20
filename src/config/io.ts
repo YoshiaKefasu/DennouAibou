@@ -54,6 +54,7 @@ import type { OpenClawConfig, ConfigFileSnapshot, LegacyConfigIssue } from "./ty
 import {
   validateConfigObjectRawWithPlugins,
   validateConfigObjectWithPlugins,
+  type ConfigValidationDeps,
 } from "./validation.js";
 import { shouldWarnOnTouchedVersion } from "./version.js";
 
@@ -1502,6 +1503,7 @@ export type ConfigIoDeps = {
   fs?: typeof fs;
   json5?: typeof JSON5;
   env?: NodeJS.ProcessEnv;
+  validation?: ConfigValidationDeps;
   homedir?: () => string;
   configPath?: string;
   logger?: Pick<typeof console, "error" | "warn">;
@@ -1608,6 +1610,7 @@ function normalizeDeps(overrides: ConfigIoDeps = {}): Required<ConfigIoDeps> {
     homedir:
       overrides.homedir ?? (() => resolveRequiredHomeDir(overrides.env ?? process.env, os.homedir)),
     configPath: overrides.configPath ?? "",
+    validation: overrides.validation ?? {},
     logger: overrides.logger ?? console,
   };
 }
@@ -1686,11 +1689,14 @@ function resolveConfigForRead(
 function resolveLegacyConfigForRead(
   resolvedConfigRaw: unknown,
   sourceRaw: unknown,
+  validationDeps?: ConfigValidationDeps,
 ): LegacyMigrationResolution {
+  const listLegacyRules =
+    validationDeps?.listPluginDoctorLegacyConfigRules ?? listPluginDoctorLegacyConfigRules;
   const sourceLegacyIssues = findLegacyConfigIssues(
     resolvedConfigRaw,
     sourceRaw,
-    listPluginDoctorLegacyConfigRules(),
+    listLegacyRules(),
   );
   return { effectiveConfigRaw: resolvedConfigRaw, sourceLegacyIssues };
 }
@@ -1780,7 +1786,11 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
         deps.env,
       );
       const resolvedConfig = readResolution.resolvedConfigRaw;
-      const legacyResolution = resolveLegacyConfigForRead(resolvedConfig, effectiveParsed);
+      const legacyResolution = resolveLegacyConfigForRead(
+        resolvedConfig,
+        effectiveParsed,
+        deps.validation,
+      );
       const effectiveConfigRaw = legacyResolution.effectiveConfigRaw;
       for (const w of readResolution.envWarnings) {
         deps.logger.warn(
@@ -1814,7 +1824,10 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
       if (preValidationDuplicates.length > 0) {
         throw new DuplicateAgentDirError(preValidationDuplicates);
       }
-      const validated = validateConfigObjectWithPlugins(effectiveConfigRaw, { env: deps.env });
+      const validated = validateConfigObjectWithPlugins(effectiveConfigRaw, {
+        env: deps.env,
+        deps: deps.validation,
+      });
       if (!validated.ok) {
         observeLoadConfigSnapshot({
           ...createConfigFileSnapshot({
@@ -2039,10 +2052,17 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
       }));
 
       const resolvedConfigRaw = readResolution.resolvedConfigRaw;
-      const legacyResolution = resolveLegacyConfigForRead(resolvedConfigRaw, effectiveParsed);
+      const legacyResolution = resolveLegacyConfigForRead(
+        resolvedConfigRaw,
+        effectiveParsed,
+        deps.validation,
+      );
       const effectiveConfigRaw = legacyResolution.effectiveConfigRaw;
 
-      const validated = validateConfigObjectWithPlugins(effectiveConfigRaw, { env: deps.env });
+      const validated = validateConfigObjectWithPlugins(effectiveConfigRaw, {
+        env: deps.env,
+        deps: deps.validation,
+      });
       if (!validated.ok) {
         return await finalizeReadConfigSnapshotInternalResult(deps, {
           snapshot: createConfigFileSnapshot({
@@ -2172,7 +2192,10 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
       }
     }
 
-    const validated = validateConfigObjectRawWithPlugins(persistCandidate, { env: deps.env });
+    const validated = validateConfigObjectRawWithPlugins(persistCandidate, {
+      env: deps.env,
+      deps: deps.validation,
+    });
     if (!validated.ok) {
       const issue = validated.issues[0];
       const pathLabel = issue?.path ? issue.path : "<root>";

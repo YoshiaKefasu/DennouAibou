@@ -6,22 +6,25 @@ import type { PluginManifestRecord, PluginManifestRegistry } from "../plugins/ma
 import { createConfigIO } from "./io.js";
 import type { OpenClawConfig } from "./types.js";
 
-// Mock the plugin manifest registry so we can register a fake channel whose
-// AJV JSON Schema carries a `default` value.  This lets the #56772 regression
-// test exercise the exact code path that caused the bug: AJV injecting
-// defaults during the write-back validation pass.
-const mockLoadPluginManifestRegistry = vi.hoisted(() =>
-  vi.fn(
-    (): PluginManifestRegistry => ({
-      diagnostics: [],
-      plugins: [],
-    }),
-  ),
+// Inject the plugin manifest registry so the #56772 regression test can
+// exercise AJV defaults without replacing the module for the whole file.
+const mockLoadPluginManifestRegistry = vi.fn(
+  (): PluginManifestRegistry => ({ diagnostics: [], plugins: [] }),
 );
+const mockListPluginDoctorLegacyConfigRules = vi.fn(() => []);
+const previousDisableBundledPlugins = process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
 
-vi.mock("../plugins/manifest-registry.js", () => ({
-  loadPluginManifestRegistry: mockLoadPluginManifestRegistry,
-}));
+beforeAll(() => {
+  process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = "1";
+});
+
+afterAll(() => {
+  if (previousDisableBundledPlugins === undefined) {
+    delete process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
+  } else {
+    process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = previousDisableBundledPlugins;
+  }
+});
 
 describe("config io write", () => {
   let fixtureRoot = "";
@@ -30,6 +33,21 @@ describe("config io write", () => {
     warn: () => {},
     error: () => {},
   };
+
+  function createSlackManifestRecord(): PluginManifestRecord {
+    return {
+      id: "slack",
+      origin: "bundled",
+      channels: ["slack"],
+      providers: [],
+      skills: [],
+      hooks: [],
+      rootDir: "/virtual/plugins/slack",
+      source: "/virtual/plugins/slack/openclaw.plugin.json",
+      manifestPath: "/virtual/plugins/slack/openclaw.plugin.json",
+      channelCatalogMeta: { id: "slack", label: "Slack", blurb: "Slack channel" },
+    };
+  }
 
   function createBlueBubblesManifestRecord(): PluginManifestRecord {
     return {
@@ -112,6 +130,10 @@ describe("config io write", () => {
       env: params.env ?? {},
       homedir: () => params.home,
       logger: params.logger ?? silentLogger,
+      validation: {
+        loadPluginManifestRegistry: mockLoadPluginManifestRegistry,
+        listPluginDoctorLegacyConfigRules: mockListPluginDoctorLegacyConfigRules,
+      },
     });
     const snapshot = await io.readConfigFileSnapshot();
     expect(snapshot.valid).toBe(true);
@@ -213,7 +235,7 @@ describe("config io write", () => {
     });
   });
 
-  it.runIf(process.platform !== "win32")(
+  (process.platform !== "win32" ? it : it.skip)(
     "tightens world-writable state dir when writing the default config",
     async () => {
       await withSuiteHome(async (home) => {
@@ -478,6 +500,10 @@ describe("config io write", () => {
   });
 
   it("does not reintroduce Slack/Discord legacy dm.policy defaults when writing", async () => {
+    mockLoadPluginManifestRegistry.mockReturnValue({
+      diagnostics: [],
+      plugins: [createSlackManifestRecord()],
+    });
     await withSuiteHome(async (home) => {
       const { configPath, io, snapshot } = await writeConfigAndCreateIo({
         home,
@@ -521,6 +547,7 @@ describe("config io write", () => {
       expect(persisted.channels?.slack?.dmPolicy).toBe("pairing");
       expect(persisted.channels?.slack?.dm).toEqual({ enabled: true });
     });
+    mockLoadPluginManifestRegistry.mockReturnValue({ diagnostics: [], plugins: [] });
   });
 
   it("logs an overwrite audit entry when replacing an existing config file", async () => {

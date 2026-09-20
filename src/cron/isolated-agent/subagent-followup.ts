@@ -1,10 +1,25 @@
 import { readLatestAssistantReply, waitForAgentRunsToDrain } from "../../agents/run-wait.js";
 import { listDescendantRunsForRequester } from "../../agents/subagent-registry-read.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
+import { callGateway } from "../../gateway/call.js";
 import { expectsSubagentFollowup, isLikelyInterimCronMessage } from "./subagent-followup-hints.js";
 export { expectsSubagentFollowup, isLikelyInterimCronMessage } from "./subagent-followup-hints.js";
 
-function resolveCronSubagentTimings() {
+type SubagentFollowupTimings = {
+  waitMinMs: number;
+  finalReplyGraceMs: number;
+  gracePollMs: number;
+};
+
+export type SubagentFollowupDeps = {
+  listDescendantRunsForRequester?: typeof listDescendantRunsForRequester;
+  readLatestAssistantReply?: typeof readLatestAssistantReply;
+  waitForAgentRunsToDrain?: typeof waitForAgentRunsToDrain;
+  callGateway?: typeof callGateway;
+  timings?: SubagentFollowupTimings;
+};
+
+function resolveCronSubagentTimings(): SubagentFollowupTimings {
   const fastTestMode = process.env.DENNOU_TEST_FAST === "1";
   return {
     waitMinMs: fastTestMode ? 10 : 30_000,
@@ -13,11 +28,16 @@ function resolveCronSubagentTimings() {
   };
 }
 
-export async function readDescendantSubagentFallbackReply(params: {
-  sessionKey: string;
-  runStartedAt: number;
-}): Promise<string | undefined> {
-  const descendants = listDescendantRunsForRequester(params.sessionKey)
+export async function readDescendantSubagentFallbackReply(
+  params: {
+    sessionKey: string;
+    runStartedAt: number;
+  },
+  deps: SubagentFollowupDeps = {},
+): Promise<string | undefined> {
+  const listDescendants = deps.listDescendantRunsForRequester ?? listDescendantRunsForRequester;
+  const readLatest = deps.readLatestAssistantReply ?? readLatestAssistantReply;
+  const descendants = listDescendants(params.sessionKey)
     .filter(
       (entry) =>
         typeof entry.endedAt === "number" &&
@@ -46,7 +66,12 @@ export async function readDescendantSubagentFallbackReply(params: {
     .toSorted((a, b) => (a.endedAt ?? 0) - (b.endedAt ?? 0))
     .slice(-4);
   for (const entry of latestRuns) {
-    let reply = (await readLatestAssistantReply({ sessionKey: entry.childSessionKey }))?.trim();
+    let reply = (
+      await readLatest({
+        sessionKey: entry.childSessionKey,
+        callGateway: deps.callGateway,
+      })
+    )?.trim();
     // Fall back to the registry's frozen result text when the session transcript
     // is unavailable (e.g. child session already deleted by announce cleanup).
     if (!reply && typeof entry.frozenResultText === "string" && entry.frozenResultText.trim()) {
@@ -72,21 +97,25 @@ export async function readDescendantSubagentFallbackReply(params: {
  * of a busy-poll loop.  After all active runs settle, a short grace period
  * polls the cron agent's session for a post-orchestration synthesis message.
  */
-export async function waitForDescendantSubagentSummary(params: {
-  sessionKey: string;
-  initialReply?: string;
-  timeoutMs: number;
-  observedActiveDescendants?: boolean;
-}): Promise<string | undefined> {
-  const timings = resolveCronSubagentTimings();
+export async function waitForDescendantSubagentSummary(
+  params: {
+    sessionKey: string;
+    initialReply?: string;
+    timeoutMs: number;
+    observedActiveDescendants?: boolean;
+  },
+  deps: SubagentFollowupDeps = {},
+): Promise<string | undefined> {
+  const listDescendants = deps.listDescendantRunsForRequester ?? listDescendantRunsForRequester;
+  const readLatest = deps.readLatestAssistantReply ?? readLatestAssistantReply;
+  const waitForRunsToDrain = deps.waitForAgentRunsToDrain ?? waitForAgentRunsToDrain;
+  const timings = deps.timings ?? resolveCronSubagentTimings();
   const initialReply = params.initialReply?.trim();
   const deadline = Date.now() + Math.max(timings.waitMinMs, Math.floor(params.timeoutMs));
 
   // Snapshot the currently active descendant run IDs.
   const getActiveRuns = () =>
-    listDescendantRunsForRequester(params.sessionKey).filter(
-      (entry) => typeof entry.endedAt !== "number",
-    );
+    listDescendants(params.sessionKey).filter((entry) => typeof entry.endedAt !== "number");
 
   const initialActiveRuns = getActiveRuns();
   const sawActiveDescendants =
@@ -99,10 +128,11 @@ export async function waitForDescendantSubagentSummary(params: {
 
   // Wait until no descendant runs remain active. Descendants can finish and
   // spawn more descendants, so the helper refreshes the run set until it drains.
-  await waitForAgentRunsToDrain({
+  await waitForRunsToDrain({
     deadlineAtMs: deadline,
     initialPendingRunIds: initialActiveRuns.map((entry) => entry.runId),
     getPendingRunIds: () => getActiveRuns().map((entry) => entry.runId),
+    callGateway: deps.callGateway,
   });
 
   // --- Grace period: wait for the cron agent's synthesis ---
@@ -112,7 +142,12 @@ export async function waitForDescendantSubagentSummary(params: {
   const gracePeriodDeadline = Math.min(Date.now() + timings.finalReplyGraceMs, deadline);
 
   const resolveUsableLatestReply = async () => {
-    const latest = (await readLatestAssistantReply({ sessionKey: params.sessionKey }))?.trim();
+    const latest = (
+      await readLatest({
+        sessionKey: params.sessionKey,
+        callGateway: deps.callGateway,
+      })
+    )?.trim();
     if (
       latest &&
       latest.toUpperCase() !== SILENT_REPLY_TOKEN.toUpperCase() &&

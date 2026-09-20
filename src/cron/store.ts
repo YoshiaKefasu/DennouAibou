@@ -74,9 +74,17 @@ export function resolveCronStorePath(storePath?: string) {
   return resolveDefaultCronStorePath();
 }
 
-export async function loadCronStore(storePath: string): Promise<CronStoreFile> {
+export type CronStoreDeps = {
+  fs?: typeof fs;
+};
+
+export async function loadCronStore(
+  storePath: string,
+  deps: CronStoreDeps = {},
+): Promise<CronStoreFile> {
+  const ioFs = deps.fs ?? fs;
   try {
-    const raw = await fs.promises.readFile(storePath, "utf-8");
+    const raw = await ioFs.promises.readFile(storePath, "utf-8");
     let parsed: unknown;
     try {
       parsed = parseJsonWithJson5Fallback(raw);
@@ -109,18 +117,20 @@ type SaveCronStoreOptions = {
   skipBackup?: boolean;
 };
 
-async function setSecureFileMode(filePath: string): Promise<void> {
-  await fs.promises.chmod(filePath, 0o600).catch(() => undefined);
+async function setSecureFileMode(filePath: string, ioFs: typeof fs): Promise<void> {
+  await ioFs.promises.chmod(filePath, 0o600).catch(() => undefined);
 }
 
 export async function saveCronStore(
   storePath: string,
   store: CronStoreFile,
   opts?: SaveCronStoreOptions,
+  deps: CronStoreDeps = {},
 ) {
+  const ioFs = deps.fs ?? fs;
   const storeDir = path.dirname(storePath);
-  await fs.promises.mkdir(storeDir, { recursive: true, mode: 0o700 });
-  await fs.promises.chmod(storeDir, 0o700).catch(() => undefined);
+  await ioFs.promises.mkdir(storeDir, { recursive: true, mode: 0o700 });
+  await ioFs.promises.chmod(storeDir, 0o700).catch(() => undefined);
   const json = JSON.stringify(store, null, 2);
   const cached = serializedStoreCache.get(storePath);
   if (cached === json) {
@@ -130,7 +140,7 @@ export async function saveCronStore(
   let previous: string | null = cached ?? null;
   if (previous === null) {
     try {
-      previous = await fs.promises.readFile(storePath, "utf-8");
+      previous = await ioFs.promises.readFile(storePath, "utf-8");
     } catch (err) {
       if ((err as { code?: unknown }).code !== "ENOENT") {
         throw err;
@@ -144,29 +154,29 @@ export async function saveCronStore(
   const skipBackup =
     opts?.skipBackup === true || shouldSkipCronBackupForRuntimeOnlyChanges(previous, store);
   const tmp = `${storePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-  await fs.promises.writeFile(tmp, json, { encoding: "utf-8", mode: 0o600 });
-  await setSecureFileMode(tmp);
+  await ioFs.promises.writeFile(tmp, json, { encoding: "utf-8", mode: 0o600 });
+  await setSecureFileMode(tmp, ioFs);
   if (previous !== null && !skipBackup) {
     try {
       const backupPath = `${storePath}.bak`;
-      await fs.promises.copyFile(storePath, backupPath);
-      await setSecureFileMode(backupPath);
+      await ioFs.promises.copyFile(storePath, backupPath);
+      await setSecureFileMode(backupPath, ioFs);
     } catch {
       // best-effort
     }
   }
-  await renameWithRetry(tmp, storePath);
-  await setSecureFileMode(storePath);
+  await renameWithRetry(tmp, storePath, ioFs);
+  await setSecureFileMode(storePath, ioFs);
   serializedStoreCache.set(storePath, json);
 }
 
 const RENAME_MAX_RETRIES = 3;
 const RENAME_BASE_DELAY_MS = 50;
 
-async function renameWithRetry(src: string, dest: string): Promise<void> {
+async function renameWithRetry(src: string, dest: string, ioFs: typeof fs): Promise<void> {
   for (let attempt = 0; attempt <= RENAME_MAX_RETRIES; attempt++) {
     try {
-      await fs.promises.rename(src, dest);
+      await ioFs.promises.rename(src, dest);
       return;
     } catch (err) {
       const code = (err as { code?: string }).code;
@@ -176,8 +186,8 @@ async function renameWithRetry(src: string, dest: string): Promise<void> {
       }
       // Windows doesn't reliably support atomic replace via rename when dest exists.
       if (code === "EPERM" || code === "EEXIST") {
-        await fs.promises.copyFile(src, dest);
-        await fs.promises.unlink(src).catch(() => {});
+        await ioFs.promises.copyFile(src, dest);
+        await ioFs.promises.unlink(src).catch(() => {});
         return;
       }
       throw err;

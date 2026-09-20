@@ -4,9 +4,9 @@ import type { CronJob } from "../types.js";
 import { recomputeNextRuns } from "./jobs.js";
 import type { CronServiceState } from "./state.js";
 
-async function getFileMtimeMs(path: string): Promise<number | null> {
+async function getFileMtimeMs(path: string, ioFs: typeof fs): Promise<number | null> {
   try {
-    const stats = await fs.promises.stat(path);
+    const stats = await ioFs.promises.stat(path);
     return stats.mtimeMs;
   } catch {
     return null;
@@ -30,8 +30,9 @@ export async function ensureLoaded(
   // Force reload always re-reads the file to avoid missing cross-service
   // edits on filesystems with coarse mtime resolution.
 
-  const fileMtimeMs = await getFileMtimeMs(state.deps.storePath);
-  const loaded = await loadCronStore(state.deps.storePath);
+  const ioFs = state.deps.storeDeps?.fs ?? fs;
+  const fileMtimeMs = await getFileMtimeMs(state.deps.storePath, ioFs);
+  const loaded = await loadCronStore(state.deps.storePath, state.deps.storeDeps);
   const jobs = (loaded.jobs ?? []) as unknown as CronJob[];
   for (const job of jobs) {
     // Persisted legacy jobs may predate the required `enabled` field.
@@ -70,7 +71,8 @@ export async function persist(state: CronServiceState, opts?: { skipBackup?: boo
   if (!state.store) {
     return;
   }
-  await saveCronStore(state.deps.storePath, state.store, opts);
+  await saveCronStore(state.deps.storePath, state.store, opts, state.deps.storeDeps);
   // Update file mtime after save to prevent immediate reload
-  state.storeFileMtimeMs = await getFileMtimeMs(state.deps.storePath);
+  const ioFs = state.deps.storeDeps?.fs ?? fs;
+  state.storeFileMtimeMs = await getFileMtimeMs(state.deps.storePath, ioFs);
 }

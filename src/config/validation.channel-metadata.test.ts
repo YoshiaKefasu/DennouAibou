@@ -1,17 +1,26 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { PluginManifestRegistry } from "../plugins/manifest-registry.js";
+import {
+  validateConfigObjectRawWithPlugins,
+  validateConfigObjectWithPlugins,
+} from "./validation.js";
 
-const mockLoadPluginManifestRegistry = vi.hoisted(() => vi.fn());
+const mockLoadPluginManifestRegistry = vi.fn(
+  (): PluginManifestRegistry => ({ diagnostics: [], plugins: [] }),
+);
+const mockListPluginDoctorLegacyConfigRules = vi.fn(() => []);
+const previousDisableBundledPlugins = process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
 
-let validateConfigObjectWithPlugins: typeof import("./validation.js").validateConfigObjectWithPlugins;
-let validateConfigObjectRawWithPlugins: typeof import("./validation.js").validateConfigObjectRawWithPlugins;
+beforeAll(() => {
+  process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = "1";
+});
 
-vi.mock("../plugins/manifest-registry.js", () => ({
-  loadPluginManifestRegistry: (...args: unknown[]) => mockLoadPluginManifestRegistry(...args),
-}));
-
-beforeAll(async () => {
-  ({ validateConfigObjectWithPlugins, validateConfigObjectRawWithPlugins } =
-    await import("./validation.js"));
+afterAll(() => {
+  if (previousDisableBundledPlugins === undefined) {
+    delete process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
+  } else {
+    process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = previousDisableBundledPlugins;
+  }
 });
 
 function setupTelegramSchemaWithDefault() {
@@ -22,6 +31,12 @@ function setupTelegramSchemaWithDefault() {
         id: "telegram",
         origin: "bundled",
         channels: ["telegram"],
+        providers: [],
+        skills: [],
+        hooks: [],
+        rootDir: "/virtual/plugins/telegram",
+        source: "/virtual/plugins/telegram/openclaw.plugin.json",
+        manifestPath: "/virtual/plugins/telegram/openclaw.plugin.json",
         channelCatalogMeta: {
           id: "telegram",
           label: "Telegram",
@@ -56,11 +71,19 @@ describe("validateConfigObjectWithPlugins channel metadata (applyDefaults: true)
   it("applies bundled channel defaults from plugin-owned schema metadata", async () => {
     setupTelegramSchemaWithDefault();
 
-    const result = validateConfigObjectWithPlugins({
-      channels: {
-        telegram: {},
+    const result = validateConfigObjectWithPlugins(
+      {
+        channels: {
+          telegram: {},
+        },
       },
-    });
+      {
+        deps: {
+          loadPluginManifestRegistry: mockLoadPluginManifestRegistry,
+          listPluginDoctorLegacyConfigRules: mockListPluginDoctorLegacyConfigRules,
+        },
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -82,11 +105,19 @@ describe("validateConfigObjectRawWithPlugins channel metadata", () => {
     // merge-patched value) instead of validated.config.
     setupTelegramSchemaWithDefault();
 
-    const result = validateConfigObjectRawWithPlugins({
-      channels: {
-        telegram: {},
+    const result = validateConfigObjectRawWithPlugins(
+      {
+        channels: {
+          telegram: {},
+        },
       },
-    });
+      {
+        deps: {
+          loadPluginManifestRegistry: mockLoadPluginManifestRegistry,
+          listPluginDoctorLegacyConfigRules: mockListPluginDoctorLegacyConfigRules,
+        },
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
