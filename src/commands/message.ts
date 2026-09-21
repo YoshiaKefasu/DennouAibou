@@ -23,6 +23,7 @@ import { buildMessageCliJson, formatMessageCliText } from "./message-format.js";
  */
 export type MessageCommandOverrides = {
   loadConfig?: typeof loadConfig;
+  applyPluginAutoEnable?: typeof applyPluginAutoEnable;
   resolveCommandSecretRefsViaGateway?: typeof resolveCommandSecretRefsViaGateway;
   runMessageAction?: typeof runMessageAction;
 };
@@ -34,6 +35,7 @@ export async function messageCommand(
   overrides: MessageCommandOverrides = {},
 ) {
   const loadConfigImpl = overrides.loadConfig ?? loadConfig;
+  const applyPluginAutoEnableImpl = overrides.applyPluginAutoEnable ?? applyPluginAutoEnable;
   const resolveCommandSecretRefsViaGatewayImpl =
     overrides.resolveCommandSecretRefsViaGateway ?? resolveCommandSecretRefsViaGateway;
   const runMessageActionImpl = overrides.runMessageAction ?? runMessageAction;
@@ -55,7 +57,7 @@ export async function messageCommand(
     targetIds: scopedTargets.targetIds,
     ...(scopedTargets.allowedPaths ? { allowedPaths: scopedTargets.allowedPaths } : {}),
   });
-  const cfg = applyPluginAutoEnable({
+  const cfg = applyPluginAutoEnableImpl({
     config: resolvedConfig,
     env: process.env,
   }).config;

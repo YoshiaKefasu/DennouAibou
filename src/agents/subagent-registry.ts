@@ -5,6 +5,7 @@ import type { SubagentEndReason } from "../context-engine/types.js";
 import { callGateway } from "../gateway/call.js";
 import { onAgentEvent } from "../infra/agent-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import { emitSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { type DeliveryContext, normalizeDeliveryContext } from "../utils/delivery-context.js";
 import type { ensureRuntimePluginsLoaded as ensureRuntimePluginsLoadedFn } from "./runtime-plugins.js";
 import { resetAnnounceQueuesForTests } from "./subagent-announce-queue.js";
@@ -29,6 +30,8 @@ import {
   resolveSubagentRunOrphanReason,
   resolveSubagentSessionStatus,
   safeRemoveAttachmentsDir,
+  type SubagentRegistrySessionDeps,
+  persistSubagentSessionTiming,
 } from "./subagent-registry-helpers.js";
 import { createSubagentRegistryLifecycleController } from "./subagent-registry-lifecycle.js";
 import { subagentRuns } from "./subagent-registry-memory.js";
@@ -67,13 +70,17 @@ type SubagentRegistryDeps = {
   getSubagentRunsSnapshotForRead: typeof getSubagentRunsSnapshotForRead;
   loadConfig: typeof loadConfig;
   onAgentEvent: typeof onAgentEvent;
+  emitSessionLifecycleEvent: typeof emitSessionLifecycleEvent;
   persistSubagentRunsToDisk: typeof persistSubagentRunsToDisk;
   resolveAgentTimeoutMs: typeof resolveAgentTimeoutMs;
   restoreSubagentRunsFromDisk: typeof restoreSubagentRunsFromDisk;
   runSubagentAnnounceFlow: typeof subagentAnnounceModule.runSubagentAnnounceFlow;
+  resolveSubagentRunOrphanReason?: typeof resolveSubagentRunOrphanReason;
+  sessionDeps?: SubagentRegistrySessionDeps;
   ensureContextEnginesInitialized?: typeof ensureContextEnginesInitializedFn;
   ensureRuntimePluginsLoaded?: typeof ensureRuntimePluginsLoadedFn;
   resolveContextEngine?: typeof resolveContextEngineFn;
+  getGlobalHookRunner?: typeof import("../plugins/hook-runner-global.js").getGlobalHookRunner;
 };
 
 const defaultSubagentRegistryDeps: SubagentRegistryDeps = {
@@ -83,13 +90,24 @@ const defaultSubagentRegistryDeps: SubagentRegistryDeps = {
   getSubagentRunsSnapshotForRead,
   loadConfig,
   onAgentEvent,
+  emitSessionLifecycleEvent,
   persistSubagentRunsToDisk,
   resolveAgentTimeoutMs,
   restoreSubagentRunsFromDisk,
   runSubagentAnnounceFlow: (params) => subagentAnnounceModule.runSubagentAnnounceFlow(params),
+  resolveSubagentRunOrphanReason,
+  sessionDeps: {},
+  getGlobalHookRunner: undefined,
 };
 
 let subagentRegistryDeps: SubagentRegistryDeps = defaultSubagentRegistryDeps;
+
+function resolveSubagentRunOrphanReasonImpl(entry: SubagentRunRecord) {
+  return (subagentRegistryDeps.resolveSubagentRunOrphanReason ?? resolveSubagentRunOrphanReason)(
+    { entry },
+    subagentRegistryDeps.sessionDeps,
+  );
+}
 let subagentRegistryRuntimePromise: Promise<
   typeof import("./subagent-registry.runtime.js")
 > | null = null;
@@ -261,16 +279,19 @@ async function emitSubagentEndedHookForRun(params: {
   const reason = params.reason ?? params.entry.endedReason ?? SUBAGENT_ENDED_REASON_COMPLETE;
   const outcome = resolveLifecycleOutcomeFromRunOutcome(params.entry.outcome);
   const error = params.entry.outcome?.status === "error" ? params.entry.outcome.error : undefined;
-  await emitSubagentEndedHookOnce({
-    entry: params.entry,
-    reason,
-    sendFarewell: params.sendFarewell,
-    accountId: params.accountId ?? params.entry.requesterOrigin?.accountId,
-    outcome,
-    error,
-    inFlightRunIds: endedHookInFlightRunIds,
-    persist: persistSubagentRuns,
-  });
+  await emitSubagentEndedHookOnce(
+    {
+      entry: params.entry,
+      reason,
+      sendFarewell: params.sendFarewell,
+      accountId: params.accountId ?? params.entry.requesterOrigin?.accountId,
+      outcome,
+      error,
+      inFlightRunIds: endedHookInFlightRunIds,
+      persist: persistSubagentRuns,
+    },
+    { getGlobalHookRunner: subagentRegistryDeps.getGlobalHookRunner },
+  );
 }
 
 const subagentLifecycleController = createSubagentRegistryLifecycleController({
@@ -288,6 +309,9 @@ const subagentLifecycleController = createSubagentRegistryLifecycleController({
   captureSubagentCompletionReply: (sessionKey) =>
     subagentRegistryDeps.captureSubagentCompletionReply(sessionKey),
   runSubagentAnnounceFlow: (params) => subagentRegistryDeps.runSubagentAnnounceFlow(params),
+  persistSubagentSessionTiming: (entry) =>
+    persistSubagentSessionTiming(entry, subagentRegistryDeps.sessionDeps),
+  emitSessionLifecycleEvent: (event) => subagentRegistryDeps.emitSessionLifecycleEvent(event),
   warn: (message, meta) => log.warn(message, meta),
 });
 
@@ -307,7 +331,7 @@ function resumeSubagentRun(runId: string) {
   if (!entry) {
     return;
   }
-  const orphanReason = resolveSubagentRunOrphanReason({ entry });
+  const orphanReason = resolveSubagentRunOrphanReasonImpl(entry);
   if (orphanReason) {
     if (
       reconcileOrphanedRun({
@@ -398,10 +422,13 @@ function restoreSubagentRunsOnce() {
       return;
     }
     if (
-      reconcileOrphanedRestoredRuns({
-        runs: subagentRuns,
-        resumedRuns,
-      })
+      reconcileOrphanedRestoredRuns(
+        {
+          runs: subagentRuns,
+          resumedRuns,
+        },
+        subagentRegistryDeps.sessionDeps,
+      )
     ) {
       persistSubagentRuns();
     }
@@ -582,6 +609,12 @@ const subagentRunManager = createSubagentRunManager({
   notifyContextEngineSubagentEnded,
   completeCleanupBookkeeping,
   completeSubagentRun,
+  persistSubagentSessionTiming: (entry) =>
+    persistSubagentSessionTiming(entry, subagentRegistryDeps.sessionDeps),
+  emitSubagentEndedHookOnce: (params) =>
+    emitSubagentEndedHookOnce(params, {
+      getGlobalHookRunner: subagentRegistryDeps.getGlobalHookRunner,
+    }),
 });
 
 export function markSubagentRunForSteerRestart(runId: string) {

@@ -62,8 +62,14 @@ export function createSubagentRegistryLifecycleController(params: {
   resumeSubagentRun(runId: string): void;
   captureSubagentCompletionReply: typeof captureSubagentCompletionReply;
   runSubagentAnnounceFlow: typeof runSubagentAnnounceFlow;
+  persistSubagentSessionTiming?: typeof persistSubagentSessionTiming;
+  emitSessionLifecycleEvent?: typeof emitSessionLifecycleEvent;
   warn(message: string, meta?: Record<string, unknown>): void;
 }) {
+  const persistSubagentSessionTimingImpl =
+    params.persistSubagentSessionTiming ?? persistSubagentSessionTiming;
+  const emitSessionLifecycleEventImpl =
+    params.emitSessionLifecycleEvent ?? emitSessionLifecycleEvent;
   const maskRunId = (runId: string): string => {
     const trimmed = runId.trim();
     if (!trimmed) {
@@ -566,7 +572,7 @@ export function createSubagentRegistryLifecycleController(params: {
     });
 
     try {
-      await persistSubagentSessionTiming(entry);
+      await persistSubagentSessionTimingImpl(entry);
     } catch (err) {
       params.warn("failed to persist subagent session timing", {
         err,
@@ -577,7 +583,7 @@ export function createSubagentRegistryLifecycleController(params: {
 
     const suppressedForSteerRestart = params.suppressAnnounceForSteerRestart(entry);
     if (mutated && !suppressedForSteerRestart) {
-      emitSessionLifecycleEvent({
+      emitSessionLifecycleEventImpl({
         sessionKey: entry.childSessionKey,
         reason: "subagent-status",
         parentSessionKey: entry.requesterSessionKey,

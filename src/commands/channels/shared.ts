@@ -7,6 +7,7 @@ import { getChannelsCommandSecretTargetIds } from "../../cli/command-secret-targ
 import type { OpenClawConfig } from "../../config/config.js";
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv } from "../../runtime.js";
+import type { ConfigValidationDeps } from "../config-validation.js";
 import {
   requireValidConfigFileSnapshot,
   requireValidConfigSnapshot,
@@ -23,8 +24,9 @@ export async function requireValidConfig(
     commandName?: string;
     mode?: CommandSecretResolutionMode;
   },
+  deps: ConfigValidationDeps = {},
 ): Promise<OpenClawConfig | null> {
-  const cfg = await requireValidConfigSnapshot(runtime);
+  const cfg = await requireValidConfigSnapshot(runtime, undefined, deps);
   if (!cfg) {
     return null;
   }

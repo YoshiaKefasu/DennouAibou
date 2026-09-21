@@ -1,40 +1,58 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Mock } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "./subagent-registry.mocks.shared.js";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearSessionStoreCacheForTest,
   drainSessionStoreLockQueuesForTest,
 } from "../config/sessions/store.js";
+import { callGateway } from "../gateway/call.js";
+import { onAgentEvent } from "../infra/agent-events.js";
+import { resetTaskFlowRegistryForTests } from "../tasks/task-flow-registry.js";
+import { configureTaskFlowRegistryRuntime } from "../tasks/task-flow-registry.store.js";
+import { resetTaskRegistryForTests } from "../tasks/task-registry.js";
+import { configureTaskRegistryRuntime } from "../tasks/task-registry.store.js";
 import { captureEnv } from "../test-utils/env.js";
+import { runSubagentAnnounceFlow } from "./subagent-announce.js";
+import {
+  __testing as registryTesting,
+  initSubagentRegistry,
+  listSubagentRunsForRequester,
+  registerSubagentRun,
+  resetSubagentRegistryForTests,
+} from "./subagent-registry.js";
 
-const { announceSpy } = vi.hoisted(() => ({
-  announceSpy: vi.fn(async () => true),
-}));
-vi.mock("./subagent-announce.js", () => ({
-  runSubagentAnnounceFlow: announceSpy,
-}));
+const announceSpy = vi.fn<typeof runSubagentAnnounceFlow>(async () => true);
+const callGatewayMock = vi.fn<typeof callGateway>();
+const onAgentEventMock = vi.fn<typeof onAgentEvent>();
 
-vi.mock("./subagent-orphan-recovery.js", () => ({
-  scheduleOrphanRecovery: vi.fn(),
-}));
-
-let initSubagentRegistry: typeof import("./subagent-registry.js").initSubagentRegistry;
-let listSubagentRunsForRequester: typeof import("./subagent-registry.js").listSubagentRunsForRequester;
-let registerSubagentRun: typeof import("./subagent-registry.js").registerSubagentRun;
-let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
-
-async function loadSubagentRegistryModules(): Promise<void> {
-  vi.resetModules();
-  ({
-    initSubagentRegistry,
-    listSubagentRunsForRequester,
-    registerSubagentRun,
-    resetSubagentRegistryForTests,
-  } = await import("./subagent-registry.js"));
-}
+beforeAll(() => {
+  // Keep task/flow registry writes in-memory so no sqlite handle pins the temp
+  // state dir on Windows (node:sqlite WAL/shm files cannot be unlinked while
+  // held open; closing the cached handles is not enough on this platform).
+  configureTaskRegistryRuntime({
+    store: {
+      loadSnapshot: () => ({ tasks: new Map(), deliveryStates: new Map() }),
+      saveSnapshot: () => {},
+      upsertTaskWithDeliveryState: () => {},
+      upsertTask: () => {},
+      deleteTaskWithDeliveryState: () => {},
+      deleteTask: () => {},
+      upsertDeliveryState: () => {},
+      deleteDeliveryState: () => {},
+      close: () => {},
+    },
+  });
+  configureTaskFlowRegistryRuntime({
+    store: {
+      loadSnapshot: () => ({ flows: new Map() }),
+      saveSnapshot: () => {},
+      upsertFlow: () => {},
+      deleteFlow: () => {},
+      close: () => {},
+    },
+  });
+});
 
 describe("subagent registry persistence resume", () => {
   const envSnapshot = captureEnv(["DENNOU_STATE_DIR"]);
@@ -83,26 +101,34 @@ describe("subagent registry persistence resume", () => {
   };
 
   beforeEach(async () => {
-    await loadSubagentRegistryModules();
-    const { callGateway } = await import("../gateway/call.js");
-    const { onAgentEvent } = await import("../infra/agent-events.js");
-    (callGateway as Mock).mockReset();
-    (callGateway as Mock).mockResolvedValue({
+    registryTesting.setDepsForTest({
+      callGateway: callGatewayMock as never,
+      onAgentEvent: onAgentEventMock as never,
+      runSubagentAnnounceFlow: announceSpy,
+    });
+    callGatewayMock.mockReset();
+    callGatewayMock.mockResolvedValue({
       status: "ok",
       startedAt: 111,
       endedAt: 222,
     });
-    (onAgentEvent as Mock).mockReset();
-    (onAgentEvent as Mock).mockReturnValue(() => undefined);
+    onAgentEventMock.mockReset();
+    onAgentEventMock.mockReturnValue(() => undefined);
   });
 
   afterEach(async () => {
     announceSpy.mockClear();
+    callGatewayMock.mockClear();
+    onAgentEventMock.mockClear();
     resetSubagentRegistryForTests({ persist: false });
+    registryTesting.setDepsForTest();
+    // Close the sqlite handles opened by createRunningTaskRun so the temp state dir can be removed.
+    resetTaskRegistryForTests({ persist: false });
+    resetTaskFlowRegistryForTests({ persist: false });
     await drainSessionStoreLockQueuesForTest();
     clearSessionStoreCacheForTest();
     if (tempStateDir) {
-      await fs.rm(tempStateDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+      await fs.rm(tempStateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 });
       tempStateDir = null;
     }
     envSnapshot.restore();
@@ -112,11 +138,10 @@ describe("subagent registry persistence resume", () => {
     tempStateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-subagent-"));
     process.env.DENNOU_STATE_DIR = tempStateDir;
 
-    const { callGateway } = await import("../gateway/call.js");
     let releaseInitialWait:
       | ((value: { status: "ok"; startedAt: number; endedAt: number }) => void)
       | undefined;
-    (callGateway as Mock)
+    callGatewayMock
       .mockImplementationOnce(
         async () =>
           await new Promise((resolve) => {

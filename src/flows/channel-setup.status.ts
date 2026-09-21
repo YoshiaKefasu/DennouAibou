@@ -10,6 +10,7 @@ import {
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveChannelSetupEntries } from "../commands/channel-setup/discovery.js";
 import { shouldShowChannelInSetup } from "../commands/channel-setup/discovery.js";
+import type { ChannelSetupDiscoveryDeps } from "../commands/channel-setup/discovery.js";
 import { resolveChannelSetupWizardAdapterForPlugin } from "../commands/channel-setup/registry.js";
 import type {
   ChannelSetupWizardAdapter,
@@ -58,20 +59,26 @@ function buildChannelSetupSelectionContribution(params: {
   };
 }
 
-export async function collectChannelStatus(params: {
-  cfg: OpenClawConfig;
-  options?: SetupChannelsOptions;
-  accountOverrides: Partial<Record<ChannelChoice, string>>;
-  installedPlugins?: ChannelSetupPlugin[];
-  resolveAdapter?: (channel: ChannelChoice) => ChannelSetupWizardAdapter | undefined;
-}): Promise<ChannelStatusSummary> {
+export async function collectChannelStatus(
+  params: {
+    cfg: OpenClawConfig;
+    options?: SetupChannelsOptions;
+    accountOverrides: Partial<Record<ChannelChoice, string>>;
+    installedPlugins?: ChannelSetupPlugin[];
+    resolveAdapter?: (channel: ChannelChoice) => ChannelSetupWizardAdapter | undefined;
+  },
+  deps: ChannelSetupDiscoveryDeps = {},
+): Promise<ChannelStatusSummary> {
   const installedPlugins = params.installedPlugins ?? listChannelSetupPlugins();
   const workspaceDir = resolveAgentWorkspaceDir(params.cfg, resolveDefaultAgentId(params.cfg));
-  const { installedCatalogEntries, installableCatalogEntries } = resolveChannelSetupEntries({
-    cfg: params.cfg,
-    installedPlugins,
-    workspaceDir,
-  });
+  const { installedCatalogEntries, installableCatalogEntries } = resolveChannelSetupEntries(
+    {
+      cfg: params.cfg,
+      installedPlugins,
+      workspaceDir,
+    },
+    deps,
+  );
   const resolveAdapter =
     params.resolveAdapter ??
     ((channel: ChannelChoice) =>

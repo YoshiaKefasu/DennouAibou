@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import type { RuntimeEnv } from "../runtime.js";
+import type { NonInteractiveSetupDeps } from "./onboard-non-interactive.js";
 
 type RuntimeLike = Pick<RuntimeEnv, "log" | "error" | "exit">;
 
@@ -31,14 +32,16 @@ export function createThrowingRuntime(): NonInteractiveRuntime {
 export async function runNonInteractiveSetup(
   options: Record<string, unknown>,
   runtime: NonInteractiveRuntime,
+  deps?: NonInteractiveSetupDeps,
 ): Promise<void> {
   const { runNonInteractiveSetup: run } = await import("./onboard-non-interactive.js");
-  await run(options, runtime);
+  await run(options, runtime, deps);
 }
 
 export async function runNonInteractiveSetupWithDefaults(
   runtime: NonInteractiveRuntime,
   options: Record<string, unknown>,
+  deps?: NonInteractiveSetupDeps,
 ): Promise<void> {
   await runNonInteractiveSetup(
     {
@@ -46,6 +49,7 @@ export async function runNonInteractiveSetupWithDefaults(
       ...options,
     },
     runtime,
+    deps,
   );
 }
 

@@ -32,27 +32,56 @@ import { resolveGatewayInstallToken } from "./gateway-install-token.js";
 import { formatHealthCheckFailure } from "./health-format.js";
 import { healthCommand } from "./health.js";
 
+export type DoctorGatewayDaemonFlowDeps = {
+  resolveGatewayService?: typeof resolveGatewayService;
+  resolveGatewayPort?: typeof resolveGatewayPort;
+  readLastGatewayErrorLine?: typeof readLastGatewayErrorLine;
+  note?: typeof note;
+  sleep?: typeof sleep;
+  healthCommand?: typeof healthCommand;
+  inspectPortUsage?: typeof inspectPortUsage;
+  formatPortDiagnostics?: typeof formatPortDiagnostics;
+  isSystemdUserServiceAvailable?: typeof isSystemdUserServiceAvailable;
+  isWSL?: typeof isWSL;
+  renderSystemdUnavailableHints?: typeof renderSystemdUnavailableHints;
+  buildGatewayInstallPlan?: typeof buildGatewayInstallPlan;
+  gatewayInstallErrorHint?: typeof gatewayInstallErrorHint;
+  resolveGatewayInstallToken?: typeof resolveGatewayInstallToken;
+  resolveGatewayLaunchAgentLabel?: typeof resolveGatewayLaunchAgentLabel;
+  resolveNodeLaunchAgentLabel?: typeof resolveNodeLaunchAgentLabel;
+  isLaunchAgentListed?: typeof isLaunchAgentListed;
+  isLaunchAgentLoaded?: typeof isLaunchAgentLoaded;
+  launchAgentPlistExists?: typeof launchAgentPlistExists;
+  repairLaunchAgentBootstrap?: typeof repairLaunchAgentBootstrap;
+  formatGatewayRuntimeSummary?: typeof formatGatewayRuntimeSummary;
+  buildGatewayRuntimeHints?: typeof buildGatewayRuntimeHints;
+};
+
 async function maybeRepairLaunchAgentBootstrap(params: {
   env: Record<string, string | undefined>;
   title: string;
   runtime: RuntimeEnv;
   prompter: DoctorPrompter;
+  isLaunchAgentListed: typeof isLaunchAgentListed;
+  isLaunchAgentLoaded: typeof isLaunchAgentLoaded;
+  launchAgentPlistExists: typeof launchAgentPlistExists;
+  repairLaunchAgentBootstrap: typeof repairLaunchAgentBootstrap;
 }): Promise<boolean> {
   if (process.platform !== "darwin") {
     return false;
   }
 
-  const listed = await isLaunchAgentListed({ env: params.env });
+  const listed = await params.isLaunchAgentListed({ env: params.env });
   if (!listed) {
     return false;
   }
 
-  const loaded = await isLaunchAgentLoaded({ env: params.env });
+  const loaded = await params.isLaunchAgentLoaded({ env: params.env });
   if (loaded) {
     return false;
   }
 
-  const plistExists = await launchAgentPlistExists(params.env);
+  const plistExists = await params.launchAgentPlistExists(params.env);
   if (!plistExists) {
     return false;
   }
@@ -68,7 +97,7 @@ async function maybeRepairLaunchAgentBootstrap(params: {
   }
 
   params.runtime.log(`Bootstrapping ${params.title} LaunchAgent...`);
-  const repair = await repairLaunchAgentBootstrap({ env: params.env });
+  const repair = await params.repairLaunchAgentBootstrap({ env: params.env });
   if (!repair.ok) {
     params.runtime.error(
       `${params.title} LaunchAgent bootstrap failed: ${repair.detail ?? "unknown error"}`,
@@ -76,7 +105,7 @@ async function maybeRepairLaunchAgentBootstrap(params: {
     return false;
   }
 
-  const verified = await isLaunchAgentLoaded({ env: params.env });
+  const verified = await params.isLaunchAgentLoaded({ env: params.env });
   if (!verified) {
     params.runtime.error(`${params.title} LaunchAgent still not loaded after repair.`);
     return false;
@@ -86,19 +115,51 @@ async function maybeRepairLaunchAgentBootstrap(params: {
   return true;
 }
 
-export async function maybeRepairGatewayDaemon(params: {
-  cfg: OpenClawConfig;
-  runtime: RuntimeEnv;
-  prompter: DoctorPrompter;
-  options: DoctorOptions;
-  gatewayDetailsMessage: string;
-  healthOk: boolean;
-}) {
+export async function maybeRepairGatewayDaemon(
+  params: {
+    cfg: OpenClawConfig;
+    runtime: RuntimeEnv;
+    prompter: DoctorPrompter;
+    options: DoctorOptions;
+    gatewayDetailsMessage: string;
+    healthOk: boolean;
+  },
+  deps: DoctorGatewayDaemonFlowDeps = {},
+) {
+  const resolveGatewayServiceImpl = deps.resolveGatewayService ?? resolveGatewayService;
+  const resolveGatewayPortImpl = deps.resolveGatewayPort ?? resolveGatewayPort;
+  const readLastGatewayErrorLineImpl = deps.readLastGatewayErrorLine ?? readLastGatewayErrorLine;
+  const noteImpl = deps.note ?? note;
+  const sleepImpl = deps.sleep ?? sleep;
+  const healthCommandImpl = deps.healthCommand ?? healthCommand;
+  const inspectPortUsageImpl = deps.inspectPortUsage ?? inspectPortUsage;
+  const formatPortDiagnosticsImpl = deps.formatPortDiagnostics ?? formatPortDiagnostics;
+  const isSystemdUserServiceAvailableImpl =
+    deps.isSystemdUserServiceAvailable ?? isSystemdUserServiceAvailable;
+  const isWSLImpl = deps.isWSL ?? isWSL;
+  const renderSystemdUnavailableHintsImpl =
+    deps.renderSystemdUnavailableHints ?? renderSystemdUnavailableHints;
+  const buildGatewayInstallPlanImpl = deps.buildGatewayInstallPlan ?? buildGatewayInstallPlan;
+  const gatewayInstallErrorHintImpl = deps.gatewayInstallErrorHint ?? gatewayInstallErrorHint;
+  const resolveGatewayInstallTokenImpl =
+    deps.resolveGatewayInstallToken ?? resolveGatewayInstallToken;
+  const resolveGatewayLaunchAgentLabelImpl =
+    deps.resolveGatewayLaunchAgentLabel ?? resolveGatewayLaunchAgentLabel;
+  const resolveNodeLaunchAgentLabelImpl =
+    deps.resolveNodeLaunchAgentLabel ?? resolveNodeLaunchAgentLabel;
+  const isLaunchAgentListedImpl = deps.isLaunchAgentListed ?? isLaunchAgentListed;
+  const isLaunchAgentLoadedImpl = deps.isLaunchAgentLoaded ?? isLaunchAgentLoaded;
+  const launchAgentPlistExistsImpl = deps.launchAgentPlistExists ?? launchAgentPlistExists;
+  const repairLaunchAgentBootstrapImpl =
+    deps.repairLaunchAgentBootstrap ?? repairLaunchAgentBootstrap;
+  const formatGatewayRuntimeSummaryImpl =
+    deps.formatGatewayRuntimeSummary ?? formatGatewayRuntimeSummary;
+  const buildGatewayRuntimeHintsImpl = deps.buildGatewayRuntimeHints ?? buildGatewayRuntimeHints;
   if (params.healthOk) {
     return;
   }
 
-  const service = resolveGatewayService();
+  const service = resolveGatewayServiceImpl();
   // systemd can throw in containers/WSL; treat as "not loaded" and fall back to hints.
   let loaded = false;
   try {
@@ -117,15 +178,23 @@ export async function maybeRepairGatewayDaemon(params: {
       title: "Gateway",
       runtime: params.runtime,
       prompter: params.prompter,
+      isLaunchAgentListed: isLaunchAgentListedImpl,
+      isLaunchAgentLoaded: isLaunchAgentLoadedImpl,
+      launchAgentPlistExists: launchAgentPlistExistsImpl,
+      repairLaunchAgentBootstrap: repairLaunchAgentBootstrapImpl,
     });
     await maybeRepairLaunchAgentBootstrap({
       env: {
         ...process.env,
-        DENNOU_LAUNCHD_LABEL: resolveNodeLaunchAgentLabel(),
+        DENNOU_LAUNCHD_LABEL: resolveNodeLaunchAgentLabelImpl(),
       },
       title: "Node",
       runtime: params.runtime,
       prompter: params.prompter,
+      isLaunchAgentListed: isLaunchAgentListedImpl,
+      isLaunchAgentLoaded: isLaunchAgentLoadedImpl,
+      launchAgentPlistExists: launchAgentPlistExistsImpl,
+      repairLaunchAgentBootstrap: repairLaunchAgentBootstrapImpl,
     });
     if (gatewayRepaired) {
       loaded = await service.isLoaded({ env: process.env });
@@ -136,31 +205,31 @@ export async function maybeRepairGatewayDaemon(params: {
   }
 
   if (params.cfg.gateway?.mode !== "remote") {
-    const port = resolveGatewayPort(params.cfg, process.env);
-    const diagnostics = await inspectPortUsage(port);
+    const port = resolveGatewayPortImpl(params.cfg, process.env);
+    const diagnostics = await inspectPortUsageImpl(port);
     if (diagnostics.status === "busy") {
-      note(formatPortDiagnostics(diagnostics).join("\n"), "Gateway port");
+      noteImpl(formatPortDiagnosticsImpl(diagnostics).join("\n"), "Gateway port");
     } else if (loaded && serviceRuntime?.status === "running") {
-      const lastError = await readLastGatewayErrorLine(process.env);
+      const lastError = await readLastGatewayErrorLineImpl(process.env);
       if (lastError) {
-        note(`Last gateway error: ${lastError}`, "Gateway");
+        noteImpl(`Last gateway error: ${lastError}`, "Gateway");
       }
     }
   }
 
   if (!loaded) {
     if (process.platform === "linux") {
-      const systemdAvailable = await isSystemdUserServiceAvailable().catch(() => false);
+      const systemdAvailable = await isSystemdUserServiceAvailableImpl().catch(() => false);
       if (!systemdAvailable) {
-        const wsl = await isWSL();
-        note(
-          renderSystemdUnavailableHints({ wsl, kind: "generic_unavailable" }).join("\n"),
+        const wsl = await isWSLImpl();
+        noteImpl(
+          renderSystemdUnavailableHintsImpl({ wsl, kind: "generic_unavailable" }).join("\n"),
           "Gateway",
         );
         return;
       }
     }
-    note("Gateway service not installed.", "Gateway");
+    noteImpl("Gateway service not installed.", "Gateway");
     if (params.cfg.gateway?.mode !== "remote") {
       const install = await params.prompter.confirmRuntimeRepair({
         message: "Install gateway service now?",
@@ -175,15 +244,15 @@ export async function maybeRepairGatewayDaemon(params: {
           },
           DEFAULT_GATEWAY_DAEMON_RUNTIME,
         );
-        const tokenResolution = await resolveGatewayInstallToken({
+        const tokenResolution = await resolveGatewayInstallTokenImpl({
           config: params.cfg,
           env: process.env,
         });
         for (const warning of tokenResolution.warnings) {
-          note(warning, "Gateway");
+          noteImpl(warning, "Gateway");
         }
         if (tokenResolution.unavailableReason) {
-          note(
+          noteImpl(
             [
               "Gateway service install aborted.",
               tokenResolution.unavailableReason,
@@ -193,14 +262,15 @@ export async function maybeRepairGatewayDaemon(params: {
           );
           return;
         }
-        const port = resolveGatewayPort(params.cfg, process.env);
-        const { programArguments, workingDirectory, environment } = await buildGatewayInstallPlan({
-          env: process.env,
-          port,
-          runtime: daemonRuntime,
-          warn: (message, title) => note(message, title),
-          config: params.cfg,
-        });
+        const port = resolveGatewayPortImpl(params.cfg, process.env);
+        const { programArguments, workingDirectory, environment } =
+          await buildGatewayInstallPlanImpl({
+            env: process.env,
+            port,
+            runtime: daemonRuntime,
+            warn: (message, title) => noteImpl(message, title),
+            config: params.cfg,
+          });
         try {
           await service.install({
             env: process.env,
@@ -210,16 +280,16 @@ export async function maybeRepairGatewayDaemon(params: {
             environment,
           });
         } catch (err) {
-          note(`Gateway service install failed: ${String(err)}`, "Gateway");
-          note(gatewayInstallErrorHint(), "Gateway");
+          noteImpl(`Gateway service install failed: ${String(err)}`, "Gateway");
+          noteImpl(gatewayInstallErrorHintImpl(), "Gateway");
         }
       }
     }
     return;
   }
 
-  const summary = formatGatewayRuntimeSummary(serviceRuntime);
-  const hints = buildGatewayRuntimeHints(serviceRuntime, {
+  const summary = formatGatewayRuntimeSummaryImpl(serviceRuntime);
+  const hints = buildGatewayRuntimeHintsImpl(serviceRuntime, {
     platform: process.platform,
     env: process.env,
   });
@@ -229,7 +299,7 @@ export async function maybeRepairGatewayDaemon(params: {
       lines.push(`Runtime: ${summary}`);
     }
     lines.push(...hints);
-    note(lines.join("\n"), "Gateway");
+    noteImpl(lines.join("\n"), "Gateway");
   }
 
   if (serviceRuntime?.status !== "running") {
@@ -244,16 +314,16 @@ export async function maybeRepairGatewayDaemon(params: {
       });
       const restartStatus = describeGatewayServiceRestart("Gateway", restartResult);
       if (!restartStatus.scheduled) {
-        await sleep(1500);
+        await sleepImpl(1500);
       } else {
-        note(restartStatus.message, "Gateway");
+        noteImpl(restartStatus.message, "Gateway");
       }
     }
   }
 
   if (process.platform === "darwin") {
-    const label = resolveGatewayLaunchAgentLabel(process.env.DENNOU_PROFILE);
-    note(
+    const label = resolveGatewayLaunchAgentLabelImpl(process.env.DENNOU_PROFILE);
+    noteImpl(
       `LaunchAgent loaded; stopping requires "${formatCliCommand("openclaw gateway stop")}" or launchctl bootout gui/$UID/${label}.`,
       "Gateway",
     );
@@ -271,17 +341,17 @@ export async function maybeRepairGatewayDaemon(params: {
       });
       const restartStatus = describeGatewayServiceRestart("Gateway", restartResult);
       if (restartStatus.scheduled) {
-        note(restartStatus.message, "Gateway");
+        noteImpl(restartStatus.message, "Gateway");
         return;
       }
-      await sleep(1500);
+      await sleepImpl(1500);
       try {
-        await healthCommand({ json: false, timeoutMs: 10_000 }, params.runtime);
+        await healthCommandImpl({ json: false, timeoutMs: 10_000 }, params.runtime);
       } catch (err) {
         const message = String(err);
         if (message.includes("gateway closed")) {
-          note("Gateway not running.", "Gateway");
-          note(params.gatewayDetailsMessage, "Gateway connection");
+          noteImpl("Gateway not running.", "Gateway");
+          noteImpl(params.gatewayDetailsMessage, "Gateway connection");
         } else {
           params.runtime.error(formatHealthCheckFailure(err));
         }

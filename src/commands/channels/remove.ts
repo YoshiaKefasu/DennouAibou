@@ -8,13 +8,25 @@ import { replaceConfigFile, type OpenClawConfig } from "../../config/config.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv } from "../../runtime.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
-import { resolveInstallableChannelPlugin } from "../channel-setup/channel-plugin-resolution.js";
+import {
+  resolveInstallableChannelPlugin,
+  type ResolveInstallableChannelPluginDeps,
+} from "../channel-setup/channel-plugin-resolution.js";
+import type { ConfigValidationDeps } from "../config-validation.js";
 import {
   type ChatChannel,
   channelLabel,
   requireValidConfigFileSnapshot,
   shouldUseWizard,
 } from "./shared.js";
+
+export type ChannelsRemoveDeps = {
+  requireValidConfigFileSnapshot?: typeof requireValidConfigFileSnapshot;
+  configValidation?: ConfigValidationDeps;
+  replaceConfigFile?: typeof replaceConfigFile;
+  resolveInstallableChannelPlugin?: typeof resolveInstallableChannelPlugin;
+  resolveInstallableChannelPluginDeps?: ResolveInstallableChannelPluginDeps;
+};
 
 export type ChannelsRemoveOptions = {
   channel?: string;
@@ -34,8 +46,13 @@ export async function channelsRemoveCommand(
   opts: ChannelsRemoveOptions,
   runtime: RuntimeEnv = defaultRuntime,
   params?: { hasFlags?: boolean },
+  deps: ChannelsRemoveDeps = {},
 ) {
-  const configSnapshot = await requireValidConfigFileSnapshot(runtime);
+  const replaceConfigFileImpl = deps.replaceConfigFile ?? replaceConfigFile;
+  const requireValidConfigFileSnapshotImpl =
+    deps.requireValidConfigFileSnapshot ??
+    ((rt) => requireValidConfigFileSnapshot(rt, undefined, deps.configValidation));
+  const configSnapshot = await requireValidConfigFileSnapshotImpl(runtime);
   if (!configSnapshot) {
     return;
   }
@@ -102,11 +119,12 @@ export async function channelsRemoveCommand(
 
   const resolvedPluginState =
     !useWizard && rawChannel
-      ? await resolveInstallableChannelPlugin({
+      ? await (deps.resolveInstallableChannelPlugin ?? resolveInstallableChannelPlugin)({
           cfg,
           runtime,
           rawChannel,
           allowInstall: true,
+          deps: deps.resolveInstallableChannelPluginDeps,
         })
       : null;
   if (resolvedPluginState?.configChanged) {
@@ -166,7 +184,7 @@ export async function channelsRemoveCommand(
     });
   }
 
-  await replaceConfigFile({
+  await replaceConfigFileImpl({
     nextConfig: next,
     ...(baseHash !== undefined ? { baseHash } : {}),
   });

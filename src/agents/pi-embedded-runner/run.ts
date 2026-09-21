@@ -72,7 +72,10 @@ import { log } from "./logger.js";
 import { resolveModelAsync } from "./model.js";
 import { handleAssistantFailover } from "./run/assistant-failover.js";
 import { runEmbeddedAttempt } from "./run/attempt.js";
-import { createEmbeddedRunAuthController } from "./run/auth-controller.js";
+import {
+  createEmbeddedRunAuthController,
+  type EmbeddedRunAuthControllerDeps,
+} from "./run/auth-controller.js";
 import { createFailoverDecisionLogger } from "./run/failover-observation.js";
 import { mergeRetryFailoverReason, resolveRunFailoverDecision } from "./run/failover-policy.js";
 import {
@@ -147,9 +150,32 @@ function backfillSessionKey(params: {
   }
 }
 
+export type RunEmbeddedPiAgentDeps = {
+  ensureContextEnginesInitialized?: typeof ensureContextEnginesInitialized;
+  resolveContextEngine?: typeof resolveContextEngine;
+  sleepWithAbort?: typeof sleepWithAbort;
+  getGlobalHookRunner?: typeof getGlobalHookRunner;
+  ensureOpenClawModelsJson?: typeof ensureOpenClawModelsJson;
+  resolveModelAsync?: typeof resolveModelAsync;
+  runEmbeddedAttempt?: typeof runEmbeddedAttempt;
+  ensureRuntimePluginsLoaded?: typeof ensureRuntimePluginsLoaded;
+  prepareProviderRuntimeAuth?: EmbeddedRunAuthControllerDeps["prepareProviderRuntimeAuth"];
+};
+
 export async function runEmbeddedPiAgent(
   params: RunEmbeddedPiAgentParams,
+  deps: RunEmbeddedPiAgentDeps = {},
 ): Promise<EmbeddedPiRunResult> {
+  const ensureContextEnginesInitializedImpl =
+    deps.ensureContextEnginesInitialized ?? ensureContextEnginesInitialized;
+  const resolveContextEngineImpl = deps.resolveContextEngine ?? resolveContextEngine;
+  const sleepWithAbortImpl = deps.sleepWithAbort ?? sleepWithAbort;
+  const getGlobalHookRunnerImpl = deps.getGlobalHookRunner ?? getGlobalHookRunner;
+  const ensureOpenClawModelsJsonImpl = deps.ensureOpenClawModelsJson ?? ensureOpenClawModelsJson;
+  const resolveModelAsyncImpl = deps.resolveModelAsync ?? resolveModelAsync;
+  const runEmbeddedAttemptImpl = deps.runEmbeddedAttempt ?? runEmbeddedAttempt;
+  const ensureRuntimePluginsLoadedImpl =
+    deps.ensureRuntimePluginsLoaded ?? ensureRuntimePluginsLoaded;
   // Resolve sessionKey early so all downstream consumers (hooks, LCM, compaction)
   // receive a non-null key even when callers omit it. See #60552.
   const effectiveSessionKey = backfillSessionKey({
@@ -215,7 +241,7 @@ export async function runEmbeddedPiAgent(
           `[workspace-fallback] caller=runEmbeddedPiAgent reason=${workspaceResolution.fallbackReason} run=${params.runId} session=${redactedSessionId} sessionKey=${redactedSessionKey} agent=${workspaceResolution.agentId} workspace=${redactedWorkspace}`,
         );
       }
-      ensureRuntimePluginsLoaded({
+      ensureRuntimePluginsLoadedImpl({
         config: params.config,
         workspaceDir: resolvedWorkspace,
         allowGatewaySubagentBinding: params.allowGatewaySubagentBinding,
@@ -230,9 +256,9 @@ export async function runEmbeddedPiAgent(
         agentId: params.agentId,
         sessionKey: normalizedSessionKey,
       });
-      await ensureOpenClawModelsJson(params.config, agentDir);
+      await ensureOpenClawModelsJsonImpl(params.config, agentDir);
       const resolvedSessionKey = normalizedSessionKey;
-      const hookRunner = getGlobalHookRunner();
+      const hookRunner = getGlobalHookRunnerImpl();
       const hookCtx = {
         runId: params.runId,
         agentId: workspaceResolution.agentId,
@@ -262,7 +288,7 @@ export async function runEmbeddedPiAgent(
         error,
         authStorage: rawAuthStorage,
         modelRegistry,
-      } = await resolveModelAsync(provider, modelId, agentDir, params.config);
+      } = await resolveModelAsyncImpl(provider, modelId, agentDir, params.config);
       const authStorage = await createLegacyAuthStorageAdapter(rawAuthStorage);
       if (!model) {
         throw new FailoverError(error ?? `Unknown model: ${provider}/${modelId}`, {
@@ -331,53 +357,58 @@ export async function runEmbeddedPiAgent(
         initializeAuthProfile,
         maybeRefreshRuntimeAuthForAuthError,
         stopRuntimeAuthRefreshTimer,
-      } = createEmbeddedRunAuthController({
-        config: params.config,
-        agentDir,
-        workspaceDir: resolvedWorkspace,
-        authStore,
-        authStorage,
-        profileCandidates,
-        lockedProfileId,
-        initialThinkLevel,
-        attemptedThinking,
-        fallbackConfigured,
-        allowTransientCooldownProbe: params.allowTransientCooldownProbe === true,
-        getProvider: () => provider,
-        getModelId: () => modelId,
-        getRuntimeModel: () => runtimeModel,
-        setRuntimeModel: (next) => {
-          runtimeModel = next;
+      } = createEmbeddedRunAuthController(
+        {
+          config: params.config,
+          agentDir,
+          workspaceDir: resolvedWorkspace,
+          authStore,
+          authStorage,
+          profileCandidates,
+          lockedProfileId,
+          initialThinkLevel,
+          attemptedThinking,
+          fallbackConfigured,
+          allowTransientCooldownProbe: params.allowTransientCooldownProbe === true,
+          getProvider: () => provider,
+          getModelId: () => modelId,
+          getRuntimeModel: () => runtimeModel,
+          setRuntimeModel: (next) => {
+            runtimeModel = next;
+          },
+          getEffectiveModel: () => effectiveModel,
+          setEffectiveModel: (next) => {
+            effectiveModel = next;
+          },
+          getApiKeyInfo: () => apiKeyInfo,
+          setApiKeyInfo: (next) => {
+            apiKeyInfo = next;
+          },
+          getLastProfileId: () => lastProfileId,
+          setLastProfileId: (next) => {
+            lastProfileId = next;
+          },
+          getRuntimeAuthState: () => runtimeAuthState,
+          setRuntimeAuthState: (next) => {
+            runtimeAuthState = next;
+          },
+          getRuntimeAuthRefreshCancelled: () => runtimeAuthRefreshCancelled,
+          setRuntimeAuthRefreshCancelled: (next) => {
+            runtimeAuthRefreshCancelled = next;
+          },
+          getProfileIndex: () => profileIndex,
+          setProfileIndex: (next) => {
+            profileIndex = next;
+          },
+          setThinkLevel: (next) => {
+            thinkLevel = next;
+          },
+          log,
         },
-        getEffectiveModel: () => effectiveModel,
-        setEffectiveModel: (next) => {
-          effectiveModel = next;
+        {
+          prepareProviderRuntimeAuth: deps.prepareProviderRuntimeAuth,
         },
-        getApiKeyInfo: () => apiKeyInfo,
-        setApiKeyInfo: (next) => {
-          apiKeyInfo = next;
-        },
-        getLastProfileId: () => lastProfileId,
-        setLastProfileId: (next) => {
-          lastProfileId = next;
-        },
-        getRuntimeAuthState: () => runtimeAuthState,
-        setRuntimeAuthState: (next) => {
-          runtimeAuthState = next;
-        },
-        getRuntimeAuthRefreshCancelled: () => runtimeAuthRefreshCancelled,
-        setRuntimeAuthRefreshCancelled: (next) => {
-          runtimeAuthRefreshCancelled = next;
-        },
-        getProfileIndex: () => profileIndex,
-        setProfileIndex: (next) => {
-          profileIndex = next;
-        },
-        setThinkLevel: (next) => {
-          thinkLevel = next;
-        },
-        log,
-      });
+      );
 
       await initializeAuthProfile();
 
@@ -471,7 +502,7 @@ export async function runEmbeddedPiAgent(
           `overload backoff before failover for ${provider}/${modelId}: delayMs=${overloadFailoverBackoffMs}`,
         );
         try {
-          await sleepWithAbort(overloadFailoverBackoffMs, params.abortSignal);
+          await sleepWithAbortImpl(overloadFailoverBackoffMs, params.abortSignal);
         } catch (err) {
           if (params.abortSignal?.aborted) {
             const abortErr = new Error("Operation aborted", { cause: err });
@@ -483,8 +514,8 @@ export async function runEmbeddedPiAgent(
       };
       // Resolve the context engine once and reuse across retries to avoid
       // repeated initialization/connection overhead per attempt.
-      ensureContextEnginesInitialized();
-      const contextEngine = await resolveContextEngine(params.config);
+      ensureContextEnginesInitializedImpl();
+      const contextEngine = await resolveContextEngineImpl(params.config);
       try {
         // When the engine owns compaction, compactEmbeddedPiSessionDirect is
         // bypassed. Fire lifecycle hooks here so recovery paths still notify
@@ -591,7 +622,7 @@ export async function runEmbeddedPiAgent(
 
           const onUserMessagePersisted = params.onUserMessagePersisted;
           const suppressNextUserMessagePersistence = params.suppressNextUserMessagePersistence;
-          const attempt = await runEmbeddedAttempt({
+          const attempt = await runEmbeddedAttemptImpl({
             sessionId: params.sessionId,
             sessionKey: resolvedSessionKey,
             trigger: params.trigger,

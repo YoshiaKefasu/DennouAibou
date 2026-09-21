@@ -53,11 +53,30 @@ export type SpawnSubagentSandboxMode = (typeof SUBAGENT_SPAWN_SANDBOX_MODES)[num
 
 export { decodeStrictBase64 };
 
-type SubagentSpawnDeps = {
+export type SubagentSpawnDeps = {
   callGateway: typeof callGateway;
   getGlobalHookRunner: () => SubagentLifecycleHookRunner | null;
   loadConfig: typeof loadConfig;
   updateSessionStore: typeof updateSessionStore;
+  pruneLegacyStoreKeys: typeof pruneLegacyStoreKeys;
+  registerSubagentRun: typeof registerSubagentRun;
+  emitSessionLifecycleEvent: typeof emitSessionLifecycleEvent;
+  resolveAgentConfig: typeof resolveAgentConfig;
+  resolveSubagentSpawnModelSelection: typeof resolveSubagentSpawnModelSelection;
+  resolveSandboxRuntimeStatus: typeof resolveSandboxRuntimeStatus;
+  resolveGatewaySessionStoreTarget: typeof resolveGatewaySessionStoreTarget;
+  getSubagentDepthFromSessionStore: typeof getSubagentDepthFromSessionStore;
+  mergeSessionEntry: typeof mergeSessionEntry;
+  resolveMainSessionAlias: typeof resolveMainSessionAlias;
+  resolveInternalSessionKey: typeof resolveInternalSessionKey;
+  resolveDisplaySessionKey: typeof resolveDisplaySessionKey;
+  isAdminOnlyMethod: typeof isAdminOnlyMethod;
+  normalizeDeliveryContext: typeof normalizeDeliveryContext;
+  buildSubagentSystemPrompt: typeof buildSubagentSystemPrompt;
+  formatThinkingLevels: typeof formatThinkingLevels;
+  normalizeThinkLevel: typeof normalizeThinkLevel;
+  countActiveRunsForSession: typeof countActiveRunsForSession;
+  resolveSpawnedWorkspaceInheritance: typeof resolveSpawnedWorkspaceInheritance;
 };
 
 const defaultSubagentSpawnDeps: SubagentSpawnDeps = {
@@ -65,6 +84,25 @@ const defaultSubagentSpawnDeps: SubagentSpawnDeps = {
   getGlobalHookRunner,
   loadConfig,
   updateSessionStore,
+  pruneLegacyStoreKeys,
+  registerSubagentRun,
+  emitSessionLifecycleEvent,
+  resolveAgentConfig,
+  resolveSubagentSpawnModelSelection,
+  resolveSandboxRuntimeStatus,
+  resolveGatewaySessionStoreTarget,
+  getSubagentDepthFromSessionStore,
+  mergeSessionEntry,
+  resolveMainSessionAlias,
+  resolveInternalSessionKey,
+  resolveDisplaySessionKey,
+  isAdminOnlyMethod,
+  normalizeDeliveryContext,
+  buildSubagentSystemPrompt,
+  formatThinkingLevels,
+  normalizeThinkLevel,
+  countActiveRunsForSession,
+  resolveSpawnedWorkspaceInheritance,
 };
 
 let subagentSpawnDeps: SubagentSpawnDeps = defaultSubagentSpawnDeps;
@@ -160,7 +198,9 @@ async function callSubagentGateway(
   // Only admin-only methods are pinned to ADMIN_SCOPE; other methods (e.g.
   // "agent" → write) keep their least-privilege scope so that the gateway does
   // not treat the caller as owner (senderIsOwner) and expose owner-only tools.
-  const scopes = params.scopes ?? (isAdminOnlyMethod(params.method) ? [ADMIN_SCOPE] : undefined);
+  const scopes =
+    params.scopes ??
+    (subagentSpawnDeps.isAdminOnlyMethod(params.method) ? [ADMIN_SCOPE] : undefined);
   return await subagentSpawnDeps.callGateway({
     ...params,
     ...(scopes != null ? { scopes } : {}),
@@ -189,17 +229,17 @@ async function persistInitialChildSessionRuntimeModel(params: {
     return undefined;
   }
   try {
-    const target = resolveGatewaySessionStoreTarget({
+    const target = subagentSpawnDeps.resolveGatewaySessionStoreTarget({
       cfg: params.cfg,
       key: params.childSessionKey,
     });
     await updateSubagentSessionStore(target.storePath, (store) => {
-      pruneLegacyStoreKeys({
+      subagentSpawnDeps.pruneLegacyStoreKeys({
         store,
         canonicalKey: target.canonicalKey,
         candidates: target.storeKeys,
       });
-      store[target.canonicalKey] = mergeSessionEntry(store[target.canonicalKey], {
+      store[target.canonicalKey] = subagentSpawnDeps.mergeSessionEntry(store[target.canonicalKey], {
         model,
         ...(provider ? { modelProvider: provider } : {}),
       });
@@ -388,7 +428,7 @@ export async function spawnSubagentDirect(
         ? params.cleanup
         : "keep";
   const expectsCompletionMessage = params.expectsCompletionMessage !== false;
-  const requesterOrigin = normalizeDeliveryContext({
+  const requesterOrigin = subagentSpawnDeps.normalizeDeliveryContext({
     channel: ctx.agentChannel,
     accountId: ctx.agentAccountId,
     to: ctx.agentTo,
@@ -411,22 +451,24 @@ export async function spawnSubagentDirect(
       : cfgSubagentTimeout;
   let modelApplied = false;
   let threadBindingReady = false;
-  const { mainKey, alias } = resolveMainSessionAlias(cfg);
+  const { mainKey, alias } = subagentSpawnDeps.resolveMainSessionAlias(cfg);
   const requesterSessionKey = ctx.agentSessionKey;
   const requesterInternalKey = requesterSessionKey
-    ? resolveInternalSessionKey({
+    ? subagentSpawnDeps.resolveInternalSessionKey({
         key: requesterSessionKey,
         alias,
         mainKey,
       })
     : alias;
-  const requesterDisplayKey = resolveDisplaySessionKey({
+  const requesterDisplayKey = subagentSpawnDeps.resolveDisplaySessionKey({
     key: requesterInternalKey,
     alias,
     mainKey,
   });
 
-  const callerDepth = getSubagentDepthFromSessionStore(requesterInternalKey, { cfg });
+  const callerDepth = subagentSpawnDeps.getSubagentDepthFromSessionStore(requesterInternalKey, {
+    cfg,
+  });
   const maxSpawnDepth =
     cfg.agents?.defaults?.subagents?.maxSpawnDepth ?? DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH;
   if (callerDepth >= maxSpawnDepth) {
@@ -437,7 +479,7 @@ export async function spawnSubagentDirect(
   }
 
   const maxChildren = cfg.agents?.defaults?.subagents?.maxChildrenPerAgent ?? 5;
-  const activeChildren = countActiveRunsForSession(requesterInternalKey);
+  const activeChildren = subagentSpawnDeps.countActiveRunsForSession(requesterInternalKey);
   if (activeChildren >= maxChildren) {
     return {
       status: "forbidden",
@@ -449,7 +491,7 @@ export async function spawnSubagentDirect(
     ctx.requesterAgentIdOverride ?? parseAgentSessionKey(requesterInternalKey)?.agentId,
   );
   const requireAgentId =
-    resolveAgentConfig(cfg, requesterAgentId)?.subagents?.requireAgentId ??
+    subagentSpawnDeps.resolveAgentConfig(cfg, requesterAgentId)?.subagents?.requireAgentId ??
     cfg.agents?.defaults?.subagents?.requireAgentId ??
     false;
   if (requireAgentId && !requestedAgentId?.trim()) {
@@ -462,7 +504,7 @@ export async function spawnSubagentDirect(
   const targetAgentId = requestedAgentId ? normalizeAgentId(requestedAgentId) : requesterAgentId;
   if (targetAgentId !== requesterAgentId) {
     const allowAgents =
-      resolveAgentConfig(cfg, requesterAgentId)?.subagents?.allowAgents ??
+      subagentSpawnDeps.resolveAgentConfig(cfg, requesterAgentId)?.subagents?.allowAgents ??
       cfg?.agents?.defaults?.subagents?.allowAgents ??
       [];
     const allowAny = allowAgents.some((value) => value.trim() === "*");
@@ -481,11 +523,11 @@ export async function spawnSubagentDirect(
     }
   }
   const childSessionKey = `agent:${targetAgentId}:subagent:${crypto.randomUUID()}`;
-  const requesterRuntime = resolveSandboxRuntimeStatus({
+  const requesterRuntime = subagentSpawnDeps.resolveSandboxRuntimeStatus({
     cfg,
     sessionKey: requesterInternalKey,
   });
-  const childRuntime = resolveSandboxRuntimeStatus({
+  const childRuntime = subagentSpawnDeps.resolveSandboxRuntimeStatus({
     cfg,
     sessionKey: childSessionKey,
   });
@@ -509,8 +551,8 @@ export async function spawnSubagentDirect(
     depth: childDepth,
     maxSpawnDepth,
   });
-  const targetAgentConfig = resolveAgentConfig(cfg, targetAgentId);
-  const resolvedModel = resolveSubagentSpawnModelSelection({
+  const targetAgentConfig = subagentSpawnDeps.resolveAgentConfig(cfg, targetAgentId);
+  const resolvedModel = subagentSpawnDeps.resolveSubagentSpawnModelSelection({
     cfg,
     agentId: targetAgentId,
     modelOverride,
@@ -523,10 +565,10 @@ export async function spawnSubagentDirect(
   let thinkingOverride: string | undefined;
   const thinkingCandidateRaw = thinkingOverrideRaw || resolvedThinkingDefaultRaw;
   if (thinkingCandidateRaw) {
-    const normalized = normalizeThinkLevel(thinkingCandidateRaw);
+    const normalized = subagentSpawnDeps.normalizeThinkLevel(thinkingCandidateRaw);
     if (!normalized) {
       const { provider, model } = splitModelRef(resolvedModel);
-      const hint = formatThinkingLevels(provider, model);
+      const hint = subagentSpawnDeps.formatThinkingLevels(provider, model);
       return {
         status: "error",
         error: `Invalid thinking level "${thinkingCandidateRaw}". Use one of: ${hint}.`,
@@ -626,7 +668,7 @@ export async function spawnSubagentDirect(
   }
   const mountPathHint = sanitizeMountPathHint(params.attachMountPath);
 
-  let childSystemPrompt = buildSubagentSystemPrompt({
+  let childSystemPrompt = subagentSpawnDeps.buildSubagentSystemPrompt({
     requesterSessionKey,
     requesterOrigin,
     childSessionKey,
@@ -690,7 +732,7 @@ export async function spawnSubagentDirect(
   const spawnedMetadata = normalizeSpawnedRunMetadata({
     spawnedBy: spawnedByKey,
     ...toolSpawnMetadata,
-    workspaceDir: resolveSpawnedWorkspaceInheritance({
+    workspaceDir: subagentSpawnDeps.resolveSpawnedWorkspaceInheritance({
       config: cfg,
       targetAgentId,
       // For cross-agent spawns, ignore the caller's inherited workspace;
@@ -812,7 +854,7 @@ export async function spawnSubagentDirect(
   }
 
   try {
-    registerSubagentRun({
+    subagentSpawnDeps.registerSubagentRun({
       runId: childRunId,
       childSessionKey,
       controllerSessionKey: requesterInternalKey,
@@ -889,7 +931,7 @@ export async function spawnSubagentDirect(
   }
 
   // Emit lifecycle event so the gateway can broadcast sessions.changed to SSE subscribers.
-  emitSessionLifecycleEvent({
+  subagentSpawnDeps.emitSessionLifecycleEvent({
     sessionKey: childSessionKey,
     reason: "create",
     parentSessionKey: requesterInternalKey,

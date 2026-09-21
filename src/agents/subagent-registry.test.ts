@@ -3,115 +3,81 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pollUntilAssert } from "../../test/helpers/poll.js";
+import { loadConfig } from "../config/config.js";
+import {
+  loadSessionStore,
+  resolveAgentIdFromSessionKey,
+  resolveStorePath,
+  updateSessionStore,
+} from "../config/sessions.js";
+import { ensureContextEnginesInitialized } from "../context-engine/init.js";
+import { resolveContextEngine } from "../context-engine/registry.js";
+import { callGateway } from "../gateway/call.js";
+import { onAgentEvent } from "../infra/agent-events.js";
+import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
+import { emitSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
+import { ensureRuntimePluginsLoaded } from "./runtime-plugins.js";
+import { captureSubagentCompletionReply, runSubagentAnnounceFlow } from "./subagent-announce.js";
+import { resolveSubagentRunOrphanReason } from "./subagent-registry-helpers.js";
+import {
+  getSubagentRunsSnapshotForRead,
+  persistSubagentRunsToDisk,
+  restoreSubagentRunsFromDisk,
+} from "./subagent-registry-state.js";
+import { __testing as registryTesting } from "./subagent-registry.js";
+import { resolveAgentTimeoutMs } from "./timeout.js";
 
 const noop = () => {};
 
-const mocks = vi.hoisted(() => ({
-  callGateway: vi.fn(),
-  onAgentEvent: vi.fn(() => noop),
-  loadConfig: vi.fn(() => ({
+const mocks = {
+  callGateway: vi.fn<typeof callGateway>(),
+  onAgentEvent: vi.fn<typeof onAgentEvent>(() => noop),
+  loadConfig: vi.fn<typeof loadConfig>(() => ({
     agents: { defaults: { subagents: { archiveAfterMinutes: 0 } } },
     session: { mainKey: "main", scope: "per-sender" },
   })),
-  loadSessionStore: vi.fn(() => ({})),
-  resolveAgentIdFromSessionKey: vi.fn((sessionKey: string) => {
-    return sessionKey.match(/^agent:([^:]+)/)?.[1] ?? "main";
-  }),
-  resolveStorePath: vi.fn(() => "/tmp/test-session-store.json"),
-  updateSessionStore: vi.fn(),
-  emitSessionLifecycleEvent: vi.fn(),
-  persistSubagentRunsToDisk: vi.fn(),
-  restoreSubagentRunsFromDisk: vi.fn(() => 0),
-  getSubagentRunsSnapshotForRead: vi.fn((runs: Map<string, unknown>) => new Map(runs)),
-  resetAnnounceQueuesForTests: vi.fn(),
-  captureSubagentCompletionReply: vi.fn(async () => "final completion reply"),
-  runSubagentAnnounceFlow: vi.fn(async () => true),
-  getGlobalHookRunner: vi.fn(() => null),
-  ensureRuntimePluginsLoaded: vi.fn(),
-  ensureContextEnginesInitialized: vi.fn(),
-  resolveContextEngine: vi.fn(),
+  loadSessionStore: vi.fn<typeof loadSessionStore>(() => ({})),
+  resolveAgentIdFromSessionKey: vi.fn<typeof resolveAgentIdFromSessionKey>(
+    (sessionKey: string | null | undefined) => {
+      return (sessionKey ?? "").match(/^agent:([^:]+)/)?.[1] ?? "main";
+    },
+  ),
+  resolveStorePath: vi.fn<typeof resolveStorePath>(() => "/tmp/test-session-store.json"),
+  updateSessionStore: vi.fn<typeof updateSessionStore>(),
+  emitSessionLifecycleEvent: vi.fn<typeof emitSessionLifecycleEvent>(),
+  persistSubagentRunsToDisk: vi.fn<typeof persistSubagentRunsToDisk>(),
+  restoreSubagentRunsFromDisk: vi.fn<typeof restoreSubagentRunsFromDisk>(() => 0),
+  getSubagentRunsSnapshotForRead: vi.fn<typeof getSubagentRunsSnapshotForRead>(
+    (runs) => new Map(runs),
+  ),
+  captureSubagentCompletionReply: vi.fn<typeof captureSubagentCompletionReply>(
+    async () => "final completion reply",
+  ),
+  runSubagentAnnounceFlow: vi.fn<typeof runSubagentAnnounceFlow>(async () => true),
+  getGlobalHookRunner: vi.fn<typeof getGlobalHookRunner>(() => null),
+  ensureRuntimePluginsLoaded: vi.fn<typeof ensureRuntimePluginsLoaded>(),
+  ensureContextEnginesInitialized: vi.fn<typeof ensureContextEnginesInitialized>(),
+  resolveContextEngine: vi.fn<typeof resolveContextEngine>(),
   onSubagentEnded: vi.fn(async () => {}),
   runSubagentEnded: vi.fn(async () => {}),
-  resolveAgentTimeoutMs: vi.fn(() => 1_000),
-}));
+  resolveAgentTimeoutMs: vi.fn<typeof resolveAgentTimeoutMs>(() => 1_000),
+};
 
-vi.mock("../gateway/call.js", () => ({
-  callGateway: mocks.callGateway,
-}));
-
-vi.mock("../infra/agent-events.js", () => ({
-  onAgentEvent: mocks.onAgentEvent,
-}));
-
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    loadConfig: mocks.loadConfig,
-  };
-});
-
-vi.mock("../config/sessions.js", () => ({
-  loadSessionStore: mocks.loadSessionStore,
-  resolveAgentIdFromSessionKey: mocks.resolveAgentIdFromSessionKey,
-  resolveStorePath: mocks.resolveStorePath,
-  updateSessionStore: mocks.updateSessionStore,
-}));
-
-vi.mock("../sessions/session-lifecycle-events.js", () => ({
-  emitSessionLifecycleEvent: mocks.emitSessionLifecycleEvent,
-}));
-
-vi.mock("./subagent-registry-state.js", () => ({
-  getSubagentRunsSnapshotForRead: mocks.getSubagentRunsSnapshotForRead,
-  persistSubagentRunsToDisk: mocks.persistSubagentRunsToDisk,
-  restoreSubagentRunsFromDisk: mocks.restoreSubagentRunsFromDisk,
-}));
-
-vi.mock("./subagent-announce-queue.js", () => ({
-  resetAnnounceQueuesForTests: mocks.resetAnnounceQueuesForTests,
-}));
-
-vi.mock("./subagent-announce.js", () => ({
-  captureSubagentCompletionReply: mocks.captureSubagentCompletionReply,
-  runSubagentAnnounceFlow: mocks.runSubagentAnnounceFlow,
-}));
-
-vi.mock("../plugins/hook-runner-global.js", () => ({
-  getGlobalHookRunner: mocks.getGlobalHookRunner,
-}));
-
-vi.mock("./runtime-plugins.js", () => ({
-  ensureRuntimePluginsLoaded: mocks.ensureRuntimePluginsLoaded,
-}));
-
-vi.mock("../context-engine/init.js", () => ({
-  ensureContextEnginesInitialized: mocks.ensureContextEnginesInitialized,
-}));
-
-vi.mock("../context-engine/registry.js", () => ({
-  resolveContextEngine: mocks.resolveContextEngine,
-}));
-
-vi.mock("./timeout.js", () => ({
-  resolveAgentTimeoutMs: mocks.resolveAgentTimeoutMs,
-}));
+import * as mod from "./subagent-registry.js";
 
 describe("subagent registry seam flow", () => {
-  let mod: typeof import("./subagent-registry.js");
-
   beforeEach(async () => {
-    vi.resetModules();
     vi.clearAllMocks();
-    vi.useFakeTimers({ now: new Date("2026-03-24T12:00:00Z") });
     mocks.onAgentEvent.mockReturnValue(noop);
     mocks.loadConfig.mockReturnValue({
       agents: { defaults: { subagents: { archiveAfterMinutes: 0 } } },
       session: { mainKey: "main", scope: "per-sender" },
     });
-    mocks.resolveAgentIdFromSessionKey.mockImplementation((sessionKey: string) => {
-      return sessionKey.match(/^agent:([^:]+)/)?.[1] ?? "main";
-    });
+    mocks.resolveAgentIdFromSessionKey.mockImplementation(
+      (sessionKey: string | null | undefined) => {
+        return (sessionKey ?? "").match(/^agent:([^:]+)/)?.[1] ?? "main";
+      },
+    );
     mocks.resolveStorePath.mockReturnValue("/tmp/test-session-store.json");
     mocks.loadSessionStore.mockReturnValue({
       "agent:main:subagent:child": {
@@ -121,6 +87,10 @@ describe("subagent registry seam flow", () => {
     });
     mocks.getGlobalHookRunner.mockReturnValue(null);
     mocks.resolveContextEngine.mockResolvedValue({
+      info: { id: "test", name: "test" },
+      ingest: async () => ({ ingested: false }),
+      assemble: async ({ messages }) => ({ messages, estimatedTokens: 0 }),
+      compact: async () => ({ ok: true, compacted: false }),
       onSubagentEnded: mocks.onSubagentEnded,
     });
     mocks.callGateway.mockImplementation(async (request: { method?: string }) => {
@@ -133,16 +103,41 @@ describe("subagent registry seam flow", () => {
       }
       return {};
     });
-    mod = await import("./subagent-registry.js");
+    registryTesting.setDepsForTest({
+      callGateway: mocks.callGateway as never,
+      onAgentEvent: mocks.onAgentEvent,
+      loadConfig: mocks.loadConfig,
+      persistSubagentRunsToDisk: mocks.persistSubagentRunsToDisk,
+      restoreSubagentRunsFromDisk: mocks.restoreSubagentRunsFromDisk,
+      getSubagentRunsSnapshotForRead: mocks.getSubagentRunsSnapshotForRead,
+      captureSubagentCompletionReply: mocks.captureSubagentCompletionReply,
+      runSubagentAnnounceFlow: mocks.runSubagentAnnounceFlow,
+      ensureRuntimePluginsLoaded: mocks.ensureRuntimePluginsLoaded,
+      ensureContextEnginesInitialized: mocks.ensureContextEnginesInitialized,
+      resolveContextEngine: mocks.resolveContextEngine,
+      resolveAgentTimeoutMs: mocks.resolveAgentTimeoutMs,
+      getGlobalHookRunner: mocks.getGlobalHookRunner,
+      emitSessionLifecycleEvent: mocks.emitSessionLifecycleEvent,
+      sessionDeps: {
+        loadConfig: mocks.loadConfig,
+        loadSessionStore: mocks.loadSessionStore,
+        resolveAgentIdFromSessionKey: mocks.resolveAgentIdFromSessionKey,
+        resolveStorePath: mocks.resolveStorePath,
+        updateSessionStore: mocks.updateSessionStore as never,
+      },
+    });
     mod.resetSubagentRegistryForTests({ persist: false });
   });
 
   afterEach(() => {
     mod.resetSubagentRegistryForTests({ persist: false });
-    vi.useRealTimers();
+    registryTesting.setDepsForTest();
   });
 
   it("completes a registered run across timing persistence, lifecycle status, and announce cleanup", async () => {
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync), so
+    // sessionStartedAt is captured relative to Date.now() at registration.
+    const beforeRegister = Date.now();
     mod.registerSubagentRun({
       runId: "run-1",
       childSessionKey: "agent:main:subagent:child",
@@ -197,18 +192,25 @@ describe("subagent registry seam flow", () => {
     };
     updateStore?.(store);
     expect(store["agent:main:subagent:child"]).toMatchObject({
-      startedAt: Date.parse("2026-03-24T12:00:00Z"),
       endedAt: 222,
       runtimeMs: 111,
       status: "done",
     });
+    const storedStartedAt = (store["agent:main:subagent:child"] as { startedAt?: unknown })
+      .startedAt;
+    expect(typeof storedStartedAt).toBe("number");
+    expect(storedStartedAt as number).toBeGreaterThanOrEqual(beforeRegister);
+    expect(storedStartedAt as number).toBeLessThanOrEqual(Date.now());
 
     expect(mocks.persistSubagentRunsToDisk).toHaveBeenCalled();
   });
 
   it("deletes delete-mode completion runs when announce cleanup gives up after retry limit", async () => {
     mocks.runSubagentAnnounceFlow.mockResolvedValue(false);
-    const endedAt = Date.parse("2026-03-24T12:00:00Z");
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync), so
+    // endedAt stays recent to avoid the 30min completion hard-expiry give-up.
+    // Retry delays are 1s -> 2s -> give-up (MAX_ANNOUNCE_RETRY_COUNT=3).
+    const endedAt = Date.now();
     mocks.callGateway.mockResolvedValueOnce({
       status: "ok",
       startedAt: endedAt - 500,
@@ -225,27 +227,49 @@ describe("subagent registry seam flow", () => {
       expectsCompletionMessage: true,
     });
 
-    await vi.advanceTimersByTimeAsync(0);
-    expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
+    await pollUntilAssert(
+      () => {
+        expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 5_000 },
+    );
+    // Note: lower-bound backoff check (1s -> 2s). Poll granularity only
+    // shortens observed gaps, so >=800ms catches shrunken/missing backoff.
+    const firstAnnounceAt = Date.now();
     expect(
       mod
         .listSubagentRunsForRequester("agent:main:main")
         .find((entry) => entry.runId === "run-delete-give-up"),
     ).toBeDefined();
 
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(2);
+    await pollUntilAssert(
+      () => {
+        expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(2);
+      },
+      { timeoutMs: 5_000 },
+    );
+    const secondAnnounceAt = Date.now();
+    expect(secondAnnounceAt - firstAnnounceAt).toBeGreaterThanOrEqual(800);
 
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(3);
+    await pollUntilAssert(
+      () => {
+        expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(3);
+      },
+      { timeoutMs: 5_000 },
+    );
+    expect(Date.now() - secondAnnounceAt).toBeGreaterThanOrEqual(800);
 
-    await vi.advanceTimersByTimeAsync(4_000);
+    await pollUntilAssert(
+      () => {
+        expect(
+          mod
+            .listSubagentRunsForRequester("agent:main:main")
+            .find((entry) => entry.runId === "run-delete-give-up"),
+        ).toBeUndefined();
+      },
+      { timeoutMs: 5_000 },
+    );
     expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(3);
-    expect(
-      mod
-        .listSubagentRunsForRequester("agent:main:main")
-        .find((entry) => entry.runId === "run-delete-give-up"),
-    ).toBeUndefined();
   });
 
   it("finalizes retry-budgeted completion delete runs during resume", async () => {
@@ -254,6 +278,9 @@ describe("subagent registry seam flow", () => {
       runSubagentEnded: mocks.runSubagentEnded,
     };
     mocks.getGlobalHookRunner.mockReturnValue(endedHookRunner as never);
+    // Note: relative fixture (was fixed 2026-03-24 under fake timers).
+    // Retry budget (3/3) is exhausted, so resume gives up immediately.
+    const now = Date.now();
     mocks.restoreSubagentRunsFromDisk.mockImplementation(((params: {
       runs: Map<string, unknown>;
       mergeOnly?: boolean;
@@ -265,12 +292,12 @@ describe("subagent registry seam flow", () => {
         requesterDisplayKey: "main",
         task: "resume delete retry budget",
         cleanup: "delete",
-        createdAt: Date.parse("2026-03-24T11:58:00Z"),
-        startedAt: Date.parse("2026-03-24T11:59:00Z"),
-        endedAt: Date.parse("2026-03-24T11:59:30Z"),
+        createdAt: now - 120_000,
+        startedAt: now - 60_000,
+        endedAt: now - 30_000,
         expectsCompletionMessage: true,
         announceRetryCount: 3,
-        lastAnnounceRetryAt: Date.parse("2026-03-24T11:59:40Z"),
+        lastAnnounceRetryAt: now - 20_000,
       });
       return 1;
     }) as never);
@@ -315,6 +342,9 @@ describe("subagent registry seam flow", () => {
       },
     });
 
+    // Note: relative fixture (was fixed 2026-03-24 under fake timers).
+    // Parent stays expired (>5min) on any machine clock.
+    const now = Date.now();
     mod.addSubagentRunForTests({
       runId: "run-parent-expired",
       childSessionKey: "agent:main:subagent:parent",
@@ -322,9 +352,9 @@ describe("subagent registry seam flow", () => {
       requesterDisplayKey: "main",
       task: "expired parent cleanup",
       cleanup: "delete",
-      createdAt: Date.parse("2026-03-24T11:50:00Z"),
-      startedAt: Date.parse("2026-03-24T11:50:30Z"),
-      endedAt: Date.parse("2026-03-24T11:51:00Z"),
+      createdAt: now - 10 * 60_000,
+      startedAt: now - 9 * 60_000 - 30_000,
+      endedAt: now - 9 * 60_000,
       cleanupHandled: false,
       cleanupCompletedAt: undefined,
     });
@@ -485,7 +515,9 @@ describe("subagent registry seam flow", () => {
     expect(updated).toBe(1);
     await pollUntilAssert(
       async () => {
-        await expect(fs.access(attachmentsDir)).rejects.toMatchObject({ code: "ENOENT" });
+        await expect(fs.access(attachmentsDir)).rejects.toMatchObject({
+          code: "ENOENT",
+        });
       },
       { timeoutMs: 3_000 },
     );
@@ -523,7 +555,9 @@ describe("subagent registry seam flow", () => {
 
     await pollUntilAssert(
       async () => {
-        await expect(fs.access(attachmentsDir)).rejects.toMatchObject({ code: "ENOENT" });
+        await expect(fs.access(attachmentsDir)).rejects.toMatchObject({
+          code: "ENOENT",
+        });
       },
       { timeoutMs: 3_000 },
     );

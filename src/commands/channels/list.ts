@@ -8,7 +8,14 @@ import { formatUsageReportLines, loadProviderUsageSummary } from "../../infra/pr
 import { defaultRuntime, type RuntimeEnv, writeRuntimeJson } from "../../runtime.js";
 import { formatDocsLink } from "../../terminal/links.js";
 import { theme } from "../../terminal/theme.js";
+import type { ConfigValidationDeps } from "../config-validation.js";
 import { formatChannelAccountLabel, requireValidConfig } from "./shared.js";
+
+export type ChannelsListDeps = {
+  requireValidConfig?: typeof requireValidConfig;
+  configValidation?: ConfigValidationDeps;
+  loadAuthProfileStore?: typeof loadAuthProfileStore;
+};
 
 export type ChannelsListOptions = {
   json?: boolean;
@@ -104,8 +111,11 @@ async function loadUsageWithProgress(
 export async function channelsListCommand(
   opts: ChannelsListOptions,
   runtime: RuntimeEnv = defaultRuntime,
+  deps: ChannelsListDeps = {},
 ) {
-  const cfg = await requireValidConfig(runtime);
+  const cfg = await (deps.requireValidConfig
+    ? deps.requireValidConfig(runtime)
+    : requireValidConfig(runtime, undefined, deps.configValidation));
   if (!cfg) {
     return;
   }
@@ -113,7 +123,7 @@ export async function channelsListCommand(
 
   const plugins = listChannelPlugins();
 
-  const authStore = loadAuthProfileStore();
+  const authStore = (deps.loadAuthProfileStore ?? loadAuthProfileStore)();
   const authProfiles = Object.entries(authStore.profiles).map(([profileId, profile]) => ({
     id: profileId,
     provider: profile.provider,

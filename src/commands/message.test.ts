@@ -1,62 +1,90 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChannelMessageActionAdapter,
   ChannelOutboundAdapter,
   ChannelPlugin,
 } from "../channels/plugins/types.js";
+import { resolveCommandSecretRefsViaGateway } from "../cli/command-secret-gateway.js";
 import type { CliDeps } from "../cli/deps.js";
+import type { OpenClawConfig } from "../config/config.js";
+import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
+import { callGatewayLeastPrivilege, randomIdempotencyKey } from "../gateway/call.js";
+import { messageGatewayTesting } from "../infra/outbound/message.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import { captureEnv } from "../test-utils/env.js";
+import { messageCommand as messageCommandImpl, type MessageCommandOverrides } from "./message.js";
+
+// Explicit dependency injection replaces the module-level `vi.mock` calls
+// (Bun cannot intercept ESM imports).
 
 let testConfig: Record<string, unknown> = {};
-const applyPluginAutoEnable = vi.hoisted(() => vi.fn(({ config }) => ({ config, changes: [] })));
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    loadConfig: () => testConfig,
-  };
-});
 
-vi.mock("../config/plugin-auto-enable.js", () => ({
-  applyPluginAutoEnable,
+const applyPluginAutoEnableMock = vi.fn<typeof applyPluginAutoEnable>(({ config }) => ({
+  config: config ?? {},
+  changes: [],
+  autoEnabledReasons: {},
 }));
 
-const { resolveCommandSecretRefsViaGateway, callGatewayMock } = vi.hoisted(() => ({
-  resolveCommandSecretRefsViaGateway: vi.fn(async ({ config }: { config: unknown }) => ({
+const resolveCommandSecretRefsViaGatewayMock = vi.fn<typeof resolveCommandSecretRefsViaGateway>(
+  async ({ config }) => ({
     resolvedConfig: config,
-    diagnostics: [] as string[],
-  })),
-  callGatewayMock: vi.fn(),
-}));
-
-vi.mock("../cli/command-secret-gateway.js", () => ({
-  resolveCommandSecretRefsViaGateway,
-}));
-
-vi.mock("../gateway/call.js", () => ({
-  callGateway: callGatewayMock,
-  callGatewayLeastPrivilege: callGatewayMock,
-  randomIdempotencyKey: () => "idem-1",
-}));
-
-const handleDiscordAction = vi.hoisted(() =>
-  vi.fn(async (..._args: unknown[]) => ({ details: { ok: true } })),
+    diagnostics: [],
+    targetStatesByPath: {},
+    hadUnresolvedTargets: false,
+  }),
 );
 
-const handleTelegramAction = vi.hoisted(() =>
-  vi.fn(async (..._args: unknown[]) => ({ details: { ok: true } })),
-);
+// A generic-bound `vi.fn` cannot satisfy the gateway runtime module's generic
+// call signature, so the test runtime uses a typed stub with call tracking.
+type CallGatewayLeastPrivilegeOpts = Parameters<typeof callGatewayLeastPrivilege>[0];
+const callGatewayCalls: CallGatewayLeastPrivilegeOpts[] = [];
+const callGatewayResponses: unknown[] = [];
+const callGatewayLeastPrivilegeStub = async <T = Record<string, unknown>>(
+  opts: CallGatewayLeastPrivilegeOpts,
+): Promise<T> => {
+  callGatewayCalls.push(opts);
+  return callGatewayResponses.shift() as T;
+};
+const randomIdempotencyKeyMock = vi.fn<typeof randomIdempotencyKey>(() => "idem-1-1-1-1");
 
-let messageCommand: typeof import("./message.js").messageCommand;
+const handleDiscordAction = vi.fn<
+  (input: Record<string, unknown>, cfg: unknown) => Promise<{ details: { ok: boolean } }>
+>(async () => ({
+  details: { ok: true },
+}));
+
+const handleTelegramAction = vi.fn<
+  (input: Record<string, unknown>, cfg: unknown) => Promise<{ details: { ok: boolean } }>
+>(async () => ({
+  details: { ok: true },
+}));
+
+const commandOverrides: MessageCommandOverrides = {
+  loadConfig: () => testConfig as OpenClawConfig,
+  applyPluginAutoEnable: applyPluginAutoEnableMock,
+  resolveCommandSecretRefsViaGateway: resolveCommandSecretRefsViaGatewayMock,
+};
+
+const messageCommand = (
+  opts: Parameters<typeof messageCommandImpl>[0],
+  deps: Parameters<typeof messageCommandImpl>[1],
+  runtime: Parameters<typeof messageCommandImpl>[2],
+) => messageCommandImpl(opts, deps, runtime, commandOverrides);
 
 let envSnapshot: ReturnType<typeof captureEnv>;
 const EMPTY_TEST_REGISTRY = createTestRegistry([]);
 
-beforeAll(async () => {
-  ({ messageCommand } = await import("./message.js"));
+beforeAll(() => {
+  messageGatewayTesting.setRuntimeForTests({
+    callGatewayLeastPrivilege: callGatewayLeastPrivilegeStub,
+    randomIdempotencyKey: randomIdempotencyKeyMock,
+  });
+});
+
+afterAll(() => {
+  messageGatewayTesting.setRuntimeForTests(null);
 });
 
 beforeEach(() => {
@@ -65,12 +93,18 @@ beforeEach(() => {
   process.env.DISCORD_BOT_TOKEN = "";
   testConfig = {};
   setActivePluginRegistry(EMPTY_TEST_REGISTRY);
-  callGatewayMock.mockClear();
+  callGatewayCalls.length = 0;
+  callGatewayResponses.length = 0;
+  randomIdempotencyKeyMock.mockClear();
   handleDiscordAction.mockClear();
   handleTelegramAction.mockClear();
-  resolveCommandSecretRefsViaGateway.mockClear();
-  applyPluginAutoEnable.mockClear();
-  applyPluginAutoEnable.mockImplementation(({ config }) => ({ config, changes: [] }));
+  resolveCommandSecretRefsViaGatewayMock.mockClear();
+  applyPluginAutoEnableMock.mockClear();
+  applyPluginAutoEnableMock.mockImplementation(({ config }) => ({
+    config: config ?? {},
+    changes: [],
+    autoEnabledReasons: {},
+  }));
 });
 
 afterEach(() => {
@@ -203,9 +237,11 @@ function mockResolvedCommandConfig(params: {
   diagnostics?: string[];
 }) {
   testConfig = params.rawConfig;
-  resolveCommandSecretRefsViaGateway.mockResolvedValueOnce({
-    resolvedConfig: params.resolvedConfig,
+  resolveCommandSecretRefsViaGatewayMock.mockResolvedValueOnce({
+    resolvedConfig: params.resolvedConfig as OpenClawConfig,
     diagnostics: params.diagnostics ?? ["resolved channels.telegram.token"],
+    targetStatesByPath: {},
+    hadUnresolvedTargets: false,
   });
 }
 
@@ -286,13 +322,13 @@ describe("messageCommand", () => {
       runtime,
     );
 
-    expect(resolveCommandSecretRefsViaGateway).toHaveBeenCalledWith(
+    expect(resolveCommandSecretRefsViaGatewayMock).toHaveBeenCalledWith(
       expect.objectContaining({
         config: rawConfig,
         commandName: "message",
       }),
     );
-    const secretResolveCall = resolveCommandSecretRefsViaGateway.mock.calls[0]?.[0] as {
+    const secretResolveCall = resolveCommandSecretRefsViaGatewayMock.mock.calls[0]?.[0] as {
       targetIds?: Set<string>;
     };
     expect(secretResolveCall.targetIds).toBeInstanceOf(Set);
@@ -392,7 +428,11 @@ describe("messageCommand", () => {
       resolvedConfig,
       diagnostics: [],
     });
-    applyPluginAutoEnable.mockReturnValue({ config: autoEnabledConfig, changes: [] });
+    applyPluginAutoEnableMock.mockReturnValue({
+      config: autoEnabledConfig as OpenClawConfig,
+      changes: [],
+      autoEnabledReasons: {},
+    });
     setActivePluginRegistry(
       createTestRegistry([
         {
@@ -411,7 +451,7 @@ describe("messageCommand", () => {
       runtime,
     );
 
-    expect(applyPluginAutoEnable).toHaveBeenCalledWith({
+    expect(applyPluginAutoEnableMock).toHaveBeenCalledWith({
       config: resolvedConfig,
       env: process.env,
     });
@@ -451,7 +491,7 @@ describe("messageCommand", () => {
   });
 
   it("sends via gateway for WhatsApp", async () => {
-    callGatewayMock.mockResolvedValueOnce({ messageId: "g1" });
+    callGatewayResponses.push({ messageId: "g1" });
     setActivePluginRegistry(
       createTestRegistry([
         {
@@ -478,7 +518,7 @@ describe("messageCommand", () => {
       deps,
       runtime,
     );
-    expect(callGatewayMock).toHaveBeenCalled();
+    expect(callGatewayCalls.length).toBeGreaterThan(0);
   });
 
   it("routes discord polls through message action", async () => {

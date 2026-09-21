@@ -144,15 +144,32 @@ export function getSubagentSessionRuntimeMs(
   return Math.max(0, accumulatedRuntimeMs + Math.max(0, currentRunEndedAt - entry.startedAt));
 }
 
-export async function persistSubagentSessionTiming(entry: SubagentRunRecord) {
+export type SubagentRegistrySessionDeps = {
+  loadConfig?: typeof loadConfig;
+  loadSessionStore?: typeof loadSessionStore;
+  resolveAgentIdFromSessionKey?: typeof resolveAgentIdFromSessionKey;
+  resolveStorePath?: typeof resolveStorePath;
+  updateSessionStore?: typeof updateSessionStore;
+};
+
+export async function persistSubagentSessionTiming(
+  entry: SubagentRunRecord,
+  deps: SubagentRegistrySessionDeps = {},
+) {
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
+  const loadSessionStoreImpl = deps.loadSessionStore ?? loadSessionStore;
+  const resolveAgentIdFromSessionKeyImpl =
+    deps.resolveAgentIdFromSessionKey ?? resolveAgentIdFromSessionKey;
+  const resolveStorePathImpl = deps.resolveStorePath ?? resolveStorePath;
+  const updateSessionStoreImpl = deps.updateSessionStore ?? updateSessionStore;
   const childSessionKey = entry.childSessionKey?.trim();
   if (!childSessionKey) {
     return;
   }
 
-  const cfg = loadConfig();
-  const agentId = resolveAgentIdFromSessionKey(childSessionKey);
-  const storePath = resolveStorePath(cfg.session?.store, { agentId });
+  const cfg = loadConfigImpl();
+  const agentId = resolveAgentIdFromSessionKeyImpl(childSessionKey);
+  const storePath = resolveStorePathImpl(cfg.session?.store, { agentId });
   const startedAt = getSubagentSessionStartedAt(entry);
   const endedAt =
     typeof entry.endedAt === "number" && Number.isFinite(entry.endedAt) ? entry.endedAt : undefined;
@@ -162,7 +179,7 @@ export async function persistSubagentSessionTiming(entry: SubagentRunRecord) {
       : getSubagentSessionRuntimeMs(entry);
   const status = resolveSubagentSessionStatus(entry);
 
-  await updateSessionStore(storePath, (store) => {
+  await updateSessionStoreImpl(storePath, (store) => {
     const sessionEntry = findSessionEntryByKey(store, childSessionKey);
     if (!sessionEntry) {
       return;
@@ -194,21 +211,29 @@ export async function persistSubagentSessionTiming(entry: SubagentRunRecord) {
   });
 }
 
-export function resolveSubagentRunOrphanReason(params: {
-  entry: SubagentRunRecord;
-  storeCache?: Map<string, Record<string, SessionEntry>>;
-}): SubagentRunOrphanReason | null {
+export function resolveSubagentRunOrphanReason(
+  params: {
+    entry: SubagentRunRecord;
+    storeCache?: Map<string, Record<string, SessionEntry>>;
+  },
+  deps: SubagentRegistrySessionDeps = {},
+): SubagentRunOrphanReason | null {
+  const loadConfigImpl = deps.loadConfig ?? loadConfig;
+  const loadSessionStoreImpl = deps.loadSessionStore ?? loadSessionStore;
+  const resolveAgentIdFromSessionKeyImpl =
+    deps.resolveAgentIdFromSessionKey ?? resolveAgentIdFromSessionKey;
+  const resolveStorePathImpl = deps.resolveStorePath ?? resolveStorePath;
   const childSessionKey = params.entry.childSessionKey?.trim();
   if (!childSessionKey) {
     return "missing-session-entry";
   }
   try {
-    const cfg = loadConfig();
-    const agentId = resolveAgentIdFromSessionKey(childSessionKey);
-    const storePath = resolveStorePath(cfg.session?.store, { agentId });
+    const cfg = loadConfigImpl();
+    const agentId = resolveAgentIdFromSessionKeyImpl(childSessionKey);
+    const storePath = resolveStorePathImpl(cfg.session?.store, { agentId });
     let store = params.storeCache?.get(storePath);
     if (!store) {
-      store = loadSessionStore(storePath);
+      store = loadSessionStoreImpl(storePath);
       params.storeCache?.set(storePath, store);
     }
     const sessionEntry = findSessionEntryByKey(store, childSessionKey);
@@ -312,17 +337,23 @@ export function reconcileOrphanedRun(params: {
   return true;
 }
 
-export function reconcileOrphanedRestoredRuns(params: {
-  runs: Map<string, SubagentRunRecord>;
-  resumedRuns: Set<string>;
-}) {
+export function reconcileOrphanedRestoredRuns(
+  params: {
+    runs: Map<string, SubagentRunRecord>;
+    resumedRuns: Set<string>;
+  },
+  deps: SubagentRegistrySessionDeps = {},
+) {
   const storeCache = new Map<string, Record<string, SessionEntry>>();
   let changed = false;
   for (const [runId, entry] of params.runs.entries()) {
-    const orphanReason = resolveSubagentRunOrphanReason({
-      entry,
-      storeCache,
-    });
+    const orphanReason = resolveSubagentRunOrphanReason(
+      {
+        entry,
+        storeCache,
+      },
+      deps,
+    );
     if (!orphanReason) {
       continue;
     }

@@ -24,6 +24,18 @@ let messageConfigRuntimePromise: Promise<typeof import("./message.config.runtime
   null;
 let messageGatewayRuntimePromise: Promise<typeof import("./message.gateway.runtime.js")> | null =
   null;
+type MessageGatewayRuntimeModule = typeof import("./message.gateway.runtime.js");
+let messageGatewayRuntimeForTests: MessageGatewayRuntimeModule | null = null;
+
+/**
+ * Test seam: substitutes the lazy gateway runtime boundary (`callGatewayLeastPrivilege`,
+ * `randomIdempotencyKey`) because Bun cannot intercept ESM module imports.
+ */
+export const messageGatewayTesting = {
+  setRuntimeForTests(runtime: MessageGatewayRuntimeModule | null): void {
+    messageGatewayRuntimeForTests = runtime;
+  },
+};
 
 function loadMessageConfigRuntime() {
   messageConfigRuntimePromise ??= import("./message.config.runtime.js");
@@ -31,6 +43,9 @@ function loadMessageConfigRuntime() {
 }
 
 function loadMessageGatewayRuntime() {
+  if (messageGatewayRuntimeForTests) {
+    return Promise.resolve(messageGatewayRuntimeForTests);
+  }
   messageGatewayRuntimePromise ??= import("./message.gateway.runtime.js");
   return messageGatewayRuntimePromise;
 }

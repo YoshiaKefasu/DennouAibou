@@ -1,113 +1,98 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveConfigPath } from "../config/config.js";
+import { resolveConfigPath as resolveStateConfigPath } from "../config/paths.js";
+import { readLastGatewayErrorLine } from "../daemon/diagnostics.js";
+import type { GatewayService } from "../daemon/service.js";
+import { resolveGatewayService } from "../daemon/service.js";
+import { __testing as gatewayCallTesting, callGateway } from "../gateway/call.js";
+import {
+  GatewayClient as GatewayClientImpl,
+  type GatewayClientOptions,
+} from "../gateway/client.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { makeTempWorkspace } from "../test-helpers/workspace.js";
 import { captureEnv } from "../test-utils/env.js";
+import { healthCommand } from "./health.js";
+import { ensureWorkspaceAndSessions, waitForGatewayReachable } from "./onboard-helpers.js";
+import {
+  runNonInteractiveSetup as runNonInteractiveSetupImpl,
+  type NonInteractiveSetupDeps,
+} from "./onboard-non-interactive.js";
 import { createThrowingRuntime, readJsonFile } from "./onboard-non-interactive.test-helpers.js";
-import type { installGatewayDaemonNonInteractive } from "./onboard-non-interactive/local/daemon-install.js";
+import type { NonInteractiveLocalSetupDeps } from "./onboard-non-interactive/local.js";
+import { installGatewayDaemonNonInteractive } from "./onboard-non-interactive/local/daemon-install.js";
 
-const gatewayClientCalls: Array<{
-  url?: string;
-  token?: string;
-  password?: string;
-  onHelloOk?: (hello: { features?: { methods?: string[] } }) => void;
-  onClose?: (code: number, reason: string) => void;
-}> = [];
-const ensureWorkspaceAndSessionsMock = vi.fn(async (..._args: unknown[]) => {});
-type InstallGatewayDaemonResult = Awaited<ReturnType<typeof installGatewayDaemonNonInteractive>>;
-const installGatewayDaemonNonInteractiveMock = vi.hoisted(() =>
-  vi.fn(async (): Promise<InstallGatewayDaemonResult> => ({ installed: true })),
+const gatewayClientCalls: GatewayClientOptions[] = [];
+
+class TestGatewayClient extends GatewayClientImpl {
+  constructor(private readonly testOpts: GatewayClientOptions) {
+    super(testOpts);
+    gatewayClientCalls.push(testOpts);
+  }
+
+  override async request<T = Record<string, unknown>>(): Promise<T> {
+    return { ok: true } as T;
+  }
+
+  override start(): void {
+    queueMicrotask(() => this.testOpts.onHelloOk?.({ features: { methods: ["health"] } } as never));
+  }
+
+  override stop(): void {}
+}
+
+const createGatewayClientMock = vi.fn<(opts: GatewayClientOptions) => GatewayClientImpl>(
+  (opts) => new TestGatewayClient(opts),
 );
-const gatewayServiceMock = vi.hoisted(() => ({
+const ensureWorkspaceAndSessionsMock = vi.fn<typeof ensureWorkspaceAndSessions>(async () => {});
+type InstallGatewayDaemonResult = Awaited<ReturnType<typeof installGatewayDaemonNonInteractive>>;
+const installGatewayDaemonNonInteractiveMock = vi.fn<typeof installGatewayDaemonNonInteractive>(
+  async (): Promise<InstallGatewayDaemonResult> => ({ installed: true }),
+);
+const gatewayServiceMock = {
   label: "LaunchAgent",
   loadedText: "loaded",
+  notLoadedText: "not loaded",
+  stage: vi.fn(async () => {}),
+  install: vi.fn(async () => {}),
+  uninstall: vi.fn(async () => {}),
+  stop: vi.fn(async () => {}),
+  restart: vi.fn(async () => ({ outcome: "completed" as const })),
   isLoaded: vi.fn(async () => true),
+  readCommand: vi.fn(async () => null),
   readRuntime: vi.fn(async () => ({
-    status: "running",
+    status: "running" as const,
     state: "active",
     pid: 4242,
   })),
-}));
-const readLastGatewayErrorLineMock = vi.hoisted(() =>
-  vi.fn(async () => "Gateway failed to start: required secrets are unavailable."),
+} satisfies GatewayService;
+const resolveGatewayServiceMock = vi.fn<typeof resolveGatewayService>(() => gatewayServiceMock);
+const readLastGatewayErrorLineMock = vi.fn<typeof readLastGatewayErrorLine>(
+  async () => "Gateway failed to start: required secrets are unavailable.",
 );
-let waitForGatewayReachableMock:
-  | ((params: {
-      url: string;
-      token?: string;
-      password?: string;
-      deadlineMs?: number;
-      probeTimeoutMs?: number;
-    }) => Promise<{
-      ok: boolean;
-      detail?: string;
-    }>)
-  | undefined;
+const healthCommandMock = vi.fn<typeof healthCommand>(async () => {});
+let waitForGatewayReachableMock: typeof waitForGatewayReachable | undefined;
 
-vi.mock("../gateway/client.js", () => ({
-  GatewayClient: class {
-    params: {
-      url?: string;
-      token?: string;
-      password?: string;
-      onHelloOk?: (hello: { features?: { methods?: string[] } }) => void;
-    };
-    constructor(params: {
-      url?: string;
-      token?: string;
-      password?: string;
-      onHelloOk?: (hello: { features?: { methods?: string[] } }) => void;
-    }) {
-      this.params = params;
-      gatewayClientCalls.push(params);
-    }
-    async request() {
-      return { ok: true };
-    }
-    start() {
-      queueMicrotask(() => this.params.onHelloOk?.({ features: { methods: ["health"] } }));
-    }
-    stop() {}
-  },
-}));
-
-vi.mock("./onboard-helpers.js", async () => {
-  const actual = await import("./onboard-helpers.js");
-  return {
-    ...actual,
-    ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,
-    waitForGatewayReachable: (...args: Parameters<typeof actual.waitForGatewayReachable>) =>
-      waitForGatewayReachableMock
-        ? waitForGatewayReachableMock(args[0])
-        : actual.waitForGatewayReachable(...args),
-  };
-});
-
-vi.mock("./onboard-non-interactive/local/daemon-install.js", () => ({
+const localDeps: NonInteractiveLocalSetupDeps = {
+  ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,
+  waitForGatewayReachable: (params) =>
+    waitForGatewayReachableMock
+      ? waitForGatewayReachableMock(params)
+      : waitForGatewayReachable(params),
   installGatewayDaemonNonInteractive: installGatewayDaemonNonInteractiveMock,
-}));
-
-vi.mock("../daemon/service.js", () => ({
-  resolveGatewayService: () => gatewayServiceMock,
-}));
-
-vi.mock("../daemon/diagnostics.js", () => ({
+  resolveGatewayService: resolveGatewayServiceMock,
   readLastGatewayErrorLine: readLastGatewayErrorLineMock,
-}));
+  healthCommand: healthCommandMock,
+};
 
-let runNonInteractiveSetup: typeof import("./onboard-non-interactive.js").runNonInteractiveSetup;
-let resolveStateConfigPath: typeof import("../config/paths.js").resolveConfigPath;
-let resolveConfigPath: typeof import("../config/config.js").resolveConfigPath;
-let callGateway: typeof import("../gateway/call.js").callGateway;
+gatewayCallTesting.setDepsForTests({ createGatewayClient: createGatewayClientMock });
 
-async function loadGatewayOnboardModules(): Promise<void> {
-  vi.resetModules();
-  ({ runNonInteractiveSetup } = await import("./onboard-non-interactive.js"));
-  ({ resolveConfigPath: resolveStateConfigPath } = await import("../config/paths.js"));
-  ({ resolveConfigPath } = await import("../config/config.js"));
-  ({ callGateway } = await import("../gateway/call.js"));
-}
+const runNonInteractiveSetup = (
+  opts: Parameters<typeof runNonInteractiveSetupImpl>[0],
+  runtime: Parameters<typeof runNonInteractiveSetupImpl>[1],
+) => runNonInteractiveSetupImpl(opts, runtime, { local: localDeps });
 
 function getPseudoPort(base: number): number {
   return base + (process.pid % 1000);
@@ -203,6 +188,7 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
       "DENNOU_SKIP_BROWSER_CONTROL_SERVER",
       "DENNOU_GATEWAY_TOKEN",
       "DENNOU_GATEWAY_PASSWORD",
+      "DENNOU_DISABLE_BUNDLED_PLUGINS",
     ]);
     process.env.DENNOU_SKIP_CHANNELS = "1";
     process.env.DENNOU_SKIP_GMAIL_WATCHER = "1";
@@ -211,11 +197,12 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
     process.env.DENNOU_SKIP_BROWSER_CONTROL_SERVER = "1";
     delete process.env.DENNOU_GATEWAY_TOKEN;
     delete process.env.DENNOU_GATEWAY_PASSWORD;
+    process.env.DENNOU_DISABLE_BUNDLED_PLUGINS = "1";
 
     tempHome = await makeTempWorkspace("openclaw-onboard-");
     process.env.HOME = tempHome;
 
-    await loadGatewayOnboardModules();
+    gatewayCallTesting.setDepsForTests({ createGatewayClient: createGatewayClientMock });
   });
 
   beforeEach(() => {
@@ -223,6 +210,7 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
   });
 
   afterAll(async () => {
+    gatewayCallTesting.resetDepsForTests();
     if (tempHome) {
       await fs.rm(tempHome, { recursive: true, force: true });
     }
@@ -514,8 +502,8 @@ describe("onboard (non-interactive): gateway and remote auth", () => {
       );
 
       expect(installGatewayDaemonNonInteractiveMock).toHaveBeenCalledTimes(1);
-      expect(capturedDeadlineMs).toBe(45_000);
-      expect(capturedProbeTimeoutMs).toBe(10_000);
+      expect(capturedDeadlineMs).toBe(process.platform === "win32" ? 90_000 : 45_000);
+      expect(capturedProbeTimeoutMs).toBe(process.platform === "win32" ? 15_000 : 10_000);
     });
   }, 60_000);
 

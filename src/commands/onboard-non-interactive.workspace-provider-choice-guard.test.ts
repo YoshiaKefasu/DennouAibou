@@ -6,6 +6,8 @@ import { clearPluginDiscoveryCache } from "../plugins/discovery.js";
 import { clearPluginManifestRegistryCache } from "../plugins/manifest-registry.js";
 import { makeTempWorkspace } from "../test-helpers/workspace.js";
 import { withEnvAsync } from "../test-utils/env.js";
+import { ensureWorkspaceAndSessions } from "./onboard-helpers.js";
+import type { NonInteractiveSetupDeps } from "./onboard-non-interactive.js";
 import {
   createThrowingRuntime,
   readJsonFile,
@@ -13,15 +15,13 @@ import {
   type NonInteractiveRuntime,
 } from "./onboard-non-interactive.test-helpers.js";
 
-const ensureWorkspaceAndSessionsMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => {}));
+const ensureWorkspaceAndSessionsMock = vi.fn<typeof ensureWorkspaceAndSessions>(async () => {});
 
-vi.mock("./onboard-helpers.js", async () => {
-  const actual = await import("./onboard-helpers.js");
-  return {
-    ...actual,
+const setupDeps: NonInteractiveSetupDeps = {
+  local: {
     ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,
-  };
-});
+  },
+};
 
 type ConfigSnapshot = {
   agents?: { defaults?: { model?: { primary?: string }; workspace?: string } };
@@ -221,31 +221,43 @@ describe("onboard non-interactive workspace provider choice guard", () => {
     ensureWorkspaceAndSessionsMock.mockClear();
   });
 
-  it("does not let an untrusted workspace plugin hijack the bundled openai auth choice", async () => {
-    await withOnboardEnv("openclaw-onboard-choice-guard-", async ({ configPath, runtime }) => {
-      const workspaceDir = path.join(path.dirname(configPath), "repo");
-      await fs.mkdir(workspaceDir, { recursive: true });
-      await writeWorkspaceChoiceHijackPlugin(workspaceDir);
+  // Bundled plugin discovery (jiti) takes ~2-4 minutes cold; keep the real
+  // discovery path so the guard is tested against the bundled openai provider.
+  it(
+    "does not let an untrusted workspace plugin hijack the bundled openai auth choice",
+    { timeout: 300_000 },
+    async () => {
+      await withOnboardEnv("openclaw-onboard-choice-guard-", async ({ configPath, runtime }) => {
+        const workspaceDir = path.join(path.dirname(configPath), "repo");
+        await fs.mkdir(workspaceDir, { recursive: true });
+        await writeWorkspaceChoiceHijackPlugin(workspaceDir);
 
-      await runNonInteractiveSetupWithDefaults(runtime, {
-        workspace: workspaceDir,
-        openaiApiKey: "sk-openai-test", // pragma: allowlist secret
-        skipSkills: true,
+        await runNonInteractiveSetupWithDefaults(
+          runtime,
+          {
+            workspace: workspaceDir,
+            openaiApiKey: "sk-openai-test", // pragma: allowlist secret
+            skipSkills: true,
+          },
+          setupDeps,
+        );
+
+        const cfg = await readJsonFile<ConfigSnapshot>(configPath);
+
+        expect(cfg.agents?.defaults?.workspace).toBe(workspaceDir);
+        expect(cfg.plugins?.allow ?? []).not.toContain("evil-openai-hijack");
+        expect(cfg.plugins?.entries?.["evil-openai-hijack"]?.enabled).not.toBe(true);
+        expect(
+          cfg.plugins?.entries?.["evil-openai-hijack"]?.config?.capturedSecret,
+        ).toBeUndefined();
+        expect(cfg.models?.providers?.["evil-openai"]).toBeUndefined();
+        expect(cfg.agents?.defaults?.model?.primary).toBe(OPENAI_DEFAULT_MODEL);
+        expect(ensureWorkspaceAndSessionsMock).toHaveBeenCalledWith(
+          workspaceDir,
+          runtime,
+          expect.any(Object),
+        );
       });
-
-      const cfg = await readJsonFile<ConfigSnapshot>(configPath);
-
-      expect(cfg.agents?.defaults?.workspace).toBe(workspaceDir);
-      expect(cfg.plugins?.allow ?? []).not.toContain("evil-openai-hijack");
-      expect(cfg.plugins?.entries?.["evil-openai-hijack"]?.enabled).not.toBe(true);
-      expect(cfg.plugins?.entries?.["evil-openai-hijack"]?.config?.capturedSecret).toBeUndefined();
-      expect(cfg.models?.providers?.["evil-openai"]).toBeUndefined();
-      expect(cfg.agents?.defaults?.model?.primary).toBe(OPENAI_DEFAULT_MODEL);
-      expect(ensureWorkspaceAndSessionsMock).toHaveBeenCalledWith(
-        workspaceDir,
-        runtime,
-        expect.any(Object),
-      );
-    });
-  });
+    },
+  );
 });

@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { loadAuthProfileStore } from "../agents/auth-profiles.js";
 import { createPatchedAccountSetupAdapter } from "../channels/plugins/setup-helpers.js";
 import type { ChannelStatusIssue } from "../channels/plugins/types.core.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
@@ -9,24 +10,37 @@ import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/c
 import { configMocks, offsetMocks } from "./channels.mock-harness.js";
 import { baseConfigSnapshot, createTestRuntime } from "./test-runtime-config-helpers.js";
 
-const authMocks = vi.hoisted(() => ({
-  loadAuthProfileStore: vi.fn(),
-}));
-
-vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await import("../agents/auth-profiles.js");
-  return {
-    ...actual,
-    loadAuthProfileStore: authMocks.loadAuthProfileStore,
-  };
-});
+const authStoreMock = vi.fn<typeof loadAuthProfileStore>();
 
 import {
-  channelsAddCommand,
-  channelsListCommand,
-  channelsRemoveCommand,
+  channelsAddCommand as channelsAddCommandImpl,
+  channelsListCommand as channelsListCommandImpl,
+  channelsRemoveCommand as channelsRemoveCommandImpl,
   formatGatewayChannelsStatusLines,
 } from "./channels.js";
+import { channelCommandDeps } from "./channels.mock-harness.js";
+import type { ChannelsAddDeps } from "./channels/add.js";
+import type { ChannelsListDeps } from "./channels/list.js";
+import type { ChannelsRemoveDeps } from "./channels/remove.js";
+
+const commandDeps: ChannelsAddDeps & ChannelsRemoveDeps & ChannelsListDeps = {
+  ...channelCommandDeps,
+  loadAuthProfileStore: authStoreMock,
+};
+const channelsAddCommand = (
+  opts: Parameters<typeof channelsAddCommandImpl>[0],
+  runtime: Parameters<typeof channelsAddCommandImpl>[1],
+  params: Parameters<typeof channelsAddCommandImpl>[2],
+) => channelsAddCommandImpl(opts, runtime, params, commandDeps);
+const channelsRemoveCommand = (
+  opts: Parameters<typeof channelsRemoveCommandImpl>[0],
+  runtime: Parameters<typeof channelsRemoveCommandImpl>[1],
+  params: Parameters<typeof channelsRemoveCommandImpl>[2],
+) => channelsRemoveCommandImpl(opts, runtime, params, commandDeps);
+const channelsListCommand = (
+  opts: Parameters<typeof channelsListCommandImpl>[0],
+  runtime: Parameters<typeof channelsListCommandImpl>[1],
+) => channelsListCommandImpl(opts, runtime, commandDeps);
 
 const runtime = createTestRuntime();
 let clackPrompterModule: typeof import("../wizard/clack-prompter.js");
@@ -113,16 +127,19 @@ function createScopedCommandTestPlugin(params: {
       resolveAllowFrom: () => [],
       formatAllowFrom: (allowFrom) => allowFrom.map(String),
     }),
-    setup: createPatchedAccountSetupAdapter({
-      channelKey: params.id,
-      buildPatch: (input) =>
-        params.buildPatch({
-          token: input.token,
-          botToken: input.botToken,
-          appToken: input.appToken,
-          signalNumber: input.signalNumber,
-        }),
-    }),
+    setup: {
+      ...createPatchedAccountSetupAdapter({
+        channelKey: params.id,
+        buildPatch: (input) =>
+          params.buildPatch({
+            token: input.token,
+            botToken: input.botToken,
+            appToken: input.appToken,
+            signalNumber: input.signalNumber,
+          }),
+      }),
+      ...(params.id === "telegram" ? { singleAccountKeysToMove: ["streaming"] } : {}),
+    },
     lifecycle:
       params.onAccountConfigChanged || params.onAccountRemoved
         ? {
@@ -311,12 +328,12 @@ describe("channels command", () => {
   beforeEach(() => {
     configMocks.readConfigFileSnapshot.mockClear();
     configMocks.writeConfigFile.mockClear();
-    authMocks.loadAuthProfileStore.mockClear();
+    authStoreMock.mockClear();
     offsetMocks.deleteTelegramUpdateOffset.mockClear();
     runtime.log.mockClear();
     runtime.error.mockClear();
     runtime.exit.mockClear();
-    authMocks.loadAuthProfileStore.mockReturnValue({
+    authStoreMock.mockReturnValue({
       version: 1,
       profiles: {},
     });
@@ -389,6 +406,18 @@ describe("channels command", () => {
           },
         },
       },
+      sourceConfig: {
+        channels: {
+          telegram: {
+            enabled: true,
+            botToken: "legacy-token",
+            dmPolicy: "allowlist",
+            allowFrom: ["111"],
+            groupPolicy: "allowlist",
+            streaming: "partial",
+          },
+        },
+      },
     });
 
     await addTelegramAccount("alerts", "alerts-token");
@@ -439,6 +468,13 @@ describe("channels command", () => {
           },
         },
       },
+      sourceConfig: {
+        channels: {
+          telegram: {
+            enabled: true,
+          },
+        },
+      },
     });
 
     const next = await addAlertsTelegramAccount("alerts-token");
@@ -474,6 +510,16 @@ describe("channels command", () => {
     configMocks.readConfigFileSnapshot.mockResolvedValue({
       ...baseConfigSnapshot,
       config: {
+        channels: {
+          discord: {
+            accounts: {
+              default: { token: "d0" },
+              work: { token: "d1" },
+            },
+          },
+        },
+      },
+      sourceConfig: {
         channels: {
           discord: {
             accounts: {
@@ -526,6 +572,15 @@ describe("channels command", () => {
           },
         },
       },
+      sourceConfig: {
+        channels: {
+          signal: {
+            accounts: {
+              default: { account: "+15555550111", name: "Primary" },
+            },
+          },
+        },
+      },
     });
 
     await channelsAddCommand(
@@ -557,6 +612,9 @@ describe("channels command", () => {
       config: {
         channels: { discord: { token: "d0", enabled: true } },
       },
+      sourceConfig: {
+        channels: { discord: { token: "d0", enabled: true } },
+      },
     });
 
     await runRemoveWithConfirm({ channel: "discord", account: "default" });
@@ -571,8 +629,9 @@ describe("channels command", () => {
     configMocks.readConfigFileSnapshot.mockResolvedValue({
       ...baseConfigSnapshot,
       config: {},
+      sourceConfig: {},
     });
-    authMocks.loadAuthProfileStore.mockReturnValue({
+    authStoreMock.mockReturnValue({
       version: 1,
       profiles: {
         "anthropic:default": {
@@ -581,7 +640,6 @@ describe("channels command", () => {
           access: "token",
           refresh: "refresh",
           expires: 0,
-          created: 0,
         },
         "openai-codex:default": {
           type: "oauth",
@@ -589,7 +647,6 @@ describe("channels command", () => {
           access: "token",
           refresh: "refresh",
           expires: 0,
-          created: 0,
         },
       },
     });
@@ -607,6 +664,16 @@ describe("channels command", () => {
     configMocks.readConfigFileSnapshot.mockResolvedValue({
       ...baseConfigSnapshot,
       config: {
+        channels: {
+          telegram: {
+            name: "Legacy Name",
+            accounts: {
+              work: { botToken: "t0" },
+            },
+          },
+        },
+      },
+      sourceConfig: {
         channels: {
           telegram: {
             name: "Legacy Name",
@@ -645,6 +712,14 @@ describe("channels command", () => {
     configMocks.readConfigFileSnapshot.mockResolvedValue({
       ...baseConfigSnapshot,
       config: {
+        channels: {
+          discord: {
+            name: "Primary Bot",
+            token: "d0",
+          },
+        },
+      },
+      sourceConfig: {
         channels: {
           discord: {
             name: "Primary Bot",
@@ -825,6 +900,11 @@ describe("channels command", () => {
           telegram: { botToken: "123:abc", enabled: true },
         },
       },
+      sourceConfig: {
+        channels: {
+          telegram: { botToken: "123:abc", enabled: true },
+        },
+      },
     });
 
     await channelsRemoveCommand(
@@ -850,6 +930,15 @@ describe("channels command", () => {
           },
         },
       },
+      sourceConfig: {
+        channels: {
+          discord: {
+            accounts: {
+              default: { token: "d0" },
+            },
+          },
+        },
+      },
     });
 
     await channelsRemoveCommand({ channel: "discord", account: "default", delete: true }, runtime, {
@@ -863,6 +952,11 @@ describe("channels command", () => {
     configMocks.readConfigFileSnapshot.mockResolvedValue({
       ...baseConfigSnapshot,
       config: {
+        channels: {
+          telegram: { botToken: "123:abc", enabled: true },
+        },
+      },
+      sourceConfig: {
         channels: {
           telegram: { botToken: "123:abc", enabled: true },
         },

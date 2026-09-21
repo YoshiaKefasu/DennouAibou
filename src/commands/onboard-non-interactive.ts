@@ -3,15 +3,24 @@ import type { OpenClawConfig } from "../config/config.js";
 import { readConfigFileSnapshot } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
-import { runNonInteractiveLocalSetup } from "./onboard-non-interactive/local.js";
+import {
+  runNonInteractiveLocalSetup,
+  type NonInteractiveLocalSetupDeps,
+} from "./onboard-non-interactive/local.js";
 import { runNonInteractiveRemoteSetup } from "./onboard-non-interactive/remote.js";
 import type { OnboardOptions } from "./onboard-types.js";
+
+export type NonInteractiveSetupDeps = {
+  readConfigFileSnapshot?: typeof readConfigFileSnapshot;
+  local?: NonInteractiveLocalSetupDeps;
+};
 
 export async function runNonInteractiveSetup(
   opts: OnboardOptions,
   runtime: RuntimeEnv = defaultRuntime,
+  deps: NonInteractiveSetupDeps = {},
 ) {
-  const snapshot = await readConfigFileSnapshot();
+  const snapshot = await (deps.readConfigFileSnapshot ?? readConfigFileSnapshot)();
   if (snapshot.exists && !snapshot.valid) {
     runtime.error(
       `Config invalid. Run \`${formatCliCommand("openclaw doctor")}\` to repair it, then re-run setup.`,
@@ -37,5 +46,8 @@ export async function runNonInteractiveSetup(
     return;
   }
 
-  await runNonInteractiveLocalSetup({ opts, runtime, baseConfig, baseHash: snapshot.hash });
+  await runNonInteractiveLocalSetup(
+    { opts, runtime, baseConfig, baseHash: snapshot.hash },
+    deps.local,
+  );
 }

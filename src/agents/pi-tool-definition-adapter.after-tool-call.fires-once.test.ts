@@ -9,24 +9,47 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  handleToolExecutionEnd,
+  handleToolExecutionStart,
+} from "./pi-embedded-subscribe.handlers.tools.js";
+import {
+  toToolDefinitions,
+  type PiToolDefinitionAdapterDeps,
+} from "./pi-tool-definition-adapter.js";
 import { createBaseToolHandlerState } from "./pi-tool-handler-state.test-helpers.js";
+import {
+  consumeAdjustedParamsForToolCall,
+  isToolWrappedWithBeforeToolCallHook,
+  runBeforeToolCallHook,
+} from "./pi-tools.before-tool-call.js";
 
-const hookMocks = vi.hoisted(() => ({
+const hookMocks = {
   runner: {
     hasHooks: vi.fn(() => true),
     runAfterToolCall: vi.fn(async () => {}),
     runBeforeToolCall: vi.fn(async () => {}),
   },
-}));
+};
 
-const beforeToolCallMocks = vi.hoisted(() => ({
-  consumeAdjustedParamsForToolCall: vi.fn((_: string): unknown => undefined),
-  isToolWrappedWithBeforeToolCallHook: vi.fn(() => false),
-  runBeforeToolCallHook: vi.fn(async ({ params }: { params: unknown }) => ({
+const beforeToolCallMocks = {
+  consumeAdjustedParamsForToolCall: vi.fn<typeof consumeAdjustedParamsForToolCall>(() => undefined),
+  isToolWrappedWithBeforeToolCallHook: vi.fn<typeof isToolWrappedWithBeforeToolCallHook>(
+    () => false,
+  ),
+  runBeforeToolCallHook: vi.fn<typeof runBeforeToolCallHook>(async ({ params }) => ({
     blocked: false,
     params,
   })),
-}));
+} satisfies {
+  isToolWrappedWithBeforeToolCallHook: ReturnType<
+    typeof vi.fn<typeof isToolWrappedWithBeforeToolCallHook>
+  >;
+  runBeforeToolCallHook: ReturnType<typeof vi.fn<typeof runBeforeToolCallHook>>;
+  consumeAdjustedParamsForToolCall: ReturnType<
+    typeof vi.fn<typeof consumeAdjustedParamsForToolCall>
+  >;
+};
 
 function createTestTool(name: string) {
   return {
@@ -74,30 +97,6 @@ function createToolHandlerCtx() {
   };
 }
 
-let toToolDefinitions: typeof import("./pi-tool-definition-adapter.js").toToolDefinitions;
-let handleToolExecutionStart: typeof import("./pi-embedded-subscribe.handlers.tools.js").handleToolExecutionStart;
-let handleToolExecutionEnd: typeof import("./pi-embedded-subscribe.handlers.tools.js").handleToolExecutionEnd;
-
-async function loadFreshAfterToolCallModulesForTest() {
-  vi.resetModules();
-  vi.doMock("../plugins/hook-runner-global.js", () => ({
-    getGlobalHookRunner: () => hookMocks.runner,
-  }));
-  vi.doMock("../infra/agent-events.js", () => ({
-    emitAgentCommandOutputEvent: vi.fn(),
-    emitAgentEvent: vi.fn(),
-    emitAgentItemEvent: vi.fn(),
-  }));
-  vi.doMock("./pi-tools.before-tool-call.js", () => ({
-    consumeAdjustedParamsForToolCall: beforeToolCallMocks.consumeAdjustedParamsForToolCall,
-    isToolWrappedWithBeforeToolCallHook: beforeToolCallMocks.isToolWrappedWithBeforeToolCallHook,
-    runBeforeToolCallHook: beforeToolCallMocks.runBeforeToolCallHook,
-  }));
-  ({ toToolDefinitions } = await import("./pi-tool-definition-adapter.js"));
-  ({ handleToolExecutionStart, handleToolExecutionEnd } =
-    await import("./pi-embedded-subscribe.handlers.tools.js"));
-}
-
 describe("after_tool_call fires exactly once in embedded runs", () => {
   beforeEach(async () => {
     hookMocks.runner.hasHooks.mockClear();
@@ -115,11 +114,10 @@ describe("after_tool_call fires exactly once in embedded runs", () => {
       blocked: false,
       params,
     }));
-    await loadFreshAfterToolCallModulesForTest();
   });
 
   function resolveAdapterDefinition(tool: Parameters<typeof toToolDefinitions>[0][number]) {
-    const def = toToolDefinitions([tool])[0];
+    const def = toToolDefinitions([tool], beforeToolCallMocks)[0];
     if (!def) {
       throw new Error("missing tool definition");
     }
@@ -160,6 +158,7 @@ describe("after_tool_call fires exactly once in embedded runs", () => {
         isError: params.isError,
         result: params.result,
       } as never,
+      { consumeAdjustedParamsForToolCall: beforeToolCallMocks.consumeAdjustedParamsForToolCall },
     );
   }
 

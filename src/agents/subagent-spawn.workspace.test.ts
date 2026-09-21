@@ -1,4 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
+import { callGateway } from "../gateway/call.js";
+import { registerSubagentRun } from "./subagent-registry.js";
 import {
   createSubagentSpawnTestConfig,
   loadSubagentSpawnModuleForTest,
@@ -19,29 +22,23 @@ type TestConfig = {
   };
 };
 
-const hoisted = vi.hoisted(() => ({
-  callGatewayMock: vi.fn(),
-  configOverride: {} as Record<string, unknown>,
-  registerSubagentRunMock: vi.fn(),
+const hoisted = {
+  callGatewayMock: vi.fn<typeof callGateway>(),
+  configOverride: {} as OpenClawConfig,
+  registerSubagentRunMock: vi.fn<typeof registerSubagentRun>(),
   hookRunner: {
     hasHooks: vi.fn(() => false),
     runSubagentSpawning: vi.fn(),
-  },
-}));
+    runSubagentSpawned: vi.fn(),
+    runSubagentEnded: vi.fn(),
+  } satisfies Pick<
+    import("../plugins/hooks.js").SubagentLifecycleHookRunner,
+    "hasHooks" | "runSubagentSpawning" | "runSubagentSpawned" | "runSubagentEnded"
+  >,
+};
 
 let spawnSubagentDirect: typeof import("./subagent-spawn.js").spawnSubagentDirect;
 let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
-
-vi.mock("@earendil-works/pi-ai/oauth", async () => {
-  const actual = await import(
-    "@earendil-works/pi-ai/oauth",
-  );
-  return {
-    ...actual,
-    getOAuthApiKey: () => "",
-    getOAuthProviders: () => [],
-  };
-});
 
 function createConfigOverride(overrides?: Record<string, unknown>) {
   return createSubagentSpawnTestConfig("/tmp/workspace-main", {
@@ -57,11 +54,11 @@ function createConfigOverride(overrides?: Record<string, unknown>) {
   });
 }
 
-function resolveTestAgentConfig(cfg: Record<string, unknown>, agentId: string) {
+function resolveTestAgentConfig(cfg: OpenClawConfig, agentId: string) {
   return (cfg as TestConfig).agents?.list?.find((entry) => entry.id === agentId);
 }
 
-function resolveTestAgentWorkspace(cfg: Record<string, unknown>, agentId: string) {
+function resolveTestAgentWorkspace(cfg: OpenClawConfig, agentId: string) {
   return resolveTestAgentConfig(cfg, agentId)?.workspace ?? `/tmp/workspace-${agentId}`;
 }
 
@@ -149,23 +146,18 @@ describe("spawnSubagentDirect workspace inheritance", () => {
   });
 
   it("deletes the provisional child session when a non-thread subagent start fails", async () => {
-    hoisted.callGatewayMock.mockImplementation(
-      async (request: {
-        method?: string;
-        params?: { key?: string; deleteTranscript?: boolean; emitLifecycleHooks?: boolean };
-      }) => {
-        if (request.method === "sessions.patch") {
-          return { ok: true };
-        }
-        if (request.method === "agent") {
-          throw new Error("spawn startup failed");
-        }
-        if (request.method === "sessions.delete") {
-          return { ok: true };
-        }
-        return {};
-      },
-    );
+    hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
+      if (request.method === "sessions.patch") {
+        return { ok: true };
+      }
+      if (request.method === "agent") {
+        throw new Error("spawn startup failed");
+      }
+      if (request.method === "sessions.delete") {
+        return { ok: true };
+      }
+      return {};
+    });
 
     const result = await spawnSubagentDirect(
       {
@@ -215,23 +207,18 @@ describe("spawnSubagentDirect workspace inheritance", () => {
     hoisted.registerSubagentRunMock.mockImplementation(() => {
       throw new Error("registry unavailable");
     });
-    hoisted.callGatewayMock.mockImplementation(
-      async (request: {
-        method?: string;
-        params?: { key?: string; deleteTranscript?: boolean; emitLifecycleHooks?: boolean };
-      }) => {
-        if (request.method === "sessions.patch") {
-          return { ok: true };
-        }
-        if (request.method === "agent") {
-          return { runId: "run-thread-register-fail" };
-        }
-        if (request.method === "sessions.delete") {
-          return { ok: true };
-        }
-        return {};
-      },
-    );
+    hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
+      if (request.method === "sessions.patch") {
+        return { ok: true };
+      }
+      if (request.method === "agent") {
+        return { runId: "run-thread-register-fail" };
+      }
+      if (request.method === "sessions.delete") {
+        return { ok: true };
+      }
+      return {};
+    });
 
     const result = await spawnSubagentDirect(
       {

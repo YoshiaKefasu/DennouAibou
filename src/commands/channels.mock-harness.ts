@@ -1,48 +1,62 @@
 import { vi } from "vitest";
+import type { ConfigFileSnapshot, OpenClawConfig } from "../config/config.js";
 import type { MockFn } from "../test-utils/vitest-mock-fn.js";
+import type { ChannelsAddDeps } from "./channels/add.js";
+import type { ChannelsListDeps } from "./channels/list.js";
+import type { ChannelsRemoveDeps } from "./channels/remove.js";
+import { requireValidConfigFileSnapshot } from "./config-validation.js";
 
-function buildBundledPluginModuleId(pluginId: string, artifactBasename: string): string {
-  return ["..", "..", "extensions", pluginId, artifactBasename].join("/");
-}
+type ConfigModule = typeof import("../config/config.js");
 
-const readConfigFileSnapshotMock = vi.fn() as unknown as MockFn;
-const writeConfigFileMock = vi.fn().mockResolvedValue(undefined) as unknown as MockFn;
-const replaceConfigFileMock = vi.fn(async (params: { nextConfig: unknown }) => {
+type DeleteTelegramUpdateOffset = (params: { accountId?: string }) => Promise<void>;
+
+const readConfigFileSnapshotMock = vi.fn<ConfigModule["readConfigFileSnapshot"]>();
+const writeConfigFileMock = vi.fn<ConfigModule["writeConfigFile"]>(async () => {});
+const emptyFileSnapshot: ConfigFileSnapshot = {
+  path: "",
+  exists: true,
+  raw: null,
+  parsed: {},
+  sourceConfig: {},
+  resolved: {},
+  valid: true,
+  runtimeConfig: {},
+  config: {},
+  issues: [],
+  warnings: [],
+  legacyIssues: [],
+};
+const replaceConfigFileMock = vi.fn<ConfigModule["replaceConfigFile"]>(async (params) => {
   await writeConfigFileMock(params.nextConfig);
-}) as unknown as MockFn;
+  return {
+    path: emptyFileSnapshot.path,
+    previousHash: null,
+    snapshot: emptyFileSnapshot,
+    nextConfig: params.nextConfig as OpenClawConfig,
+  };
+});
 
 export const configMocks: {
-  readConfigFileSnapshot: MockFn;
-  writeConfigFile: MockFn;
-  replaceConfigFile: MockFn;
+  readConfigFileSnapshot: MockFn<ConfigModule["readConfigFileSnapshot"]>;
+  writeConfigFile: MockFn<ConfigModule["writeConfigFile"]>;
+  replaceConfigFile: MockFn<ConfigModule["replaceConfigFile"]>;
 } = {
   readConfigFileSnapshot: readConfigFileSnapshotMock,
   writeConfigFile: writeConfigFileMock,
   replaceConfigFile: replaceConfigFileMock,
 };
 
-export const offsetMocks: {
-  deleteTelegramUpdateOffset: MockFn;
-} = {
-  deleteTelegramUpdateOffset: vi.fn().mockResolvedValue(undefined) as unknown as MockFn,
+export const channelCommandDeps: ChannelsAddDeps & ChannelsRemoveDeps & ChannelsListDeps = {
+  requireValidConfigFileSnapshot: async (runtime) => {
+    return await requireValidConfigFileSnapshot(runtime, undefined, {
+      readConfigFileSnapshot: configMocks.readConfigFileSnapshot,
+    });
+  },
+  replaceConfigFile: configMocks.replaceConfigFile,
 };
 
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    readConfigFileSnapshot: configMocks.readConfigFileSnapshot,
-    writeConfigFile: configMocks.writeConfigFile,
-    replaceConfigFile: configMocks.replaceConfigFile,
-  };
-});
-
-vi.mock(buildBundledPluginModuleId("telegram", "update-offset-runtime-api.js"), async () => {
-  const actual: Record<string, unknown> = await import(
-    buildBundledPluginModuleId("telegram", "update-offset-runtime-api.js")
-  );
-  return {
-    ...actual,
-    deleteTelegramUpdateOffset: offsetMocks.deleteTelegramUpdateOffset,
-  };
-});
+export const offsetMocks: {
+  deleteTelegramUpdateOffset: MockFn<DeleteTelegramUpdateOffset>;
+} = {
+  deleteTelegramUpdateOffset: vi.fn<DeleteTelegramUpdateOffset>(async () => {}),
+};

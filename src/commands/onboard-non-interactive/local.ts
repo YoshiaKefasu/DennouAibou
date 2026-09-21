@@ -1,9 +1,13 @@
+// Note: daemon/diagnostics, daemon/service, health, local/auth-choice, and local/daemon-install were dynamic imports; kept static intentionally (jiti race avoidance).
 import { formatCliCommand } from "../../cli/command-format.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { replaceConfigFile, resolveGatewayPort } from "../../config/config.js";
 import { logConfigUpdated } from "../../config/logging.js";
+import { readLastGatewayErrorLine } from "../../daemon/diagnostics.js";
+import { resolveGatewayService } from "../../daemon/service.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { DEFAULT_GATEWAY_DAEMON_RUNTIME } from "../daemon-runtime.js";
+import { healthCommand } from "../health.js";
 import { applyLocalSetupWorkspaceConfig } from "../onboard-config.js";
 import {
   applyWizardMetadata,
@@ -13,7 +17,12 @@ import {
   waitForGatewayReachable,
 } from "../onboard-helpers.js";
 import type { OnboardOptions } from "../onboard-types.js";
-import { inferAuthChoiceFromFlags } from "./local/auth-choice-inference.js";
+import {
+  inferAuthChoiceFromFlags,
+  type AuthChoiceInference,
+} from "./local/auth-choice-inference.js";
+import { applyNonInteractiveAuthChoice } from "./local/auth-choice.js";
+import { installGatewayDaemonNonInteractive } from "./local/daemon-install.js";
 import { applyNonInteractiveGatewayConfig } from "./local/gateway-config.js";
 import {
   type GatewayHealthFailureDiagnostics,
@@ -30,6 +39,22 @@ const WINDOWS_INSTALL_DAEMON_HEALTH_DEADLINE_MS = 90_000;
 const WINDOWS_INSTALL_DAEMON_HEALTH_PROBE_TIMEOUT_MS = 15_000;
 const INSTALL_DAEMON_HEALTH_COMMAND_TIMEOUT_MS = 10_000;
 const WINDOWS_INSTALL_DAEMON_HEALTH_COMMAND_TIMEOUT_MS = 30_000;
+
+export type NonInteractiveLocalSetupDeps = {
+  replaceConfigFile?: typeof replaceConfigFile;
+  resolveGatewayPort?: typeof resolveGatewayPort;
+  logConfigUpdated?: typeof logConfigUpdated;
+  applyWizardMetadata?: typeof applyWizardMetadata;
+  ensureWorkspaceAndSessions?: typeof ensureWorkspaceAndSessions;
+  resolveControlUiLinks?: typeof resolveControlUiLinks;
+  waitForGatewayReachable?: typeof waitForGatewayReachable;
+  installGatewayDaemonNonInteractive?: typeof installGatewayDaemonNonInteractive;
+  healthCommand?: typeof healthCommand;
+  resolveGatewayService?: typeof resolveGatewayService;
+  readLastGatewayErrorLine?: typeof readLastGatewayErrorLine;
+  applyNonInteractiveAuthChoice?: typeof applyNonInteractiveAuthChoice;
+  inferAuthChoiceFromFlags?: typeof inferAuthChoiceFromFlags;
+};
 
 function resolveInstallDaemonGatewayHealthTiming(): {
   deadlineMs: number;
@@ -50,14 +75,13 @@ function resolveInstallDaemonGatewayHealthTiming(): {
   };
 }
 
-async function collectGatewayHealthFailureDiagnostics(): Promise<
-  GatewayHealthFailureDiagnostics | undefined
-> {
+async function collectGatewayHealthFailureDiagnostics(
+  deps: NonInteractiveLocalSetupDeps,
+): Promise<GatewayHealthFailureDiagnostics | undefined> {
   const diagnostics: GatewayHealthFailureDiagnostics = {};
 
   try {
-    const { resolveGatewayService } = await import("../../daemon/service.js");
-    const service = resolveGatewayService();
+    const service = (deps.resolveGatewayService ?? resolveGatewayService)();
     const env = process.env as Record<string, string | undefined>;
     const [loaded, runtime] = await Promise.all([
       service.isLoaded({ env }).catch(() => false),
@@ -78,8 +102,8 @@ async function collectGatewayHealthFailureDiagnostics(): Promise<
   }
 
   try {
-    const { readLastGatewayErrorLine } = await import("../../daemon/diagnostics.js");
-    diagnostics.lastGatewayError = (await readLastGatewayErrorLine(process.env)) ?? undefined;
+    const readLastGatewayErrorLineImpl = deps.readLastGatewayErrorLine ?? readLastGatewayErrorLine;
+    diagnostics.lastGatewayError = (await readLastGatewayErrorLineImpl(process.env)) ?? undefined;
   } catch (err) {
     diagnostics.inspectError = diagnostics.inspectError
       ? `${diagnostics.inspectError}; log diagnostics failed: ${String(err)}`
@@ -91,13 +115,28 @@ async function collectGatewayHealthFailureDiagnostics(): Promise<
     : undefined;
 }
 
-export async function runNonInteractiveLocalSetup(params: {
-  opts: OnboardOptions;
-  runtime: RuntimeEnv;
-  baseConfig: OpenClawConfig;
-  baseHash?: string;
-}) {
+export async function runNonInteractiveLocalSetup(
+  params: {
+    opts: OnboardOptions;
+    runtime: RuntimeEnv;
+    baseConfig: OpenClawConfig;
+    baseHash?: string;
+  },
+  deps: NonInteractiveLocalSetupDeps = {},
+) {
   const { opts, runtime, baseConfig, baseHash } = params;
+  const replaceConfigFileImpl = deps.replaceConfigFile ?? replaceConfigFile;
+  const resolveGatewayPortImpl = deps.resolveGatewayPort ?? resolveGatewayPort;
+  const logConfigUpdatedImpl = deps.logConfigUpdated ?? logConfigUpdated;
+  const applyWizardMetadataImpl = deps.applyWizardMetadata ?? applyWizardMetadata;
+  const ensureWorkspaceAndSessionsImpl =
+    deps.ensureWorkspaceAndSessions ?? ensureWorkspaceAndSessions;
+  const resolveControlUiLinksImpl = deps.resolveControlUiLinks ?? resolveControlUiLinks;
+  const waitForGatewayReachableImpl = deps.waitForGatewayReachable ?? waitForGatewayReachable;
+  const installGatewayDaemonNonInteractiveImpl =
+    deps.installGatewayDaemonNonInteractive ?? installGatewayDaemonNonInteractive;
+  const healthCommandImpl = deps.healthCommand ?? healthCommand;
+  const inferAuthChoiceFromFlagsImpl = deps.inferAuthChoiceFromFlags ?? inferAuthChoiceFromFlags;
   const mode = "local" as const;
 
   const workspaceDir = resolveNonInteractiveWorkspaceDir({
@@ -108,7 +147,7 @@ export async function runNonInteractiveLocalSetup(params: {
 
   let nextConfig: OpenClawConfig = applyLocalSetupWorkspaceConfig(baseConfig, workspaceDir);
 
-  const inferredAuthChoice = inferAuthChoiceFromFlags(opts, {
+  const inferredAuthChoice: AuthChoiceInference = inferAuthChoiceFromFlagsImpl(opts, {
     config: nextConfig,
     workspaceDir,
     env: process.env,
@@ -126,8 +165,9 @@ export async function runNonInteractiveLocalSetup(params: {
   }
   const authChoice = opts.authChoice ?? inferredAuthChoice.choice ?? "skip";
   if (authChoice !== "skip") {
-    const { applyNonInteractiveAuthChoice } = await import("./local/auth-choice.js");
-    const nextConfigAfterAuth = await applyNonInteractiveAuthChoice({
+    const nextConfigAfterAuth = await (
+      deps.applyNonInteractiveAuthChoice ?? applyNonInteractiveAuthChoice
+    )({
       nextConfig,
       authChoice,
       opts,
@@ -140,7 +180,7 @@ export async function runNonInteractiveLocalSetup(params: {
     nextConfig = nextConfigAfterAuth;
   }
 
-  const gatewayBasePort = resolveGatewayPort(baseConfig);
+  const gatewayBasePort = resolveGatewayPortImpl(baseConfig);
   const gatewayResult = applyNonInteractiveGatewayConfig({
     nextConfig,
     opts,
@@ -154,14 +194,17 @@ export async function runNonInteractiveLocalSetup(params: {
 
   nextConfig = applyNonInteractiveSkillsConfig({ nextConfig, opts, runtime });
 
-  nextConfig = applyWizardMetadata(nextConfig, { command: "onboard", mode });
-  await replaceConfigFile({
+  nextConfig = applyWizardMetadataImpl(nextConfig, {
+    command: "onboard",
+    mode,
+  });
+  await replaceConfigFileImpl({
     nextConfig,
     ...(baseHash !== undefined ? { baseHash } : {}),
   });
-  logConfigUpdated(runtime);
+  logConfigUpdatedImpl(runtime);
 
-  await ensureWorkspaceAndSessions(workspaceDir, runtime, {
+  await ensureWorkspaceAndSessionsImpl(workspaceDir, runtime, {
     skipBootstrap: Boolean(nextConfig.agents?.defaults?.skipBootstrap),
   });
 
@@ -174,8 +217,7 @@ export async function runNonInteractiveLocalSetup(params: {
       }
     | undefined;
   if (opts.installDaemon) {
-    const { installGatewayDaemonNonInteractive } = await import("./local/daemon-install.js");
-    const daemonInstall = await installGatewayDaemonNonInteractive({
+    const daemonInstall = await installGatewayDaemonNonInteractiveImpl({
       nextConfig,
       opts,
       runtime,
@@ -222,15 +264,14 @@ export async function runNonInteractiveLocalSetup(params: {
   }
 
   if (!opts.skipHealth) {
-    const { healthCommand } = await import("../health.js");
-    const links = resolveControlUiLinks({
+    const links = resolveControlUiLinksImpl({
       bind: gatewayResult.bind as "auto" | "lan" | "loopback" | "custom" | "tailnet",
       port: gatewayResult.port,
       customBindHost: nextConfig.gateway?.customBindHost,
       basePath: undefined,
     });
     const installDaemonGatewayHealthTiming = resolveInstallDaemonGatewayHealthTiming();
-    const probe = await waitForGatewayReachable({
+    const probe = await waitForGatewayReachableImpl({
       url: links.wsUrl,
       token: gatewayResult.gatewayToken,
       deadlineMs: opts.installDaemon
@@ -242,7 +283,7 @@ export async function runNonInteractiveLocalSetup(params: {
     });
     if (!probe.ok) {
       const diagnostics = opts.installDaemon
-        ? await collectGatewayHealthFailureDiagnostics()
+        ? await collectGatewayHealthFailureDiagnostics(deps)
         : undefined;
       logNonInteractiveOnboardingFailure({
         opts,
@@ -272,7 +313,7 @@ export async function runNonInteractiveLocalSetup(params: {
       runtime.exit(1);
       return;
     }
-    await healthCommand(
+    await healthCommandImpl(
       {
         json: false,
         timeoutMs: opts.installDaemon

@@ -11,11 +11,16 @@ import {
 } from "../plugins/status.js";
 import type { RuntimeEnv } from "../runtime.js";
 
+export type ConfigValidationDeps = {
+  readConfigFileSnapshot?: typeof readConfigFileSnapshot;
+};
+
 export async function requireValidConfigFileSnapshot(
   runtime: RuntimeEnv,
   opts?: { includeCompatibilityAdvisory?: boolean },
+  deps: ConfigValidationDeps = {},
 ): Promise<ConfigFileSnapshot | null> {
-  const snapshot = await readConfigFileSnapshot();
+  const snapshot = await (deps.readConfigFileSnapshot ?? readConfigFileSnapshot)();
   if (snapshot.exists && !snapshot.valid) {
     const issues =
       snapshot.issues.length > 0
@@ -48,6 +53,7 @@ export async function requireValidConfigFileSnapshot(
 export async function requireValidConfigSnapshot(
   runtime: RuntimeEnv,
   opts?: { includeCompatibilityAdvisory?: boolean },
+  deps: ConfigValidationDeps = {},
 ): Promise<OpenClawConfig | null> {
-  return (await requireValidConfigFileSnapshot(runtime, opts))?.config ?? null;
+  return (await requireValidConfigFileSnapshot(runtime, opts, deps))?.config ?? null;
 }

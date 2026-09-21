@@ -1,116 +1,80 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import type { ConfigFileSnapshot } from "../config/config.js";
+import { readConfigFileSnapshot, replaceConfigFile, resolveGatewayPort } from "../config/config.js";
+import { ensureControlUiAssetsBuilt } from "../infra/control-ui-assets.js";
+import { note } from "../terminal/note.js";
+import { createClackPrompter } from "../wizard/clack-prompter.js";
+import { runConfigureWizard, type ConfigureWizardDeps } from "./configure.wizard.js";
+import {
+  probeGatewayReachable,
+  resolveControlUiLinks,
+  summarizeExistingConfig,
+  waitForGatewayReachable,
+} from "./onboard-helpers.js";
+import { resolveSearchProviderOptions, setupSearch } from "./onboard-search.js";
 
-const mocks = vi.hoisted(() => {
-  const writeConfigFile = vi.fn();
-  return {
-    clackIntro: vi.fn(),
-    clackOutro: vi.fn(),
-    clackSelect: vi.fn(),
-    clackText: vi.fn(),
-    clackConfirm: vi.fn(),
-    resolveSearchProviderOptions: vi.fn(),
-    setupSearch: vi.fn(),
-    readConfigFileSnapshot: vi.fn(),
-    writeConfigFile,
-    replaceConfigFile: vi.fn(async (params: { nextConfig: unknown }) => {
-      await writeConfigFile(params.nextConfig);
-    }),
-    resolveGatewayPort: vi.fn(),
-    ensureControlUiAssetsBuilt: vi.fn(),
-    createClackPrompter: vi.fn(),
-    note: vi.fn(),
-    printWizardHeader: vi.fn(),
-    probeGatewayReachable: vi.fn(),
-    waitForGatewayReachable: vi.fn(),
-    resolveControlUiLinks: vi.fn(),
-    summarizeExistingConfig: vi.fn(),
-  };
-});
+const writeConfigFile = vi.fn();
+const emptyWriteSnapshot: ConfigFileSnapshot = {
+  path: "",
+  exists: true,
+  raw: null,
+  parsed: {},
+  sourceConfig: {},
+  resolved: {},
+  valid: true,
+  runtimeConfig: {},
+  config: {},
+  issues: [],
+  warnings: [],
+  legacyIssues: [],
+};
+const mocks = {
+  clackIntro: vi.fn(),
+  clackOutro: vi.fn(),
+  clackSelect: vi.fn(),
+  clackText: vi.fn(),
+  clackConfirm: vi.fn(),
+  resolveSearchProviderOptions: vi.fn(),
+  setupSearch: vi.fn(),
+  readConfigFileSnapshot: vi.fn(),
+  writeConfigFile,
+  replaceConfigFile: vi.fn<typeof replaceConfigFile>(async (params) => {
+    await writeConfigFile(params.nextConfig);
+    return {
+      path: emptyWriteSnapshot.path,
+      previousHash: null,
+      snapshot: emptyWriteSnapshot,
+      nextConfig: params.nextConfig as OpenClawConfig,
+    };
+  }),
+  resolveGatewayPort: vi.fn(),
+  ensureControlUiAssetsBuilt: vi.fn(),
+  createClackPrompter: vi.fn(),
+  note: vi.fn(),
+  printWizardHeader: vi.fn(),
+  probeGatewayReachable: vi.fn(),
+  waitForGatewayReachable: vi.fn(),
+  resolveControlUiLinks: vi.fn(),
+  summarizeExistingConfig: vi.fn(),
+};
 
-vi.mock("@clack/prompts", () => ({
-  intro: mocks.clackIntro,
-  outro: mocks.clackOutro,
-  select: mocks.clackSelect,
-  text: mocks.clackText,
-  confirm: mocks.clackConfirm,
-}));
-
-vi.mock("../config/config.js", () => ({
-  CONFIG_PATH: "~/.dennou-aibou/dennou-aibou.json",
+const configureDeps: ConfigureWizardDeps = {
   readConfigFileSnapshot: mocks.readConfigFileSnapshot,
-  writeConfigFile: mocks.writeConfigFile,
   replaceConfigFile: mocks.replaceConfigFile,
   resolveGatewayPort: mocks.resolveGatewayPort,
-}));
-
-vi.mock("../infra/control-ui-assets.js", () => ({
   ensureControlUiAssetsBuilt: mocks.ensureControlUiAssetsBuilt,
-}));
-
-vi.mock("../wizard/clack-prompter.js", () => ({
   createClackPrompter: mocks.createClackPrompter,
-}));
-
-vi.mock("../terminal/note.js", () => ({
   note: mocks.note,
-}));
-
-vi.mock("./onboard-helpers.js", () => ({
-  DEFAULT_WORKSPACE: "~/.dennou-aibou/workspace",
-  applyWizardMetadata: (cfg: OpenClawConfig) => cfg,
-  ensureWorkspaceAndSessions: vi.fn(),
-  guardCancel: <T>(value: T) => value,
-  printWizardHeader: mocks.printWizardHeader,
   probeGatewayReachable: mocks.probeGatewayReachable,
   resolveControlUiLinks: mocks.resolveControlUiLinks,
   summarizeExistingConfig: mocks.summarizeExistingConfig,
   waitForGatewayReachable: mocks.waitForGatewayReachable,
-}));
-
-vi.mock("./health.js", () => ({
-  healthCommand: vi.fn(),
-}));
-
-vi.mock("./health-format.js", () => ({
-  formatHealthCheckFailure: vi.fn(),
-}));
-
-vi.mock("./configure.gateway.js", () => ({
-  promptGatewayConfig: vi.fn(),
-}));
-
-vi.mock("./configure.gateway-auth.js", () => ({
-  promptAuthConfig: vi.fn(),
-}));
-
-vi.mock("./configure.channels.js", () => ({
-  removeChannelConfigWizard: vi.fn(),
-}));
-
-vi.mock("./configure.daemon.js", () => ({
-  maybeInstallDaemon: vi.fn(),
-}));
-
-vi.mock("./onboard-remote.js", () => ({
-  promptRemoteGatewayConfig: vi.fn(),
-}));
-
-vi.mock("./onboard-skills.js", () => ({
-  setupSkills: vi.fn(),
-}));
-
-vi.mock("./onboard-channels.js", () => ({
-  setupChannels: vi.fn(),
-}));
-
-vi.mock("./onboard-search.js", () => ({
   resolveSearchProviderOptions: mocks.resolveSearchProviderOptions,
   setupSearch: mocks.setupSearch,
-}));
+};
 
 import { WizardCancelledError } from "../wizard/prompts.js";
-import { runConfigureWizard } from "./configure.wizard.js";
 
 const EMPTY_CONFIG_SNAPSHOT = {
   exists: false,
@@ -185,8 +149,35 @@ function queueWizardPrompts(params: { select: string[]; confirm: boolean[]; text
   mocks.clackOutro.mockResolvedValue(undefined);
 }
 
+function getConfigureDeps(): ConfigureWizardDeps {
+  return {
+    ...configureDeps,
+    intro: mocks.clackIntro,
+    outro: mocks.clackOutro,
+    select: mocks.clackSelect,
+    text: mocks.clackText,
+    confirm: mocks.clackConfirm,
+    readConfigFileSnapshot: mocks.readConfigFileSnapshot,
+    replaceConfigFile: mocks.replaceConfigFile,
+    resolveGatewayPort: mocks.resolveGatewayPort,
+    ensureControlUiAssetsBuilt: mocks.ensureControlUiAssetsBuilt,
+    createClackPrompter: mocks.createClackPrompter,
+    note: mocks.note,
+    probeGatewayReachable: mocks.probeGatewayReachable,
+    resolveControlUiLinks: mocks.resolveControlUiLinks,
+    summarizeExistingConfig: mocks.summarizeExistingConfig,
+    waitForGatewayReachable: mocks.waitForGatewayReachable,
+    resolveSearchProviderOptions: mocks.resolveSearchProviderOptions,
+    setupSearch: mocks.setupSearch,
+  };
+}
+
 async function runWebConfigureWizard() {
-  await runConfigureWizard({ command: "configure", sections: ["web"] }, createRuntime());
+  await runConfigureWizard(
+    { command: "configure", sections: ["web"] },
+    createRuntime(),
+    getConfigureDeps(),
+  );
 }
 
 describe("runConfigureWizard", () => {
@@ -216,7 +207,7 @@ describe("runConfigureWizard", () => {
       confirm: [false],
     });
 
-    await runConfigureWizard({ command: "configure" }, createRuntime());
+    await runConfigureWizard({ command: "configure" }, createRuntime(), getConfigureDeps());
 
     expect(mocks.writeConfigFile).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -230,7 +221,7 @@ describe("runConfigureWizard", () => {
     setupBaseWizardState();
     mocks.clackSelect.mockRejectedValueOnce(new WizardCancelledError());
 
-    await runConfigureWizard({ command: "configure" }, runtime);
+    await runConfigureWizard({ command: "configure" }, runtime, getConfigureDeps());
 
     expect(runtime.exit).toHaveBeenCalledWith(1);
   });

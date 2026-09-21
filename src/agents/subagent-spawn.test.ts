@@ -1,5 +1,14 @@
 import os from "node:os";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
+import type { SessionEntry } from "../config/sessions.js";
+import { callGateway } from "../gateway/call.js";
+import { registerSubagentRun } from "./subagent-registry.js";
+import {
+  emitSessionLifecycleEvent,
+  pruneLegacyStoreKeys,
+  updateSessionStore,
+} from "./subagent-spawn.runtime.js";
 import {
   createSubagentSpawnTestConfig,
   expectPersistedRuntimeModel,
@@ -8,14 +17,14 @@ import {
 } from "./subagent-spawn.test-helpers.js";
 import { installAcceptedSubagentGatewayMock } from "./test-helpers/subagent-gateway.js";
 
-const hoisted = vi.hoisted(() => ({
-  callGatewayMock: vi.fn(),
-  updateSessionStoreMock: vi.fn(),
-  pruneLegacyStoreKeysMock: vi.fn(),
-  registerSubagentRunMock: vi.fn(),
-  emitSessionLifecycleEventMock: vi.fn(),
-  configOverride: {} as Record<string, unknown>,
-}));
+const hoisted = {
+  callGatewayMock: vi.fn<typeof callGateway>(),
+  updateSessionStoreMock: vi.fn<typeof updateSessionStore>(),
+  pruneLegacyStoreKeysMock: vi.fn<typeof pruneLegacyStoreKeys>(),
+  registerSubagentRunMock: vi.fn<typeof registerSubagentRun>(),
+  emitSessionLifecycleEventMock: vi.fn<typeof emitSessionLifecycleEvent>(),
+  configOverride: {} as OpenClawConfig,
+};
 
 let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
 let spawnSubagentDirect: typeof import("./subagent-spawn.js").spawnSubagentDirect;
@@ -48,7 +57,6 @@ describe("spawnSubagentDirect seam flow", () => {
       emitSessionLifecycleEventMock: hoisted.emitSessionLifecycleEventMock,
       resolveAgentConfig: () => undefined,
       resolveSubagentSpawnModelSelection: () => "openai-codex/gpt-5.4",
-      resolveSandboxRuntimeStatus: () => ({ sandboxed: false }),
       sessionStorePath: "/tmp/subagent-spawn-session-store.json",
       resetModules: false,
     }));
@@ -65,11 +73,8 @@ describe("spawnSubagentDirect seam flow", () => {
     installAcceptedSubagentGatewayMock(hoisted.callGatewayMock);
 
     hoisted.updateSessionStoreMock.mockImplementation(
-      async (
-        _storePath: string,
-        mutator: (store: Record<string, Record<string, unknown>>) => unknown,
-      ) => {
-        const store: Record<string, Record<string, unknown>> = {};
+      async (_storePath: string, mutator: (store: Record<string, SessionEntry>) => unknown) => {
+        const store: Record<string, SessionEntry> = {};
         await mutator(store);
         return store;
       },
@@ -78,7 +83,7 @@ describe("spawnSubagentDirect seam flow", () => {
 
   it("accepts a spawned run across session patching, runtime-model persistence, registry registration, and lifecycle emission", async () => {
     const operations: string[] = [];
-    let persistedStore: Record<string, Record<string, unknown>> | undefined;
+    let persistedStore: Record<string, SessionEntry> | undefined;
 
     hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
       operations.push(`gateway:${request.method ?? "unknown"}`);

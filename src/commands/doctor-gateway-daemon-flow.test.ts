@@ -1,126 +1,118 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveGatewayPort } from "../config/config.js";
+import {
+  resolveGatewayLaunchAgentLabel,
+  resolveNodeLaunchAgentLabel,
+} from "../daemon/constants.js";
+import { readLastGatewayErrorLine } from "../daemon/diagnostics.js";
+import {
+  isLaunchAgentListed,
+  isLaunchAgentLoaded,
+  launchAgentPlistExists,
+  repairLaunchAgentBootstrap,
+} from "../daemon/launchd.js";
+import { resolveGatewayService, type GatewayService } from "../daemon/service.js";
+import { renderSystemdUnavailableHints } from "../daemon/systemd-hints.js";
+import { isSystemdUserServiceAvailable } from "../daemon/systemd.js";
+import { formatPortDiagnostics, inspectPortUsage } from "../infra/ports.js";
+import { isWSL } from "../infra/wsl.js";
+import { note } from "../terminal/note.js";
+import { sleep } from "../utils.js";
+import { buildGatewayInstallPlan, gatewayInstallErrorHint } from "./daemon-install-helpers.js";
+import { buildGatewayRuntimeHints, formatGatewayRuntimeSummary } from "./doctor-format.js";
+import {
+  maybeRepairGatewayDaemon as maybeRepairGatewayDaemonImpl,
+  type DoctorGatewayDaemonFlowDeps,
+} from "./doctor-gateway-daemon-flow.js";
 import { createDoctorPrompter } from "./doctor-prompter.js";
+import { resolveGatewayInstallToken } from "./gateway-install-token.js";
+import { healthCommand } from "./health.js";
 
-const service = vi.hoisted(() => ({
-  isLoaded: vi.fn(),
-  readRuntime: vi.fn(),
-  restart: vi.fn(),
-  stage: vi.fn(),
-  install: vi.fn(),
-  readCommand: vi.fn(),
+// Explicit dependency injection replaces the module-level `vi.mock` calls
+// (Bun cannot intercept ESM imports).
+
+const service = {
+  label: "LaunchAgent",
+  loadedText: "loaded",
+  notLoadedText: "not loaded",
+  stage: vi.fn<GatewayService["stage"]>(async () => {}),
+  install: vi.fn<GatewayService["install"]>(async () => {}),
+  uninstall: vi.fn<GatewayService["uninstall"]>(async () => {}),
+  stop: vi.fn<GatewayService["stop"]>(async () => {}),
+  restart: vi.fn<GatewayService["restart"]>(async () => ({ outcome: "completed" })),
+  isLoaded: vi.fn<GatewayService["isLoaded"]>(async () => true),
+  readCommand: vi.fn<GatewayService["readCommand"]>(async () => null),
+  readRuntime: vi.fn<GatewayService["readRuntime"]>(async () => ({ status: "running" })),
+} satisfies GatewayService;
+const resolveGatewayPortMock = vi.fn<typeof resolveGatewayPort>(() => 18789);
+const readLastGatewayErrorLineMock = vi.fn<typeof readLastGatewayErrorLine>(async () => null);
+const noteMock = vi.fn<typeof note>();
+const sleepMock = vi.fn<typeof sleep>(async () => {});
+const healthCommandMock = vi.fn<typeof healthCommand>();
+const inspectPortUsageMock = vi.fn<typeof inspectPortUsage>();
+const formatPortDiagnosticsMock = vi.fn<typeof formatPortDiagnostics>(() => []);
+const isSystemdUserServiceAvailableMock = vi.fn<typeof isSystemdUserServiceAvailable>(
+  async () => true,
+);
+const isWSLMock = vi.fn<typeof isWSL>(async () => false);
+const renderSystemdUnavailableHintsMock = vi.fn<typeof renderSystemdUnavailableHints>(() => []);
+const buildGatewayInstallPlanMock = vi.fn<typeof buildGatewayInstallPlan>();
+const gatewayInstallErrorHintMock = vi.fn<typeof gatewayInstallErrorHint>(() => "hint");
+const resolveGatewayInstallTokenMock = vi.fn<typeof resolveGatewayInstallToken>();
+const resolveGatewayLaunchAgentLabelMock = vi.fn<typeof resolveGatewayLaunchAgentLabel>(
+  () => "ai.openclaw.gateway",
+);
+const resolveNodeLaunchAgentLabelMock = vi.fn<typeof resolveNodeLaunchAgentLabel>(
+  () => "ai.openclaw.node",
+);
+const isLaunchAgentListedMock = vi.fn<typeof isLaunchAgentListed>(async () => false);
+const isLaunchAgentLoadedMock = vi.fn<typeof isLaunchAgentLoaded>(async () => false);
+const launchAgentPlistExistsMock = vi.fn<typeof launchAgentPlistExists>(async () => false);
+const repairLaunchAgentBootstrapMock = vi.fn<typeof repairLaunchAgentBootstrap>(async () => ({
+  ok: true,
+  status: "repaired",
 }));
-const note = vi.hoisted(() => vi.fn());
-const sleep = vi.hoisted(() => vi.fn(async () => {}));
-const healthCommand = vi.hoisted(() => vi.fn(async () => {}));
-const inspectPortUsage = vi.hoisted(() => vi.fn());
-const readLastGatewayErrorLine = vi.hoisted(() => vi.fn(async () => null));
+const formatGatewayRuntimeSummaryMock = vi.fn<typeof formatGatewayRuntimeSummary>(() => null);
+const buildGatewayRuntimeHintsMock = vi.fn<typeof buildGatewayRuntimeHints>(() => []);
 
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    resolveGatewayPort: vi.fn(() => 18789),
-  };
-});
+const daemonDeps: DoctorGatewayDaemonFlowDeps = {
+  resolveGatewayService: () => service,
+  resolveGatewayPort: resolveGatewayPortMock,
+  readLastGatewayErrorLine: readLastGatewayErrorLineMock,
+  note: noteMock,
+  sleep: sleepMock,
+  healthCommand: healthCommandMock,
+  inspectPortUsage: inspectPortUsageMock,
+  formatPortDiagnostics: formatPortDiagnosticsMock,
+  isSystemdUserServiceAvailable: isSystemdUserServiceAvailableMock,
+  isWSL: isWSLMock,
+  renderSystemdUnavailableHints: renderSystemdUnavailableHintsMock,
+  buildGatewayInstallPlan: buildGatewayInstallPlanMock,
+  gatewayInstallErrorHint: gatewayInstallErrorHintMock,
+  resolveGatewayInstallToken: resolveGatewayInstallTokenMock,
+  resolveGatewayLaunchAgentLabel: resolveGatewayLaunchAgentLabelMock,
+  resolveNodeLaunchAgentLabel: resolveNodeLaunchAgentLabelMock,
+  isLaunchAgentListed: isLaunchAgentListedMock,
+  isLaunchAgentLoaded: isLaunchAgentLoadedMock,
+  launchAgentPlistExists: launchAgentPlistExistsMock,
+  repairLaunchAgentBootstrap: repairLaunchAgentBootstrapMock,
+  formatGatewayRuntimeSummary: formatGatewayRuntimeSummaryMock,
+  buildGatewayRuntimeHints: buildGatewayRuntimeHintsMock,
+};
 
-vi.mock("../daemon/constants.js", () => ({
-  resolveGatewayLaunchAgentLabel: vi.fn(() => "ai.openclaw.gateway"),
-  resolveNodeLaunchAgentLabel: vi.fn(() => "ai.openclaw.node"),
-}));
-
-vi.mock("../daemon/diagnostics.js", () => ({
-  readLastGatewayErrorLine,
-}));
-
-vi.mock("../daemon/launchd.js", async () => {
-  const actual = await import("../daemon/launchd.js");
-  return {
-    ...actual,
-    isLaunchAgentListed: vi.fn(async () => false),
-    isLaunchAgentLoaded: vi.fn(async () => false),
-    launchAgentPlistExists: vi.fn(async () => false),
-    repairLaunchAgentBootstrap: vi.fn(async () => ({ ok: true, status: "repaired" })),
-  };
-});
-
-vi.mock("../daemon/service.js", async () => {
-  const actual = await import("../daemon/service.js");
-  return {
-    ...actual,
-    resolveGatewayService: () => service,
-  };
-});
-
-vi.mock("../daemon/systemd-hints.js", () => ({
-  renderSystemdUnavailableHints: vi.fn(() => []),
-}));
-
-vi.mock("../daemon/systemd.js", async () => {
-  const actual = await import("../daemon/systemd.js");
-  return {
-    ...actual,
-    isSystemdUserServiceAvailable: vi.fn(async () => true),
-  };
-});
-
-vi.mock("../infra/ports.js", () => ({
-  inspectPortUsage,
-  formatPortDiagnostics: vi.fn(() => []),
-}));
-
-vi.mock("../infra/wsl.js", () => ({
-  isWSL: vi.fn(async () => false),
-}));
-
-vi.mock("../terminal/note.js", () => ({
-  note,
-}));
-
-vi.mock("../utils.js", async () => {
-  const actual = await import("../utils.js");
-  return {
-    ...actual,
-    sleep,
-  };
-});
-
-vi.mock("./daemon-install-helpers.js", () => ({
-  buildGatewayInstallPlan: vi.fn(),
-  gatewayInstallErrorHint: vi.fn(() => "hint"),
-}));
-
-vi.mock("./doctor-format.js", () => ({
-  buildGatewayRuntimeHints: vi.fn(() => []),
-  formatGatewayRuntimeSummary: vi.fn(() => null),
-}));
-
-vi.mock("./gateway-install-token.js", () => ({
-  resolveGatewayInstallToken: vi.fn(),
-}));
-
-vi.mock("./health-format.js", () => ({
-  formatHealthCheckFailure: vi.fn(() => "health failed"),
-}));
-
-vi.mock("./health.js", () => ({
-  healthCommand,
-}));
+const maybeRepairGatewayDaemon = (params: Parameters<typeof maybeRepairGatewayDaemonImpl>[0]) =>
+  maybeRepairGatewayDaemonImpl(params, daemonDeps);
 
 describe("maybeRepairGatewayDaemon", () => {
-  let maybeRepairGatewayDaemon: typeof import("./doctor-gateway-daemon-flow.js").maybeRepairGatewayDaemon;
   const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
   const originalUpdateInProgress = process.env.DENNOU_UPDATE_IN_PROGRESS;
-
-  beforeAll(async () => {
-    ({ maybeRepairGatewayDaemon } = await import("./doctor-gateway-daemon-flow.js"));
-  });
 
   beforeEach(() => {
     vi.clearAllMocks();
     service.isLoaded.mockResolvedValue(true);
     service.readRuntime.mockResolvedValue({ status: "running" });
     service.restart.mockResolvedValue({ outcome: "completed" });
-    inspectPortUsage.mockResolvedValue({
+    inspectPortUsageMock.mockResolvedValue({
       port: 18789,
       status: "free",
       listeners: [],
@@ -198,12 +190,12 @@ describe("maybeRepairGatewayDaemon", () => {
     });
 
     expect(service.restart).toHaveBeenCalledTimes(1);
-    expect(note).toHaveBeenCalledWith(
+    expect(noteMock).toHaveBeenCalledWith(
       "restart scheduled, gateway will restart momentarily",
       "Gateway",
     );
-    expect(sleep).not.toHaveBeenCalled();
-    expect(healthCommand).not.toHaveBeenCalled();
+    expect(sleepMock).not.toHaveBeenCalled();
+    expect(healthCommandMock).not.toHaveBeenCalled();
   });
 
   it("skips start verification when a stopped service start is only scheduled", async () => {
@@ -221,12 +213,12 @@ describe("maybeRepairGatewayDaemon", () => {
     });
 
     expect(service.restart).toHaveBeenCalledTimes(1);
-    expect(note).toHaveBeenCalledWith(
+    expect(noteMock).toHaveBeenCalledWith(
       "restart scheduled, gateway will restart momentarily",
       "Gateway",
     );
-    expect(sleep).not.toHaveBeenCalled();
-    expect(healthCommand).not.toHaveBeenCalled();
+    expect(sleepMock).not.toHaveBeenCalled();
+    expect(healthCommandMock).not.toHaveBeenCalled();
   });
 
   it("skips gateway install during non-interactive update repairs", async () => {

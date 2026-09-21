@@ -50,6 +50,11 @@ type ToolStartRecord = {
   args: unknown;
 };
 
+export type PiEmbeddedToolHandlerDeps = {
+  getGlobalHookRunner?: typeof getGlobalHookRunner;
+  consumeAdjustedParamsForToolCall?: typeof consumeAdjustedParamsForToolCall;
+};
+
 /** Track tool execution start data for after_tool_call hook. */
 const toolStartData = new Map<string, ToolStartRecord>();
 
@@ -718,7 +723,11 @@ export async function handleToolExecutionEnd(
     isError: boolean;
     result?: unknown;
   },
+  deps: PiEmbeddedToolHandlerDeps = {},
 ) {
+  const consumeAdjustedParamsForToolCallImpl =
+    deps.consumeAdjustedParamsForToolCall ?? consumeAdjustedParamsForToolCall;
+  const getGlobalHookRunnerImpl = deps.getGlobalHookRunner ?? getGlobalHookRunner;
   const toolName = normalizeToolName(String(evt.toolName));
   const toolCallId = String(evt.toolCallId);
   const runId = ctx.params.runId;
@@ -786,7 +795,7 @@ export async function handleToolExecutionEnd(
     startData?.args && typeof startData.args === "object"
       ? (startData.args as Record<string, unknown>)
       : {};
-  const adjustedArgs = consumeAdjustedParamsForToolCall(toolCallId, runId);
+  const adjustedArgs = consumeAdjustedParamsForToolCallImpl(toolCallId, runId);
   const afterToolCallArgs =
     adjustedArgs && typeof adjustedArgs === "object"
       ? (adjustedArgs as Record<string, unknown>)
@@ -1038,7 +1047,7 @@ export async function handleToolExecutionEnd(
   await emitToolResultOutput({ ctx, toolName, meta, isToolError, result, sanitizedResult });
 
   // Run after_tool_call plugin hook (fire-and-forget)
-  const hookRunnerAfter = ctx.hookRunner ?? getGlobalHookRunner();
+  const hookRunnerAfter = ctx.hookRunner ?? getGlobalHookRunnerImpl();
   if (hookRunnerAfter?.hasHooks("after_tool_call")) {
     const durationMs = startData?.startTime != null ? Date.now() - startData.startTime : undefined;
     const hookEvent: PluginHookAfterToolCallEvent = {

@@ -2,15 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
+import { callGateway } from "../gateway/call.js";
 import {
   createSubagentSpawnTestConfig,
   loadSubagentSpawnModuleForTest,
   setupAcceptedSubagentGatewayMock,
 } from "./subagent-spawn.test-helpers.js";
 
-const callGatewayMock = vi.fn();
+const callGatewayMock = vi.fn<typeof callGateway>();
 
-let configOverride: Record<string, unknown> = {
+let configOverride: OpenClawConfig = {
   ...createSubagentSpawnTestConfig(),
 };
 let workspaceDirOverride = "";

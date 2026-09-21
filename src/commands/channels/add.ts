@@ -6,11 +6,17 @@ import { moveSingleAccountChannelSectionToDefaultAccount } from "../../channels/
 import type { ChannelSetupPlugin } from "../../channels/plugins/setup-wizard-types.js";
 import type { ChannelId, ChannelPlugin, ChannelSetupInput } from "../../channels/plugins/types.js";
 import { replaceConfigFile, type OpenClawConfig } from "../../config/config.js";
+import { loadPluginManifestRegistry } from "../../plugins/manifest-registry.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv } from "../../runtime.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
 import { applyAgentBindings, describeBinding } from "../agents.bindings.js";
 import { isCatalogChannelInstalled } from "../channel-setup/discovery.js";
+import type {
+  ensureChannelSetupPluginInstalled,
+  loadChannelSetupPluginRegistrySnapshotForChannel,
+} from "../channel-setup/plugin-install.js";
+import type { ConfigValidationDeps } from "../config-validation.js";
 import {
   createChannelOnboardingPostWriteHookCollector,
   runCollectedChannelOnboardingPostWriteHooks,
@@ -18,6 +24,16 @@ import {
 import type { ChannelChoice } from "../onboard-types.js";
 import { applyAccountName, applyChannelAccountConfig } from "./add-mutators.js";
 import { channelLabel, requireValidConfigFileSnapshot, shouldUseWizard } from "./shared.js";
+
+export type ChannelsAddDeps = {
+  requireValidConfigFileSnapshot?: typeof requireValidConfigFileSnapshot;
+  configValidation?: ConfigValidationDeps;
+  replaceConfigFile?: typeof replaceConfigFile;
+  listChannelPluginCatalogEntries?: typeof listChannelPluginCatalogEntries;
+  loadPluginManifestRegistry?: typeof loadPluginManifestRegistry;
+  ensureChannelSetupPluginInstalled?: typeof ensureChannelSetupPluginInstalled;
+  loadChannelSetupPluginRegistrySnapshotForChannel?: typeof loadChannelSetupPluginRegistrySnapshotForChannel;
+};
 
 export type ChannelsAddOptions = {
   channel?: string;
@@ -27,13 +43,17 @@ export type ChannelsAddOptions = {
   dmAllowlist?: string;
 } & Omit<ChannelSetupInput, "groupChannels" | "dmAllowlist" | "initialSyncLimit">;
 
-function resolveCatalogChannelEntry(raw: string, cfg: OpenClawConfig | null) {
+function resolveCatalogChannelEntry(
+  raw: string,
+  cfg: OpenClawConfig | null,
+  listCatalogEntries: typeof listChannelPluginCatalogEntries,
+) {
   const trimmed = raw.trim().toLowerCase();
   if (!trimmed) {
     return undefined;
   }
   const workspaceDir = cfg ? resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg)) : undefined;
-  return listChannelPluginCatalogEntries({ workspaceDir }).find((entry) => {
+  return listCatalogEntries({ workspaceDir }).find((entry) => {
     if (entry.id.toLowerCase() === trimmed) {
       return true;
     }
@@ -45,8 +65,17 @@ export async function channelsAddCommand(
   opts: ChannelsAddOptions,
   runtime: RuntimeEnv = defaultRuntime,
   params?: { hasFlags?: boolean },
+  deps: ChannelsAddDeps = {},
 ) {
-  const configSnapshot = await requireValidConfigFileSnapshot(runtime);
+  const requireValidConfigFileSnapshotImpl =
+    deps.requireValidConfigFileSnapshot ??
+    ((rt) => requireValidConfigFileSnapshot(rt, undefined, deps.configValidation));
+  const replaceConfigFileImpl = deps.replaceConfigFile ?? replaceConfigFile;
+  const listChannelPluginCatalogEntriesImpl =
+    deps.listChannelPluginCatalogEntries ?? listChannelPluginCatalogEntries;
+  const loadPluginManifestRegistryImpl =
+    deps.loadPluginManifestRegistry ?? loadPluginManifestRegistry;
+  const configSnapshot = await requireValidConfigFileSnapshotImpl(runtime);
   if (!configSnapshot) {
     return;
   }
@@ -179,7 +208,7 @@ export async function channelsAddCommand(
       }
     }
 
-    await replaceConfigFile({
+    await replaceConfigFileImpl({
       nextConfig,
       ...(baseHash !== undefined ? { baseHash } : {}),
     });
@@ -194,7 +223,9 @@ export async function channelsAddCommand(
 
   const rawChannel = String(opts.channel ?? "");
   let channel = normalizeChannelId(rawChannel);
-  let catalogEntry = channel ? undefined : resolveCatalogChannelEntry(rawChannel, nextConfig);
+  let catalogEntry = channel
+    ? undefined
+    : resolveCatalogChannelEntry(rawChannel, nextConfig, listChannelPluginCatalogEntriesImpl);
   const resolveWorkspaceDir = () =>
     resolveAgentWorkspaceDir(nextConfig, resolveDefaultAgentId(nextConfig));
   // May trigger loadOpenClawPlugins on cache miss (disk scan + jiti import)
@@ -206,9 +237,11 @@ export async function channelsAddCommand(
     if (existing) {
       return existing;
     }
-    const { loadChannelSetupPluginRegistrySnapshotForChannel } =
-      await import("../channel-setup/plugin-install.js");
-    const snapshot = loadChannelSetupPluginRegistrySnapshotForChannel({
+    const loadChannelSetupPluginRegistrySnapshotForChannelImpl =
+      deps.loadChannelSetupPluginRegistrySnapshotForChannel ??
+      (await import("../channel-setup/plugin-install.js"))
+        .loadChannelSetupPluginRegistrySnapshotForChannel;
+    const snapshot = loadChannelSetupPluginRegistrySnapshotForChannelImpl({
       cfg: nextConfig,
       runtime,
       channel: channelId,
@@ -224,16 +257,20 @@ export async function channelsAddCommand(
   if (!channel && catalogEntry) {
     const workspaceDir = resolveWorkspaceDir();
     if (
-      !isCatalogChannelInstalled({
-        cfg: nextConfig,
-        entry: catalogEntry,
-        workspaceDir,
-      })
+      !isCatalogChannelInstalled(
+        {
+          cfg: nextConfig,
+          entry: catalogEntry,
+          workspaceDir,
+        },
+        { loadPluginManifestRegistry: loadPluginManifestRegistryImpl },
+      )
     ) {
-      const { ensureChannelSetupPluginInstalled } =
-        await import("../channel-setup/plugin-install.js");
+      const ensureChannelSetupPluginInstalledImpl =
+        deps.ensureChannelSetupPluginInstalled ??
+        (await import("../channel-setup/plugin-install.js")).ensureChannelSetupPluginInstalled;
       const prompter = createClackPrompter();
-      const result = await ensureChannelSetupPluginInstalled({
+      const result = await ensureChannelSetupPluginInstalledImpl({
         cfg: nextConfig,
         entry: catalogEntry,
         prompter,
@@ -353,7 +390,7 @@ export async function channelsAddCommand(
     runtime,
   });
 
-  await replaceConfigFile({
+  await replaceConfigFileImpl({
     nextConfig,
     ...(baseHash !== undefined ? { baseHash } : {}),
   });

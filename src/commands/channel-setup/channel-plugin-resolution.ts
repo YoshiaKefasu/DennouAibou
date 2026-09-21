@@ -21,6 +21,14 @@ type ChannelPluginSnapshot = {
   channelSetups: Array<{ plugin: ChannelPlugin }>;
 };
 
+export type ResolveInstallableChannelPluginDeps = {
+  listChannelPluginCatalogEntries?: typeof listChannelPluginCatalogEntries;
+  getChannelPluginCatalogEntry?: typeof getChannelPluginCatalogEntry;
+  getChannelPlugin?: typeof getChannelPlugin;
+  ensureChannelSetupPluginInstalled?: typeof ensureChannelSetupPluginInstalled;
+  loadChannelSetupPluginRegistrySnapshotForChannel?: typeof loadChannelSetupPluginRegistrySnapshotForChannel;
+};
+
 type ResolveInstallableChannelPluginResult = {
   cfg: OpenClawConfig;
   channelId?: ChannelId;
@@ -47,13 +55,19 @@ function resolveResolvedChannelId(params: {
   return normalizeChannelId(params.catalogEntry.id) ?? (params.catalogEntry.id as ChannelId);
 }
 
-export function resolveCatalogChannelEntry(raw: string, cfg: OpenClawConfig | null) {
+export function resolveCatalogChannelEntry(
+  raw: string,
+  cfg: OpenClawConfig | null,
+  deps: ResolveInstallableChannelPluginDeps = {},
+) {
+  const listCatalogEntries =
+    deps.listChannelPluginCatalogEntries ?? listChannelPluginCatalogEntries;
   const trimmed = raw.trim().toLowerCase();
   if (!trimmed) {
     return undefined;
   }
   const workspaceDir = cfg ? resolveWorkspaceDir(cfg) : undefined;
-  return listChannelPluginCatalogEntries({ workspaceDir }).find((entry) => {
+  return listCatalogEntries({ workspaceDir }).find((entry) => {
     if (entry.id.toLowerCase() === trimmed) {
       return true;
     }
@@ -91,26 +105,30 @@ function resolveTrustedCatalogEntry(params: {
   cfg: OpenClawConfig;
   workspaceDir?: string;
   catalogEntry?: ChannelPluginCatalogEntry;
+  listChannelPluginCatalogEntries: typeof listChannelPluginCatalogEntries;
+  getChannelPluginCatalogEntry: typeof getChannelPluginCatalogEntry;
 }): ChannelPluginCatalogEntry | undefined {
   if (isTrustedWorkspaceChannelCatalogEntry(params.catalogEntry, params.cfg)) {
     return params.catalogEntry;
   }
   if (params.rawChannel) {
     const trimmed = params.rawChannel.trim().toLowerCase();
-    return listChannelPluginCatalogEntries({
-      workspaceDir: params.workspaceDir,
-      excludeWorkspace: true,
-    }).find((entry) => {
-      if (entry.id.toLowerCase() === trimmed) {
-        return true;
-      }
-      return (entry.meta.aliases ?? []).some((alias) => alias.trim().toLowerCase() === trimmed);
-    });
+    return params
+      .listChannelPluginCatalogEntries({
+        workspaceDir: params.workspaceDir,
+        excludeWorkspace: true,
+      })
+      .find((entry) => {
+        if (entry.id.toLowerCase() === trimmed) {
+          return true;
+        }
+        return (entry.meta.aliases ?? []).some((alias) => alias.trim().toLowerCase() === trimmed);
+      });
   }
   if (!params.channelId) {
     return undefined;
   }
-  return getChannelPluginCatalogEntry(params.channelId, {
+  return params.getChannelPluginCatalogEntry(params.channelId, {
     workspaceDir: params.workspaceDir,
     excludeWorkspace: true,
   });
@@ -122,8 +140,9 @@ function loadScopedChannelPlugin(params: {
   channelId: ChannelId;
   pluginId?: string;
   workspaceDir?: string;
+  loadChannelSetupPluginRegistrySnapshotForChannel: typeof loadChannelSetupPluginRegistrySnapshotForChannel;
 }): ChannelPlugin | undefined {
-  const snapshot = loadChannelSetupPluginRegistrySnapshotForChannel({
+  const snapshot = params.loadChannelSetupPluginRegistrySnapshotForChannel({
     cfg: params.cfg,
     runtime: params.runtime,
     channel: params.channelId,
@@ -141,14 +160,26 @@ export async function resolveInstallableChannelPlugin(params: {
   allowInstall?: boolean;
   prompter?: WizardPrompter;
   supports?: (plugin: ChannelPlugin) => boolean;
+  deps?: ResolveInstallableChannelPluginDeps;
 }): Promise<ResolveInstallableChannelPluginResult> {
   const supports = params.supports ?? (() => true);
+  const deps = params.deps ?? {};
+  const listCatalogEntries =
+    deps.listChannelPluginCatalogEntries ?? listChannelPluginCatalogEntries;
+  const getCatalogEntry = deps.getChannelPluginCatalogEntry ?? getChannelPluginCatalogEntry;
+  const getPlugin = deps.getChannelPlugin ?? getChannelPlugin;
+  const loadSnapshot =
+    deps.loadChannelSetupPluginRegistrySnapshotForChannel ??
+    loadChannelSetupPluginRegistrySnapshotForChannel;
+  const ensureInstall = deps.ensureChannelSetupPluginInstalled ?? ensureChannelSetupPluginInstalled;
   let nextCfg = params.cfg;
   const workspaceDir = resolveWorkspaceDir(nextCfg);
   const unresolvedCatalogEntry =
-    (params.rawChannel ? resolveCatalogChannelEntry(params.rawChannel, nextCfg) : undefined) ??
+    (params.rawChannel
+      ? resolveCatalogChannelEntry(params.rawChannel, nextCfg, deps)
+      : undefined) ??
     (params.channelId
-      ? getChannelPluginCatalogEntry(params.channelId, {
+      ? getCatalogEntry(params.channelId, {
           workspaceDir,
         })
       : undefined);
@@ -158,6 +189,8 @@ export async function resolveInstallableChannelPlugin(params: {
     cfg: nextCfg,
     workspaceDir,
     catalogEntry: unresolvedCatalogEntry,
+    listChannelPluginCatalogEntries: listCatalogEntries,
+    getChannelPluginCatalogEntry: getCatalogEntry,
   });
   const channelId =
     params.channelId ??
@@ -173,7 +206,7 @@ export async function resolveInstallableChannelPlugin(params: {
     };
   }
 
-  const existing = getChannelPlugin(channelId);
+  const existing = getPlugin(channelId);
   if (existing && supports(existing)) {
     return {
       cfg: nextCfg,
@@ -192,6 +225,7 @@ export async function resolveInstallableChannelPlugin(params: {
       channelId,
       pluginId: resolvedPluginId,
       workspaceDir,
+      loadChannelSetupPluginRegistrySnapshotForChannel: loadSnapshot,
     });
     if (scoped && supports(scoped)) {
       return {
@@ -204,7 +238,7 @@ export async function resolveInstallableChannelPlugin(params: {
     }
 
     if (params.allowInstall !== false) {
-      const installResult = await ensureChannelSetupPluginInstalled({
+      const installResult = await ensureInstall({
         cfg: nextCfg,
         entry: catalogEntry,
         prompter: params.prompter ?? createClackPrompter(),
@@ -220,6 +254,7 @@ export async function resolveInstallableChannelPlugin(params: {
             channelId,
             pluginId: installedPluginId,
             workspaceDir: resolveWorkspaceDir(nextCfg),
+            loadChannelSetupPluginRegistrySnapshotForChannel: loadSnapshot,
           })
         : undefined;
       return {

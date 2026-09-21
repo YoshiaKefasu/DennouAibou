@@ -63,6 +63,8 @@ export function createSubagentRunManager(params: {
     cleanup: "delete" | "keep";
     completedAt: number;
   }): void;
+  persistSubagentSessionTiming?: typeof persistSubagentSessionTiming;
+  emitSubagentEndedHookOnce?: typeof emitSubagentEndedHookOnce;
   completeSubagentRun(args: {
     runId: string;
     endedAt?: number;
@@ -73,6 +75,11 @@ export function createSubagentRunManager(params: {
     triggerCleanup: boolean;
   }): Promise<void>;
 }) {
+  const persistSubagentSessionTimingImpl =
+    params.persistSubagentSessionTiming ?? persistSubagentSessionTiming;
+  const emitSubagentEndedHookOnceImpl =
+    params.emitSubagentEndedHookOnce ?? emitSubagentEndedHookOnce;
+
   const waitForSubagentCompletion = async (runId: string, waitTimeoutMs: number) => {
     try {
       const wait = await waitForAgentRun({
@@ -415,7 +422,7 @@ export function createSubagentRunManager(params: {
     if (updated > 0) {
       params.persist();
       for (const entry of entriesByChildSessionKey.values()) {
-        void persistSubagentSessionTiming(entry).catch((err) => {
+        void persistSubagentSessionTimingImpl(entry).catch((err) => {
           log.warn("failed to persist killed subagent session timing", {
             err,
             runId: entry.runId,
@@ -440,7 +447,7 @@ export function createSubagentRunManager(params: {
           }),
         )
           .then(() =>
-            emitSubagentEndedHookOnce({
+            emitSubagentEndedHookOnceImpl({
               entry,
               reason: SUBAGENT_ENDED_REASON_KILLED,
               sendFarewell: true,

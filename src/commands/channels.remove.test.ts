@@ -1,38 +1,42 @@
-import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { listChannelPluginCatalogEntries } from "../channels/plugins/catalog.js";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createTestRegistry } from "../test-utils/channel-plugins.js";
-import {
+import type {
   ensureChannelSetupPluginInstalled,
   loadChannelSetupPluginRegistrySnapshotForChannel,
 } from "./channel-setup/plugin-install.js";
-import { channelsRemoveCommand } from "./channels.js";
-import { configMocks } from "./channels.mock-harness.js";
+import { channelsRemoveCommand as channelsRemoveCommandImpl } from "./channels.js";
+import { channelCommandDeps, configMocks } from "./channels.mock-harness.js";
 import {
   createMSTeamsCatalogEntry,
   createMSTeamsDeletePlugin,
 } from "./channels.plugin-install.test-helpers.js";
+import type { ChannelsRemoveDeps } from "./channels/remove.js";
 import { baseConfigSnapshot, createTestRuntime } from "./test-runtime-config-helpers.js";
 
-const catalogMocks = vi.hoisted(() => ({
-  listChannelPluginCatalogEntries: vi.fn((): ChannelPluginCatalogEntry[] => []),
+const catalogEntriesMock = vi.fn<typeof listChannelPluginCatalogEntries>(() => []);
+const ensureInstalledMock = vi.fn<typeof ensureChannelSetupPluginInstalled>(async ({ cfg }) => ({
+  cfg,
+  installed: true,
 }));
-
-vi.mock("../channels/plugins/catalog.js", async () => {
-  const actual = await import("../channels/plugins/catalog.js");
-  return {
-    ...actual,
-    listChannelPluginCatalogEntries: catalogMocks.listChannelPluginCatalogEntries,
-  };
-});
-
-vi.mock("./channel-setup/plugin-install.js", async () => {
-  const actual = await import("./channel-setup/plugin-install.js");
-  const { createMockChannelSetupPluginInstallModule } =
-    await import("./channels.plugin-install.test-helpers.js");
-  return createMockChannelSetupPluginInstallModule(actual);
-});
+const loadSnapshotMock = vi.fn<typeof loadChannelSetupPluginRegistrySnapshotForChannel>(() =>
+  createTestRegistry(),
+);
+const removeDeps: ChannelsRemoveDeps = {
+  ...channelCommandDeps,
+  resolveInstallableChannelPluginDeps: {
+    listChannelPluginCatalogEntries: catalogEntriesMock,
+    ensureChannelSetupPluginInstalled: ensureInstalledMock,
+    loadChannelSetupPluginRegistrySnapshotForChannel: loadSnapshotMock,
+  },
+};
+const channelsRemoveCommand = (
+  opts: Parameters<typeof channelsRemoveCommandImpl>[0],
+  runtime: Parameters<typeof channelsRemoveCommandImpl>[1],
+  params: Parameters<typeof channelsRemoveCommandImpl>[2],
+) => channelsRemoveCommandImpl(opts, runtime, params, removeDeps);
 
 const runtime = createTestRuntime();
 
@@ -43,17 +47,15 @@ describe("channelsRemoveCommand", () => {
     runtime.log.mockClear();
     runtime.error.mockClear();
     runtime.exit.mockClear();
-    catalogMocks.listChannelPluginCatalogEntries.mockClear();
-    catalogMocks.listChannelPluginCatalogEntries.mockReturnValue([]);
-    (ensureChannelSetupPluginInstalled as Mock).mockClear();
-    (ensureChannelSetupPluginInstalled as Mock).mockImplementation(async ({ cfg }) => ({
+    catalogEntriesMock.mockClear();
+    catalogEntriesMock.mockReturnValue([]);
+    ensureInstalledMock.mockClear();
+    ensureInstalledMock.mockImplementation(async ({ cfg }) => ({
       cfg,
       installed: true,
     }));
-    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockClear();
-    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock).mockReturnValue(
-      createTestRegistry(),
-    );
+    loadSnapshotMock.mockClear();
+    loadSnapshotMock.mockReturnValue(createTestRegistry());
     setActivePluginRegistry(createTestRegistry());
   });
 
@@ -68,21 +70,27 @@ describe("channelsRemoveCommand", () => {
           },
         },
       },
+      sourceConfig: {
+        channels: {
+          msteams: {
+            enabled: true,
+            tenantId: "tenant-1",
+          },
+        },
+      },
     });
     const catalogEntry: ChannelPluginCatalogEntry = createMSTeamsCatalogEntry();
-    catalogMocks.listChannelPluginCatalogEntries.mockReturnValue([catalogEntry]);
+    catalogEntriesMock.mockReturnValue([catalogEntry]);
     const scopedPlugin = createMSTeamsDeletePlugin();
-    (loadChannelSetupPluginRegistrySnapshotForChannel as Mock)
-      .mockReturnValueOnce(createTestRegistry())
-      .mockReturnValueOnce(
-        createTestRegistry([
-          {
-            pluginId: "@openclaw/msteams-plugin",
-            plugin: scopedPlugin,
-            source: "test",
-          },
-        ]),
-      );
+    loadSnapshotMock.mockReturnValueOnce(createTestRegistry()).mockReturnValueOnce(
+      createTestRegistry([
+        {
+          pluginId: "@openclaw/msteams-plugin",
+          plugin: scopedPlugin,
+          source: "test",
+        },
+      ]),
+    );
 
     await channelsRemoveCommand(
       {
@@ -94,12 +102,12 @@ describe("channelsRemoveCommand", () => {
       { hasFlags: true },
     );
 
-    expect(ensureChannelSetupPluginInstalled).toHaveBeenCalledWith(
+    expect(ensureInstalledMock).toHaveBeenCalledWith(
       expect.objectContaining({
         entry: catalogEntry,
       }),
     );
-    expect(loadChannelSetupPluginRegistrySnapshotForChannel).toHaveBeenCalledWith(
+    expect(loadSnapshotMock).toHaveBeenCalledWith(
       expect.objectContaining({
         channel: "msteams",
         pluginId: "@openclaw/msteams-plugin",

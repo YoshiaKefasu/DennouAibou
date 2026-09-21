@@ -30,6 +30,25 @@ import { isDoctorUpdateRepairMode } from "./doctor-repair-mode.js";
 
 const execFileAsync = promisify(execFile);
 
+export type DoctorGatewayServicesDeps = {
+  realpath?: (path: string) => Promise<string>;
+  resolveIsNixMode?: typeof resolveIsNixMode;
+  writeConfigFile?: typeof writeConfigFile;
+  resolveGatewayService?: typeof resolveGatewayService;
+  resolveGatewayPort?: typeof resolveGatewayPort;
+  resolveGatewayAuthTokenForService?: typeof resolveGatewayAuthTokenForService;
+  auditGatewayServiceConfig?: typeof auditGatewayServiceConfig;
+  readEmbeddedGatewayToken?: typeof readEmbeddedGatewayToken;
+  needsNodeRuntimeMigration?: typeof needsNodeRuntimeMigration;
+  resolveSystemNodeInfo?: typeof resolveSystemNodeInfo;
+  renderSystemNodeWarning?: typeof renderSystemNodeWarning;
+  buildGatewayInstallPlan?: typeof buildGatewayInstallPlan;
+  findExtraGatewayServices?: typeof findExtraGatewayServices;
+  renderGatewayServiceCleanupHints?: typeof renderGatewayServiceCleanupHints;
+  uninstallLegacySystemdUnits?: typeof uninstallLegacySystemdUnits;
+  note?: typeof note;
+};
+
 function detectGatewayRuntime(programArguments: string[] | undefined): GatewayDaemonRuntime {
   const first = programArguments?.[0];
   if (first) {
@@ -55,10 +74,13 @@ function findGatewayEntrypoint(programArguments?: string[]): string | null {
   return programArguments[gatewayIndex - 1] ?? null;
 }
 
-async function normalizeExecutablePath(value: string): Promise<string> {
+async function normalizeExecutablePath(
+  value: string,
+  realpathImpl: (path: string) => Promise<string>,
+): Promise<string> {
   const resolvedPath = path.resolve(value);
   try {
-    return await fs.realpath(resolvedPath);
+    return await realpathImpl(resolvedPath);
   } catch {
     return resolvedPath;
   }
@@ -161,12 +183,13 @@ async function cleanupLegacyDarwinServices(
 async function cleanupLegacyLinuxUserServices(
   services: ExtraGatewayService[],
   runtime: RuntimeEnv,
+  uninstallLegacySystemdUnitsImpl: typeof uninstallLegacySystemdUnits,
 ): Promise<{ removed: string[]; failed: string[] }> {
   const removed: string[] = [];
   const failed: string[] = [];
 
   try {
-    const removedUnits = await uninstallLegacySystemdUnits({
+    const removedUnits = await uninstallLegacySystemdUnitsImpl({
       env: process.env,
       stdout: process.stdout,
     });
@@ -196,18 +219,34 @@ export async function maybeRepairGatewayServiceConfig(
   mode: "local" | "remote",
   runtime: RuntimeEnv,
   prompter: DoctorPrompter,
+  deps: DoctorGatewayServicesDeps = {},
 ) {
-  if (resolveIsNixMode(process.env)) {
-    note("Nix mode detected; skip service updates.", "Gateway");
+  const realpathImpl = deps.realpath ?? (async (path: string) => await fs.realpath(path));
+  const resolveIsNixModeImpl = deps.resolveIsNixMode ?? resolveIsNixMode;
+  const writeConfigFileImpl = deps.writeConfigFile ?? writeConfigFile;
+  const resolveGatewayServiceImpl = deps.resolveGatewayService ?? resolveGatewayService;
+  const resolveGatewayPortImpl = deps.resolveGatewayPort ?? resolveGatewayPort;
+  const resolveGatewayAuthTokenForServiceImpl =
+    deps.resolveGatewayAuthTokenForService ?? resolveGatewayAuthTokenForService;
+  const auditGatewayServiceConfigImpl = deps.auditGatewayServiceConfig ?? auditGatewayServiceConfig;
+  const readEmbeddedGatewayTokenImpl = deps.readEmbeddedGatewayToken ?? readEmbeddedGatewayToken;
+  const needsNodeRuntimeMigrationImpl = deps.needsNodeRuntimeMigration ?? needsNodeRuntimeMigration;
+  const resolveSystemNodeInfoImpl = deps.resolveSystemNodeInfo ?? resolveSystemNodeInfo;
+  const renderSystemNodeWarningImpl = deps.renderSystemNodeWarning ?? renderSystemNodeWarning;
+  const buildGatewayInstallPlanImpl = deps.buildGatewayInstallPlan ?? buildGatewayInstallPlan;
+  const noteImpl = deps.note ?? note;
+
+  if (resolveIsNixModeImpl(process.env)) {
+    noteImpl("Nix mode detected; skip service updates.", "Gateway");
     return;
   }
 
   if (mode === "remote") {
-    note("Gateway mode is remote; skipped local service audit.", "Gateway");
+    noteImpl("Gateway mode is remote; skipped local service audit.", "Gateway");
     return;
   }
 
-  const service = resolveGatewayService();
+  const service = resolveGatewayServiceImpl();
   let command: Awaited<ReturnType<typeof service.readCommand>> | null = null;
   try {
     command = await service.readCommand(process.env);
@@ -224,20 +263,20 @@ export async function maybeRepairGatewayServiceConfig(
       defaults: cfg.secrets?.defaults,
     }).ref,
   );
-  const gatewayTokenResolution = await resolveGatewayAuthTokenForService(cfg, process.env);
+  const gatewayTokenResolution = await resolveGatewayAuthTokenForServiceImpl(cfg, process.env);
   if (gatewayTokenResolution.unavailableReason) {
-    note(
+    noteImpl(
       `Unable to verify gateway service token drift: ${gatewayTokenResolution.unavailableReason}`,
       "Gateway service config",
     );
   }
   const expectedGatewayToken = tokenRefConfigured ? undefined : gatewayTokenResolution.token;
-  const audit = await auditGatewayServiceConfig({
+  const audit = await auditGatewayServiceConfigImpl({
     env: process.env,
     command,
     expectedGatewayToken,
   });
-  const serviceToken = readEmbeddedGatewayToken(command);
+  const serviceToken = readEmbeddedGatewayTokenImpl(command);
   if (tokenRefConfigured && serviceToken) {
     audit.issues.push({
       code: SERVICE_AUDIT_CODES.gatewayTokenMismatch,
@@ -247,39 +286,39 @@ export async function maybeRepairGatewayServiceConfig(
       level: "recommended",
     });
   }
-  const needsNodeRuntime = needsNodeRuntimeMigration(audit.issues);
+  const needsNodeRuntime = needsNodeRuntimeMigrationImpl(audit.issues);
   const systemNodeInfo = needsNodeRuntime
-    ? await resolveSystemNodeInfo({ env: process.env })
+    ? await resolveSystemNodeInfoImpl({ env: process.env })
     : null;
   const systemNodePath = systemNodeInfo?.supported ? systemNodeInfo.path : null;
   if (needsNodeRuntime && !systemNodePath) {
-    const warning = renderSystemNodeWarning(systemNodeInfo);
+    const warning = renderSystemNodeWarningImpl(systemNodeInfo);
     if (warning) {
-      note(warning, "Gateway runtime");
+      noteImpl(warning, "Gateway runtime");
     }
-    note(
+    noteImpl(
       "System Node 22 LTS (22.14+) or Node 24 not found. Install via Homebrew/apt/choco and rerun doctor to migrate off Bun/version managers.",
       "Gateway runtime",
     );
   }
 
-  const port = resolveGatewayPort(cfg, process.env);
+  const port = resolveGatewayPortImpl(cfg, process.env);
   const runtimeChoice = detectGatewayRuntime(command.programArguments);
-  const { programArguments } = await buildGatewayInstallPlan({
+  const { programArguments } = await buildGatewayInstallPlanImpl({
     env: process.env,
     port,
     runtime: needsNodeRuntime && systemNodePath ? "node" : runtimeChoice,
     nodePath: systemNodePath ?? undefined,
-    warn: (message, title) => note(message, title),
+    warn: (message, title) => noteImpl(message, title),
     config: cfg,
   });
   const expectedEntrypoint = findGatewayEntrypoint(programArguments);
   const currentEntrypoint = findGatewayEntrypoint(command.programArguments);
   const normalizedExpectedEntrypoint = expectedEntrypoint
-    ? await normalizeExecutablePath(expectedEntrypoint)
+    ? await normalizeExecutablePath(expectedEntrypoint, realpathImpl)
     : null;
   const normalizedCurrentEntrypoint = currentEntrypoint
-    ? await normalizeExecutablePath(currentEntrypoint)
+    ? await normalizeExecutablePath(currentEntrypoint, realpathImpl)
     : null;
   if (
     normalizedExpectedEntrypoint &&
@@ -298,7 +337,7 @@ export async function maybeRepairGatewayServiceConfig(
     return;
   }
 
-  note(
+  noteImpl(
     audit.issues
       .map((issue) =>
         issue.detail ? `- ${issue.message} (${issue.detail})` : `- ${issue.message}`,
@@ -311,7 +350,7 @@ export async function maybeRepairGatewayServiceConfig(
   const needsAggressive = aggressiveIssues.length > 0;
 
   if (needsAggressive && !prompter.shouldForce) {
-    note(
+    noteImpl(
       "Custom or unexpected service edits detected. Rerun with --force to overwrite.",
       "Gateway service config",
     );
@@ -330,7 +369,7 @@ export async function maybeRepairGatewayServiceConfig(
     return;
   }
   const updateRepairMode = isDoctorUpdateRepairMode(prompter.repairMode);
-  const serviceEmbeddedToken = readEmbeddedGatewayToken(command);
+  const serviceEmbeddedToken = readEmbeddedGatewayTokenImpl(command);
   const gatewayTokenForRepair = expectedGatewayToken ?? serviceEmbeddedToken;
   const configuredGatewayToken =
     typeof cfg.gateway?.auth?.token === "string"
@@ -355,9 +394,9 @@ export async function maybeRepairGatewayServiceConfig(
       },
     };
     try {
-      await writeConfigFile(nextCfg);
+      await writeConfigFileImpl(nextCfg);
       cfgForServiceInstall = nextCfg;
-      note(
+      noteImpl(
         expectedGatewayToken
           ? "Persisted gateway.auth.token from environment before reinstalling service."
           : "Persisted gateway.auth.token from existing service definition before reinstalling service.",
@@ -369,13 +408,13 @@ export async function maybeRepairGatewayServiceConfig(
     }
   }
 
-  const updatedPort = resolveGatewayPort(cfgForServiceInstall, process.env);
-  const updatedPlan = await buildGatewayInstallPlan({
+  const updatedPort = resolveGatewayPortImpl(cfgForServiceInstall, process.env);
+  const updatedPlan = await buildGatewayInstallPlanImpl({
     env: process.env,
     port: updatedPort,
     runtime: needsNodeRuntime && systemNodePath ? "node" : runtimeChoice,
     nodePath: systemNodePath ?? undefined,
-    warn: (message, title) => note(message, title),
+    warn: (message, title) => noteImpl(message, title),
     config: cfgForServiceInstall,
   });
   try {
@@ -395,15 +434,23 @@ export async function maybeScanExtraGatewayServices(
   options: DoctorOptions,
   runtime: RuntimeEnv,
   prompter: DoctorPrompter,
+  deps: DoctorGatewayServicesDeps = {},
 ) {
-  const extraServices = await findExtraGatewayServices(process.env, {
+  const findExtraGatewayServicesImpl = deps.findExtraGatewayServices ?? findExtraGatewayServices;
+  const renderGatewayServiceCleanupHintsImpl =
+    deps.renderGatewayServiceCleanupHints ?? renderGatewayServiceCleanupHints;
+  const uninstallLegacySystemdUnitsImpl =
+    deps.uninstallLegacySystemdUnits ?? uninstallLegacySystemdUnits;
+  const noteImpl = deps.note ?? note;
+
+  const extraServices = await findExtraGatewayServicesImpl(process.env, {
     deep: options.deep,
   });
   if (extraServices.length === 0) {
     return;
   }
 
-  note(
+  noteImpl(
     extraServices.map((svc) => `- ${svc.label} (${svc.scope}, ${svc.detail})`).join("\n"),
     "Other gateway-like services detected",
   );
@@ -426,16 +473,20 @@ export async function maybeScanExtraGatewayServices(
       }
 
       if (linuxUserServices.length > 0) {
-        const result = await cleanupLegacyLinuxUserServices(linuxUserServices, runtime);
+        const result = await cleanupLegacyLinuxUserServices(
+          linuxUserServices,
+          runtime,
+          uninstallLegacySystemdUnitsImpl,
+        );
         removed.push(...result.removed);
         failed.push(...result.failed);
       }
 
       if (removed.length > 0) {
-        note(removed.map((line) => `- ${line}`).join("\n"), "Legacy gateway removed");
+        noteImpl(removed.map((line) => `- ${line}`).join("\n"), "Legacy gateway removed");
       }
       if (failed.length > 0) {
-        note(failed.map((line) => `- ${line}`).join("\n"), "Legacy gateway cleanup skipped");
+        noteImpl(failed.map((line) => `- ${line}`).join("\n"), "Legacy gateway cleanup skipped");
       }
       if (removed.length > 0) {
         runtime.log("Legacy gateway services removed. Installing OpenClaw gateway next.");
@@ -443,12 +494,12 @@ export async function maybeScanExtraGatewayServices(
     }
   }
 
-  const cleanupHints = renderGatewayServiceCleanupHints();
+  const cleanupHints = renderGatewayServiceCleanupHintsImpl();
   if (cleanupHints.length > 0) {
-    note(cleanupHints.map((hint) => `- ${hint}`).join("\n"), "Cleanup hints");
+    noteImpl(cleanupHints.map((hint) => `- ${hint}`).join("\n"), "Cleanup hints");
   }
 
-  note(
+  noteImpl(
     [
       "Recommendation: run a single gateway per machine for most setups.",
       "One gateway supports multiple agents.",

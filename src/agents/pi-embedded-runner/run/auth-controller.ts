@@ -40,37 +40,46 @@ type LogLike = {
   warn(message: string): void;
 };
 
-export function createEmbeddedRunAuthController(params: {
-  config: RunEmbeddedPiAgentParams["config"];
-  agentDir: string;
-  workspaceDir: string;
-  authStore: AuthProfileStore;
-  authStorage: RuntimeApiKeySink;
-  profileCandidates: Array<string | undefined>;
-  lockedProfileId?: string;
-  initialThinkLevel: ThinkLevel;
-  attemptedThinking: Set<ThinkLevel>;
-  fallbackConfigured: boolean;
-  allowTransientCooldownProbe: boolean;
-  getProvider(): string;
-  getModelId(): string;
-  getRuntimeModel(): Model<Api>;
-  setRuntimeModel(next: Model<Api>): void;
-  getEffectiveModel(): Model<Api>;
-  setEffectiveModel(next: Model<Api>): void;
-  getApiKeyInfo(): ApiKeyInfo | null;
-  setApiKeyInfo(next: ApiKeyInfo | null): void;
-  getLastProfileId(): string | undefined;
-  setLastProfileId(next: string | undefined): void;
-  getRuntimeAuthState(): RuntimeAuthState | null;
-  setRuntimeAuthState(next: RuntimeAuthState | null): void;
-  getRuntimeAuthRefreshCancelled(): boolean;
-  setRuntimeAuthRefreshCancelled(next: boolean): void;
-  getProfileIndex(): number;
-  setProfileIndex(next: number): void;
-  setThinkLevel(next: ThinkLevel): void;
-  log: LogLike;
-}) {
+export type EmbeddedRunAuthControllerDeps = {
+  prepareProviderRuntimeAuth?: typeof prepareProviderRuntimeAuth;
+};
+
+export function createEmbeddedRunAuthController(
+  params: {
+    config: RunEmbeddedPiAgentParams["config"];
+    agentDir: string;
+    workspaceDir: string;
+    authStore: AuthProfileStore;
+    authStorage: RuntimeApiKeySink;
+    profileCandidates: Array<string | undefined>;
+    lockedProfileId?: string;
+    initialThinkLevel: ThinkLevel;
+    attemptedThinking: Set<ThinkLevel>;
+    fallbackConfigured: boolean;
+    allowTransientCooldownProbe: boolean;
+    getProvider(): string;
+    getModelId(): string;
+    getRuntimeModel(): Model<Api>;
+    setRuntimeModel(next: Model<Api>): void;
+    getEffectiveModel(): Model<Api>;
+    setEffectiveModel(next: Model<Api>): void;
+    getApiKeyInfo(): ApiKeyInfo | null;
+    setApiKeyInfo(next: ApiKeyInfo | null): void;
+    getLastProfileId(): string | undefined;
+    setLastProfileId(next: string | undefined): void;
+    getRuntimeAuthState(): RuntimeAuthState | null;
+    setRuntimeAuthState(next: RuntimeAuthState | null): void;
+    getRuntimeAuthRefreshCancelled(): boolean;
+    setRuntimeAuthRefreshCancelled(next: boolean): void;
+    getProfileIndex(): number;
+    setProfileIndex(next: number): void;
+    setThinkLevel(next: ThinkLevel): void;
+    log: LogLike;
+  },
+  deps: EmbeddedRunAuthControllerDeps = {},
+) {
+  const prepareProviderRuntimeAuthImpl =
+    deps.prepareProviderRuntimeAuth ?? prepareProviderRuntimeAuth;
   const applyPreparedRuntimeRequestOverrides = (paramsForApply: {
     runtimeModel: Model<Api>;
     preparedAuth: {
@@ -147,7 +156,7 @@ export function createEmbeddedRunAuthController(params: {
       }
       const runtimeModel = params.getRuntimeModel();
       params.log.debug(`Refreshing runtime auth for ${runtimeModel.provider} (${reason})...`);
-      const preparedAuth = await prepareProviderRuntimeAuth({
+      const preparedAuth = await prepareProviderRuntimeAuthImpl({
         provider: runtimeModel.provider,
         config: params.config,
         workspaceDir: params.workspaceDir,
@@ -338,7 +347,7 @@ export function createEmbeddedRunAuthController(params: {
     }
     let runtimeAuthHandled = false;
     const runtimeModel = params.getRuntimeModel();
-    const preparedAuth = await prepareProviderRuntimeAuth({
+    const preparedAuth = await prepareProviderRuntimeAuthImpl({
       provider: runtimeModel.provider,
       config: params.config,
       workspaceDir: params.workspaceDir,

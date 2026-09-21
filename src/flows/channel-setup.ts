@@ -11,6 +11,7 @@ import { formatCliCommand } from "../cli/command-format.js";
 import {
   resolveChannelSetupEntries,
   shouldShowChannelInSetup,
+  type ChannelSetupDiscoveryDeps,
 } from "../commands/channel-setup/discovery.js";
 import {
   ensureChannelSetupPluginInstalled,
@@ -76,6 +77,11 @@ export async function runCollectedChannelOnboardingPostWriteHooks(params: {
   }
 }
 
+export type SetupChannelsDeps = ChannelSetupDiscoveryDeps & {
+  ensureChannelSetupPluginInstalled?: typeof ensureChannelSetupPluginInstalled;
+  loadChannelSetupPluginRegistrySnapshotForChannel?: typeof loadChannelSetupPluginRegistrySnapshotForChannel;
+};
+
 // Channel-specific prompts moved into setup flow adapters.
 
 export async function setupChannels(
@@ -83,7 +89,15 @@ export async function setupChannels(
   runtime: RuntimeEnv,
   prompter: WizardPrompter,
   options?: SetupChannelsOptions,
+  deps: SetupChannelsDeps = {},
 ): Promise<OpenClawConfig> {
+  const listChannelPluginCatalogEntriesImpl =
+    deps.listChannelPluginCatalogEntries ?? listChannelPluginCatalogEntries;
+  const ensureChannelSetupPluginInstalledImpl =
+    deps.ensureChannelSetupPluginInstalled ?? ensureChannelSetupPluginInstalled;
+  const loadChannelSetupPluginRegistrySnapshotForChannelImpl =
+    deps.loadChannelSetupPluginRegistrySnapshotForChannel ??
+    loadChannelSetupPluginRegistrySnapshotForChannel;
   let next = cfg;
   const forceAllowFromChannels = new Set(options?.forceAllowFromChannels ?? []);
   const accountOverrides: Partial<Record<ChannelChoice, string>> = {
@@ -120,7 +134,7 @@ export async function setupChannels(
     if (existing) {
       return existing;
     }
-    const snapshot = loadChannelSetupPluginRegistrySnapshotForChannel({
+    const snapshot = loadChannelSetupPluginRegistrySnapshotForChannelImpl({
       cfg: next,
       runtime,
       channel,
@@ -146,7 +160,7 @@ export async function setupChannels(
   const preloadConfiguredExternalPlugins = () => {
     // Keep setup memory bounded by snapshot-loading only configured external plugins.
     const workspaceDir = resolveWorkspaceDir();
-    for (const entry of listChannelPluginCatalogEntries({ workspaceDir })) {
+    for (const entry of listChannelPluginCatalogEntriesImpl({ workspaceDir })) {
       const channel = entry.id as ChannelChoice;
       if (getVisibleChannelPlugin(channel)) {
         continue;
@@ -167,13 +181,16 @@ export async function setupChannels(
     installedCatalogEntries,
     statusByChannel,
     statusLines,
-  } = await collectChannelStatus({
-    cfg: next,
-    options,
-    accountOverrides,
-    installedPlugins: listVisibleInstalledPlugins(),
-    resolveAdapter: getVisibleSetupFlowAdapter,
-  });
+  } = await collectChannelStatus(
+    {
+      cfg: next,
+      options,
+      accountOverrides,
+      installedPlugins: listVisibleInstalledPlugins(),
+      resolveAdapter: getVisibleSetupFlowAdapter,
+    },
+    deps,
+  );
   if (!options?.skipStatusNote && statusLines.length > 0) {
     await prompter.note(statusLines.join("\n"), "Channel status");
   }
@@ -272,11 +289,14 @@ export async function setupChannels(
   };
 
   const getChannelEntries = () => {
-    const resolved = resolveChannelSetupEntries({
-      cfg: next,
-      installedPlugins: listVisibleInstalledPlugins(),
-      workspaceDir: resolveWorkspaceDir(),
-    });
+    const resolved = resolveChannelSetupEntries(
+      {
+        cfg: next,
+        installedPlugins: listVisibleInstalledPlugins(),
+        workspaceDir: resolveWorkspaceDir(),
+      },
+      deps,
+    );
     return {
       entries: resolved.entries,
       catalogById: resolved.installableCatalogById,
@@ -478,7 +498,7 @@ export async function setupChannels(
     const installedCatalogEntry = installedCatalogById.get(channel);
     if (catalogEntry) {
       const workspaceDir = resolveWorkspaceDir();
-      const result = await ensureChannelSetupPluginInstalled({
+      const result = await ensureChannelSetupPluginInstalledImpl({
         cfg: next,
         entry: catalogEntry,
         prompter,

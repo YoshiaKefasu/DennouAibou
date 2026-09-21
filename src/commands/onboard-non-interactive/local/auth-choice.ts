@@ -20,18 +20,30 @@ import type { AuthChoice, OnboardOptions } from "../../onboard-types.js";
 import { resolveNonInteractiveApiKey } from "../api-keys.js";
 import { applyNonInteractivePluginProviderChoice } from "./auth-choice.plugin-providers.js";
 
+export type ApplyNonInteractiveAuthChoiceDeps = {
+  applyNonInteractivePluginProviderChoice?: typeof applyNonInteractivePluginProviderChoice;
+  resolveNonInteractiveApiKey?: typeof resolveNonInteractiveApiKey;
+};
+
 type ResolvedNonInteractiveApiKey = NonNullable<
   Awaited<ReturnType<typeof resolveNonInteractiveApiKey>>
 >;
 
-export async function applyNonInteractiveAuthChoice(params: {
-  nextConfig: OpenClawConfig;
-  authChoice: AuthChoice;
-  opts: OnboardOptions;
-  runtime: RuntimeEnv;
-  baseConfig: OpenClawConfig;
-}): Promise<OpenClawConfig | null> {
+export async function applyNonInteractiveAuthChoice(
+  params: {
+    nextConfig: OpenClawConfig;
+    authChoice: AuthChoice;
+    opts: OnboardOptions;
+    runtime: RuntimeEnv;
+    baseConfig: OpenClawConfig;
+  },
+  deps: ApplyNonInteractiveAuthChoiceDeps = {},
+): Promise<OpenClawConfig | null> {
   const { opts, runtime, baseConfig } = params;
+  const applyNonInteractivePluginProviderChoiceImpl =
+    deps.applyNonInteractivePluginProviderChoice ?? applyNonInteractivePluginProviderChoice;
+  const resolveNonInteractiveApiKeyImpl =
+    deps.resolveNonInteractiveApiKey ?? resolveNonInteractiveApiKey;
   const authChoice = normalizeApiKeyTokenProviderAuthChoice({
     authChoice: params.authChoice,
     tokenProvider: opts.tokenProvider,
@@ -72,7 +84,7 @@ export async function applyNonInteractiveAuthChoice(params: {
     };
   };
   const resolveApiKey = (input: Parameters<typeof resolveNonInteractiveApiKey>[0]) =>
-    resolveNonInteractiveApiKey({
+    resolveNonInteractiveApiKeyImpl({
       ...input,
       secretInputMode: requestedSecretInputMode,
     });
@@ -127,7 +139,7 @@ export async function applyNonInteractiveAuthChoice(params: {
     return null;
   }
 
-  const pluginProviderChoice = await applyNonInteractivePluginProviderChoice({
+  const pluginProviderChoice = await applyNonInteractivePluginProviderChoiceImpl({
     nextConfig,
     authChoice,
     opts,

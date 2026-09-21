@@ -7,9 +7,13 @@ export const baseConfigSnapshot = {
   exists: true,
   raw: "{}",
   parsed: {},
+  sourceConfig: {},
+  resolved: {},
   valid: true,
+  runtimeConfig: {},
   config: {},
   issues: [],
+  warnings: [],
   legacyIssues: [],
 };
 

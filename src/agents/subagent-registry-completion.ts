@@ -41,16 +41,24 @@ export function resolveLifecycleOutcomeFromRunOutcome(
   return SUBAGENT_ENDED_OUTCOME_OK;
 }
 
-export async function emitSubagentEndedHookOnce(params: {
-  entry: SubagentRunRecord;
-  reason: SubagentLifecycleEndedReason;
-  sendFarewell?: boolean;
-  accountId?: string;
-  outcome?: SubagentLifecycleEndedOutcome;
-  error?: string;
-  inFlightRunIds: Set<string>;
-  persist: () => void;
-}) {
+export type SubagentRegistryCompletionDeps = {
+  getGlobalHookRunner?: typeof getGlobalHookRunner;
+};
+
+export async function emitSubagentEndedHookOnce(
+  params: {
+    entry: SubagentRunRecord;
+    reason: SubagentLifecycleEndedReason;
+    sendFarewell?: boolean;
+    accountId?: string;
+    outcome?: SubagentLifecycleEndedOutcome;
+    error?: string;
+    inFlightRunIds: Set<string>;
+    persist: () => void;
+  },
+  deps: SubagentRegistryCompletionDeps = {},
+) {
+  const getGlobalHookRunnerImpl = deps.getGlobalHookRunner ?? getGlobalHookRunner;
   const runId = params.entry.runId.trim();
   if (!runId) {
     return false;
@@ -64,7 +72,7 @@ export async function emitSubagentEndedHookOnce(params: {
 
   params.inFlightRunIds.add(runId);
   try {
-    const hookRunner = getGlobalHookRunner();
+    const hookRunner = getGlobalHookRunnerImpl();
     if (!hookRunner) {
       return false;
     }

@@ -11,6 +11,11 @@ import { applyPluginAutoEnable } from "../../config/plugin-auto-enable.js";
 import { loadPluginManifestRegistry } from "../../plugins/manifest-registry.js";
 import type { ChannelChoice } from "../onboard-types.js";
 
+export type ChannelSetupDiscoveryDeps = {
+  listChannelPluginCatalogEntries?: typeof listChannelPluginCatalogEntries;
+  loadPluginManifestRegistry?: typeof loadPluginManifestRegistry;
+};
+
 type ChannelCatalogEntry = {
   id: ChannelChoice;
   meta: ChannelMeta;
@@ -34,18 +39,23 @@ function resolveWorkspaceDir(cfg: OpenClawConfig, workspaceDir?: string): string
   return workspaceDir ?? resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg));
 }
 
-export function listManifestInstalledChannelIds(params: {
-  cfg: OpenClawConfig;
-  workspaceDir?: string;
-  env?: NodeJS.ProcessEnv;
-}): Set<ChannelChoice> {
+export function listManifestInstalledChannelIds(
+  params: {
+    cfg: OpenClawConfig;
+    workspaceDir?: string;
+    env?: NodeJS.ProcessEnv;
+  },
+  deps: ChannelSetupDiscoveryDeps = {},
+): Set<ChannelChoice> {
+  const loadPluginManifestRegistryImpl =
+    deps.loadPluginManifestRegistry ?? loadPluginManifestRegistry;
   const resolvedConfig = applyPluginAutoEnable({
     config: params.cfg,
     env: params.env ?? process.env,
   }).config;
   const workspaceDir = resolveWorkspaceDir(resolvedConfig, params.workspaceDir);
   return new Set(
-    loadPluginManifestRegistry({
+    loadPluginManifestRegistryImpl({
       config: resolvedConfig,
       workspaceDir,
       env: params.env ?? process.env,
@@ -53,29 +63,40 @@ export function listManifestInstalledChannelIds(params: {
   );
 }
 
-export function isCatalogChannelInstalled(params: {
-  cfg: OpenClawConfig;
-  entry: ChannelPluginCatalogEntry;
-  workspaceDir?: string;
-  env?: NodeJS.ProcessEnv;
-}): boolean {
-  return listManifestInstalledChannelIds(params).has(params.entry.id as ChannelChoice);
+export function isCatalogChannelInstalled(
+  params: {
+    cfg: OpenClawConfig;
+    entry: ChannelPluginCatalogEntry;
+    workspaceDir?: string;
+    env?: NodeJS.ProcessEnv;
+  },
+  deps?: ChannelSetupDiscoveryDeps,
+): boolean {
+  return listManifestInstalledChannelIds(params, deps).has(params.entry.id as ChannelChoice);
 }
 
-export function resolveChannelSetupEntries(params: {
-  cfg: OpenClawConfig;
-  installedPlugins: ChannelPlugin[];
-  workspaceDir?: string;
-  env?: NodeJS.ProcessEnv;
-}): ResolvedChannelSetupEntries {
+export function resolveChannelSetupEntries(
+  params: {
+    cfg: OpenClawConfig;
+    installedPlugins: ChannelPlugin[];
+    workspaceDir?: string;
+    env?: NodeJS.ProcessEnv;
+  },
+  deps: ChannelSetupDiscoveryDeps = {},
+): ResolvedChannelSetupEntries {
+  const listChannelPluginCatalogEntriesImpl =
+    deps.listChannelPluginCatalogEntries ?? listChannelPluginCatalogEntries;
   const workspaceDir = resolveWorkspaceDir(params.cfg, params.workspaceDir);
-  const manifestInstalledIds = listManifestInstalledChannelIds({
-    cfg: params.cfg,
-    workspaceDir,
-    env: params.env,
-  });
+  const manifestInstalledIds = listManifestInstalledChannelIds(
+    {
+      cfg: params.cfg,
+      workspaceDir,
+      env: params.env,
+    },
+    deps,
+  );
   const installedPluginIds = new Set(params.installedPlugins.map((plugin) => plugin.id));
-  const catalogEntries = listChannelPluginCatalogEntries({ workspaceDir });
+  const catalogEntries = listChannelPluginCatalogEntriesImpl({ workspaceDir });
   const installedCatalogEntries = catalogEntries.filter(
     (entry) =>
       !installedPluginIds.has(entry.id) &&

@@ -39,6 +39,11 @@ type ToolExecuteArgs = ToolDefinition["execute"] extends (...args: infer P) => u
 type ToolExecuteArgsAny = ToolExecuteArgs | ToolExecuteArgsLegacy | ToolExecuteArgsCurrent;
 const TOOL_ERROR_PARAM_PREVIEW_MAX_CHARS = 600;
 
+export type PiToolDefinitionAdapterDeps = {
+  isToolWrappedWithBeforeToolCallHook?: typeof isToolWrappedWithBeforeToolCallHook;
+  runBeforeToolCallHook?: typeof runBeforeToolCallHook;
+};
+
 function isAbortSignal(value: unknown): value is AbortSignal {
   return typeof value === "object" && value !== null && "aborted" in value;
 }
@@ -169,11 +174,17 @@ function splitToolExecuteArgs(args: ToolExecuteArgsAny): {
   };
 }
 
-export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
+export function toToolDefinitions(
+  tools: AnyAgentTool[],
+  deps: PiToolDefinitionAdapterDeps = {},
+): ToolDefinition[] {
+  const isToolWrappedWithBeforeToolCallHookImpl =
+    deps.isToolWrappedWithBeforeToolCallHook ?? isToolWrappedWithBeforeToolCallHook;
+  const runBeforeToolCallHookImpl = deps.runBeforeToolCallHook ?? runBeforeToolCallHook;
   return tools.map((tool) => {
     const name = tool.name || "tool";
     const normalizedName = normalizeToolName(name);
-    const beforeHookWrapped = isToolWrappedWithBeforeToolCallHook(tool);
+    const beforeHookWrapped = isToolWrappedWithBeforeToolCallHookImpl(tool);
     return {
       name,
       label: tool.label ?? name,
@@ -184,7 +195,7 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
         let executeParams = params;
         try {
           if (!beforeHookWrapped) {
-            const hookOutcome = await runBeforeToolCallHook({
+            const hookOutcome = await runBeforeToolCallHookImpl({
               toolName: name,
               params,
               toolCallId,
@@ -269,7 +280,9 @@ export function toClientToolDefinitions(
   tools: ClientToolDefinition[],
   onClientToolCall?: (toolName: string, params: Record<string, unknown>) => void,
   hookContext?: HookContext,
+  deps: PiToolDefinitionAdapterDeps = {},
 ): ToolDefinition[] {
+  const runBeforeToolCallHookImpl = deps.runBeforeToolCallHook ?? runBeforeToolCallHook;
   return tools.map((tool) => {
     const func = tool.function;
     return {
@@ -279,7 +292,7 @@ export function toClientToolDefinitions(
       parameters: func.parameters as ToolDefinition["parameters"],
       execute: async (...args: ToolExecuteArgs): Promise<AgentToolResult<unknown>> => {
         const { toolCallId, params } = splitToolExecuteArgs(args);
-        const outcome = await runBeforeToolCallHook({
+        const outcome = await runBeforeToolCallHookImpl({
           toolName: func.name,
           params,
           toolCallId,

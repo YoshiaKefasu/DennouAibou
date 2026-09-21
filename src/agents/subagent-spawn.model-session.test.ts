@@ -1,5 +1,8 @@
 import os from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SessionEntry } from "../config/sessions.js";
+import { callGateway } from "../gateway/call.js";
+import { pruneLegacyStoreKeys, updateSessionStore } from "./subagent-spawn.runtime.js";
 import {
   createSubagentSpawnTestConfig,
   expectPersistedRuntimeModel,
@@ -8,9 +11,9 @@ import {
   setupAcceptedSubagentGatewayMock,
 } from "./subagent-spawn.test-helpers.js";
 
-const callGatewayMock = vi.fn();
-const updateSessionStoreMock = vi.fn();
-const pruneLegacyStoreKeysMock = vi.fn();
+const callGatewayMock = vi.fn<typeof callGateway>();
+const updateSessionStoreMock = vi.fn<typeof updateSessionStore>();
+const pruneLegacyStoreKeysMock = vi.fn<typeof pruneLegacyStoreKeys>();
 
 let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
 let spawnSubagentDirect: typeof import("./subagent-spawn.js").spawnSubagentDirect;
@@ -31,11 +34,8 @@ describe("spawnSubagentDirect runtime model persistence", () => {
     setupAcceptedSubagentGatewayMock(callGatewayMock);
 
     updateSessionStoreMock.mockImplementation(
-      async (
-        _storePath: string,
-        mutator: (store: Record<string, Record<string, unknown>>) => unknown,
-      ) => {
-        const store: Record<string, Record<string, unknown>> = {};
+      async (_storePath: string, mutator: (store: Record<string, SessionEntry>) => unknown) => {
+        const store: Record<string, SessionEntry> = {};
         await mutator(store);
         return store;
       },
@@ -57,7 +57,7 @@ describe("spawnSubagentDirect runtime model persistence", () => {
       }
       return {};
     });
-    let persistedStore: Record<string, Record<string, unknown>> | undefined;
+    let persistedStore: Record<string, SessionEntry> | undefined;
     installSessionStoreCaptureMock(updateSessionStoreMock, {
       operations,
       onStore: (store) => {

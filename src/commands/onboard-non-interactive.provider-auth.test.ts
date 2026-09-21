@@ -2,13 +2,39 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  resolveAgentDir,
+  resolveAgentWorkspaceDir,
+  resolveDefaultAgentId,
+} from "../agents/agent-scope.js";
+import { ensureAuthProfileStore, upsertAuthProfile } from "../agents/auth-profiles.js";
+import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles.js";
+import { resolveDefaultAgentWorkspaceDir } from "../agents/workspace.js";
+import { resetFileLockStateForTest } from "../infra/file-lock.js";
+import { clearPluginDiscoveryCache } from "../plugins/discovery.js";
+import { enablePluginInConfig } from "../plugins/enable.js";
+import { clearPluginManifestRegistryCache } from "../plugins/manifest-registry.js";
+import { createProviderApiKeyAuthMethod } from "../plugins/provider-api-key-auth.js";
+import { providerApiKeyAuthRuntime } from "../plugins/provider-api-key-auth.runtime.js";
+import { configureOpenAICompatibleSelfHostedProviderNonInteractive } from "../plugins/provider-self-hosted-setup.js";
 import { makeTempWorkspace } from "../test-helpers/workspace.js";
+import { restoreTestGlobals, setTestGlobal } from "../test-utils/bun-test-mocks.js";
 import { withEnvAsync } from "../test-utils/env.js";
+import { ensureWorkspaceAndSessions } from "./onboard-helpers.js";
+import { runNonInteractiveSetup, type NonInteractiveSetupDeps } from "./onboard-non-interactive.js";
 import {
   createThrowingRuntime,
   readJsonFile,
   type NonInteractiveRuntime,
 } from "./onboard-non-interactive.test-helpers.js";
+import { resolveNonInteractiveApiKey } from "./onboard-non-interactive/api-keys.js";
+import { inferAuthChoiceFromFlags } from "./onboard-non-interactive/local/auth-choice-inference.js";
+import {
+  applyNonInteractiveAuthChoice,
+  type ApplyNonInteractiveAuthChoiceDeps,
+} from "./onboard-non-interactive/local/auth-choice.js";
+import type { AuthChoice, OnboardOptions } from "./onboard-types.js";
+import { detectZaiEndpoint } from "./zai-endpoint-detect.js";
 
 type OnboardEnv = {
   configPath: string;
@@ -23,28 +49,13 @@ const ZAI_CODING_GLOBAL_BASE_URL = "https://api.z.ai/api/coding/paas/v4";
 const ZAI_CODING_CN_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4";
 const ZAI_GLOBAL_BASE_URL = "https://api.z.ai/api/paas/v4";
 
-const ensureWorkspaceAndSessionsMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => {}));
+const ensureWorkspaceAndSessionsMock = vi.fn<typeof ensureWorkspaceAndSessions>(async () => {});
 
-vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async () => {
-  const [
-    { resolveDefaultAgentId, resolveAgentDir, resolveAgentWorkspaceDir },
-    { resolveDefaultAgentWorkspaceDir },
-    { enablePluginInConfig },
-    { upsertAuthProfile },
-    { createProviderApiKeyAuthMethod },
-    { providerApiKeyAuthRuntime },
-    { configureOpenAICompatibleSelfHostedProviderNonInteractive },
-    { detectZaiEndpoint },
-  ] = await Promise.all([
-    import("../agents/agent-scope.js"),
-    import("../agents/workspace.js"),
-    import("../plugins/enable.js"),
-    import("../agents/auth-profiles/profiles.js"),
-    import("../plugins/provider-api-key-auth.js"),
-    import("../plugins/provider-api-key-auth.runtime.js"),
-    import("../plugins/provider-self-hosted-setup.js"),
-    import("./zai-endpoint-detect.js"),
-  ]);
+function createProviderAuthChoiceDeps() {
+  type PluginProviderChoiceFn = NonNullable<
+    ApplyNonInteractiveAuthChoiceDeps["applyNonInteractivePluginProviderChoice"]
+  >;
+  type PluginProviderChoiceParams = Parameters<PluginProviderChoiceFn>[0];
 
   const ZAI_FALLBACKS = {
     "zai-api-key": {
@@ -73,29 +84,8 @@ vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async
     };
     agentDir?: string;
     workspaceDir?: string;
-    resolveApiKey: (input: {
-      provider: string;
-      flagValue?: string;
-      flagName: `--${string}`;
-      envVar: string;
-      envVarName?: string;
-      allowProfile?: boolean;
-      required?: boolean;
-    }) => Promise<{
-      key: string;
-      source: "profile" | "env" | "flag";
-      envVarName?: string;
-    } | null>;
-    toApiKeyCredential: (input: {
-      provider: string;
-      resolved: {
-        key: string;
-        source: "profile" | "env" | "flag";
-        envVarName?: string;
-      };
-      email?: string;
-      metadata?: Record<string, string>;
-    }) => Record<string, unknown> | null;
+    resolveApiKey: PluginProviderChoiceParams["resolveApiKey"];
+    toApiKeyCredential: PluginProviderChoiceParams["toApiKeyCredential"];
   };
 
   type ChoiceHandler = {
@@ -591,22 +581,16 @@ vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async
   ]);
 
   return {
-    applyNonInteractivePluginProviderChoice: async (params: {
-      nextConfig: Record<string, unknown>;
-      authChoice: string;
-      opts: Record<string, unknown>;
-      runtime: HandlerContext["runtime"];
-      baseConfig: Record<string, unknown>;
-      resolveApiKey: HandlerContext["resolveApiKey"];
-      toApiKeyCredential: HandlerContext["toApiKeyCredential"];
-    }) => {
+    applyNonInteractivePluginProviderChoice: async (
+      params: PluginProviderChoiceParams,
+    ): Promise<Awaited<ReturnType<PluginProviderChoiceFn>>> => {
       const handler = choiceMap.get(params.authChoice);
       if (!handler) {
         return undefined;
       }
 
       const enableResult = enablePluginInConfig(
-        params.nextConfig as never,
+        params.nextConfig,
         handler.pluginId ?? handler.providerId,
       );
       if (!enableResult.enabled) {
@@ -622,7 +606,7 @@ vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async
       const workspaceDir =
         resolveAgentWorkspaceDir(enableResult.config, agentId) ?? resolveDefaultAgentWorkspaceDir();
 
-      return await handler.runNonInteractive({
+      return (await handler.runNonInteractive({
         authChoice: params.authChoice,
         config: enableResult.config,
         baseConfig: params.baseConfig,
@@ -632,18 +616,72 @@ vi.mock("./onboard-non-interactive/local/auth-choice.plugin-providers.js", async
         workspaceDir,
         resolveApiKey: params.resolveApiKey,
         toApiKeyCredential: params.toApiKeyCredential,
-      });
+      })) as Awaited<ReturnType<PluginProviderChoiceFn>>;
     },
   };
+}
+
+const providerAuthChoiceDeps = createProviderAuthChoiceDeps();
+const resolveNonInteractiveApiKeyMock = vi.fn<typeof resolveNonInteractiveApiKey>(
+  async (params) => {
+    if (params.envVar === "OPENCODE_ZEN_API_KEY") {
+      const envKey = process.env[params.envVar]?.trim();
+      if (envKey) {
+        return { key: envKey, source: "env", envVarName: params.envVar };
+      }
+    }
+    return await resolveNonInteractiveApiKey(params);
+  },
+);
+
+const authChoiceDeps: ApplyNonInteractiveAuthChoiceDeps = {
+  applyNonInteractivePluginProviderChoice:
+    providerAuthChoiceDeps.applyNonInteractivePluginProviderChoice,
+  resolveNonInteractiveApiKey: resolveNonInteractiveApiKeyMock,
+};
+const inferAuthChoiceFromFlagsMock = vi.fn<typeof inferAuthChoiceFromFlags>((opts) => {
+  const choices: Array<{ optionKey: string; authChoice: AuthChoice; label: string }> = [
+    { optionKey: "mistralApiKey", authChoice: "mistral-api-key", label: "--mistral-api-key" },
+    { optionKey: "byteplusApiKey", authChoice: "byteplus-api-key", label: "--byteplus-api-key" },
+    {
+      optionKey: "cloudflareAiGatewayApiKey",
+      authChoice: "cloudflare-ai-gateway-api-key",
+      label: "--cloudflare-ai-gateway-api-key",
+    },
+    { optionKey: "togetherApiKey", authChoice: "together-api-key", label: "--together-api-key" },
+    { optionKey: "qianfanApiKey", authChoice: "qianfan-api-key", label: "--qianfan-api-key" },
+    {
+      optionKey: "modelstudioApiKey",
+      authChoice: "qwen-api-key",
+      label: "--modelstudio-api-key",
+    },
+  ];
+  const matches = choices.filter((choice) => {
+    const value = opts[choice.optionKey as keyof OnboardOptions];
+    return typeof value === "string" && value.trim().length > 0;
+  });
+  if (
+    typeof opts.customBaseUrl === "string" ||
+    typeof opts.customModelId === "string" ||
+    typeof opts.customApiKey === "string"
+  ) {
+    matches.push({
+      optionKey: "customBaseUrl",
+      authChoice: "custom-api-key",
+      label: "--custom-base-url/--custom-model-id/--custom-api-key",
+    });
+  }
+  return { choice: matches[0]?.authChoice, matches };
 });
 
-vi.mock("./onboard-helpers.js", async () => {
-  const actual = await import("./onboard-helpers.js");
-  return {
-    ...actual,
+const setupDeps: NonInteractiveSetupDeps = {
+  local: {
     ensureWorkspaceAndSessions: ensureWorkspaceAndSessionsMock,
-  };
-});
+    inferAuthChoiceFromFlags: inferAuthChoiceFromFlagsMock,
+    applyNonInteractiveAuthChoice: (params) =>
+      applyNonInteractiveAuthChoice(params, authChoiceDeps),
+  },
+};
 
 const NON_INTERACTIVE_DEFAULT_OPTIONS = {
   nonInteractive: true,
@@ -651,14 +689,6 @@ const NON_INTERACTIVE_DEFAULT_OPTIONS = {
   skipChannels: true,
   json: true,
 } as const;
-
-let runNonInteractiveSetup: typeof import("./onboard-non-interactive.js").runNonInteractiveSetup;
-let clearRuntimeAuthProfileStoreSnapshots: typeof import("../agents/auth-profiles.js").clearRuntimeAuthProfileStoreSnapshots;
-let ensureAuthProfileStore: typeof import("../agents/auth-profiles.js").ensureAuthProfileStore;
-let upsertAuthProfile: typeof import("../agents/auth-profiles.js").upsertAuthProfile;
-let resetFileLockStateForTest: typeof import("../infra/file-lock.js").resetFileLockStateForTest;
-let clearPluginDiscoveryCache: typeof import("../plugins/discovery.js").clearPluginDiscoveryCache;
-let clearPluginManifestRegistryCache: typeof import("../plugins/manifest-registry.js").clearPluginManifestRegistryCache;
 
 type ProviderAuthConfigSnapshot = {
   auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
@@ -779,6 +809,7 @@ async function withOnboardEnv(
         DENNOU_GATEWAY_TOKEN: undefined,
         DENNOU_GATEWAY_PASSWORD: undefined,
         CUSTOM_API_KEY: undefined,
+        DENNOU_DISABLE_BUNDLED_PLUGINS: "1",
         DENNOU_DISABLE_CONFIG_CACHE: "1",
         DENNOU_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
         DENNOU_DISABLE_PLUGIN_MANIFEST_CACHE: "1",
@@ -802,6 +833,7 @@ async function runNonInteractiveSetupWithDefaults(
       ...options,
     },
     runtime,
+    setupDeps,
   );
 }
 
@@ -864,21 +896,7 @@ async function expectApiKeyProfile(params: {
   }
 }
 
-async function loadProviderAuthOnboardModules(): Promise<void> {
-  vi.resetModules();
-  ({ runNonInteractiveSetup } = await import("./onboard-non-interactive.js"));
-  ({ clearRuntimeAuthProfileStoreSnapshots, ensureAuthProfileStore, upsertAuthProfile } =
-    await import("../agents/auth-profiles.js"));
-  ({ resetFileLockStateForTest } = await import("../infra/file-lock.js"));
-  ({ clearPluginDiscoveryCache } = await import("../plugins/discovery.js"));
-  ({ clearPluginManifestRegistryCache } = await import("../plugins/manifest-registry.js"));
-}
-
 describe("onboard (non-interactive): provider auth", () => {
-  beforeAll(async () => {
-    await loadProviderAuthOnboardModules();
-  });
-
   beforeEach(() => {
     clearRuntimeAuthProfileStoreSnapshots();
     resetFileLockStateForTest();

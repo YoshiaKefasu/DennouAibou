@@ -1,10 +1,18 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { ensureContextEnginesInitialized, resolveContextEngine } from "../context-engine/index.js";
+import { sleepWithAbort } from "../infra/backoff.js";
+import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
+import { prepareProviderRuntimeAuth } from "../plugins/provider-runtime.js";
 import type { AuthProfileFailureReason } from "./auth-profiles.js";
 import { runWithModelFallback } from "./model-fallback.js";
+import { ensureOpenClawModelsJson } from "./models-config.js";
+import { resolveModelAsync } from "./pi-embedded-runner/model.js";
+import { runEmbeddedPiAgent, type RunEmbeddedPiAgentDeps } from "./pi-embedded-runner/run.js";
+import { runEmbeddedAttempt } from "./pi-embedded-runner/run/attempt.js";
 import type { EmbeddedRunAttemptResult } from "./pi-embedded-runner/run/types.js";
 import {
   buildEmbeddedRunnerAssistant,
@@ -12,84 +20,59 @@ import {
   makeEmbeddedRunnerAttempt,
 } from "./test-helpers/pi-embedded-runner-e2e-fixtures.js";
 
-const runEmbeddedAttemptMock = vi.fn<(params: unknown) => Promise<EmbeddedRunAttemptResult>>();
-const { computeBackoffMock, sleepWithAbortMock } = vi.hoisted(() => ({
-  computeBackoffMock: vi.fn(
-    (
-      _policy: { initialMs: number; maxMs: number; factor: number; jitter: number },
-      _attempt: number,
-    ) => 321,
-  ),
-  sleepWithAbortMock: vi.fn(async (_ms: number, _abortSignal?: AbortSignal) => undefined),
+const runEmbeddedAttemptMock = vi.fn<typeof runEmbeddedAttempt>();
+// Note: no computeBackoff mock — run.ts resolves overload backoff from config
+// (resolveOverloadFailoverBackoffMs) and only sleepWithAbort is injectable.
+// Spurious-backoff checks live on sleepWithAbortMock below.
+const sleepWithAbortMock = vi.fn<typeof sleepWithAbort>(async () => undefined);
+const ensureOpenClawModelsJsonMock = vi.fn<typeof ensureOpenClawModelsJson>(
+  async (config, agentDir) => ({
+    agentDir: agentDir ?? "",
+    wrote: false,
+  }),
+);
+const getGlobalHookRunnerMock = vi.fn<typeof getGlobalHookRunner>(() => null);
+const ensureContextEnginesInitializedMock = vi.fn<typeof ensureContextEnginesInitialized>();
+const resolveContextEngineMock = vi.fn<typeof resolveContextEngine>(async () => ({
+  info: { id: "test", name: "test" },
+  ingest: async () => ({ ingested: false }),
+  assemble: async ({ messages }) => ({ messages, estimatedTokens: 0 }),
+  compact: async () => ({ ok: true, compacted: false }),
 }));
-
-vi.mock("./pi-embedded-runner/run/attempt.js", async () => {
-  const actual = await import("./pi-embedded-runner/run/attempt.js");
+const resolveModelAsyncMock = vi.fn<typeof resolveModelAsync>(async (provider, modelId) => {
+  const resolved = createResolvedEmbeddedRunnerModel(provider, modelId);
   return {
-    ...actual,
-    runEmbeddedAttempt: (params: unknown) => runEmbeddedAttemptMock(params),
+    ...resolved,
+    model: { ...resolved.model, input: ["text"] as const },
+    authStorage: {} as never,
+    modelRegistry: {} as never,
   };
 });
-
-vi.mock("../infra/backoff.js", async () => {
-  const actual = await import("../infra/backoff.js");
-  return {
-    ...actual,
-    computeBackoff: (
-      policy: { initialMs: number; maxMs: number; factor: number; jitter: number },
-      attempt: number,
-    ) => computeBackoffMock(policy, attempt),
-    sleepWithAbort: (ms: number, abortSignal?: AbortSignal) => sleepWithAbortMock(ms, abortSignal),
-  };
-});
-
-vi.mock("./models-config.js", async () => {
-  const mod = await import("./models-config.js");
-  return {
-    ...mod,
-    ensureOpenClawModelsJson: vi.fn(async () => ({ wrote: false })),
-  };
-});
-
-const installRunEmbeddedMocks = () => {
-  vi.doMock("../plugins/hook-runner-global.js", () => ({
-    getGlobalHookRunner: vi.fn(() => undefined),
-  }));
-  vi.doMock("../context-engine/index.js", () => ({
-    ensureContextEnginesInitialized: vi.fn(),
-    resolveContextEngine: vi.fn(async () => ({
-      dispose: async () => undefined,
-    })),
-  }));
-  vi.doMock("./runtime-plugins.js", () => ({
-    ensureRuntimePluginsLoaded: vi.fn(),
-  }));
-  vi.doMock("./pi-embedded-runner/model.js", () => ({
-    resolveModelAsync: async (provider: string, modelId: string) =>
-      createResolvedEmbeddedRunnerModel(provider, modelId),
-  }));
-  vi.doMock("../plugins/provider-runtime.js", async () => {
-    const actual = await import("../plugins/provider-runtime.js");
-    return {
-      ...actual,
-      prepareProviderRuntimeAuth: vi.fn(async () => undefined),
-      resolveProviderCapabilitiesWithPlugin: vi.fn(() => undefined),
-    };
-  });
+const prepareProviderRuntimeAuthMock = vi.fn<typeof prepareProviderRuntimeAuth>(
+  async () => undefined,
+);
+const runEmbeddedDeps: RunEmbeddedPiAgentDeps = {
+  runEmbeddedAttempt: runEmbeddedAttemptMock,
+  sleepWithAbort: sleepWithAbortMock,
+  ensureRuntimePluginsLoaded: vi.fn(),
+  ensureOpenClawModelsJson: ensureOpenClawModelsJsonMock,
+  getGlobalHookRunner: getGlobalHookRunnerMock,
+  ensureContextEnginesInitialized: ensureContextEnginesInitializedMock,
+  resolveContextEngine: resolveContextEngineMock,
+  resolveModelAsync: resolveModelAsyncMock,
+  prepareProviderRuntimeAuth: prepareProviderRuntimeAuthMock,
 };
-
-let runEmbeddedPiAgent: typeof import("./pi-embedded-runner/run.js").runEmbeddedPiAgent;
-
-beforeAll(async () => {
-  vi.resetModules();
-  installRunEmbeddedMocks();
-  ({ runEmbeddedPiAgent } = await import("./pi-embedded-runner/run.js"));
-});
 
 beforeEach(() => {
   runEmbeddedAttemptMock.mockReset();
-  computeBackoffMock.mockClear();
   sleepWithAbortMock.mockClear();
+  runEmbeddedAttemptMock.mockClear();
+  ensureOpenClawModelsJsonMock.mockClear();
+  getGlobalHookRunnerMock.mockClear();
+  ensureContextEnginesInitializedMock.mockClear();
+  resolveContextEngineMock.mockClear();
+  resolveModelAsyncMock.mockClear();
+  prepareProviderRuntimeAuthMock.mockClear();
 });
 
 const OVERLOADED_ERROR_PAYLOAD =
@@ -203,9 +186,21 @@ async function writeMultiProfileAuthStore(agentDir: string) {
     JSON.stringify({
       version: 1,
       profiles: {
-        "openai:p1": { type: "api_key", provider: "openai", key: "sk-openai-1" },
-        "openai:p2": { type: "api_key", provider: "openai", key: "sk-openai-2" },
-        "openai:p3": { type: "api_key", provider: "openai", key: "sk-openai-3" },
+        "openai:p1": {
+          type: "api_key",
+          provider: "openai",
+          key: "sk-openai-1",
+        },
+        "openai:p2": {
+          type: "api_key",
+          provider: "openai",
+          key: "sk-openai-2",
+        },
+        "openai:p3": {
+          type: "api_key",
+          provider: "openai",
+          key: "sk-openai-3",
+        },
         "groq:p1": { type: "api_key", provider: "groq", key: "sk-groq" },
       },
       usageStats: {
@@ -234,23 +229,26 @@ async function runEmbeddedFallback(params: {
     runId: params.runId,
     agentDir: params.agentDir,
     run: (provider, model, options) =>
-      runEmbeddedPiAgent({
-        sessionId: `session:${params.runId}`,
-        sessionKey: params.sessionKey,
-        sessionFile: path.join(params.workspaceDir, `${params.runId}.jsonl`),
-        workspaceDir: params.workspaceDir,
-        agentDir: params.agentDir,
-        config: cfg,
-        prompt: "hello",
-        provider,
-        model,
-        authProfileIdSource: "auto",
-        allowTransientCooldownProbe: options?.allowTransientCooldownProbe,
-        timeoutMs: 5_000,
-        runId: params.runId,
-        abortSignal: params.abortSignal,
-        enqueue: async (task) => await task(),
-      }),
+      runEmbeddedPiAgent(
+        {
+          sessionId: `session:${params.runId}`,
+          sessionKey: params.sessionKey,
+          sessionFile: path.join(params.workspaceDir, `${params.runId}.jsonl`),
+          workspaceDir: params.workspaceDir,
+          agentDir: params.agentDir,
+          config: cfg,
+          prompt: "hello",
+          provider,
+          model,
+          authProfileIdSource: "auto",
+          allowTransientCooldownProbe: options?.allowTransientCooldownProbe,
+          timeoutMs: 5_000,
+          runId: params.runId,
+          abortSignal: params.abortSignal,
+          enqueue: async (task) => await task(),
+        },
+        runEmbeddedDeps,
+      ),
   });
 }
 
@@ -283,7 +281,11 @@ function mockPrimaryPromptErrorThenFallbackSuccess(errorMessage: string) {
 
 function mockPrimaryErrorThenFallbackSuccess(errorMessage: string) {
   runEmbeddedAttemptMock.mockImplementation(async (params: unknown) => {
-    const attemptParams = params as { provider: string; modelId: string; authProfileId?: string };
+    const attemptParams = params as {
+      provider: string;
+      modelId: string;
+      authProfileId?: string;
+    };
     if (attemptParams.provider === "openai") {
       return makeEmbeddedRunnerAttempt({
         assistantTexts: [],
@@ -356,7 +358,11 @@ function expectOpenAiThenGroqAttemptOrder(params?: { expectOpenAiAuthProfileId?:
 
 function mockAllProvidersOverloaded() {
   runEmbeddedAttemptMock.mockImplementation(async (params: unknown) => {
-    const attemptParams = params as { provider: string; modelId: string; authProfileId?: string };
+    const attemptParams = params as {
+      provider: string;
+      modelId: string;
+      authProfileId?: string;
+    };
     if (attemptParams.provider === "openai" || attemptParams.provider === "groq") {
       return makeEmbeddedRunnerAttempt({
         assistantTexts: [],
@@ -392,11 +398,12 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
 
       const usageStats = await readUsageStats(agentDir);
       expect(typeof usageStats["openai:p1"]?.cooldownUntil).toBe("number");
-      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({ overloaded: 1 });
+      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({
+        overloaded: 1,
+      });
       expect(typeof usageStats["groq:p1"]?.lastUsed).toBe("number");
 
       expectOpenAiThenGroqAttemptOrder();
-      expect(computeBackoffMock).not.toHaveBeenCalled();
       expect(sleepWithAbortMock).not.toHaveBeenCalled();
     });
   });
@@ -427,13 +434,16 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
       const usageStats = await readUsageStats(agentDir);
       expect(typeof usageStats["openai:p1"]?.cooldownUntil).toBe("number");
       expect(typeof usageStats["groq:p1"]?.cooldownUntil).toBe("number");
-      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({ overloaded: 1 });
-      expect(usageStats["groq:p1"]?.failureCounts).toMatchObject({ overloaded: 1 });
+      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({
+        overloaded: 1,
+      });
+      expect(usageStats["groq:p1"]?.failureCounts).toMatchObject({
+        overloaded: 1,
+      });
       expect(usageStats["openai:p1"]?.disabledUntil).toBeUndefined();
       expect(usageStats["groq:p1"]?.disabledUntil).toBeUndefined();
 
       expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(2);
-      expect(computeBackoffMock).not.toHaveBeenCalled();
       expect(sleepWithAbortMock).not.toHaveBeenCalled();
     });
   });
@@ -459,7 +469,9 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
       });
 
       expect(result.provider).toBe("groq");
-      expectOpenAiThenGroqAttemptOrder({ expectOpenAiAuthProfileId: "openai:p1" });
+      expectOpenAiThenGroqAttemptOrder({
+        expectOpenAiAuthProfileId: "openai:p1",
+      });
     });
   });
 
@@ -478,7 +490,6 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
       expect(firstResult.provider).toBe("groq");
 
       runEmbeddedAttemptMock.mockClear();
-      computeBackoffMock.mockClear();
       sleepWithAbortMock.mockClear();
 
       mockPrimaryOverloadedThenFallbackSuccess();
@@ -491,12 +502,15 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
       });
 
       expect(secondResult.provider).toBe("groq");
-      expectOpenAiThenGroqAttemptOrder({ expectOpenAiAuthProfileId: "openai:p1" });
+      expectOpenAiThenGroqAttemptOrder({
+        expectOpenAiAuthProfileId: "openai:p1",
+      });
 
       const usageStats = await readUsageStats(agentDir);
       expect(typeof usageStats["openai:p1"]?.cooldownUntil).toBe("number");
-      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({ overloaded: 2 });
-      expect(computeBackoffMock).not.toHaveBeenCalled();
+      expect(usageStats["openai:p1"]?.failureCounts).toMatchObject({
+        overloaded: 2,
+      });
       expect(sleepWithAbortMock).not.toHaveBeenCalled();
     });
   });
@@ -519,7 +533,6 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
       const usageStats = await readUsageStats(agentDir);
       expect(usageStats["openai:p1"]?.cooldownUntil).toBeUndefined();
       expect(usageStats["openai:p1"]?.failureCounts).toBeUndefined();
-      expect(computeBackoffMock).not.toHaveBeenCalled();
       expect(sleepWithAbortMock).not.toHaveBeenCalled();
     });
   });
@@ -571,9 +584,21 @@ describe("runWithModelFallback + runEmbeddedPiAgent overload policy", () => {
         JSON.stringify({
           version: 1,
           profiles: {
-            "openai:p1": { type: "api_key", provider: "openai", key: "sk-openai-1" },
-            "openai:p2": { type: "api_key", provider: "openai", key: "sk-openai-2" },
-            "openai:p3": { type: "api_key", provider: "openai", key: "sk-openai-3" },
+            "openai:p1": {
+              type: "api_key",
+              provider: "openai",
+              key: "sk-openai-1",
+            },
+            "openai:p2": {
+              type: "api_key",
+              provider: "openai",
+              key: "sk-openai-2",
+            },
+            "openai:p3": {
+              type: "api_key",
+              provider: "openai",
+              key: "sk-openai-3",
+            },
             "groq:p1": { type: "api_key", provider: "groq", key: "sk-groq" },
           },
           usageStats: {
