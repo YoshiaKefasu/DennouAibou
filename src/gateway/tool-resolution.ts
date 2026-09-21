@@ -20,18 +20,21 @@ import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
 import { DEFAULT_GATEWAY_HTTP_TOOL_DENY } from "../security/dangerous-tools.js";
 
-export function resolveGatewayScopedTools(params: {
-  cfg: ReturnType<typeof loadConfig>;
-  sessionKey: string;
-  messageProvider?: string;
-  accountId?: string;
-  agentTo?: string;
-  agentThreadId?: string;
-  allowGatewaySubagentBinding?: boolean;
-  allowMediaInvokeCommands?: boolean;
-  excludeToolNames?: Iterable<string>;
-  disablePluginTools?: boolean;
-}) {
+export function resolveGatewayScopedTools(
+  params: {
+    cfg: ReturnType<typeof loadConfig>;
+    sessionKey: string;
+    messageProvider?: string;
+    accountId?: string;
+    agentTo?: string;
+    agentThreadId?: string;
+    allowGatewaySubagentBinding?: boolean;
+    allowMediaInvokeCommands?: boolean;
+    excludeToolNames?: Iterable<string>;
+    disablePluginTools?: boolean;
+  },
+  deps?: { createOpenClawTools?: typeof createOpenClawTools },
+) {
   const {
     agentId,
     globalPolicy,
@@ -64,7 +67,7 @@ export function resolveGatewayScopedTools(params: {
     agentId ?? resolveDefaultAgentId(params.cfg),
   );
 
-  const allTools = createOpenClawTools({
+  const allTools = (deps?.createOpenClawTools ?? createOpenClawTools)({
     agentSessionKey: params.sessionKey,
     agentChannel: params.messageProvider ?? undefined,
     agentAccountId: params.accountId,

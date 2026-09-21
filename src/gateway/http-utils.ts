@@ -83,17 +83,20 @@ function shouldTrustDeclaredHttpOperatorScopes(
   return !isGatewayBearerHttpRequest(req, authOrRequest);
 }
 
-export async function authorizeGatewayHttpRequestOrReply(params: {
-  req: IncomingMessage;
-  res: ServerResponse;
-  auth: ResolvedGatewayAuth;
-  trustedProxies?: string[];
-  allowRealIpFallback?: boolean;
-  rateLimiter?: AuthRateLimiter;
-}): Promise<AuthorizedGatewayHttpRequest | null> {
+export async function authorizeGatewayHttpRequestOrReply(
+  params: {
+    req: IncomingMessage;
+    res: ServerResponse;
+    auth: ResolvedGatewayAuth;
+    trustedProxies?: string[];
+    allowRealIpFallback?: boolean;
+    rateLimiter?: AuthRateLimiter;
+  },
+  deps?: { authorizeHttpGatewayConnect?: typeof authorizeHttpGatewayConnect },
+): Promise<AuthorizedGatewayHttpRequest | null> {
   const token = getBearerToken(params.req);
   const browserOriginPolicy = resolveHttpBrowserOriginPolicy(params.req);
-  const authResult = await authorizeHttpGatewayConnect({
+  const authResult = await (deps?.authorizeHttpGatewayConnect ?? authorizeHttpGatewayConnect)({
     auth: params.auth,
     connectAuth: token ? { token, password: token } : null,
     req: params.req,

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sanitizeNodeInvokeParamsForForwarding } from "../node-invoke-sanitize.js";
 import { ErrorCodes } from "../protocol/index.js";
-import { maybeWakeNodeWithApns, nodeHandlers } from "./nodes.js";
+import { createNodeHandlers, maybeWakeNodeWithApns, type NodeHandlersDeps } from "./nodes.js";
 
 type MockNodeCommandPolicyParams = {
   command: string;
@@ -8,16 +9,13 @@ type MockNodeCommandPolicyParams = {
   allowlist: Set<string>;
 };
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   loadConfig: vi.fn(() => ({})),
   resolveNodeCommandAllowlist: vi.fn<() => Set<string>>(() => new Set()),
   isNodeCommandAllowed: vi.fn<
     (params: MockNodeCommandPolicyParams) => { ok: true } | { ok: false; reason: string }
   >(() => ({ ok: true })),
-  sanitizeNodeInvokeParamsForForwarding: vi.fn(({ rawParams }: { rawParams: unknown }) => ({
-    ok: true,
-    params: rawParams,
-  })),
+  sanitizeNodeInvokeParamsForForwarding: vi.fn<typeof sanitizeNodeInvokeParamsForForwarding>(),
   clearApnsRegistrationIfCurrent: vi.fn(),
   loadApnsRegistration: vi.fn(),
   resolveApnsAuthConfigFromEnv: vi.fn(),
@@ -25,22 +23,13 @@ const mocks = vi.hoisted(() => ({
   sendApnsBackgroundWake: vi.fn(),
   sendApnsAlert: vi.fn(),
   shouldClearStoredApnsRegistration: vi.fn(() => false),
-}));
+};
 
-vi.mock("../../config/config.js", () => ({
+const nodeDeps: NodeHandlersDeps = {
   loadConfig: mocks.loadConfig,
-}));
-
-vi.mock("../node-command-policy.js", () => ({
   resolveNodeCommandAllowlist: mocks.resolveNodeCommandAllowlist,
   isNodeCommandAllowed: mocks.isNodeCommandAllowed,
-}));
-
-vi.mock("../node-invoke-sanitize.js", () => ({
   sanitizeNodeInvokeParamsForForwarding: mocks.sanitizeNodeInvokeParamsForForwarding,
-}));
-
-vi.mock("../../infra/push-apns.js", () => ({
   clearApnsRegistrationIfCurrent: mocks.clearApnsRegistrationIfCurrent,
   loadApnsRegistration: mocks.loadApnsRegistration,
   resolveApnsAuthConfigFromEnv: mocks.resolveApnsAuthConfigFromEnv,
@@ -48,7 +37,22 @@ vi.mock("../../infra/push-apns.js", () => ({
   sendApnsBackgroundWake: mocks.sendApnsBackgroundWake,
   sendApnsAlert: mocks.sendApnsAlert,
   shouldClearStoredApnsRegistration: mocks.shouldClearStoredApnsRegistration,
-}));
+};
+
+const nodeHandlers = createNodeHandlers(nodeDeps);
+
+async function advanceTimers(ms: number): Promise<void> {
+  if (typeof vi.advanceTimersByTimeAsync === "function") {
+    await vi.advanceTimersByTimeAsync(ms);
+    return;
+  }
+  for (let elapsed = 0; elapsed < ms; elapsed += 50) {
+    vi.advanceTimersByTime(Math.min(50, ms - elapsed));
+    for (let round = 0; round < 4; round += 1) {
+      await Promise.resolve();
+    }
+  }
+}
 
 type RespondCall = [
   boolean,
@@ -312,8 +316,8 @@ describe("node.invoke APNs wake path", () => {
       error: "relay config missing",
     });
 
-    const first = await maybeWakeNodeWithApns("ios-node-relay-no-auth");
-    const second = await maybeWakeNodeWithApns("ios-node-relay-no-auth");
+    const first = await maybeWakeNodeWithApns("ios-node-relay-no-auth", undefined, nodeDeps);
+    const second = await maybeWakeNodeWithApns("ios-node-relay-no-auth", undefined, nodeDeps);
 
     expect(first).toMatchObject({
       available: false,
@@ -359,7 +363,7 @@ describe("node.invoke APNs wake path", () => {
       connected = true;
     }, 300);
 
-    await vi.advanceTimersByTimeAsync(WAKE_WAIT_TIMEOUT_MS);
+    await advanceTimers(WAKE_WAIT_TIMEOUT_MS);
     const respond = await invokePromise;
 
     expect(mocks.sendApnsBackgroundWake).toHaveBeenCalledTimes(1);
@@ -439,7 +443,7 @@ describe("node.invoke APNs wake path", () => {
       nodeRegistry,
       requestParams: { nodeId: "ios-node-throttle", idempotencyKey: "idem-throttle-1" },
     });
-    await vi.advanceTimersByTimeAsync(20_000);
+    await advanceTimers(20_000);
     await invokePromise;
 
     expect(mocks.sendApnsBackgroundWake).toHaveBeenCalledTimes(2);
@@ -481,6 +485,8 @@ describe("node.invoke APNs wake path", () => {
 
     const pullRespond = await pullPending("ios-node-queued", ["canvas.navigate"]);
     const pullCall = pullRespond.mock.calls[0] as RespondCall | undefined;
+    const queuedActionId = (pullCall?.[1] as { actions?: Array<{ id?: string }> } | undefined)
+      ?.actions?.[0]?.id;
     expect(pullCall?.[0]).toBe(true);
     expect(pullCall?.[1]).toMatchObject({
       nodeId: "ios-node-queued",
@@ -505,8 +511,6 @@ describe("node.invoke APNs wake path", () => {
       ],
     });
 
-    const queuedActionId = (pullCall?.[1] as { actions?: Array<{ id?: string }> } | undefined)
-      ?.actions?.[0]?.id;
     expect(queuedActionId).toBeTruthy();
 
     const ackRespond = await ackPending("ios-node-queued", [queuedActionId!], ["canvas.navigate"]);

@@ -1,30 +1,37 @@
 import path from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { listAgentEntries, pruneAgentConfig } from "../../commands/agents.config.js";
 import { SafeOpenError } from "../../infra/fs-safe.js";
+import { listAgentsForGateway } from "../session-utils.js";
+import { __testing as agentsTesting, agentsHandlers } from "./agents.js";
 
 /* ------------------------------------------------------------------ */
 /* Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   loadConfigReturn: {} as Record<string, unknown>,
-  listAgentEntries: vi.fn(() => [] as Array<{ agentId: string }>),
+  listAgentEntries: vi.fn<typeof listAgentEntries>(() => []),
   findAgentEntryIndex: vi.fn(() => -1),
   applyAgentConfig: vi.fn((_cfg: unknown, _opts: unknown) => ({})),
-  pruneAgentConfig: vi.fn(() => ({ config: {}, removedBindings: 0 })),
+  pruneAgentConfig: vi.fn<typeof pruneAgentConfig>(() => ({
+    config: {},
+    removedBindings: 0,
+    removedAllow: 0,
+  })),
   writeConfigFile: vi.fn(async () => {}),
-  ensureAgentWorkspace: vi.fn(async () => {}),
+  ensureAgentWorkspace: vi.fn(async () => ({ dir: "/workspace/test-agent" })),
   isWorkspaceSetupCompleted: vi.fn(async () => false),
   resolveAgentDir: vi.fn(() => "/agents/test-agent"),
   resolveAgentWorkspaceDir: vi.fn(() => "/workspace/test-agent"),
   resolveSessionTranscriptsDirForAgent: vi.fn(() => "/transcripts/test-agent"),
-  listAgentsForGateway: vi.fn(() => ({
+  listAgentsForGateway: vi.fn<typeof listAgentsForGateway>(() => ({
     defaultId: "main",
     mainKey: "agent:main:main",
     scope: "global",
     agents: [],
   })),
-  movePathToTrash: vi.fn(async () => "/trashed"),
+  movePathToTrash: vi.fn(async () => {}),
   fsAccess: vi.fn(async () => {}),
   fsMkdir: vi.fn(async () => undefined),
   fsAppendFile: vi.fn(async () => {}),
@@ -36,93 +43,39 @@ const mocks = vi.hoisted(() => ({
   fsOpen: vi.fn(async () => ({}) as unknown),
   appendFileWithinRoot: vi.fn(async () => {}),
   writeFileWithinRoot: vi.fn(async () => {}),
-}));
+};
 
-vi.mock("../../config/config.js", async () => {
-  const actual = await import("../../config/config.js");
-  return {
-    ...actual,
-    loadConfig: () => mocks.loadConfigReturn,
-    writeConfigFile: mocks.writeConfigFile,
-  };
-});
+const fsDeps = {
+  access: mocks.fsAccess,
+  mkdir: mocks.fsMkdir,
+  appendFile: mocks.fsAppendFile,
+  readFile: mocks.fsReadFile,
+  stat: mocks.fsStat,
+  lstat: mocks.fsLstat,
+  realpath: mocks.fsRealpath,
+  readlink: mocks.fsReadlink,
+  open: mocks.fsOpen,
+} as unknown as typeof import("node:fs/promises");
 
-vi.mock("../../commands/agents.config.js", () => ({
+const agentDeps = {
+  loadConfig: () => mocks.loadConfigReturn,
+  writeConfigFile: mocks.writeConfigFile,
+  listAgentIds: () => ["main"],
+  resolveAgentDir: mocks.resolveAgentDir,
+  resolveAgentWorkspaceDir: mocks.resolveAgentWorkspaceDir,
+  ensureAgentWorkspace: mocks.ensureAgentWorkspace,
+  resolveSessionTranscriptsDirForAgent: mocks.resolveSessionTranscriptsDirForAgent,
   applyAgentConfig: mocks.applyAgentConfig,
   findAgentEntryIndex: mocks.findAgentEntryIndex,
   listAgentEntries: mocks.listAgentEntries,
   pruneAgentConfig: mocks.pruneAgentConfig,
-}));
-
-vi.mock("../../agents/agent-scope.js", () => ({
-  listAgentIds: () => ["main"],
-  resolveAgentDir: mocks.resolveAgentDir,
-  resolveAgentWorkspaceDir: mocks.resolveAgentWorkspaceDir,
-}));
-
-vi.mock("../../agents/workspace.js", async () => {
-  const actual = await import("../../agents/workspace.js");
-  return {
-    ...actual,
-    ensureAgentWorkspace: mocks.ensureAgentWorkspace,
-    isWorkspaceSetupCompleted: mocks.isWorkspaceSetupCompleted,
-  };
-});
-
-vi.mock("../../config/sessions/paths.js", () => ({
-  resolveSessionTranscriptsDirForAgent: mocks.resolveSessionTranscriptsDirForAgent,
-}));
-
-vi.mock("../../plugin-sdk/browser-maintenance.js", () => ({
-  movePathToTrash: mocks.movePathToTrash,
-}));
-
-vi.mock("../../utils.js", async () => {
-  const actual = await import("../../utils.js");
-  return {
-    ...actual,
-    resolveUserPath: (p: string) => `/resolved${p.startsWith("/") ? "" : "/"}${p}`,
-  };
-});
-
-vi.mock("../session-utils.js", () => ({
   listAgentsForGateway: mocks.listAgentsForGateway,
-}));
-
-vi.mock("../../infra/fs-safe.js", async () => {
-  const actual = await import("../../infra/fs-safe.js");
-  return {
-    ...actual,
-    appendFileWithinRoot: mocks.appendFileWithinRoot,
-    writeFileWithinRoot: mocks.writeFileWithinRoot,
-  };
-});
-
-// Mock node:fs/promises – agents.ts uses `import fs from "node:fs/promises"`
-// which resolves to the module namespace default, so we spread actual and
-// override the methods we need, plus set `default` explicitly.
-vi.mock("node:fs/promises", async () => {
-  const actual = await import("node:fs/promises");
-  const patched = {
-    ...actual,
-    access: mocks.fsAccess,
-    mkdir: mocks.fsMkdir,
-    appendFile: mocks.fsAppendFile,
-    readFile: mocks.fsReadFile,
-    stat: mocks.fsStat,
-    lstat: mocks.fsLstat,
-    realpath: mocks.fsRealpath,
-    readlink: mocks.fsReadlink,
-    open: mocks.fsOpen,
-  };
-  return { ...patched, default: patched };
-});
-
-/* ------------------------------------------------------------------ */
-/* Import after mocks are set up                                      */
-/* ------------------------------------------------------------------ */
-
-const { __testing: agentsTesting, agentsHandlers } = await import("./agents.js");
+  movePathToTrash: mocks.movePathToTrash,
+  resolveUserPath: (p: string) => `/resolved${p.startsWith("/") ? "" : "/"}${p}`,
+  fs: fsDeps,
+  appendFileWithinRoot: mocks.appendFileWithinRoot,
+  writeFileWithinRoot: mocks.writeFileWithinRoot,
+};
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -130,6 +83,7 @@ const { __testing: agentsTesting, agentsHandlers } = await import("./agents.js")
 
 beforeEach(() => {
   agentsTesting.resetDepsForTests();
+  agentsTesting.setDepsForTests(agentDeps);
 });
 
 function makeCall(method: keyof typeof agentsHandlers, params: Record<string, unknown>) {
@@ -297,6 +251,7 @@ describe("agents.create", () => {
     const callOrder: string[] = [];
     mocks.ensureAgentWorkspace.mockImplementation(async () => {
       callOrder.push("ensureAgentWorkspace");
+      return { dir: "/workspace/test-agent" };
     });
     mocks.writeConfigFile.mockImplementation(async () => {
       callOrder.push("writeConfigFile");
@@ -558,7 +513,7 @@ describe("agents.delete", () => {
     vi.clearAllMocks();
     mocks.loadConfigReturn = {};
     mocks.findAgentEntryIndex.mockReturnValue(0);
-    mocks.pruneAgentConfig.mockReturnValue({ config: {}, removedBindings: 2 });
+    mocks.pruneAgentConfig.mockReturnValue({ config: {}, removedBindings: 2, removedAllow: 0 });
   });
 
   it("deletes an existing agent and trashes files by default", async () => {

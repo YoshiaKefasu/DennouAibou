@@ -1,14 +1,20 @@
 import { Buffer } from "node:buffer";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pollUntilAssert } from "../../test/helpers/poll.js";
 import type { DeviceIdentity } from "../infra/device-identity.js";
 import { captureEnv } from "../test-utils/env.js";
+import {
+  GatewayClient as GatewayClientImpl,
+  type GatewayClientDeps,
+  type GatewayClientOptions,
+} from "./client.js";
 
-const wsInstances = vi.hoisted((): MockWebSocket[] => []);
-const clearDeviceAuthTokenMock = vi.hoisted(() => vi.fn());
-const loadDeviceAuthTokenMock = vi.hoisted(() => vi.fn());
-const storeDeviceAuthTokenMock = vi.hoisted(() => vi.fn());
-const logDebugMock = vi.hoisted(() => vi.fn());
+const wsInstances: MockWebSocket[] = [];
+const clearDeviceAuthTokenMock = vi.fn();
+const loadDeviceAuthTokenMock = vi.fn();
+const storeDeviceAuthTokenMock = vi.fn();
+const logDebugMock = vi.fn();
+const logErrorMock = vi.fn();
 
 type WsEvent = "open" | "message" | "close" | "error";
 type WsEventHandlers = {
@@ -27,6 +33,9 @@ class MockWebSocket {
   closeCalls = 0;
   terminateCalls = 0;
   autoCloseOnClose = true;
+
+  static readonly OPEN = 1;
+  readyState = MockWebSocket.OPEN;
 
   constructor(_url: string, _options?: unknown) {
     wsInstances.push(this);
@@ -83,42 +92,32 @@ class MockWebSocket {
   }
 
   emitClose(code: number, reason: string): void {
+    this.readyState = 3;
     for (const handler of this.closeHandlers) {
       handler(code, Buffer.from(reason));
     }
   }
 }
 
-vi.mock("ws", () => ({
-  WebSocket: MockWebSocket,
-}));
+const gatewayClientDeps: GatewayClientDeps = {
+  webSocket: MockWebSocket as unknown as GatewayClientDeps["webSocket"],
+  clearDeviceAuthToken: (params) => clearDeviceAuthTokenMock(params),
+  loadDeviceAuthToken: (params) => loadDeviceAuthTokenMock(params),
+  storeDeviceAuthToken: (params) => storeDeviceAuthTokenMock(params),
+  logDebug: (message) => logDebugMock(message),
+  logError: (message) => logErrorMock(message),
+};
 
-vi.mock("../infra/device-auth-store.js", async () => {
-  const actual = await import("../infra/device-auth-store.js");
-  return {
-    ...actual,
-    loadDeviceAuthToken: (...args: unknown[]) => loadDeviceAuthTokenMock(...args),
-    storeDeviceAuthToken: (...args: unknown[]) => storeDeviceAuthTokenMock(...args),
-    clearDeviceAuthToken: (...args: unknown[]) => clearDeviceAuthTokenMock(...args),
-  };
-});
+class GatewayClient extends GatewayClientImpl {
+  constructor(opts: GatewayClientOptions) {
+    super(opts, gatewayClientDeps);
+  }
+}
 
-vi.mock("../logger.js", async () => {
-  const actual = await import("../logger.js");
-  return {
-    ...actual,
-    logDebug: (...args: unknown[]) => logDebugMock(...args),
-  };
-});
+type GatewayClientInstance = InstanceType<typeof GatewayClient>;
 
-type GatewayClientModule = typeof import("./client.js");
-type GatewayClientInstance = InstanceType<GatewayClientModule["GatewayClient"]>;
-
-let GatewayClient: GatewayClientModule["GatewayClient"];
-
-async function loadGatewayClientModule() {
-  vi.resetModules();
-  ({ GatewayClient } = await import("./client.js"));
+function createGatewayClient(opts: GatewayClientOptions): GatewayClientInstance {
+  return new GatewayClient(opts);
 }
 
 function getLatestWs(): MockWebSocket {
@@ -138,7 +137,7 @@ function createClientWithIdentity(
     privateKeyPem: "private-key", // pragma: allowlist secret
     publicKeyPem: "public-key",
   };
-  return new GatewayClient({
+  return createGatewayClient({
     url: "ws://127.0.0.1:18789",
     deviceIdentity: identity,
     onClose,
@@ -160,10 +159,6 @@ function expectSecurityConnectError(
     expect(error.message).toContain("Tailscale Serve/Funnel");
   }
 }
-
-beforeAll(async () => {
-  await loadGatewayClientModule();
-});
 
 describe("GatewayClient security checks", () => {
   const envSnapshot = captureEnv(["DENNOU_ALLOW_INSECURE_PRIVATE_WS"]);
@@ -340,7 +335,7 @@ describe("GatewayClient close handling", () => {
       expect(ws.closeCalls).toBe(1);
       expect(ws.terminateCalls).toBe(0);
 
-      await vi.advanceTimersByTimeAsync(250);
+      vi.advanceTimersByTime(250);
 
       expect(ws.terminateCalls).toBe(1);
     } finally {
@@ -367,11 +362,11 @@ describe("GatewayClient close handling", () => {
       expect(ws.closeCalls).toBe(1);
       expect(settled).toBe(false);
 
-      await vi.advanceTimersByTimeAsync(249);
+      vi.advanceTimersByTime(249);
       expect(ws.terminateCalls).toBe(0);
       expect(settled).toBe(false);
 
-      await vi.advanceTimersByTimeAsync(1);
+      vi.advanceTimersByTime(1);
       await stopPromise;
 
       expect(ws.terminateCalls).toBe(1);
@@ -505,7 +500,7 @@ describe("GatewayClient connect auth payload", () => {
     vi.useFakeTimers();
     try {
       emitConnectFailure(params.firstWs, params.connectId, params.failureDetails);
-      await vi.advanceTimersByTimeAsync(30_000);
+      vi.advanceTimersByTime(30_000);
       expect(wsInstances).toHaveLength(1);
     } finally {
       params.client.stop();

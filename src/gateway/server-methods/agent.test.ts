@@ -1,97 +1,63 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { listAgentIds } from "../../agents/agent-scope.js";
+import { getLatestSubagentRunByChildSessionKey } from "../../agents/subagent-registry-read.js";
 import { BARE_SESSION_RESET_PROMPT } from "../../auto-reply/reply/session-reset-prompt.js";
+import { agentCommandFromIngress } from "../../commands/agent.js";
+import { loadConfig } from "../../config/config.js";
+import {
+  resolveAgentIdFromSessionKey,
+  resolveExplicitAgentSessionKey,
+  resolveAgentMainSessionKey,
+  updateSessionStore,
+} from "../../config/sessions.js";
+import { registerAgentRunContext } from "../../infra/agent-events.js";
+import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { findTaskByRunId, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
 import { withTempDir } from "../../test-helpers/temp-dir.js";
-import { agentHandlers } from "./agent.js";
+import { installInMemoryTaskRegistryRuntime } from "../../test-utils/task-registry-runtime.js";
+import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
+import { performGatewaySessionReset } from "../session-reset-service.js";
+import { reactivateCompletedSubagentSession } from "../session-subagent-reactivation.js";
+import { loadGatewaySessionRow, loadSessionEntry } from "../session-utils.js";
+import { createAgentHandlers, type AgentHandlersDeps } from "./agent.js";
 import { expectSubagentFollowupReactivation } from "./subagent-followup.test-helpers.js";
 import type { GatewayRequestContext } from "./types.js";
 
 const ORIGINAL_STATE_DIR = process.env.DENNOU_STATE_DIR;
 
-const mocks = vi.hoisted(() => ({
-  loadSessionEntry: vi.fn(),
-  loadGatewaySessionRow: vi.fn(),
+const mocks = {
+  loadSessionEntry: vi.fn<typeof loadSessionEntry>(),
+  loadGatewaySessionRow: vi.fn<typeof loadGatewaySessionRow>(),
   updateSessionStore: vi.fn(),
-  agentCommand: vi.fn(),
-  registerAgentRunContext: vi.fn(),
-  performGatewaySessionReset: vi.fn(),
-  getLatestSubagentRunByChildSessionKey: vi.fn(),
+  agentCommand: vi.fn<typeof agentCommandFromIngress>(),
+  registerAgentRunContext: vi.fn<typeof registerAgentRunContext>(),
+  performGatewaySessionReset: vi.fn<typeof performGatewaySessionReset>(),
+  getLatestSubagentRunByChildSessionKey: vi.fn<typeof getLatestSubagentRunByChildSessionKey>(),
   replaceSubagentRunAfterSteer: vi.fn(),
   loadConfigReturn: {} as Record<string, unknown>,
-}));
+};
 
-vi.mock("../session-utils.js", async () => {
-  const actual = await import("../session-utils.js");
-  return {
-    ...actual,
-    loadSessionEntry: mocks.loadSessionEntry,
-    loadGatewaySessionRow: mocks.loadGatewaySessionRow,
-  };
-});
-
-vi.mock("../../config/sessions.js", async () => {
-  const actual = await import("../../config/sessions.js");
-  return {
-    ...actual,
-    updateSessionStore: mocks.updateSessionStore,
-    resolveAgentIdFromSessionKey: () => "main",
-    resolveExplicitAgentSessionKey: () => undefined,
-    resolveAgentMainSessionKey: ({
-      cfg,
-      agentId,
-    }: {
-      cfg?: { session?: { mainKey?: string } };
-      agentId: string;
-    }) => `agent:${agentId}:${cfg?.session?.mainKey ?? "main"}`,
-  };
-});
-
-vi.mock("../../commands/agent.js", () => ({
-  agentCommand: mocks.agentCommand,
+const agentHandlers = createAgentHandlers({
+  loadSessionEntry: mocks.loadSessionEntry,
+  loadGatewaySessionRow: mocks.loadGatewaySessionRow,
+  updateSessionStore: mocks.updateSessionStore,
+  resolveAgentIdFromSessionKey: () => "main",
+  resolveExplicitAgentSessionKey: () => undefined,
+  resolveAgentMainSessionKey: ({ cfg, agentId }) =>
+    `agent:${agentId}:${cfg?.session?.mainKey ?? "main"}`,
   agentCommandFromIngress: mocks.agentCommand,
-}));
-
-vi.mock("../../config/config.js", async () => {
-  const actual = await import("../../config/config.js");
-  return {
-    ...actual,
-    loadConfig: () => mocks.loadConfigReturn,
-  };
-});
-
-vi.mock("../../agents/agent-scope.js", () => ({
-  listAgentIds: () => ["main"],
-}));
-
-vi.mock("../../infra/agent-events.js", () => ({
   registerAgentRunContext: mocks.registerAgentRunContext,
-  onAgentEvent: vi.fn(),
-}));
-
-vi.mock("../../agents/subagent-registry-read.js", () => ({
-  getLatestSubagentRunByChildSessionKey: mocks.getLatestSubagentRunByChildSessionKey,
-}));
-
-vi.mock("../session-subagent-reactivation.runtime.js", () => ({
-  replaceSubagentRunAfterSteer: mocks.replaceSubagentRunAfterSteer,
-}));
-
-vi.mock("../session-reset-service.js", () => ({
-  performGatewaySessionReset: (...args: unknown[]) =>
-    (mocks.performGatewaySessionReset as (...args: unknown[]) => unknown)(...args),
-}));
-
-vi.mock("../../sessions/send-policy.js", () => ({
+  reactivateCompletedSubagentSession: (params) =>
+    reactivateCompletedSubagentSession(params, {
+      getLatestSubagentRunByChildSessionKey: mocks.getLatestSubagentRunByChildSessionKey,
+      replaceSubagentRunAfterSteer: mocks.replaceSubagentRunAfterSteer,
+    }),
+  performGatewaySessionReset: mocks.performGatewaySessionReset,
   resolveSendPolicy: () => "allow",
-}));
-
-vi.mock("../../utils/delivery-context.js", async () => {
-  const actual = await import("../../utils/delivery-context.js");
-  return {
-    ...actual,
-    normalizeSessionDeliveryFields: () => ({}),
-  };
-});
+  normalizeSessionDeliveryFields: () => ({}),
+  listAgentIds: () => ["main"],
+  loadConfig: () => mocks.loadConfigReturn,
+} satisfies AgentHandlersDeps);
 
 const makeContext = (): GatewayRequestContext =>
   ({
@@ -136,12 +102,14 @@ function mockMainSessionEntry(entry: Record<string, unknown>, cfg: Record<string
   mocks.loadSessionEntry.mockReturnValue({
     cfg,
     storePath: "/tmp/sessions.json",
+    store: {},
     entry: {
       sessionId: "existing-session-id",
       updatedAt: Date.now(),
       ...entry,
     },
     canonicalKey: "agent:main:main",
+    legacyKey: undefined,
   });
 }
 
@@ -154,8 +122,7 @@ function buildExistingMainStoreEntry(overrides: Record<string, unknown> = {}) {
 }
 
 function setupNewYorkTimeConfig(isoDate: string) {
-  vi.useFakeTimers();
-  vi.advanceTimersByTime(new Date(isoDate).getTime() - Date.now()); // Wed Jan 28, 8:30 PM EST
+  vi.useFakeTimers({ now: new Date(isoDate) }); // Wed Jan 28, 8:30 PM EST
   mocks.agentCommand.mockClear();
   mocks.loadConfigReturn = {
     agents: {
@@ -186,7 +153,7 @@ function primeMainAgentRun(params?: { sessionId?: string; cfg?: Record<string, u
   );
   mocks.updateSessionStore.mockResolvedValue(undefined);
   mocks.agentCommand.mockResolvedValue({
-    payloads: [{ text: "ok" }],
+    payloads: [{ text: "ok", mediaUrl: null }],
     meta: { durationMs: 100 },
   });
 }
@@ -231,7 +198,7 @@ function mockSessionResetSuccess(params: {
       return {
         ok: true,
         key,
-        entry: { sessionId },
+        entry: { sessionId, updatedAt: Date.now() },
       };
     },
   );
@@ -318,7 +285,7 @@ describe("gateway agent handler", () => {
     });
 
     mocks.agentCommand.mockResolvedValue({
-      payloads: [{ text: "ok" }],
+      payloads: [{ text: "ok", mediaUrl: null }],
       meta: { durationMs: 100 },
     });
 
@@ -436,6 +403,7 @@ describe("gateway agent handler", () => {
       runId: "run-old",
       childSessionKey,
       controllerSessionKey: "agent:main:main",
+      requesterSessionKey: "agent:main:main",
       ownerKey: "agent:main:main",
       scopeKind: "session",
       requesterDisplayKey: "main",
@@ -450,11 +418,13 @@ describe("gateway agent handler", () => {
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
       storePath: "/tmp/sessions.json",
+      store: {},
       entry: {
         sessionId: "sess-followup",
         updatedAt: Date.now(),
       },
       canonicalKey: childSessionKey,
+      legacyKey: undefined,
     });
     mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
@@ -468,13 +438,16 @@ describe("gateway agent handler", () => {
     mocks.getLatestSubagentRunByChildSessionKey.mockReturnValueOnce(completedRun);
     mocks.replaceSubagentRunAfterSteer.mockReturnValueOnce(true);
     mocks.loadGatewaySessionRow.mockReturnValueOnce({
+      key: childSessionKey,
+      kind: "direct",
+      updatedAt: Date.now(),
       status: "running",
       startedAt: 123,
       endedAt: undefined,
       runtimeMs: 10,
     });
     mocks.agentCommand.mockResolvedValue({
-      payloads: [{ text: "ok" }],
+      payloads: [{ text: "ok", mediaUrl: null }],
       meta: { durationMs: 100 },
     });
 
@@ -540,6 +513,9 @@ describe("gateway agent handler", () => {
       return await updater(store);
     });
     mocks.loadGatewaySessionRow.mockReturnValue({
+      key: "agent:main:main",
+      kind: "direct",
+      updatedAt: Date.now(),
       spawnedBy: "agent:main:main",
       spawnedWorkspaceDir: "/tmp/subagent",
       forkedFromParent: true,
@@ -556,7 +532,7 @@ describe("gateway agent handler", () => {
       status: "running",
     });
     mocks.agentCommand.mockResolvedValue({
-      payloads: [{ text: "ok" }],
+      payloads: [{ text: "ok", mediaUrl: null }],
       meta: { durationMs: 100 },
     });
 
@@ -883,7 +859,7 @@ describe("gateway agent handler", () => {
       return await updater(store);
     });
     mocks.agentCommand.mockResolvedValue({
-      payloads: [{ text: "ok" }],
+      payloads: [{ text: "ok", mediaUrl: null }],
       meta: { durationMs: 100 },
     });
 
@@ -918,7 +894,8 @@ describe("gateway agent handler", () => {
   it("tracks async gateway agent runs in the shared task registry", async () => {
     await withTempDir({ prefix: "openclaw-gateway-agent-task-" }, async (root) => {
       process.env.DENNOU_STATE_DIR = root;
-      resetTaskRegistryForTests();
+      resetTaskRegistryForTests({ persist: false });
+      installInMemoryTaskRegistryRuntime();
       primeMainAgentRun();
 
       await invokeAgent(
@@ -935,6 +912,7 @@ describe("gateway agent handler", () => {
         childSessionKey: "agent:main:main",
         status: "running",
       });
+      resetTaskRegistryForTests({ persist: false });
     });
   });
 
@@ -945,11 +923,13 @@ describe("gateway agent handler", () => {
         agents: { list: [{ id: "main", default: true }] },
       },
       storePath: "/tmp/sessions.json",
+      store: {},
       entry: {
         sessionId: "existing-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: "agent:main:work",
+      legacyKey: undefined,
     });
 
     let capturedStore: Record<string, unknown> | undefined;
@@ -963,7 +943,7 @@ describe("gateway agent handler", () => {
     });
 
     mocks.agentCommand.mockResolvedValue({
-      payloads: [{ text: "ok" }],
+      payloads: [{ text: "ok", mediaUrl: null }],
       meta: { durationMs: 100 },
     });
 

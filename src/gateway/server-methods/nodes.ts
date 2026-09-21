@@ -96,15 +96,43 @@ type PendingNodeAction = {
 
 const pendingNodeActionsById = new Map<string, PendingNodeAction[]>();
 
-async function resolveDirectNodePushConfig() {
-  const auth = await resolveApnsAuthConfigFromEnv(process.env);
+export type NodeHandlersDeps = {
+  loadConfig?: typeof loadConfig;
+  resolveNodeCommandAllowlist?: typeof resolveNodeCommandAllowlist;
+  isNodeCommandAllowed?: typeof isNodeCommandAllowed;
+  sanitizeNodeInvokeParamsForForwarding?: typeof sanitizeNodeInvokeParamsForForwarding;
+  clearApnsRegistrationIfCurrent?: typeof clearApnsRegistrationIfCurrent;
+  loadApnsRegistration?: typeof loadApnsRegistration;
+  resolveApnsAuthConfigFromEnv?: typeof resolveApnsAuthConfigFromEnv;
+  resolveApnsRelayConfigFromEnv?: typeof resolveApnsRelayConfigFromEnv;
+  sendApnsBackgroundWake?: typeof sendApnsBackgroundWake;
+  sendApnsAlert?: typeof sendApnsAlert;
+  shouldClearStoredApnsRegistration?: typeof shouldClearStoredApnsRegistration;
+};
+
+const defaultNodeHandlersDeps: Required<NodeHandlersDeps> = {
+  loadConfig,
+  resolveNodeCommandAllowlist,
+  isNodeCommandAllowed,
+  sanitizeNodeInvokeParamsForForwarding,
+  clearApnsRegistrationIfCurrent,
+  loadApnsRegistration,
+  resolveApnsAuthConfigFromEnv,
+  resolveApnsRelayConfigFromEnv,
+  sendApnsBackgroundWake,
+  sendApnsAlert,
+  shouldClearStoredApnsRegistration,
+};
+
+async function resolveDirectNodePushConfig(deps: Required<NodeHandlersDeps>) {
+  const auth = await deps.resolveApnsAuthConfigFromEnv(process.env);
   return auth.ok
     ? { ok: true as const, auth: auth.value }
     : { ok: false as const, error: auth.error };
 }
 
-function resolveRelayNodePushConfig() {
-  const relay = resolveApnsRelayConfigFromEnv(process.env, loadConfig().gateway);
+function resolveRelayNodePushConfig(deps: Required<NodeHandlersDeps>) {
+  const relay = deps.resolveApnsRelayConfigFromEnv(process.env, deps.loadConfig().gateway);
   return relay.ok
     ? { ok: true as const, relayConfig: relay.value }
     : { ok: false as const, error: relay.error };
@@ -114,16 +142,17 @@ async function clearStaleApnsRegistrationIfNeeded(
   registration: NonNullable<Awaited<ReturnType<typeof loadApnsRegistration>>>,
   nodeId: string,
   params: { status: number; reason?: string },
+  deps: Required<NodeHandlersDeps>,
 ) {
   if (
-    !shouldClearStoredApnsRegistration({
+    !deps.shouldClearStoredApnsRegistration({
       registration,
       result: params,
     })
   ) {
     return;
   }
-  await clearApnsRegistrationIfCurrent({
+  await deps.clearApnsRegistrationIfCurrent({
     nodeId,
     registration,
   });
@@ -209,22 +238,25 @@ function listPendingNodeActions(nodeId: string): PendingNodeAction[] {
   return prunePendingNodeActions(nodeId, Date.now());
 }
 
-function resolveAllowedPendingNodeActions(params: {
-  nodeId: string;
-  client: { connect?: ConnectParams | null } | null;
-}): PendingNodeAction[] {
+function resolveAllowedPendingNodeActions(
+  params: {
+    nodeId: string;
+    client: { connect?: ConnectParams | null } | null;
+  },
+  deps: Required<NodeHandlersDeps>,
+): PendingNodeAction[] {
   const pending = listPendingNodeActions(params.nodeId);
   if (pending.length === 0) {
     return pending;
   }
   const connect = params.client?.connect;
   const declaredCommands = Array.isArray(connect?.commands) ? connect.commands : [];
-  const allowlist = resolveNodeCommandAllowlist(loadConfig(), {
+  const allowlist = deps.resolveNodeCommandAllowlist(deps.loadConfig(), {
     platform: connect?.client?.platform,
     deviceFamily: connect?.client?.deviceFamily,
   });
   const allowed = pending.filter((entry) => {
-    const result = isNodeCommandAllowed({
+    const result = deps.isNodeCommandAllowed({
       command: entry.command,
       declaredCommands,
       allowlist,
@@ -270,7 +302,9 @@ function toPendingParamsJSON(params: unknown): string | undefined {
 export async function maybeWakeNodeWithApns(
   nodeId: string,
   opts?: { force?: boolean; wakeReason?: string },
+  overrides?: NodeHandlersDeps,
 ): Promise<NodeWakeAttempt> {
+  const deps = { ...defaultNodeHandlersDeps, ...overrides };
   const state = nodeWakeById.get(nodeId) ?? { lastWakeAtMs: 0 };
   nodeWakeById.set(nodeId, state);
 
@@ -292,14 +326,14 @@ export async function maybeWakeNodeWithApns(
     });
 
     try {
-      const registration = await loadApnsRegistration(nodeId);
+      const registration = await deps.loadApnsRegistration(nodeId);
       if (!registration) {
         return withDuration({ available: false, throttled: false, path: "no-registration" });
       }
 
       let wakeResult;
       if (registration.transport === "relay") {
-        const relay = resolveRelayNodePushConfig();
+        const relay = resolveRelayNodePushConfig(deps);
         if (!relay.ok) {
           return withDuration({
             available: false,
@@ -309,14 +343,14 @@ export async function maybeWakeNodeWithApns(
           });
         }
         state.lastWakeAtMs = Date.now();
-        wakeResult = await sendApnsBackgroundWake({
+        wakeResult = await deps.sendApnsBackgroundWake({
           registration,
           nodeId,
           wakeReason: opts?.wakeReason ?? "node.invoke",
           relayConfig: relay.relayConfig,
         });
       } else {
-        const auth = await resolveDirectNodePushConfig();
+        const auth = await resolveDirectNodePushConfig(deps);
         if (!auth.ok) {
           return withDuration({
             available: false,
@@ -326,14 +360,14 @@ export async function maybeWakeNodeWithApns(
           });
         }
         state.lastWakeAtMs = Date.now();
-        wakeResult = await sendApnsBackgroundWake({
+        wakeResult = await deps.sendApnsBackgroundWake({
           registration,
           nodeId,
           wakeReason: opts?.wakeReason ?? "node.invoke",
           auth: auth.auth,
         });
       }
-      await clearStaleApnsRegistrationIfNeeded(registration, nodeId, wakeResult);
+      await clearStaleApnsRegistrationIfNeeded(registration, nodeId, wakeResult, deps);
       if (!wakeResult.ok) {
         return withDuration({
           available: true,
@@ -377,7 +411,11 @@ export async function maybeWakeNodeWithApns(
   }
 }
 
-export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNudgeAttempt> {
+export async function maybeSendNodeWakeNudge(
+  nodeId: string,
+  overrides?: NodeHandlersDeps,
+): Promise<NodeWakeNudgeAttempt> {
+  const deps = { ...defaultNodeHandlersDeps, ...overrides };
   const startedAtMs = Date.now();
   const withDuration = (
     attempt: Omit<NodeWakeNudgeAttempt, "durationMs">,
@@ -391,14 +429,14 @@ export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNu
     return withDuration({ sent: false, throttled: true, reason: "throttled" });
   }
 
-  const registration = await loadApnsRegistration(nodeId);
+  const registration = await deps.loadApnsRegistration(nodeId);
   if (!registration) {
     return withDuration({ sent: false, throttled: false, reason: "no-registration" });
   }
   try {
     let result;
     if (registration.transport === "relay") {
-      const relay = resolveRelayNodePushConfig();
+      const relay = resolveRelayNodePushConfig(deps);
       if (!relay.ok) {
         return withDuration({
           sent: false,
@@ -407,7 +445,7 @@ export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNu
           apnsReason: relay.error,
         });
       }
-      result = await sendApnsAlert({
+      result = await deps.sendApnsAlert({
         registration,
         nodeId,
         title: "OpenClaw needs a quick reopen",
@@ -415,7 +453,7 @@ export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNu
         relayConfig: relay.relayConfig,
       });
     } else {
-      const auth = await resolveDirectNodePushConfig();
+      const auth = await resolveDirectNodePushConfig(deps);
       if (!auth.ok) {
         return withDuration({
           sent: false,
@@ -424,7 +462,7 @@ export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNu
           apnsReason: auth.error,
         });
       }
-      result = await sendApnsAlert({
+      result = await deps.sendApnsAlert({
         registration,
         nodeId,
         title: "OpenClaw needs a quick reopen",
@@ -432,7 +470,7 @@ export async function maybeSendNodeWakeNudge(nodeId: string): Promise<NodeWakeNu
         auth: auth.auth,
       });
     }
-    await clearStaleApnsRegistrationIfNeeded(registration, nodeId, result);
+    await clearStaleApnsRegistrationIfNeeded(registration, nodeId, result, deps);
     if (!result.ok) {
       return withDuration({
         sent: false,
@@ -480,415 +518,394 @@ export async function waitForNodeReconnect(params: {
   return Boolean(params.context.nodeRegistry.get(params.nodeId));
 }
 
-export const nodeHandlers: GatewayRequestHandlers = {
-  "node.pair.request": async ({ params, respond, context }) => {
-    if (!validateNodePairRequestParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pair.request",
-        validator: validateNodePairRequestParams,
-      });
-      return;
-    }
-    const p = params as Parameters<typeof requestNodePairing>[0];
-    await respondUnavailableOnThrow(respond, async () => {
-      const result = await requestNodePairing({
-        nodeId: p.nodeId,
-        displayName: p.displayName,
-        platform: p.platform,
-        version: p.version,
-        coreVersion: p.coreVersion,
-        uiVersion: p.uiVersion,
-        deviceFamily: p.deviceFamily,
-        modelIdentifier: p.modelIdentifier,
-        caps: p.caps,
-        commands: p.commands,
-        permissions: p.permissions,
-        remoteIp: p.remoteIp,
-        silent: p.silent,
-      });
-      if (result.status === "pending" && result.created) {
-        context.broadcast("node.pair.requested", result.request, {
-          dropIfSlow: true,
+export function createNodeHandlers(overrides: NodeHandlersDeps = {}): GatewayRequestHandlers {
+  const deps = { ...defaultNodeHandlersDeps, ...overrides };
+  const nodeHandlers: GatewayRequestHandlers = {
+    "node.pair.request": async ({ params, respond, context }) => {
+      if (!validateNodePairRequestParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pair.request",
+          validator: validateNodePairRequestParams,
         });
-      }
-      respond(true, result, undefined);
-    });
-  },
-  "node.pair.list": async ({ params, respond }) => {
-    if (!validateNodePairListParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pair.list",
-        validator: validateNodePairListParams,
-      });
-      return;
-    }
-    await respondUnavailableOnThrow(respond, async () => {
-      const list = await listNodePairing();
-      respond(true, list, undefined);
-    });
-  },
-  "node.pair.approve": async ({ params, respond, context, client }) => {
-    if (!validateNodePairApproveParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pair.approve",
-        validator: validateNodePairApproveParams,
-      });
-      return;
-    }
-    const { requestId } = params as { requestId: string };
-    // Intentionally fail closed for RPC callers without an explicit scoped session.
-    const callerScopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
-    await respondUnavailableOnThrow(respond, async () => {
-      const approved = await approveNodePairing(requestId, { callerScopes });
-      if (!approved) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
         return;
       }
-      if ("status" in approved && approved.status === "forbidden") {
+      const p = params as Parameters<typeof requestNodePairing>[0];
+      await respondUnavailableOnThrow(respond, async () => {
+        const result = await requestNodePairing({
+          nodeId: p.nodeId,
+          displayName: p.displayName,
+          platform: p.platform,
+          version: p.version,
+          coreVersion: p.coreVersion,
+          uiVersion: p.uiVersion,
+          deviceFamily: p.deviceFamily,
+          modelIdentifier: p.modelIdentifier,
+          caps: p.caps,
+          commands: p.commands,
+          permissions: p.permissions,
+          remoteIp: p.remoteIp,
+          silent: p.silent,
+        });
+        if (result.status === "pending" && result.created) {
+          context.broadcast("node.pair.requested", result.request, {
+            dropIfSlow: true,
+          });
+        }
+        respond(true, result, undefined);
+      });
+    },
+    "node.pair.list": async ({ params, respond }) => {
+      if (!validateNodePairListParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pair.list",
+          validator: validateNodePairListParams,
+        });
+        return;
+      }
+      await respondUnavailableOnThrow(respond, async () => {
+        const list = await listNodePairing();
+        respond(true, list, undefined);
+      });
+    },
+    "node.pair.approve": async ({ params, respond, context, client }) => {
+      if (!validateNodePairApproveParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pair.approve",
+          validator: validateNodePairApproveParams,
+        });
+        return;
+      }
+      const { requestId } = params as { requestId: string };
+      // Intentionally fail closed for RPC callers without an explicit scoped session.
+      const callerScopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
+      await respondUnavailableOnThrow(respond, async () => {
+        const approved = await approveNodePairing(requestId, { callerScopes });
+        if (!approved) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
+          return;
+        }
+        if ("status" in approved && approved.status === "forbidden") {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, `missing scope: ${approved.missingScope}`),
+          );
+          return;
+        }
+        if (!("node" in approved)) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
+          return;
+        }
+        const approvedNode = approved.node;
+        context.broadcast(
+          "node.pair.resolved",
+          {
+            requestId,
+            nodeId: approvedNode.nodeId,
+            decision: "approved",
+            ts: Date.now(),
+          },
+          { dropIfSlow: true },
+        );
+        respond(true, approved, undefined);
+      });
+    },
+    "node.pair.reject": async ({ params, respond, context }) => {
+      if (!validateNodePairRejectParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pair.reject",
+          validator: validateNodePairRejectParams,
+        });
+        return;
+      }
+      const { requestId } = params as { requestId: string };
+      await respondUnavailableOnThrow(respond, async () => {
+        const rejected = await rejectNodePairing(requestId);
+        if (!rejected) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
+          return;
+        }
+        context.broadcast(
+          "node.pair.resolved",
+          {
+            requestId,
+            nodeId: rejected.nodeId,
+            decision: "rejected",
+            ts: Date.now(),
+          },
+          { dropIfSlow: true },
+        );
+        respond(true, rejected, undefined);
+      });
+    },
+    "node.pair.verify": async ({ params, respond }) => {
+      if (!validateNodePairVerifyParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pair.verify",
+          validator: validateNodePairVerifyParams,
+        });
+        return;
+      }
+      const { nodeId, token } = params as {
+        nodeId: string;
+        token: string;
+      };
+      await respondUnavailableOnThrow(respond, async () => {
+        const result = await verifyNodeToken(nodeId, token);
+        respond(true, result, undefined);
+      });
+    },
+    "node.rename": async ({ params, respond }) => {
+      if (!validateNodeRenameParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.rename",
+          validator: validateNodeRenameParams,
+        });
+        return;
+      }
+      const { nodeId, displayName } = params as {
+        nodeId: string;
+        displayName: string;
+      };
+      await respondUnavailableOnThrow(respond, async () => {
+        const trimmed = displayName.trim();
+        if (!trimmed) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "displayName required"));
+          return;
+        }
+        const updated = await renamePairedNode(nodeId, trimmed);
+        if (!updated) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown nodeId"));
+          return;
+        }
+        respond(true, { nodeId: updated.nodeId, displayName: updated.displayName }, undefined);
+      });
+    },
+    "node.list": async ({ params, respond, context }) => {
+      if (!validateNodeListParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.list",
+          validator: validateNodeListParams,
+        });
+        return;
+      }
+      await respondUnavailableOnThrow(respond, async () => {
+        const [devicePairing, nodePairing] = await Promise.all([
+          listDevicePairing(),
+          listNodePairing(),
+        ]);
+        const catalog = createKnownNodeCatalog({
+          pairedDevices: devicePairing.paired,
+          pairedNodes: nodePairing.paired,
+          connectedNodes: context.nodeRegistry.listConnected(),
+        });
+        const nodes = listKnownNodes(catalog);
+        respond(true, { ts: Date.now(), nodes }, undefined);
+      });
+    },
+    "node.describe": async ({ params, respond, context }) => {
+      if (!validateNodeDescribeParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.describe",
+          validator: validateNodeDescribeParams,
+        });
+        return;
+      }
+      const { nodeId } = params as { nodeId: string };
+      const id = String(nodeId ?? "").trim();
+      if (!id) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
+        return;
+      }
+      await respondUnavailableOnThrow(respond, async () => {
+        const [devicePairing, nodePairing] = await Promise.all([
+          listDevicePairing(),
+          listNodePairing(),
+        ]);
+        const catalog = createKnownNodeCatalog({
+          pairedDevices: devicePairing.paired,
+          pairedNodes: nodePairing.paired,
+          connectedNodes: context.nodeRegistry.listConnected(),
+        });
+        const node = getKnownNode(catalog, id);
+        if (!node) {
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown nodeId"));
+          return;
+        }
+        respond(true, { ts: Date.now(), ...node }, undefined);
+      });
+    },
+    "node.canvas.capability.refresh": async ({ params, respond, client }) => {
+      if (!validateNodeListParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.canvas.capability.refresh",
+          validator: validateNodeListParams,
+        });
+        return;
+      }
+      const baseCanvasHostUrl = client?.canvasHostUrl?.trim() ?? "";
+      if (!baseCanvasHostUrl) {
         respond(
           false,
           undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, `missing scope: ${approved.missingScope}`),
+          errorShape(ErrorCodes.UNAVAILABLE, "canvas host unavailable for this node session"),
         );
         return;
       }
-      if (!("node" in approved)) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
+
+      const canvasCapability = mintCanvasCapabilityToken();
+      const canvasCapabilityExpiresAtMs = Date.now() + CANVAS_CAPABILITY_TTL_MS;
+      const scopedCanvasHostUrl = buildCanvasScopedHostUrl(baseCanvasHostUrl, canvasCapability);
+      if (!scopedCanvasHostUrl) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, "failed to mint scoped canvas host URL"),
+        );
         return;
       }
-      const approvedNode = approved.node;
-      context.broadcast(
-        "node.pair.resolved",
+
+      if (client) {
+        client.canvasCapability = canvasCapability;
+        client.canvasCapabilityExpiresAtMs = canvasCapabilityExpiresAtMs;
+      }
+      respond(
+        true,
         {
-          requestId,
-          nodeId: approvedNode.nodeId,
-          decision: "approved",
-          ts: Date.now(),
+          canvasCapability,
+          canvasCapabilityExpiresAtMs,
+          canvasHostUrl: scopedCanvasHostUrl,
         },
-        { dropIfSlow: true },
+        undefined,
       );
-      respond(true, approved, undefined);
-    });
-  },
-  "node.pair.reject": async ({ params, respond, context }) => {
-    if (!validateNodePairRejectParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pair.reject",
-        validator: validateNodePairRejectParams,
-      });
-      return;
-    }
-    const { requestId } = params as { requestId: string };
-    await respondUnavailableOnThrow(respond, async () => {
-      const rejected = await rejectNodePairing(requestId);
-      if (!rejected) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown requestId"));
+    },
+    "node.pending.pull": async ({ params, respond, client }) => {
+      if (!validateNodeListParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pending.pull",
+          validator: validateNodeListParams,
+        });
         return;
       }
-      context.broadcast(
-        "node.pair.resolved",
+      const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
+      const trimmedNodeId = String(nodeId ?? "").trim();
+      if (!trimmedNodeId) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
+        return;
+      }
+
+      const pending = resolveAllowedPendingNodeActions({ nodeId: trimmedNodeId, client }, deps);
+      respond(
+        true,
         {
-          requestId,
-          nodeId: rejected.nodeId,
-          decision: "rejected",
-          ts: Date.now(),
+          nodeId: trimmedNodeId,
+          actions: pending.map((entry) => ({
+            id: entry.id,
+            command: entry.command,
+            paramsJSON: entry.paramsJSON ?? null,
+            enqueuedAtMs: entry.enqueuedAtMs,
+          })),
         },
-        { dropIfSlow: true },
+        undefined,
       );
-      respond(true, rejected, undefined);
-    });
-  },
-  "node.pair.verify": async ({ params, respond }) => {
-    if (!validateNodePairVerifyParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pair.verify",
-        validator: validateNodePairVerifyParams,
-      });
-      return;
-    }
-    const { nodeId, token } = params as {
-      nodeId: string;
-      token: string;
-    };
-    await respondUnavailableOnThrow(respond, async () => {
-      const result = await verifyNodeToken(nodeId, token);
-      respond(true, result, undefined);
-    });
-  },
-  "node.rename": async ({ params, respond }) => {
-    if (!validateNodeRenameParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.rename",
-        validator: validateNodeRenameParams,
-      });
-      return;
-    }
-    const { nodeId, displayName } = params as {
-      nodeId: string;
-      displayName: string;
-    };
-    await respondUnavailableOnThrow(respond, async () => {
-      const trimmed = displayName.trim();
-      if (!trimmed) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "displayName required"));
+    },
+    "node.pending.ack": async ({ params, respond, client }) => {
+      if (!validateNodePendingAckParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.pending.ack",
+          validator: validateNodePendingAckParams,
+        });
         return;
       }
-      const updated = await renamePairedNode(nodeId, trimmed);
-      if (!updated) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown nodeId"));
+      const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
+      const trimmedNodeId = String(nodeId ?? "").trim();
+      if (!trimmedNodeId) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
         return;
       }
-      respond(true, { nodeId: updated.nodeId, displayName: updated.displayName }, undefined);
-    });
-  },
-  "node.list": async ({ params, respond, context }) => {
-    if (!validateNodeListParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.list",
-        validator: validateNodeListParams,
-      });
-      return;
-    }
-    await respondUnavailableOnThrow(respond, async () => {
-      const [devicePairing, nodePairing] = await Promise.all([
-        listDevicePairing(),
-        listNodePairing(),
-      ]);
-      const catalog = createKnownNodeCatalog({
-        pairedDevices: devicePairing.paired,
-        pairedNodes: nodePairing.paired,
-        connectedNodes: context.nodeRegistry.listConnected(),
-      });
-      const nodes = listKnownNodes(catalog);
-      respond(true, { ts: Date.now(), nodes }, undefined);
-    });
-  },
-  "node.describe": async ({ params, respond, context }) => {
-    if (!validateNodeDescribeParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.describe",
-        validator: validateNodeDescribeParams,
-      });
-      return;
-    }
-    const { nodeId } = params as { nodeId: string };
-    const id = String(nodeId ?? "").trim();
-    if (!id) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
-      return;
-    }
-    await respondUnavailableOnThrow(respond, async () => {
-      const [devicePairing, nodePairing] = await Promise.all([
-        listDevicePairing(),
-        listNodePairing(),
-      ]);
-      const catalog = createKnownNodeCatalog({
-        pairedDevices: devicePairing.paired,
-        pairedNodes: nodePairing.paired,
-        connectedNodes: context.nodeRegistry.listConnected(),
-      });
-      const node = getKnownNode(catalog, id);
-      if (!node) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown nodeId"));
+      const ackIds = Array.from(
+        new Set((params.ids ?? []).map((value) => String(value ?? "").trim()).filter(Boolean)),
+      );
+      const remaining = ackPendingNodeActions(trimmedNodeId, ackIds);
+      respond(
+        true,
+        {
+          nodeId: trimmedNodeId,
+          ackedIds: ackIds,
+          remainingCount: remaining.length,
+        },
+        undefined,
+      );
+    },
+    "node.invoke": async ({ params, respond, context, client, req }) => {
+      if (!validateNodeInvokeParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.invoke",
+          validator: validateNodeInvokeParams,
+        });
         return;
       }
-      respond(true, { ts: Date.now(), ...node }, undefined);
-    });
-  },
-  "node.canvas.capability.refresh": async ({ params, respond, client }) => {
-    if (!validateNodeListParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.canvas.capability.refresh",
-        validator: validateNodeListParams,
-      });
-      return;
-    }
-    const baseCanvasHostUrl = client?.canvasHostUrl?.trim() ?? "";
-    if (!baseCanvasHostUrl) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.UNAVAILABLE, "canvas host unavailable for this node session"),
-      );
-      return;
-    }
-
-    const canvasCapability = mintCanvasCapabilityToken();
-    const canvasCapabilityExpiresAtMs = Date.now() + CANVAS_CAPABILITY_TTL_MS;
-    const scopedCanvasHostUrl = buildCanvasScopedHostUrl(baseCanvasHostUrl, canvasCapability);
-    if (!scopedCanvasHostUrl) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.UNAVAILABLE, "failed to mint scoped canvas host URL"),
-      );
-      return;
-    }
-
-    if (client) {
-      client.canvasCapability = canvasCapability;
-      client.canvasCapabilityExpiresAtMs = canvasCapabilityExpiresAtMs;
-    }
-    respond(
-      true,
-      {
-        canvasCapability,
-        canvasCapabilityExpiresAtMs,
-        canvasHostUrl: scopedCanvasHostUrl,
-      },
-      undefined,
-    );
-  },
-  "node.pending.pull": async ({ params, respond, client }) => {
-    if (!validateNodeListParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pending.pull",
-        validator: validateNodeListParams,
-      });
-      return;
-    }
-    const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
-    const trimmedNodeId = String(nodeId ?? "").trim();
-    if (!trimmedNodeId) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
-      return;
-    }
-
-    const pending = resolveAllowedPendingNodeActions({ nodeId: trimmedNodeId, client });
-    respond(
-      true,
-      {
-        nodeId: trimmedNodeId,
-        actions: pending.map((entry) => ({
-          id: entry.id,
-          command: entry.command,
-          paramsJSON: entry.paramsJSON ?? null,
-          enqueuedAtMs: entry.enqueuedAtMs,
-        })),
-      },
-      undefined,
-    );
-  },
-  "node.pending.ack": async ({ params, respond, client }) => {
-    if (!validateNodePendingAckParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.pending.ack",
-        validator: validateNodePendingAckParams,
-      });
-      return;
-    }
-    const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
-    const trimmedNodeId = String(nodeId ?? "").trim();
-    if (!trimmedNodeId) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
-      return;
-    }
-    const ackIds = Array.from(
-      new Set((params.ids ?? []).map((value) => String(value ?? "").trim()).filter(Boolean)),
-    );
-    const remaining = ackPendingNodeActions(trimmedNodeId, ackIds);
-    respond(
-      true,
-      {
-        nodeId: trimmedNodeId,
-        ackedIds: ackIds,
-        remainingCount: remaining.length,
-      },
-      undefined,
-    );
-  },
-  "node.invoke": async ({ params, respond, context, client, req }) => {
-    if (!validateNodeInvokeParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.invoke",
-        validator: validateNodeInvokeParams,
-      });
-      return;
-    }
-    const p = params as {
-      nodeId: string;
-      command: string;
-      params?: unknown;
-      timeoutMs?: number;
-      idempotencyKey: string;
-    };
-    const nodeId = String(p.nodeId ?? "").trim();
-    const command = String(p.command ?? "").trim();
-    if (!nodeId || !command) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, "nodeId and command required"),
-      );
-      return;
-    }
-    if (command === "system.execApprovals.get" || command === "system.execApprovals.set") {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          "node.invoke does not allow system.execApprovals.*; use exec.approvals.node.*",
-          { details: { command } },
-        ),
-      );
-      return;
-    }
-
-    await respondUnavailableOnThrow(respond, async () => {
-      let nodeSession = context.nodeRegistry.get(nodeId);
-      if (!nodeSession) {
-        const wakeReqId = req.id;
-        const wakeFlowStartedAtMs = Date.now();
-        context.logGateway.info(
-          `node wake start node=${nodeId} req=${wakeReqId} command=${command}`,
+      const p = params as {
+        nodeId: string;
+        command: string;
+        params?: unknown;
+        timeoutMs?: number;
+        idempotencyKey: string;
+      };
+      const nodeId = String(p.nodeId ?? "").trim();
+      const command = String(p.command ?? "").trim();
+      if (!nodeId || !command) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "nodeId and command required"),
         );
-
-        const wake = await maybeWakeNodeWithApns(nodeId);
-        context.logGateway.info(
-          `node wake stage=wake1 node=${nodeId} req=${wakeReqId} ` +
-            `available=${wake.available} throttled=${wake.throttled} ` +
-            `path=${wake.path} durationMs=${wake.durationMs} ` +
-            `apnsStatus=${wake.apnsStatus ?? -1} apnsReason=${wake.apnsReason ?? "-"}`,
+        return;
+      }
+      if (command === "system.execApprovals.get" || command === "system.execApprovals.set") {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            "node.invoke does not allow system.execApprovals.*; use exec.approvals.node.*",
+            { details: { command } },
+          ),
         );
-        if (wake.available) {
-          const waitStartedAtMs = Date.now();
-          const waitTimeoutMs = NODE_WAKE_RECONNECT_WAIT_MS;
-          const reconnected = await waitForNodeReconnect({
-            nodeId,
-            context,
-            timeoutMs: waitTimeoutMs,
-          });
-          const waitDurationMs = Math.max(0, Date.now() - waitStartedAtMs);
+        return;
+      }
+
+      await respondUnavailableOnThrow(respond, async () => {
+        let nodeSession = context.nodeRegistry.get(nodeId);
+        if (!nodeSession) {
+          const wakeReqId = req.id;
+          const wakeFlowStartedAtMs = Date.now();
           context.logGateway.info(
-            `node wake stage=wait1 node=${nodeId} req=${wakeReqId} ` +
-              `reconnected=${reconnected} timeoutMs=${waitTimeoutMs} durationMs=${waitDurationMs}`,
+            `node wake start node=${nodeId} req=${wakeReqId} command=${command}`,
           );
-        }
-        nodeSession = context.nodeRegistry.get(nodeId);
-        if (!nodeSession && wake.available) {
-          const retryWake = await maybeWakeNodeWithApns(nodeId, { force: true });
+
+          const wake = await maybeWakeNodeWithApns(nodeId, undefined, deps);
           context.logGateway.info(
-            `node wake stage=wake2 node=${nodeId} req=${wakeReqId} force=true ` +
-              `available=${retryWake.available} throttled=${retryWake.throttled} ` +
-              `path=${retryWake.path} durationMs=${retryWake.durationMs} ` +
-              `apnsStatus=${retryWake.apnsStatus ?? -1} apnsReason=${retryWake.apnsReason ?? "-"}`,
+            `node wake stage=wake1 node=${nodeId} req=${wakeReqId} ` +
+              `available=${wake.available} throttled=${wake.throttled} ` +
+              `path=${wake.path} durationMs=${wake.durationMs} ` +
+              `apnsStatus=${wake.apnsStatus ?? -1} apnsReason=${wake.apnsReason ?? "-"}`,
           );
-          if (retryWake.available) {
+          if (wake.available) {
             const waitStartedAtMs = Date.now();
-            const waitTimeoutMs = NODE_WAKE_RECONNECT_RETRY_WAIT_MS;
+            const waitTimeoutMs = NODE_WAKE_RECONNECT_WAIT_MS;
             const reconnected = await waitForNodeReconnect({
               nodeId,
               context,
@@ -896,195 +913,222 @@ export const nodeHandlers: GatewayRequestHandlers = {
             });
             const waitDurationMs = Math.max(0, Date.now() - waitStartedAtMs);
             context.logGateway.info(
-              `node wake stage=wait2 node=${nodeId} req=${wakeReqId} ` +
+              `node wake stage=wait1 node=${nodeId} req=${wakeReqId} ` +
                 `reconnected=${reconnected} timeoutMs=${waitTimeoutMs} durationMs=${waitDurationMs}`,
             );
           }
           nodeSession = context.nodeRegistry.get(nodeId);
-        }
-        if (!nodeSession) {
+          if (!nodeSession && wake.available) {
+            const retryWake = await maybeWakeNodeWithApns(nodeId, { force: true }, deps);
+            context.logGateway.info(
+              `node wake stage=wake2 node=${nodeId} req=${wakeReqId} force=true ` +
+                `available=${retryWake.available} throttled=${retryWake.throttled} ` +
+                `path=${retryWake.path} durationMs=${retryWake.durationMs} ` +
+                `apnsStatus=${retryWake.apnsStatus ?? -1} apnsReason=${retryWake.apnsReason ?? "-"}`,
+            );
+            if (retryWake.available) {
+              const waitStartedAtMs = Date.now();
+              const waitTimeoutMs = NODE_WAKE_RECONNECT_RETRY_WAIT_MS;
+              const reconnected = await waitForNodeReconnect({
+                nodeId,
+                context,
+                timeoutMs: waitTimeoutMs,
+              });
+              const waitDurationMs = Math.max(0, Date.now() - waitStartedAtMs);
+              context.logGateway.info(
+                `node wake stage=wait2 node=${nodeId} req=${wakeReqId} ` +
+                  `reconnected=${reconnected} timeoutMs=${waitTimeoutMs} durationMs=${waitDurationMs}`,
+              );
+            }
+            nodeSession = context.nodeRegistry.get(nodeId);
+          }
+          if (!nodeSession) {
+            const totalDurationMs = Math.max(0, Date.now() - wakeFlowStartedAtMs);
+            const nudge = await maybeSendNodeWakeNudge(nodeId, deps);
+            context.logGateway.info(
+              `node wake nudge node=${nodeId} req=${wakeReqId} sent=${nudge.sent} ` +
+                `throttled=${nudge.throttled} reason=${nudge.reason} durationMs=${nudge.durationMs} ` +
+                `apnsStatus=${nudge.apnsStatus ?? -1} apnsReason=${nudge.apnsReason ?? "-"}`,
+            );
+            context.logGateway.warn(
+              `node wake done node=${nodeId} req=${wakeReqId} connected=false ` +
+                `reason=not_connected totalMs=${totalDurationMs}`,
+            );
+            respond(
+              false,
+              undefined,
+              errorShape(ErrorCodes.UNAVAILABLE, "node not connected", {
+                details: { code: "NOT_CONNECTED" },
+              }),
+            );
+            return;
+          }
+
           const totalDurationMs = Math.max(0, Date.now() - wakeFlowStartedAtMs);
-          const nudge = await maybeSendNodeWakeNudge(nodeId);
           context.logGateway.info(
-            `node wake nudge node=${nodeId} req=${wakeReqId} sent=${nudge.sent} ` +
-              `throttled=${nudge.throttled} reason=${nudge.reason} durationMs=${nudge.durationMs} ` +
-              `apnsStatus=${nudge.apnsStatus ?? -1} apnsReason=${nudge.apnsReason ?? "-"}`,
+            `node wake done node=${nodeId} req=${wakeReqId} connected=true totalMs=${totalDurationMs}`,
           );
-          context.logGateway.warn(
-            `node wake done node=${nodeId} req=${wakeReqId} connected=false ` +
-              `reason=not_connected totalMs=${totalDurationMs}`,
-          );
+        }
+        const cfg = deps.loadConfig();
+        const allowlist = deps.resolveNodeCommandAllowlist(cfg, nodeSession);
+        const allowed = deps.isNodeCommandAllowed({
+          command,
+          declaredCommands: nodeSession.commands,
+          allowlist,
+        });
+        if (!allowed.ok) {
+          const hint = buildNodeCommandRejectionHint(allowed.reason, command, nodeSession);
           respond(
             false,
             undefined,
-            errorShape(ErrorCodes.UNAVAILABLE, "node not connected", {
-              details: { code: "NOT_CONNECTED" },
+            errorShape(ErrorCodes.INVALID_REQUEST, hint, {
+              details: { reason: allowed.reason, command },
             }),
           );
           return;
         }
-
-        const totalDurationMs = Math.max(0, Date.now() - wakeFlowStartedAtMs);
-        context.logGateway.info(
-          `node wake done node=${nodeId} req=${wakeReqId} connected=true totalMs=${totalDurationMs}`,
-        );
-      }
-      const cfg = loadConfig();
-      const allowlist = resolveNodeCommandAllowlist(cfg, nodeSession);
-      const allowed = isNodeCommandAllowed({
-        command,
-        declaredCommands: nodeSession.commands,
-        allowlist,
-      });
-      if (!allowed.ok) {
-        const hint = buildNodeCommandRejectionHint(allowed.reason, command, nodeSession);
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, hint, {
-            details: { reason: allowed.reason, command },
-          }),
-        );
-        return;
-      }
-      const forwardedParams = sanitizeNodeInvokeParamsForForwarding({
-        nodeId,
-        command,
-        rawParams: p.params,
-        client,
-        execApprovalManager: context.execApprovalManager,
-      });
-      if (!forwardedParams.ok) {
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, forwardedParams.message, {
-            details: forwardedParams.details ?? null,
-          }),
-        );
-        return;
-      }
-      const res = await context.nodeRegistry.invoke({
-        nodeId,
-        command,
-        params: forwardedParams.params,
-        timeoutMs: p.timeoutMs,
-        idempotencyKey: p.idempotencyKey,
-      });
-      if (!res.ok) {
-        if (
-          shouldQueueAsPendingForegroundAction({
-            platform: nodeSession.platform,
-            command,
-            error: res.error,
-          })
-        ) {
-          const paramsJSON = toPendingParamsJSON(forwardedParams.params);
-          const queued = enqueuePendingNodeAction({
-            nodeId,
-            command,
-            paramsJSON,
-            idempotencyKey: p.idempotencyKey,
-          });
-          const wake = await maybeWakeNodeWithApns(nodeId);
-          context.logGateway.info(
-            `node pending queued node=${nodeId} req=${req.id} command=${command} ` +
-              `queuedId=${queued.id} wakePath=${wake.path} wakeAvailable=${wake.available}`,
-          );
+        const forwardedParams = deps.sanitizeNodeInvokeParamsForForwarding({
+          nodeId,
+          command,
+          rawParams: p.params,
+          client,
+          execApprovalManager: context.execApprovalManager,
+        });
+        if (!forwardedParams.ok) {
           respond(
             false,
             undefined,
-            errorShape(
-              ErrorCodes.UNAVAILABLE,
-              "node command queued until iOS returns to foreground",
-              {
-                retryable: true,
-                details: {
-                  code: "QUEUED_UNTIL_FOREGROUND",
-                  queuedActionId: queued.id,
-                  nodeId,
-                  command,
-                  wake: {
-                    path: wake.path,
-                    available: wake.available,
-                    throttled: wake.throttled,
-                    apnsStatus: wake.apnsStatus,
-                    apnsReason: wake.apnsReason,
-                  },
-                  nodeError: res.error ?? null,
-                },
-              },
-            ),
+            errorShape(ErrorCodes.INVALID_REQUEST, forwardedParams.message, {
+              details: forwardedParams.details ?? null,
+            }),
           );
           return;
         }
-        if (!respondUnavailableOnNodeInvokeError(respond, res)) {
-          return;
-        }
-        return;
-      }
-      const payload = res.payloadJSON ? safeParseJson(res.payloadJSON) : res.payload;
-      respond(
-        true,
-        {
-          ok: true,
+        const res = await context.nodeRegistry.invoke({
           nodeId,
           command,
-          payload,
-          payloadJSON: res.payloadJSON ?? null,
-        },
-        undefined,
-      );
-    });
-  },
-  "node.invoke.result": handleNodeInvokeResult,
-  "node.event": async ({ params, respond, context, client }) => {
-    if (!validateNodeEventParams(params)) {
-      respondInvalidParams({
-        respond,
-        method: "node.event",
-        validator: validateNodeEventParams,
+          params: forwardedParams.params,
+          timeoutMs: p.timeoutMs,
+          idempotencyKey: p.idempotencyKey,
+        });
+        if (!res.ok) {
+          if (
+            shouldQueueAsPendingForegroundAction({
+              platform: nodeSession.platform,
+              command,
+              error: res.error,
+            })
+          ) {
+            const paramsJSON = toPendingParamsJSON(forwardedParams.params);
+            const queued = enqueuePendingNodeAction({
+              nodeId,
+              command,
+              paramsJSON,
+              idempotencyKey: p.idempotencyKey,
+            });
+            const wake = await maybeWakeNodeWithApns(nodeId, undefined, deps);
+            context.logGateway.info(
+              `node pending queued node=${nodeId} req=${req.id} command=${command} ` +
+                `queuedId=${queued.id} wakePath=${wake.path} wakeAvailable=${wake.available}`,
+            );
+            respond(
+              false,
+              undefined,
+              errorShape(
+                ErrorCodes.UNAVAILABLE,
+                "node command queued until iOS returns to foreground",
+                {
+                  retryable: true,
+                  details: {
+                    code: "QUEUED_UNTIL_FOREGROUND",
+                    queuedActionId: queued.id,
+                    nodeId,
+                    command,
+                    wake: {
+                      path: wake.path,
+                      available: wake.available,
+                      throttled: wake.throttled,
+                      apnsStatus: wake.apnsStatus,
+                      apnsReason: wake.apnsReason,
+                    },
+                    nodeError: res.error ?? null,
+                  },
+                },
+              ),
+            );
+            return;
+          }
+          if (!respondUnavailableOnNodeInvokeError(respond, res)) {
+            return;
+          }
+          return;
+        }
+        const payload = res.payloadJSON ? safeParseJson(res.payloadJSON) : res.payload;
+        respond(
+          true,
+          {
+            ok: true,
+            nodeId,
+            command,
+            payload,
+            payloadJSON: res.payloadJSON ?? null,
+          },
+          undefined,
+        );
       });
-      return;
-    }
-    const p = params as { event: string; payload?: unknown; payloadJSON?: string | null };
-    const payloadJSON =
-      typeof p.payloadJSON === "string"
-        ? p.payloadJSON
-        : p.payload !== undefined
-          ? JSON.stringify(p.payload)
-          : null;
-    await respondUnavailableOnThrow(respond, async () => {
-      const { handleNodeEvent } = await import("../server-node-events.js");
-      const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id ?? "node";
-      const nodeContext = {
-        deps: context.deps,
-        broadcast: context.broadcast,
-        nodeSendToSession: context.nodeSendToSession,
-        nodeSubscribe: context.nodeSubscribe,
-        nodeUnsubscribe: context.nodeUnsubscribe,
-        broadcastVoiceWakeChanged: context.broadcastVoiceWakeChanged,
-        addChatRun: context.addChatRun,
-        removeChatRun: context.removeChatRun,
-        chatAbortControllers: context.chatAbortControllers,
-        chatAbortedRuns: context.chatAbortedRuns,
-        chatRunBuffers: context.chatRunBuffers,
-        chatDeltaSentAt: context.chatDeltaSentAt,
-        dedupe: context.dedupe,
-        agentRunSeq: context.agentRunSeq,
-        getHealthCache: context.getHealthCache,
-        refreshHealthSnapshot: context.refreshHealthSnapshot,
-        loadGatewayModelCatalog: context.loadGatewayModelCatalog,
-        logGateway: { warn: context.logGateway.warn },
-      };
-      await handleNodeEvent(nodeContext, nodeId, {
-        event: p.event,
-        payloadJSON,
+    },
+    "node.invoke.result": handleNodeInvokeResult,
+    "node.event": async ({ params, respond, context, client }) => {
+      if (!validateNodeEventParams(params)) {
+        respondInvalidParams({
+          respond,
+          method: "node.event",
+          validator: validateNodeEventParams,
+        });
+        return;
+      }
+      const p = params as { event: string; payload?: unknown; payloadJSON?: string | null };
+      const payloadJSON =
+        typeof p.payloadJSON === "string"
+          ? p.payloadJSON
+          : p.payload !== undefined
+            ? JSON.stringify(p.payload)
+            : null;
+      await respondUnavailableOnThrow(respond, async () => {
+        const { handleNodeEvent } = await import("../server-node-events.js");
+        const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id ?? "node";
+        const nodeContext = {
+          deps: context.deps,
+          broadcast: context.broadcast,
+          nodeSendToSession: context.nodeSendToSession,
+          nodeSubscribe: context.nodeSubscribe,
+          nodeUnsubscribe: context.nodeUnsubscribe,
+          broadcastVoiceWakeChanged: context.broadcastVoiceWakeChanged,
+          addChatRun: context.addChatRun,
+          removeChatRun: context.removeChatRun,
+          chatAbortControllers: context.chatAbortControllers,
+          chatAbortedRuns: context.chatAbortedRuns,
+          chatRunBuffers: context.chatRunBuffers,
+          chatDeltaSentAt: context.chatDeltaSentAt,
+          dedupe: context.dedupe,
+          agentRunSeq: context.agentRunSeq,
+          getHealthCache: context.getHealthCache,
+          refreshHealthSnapshot: context.refreshHealthSnapshot,
+          loadGatewayModelCatalog: context.loadGatewayModelCatalog,
+          logGateway: { warn: context.logGateway.warn },
+        };
+        await handleNodeEvent(nodeContext, nodeId, {
+          event: p.event,
+          payloadJSON,
+        });
+        respond(true, { ok: true }, undefined);
       });
-      respond(true, { ok: true }, undefined);
-    });
-  },
-};
+    },
+  };
+  return nodeHandlers;
+}
+
+export const nodeHandlers = createNodeHandlers();
 
 function buildNodeCommandRejectionHint(
   reason: string,

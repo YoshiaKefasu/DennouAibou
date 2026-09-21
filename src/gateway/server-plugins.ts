@@ -27,6 +27,39 @@ import type {
 // through handleGatewayRequest. We store the gateway context at startup so
 // dispatchGatewayMethod can use it as a fallback.
 
+export type ServerPluginsDeps = {
+  loadOpenClawPlugins?: typeof loadOpenClawPlugins;
+  applyPluginAutoEnable?: typeof applyPluginAutoEnable;
+  resolveGatewayStartupPluginIds?: typeof resolveGatewayStartupPluginIds;
+  setActivePluginRegistry?: typeof setActivePluginRegistry;
+  createEmptyPluginRegistry?: typeof createEmptyPluginRegistry;
+  handleGatewayRequest?: typeof handleGatewayRequest;
+  getPluginRuntimeGatewayRequestScope?: typeof getPluginRuntimeGatewayRequestScope;
+};
+
+const defaultServerPluginsDeps: Required<ServerPluginsDeps> = {
+  loadOpenClawPlugins,
+  applyPluginAutoEnable,
+  resolveGatewayStartupPluginIds,
+  setActivePluginRegistry,
+  createEmptyPluginRegistry,
+  handleGatewayRequest,
+  getPluginRuntimeGatewayRequestScope,
+};
+
+let serverPluginsDeps: Required<ServerPluginsDeps> = { ...defaultServerPluginsDeps };
+
+export const __testing = {
+  setDepsForTests(deps: Partial<ServerPluginsDeps> | undefined): void {
+    serverPluginsDeps = deps
+      ? { ...defaultServerPluginsDeps, ...deps }
+      : { ...defaultServerPluginsDeps };
+  },
+  resetDepsForTests(): void {
+    serverPluginsDeps = { ...defaultServerPluginsDeps };
+  },
+};
+
 const FALLBACK_GATEWAY_CONTEXT_STATE_KEY: unique symbol = Symbol.for(
   "openclaw.fallbackGatewayContextState",
 );
@@ -254,7 +287,7 @@ async function dispatchGatewayMethod<T>(
     syntheticScopes?: string[];
   },
 ): Promise<T> {
-  const scope = getPluginRuntimeGatewayRequestScope();
+  const scope = serverPluginsDeps.getPluginRuntimeGatewayRequestScope();
   const context = scope?.context ?? getFallbackGatewayContext();
   const isWebchatConnect = scope?.isWebchatConnect ?? (() => false);
   if (!context) {
@@ -264,7 +297,7 @@ async function dispatchGatewayMethod<T>(
   }
 
   let result: { ok: boolean; payload?: unknown; error?: ErrorShape } | undefined;
-  await handleGatewayRequest({
+  await serverPluginsDeps.handleGatewayRequest({
     req: {
       type: "req",
       id: `plugin-subagent-${randomUUID()}`,
@@ -306,7 +339,7 @@ export function createGatewaySubagentRuntime(): PluginRuntime["subagent"] {
 
   return {
     async run(params) {
-      const scope = getPluginRuntimeGatewayRequestScope();
+      const scope = serverPluginsDeps.getPluginRuntimeGatewayRequestScope();
       const overrideRequested = Boolean(params.provider || params.model);
       const hasRequestScopeClient = Boolean(scope?.client);
       let allowOverride = hasRequestScopeClient && canClientUseModelOverride(scope?.client ?? null);
@@ -403,7 +436,7 @@ export function loadGatewayPlugins(params: {
           changes: [],
           autoEnabledReasons:
             params.autoEnabledReasons ??
-            applyPluginAutoEnable({
+            serverPluginsDeps.applyPluginAutoEnable({
               config: params.activationSourceConfig,
               env: process.env,
             }).autoEnabledReasons,
@@ -414,28 +447,33 @@ export function loadGatewayPlugins(params: {
             changes: [],
             autoEnabledReasons: params.autoEnabledReasons,
           }
-        : applyPluginAutoEnable({
+        : serverPluginsDeps.applyPluginAutoEnable({
             config: params.cfg,
             env: process.env,
           });
   const resolvedConfig = autoEnabled.config;
   const pluginIds =
     params.pluginIds ??
-    resolveGatewayStartupPluginIds({
+    serverPluginsDeps.resolveGatewayStartupPluginIds({
       config: resolvedConfig,
       activationSourceConfig: params.activationSourceConfig,
       workspaceDir: params.workspaceDir,
       env: process.env,
     });
   if (pluginIds.length === 0) {
-    const pluginRegistry = createEmptyPluginRegistry();
-    setActivePluginRegistry(pluginRegistry, undefined, "gateway-bindable", params.workspaceDir);
+    const pluginRegistry = serverPluginsDeps.createEmptyPluginRegistry();
+    serverPluginsDeps.setActivePluginRegistry(
+      pluginRegistry,
+      undefined,
+      "gateway-bindable",
+      params.workspaceDir,
+    );
     return {
       pluginRegistry,
       gatewayMethods: [...params.baseMethods],
     };
   }
-  const pluginRegistry = loadOpenClawPlugins({
+  const pluginRegistry = serverPluginsDeps.loadOpenClawPlugins({
     config: resolvedConfig,
     activationSourceConfig: params.activationSourceConfig ?? params.cfg,
     autoEnabledReasons: autoEnabled.autoEnabledReasons,

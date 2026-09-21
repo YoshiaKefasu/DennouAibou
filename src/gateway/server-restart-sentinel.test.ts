@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mergeMockedModule } from "../test-utils/vitest-module-mocks.js";
+import { normalizeChannelId } from "../channels/plugins/index.js";
+import { parseSessionThreadInfo } from "../config/sessions/thread-info.js";
+import { consumeRestartSentinel } from "../infra/restart-sentinel.js";
+import {
+  scheduleRestartSentinelWake,
+  type RestartSentinelDeps,
+} from "./server-restart-sentinel.js";
+import { loadSessionEntry } from "./session-utils.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resolveSessionAgentId: vi.fn(() => "agent-from-key"),
-  consumeRestartSentinel: vi.fn(async () => ({
+  consumeRestartSentinel: vi.fn<typeof consumeRestartSentinel>(async () => ({
+    version: 1,
     payload: {
+      kind: "restart",
+      status: "ok",
+      ts: 0,
       sessionKey: "agent:main:main",
       deliveryContext: {
         channel: "whatsapp",
@@ -16,8 +27,18 @@ const mocks = vi.hoisted(() => ({
   formatRestartSentinelMessage: vi.fn(() => "restart message"),
   summarizeRestartSentinel: vi.fn(() => "restart summary"),
   resolveMainSessionKeyFromConfig: vi.fn(() => "agent:main:main"),
-  parseSessionThreadInfo: vi.fn(() => ({ baseSessionKey: null, threadId: undefined })),
-  loadSessionEntry: vi.fn(() => ({ cfg: {}, entry: {} })),
+  parseSessionThreadInfo: vi.fn<typeof parseSessionThreadInfo>(() => ({
+    baseSessionKey: undefined,
+    threadId: undefined,
+  })),
+  loadSessionEntry: vi.fn<typeof loadSessionEntry>(() => ({
+    cfg: {},
+    storePath: "/tmp/sessions.json",
+    store: {},
+    entry: { sessionId: "sentinel-session", updatedAt: 0 },
+    canonicalKey: "agent:main:main",
+    legacyKey: undefined,
+  })),
   resolveAnnounceTargetFromKey: vi.fn(() => null),
   deliveryContextFromSession: vi.fn(() => undefined),
   mergeDeliveryContext: vi.fn((a?: Record<string, unknown>, b?: Record<string, unknown>) => ({
@@ -25,7 +46,7 @@ const mocks = vi.hoisted(() => ({
     ...a,
   })),
   getChannelPlugin: vi.fn(() => undefined),
-  normalizeChannelId: vi.fn((channel: string) => channel),
+  normalizeChannelId: vi.fn<typeof normalizeChannelId>((channel) => channel ?? null),
   resolveOutboundTarget: vi.fn(() => ({ ok: true as const, to: "+15550002" })),
   deliverOutboundPayloads: vi.fn(async () => [{ channel: "whatsapp", messageId: "msg-1" }]),
   enqueueDelivery: vi.fn(async () => "queue-1"),
@@ -34,88 +55,50 @@ const mocks = vi.hoisted(() => ({
   enqueueSystemEvent: vi.fn(),
   requestWakeNow: vi.fn(),
   logWarn: vi.fn(),
-}));
+};
 
-vi.mock("../agents/agent-scope.js", () => ({
-  resolveSessionAgentId: mocks.resolveSessionAgentId,
-}));
+async function advanceRetryTimerForBun(): Promise<void> {
+  for (let round = 0; round < 4; round += 1) {
+    await Promise.resolve();
+  }
+  vi.advanceTimersByTime(750);
+  for (let round = 0; round < 8; round += 1) {
+    await Promise.resolve();
+  }
+}
 
-vi.mock("../infra/restart-sentinel.js", () => ({
+const restartDeps: RestartSentinelDeps = {
+  resolveMainSessionKeyFromConfig: mocks.resolveMainSessionKeyFromConfig,
   consumeRestartSentinel: mocks.consumeRestartSentinel,
   formatRestartSentinelMessage: mocks.formatRestartSentinelMessage,
   summarizeRestartSentinel: mocks.summarizeRestartSentinel,
-}));
-
-vi.mock("../config/sessions.js", () => ({
-  resolveMainSessionKeyFromConfig: mocks.resolveMainSessionKeyFromConfig,
-}));
-
-vi.mock("../config/sessions/delivery-info.js", () => ({
   parseSessionThreadInfo: mocks.parseSessionThreadInfo,
-}));
-
-vi.mock("./session-utils.js", () => ({
   loadSessionEntry: mocks.loadSessionEntry,
-}));
-
-vi.mock("../agents/tools/sessions-send-helpers.js", () => ({
   resolveAnnounceTargetFromKey: mocks.resolveAnnounceTargetFromKey,
-}));
-
-vi.mock("../utils/delivery-context.js", () => ({
   deliveryContextFromSession: mocks.deliveryContextFromSession,
   mergeDeliveryContext: mocks.mergeDeliveryContext,
-}));
-
-vi.mock("../channels/plugins/index.js", () => ({
   getChannelPlugin: mocks.getChannelPlugin,
   normalizeChannelId: mocks.normalizeChannelId,
-}));
-
-vi.mock("../infra/outbound/targets.js", () => ({
   resolveOutboundTarget: mocks.resolveOutboundTarget,
-}));
-
-vi.mock("../infra/outbound/deliver.js", () => ({
   deliverOutboundPayloads: mocks.deliverOutboundPayloads,
-}));
-
-vi.mock("../infra/outbound/delivery-queue.js", () => ({
   enqueueDelivery: mocks.enqueueDelivery,
   ackDelivery: mocks.ackDelivery,
   failDelivery: mocks.failDelivery,
-}));
-
-vi.mock("../infra/system-events.js", () => ({
   enqueueSystemEvent: mocks.enqueueSystemEvent,
-}));
-
-vi.mock("../infra/event-pump.js", async () => {
-  return await mergeMockedModule(await import("../infra/event-pump.js"), () => ({
-    requestWakeNow: mocks.requestWakeNow,
-  }));
-});
-
-vi.mock("../logging/subsystem.js", () => {
-  const logger = {
-    warn: mocks.logWarn,
-    info: vi.fn(),
-    debug: vi.fn(),
-    error: vi.fn(),
-    child: () => logger,
-  };
-  return {
-    createSubsystemLogger: vi.fn(() => logger),
-  };
-});
-
-const { scheduleRestartSentinelWake } = await import("./server-restart-sentinel.js");
+  requestWakeNow: mocks.requestWakeNow,
+  buildOutboundSessionContext: () => ({ key: "agent:main:main", agentId: "agent-from-key" }),
+  log: { warn: mocks.logWarn },
+};
 
 describe("scheduleRestartSentinelWake", () => {
   beforeEach(() => {
     vi.useRealTimers();
     mocks.consumeRestartSentinel.mockResolvedValue({
+      version: 1,
       payload: {
+        kind: "restart",
+        status: "ok",
+        ts: 0,
         sessionKey: "agent:main:main",
         deliveryContext: {
           channel: "whatsapp",
@@ -138,7 +121,7 @@ describe("scheduleRestartSentinelWake", () => {
   it("enqueues the sentinel note and wakes the session even when outbound delivery succeeds", async () => {
     const deps = {} as never;
 
-    await scheduleRestartSentinelWake({ deps });
+    await scheduleRestartSentinelWake({ deps }, restartDeps);
 
     expect(mocks.deliverOutboundPayloads).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,8 +162,12 @@ describe("scheduleRestartSentinelWake", () => {
       .mockRejectedValueOnce(new Error("transport not ready"))
       .mockResolvedValueOnce([{ channel: "whatsapp", messageId: "msg-2" }]);
 
-    const wakePromise = scheduleRestartSentinelWake({ deps: {} as never });
-    await vi.runAllTimersAsync();
+    const wakePromise = scheduleRestartSentinelWake({ deps: {} as never }, restartDeps);
+    if (typeof vi.runAllTimersAsync === "function") {
+      await vi.runAllTimersAsync();
+    } else {
+      await advanceRetryTimerForBun();
+    }
     await wakePromise;
 
     expect(mocks.enqueueDelivery).toHaveBeenCalledTimes(1);
@@ -219,8 +206,12 @@ describe("scheduleRestartSentinelWake", () => {
       .mockRejectedValueOnce(new Error("transport not ready"))
       .mockRejectedValueOnce(new Error("transport still not ready"));
 
-    const wakePromise = scheduleRestartSentinelWake({ deps: {} as never });
-    await vi.runAllTimersAsync();
+    const wakePromise = scheduleRestartSentinelWake({ deps: {} as never }, restartDeps);
+    if (typeof vi.runAllTimersAsync === "function") {
+      await vi.runAllTimersAsync();
+    } else {
+      await advanceRetryTimerForBun();
+    }
     await wakePromise;
 
     expect(mocks.enqueueDelivery).toHaveBeenCalledTimes(1);
@@ -242,9 +233,9 @@ describe("scheduleRestartSentinelWake", () => {
         } as never,
         threadId: "fresh-thread",
       },
-    } as Awaited<ReturnType<typeof mocks.consumeRestartSentinel>>);
+    } as unknown as Awaited<ReturnType<typeof mocks.consumeRestartSentinel>>);
 
-    await scheduleRestartSentinelWake({ deps: {} as never });
+    await scheduleRestartSentinelWake({ deps: {} as never }, restartDeps);
 
     expect(mocks.enqueueSystemEvent).toHaveBeenCalledWith(
       "restart message",
@@ -264,7 +255,7 @@ describe("scheduleRestartSentinelWake", () => {
       },
     } as unknown as Awaited<ReturnType<typeof mocks.consumeRestartSentinel>>);
 
-    await scheduleRestartSentinelWake({ deps: {} as never });
+    await scheduleRestartSentinelWake({ deps: {} as never }, restartDeps);
 
     expect(mocks.enqueueSystemEvent).toHaveBeenCalledWith("restart message", {
       sessionKey: "agent:main:main",

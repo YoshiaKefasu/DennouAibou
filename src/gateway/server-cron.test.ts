@@ -4,63 +4,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CliDeps } from "../cli/deps.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { SsrFBlockedError } from "../infra/net/ssrf.js";
-import { mergeMockedModule } from "../test-utils/vitest-module-mocks.js";
+import { buildGatewayCronService, type GatewayCronDeps } from "./server-cron.js";
 
-const {
-  enqueueSystemEventMock,
-  requestWakeNowMock,
-  loadConfigMock,
-  fetchWithSsrFGuardMock,
-  runCronIsolatedAgentTurnMock,
-  cleanupBrowserSessionsForLifecycleEndMock,
-} = vi.hoisted(() => ({
-  enqueueSystemEventMock: vi.fn(),
-  requestWakeNowMock: vi.fn(),
-  loadConfigMock: vi.fn(),
-  fetchWithSsrFGuardMock: vi.fn(),
-  runCronIsolatedAgentTurnMock: vi.fn(async () => ({ status: "ok" as const, summary: "ok" })),
-  cleanupBrowserSessionsForLifecycleEndMock: vi.fn(async () => {}),
-}));
+const enqueueSystemEventMock = vi.fn();
+const requestWakeNowMock = vi.fn();
+const loadConfigMock = vi.fn();
+const fetchWithSsrFGuardMock = vi.fn();
+const runCronIsolatedAgentTurnMock = vi.fn(async () => ({ status: "ok" as const, summary: "ok" }));
+const cleanupBrowserSessionsForLifecycleEndMock = vi.fn(async () => {});
 
-function enqueueSystemEvent(...args: unknown[]) {
-  return enqueueSystemEventMock(...args);
-}
-
-function requestWakeNow(...args: unknown[]) {
-  return requestWakeNowMock(...args);
-}
-
-vi.mock("../infra/system-events.js", () => ({
-  enqueueSystemEvent,
-}));
-
-vi.mock("../infra/event-pump.js", async () => {
-  return await mergeMockedModule(await import("../infra/event-pump.js"), () => ({
-    requestWakeNow,
-  }));
-});
-
-vi.mock("../config/config.js", async () => {
-  const actual = await import("../config/config.js");
-  return {
-    ...actual,
-    loadConfig: () => loadConfigMock(),
-  };
-});
-
-vi.mock("../infra/net/fetch-guard.js", () => ({
+const runtimeDeps: GatewayCronDeps = {
+  enqueueSystemEvent: enqueueSystemEventMock,
+  requestWakeNow: requestWakeNowMock,
+  loadConfig: loadConfigMock,
   fetchWithSsrFGuard: fetchWithSsrFGuardMock,
-}));
-
-vi.mock("../cron/isolated-agent.js", () => ({
   runCronIsolatedAgentTurn: runCronIsolatedAgentTurnMock,
-}));
-
-vi.mock("../browser-lifecycle-cleanup.js", () => ({
   cleanupBrowserSessionsForLifecycleEnd: cleanupBrowserSessionsForLifecycleEndMock,
-}));
-
-import { buildGatewayCronService } from "./server-cron.js";
+};
 
 function createCronConfig(name: string): OpenClawConfig {
   const tmpDir = path.join(os.tmpdir(), `${name}-${Date.now()}`);
@@ -92,6 +52,7 @@ describe("buildGatewayCronService", () => {
       cfg,
       deps: {} as CliDeps,
       broadcast: () => {},
+      runtimeDeps,
     });
     try {
       const job = await state.cron.add({
@@ -133,6 +94,7 @@ describe("buildGatewayCronService", () => {
       cfg,
       deps: {} as CliDeps,
       broadcast: () => {},
+      runtimeDeps,
     });
     try {
       const job = await state.cron.add({
@@ -183,6 +145,7 @@ describe("buildGatewayCronService", () => {
       cfg,
       deps: {} as CliDeps,
       broadcast: () => {},
+      runtimeDeps,
     });
     try {
       const job = await state.cron.add({

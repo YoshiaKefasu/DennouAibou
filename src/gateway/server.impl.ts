@@ -402,6 +402,10 @@ export type GatewayServerOptions = {
    * Optional startup timestamp used for concise readiness logging.
    */
   startupStartedAt?: number;
+  /**
+   * Test-only: override cron runtime dependencies (webhook fetch, announce).
+   */
+  cronRuntimeDeps?: import("./server-cron.js").GatewayCronDeps;
 };
 
 export async function startGatewayServer(
@@ -865,6 +869,7 @@ export async function startGatewayServer(
     cfg: cfgAtStart,
     deps,
     broadcast,
+    runtimeDeps: opts.cronRuntimeDeps,
   });
   let { cron, storePath: cronStorePath } = cronState;
   deps.cron = cron;

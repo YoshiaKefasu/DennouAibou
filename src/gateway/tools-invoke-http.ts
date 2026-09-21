@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createOpenClawTools } from "../agents/openclaw-tools.js";
 import { runBeforeToolCallHook } from "../agents/pi-tools.before-tool-call.js";
 import { resolveToolLoopDetectionConfig } from "../agents/pi-tools.js";
 import { isKnownCoreToolId } from "../agents/tool-catalog.js";
@@ -11,7 +12,7 @@ import { logWarn } from "../logger.js";
 import { isTestDefaultMemorySlotDisabled } from "../plugins/config-state.js";
 import { normalizeMessageChannel } from "../utils/message-channel.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
-import type { ResolvedGatewayAuth } from "./auth.js";
+import { authorizeHttpGatewayConnect, type ResolvedGatewayAuth } from "./auth.js";
 import {
   readJsonBodyOrError,
   sendInvalidRequest,
@@ -45,7 +46,10 @@ function resolveSessionKeyFromBody(body: ToolsInvokeBody): string | undefined {
   return undefined;
 }
 
-function resolveMemoryToolDisableReasons(cfg: ReturnType<typeof loadConfig>): string[] {
+function resolveMemoryToolDisableReasons(
+  cfg: ReturnType<typeof loadConfig>,
+  isTestDefaultMemorySlotDisabledImpl: typeof isTestDefaultMemorySlotDisabled = isTestDefaultMemorySlotDisabled,
+): string[] {
   if (!process.env.VITEST) {
     return [];
   }
@@ -55,7 +59,7 @@ function resolveMemoryToolDisableReasons(cfg: ReturnType<typeof loadConfig>): st
   const slotDisabled =
     slotRaw === null || (typeof slotRaw === "string" && slotRaw.trim().toLowerCase() === "none");
   const pluginsDisabled = plugins?.enabled === false;
-  const defaultDisabled = isTestDefaultMemorySlotDisabled(cfg);
+  const defaultDisabled = isTestDefaultMemorySlotDisabledImpl(cfg);
 
   if (pluginsDisabled) {
     reasons.push("plugins.enabled=false");
@@ -124,6 +128,28 @@ function resolveToolInputErrorStatus(err: unknown): number | null {
   return name === "ToolAuthorizationError" ? 403 : 400;
 }
 
+export type ToolsInvokeHttpDeps = {
+  authorizeHttpGatewayConnect?: typeof authorizeHttpGatewayConnect;
+  loadConfig?: typeof loadConfig;
+  resolveMainSessionKey?: typeof resolveMainSessionKey;
+  resolveToolLoopDetectionConfig?: typeof resolveToolLoopDetectionConfig;
+  runBeforeToolCallHook?: typeof runBeforeToolCallHook;
+  isTestDefaultMemorySlotDisabled?: typeof isTestDefaultMemorySlotDisabled;
+  createOpenClawTools?: typeof createOpenClawTools;
+  logWarn?: typeof logWarn;
+};
+
+const defaultToolsInvokeHttpDeps: Required<ToolsInvokeHttpDeps> = {
+  authorizeHttpGatewayConnect,
+  loadConfig,
+  resolveMainSessionKey,
+  resolveToolLoopDetectionConfig,
+  runBeforeToolCallHook,
+  isTestDefaultMemorySlotDisabled,
+  createOpenClawTools,
+  logWarn,
+};
+
 export async function handleToolsInvokeHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -133,8 +159,10 @@ export async function handleToolsInvokeHttpRequest(
     trustedProxies?: string[];
     allowRealIpFallback?: boolean;
     rateLimiter?: AuthRateLimiter;
+    deps?: ToolsInvokeHttpDeps;
   },
 ): Promise<boolean> {
+  const deps = { ...defaultToolsInvokeHttpDeps, ...opts.deps };
   let url: URL;
   try {
     url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -152,15 +180,18 @@ export async function handleToolsInvokeHttpRequest(
     return true;
   }
 
-  const cfg = loadConfig();
-  const requestAuth = await authorizeGatewayHttpRequestOrReply({
-    req,
-    res,
-    auth: opts.auth,
-    trustedProxies: opts.trustedProxies ?? cfg.gateway?.trustedProxies,
-    allowRealIpFallback: opts.allowRealIpFallback ?? cfg.gateway?.allowRealIpFallback,
-    rateLimiter: opts.rateLimiter,
-  });
+  const cfg = deps.loadConfig();
+  const requestAuth = await authorizeGatewayHttpRequestOrReply(
+    {
+      req,
+      res,
+      auth: opts.auth,
+      trustedProxies: opts.trustedProxies ?? cfg.gateway?.trustedProxies,
+      allowRealIpFallback: opts.allowRealIpFallback ?? cfg.gateway?.allowRealIpFallback,
+      rateLimiter: opts.rateLimiter,
+    },
+    { authorizeHttpGatewayConnect: deps.authorizeHttpGatewayConnect },
+  );
   if (!requestAuth) {
     return true;
   }
@@ -194,7 +225,7 @@ export async function handleToolsInvokeHttpRequest(
   }
 
   if (process.env.VITEST && MEMORY_TOOL_NAMES.has(toolName)) {
-    const reasons = resolveMemoryToolDisableReasons(cfg);
+    const reasons = resolveMemoryToolDisableReasons(cfg, deps.isTestDefaultMemorySlotDisabled);
     if (reasons.length > 0) {
       const suffix = reasons.length > 0 ? ` (${reasons.join(", ")})` : "";
       sendJson(res, 400, {
@@ -218,24 +249,27 @@ export async function handleToolsInvokeHttpRequest(
 
   const rawSessionKey = resolveSessionKeyFromBody(body);
   const sessionKey =
-    !rawSessionKey || rawSessionKey === "main" ? resolveMainSessionKey(cfg) : rawSessionKey;
+    !rawSessionKey || rawSessionKey === "main" ? deps.resolveMainSessionKey(cfg) : rawSessionKey;
 
   // Resolve message channel/account hints (optional headers) for policy inheritance.
   const messageChannel = normalizeMessageChannel(getHeader(req, "x-dennou-message-channel") ?? "");
   const accountId = getHeader(req, "x-dennou-account-id")?.trim() || undefined;
   const agentTo = getHeader(req, "x-dennou-message-to")?.trim() || undefined;
   const agentThreadId = getHeader(req, "x-dennou-thread-id")?.trim() || undefined;
-  const { agentId, tools } = resolveGatewayScopedTools({
-    cfg,
-    sessionKey,
-    messageProvider: messageChannel ?? undefined,
-    accountId,
-    agentTo,
-    agentThreadId,
-    allowGatewaySubagentBinding: true,
-    allowMediaInvokeCommands: true,
-    disablePluginTools: isKnownCoreToolId(toolName),
-  });
+  const { agentId, tools } = resolveGatewayScopedTools(
+    {
+      cfg,
+      sessionKey,
+      messageProvider: messageChannel ?? undefined,
+      accountId,
+      agentTo,
+      agentThreadId,
+      allowGatewaySubagentBinding: true,
+      allowMediaInvokeCommands: true,
+      disablePluginTools: isKnownCoreToolId(toolName),
+    },
+    { createOpenClawTools: deps.createOpenClawTools },
+  );
   // Owner semantics intentionally follow the same shared-secret HTTP contract
   // on this direct tool surface; SECURITY.md documents this as designed-as-is.
   const senderIsOwner = resolveOpenAiCompatibleHttpSenderIsOwner(req, requestAuth);
@@ -257,14 +291,14 @@ export async function handleToolsInvokeHttpRequest(
       action,
       args,
     });
-    const hookResult = await runBeforeToolCallHook({
+    const hookResult = await deps.runBeforeToolCallHook({
       toolName,
       params: toolArgs,
       toolCallId,
       ctx: {
         agentId,
         sessionKey,
-        loopDetection: resolveToolLoopDetectionConfig({ cfg, agentId }),
+        loopDetection: deps.resolveToolLoopDetectionConfig({ cfg, agentId }),
       },
     });
     if (hookResult.blocked) {
@@ -285,7 +319,7 @@ export async function handleToolsInvokeHttpRequest(
       });
       return true;
     }
-    logWarn(`tools-invoke: tool execution failed: ${String(err)}`);
+    deps.logWarn(`tools-invoke: tool execution failed: ${String(err)}`);
     sendJson(res, 500, {
       ok: false,
       error: { type: "tool_error", message: "tool execution failed" },

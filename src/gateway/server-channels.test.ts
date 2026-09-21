@@ -12,9 +12,9 @@ import { DEFAULT_ACCOUNT_ID } from "../routing/session-key.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createChannelManager } from "./server-channels.js";
 
-const hoisted = vi.hoisted(() => {
-  const computeBackoff = vi.fn(() => 10);
-  const sleepWithAbort = vi.fn((ms: number, abortSignal?: AbortSignal) => {
+const deps = {
+  computeBackoff: vi.fn(() => 10),
+  sleepWithAbort: vi.fn((ms: number, abortSignal?: AbortSignal) => {
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => resolve(), ms);
       abortSignal?.addEventListener(
@@ -26,14 +26,8 @@ const hoisted = vi.hoisted(() => {
         { once: true },
       );
     });
-  });
-  return { computeBackoff, sleepWithAbort };
-});
-
-vi.mock("../infra/backoff.js", () => ({
-  computeBackoff: hoisted.computeBackoff,
-  sleepWithAbort: hoisted.sleepWithAbort,
-}));
+  }),
+};
 
 type TestAccount = {
   enabled?: boolean;
@@ -88,6 +82,19 @@ function createTestPlugin(params?: {
   };
 }
 
+async function flushMicrotasks(rounds = 4): Promise<void> {
+  for (let index = 0; index < rounds; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+async function advanceTimersByTime(ms: number, stepMs = 10): Promise<void> {
+  for (let elapsed = 0; elapsed < ms; elapsed += stepMs) {
+    vi.advanceTimersByTime(Math.min(stepMs, ms - elapsed));
+    await flushMicrotasks();
+  }
+}
+
 function createDeferred(): { promise: Promise<void>; resolve: () => void } {
   let resolvePromise = () => {};
   const promise = new Promise<void>((resolve) => {
@@ -131,6 +138,7 @@ function createManager(options?: {
     ...(options?.resolveChannelRuntime
       ? { resolveChannelRuntime: options.resolveChannelRuntime }
       : {}),
+    deps,
   });
 }
 
@@ -140,8 +148,8 @@ describe("server-channels auto restart", () => {
   beforeEach(() => {
     previousRegistry = getActivePluginRegistry();
     vi.useFakeTimers();
-    hoisted.computeBackoff.mockClear();
-    hoisted.sleepWithAbort.mockClear();
+    deps.computeBackoff?.mockClear();
+    deps.sleepWithAbort?.mockClear();
   });
 
   afterEach(() => {
@@ -159,7 +167,8 @@ describe("server-channels auto restart", () => {
     const manager = createManager();
 
     await manager.startChannels();
-    await vi.advanceTimersByTimeAsync(200);
+    await flushMicrotasks();
+    await advanceTimersByTime(200);
 
     expect(startAccount).toHaveBeenCalledTimes(11);
     const snapshot = manager.getRuntimeSnapshot();
@@ -167,7 +176,7 @@ describe("server-channels auto restart", () => {
     expect(account?.running).toBe(false);
     expect(account?.reconnectAttempts).toBe(11);
 
-    await vi.advanceTimersByTimeAsync(200);
+    await advanceTimersByTime(200);
     expect(startAccount).toHaveBeenCalledTimes(11);
   });
 
@@ -181,10 +190,10 @@ describe("server-channels auto restart", () => {
     const manager = createManager();
 
     await manager.startChannels();
-    vi.runAllTicks();
+    await flushMicrotasks();
     await manager.stopChannel("discord", DEFAULT_ACCOUNT_ID);
 
-    await vi.advanceTimersByTimeAsync(200);
+    await advanceTimersByTime(200);
     expect(startAccount).toHaveBeenCalledTimes(1);
   });
 

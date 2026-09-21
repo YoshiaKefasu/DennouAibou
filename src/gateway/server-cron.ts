@@ -35,6 +35,19 @@ import { getChildLogger } from "../logging.js";
 import { normalizeAgentId, toAgentStoreSessionKey } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
 
+export type GatewayCronDeps = {
+  loadConfig?: typeof loadConfig;
+  enqueueSystemEvent?: typeof enqueueSystemEvent;
+  requestWakeNow?: typeof requestWakeNow;
+  runEventPumpOnce?: typeof runEventPumpOnce;
+  runCronIsolatedAgentTurn?: typeof runCronIsolatedAgentTurn;
+  cleanupBrowserSessionsForLifecycleEnd?: typeof cleanupBrowserSessionsForLifecycleEnd;
+  fetchWithSsrFGuard?: typeof fetchWithSsrFGuard;
+  deliverOutboundPayloads?: typeof deliverOutboundPayloads;
+  createOutboundSendDeps?: typeof createOutboundSendDeps;
+  sendFailureNotificationAnnounce?: typeof sendFailureNotificationAnnounce;
+};
+
 export type GatewayCronState = {
   cron: CronService;
   storePath: string;
@@ -104,6 +117,7 @@ async function postCronWebhook(params: {
   blockedLog: string;
   failedLog: string;
   logger: ReturnType<typeof getChildLogger>;
+  fetchWithSsrFGuardImpl?: typeof fetchWithSsrFGuard;
 }): Promise<void> {
   const abortController = new AbortController();
   const timeout = setTimeout(() => {
@@ -111,7 +125,7 @@ async function postCronWebhook(params: {
   }, CRON_WEBHOOK_TIMEOUT_MS);
 
   try {
-    const result = await fetchWithSsrFGuard({
+    const result = await (params.fetchWithSsrFGuardImpl ?? fetchWithSsrFGuard)({
       url: params.webhookUrl,
       init: {
         method: "POST",
@@ -150,13 +164,27 @@ export function buildGatewayCronService(params: {
   cfg: ReturnType<typeof loadConfig>;
   deps: CliDeps;
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
+  runtimeDeps?: GatewayCronDeps;
 }): GatewayCronState {
+  const runtimeDeps: Required<GatewayCronDeps> = {
+    loadConfig,
+    enqueueSystemEvent,
+    requestWakeNow,
+    runEventPumpOnce,
+    runCronIsolatedAgentTurn,
+    cleanupBrowserSessionsForLifecycleEnd,
+    fetchWithSsrFGuard,
+    deliverOutboundPayloads,
+    createOutboundSendDeps,
+    sendFailureNotificationAnnounce,
+    ...params.runtimeDeps,
+  };
   const cronLogger = getChildLogger({ module: "cron" });
   const storePath = resolveCronStorePath(params.cfg.cron?.store);
   const cronEnabled = process.env.DENNOU_SKIP_CRON !== "1" && params.cfg.cron?.enabled !== false;
 
   const resolveCronAgent = (requested?: string | null) => {
-    const runtimeConfig = loadConfig();
+    const runtimeConfig = runtimeDeps.loadConfig();
     const normalized =
       typeof requested === "string" && requested.trim() ? normalizeAgentId(requested) : undefined;
     const hasAgent =
@@ -205,7 +233,7 @@ export function buildGatewayCronService(params: {
   };
 
   const resolveCronWakeTarget = (opts?: { agentId?: string; sessionKey?: string | null }) => {
-    const runtimeConfig = loadConfig();
+    const runtimeConfig = runtimeDeps.loadConfig();
     const requestedAgentId = opts?.agentId ? resolveCronAgent(opts.agentId).agentId : undefined;
     const derivedAgentId =
       requestedAgentId ??
@@ -247,11 +275,11 @@ export function buildGatewayCronService(params: {
         agentId,
         requestedSessionKey: opts?.sessionKey,
       });
-      enqueueSystemEvent(text, { sessionKey, contextKey: opts?.contextKey });
+      runtimeDeps.enqueueSystemEvent(text, { sessionKey, contextKey: opts?.contextKey });
     },
     requestWakeNow: (opts) => {
       const { agentId, sessionKey } = resolveCronWakeTarget(opts);
-      requestWakeNow({
+      runtimeDeps.requestWakeNow({
         reason: opts?.reason,
         agentId,
         sessionKey,
@@ -274,7 +302,7 @@ export function buildGatewayCronService(params: {
       const heartbeatOverride = opts?.heartbeat
         ? { ...baseHeartbeat, ...opts.heartbeat }
         : undefined;
-      return await runEventPumpOnce({
+      return await runtimeDeps.runEventPumpOnce({
         cfg: runtimeConfig,
         reason: opts?.reason,
         agentId,
@@ -290,7 +318,7 @@ export function buildGatewayCronService(params: {
         sessionKey = assertSafeCronSessionTargetId(job.sessionTarget.slice(8));
       }
       try {
-        return await runCronIsolatedAgentTurn({
+        return await runtimeDeps.runCronIsolatedAgentTurn({
           cfg: runtimeConfig,
           deps: params.deps,
           job,
@@ -301,7 +329,7 @@ export function buildGatewayCronService(params: {
           lane: "cron",
         });
       } finally {
-        await cleanupBrowserSessionsForLifecycleEnd({
+        await runtimeDeps.cleanupBrowserSessionsForLifecycleEnd({
           sessionKeys: [sessionKey],
           onWarn: (msg) => cronLogger.warn({ jobId: job.id }, msg),
         });
@@ -335,6 +363,7 @@ export function buildGatewayCronService(params: {
             blockedLog: "cron: failure alert webhook blocked by SSRF guard",
             failedLog: "cron: failure alert webhook failed",
             logger: cronLogger,
+            fetchWithSsrFGuardImpl: runtimeDeps.fetchWithSsrFGuard,
           });
         } else {
           cronLogger.warn(
@@ -356,14 +385,14 @@ export function buildGatewayCronService(params: {
       if (!target.ok) {
         throw target.error;
       }
-      await deliverOutboundPayloads({
+      await runtimeDeps.deliverOutboundPayloads({
         cfg: runtimeConfig,
         channel: target.channel,
         to: target.to,
         accountId: target.accountId,
         threadId: target.threadId,
         payloads: [{ text }],
-        deps: createOutboundSendDeps(params.deps),
+        deps: runtimeDeps.createOutboundSendDeps(params.deps),
       });
     },
     log: getChildLogger({ module: "cron", storePath }),
@@ -414,6 +443,7 @@ export function buildGatewayCronService(params: {
               blockedLog: "cron: webhook delivery blocked by SSRF guard",
               failedLog: "cron: webhook delivery failed",
               logger: cronLogger,
+              fetchWithSsrFGuardImpl: runtimeDeps.fetchWithSsrFGuard,
             });
           })();
         }
@@ -449,6 +479,7 @@ export function buildGatewayCronService(params: {
                       blockedLog: "cron: failure destination webhook blocked by SSRF guard",
                       failedLog: "cron: failure destination webhook failed",
                       logger: cronLogger,
+                      fetchWithSsrFGuardImpl: runtimeDeps.fetchWithSsrFGuard,
                     });
                   })();
                 } else {
@@ -462,7 +493,7 @@ export function buildGatewayCronService(params: {
                 }
               } else if (failureDest.mode === "announce") {
                 const { agentId, cfg: runtimeConfig } = resolveCronAgent(job.agentId);
-                void sendFailureNotificationAnnounce(
+                void runtimeDeps.sendFailureNotificationAnnounce(
                   params.deps,
                   runtimeConfig,
                   agentId,
@@ -481,7 +512,7 @@ export function buildGatewayCronService(params: {
               const primaryPlan = resolveCronDeliveryPlan(job);
               if (primaryPlan.mode === "announce" && primaryPlan.requested) {
                 const { agentId, cfg: runtimeConfig } = resolveCronAgent(job.agentId);
-                void sendFailureNotificationAnnounce(
+                void runtimeDeps.sendFailureNotificationAnnounce(
                   params.deps,
                   runtimeConfig,
                   agentId,

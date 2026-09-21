@@ -64,13 +64,20 @@ function isAccountEnabled(account: unknown): boolean {
   return enabled !== false;
 }
 
-function resolveDefaultRuntime(channelId: ChannelId): ChannelAccountSnapshot {
-  const plugin = getChannelPlugin(channelId);
+function resolveDefaultRuntime(
+  channelId: ChannelId,
+  getChannelPluginImpl: typeof getChannelPlugin = getChannelPlugin,
+): ChannelAccountSnapshot {
+  const plugin = getChannelPluginImpl(channelId);
   return plugin?.status?.defaultRuntime ?? { accountId: DEFAULT_ACCOUNT_ID };
 }
 
-function cloneDefaultRuntime(channelId: ChannelId, accountId: string): ChannelAccountSnapshot {
-  return { ...resolveDefaultRuntime(channelId), accountId };
+function cloneDefaultRuntime(
+  channelId: ChannelId,
+  accountId: string,
+  getChannelPluginImpl: typeof getChannelPlugin = getChannelPlugin,
+): ChannelAccountSnapshot {
+  return { ...resolveDefaultRuntime(channelId, getChannelPluginImpl), accountId };
 }
 
 function applyDescribedAccountFields(
@@ -91,6 +98,22 @@ function applyDescribedAccountFields(
   }
   return next;
 }
+
+export type ChannelManagerDeps = {
+  getChannelPlugin?: typeof getChannelPlugin;
+  listChannelPlugins?: typeof listChannelPlugins;
+  computeBackoff?: typeof computeBackoff;
+  sleepWithAbort?: typeof sleepWithAbort;
+  resetDirectoryCache?: typeof resetDirectoryCache;
+};
+
+const defaultChannelManagerDeps: Required<ChannelManagerDeps> = {
+  getChannelPlugin,
+  listChannelPlugins,
+  computeBackoff,
+  sleepWithAbort,
+  resetDirectoryCache,
+};
 
 type ChannelManagerOptions = {
   loadConfig: () => OpenClawConfig;
@@ -134,6 +157,7 @@ type ChannelManagerOptions = {
    * a channel account actually starts.
    */
   resolveChannelRuntime?: () => PluginRuntime["channel"];
+  deps?: ChannelManagerDeps;
 };
 
 type StartChannelOptions = {
@@ -156,6 +180,7 @@ export type ChannelManager = {
 export function createChannelManager(opts: ChannelManagerOptions): ChannelManager {
   const { loadConfig, channelLogs, channelRuntimeEnvs, channelRuntime, resolveChannelRuntime } =
     opts;
+  const deps = { ...defaultChannelManagerDeps, ...opts.deps };
 
   const channelStores = new Map<ChannelId, ChannelRuntimeStore>();
   // Tracks restart attempts per channel:account. Reset on successful start.
@@ -206,7 +231,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
       return channelOverride;
     }
 
-    const plugin = getChannelPlugin(channelId);
+    const plugin = deps.getChannelPlugin(channelId);
     if (!plugin) {
       return true;
     }
@@ -236,7 +261,10 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
 
   const getRuntime = (channelId: ChannelId, accountId: string): ChannelAccountSnapshot => {
     const store = getStore(channelId);
-    return store.runtimes.get(accountId) ?? cloneDefaultRuntime(channelId, accountId);
+    return (
+      store.runtimes.get(accountId) ??
+      cloneDefaultRuntime(channelId, accountId, deps.getChannelPlugin)
+    );
   };
 
   const setRuntime = (
@@ -260,14 +288,14 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
     accountId?: string,
     opts: StartChannelOptions = {},
   ) => {
-    const plugin = getChannelPlugin(channelId);
+    const plugin = deps.getChannelPlugin(channelId);
     const startAccount = plugin?.gateway?.startAccount;
     if (!startAccount) {
       return;
     }
     const { preserveRestartAttempts = false, preserveManualStop = false } = opts;
     const cfg = loadConfig();
-    resetDirectoryCache({ channel: channelId, accountId });
+    deps.resetDirectoryCache({ channel: channelId, accountId });
     const store = getStore(channelId);
     const accountIds = accountId ? [accountId] : plugin.config.listAccountIds(cfg);
     if (accountIds.length === 0) {
@@ -400,7 +428,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
                 log.error?.(`[${id}] giving up after ${MAX_RESTART_ATTEMPTS} restart attempts`);
                 return;
               }
-              const delayMs = computeBackoff(CHANNEL_RESTART_POLICY, attempt);
+              const delayMs = deps.computeBackoff(CHANNEL_RESTART_POLICY, attempt);
               log.info?.(
                 `[${id}] auto-restart attempt ${attempt}/${MAX_RESTART_ATTEMPTS} in ${Math.round(delayMs / 1000)}s`,
               );
@@ -410,7 +438,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
                 reconnectAttempts: attempt,
               });
               try {
-                await sleepWithAbort(delayMs, abort.signal);
+                await deps.sleepWithAbort(delayMs, abort.signal);
                 if (manuallyStopped.has(rKey)) {
                   return;
                 }
@@ -456,7 +484,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
   };
 
   const stopChannel = async (channelId: ChannelId, accountId?: string) => {
-    const plugin = getChannelPlugin(channelId);
+    const plugin = deps.getChannelPlugin(channelId);
     const store = getStore(channelId);
     // Fast path: nothing running and no explicit plugin shutdown hook to run.
     if (!plugin?.gateway?.stopAccount && store.aborts.size === 0 && store.tasks.size === 0) {
@@ -514,7 +542,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
   };
 
   const startChannels = async () => {
-    for (const plugin of listChannelPlugins()) {
+    for (const plugin of deps.listChannelPlugins()) {
       try {
         await startChannel(plugin.id);
       } catch (err) {
@@ -526,7 +554,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
   };
 
   const markChannelLoggedOut = (channelId: ChannelId, cleared: boolean, accountId?: string) => {
-    const plugin = getChannelPlugin(channelId);
+    const plugin = deps.getChannelPlugin(channelId);
     if (!plugin) {
       return;
     }
@@ -554,7 +582,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
     const cfg = loadConfig();
     const channels: ChannelRuntimeSnapshot["channels"] = {};
     const channelAccounts: ChannelRuntimeSnapshot["channelAccounts"] = {};
-    for (const plugin of listChannelPlugins()) {
+    for (const plugin of deps.listChannelPlugins()) {
       const store = getStore(plugin.id);
       const accountIds = plugin.config.listAccountIds(cfg);
       const defaultAccountId = resolveChannelDefaultAccountId({
@@ -569,7 +597,8 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
           ? plugin.config.isEnabled(account, cfg)
           : isAccountEnabled(account);
         const described = plugin.config.describeAccount?.(account, cfg);
-        const current = store.runtimes.get(id) ?? cloneDefaultRuntime(plugin.id, id);
+        const current =
+          store.runtimes.get(id) ?? cloneDefaultRuntime(plugin.id, id, deps.getChannelPlugin);
         const next = { ...current, accountId: id };
         next.enabled = enabled;
         applyDescribedAccountFields(next, described);
@@ -584,7 +613,8 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
         accounts[id] = next;
       }
       const defaultAccount =
-        accounts[defaultAccountId] ?? cloneDefaultRuntime(plugin.id, defaultAccountId);
+        accounts[defaultAccountId] ??
+        cloneDefaultRuntime(plugin.id, defaultAccountId, deps.getChannelPlugin);
       channels[plugin.id] = defaultAccount;
       channelAccounts[plugin.id] = accounts;
     }

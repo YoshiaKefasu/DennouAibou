@@ -33,6 +33,42 @@ type InflightResult = {
   meta?: Record<string, unknown>;
 };
 
+export type SendHandlersDeps = {
+  resolveSessionAgentId?: typeof resolveSessionAgentId;
+  normalizeChannelId?: typeof normalizeChannelId;
+  createOutboundSendDeps?: typeof createOutboundSendDeps;
+  loadConfig?: typeof loadConfig;
+  applyPluginAutoEnable?: typeof applyPluginAutoEnable;
+  resolveOutboundChannelPlugin?: typeof resolveOutboundChannelPlugin;
+  resolveMessageChannelSelection?: typeof resolveMessageChannelSelection;
+  deliverOutboundPayloads?: typeof deliverOutboundPayloads;
+  resolveOutboundSessionRoute?: typeof resolveOutboundSessionRoute;
+  ensureOutboundSessionEntry?: typeof ensureOutboundSessionEntry;
+  normalizeReplyPayloadsForDelivery?: typeof normalizeReplyPayloadsForDelivery;
+  buildOutboundSessionContext?: typeof buildOutboundSessionContext;
+  maybeResolveIdLikeTarget?: typeof maybeResolveIdLikeTarget;
+  resolveOutboundTarget?: typeof resolveOutboundTarget;
+  normalizePollInput?: typeof normalizePollInput;
+};
+
+const defaultSendHandlersDeps: Required<SendHandlersDeps> = {
+  resolveSessionAgentId,
+  normalizeChannelId,
+  createOutboundSendDeps,
+  loadConfig,
+  applyPluginAutoEnable,
+  resolveOutboundChannelPlugin,
+  resolveMessageChannelSelection,
+  deliverOutboundPayloads,
+  resolveOutboundSessionRoute,
+  ensureOutboundSessionEntry,
+  normalizeReplyPayloadsForDelivery,
+  buildOutboundSessionContext,
+  maybeResolveIdLikeTarget,
+  resolveOutboundTarget,
+  normalizePollInput,
+};
+
 const inflightByContext = new WeakMap<
   GatewayRequestContext,
   Map<string, Promise<InflightResult>>
@@ -47,11 +83,14 @@ const getInflightMap = (context: GatewayRequestContext) => {
   return inflight;
 };
 
-async function resolveRequestedChannel(params: {
-  requestChannel: unknown;
-  unsupportedMessage: (input: string) => string;
-  rejectWebchatAsInternalOnly?: boolean;
-}): Promise<
+async function resolveRequestedChannel(
+  params: {
+    requestChannel: unknown;
+    unsupportedMessage: (input: string) => string;
+    rejectWebchatAsInternalOnly?: boolean;
+  },
+  deps: Required<SendHandlersDeps>,
+): Promise<
   | {
       cfg: ReturnType<typeof loadConfig>;
       channel: string;
@@ -62,7 +101,7 @@ async function resolveRequestedChannel(params: {
 > {
   const channelInput =
     typeof params.requestChannel === "string" ? params.requestChannel : undefined;
-  const normalizedChannel = channelInput ? normalizeChannelId(channelInput) : null;
+  const normalizedChannel = channelInput ? deps.normalizeChannelId(channelInput) : null;
   if (channelInput && !normalizedChannel) {
     const normalizedInput = channelInput.trim().toLowerCase();
     if (params.rejectWebchatAsInternalOnly && normalizedInput === "webchat") {
@@ -77,14 +116,14 @@ async function resolveRequestedChannel(params: {
       error: errorShape(ErrorCodes.INVALID_REQUEST, params.unsupportedMessage(channelInput)),
     };
   }
-  const cfg = applyPluginAutoEnable({
-    config: loadConfig(),
+  const cfg = deps.applyPluginAutoEnable({
+    config: deps.loadConfig(),
     env: process.env,
   }).config;
   let channel = normalizedChannel;
   if (!channel) {
     try {
-      channel = (await resolveMessageChannelSelection({ cfg })).channel;
+      channel = (await deps.resolveMessageChannelSelection({ cfg })).channel;
     } catch (err) {
       return { error: errorShape(ErrorCodes.INVALID_REQUEST, String(err)) };
     }
@@ -92,401 +131,416 @@ async function resolveRequestedChannel(params: {
   return { cfg, channel };
 }
 
-export const sendHandlers: GatewayRequestHandlers = {
-  send: async ({ params, respond, context, client }) => {
-    const p = params;
-    if (!validateSendParams(p)) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          `invalid send params: ${formatValidationErrors(validateSendParams.errors)}`,
-        ),
-      );
-      return;
-    }
-    const request = p as {
-      to: string;
-      message?: string;
-      mediaUrl?: string;
-      mediaUrls?: string[];
-      gifPlayback?: boolean;
-      channel?: string;
-      accountId?: string;
-      agentId?: string;
-      threadId?: string;
-      sessionKey?: string;
-      idempotencyKey: string;
-    };
-    const idem = request.idempotencyKey;
-    const dedupeKey = `send:${idem}`;
-    const cached = context.dedupe.get(dedupeKey);
-    if (cached) {
-      respond(cached.ok, cached.payload, cached.error, {
-        cached: true,
-      });
-      return;
-    }
-    const inflightMap = getInflightMap(context);
-    const inflight = inflightMap.get(dedupeKey);
-    if (inflight) {
-      const result = await inflight;
-      const meta = result.meta ? { ...result.meta, cached: true } : { cached: true };
-      respond(result.ok, result.payload, result.error, meta);
-      return;
-    }
-    const to = request.to.trim();
-    const message = typeof request.message === "string" ? request.message.trim() : "";
-    const mediaUrl =
-      typeof request.mediaUrl === "string" && request.mediaUrl.trim().length > 0
-        ? request.mediaUrl.trim()
+export function createSendHandlers(overrides: SendHandlersDeps = {}): GatewayRequestHandlers {
+  const deps = { ...defaultSendHandlersDeps, ...overrides };
+  const sendHandlers: GatewayRequestHandlers = {
+    send: async ({ params, respond, context, client }) => {
+      const p = params;
+      if (!validateSendParams(p)) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `invalid send params: ${formatValidationErrors(validateSendParams.errors)}`,
+          ),
+        );
+        return;
+      }
+      const request = p as {
+        to: string;
+        message?: string;
+        mediaUrl?: string;
+        mediaUrls?: string[];
+        gifPlayback?: boolean;
+        channel?: string;
+        accountId?: string;
+        agentId?: string;
+        threadId?: string;
+        sessionKey?: string;
+        idempotencyKey: string;
+      };
+      const idem = request.idempotencyKey;
+      const dedupeKey = `send:${idem}`;
+      const cached = context.dedupe.get(dedupeKey);
+      if (cached) {
+        respond(cached.ok, cached.payload, cached.error, {
+          cached: true,
+        });
+        return;
+      }
+      const inflightMap = getInflightMap(context);
+      const inflight = inflightMap.get(dedupeKey);
+      if (inflight) {
+        const result = await inflight;
+        const meta = result.meta ? { ...result.meta, cached: true } : { cached: true };
+        respond(result.ok, result.payload, result.error, meta);
+        return;
+      }
+      const to = request.to.trim();
+      const message = typeof request.message === "string" ? request.message.trim() : "";
+      const mediaUrl =
+        typeof request.mediaUrl === "string" && request.mediaUrl.trim().length > 0
+          ? request.mediaUrl.trim()
+          : undefined;
+      const mediaUrls = Array.isArray(request.mediaUrls)
+        ? request.mediaUrls
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry) => entry.length > 0)
         : undefined;
-    const mediaUrls = Array.isArray(request.mediaUrls)
-      ? request.mediaUrls
-          .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-          .filter((entry) => entry.length > 0)
-      : undefined;
-    if (!message && !mediaUrl && (mediaUrls?.length ?? 0) === 0) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, "invalid send params: text or media is required"),
+      if (!message && !mediaUrl && (mediaUrls?.length ?? 0) === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "invalid send params: text or media is required"),
+        );
+        return;
+      }
+      const resolvedChannel = await resolveRequestedChannel(
+        {
+          requestChannel: request.channel,
+          unsupportedMessage: (input) => `unsupported channel: ${input}`,
+          rejectWebchatAsInternalOnly: true,
+        },
+        deps,
       );
-      return;
-    }
-    const resolvedChannel = await resolveRequestedChannel({
-      requestChannel: request.channel,
-      unsupportedMessage: (input) => `unsupported channel: ${input}`,
-      rejectWebchatAsInternalOnly: true,
-    });
-    if ("error" in resolvedChannel) {
-      respond(false, undefined, resolvedChannel.error);
-      return;
-    }
-    const { cfg, channel } = resolvedChannel;
-    const accountId =
-      typeof request.accountId === "string" && request.accountId.trim().length
-        ? request.accountId.trim()
-        : undefined;
-    const threadId =
-      typeof request.threadId === "string" && request.threadId.trim().length
-        ? request.threadId.trim()
-        : undefined;
-    const outboundChannel = channel;
-    const plugin = resolveOutboundChannelPlugin({ channel, cfg });
-    if (!plugin) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, `unsupported channel: ${channel}`),
-      );
-      return;
-    }
+      if ("error" in resolvedChannel) {
+        respond(false, undefined, resolvedChannel.error);
+        return;
+      }
+      const { cfg, channel } = resolvedChannel;
+      const accountId =
+        typeof request.accountId === "string" && request.accountId.trim().length
+          ? request.accountId.trim()
+          : undefined;
+      const threadId =
+        typeof request.threadId === "string" && request.threadId.trim().length
+          ? request.threadId.trim()
+          : undefined;
+      const outboundChannel = channel;
+      const plugin = deps.resolveOutboundChannelPlugin({ channel, cfg });
+      if (!plugin) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unsupported channel: ${channel}`),
+        );
+        return;
+      }
 
-    const work = (async (): Promise<InflightResult> => {
+      const work = (async (): Promise<InflightResult> => {
+        try {
+          const resolved = deps.resolveOutboundTarget({
+            channel: outboundChannel,
+            to,
+            cfg,
+            accountId,
+            mode: "explicit",
+          });
+          if (!resolved.ok) {
+            return {
+              ok: false,
+              error: errorShape(ErrorCodes.INVALID_REQUEST, String(resolved.error)),
+              meta: { channel },
+            };
+          }
+          const idLikeTarget = await deps.maybeResolveIdLikeTarget({
+            cfg,
+            channel,
+            input: resolved.to,
+            accountId,
+          });
+          const deliveryTarget = idLikeTarget?.to ?? resolved.to;
+          const outboundDeps = context.deps ? deps.createOutboundSendDeps(context.deps) : undefined;
+          const mirrorPayloads = deps.normalizeReplyPayloadsForDelivery([
+            { text: message, mediaUrl, mediaUrls },
+          ]);
+          const mirrorText = mirrorPayloads
+            .map((payload) => payload.text)
+            .filter(Boolean)
+            .join("\n");
+          const mirrorMediaUrls = mirrorPayloads.flatMap(
+            (payload) => resolveSendableOutboundReplyParts(payload).mediaUrls,
+          );
+          const providedSessionKey =
+            typeof request.sessionKey === "string" && request.sessionKey.trim()
+              ? request.sessionKey.trim().toLowerCase()
+              : undefined;
+          const explicitAgentId =
+            typeof request.agentId === "string" && request.agentId.trim()
+              ? request.agentId.trim()
+              : undefined;
+          const sessionAgentId = providedSessionKey
+            ? deps.resolveSessionAgentId({ sessionKey: providedSessionKey, config: cfg })
+            : undefined;
+          const defaultAgentId = deps.resolveSessionAgentId({ config: cfg });
+          const effectiveAgentId = explicitAgentId ?? sessionAgentId ?? defaultAgentId;
+          const derivedRoute = await deps.resolveOutboundSessionRoute({
+            cfg,
+            channel,
+            agentId: effectiveAgentId,
+            accountId,
+            target: deliveryTarget,
+            currentSessionKey: providedSessionKey,
+            resolvedTarget: idLikeTarget,
+            threadId,
+          });
+          const outboundRoute = derivedRoute
+            ? providedSessionKey
+              ? {
+                  ...derivedRoute,
+                  sessionKey: providedSessionKey,
+                  baseSessionKey: providedSessionKey,
+                }
+              : derivedRoute
+            : null;
+          if (outboundRoute) {
+            await deps.ensureOutboundSessionEntry({
+              cfg,
+              channel,
+              accountId,
+              route: outboundRoute,
+            });
+          }
+          const outboundSessionKey = outboundRoute?.sessionKey ?? providedSessionKey;
+          const outboundSession = deps.buildOutboundSessionContext({
+            cfg,
+            agentId: effectiveAgentId,
+            sessionKey: outboundSessionKey,
+          });
+          const results = await deps.deliverOutboundPayloads({
+            cfg,
+            channel: outboundChannel,
+            to: deliveryTarget,
+            accountId,
+            payloads: [{ text: message, mediaUrl, mediaUrls }],
+            session: outboundSession,
+            gifPlayback: request.gifPlayback,
+            threadId: threadId ?? null,
+            deps: outboundDeps,
+            gatewayClientScopes: client?.connect?.scopes ?? [],
+            mirror: outboundSessionKey
+              ? {
+                  sessionKey: outboundSessionKey,
+                  agentId: effectiveAgentId,
+                  text: mirrorText || message,
+                  mediaUrls: mirrorMediaUrls.length > 0 ? mirrorMediaUrls : undefined,
+                  idempotencyKey: idem,
+                }
+              : undefined,
+          });
+
+          const result = results.at(-1);
+          if (!result) {
+            throw new Error("No delivery result");
+          }
+          const payload: Record<string, unknown> = {
+            runId: idem,
+            messageId: result.messageId,
+            channel,
+          };
+          if ("chatId" in result) {
+            payload.chatId = result.chatId;
+          }
+          if ("channelId" in result) {
+            payload.channelId = result.channelId;
+          }
+          if ("toJid" in result) {
+            payload.toJid = result.toJid;
+          }
+          if ("conversationId" in result) {
+            payload.conversationId = result.conversationId;
+          }
+          context.dedupe.set(dedupeKey, {
+            ts: Date.now(),
+            ok: true,
+            payload,
+          });
+          return {
+            ok: true,
+            payload,
+            meta: { channel },
+          };
+        } catch (err) {
+          const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
+          context.dedupe.set(dedupeKey, {
+            ts: Date.now(),
+            ok: false,
+            error,
+          });
+          return { ok: false, error, meta: { channel, error: formatForLog(err) } };
+        }
+      })();
+
+      inflightMap.set(dedupeKey, work);
       try {
-        const resolved = resolveOutboundTarget({
-          channel: outboundChannel,
+        const result = await work;
+        respond(result.ok, result.payload, result.error, result.meta);
+      } finally {
+        inflightMap.delete(dedupeKey);
+      }
+    },
+    poll: async ({ params, respond, context, client }) => {
+      const p = params;
+      if (!validatePollParams(p)) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `invalid poll params: ${formatValidationErrors(validatePollParams.errors)}`,
+          ),
+        );
+        return;
+      }
+      const request = p as {
+        to: string;
+        question: string;
+        options: string[];
+        maxSelections?: number;
+        durationSeconds?: number;
+        durationHours?: number;
+        silent?: boolean;
+        isAnonymous?: boolean;
+        threadId?: string;
+        channel?: string;
+        accountId?: string;
+        idempotencyKey: string;
+      };
+      const idem = request.idempotencyKey;
+      const cached = context.dedupe.get(`poll:${idem}`);
+      if (cached) {
+        respond(cached.ok, cached.payload, cached.error, {
+          cached: true,
+        });
+        return;
+      }
+      const to = request.to.trim();
+      const resolvedChannel = await resolveRequestedChannel(
+        {
+          requestChannel: request.channel,
+          unsupportedMessage: (input) => `unsupported poll channel: ${input}`,
+        },
+        deps,
+      );
+      if ("error" in resolvedChannel) {
+        respond(false, undefined, resolvedChannel.error);
+        return;
+      }
+      const { cfg, channel } = resolvedChannel;
+      const plugin = deps.resolveOutboundChannelPlugin({ channel, cfg });
+      const outbound = plugin?.outbound;
+      if (
+        typeof request.durationSeconds === "number" &&
+        outbound?.supportsPollDurationSeconds !== true
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `durationSeconds is not supported for ${channel} polls`,
+          ),
+        );
+        return;
+      }
+      if (typeof request.isAnonymous === "boolean" && outbound?.supportsAnonymousPolls !== true) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `isAnonymous is not supported for ${channel} polls`,
+          ),
+        );
+        return;
+      }
+      const poll = {
+        question: request.question,
+        options: request.options,
+        maxSelections: request.maxSelections,
+        durationSeconds: request.durationSeconds,
+        durationHours: request.durationHours,
+      };
+      const threadId =
+        typeof request.threadId === "string" && request.threadId.trim().length
+          ? request.threadId.trim()
+          : undefined;
+      const accountId =
+        typeof request.accountId === "string" && request.accountId.trim().length
+          ? request.accountId.trim()
+          : undefined;
+      try {
+        if (!outbound?.sendPoll) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, `unsupported poll channel: ${channel}`),
+          );
+          return;
+        }
+        const resolved = deps.resolveOutboundTarget({
+          channel: channel,
           to,
           cfg,
           accountId,
           mode: "explicit",
         });
         if (!resolved.ok) {
-          return {
-            ok: false,
-            error: errorShape(ErrorCodes.INVALID_REQUEST, String(resolved.error)),
-            meta: { channel },
-          };
+          respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(resolved.error)));
+          return;
         }
-        const idLikeTarget = await maybeResolveIdLikeTarget({
+        const normalized = outbound.pollMaxOptions
+          ? deps.normalizePollInput(poll, { maxOptions: outbound.pollMaxOptions })
+          : deps.normalizePollInput(poll);
+        const result = await outbound.sendPoll({
           cfg,
-          channel,
-          input: resolved.to,
+          to: resolved.to,
+          poll: normalized,
           accountId,
-        });
-        const deliveryTarget = idLikeTarget?.to ?? resolved.to;
-        const outboundDeps = context.deps ? createOutboundSendDeps(context.deps) : undefined;
-        const mirrorPayloads = normalizeReplyPayloadsForDelivery([
-          { text: message, mediaUrl, mediaUrls },
-        ]);
-        const mirrorText = mirrorPayloads
-          .map((payload) => payload.text)
-          .filter(Boolean)
-          .join("\n");
-        const mirrorMediaUrls = mirrorPayloads.flatMap(
-          (payload) => resolveSendableOutboundReplyParts(payload).mediaUrls,
-        );
-        const providedSessionKey =
-          typeof request.sessionKey === "string" && request.sessionKey.trim()
-            ? request.sessionKey.trim().toLowerCase()
-            : undefined;
-        const explicitAgentId =
-          typeof request.agentId === "string" && request.agentId.trim()
-            ? request.agentId.trim()
-            : undefined;
-        const sessionAgentId = providedSessionKey
-          ? resolveSessionAgentId({ sessionKey: providedSessionKey, config: cfg })
-          : undefined;
-        const defaultAgentId = resolveSessionAgentId({ config: cfg });
-        const effectiveAgentId = explicitAgentId ?? sessionAgentId ?? defaultAgentId;
-        const derivedRoute = await resolveOutboundSessionRoute({
-          cfg,
-          channel,
-          agentId: effectiveAgentId,
-          accountId,
-          target: deliveryTarget,
-          currentSessionKey: providedSessionKey,
-          resolvedTarget: idLikeTarget,
           threadId,
-        });
-        const outboundRoute = derivedRoute
-          ? providedSessionKey
-            ? {
-                ...derivedRoute,
-                sessionKey: providedSessionKey,
-                baseSessionKey: providedSessionKey,
-              }
-            : derivedRoute
-          : null;
-        if (outboundRoute) {
-          await ensureOutboundSessionEntry({
-            cfg,
-            channel,
-            accountId,
-            route: outboundRoute,
-          });
-        }
-        const outboundSessionKey = outboundRoute?.sessionKey ?? providedSessionKey;
-        const outboundSession = buildOutboundSessionContext({
-          cfg,
-          agentId: effectiveAgentId,
-          sessionKey: outboundSessionKey,
-        });
-        const results = await deliverOutboundPayloads({
-          cfg,
-          channel: outboundChannel,
-          to: deliveryTarget,
-          accountId,
-          payloads: [{ text: message, mediaUrl, mediaUrls }],
-          session: outboundSession,
-          gifPlayback: request.gifPlayback,
-          threadId: threadId ?? null,
-          deps: outboundDeps,
+          silent: request.silent,
+          isAnonymous: request.isAnonymous,
           gatewayClientScopes: client?.connect?.scopes ?? [],
-          mirror: outboundSessionKey
-            ? {
-                sessionKey: outboundSessionKey,
-                agentId: effectiveAgentId,
-                text: mirrorText || message,
-                mediaUrls: mirrorMediaUrls.length > 0 ? mirrorMediaUrls : undefined,
-                idempotencyKey: idem,
-              }
-            : undefined,
         });
-
-        const result = results.at(-1);
-        if (!result) {
-          throw new Error("No delivery result");
-        }
         const payload: Record<string, unknown> = {
           runId: idem,
           messageId: result.messageId,
           channel,
         };
-        if ("chatId" in result) {
-          payload.chatId = result.chatId;
-        }
-        if ("channelId" in result) {
-          payload.channelId = result.channelId;
-        }
-        if ("toJid" in result) {
+        if (result.toJid) {
           payload.toJid = result.toJid;
         }
-        if ("conversationId" in result) {
+        if (result.channelId) {
+          payload.channelId = result.channelId;
+        }
+        if (result.conversationId) {
           payload.conversationId = result.conversationId;
         }
-        context.dedupe.set(dedupeKey, {
+        if (result.pollId) {
+          payload.pollId = result.pollId;
+        }
+        context.dedupe.set(`poll:${idem}`, {
           ts: Date.now(),
           ok: true,
           payload,
         });
-        return {
-          ok: true,
-          payload,
-          meta: { channel },
-        };
+        respond(true, payload, undefined, { channel });
       } catch (err) {
         const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
-        context.dedupe.set(dedupeKey, {
+        context.dedupe.set(`poll:${idem}`, {
           ts: Date.now(),
           ok: false,
           error,
         });
-        return { ok: false, error, meta: { channel, error: formatForLog(err) } };
+        respond(false, undefined, error, {
+          channel,
+          error: formatForLog(err),
+        });
       }
-    })();
+    },
+  };
+  return sendHandlers;
+}
 
-    inflightMap.set(dedupeKey, work);
-    try {
-      const result = await work;
-      respond(result.ok, result.payload, result.error, result.meta);
-    } finally {
-      inflightMap.delete(dedupeKey);
-    }
-  },
-  poll: async ({ params, respond, context, client }) => {
-    const p = params;
-    if (!validatePollParams(p)) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          `invalid poll params: ${formatValidationErrors(validatePollParams.errors)}`,
-        ),
-      );
-      return;
-    }
-    const request = p as {
-      to: string;
-      question: string;
-      options: string[];
-      maxSelections?: number;
-      durationSeconds?: number;
-      durationHours?: number;
-      silent?: boolean;
-      isAnonymous?: boolean;
-      threadId?: string;
-      channel?: string;
-      accountId?: string;
-      idempotencyKey: string;
-    };
-    const idem = request.idempotencyKey;
-    const cached = context.dedupe.get(`poll:${idem}`);
-    if (cached) {
-      respond(cached.ok, cached.payload, cached.error, {
-        cached: true,
-      });
-      return;
-    }
-    const to = request.to.trim();
-    const resolvedChannel = await resolveRequestedChannel({
-      requestChannel: request.channel,
-      unsupportedMessage: (input) => `unsupported poll channel: ${input}`,
-    });
-    if ("error" in resolvedChannel) {
-      respond(false, undefined, resolvedChannel.error);
-      return;
-    }
-    const { cfg, channel } = resolvedChannel;
-    const plugin = resolveOutboundChannelPlugin({ channel, cfg });
-    const outbound = plugin?.outbound;
-    if (
-      typeof request.durationSeconds === "number" &&
-      outbound?.supportsPollDurationSeconds !== true
-    ) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          `durationSeconds is not supported for ${channel} polls`,
-        ),
-      );
-      return;
-    }
-    if (typeof request.isAnonymous === "boolean" && outbound?.supportsAnonymousPolls !== true) {
-      respond(
-        false,
-        undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, `isAnonymous is not supported for ${channel} polls`),
-      );
-      return;
-    }
-    const poll = {
-      question: request.question,
-      options: request.options,
-      maxSelections: request.maxSelections,
-      durationSeconds: request.durationSeconds,
-      durationHours: request.durationHours,
-    };
-    const threadId =
-      typeof request.threadId === "string" && request.threadId.trim().length
-        ? request.threadId.trim()
-        : undefined;
-    const accountId =
-      typeof request.accountId === "string" && request.accountId.trim().length
-        ? request.accountId.trim()
-        : undefined;
-    try {
-      if (!outbound?.sendPoll) {
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, `unsupported poll channel: ${channel}`),
-        );
-        return;
-      }
-      const resolved = resolveOutboundTarget({
-        channel: channel,
-        to,
-        cfg,
-        accountId,
-        mode: "explicit",
-      });
-      if (!resolved.ok) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(resolved.error)));
-        return;
-      }
-      const normalized = outbound.pollMaxOptions
-        ? normalizePollInput(poll, { maxOptions: outbound.pollMaxOptions })
-        : normalizePollInput(poll);
-      const result = await outbound.sendPoll({
-        cfg,
-        to: resolved.to,
-        poll: normalized,
-        accountId,
-        threadId,
-        silent: request.silent,
-        isAnonymous: request.isAnonymous,
-        gatewayClientScopes: client?.connect?.scopes ?? [],
-      });
-      const payload: Record<string, unknown> = {
-        runId: idem,
-        messageId: result.messageId,
-        channel,
-      };
-      if (result.toJid) {
-        payload.toJid = result.toJid;
-      }
-      if (result.channelId) {
-        payload.channelId = result.channelId;
-      }
-      if (result.conversationId) {
-        payload.conversationId = result.conversationId;
-      }
-      if (result.pollId) {
-        payload.pollId = result.pollId;
-      }
-      context.dedupe.set(`poll:${idem}`, {
-        ts: Date.now(),
-        ok: true,
-        payload,
-      });
-      respond(true, payload, undefined, { channel });
-    } catch (err) {
-      const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
-      context.dedupe.set(`poll:${idem}`, {
-        ts: Date.now(),
-        ok: false,
-        error,
-      });
-      respond(false, undefined, error, {
-        channel,
-        error: formatForLog(err),
-      });
-    }
-  },
-};
+export const sendHandlers = createSendHandlers();

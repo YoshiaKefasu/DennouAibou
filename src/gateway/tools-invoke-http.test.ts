@@ -3,30 +3,158 @@ import type { AddressInfo } from "node:net";
 import type { Mock } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { runBeforeToolCallHook as runBeforeToolCallHookType } from "../agents/pi-tools.before-tool-call.js";
+import { runBeforeToolCallHook } from "../agents/pi-tools.before-tool-call.js";
+import { resolveToolLoopDetectionConfig } from "../agents/pi-tools.js";
+import type { AnyAgentTool } from "../agents/tools/common.js";
+import { loadConfig } from "../config/config.js";
+import { resolveMainSessionKey } from "../config/sessions.js";
+import { logWarn } from "../logger.js";
+import { isTestDefaultMemorySlotDisabled } from "../plugins/config-state.js";
+import { handleToolsInvokeHttpRequest, type ToolsInvokeHttpDeps } from "./tools-invoke-http.js";
 
 type RunBeforeToolCallHook = typeof runBeforeToolCallHookType;
 type RunBeforeToolCallHookArgs = Parameters<RunBeforeToolCallHook>[0];
 type RunBeforeToolCallHookResult = Awaited<ReturnType<RunBeforeToolCallHook>>;
 
-const hookMocks = vi.hoisted(() => ({
-  resolveToolLoopDetectionConfig: vi.fn(() => ({ warnAt: 3 })),
+const authorizeHttpGatewayConnect = vi.fn(async () => ({ ok: true }));
+
+const hookMocks = {
+  resolveToolLoopDetectionConfig: vi.fn<typeof resolveToolLoopDetectionConfig>(() => ({
+    enabled: true,
+    warningThreshold: 3,
+    criticalThreshold: 6,
+  })),
   runBeforeToolCallHook: vi.fn(
     async (args: RunBeforeToolCallHookArgs): Promise<RunBeforeToolCallHookResult> => ({
       blocked: false,
       params: args.params,
     }),
   ),
-}));
+};
 
-let cfg: Record<string, unknown> = {};
-let lastCreateOpenClawToolsContext: Record<string, unknown> | undefined;
+const toolInputError = (message: string) => {
+  const err = new Error(message);
+  err.name = "ToolInputError";
+  return err;
+};
+const toolAuthorizationError = (message: string) => {
+  const err = new Error(message) as Error & { status?: number };
+  err.name = "ToolAuthorizationError";
+  err.status = 403;
+  return err;
+};
 
-// Perf: keep this suite pure unit. Mock heavyweight config/session modules.
-vi.mock("../config/config.js", () => ({
+const toolFixtures = [
+  {
+    name: "session_status",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true }),
+  },
+  {
+    name: "agents_list",
+    parameters: { type: "object", properties: { action: { type: "string" } } },
+    execute: async () => ({ ok: true, result: [] }),
+  },
+  {
+    name: "sessions_spawn",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({
+      ok: true,
+      route: {
+        agentTo: lastCreateOpenClawToolsContext?.agentTo,
+        agentThreadId: lastCreateOpenClawToolsContext?.agentThreadId,
+      },
+    }),
+  },
+  {
+    name: "sessions_send",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true }),
+  },
+  {
+    name: "gateway",
+    parameters: { type: "object", properties: {} },
+    execute: async () => {
+      throw toolInputError("invalid args");
+    },
+  },
+  {
+    name: "exec",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true, result: "exec" }),
+  },
+  {
+    name: "apply_patch",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true, result: "apply_patch" }),
+  },
+  {
+    name: "nodes",
+    ownerOnly: true,
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true, result: "nodes" }),
+  },
+  {
+    name: "owner_only_test",
+    ownerOnly: true,
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ ok: true, result: "owner-only" }),
+  },
+  {
+    name: "tools_invoke_test",
+    parameters: {
+      type: "object",
+      properties: {
+        mode: { type: "string" },
+      },
+      required: ["mode"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId: string, args: unknown) => {
+      const mode = (args as { mode?: unknown })?.mode;
+      if (mode === "input") {
+        throw toolInputError("mode invalid");
+      }
+      if (mode === "auth") {
+        throw toolAuthorizationError("mode forbidden");
+      }
+      if (mode === "crash") {
+        throw new Error("boom");
+      }
+      return { ok: true };
+    },
+  },
+  {
+    name: "diffs_compat_test",
+    parameters: {
+      type: "object",
+      properties: {
+        mode: { type: "string" },
+        fileFormat: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId: string, args: unknown) => {
+      const input = (args ?? {}) as Record<string, unknown>;
+      return {
+        ok: true,
+        observedFormat: input.format,
+        observedFileFormat: input.fileFormat,
+      };
+    },
+  },
+];
+
+function createOpenClawTools(ctx?: Record<string, unknown>): AnyAgentTool[] {
+  lastCreateOpenClawToolsContext = ctx;
+  // Fixtures keep the legacy `{ ok, result }` result shape the HTTP surface
+  // forwards verbatim; the cast is local to the test fixtures only.
+  return toolFixtures as unknown as AnyAgentTool[];
+}
+
+const deps: ToolsInvokeHttpDeps = {
+  authorizeHttpGatewayConnect,
   loadConfig: () => cfg,
-}));
-
-vi.mock("../config/sessions.js", () => ({
   resolveMainSessionKey: (params?: {
     session?: { scope?: string; mainKey?: string };
     agents?: { list?: Array<{ id?: string; default?: boolean }> };
@@ -46,162 +174,15 @@ vi.mock("../config/sessions.js", () => ({
     const mainKey = mainKeyRaw || "main";
     return `agent:${agentId}:${mainKey}`;
   },
-}));
-
-vi.mock("./auth.js", () => ({
-  authorizeHttpGatewayConnect: vi.fn(async () => ({ ok: true })),
-}));
-
-vi.mock("../logger.js", () => ({
-  logWarn: () => {},
-}));
-
-vi.mock("../plugins/config-state.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../plugins/config-state.js")>();
-  return {
-    ...actual,
-    isTestDefaultMemorySlotDisabled: () => false,
-  };
-});
-
-vi.mock("../plugins/tools.js", () => ({
-  getPluginToolMeta: () => undefined,
-}));
-
-// Perf: the real tool factory instantiates many tools per request; for these HTTP
-// routing/policy tests we only need a small set of tool names.
-vi.mock("../agents/openclaw-tools.js", () => {
-  const toolInputError = (message: string) => {
-    const err = new Error(message);
-    err.name = "ToolInputError";
-    return err;
-  };
-  const toolAuthorizationError = (message: string) => {
-    const err = new Error(message) as Error & { status?: number };
-    err.name = "ToolAuthorizationError";
-    err.status = 403;
-    return err;
-  };
-
-  const tools = [
-    {
-      name: "session_status",
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true }),
-    },
-    {
-      name: "agents_list",
-      parameters: { type: "object", properties: { action: { type: "string" } } },
-      execute: async () => ({ ok: true, result: [] }),
-    },
-    {
-      name: "sessions_spawn",
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({
-        ok: true,
-        route: {
-          agentTo: lastCreateOpenClawToolsContext?.agentTo,
-          agentThreadId: lastCreateOpenClawToolsContext?.agentThreadId,
-        },
-      }),
-    },
-    {
-      name: "sessions_send",
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true }),
-    },
-    {
-      name: "gateway",
-      parameters: { type: "object", properties: {} },
-      execute: async () => {
-        throw toolInputError("invalid args");
-      },
-    },
-    {
-      name: "exec",
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true, result: "exec" }),
-    },
-    {
-      name: "apply_patch",
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true, result: "apply_patch" }),
-    },
-    {
-      name: "nodes",
-      ownerOnly: true,
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true, result: "nodes" }),
-    },
-    {
-      name: "owner_only_test",
-      ownerOnly: true,
-      parameters: { type: "object", properties: {} },
-      execute: async () => ({ ok: true, result: "owner-only" }),
-    },
-    {
-      name: "tools_invoke_test",
-      parameters: {
-        type: "object",
-        properties: {
-          mode: { type: "string" },
-        },
-        required: ["mode"],
-        additionalProperties: false,
-      },
-      execute: async (_toolCallId: string, args: unknown) => {
-        const mode = (args as { mode?: unknown })?.mode;
-        if (mode === "input") {
-          throw toolInputError("mode invalid");
-        }
-        if (mode === "auth") {
-          throw toolAuthorizationError("mode forbidden");
-        }
-        if (mode === "crash") {
-          throw new Error("boom");
-        }
-        return { ok: true };
-      },
-    },
-    {
-      name: "diffs_compat_test",
-      parameters: {
-        type: "object",
-        properties: {
-          mode: { type: "string" },
-          fileFormat: { type: "string" },
-        },
-        additionalProperties: false,
-      },
-      execute: async (_toolCallId: string, args: unknown) => {
-        const input = (args ?? {}) as Record<string, unknown>;
-        return {
-          ok: true,
-          observedFormat: input.format,
-          observedFileFormat: input.fileFormat,
-        };
-      },
-    },
-  ];
-
-  return {
-    createOpenClawTools: (ctx: Record<string, unknown>) => {
-      lastCreateOpenClawToolsContext = ctx;
-      return tools;
-    },
-  };
-});
-
-vi.mock("../agents/pi-tools.js", () => ({
   resolveToolLoopDetectionConfig: hookMocks.resolveToolLoopDetectionConfig,
-}));
-
-vi.mock("../agents/pi-tools.before-tool-call.js", () => ({
   runBeforeToolCallHook: hookMocks.runBeforeToolCallHook,
-}));
+  isTestDefaultMemorySlotDisabled: () => false,
+  logWarn: () => {},
+  createOpenClawTools,
+};
 
-const { authorizeHttpGatewayConnect } = await import("./auth.js");
-const { handleToolsInvokeHttpRequest } = await import("./tools-invoke-http.js");
+let cfg: Record<string, unknown> = {};
+let lastCreateOpenClawToolsContext: Record<string, unknown> | undefined;
 
 let pluginHttpHandlers: Array<(req: IncomingMessage, res: ServerResponse) => Promise<boolean>> = [];
 
@@ -213,6 +194,7 @@ beforeAll(async () => {
     void (async () => {
       const handled = await handleToolsInvokeHttpRequest(req, res, {
         auth: { mode: "none", allowTailscale: false },
+        deps,
       });
       if (handled) {
         return;
@@ -256,7 +238,11 @@ beforeEach(() => {
   cfg = {};
   lastCreateOpenClawToolsContext = undefined;
   hookMocks.resolveToolLoopDetectionConfig.mockClear();
-  hookMocks.resolveToolLoopDetectionConfig.mockImplementation(() => ({ warnAt: 3 }));
+  hookMocks.resolveToolLoopDetectionConfig.mockImplementation(() => ({
+    enabled: true,
+    warningThreshold: 3,
+    criticalThreshold: 6,
+  }));
   hookMocks.runBeforeToolCallHook.mockClear();
   hookMocks.runBeforeToolCallHook.mockImplementation(
     async (args: RunBeforeToolCallHookArgs): Promise<RunBeforeToolCallHookResult> => ({
@@ -402,7 +388,7 @@ describe("POST /tools/invoke", () => {
         ctx: expect.objectContaining({
           agentId: "main",
           sessionKey: "agent:main:main",
-          loopDetection: { warnAt: 3 },
+          loopDetection: { enabled: true, warningThreshold: 3, criticalThreshold: 6 },
         }),
       }),
     );

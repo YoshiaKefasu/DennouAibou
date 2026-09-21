@@ -1,39 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ensureOutboundSessionEntry } from "../../infra/outbound/outbound-session.js";
+import { normalizeReplyPayloadsForDelivery } from "../../infra/outbound/payloads.js";
 import { setActivePluginRegistry } from "../../plugins/runtime.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
+import { createSendHandlers, type SendHandlersDeps } from "./send.js";
 import type { GatewayRequestContext } from "./types.js";
 
 type ResolveOutboundTarget = typeof import("../../infra/outbound/targets.js").resolveOutboundTarget;
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   deliverOutboundPayloads: vi.fn(),
   appendAssistantMessageToSessionTranscript: vi.fn(async () => ({ ok: true, sessionFile: "x" })),
   recordSessionMetaFromInbound: vi.fn(async () => ({ ok: true })),
   resolveOutboundTarget: vi.fn<ResolveOutboundTarget>(() => ({ ok: true, to: "resolved" })),
   resolveOutboundSessionRoute: vi.fn(),
-  ensureOutboundSessionEntry: vi.fn(async () => undefined),
+  ensureOutboundSessionEntry: vi.fn<typeof ensureOutboundSessionEntry>(),
   resolveMessageChannelSelection: vi.fn(),
   sendPoll: vi.fn(async () => ({ messageId: "poll-1" })),
   getChannelPlugin: vi.fn(),
   loadOpenClawPlugins: vi.fn(),
   applyPluginAutoEnable: vi.fn(),
-}));
-
-vi.mock("../../config/config.js", async () => {
-  const actual = await import("../../config/config.js");
-  return {
-    ...actual,
-    loadConfig: () => ({}),
-  };
-});
-
-vi.mock("../../channels/plugins/index.js", () => ({
-  getChannelPlugin: mocks.getChannelPlugin,
-  normalizeChannelId: (value: string) => (value === "webchat" ? null : value),
-}));
+};
 
 const TEST_AGENT_WORKSPACE = "/tmp/openclaw-test-workspace";
-let sendHandlers: typeof import("./send.js").sendHandlers;
+let sendHandlers: ReturnType<typeof createSendHandlers>;
 
 function resolveAgentIdFromSessionKeyForTests(params: { sessionKey?: string }): string {
   if (typeof params.sessionKey === "string") {
@@ -45,56 +35,25 @@ function resolveAgentIdFromSessionKeyForTests(params: { sessionKey?: string }): 
   return "main";
 }
 
-vi.mock("../../agents/agent-scope.js", () => ({
-  resolveSessionAgentId: ({
-    sessionKey,
-  }: {
-    sessionKey?: string;
-    config?: unknown;
-    agentId?: string;
-  }) => resolveAgentIdFromSessionKeyForTests({ sessionKey }),
-  resolveDefaultAgentId: () => "main",
-  resolveAgentWorkspaceDir: () => TEST_AGENT_WORKSPACE,
-}));
+const sendDeps: SendHandlersDeps = {
+  resolveSessionAgentId: ({ sessionKey }) => resolveAgentIdFromSessionKeyForTests({ sessionKey }),
+  normalizeChannelId: (value) => (value === "webchat" || value == null ? null : value),
+  loadConfig: () => ({}),
+  applyPluginAutoEnable: ({ config, env }) => mocks.applyPluginAutoEnable({ config, env }),
+  resolveOutboundChannelPlugin: ({ channel }) =>
+    mocks.getChannelPlugin(channel) as ReturnType<
+      NonNullable<SendHandlersDeps["resolveOutboundChannelPlugin"]>
+    >,
+  resolveMessageChannelSelection: (params) => mocks.resolveMessageChannelSelection(params),
+  deliverOutboundPayloads: (...args) => mocks.deliverOutboundPayloads(...args),
+  resolveOutboundTarget: (...args) => mocks.resolveOutboundTarget(...args),
+  resolveOutboundSessionRoute: (...args) => mocks.resolveOutboundSessionRoute(...args),
+  ensureOutboundSessionEntry: (...args) => mocks.ensureOutboundSessionEntry(...args),
+  normalizeReplyPayloadsForDelivery,
+};
 
-vi.mock("../../config/plugin-auto-enable.js", () => ({
-  applyPluginAutoEnable: ({ config, env }: { config: unknown; env?: unknown }) =>
-    mocks.applyPluginAutoEnable({ config, env }),
-}));
-
-vi.mock("../../plugins/loader.js", () => ({
-  loadOpenClawPlugins: mocks.loadOpenClawPlugins,
-}));
-
-vi.mock("../../infra/outbound/targets.js", () => ({
-  resolveOutboundTarget: mocks.resolveOutboundTarget,
-}));
-
-vi.mock("../../infra/outbound/outbound-session.js", () => ({
-  resolveOutboundSessionRoute: mocks.resolveOutboundSessionRoute,
-  ensureOutboundSessionEntry: mocks.ensureOutboundSessionEntry,
-}));
-
-vi.mock("../../infra/outbound/channel-selection.js", () => ({
-  resolveMessageChannelSelection: mocks.resolveMessageChannelSelection,
-}));
-
-vi.mock("../../infra/outbound/deliver.js", () => ({
-  deliverOutboundPayloads: mocks.deliverOutboundPayloads,
-}));
-
-vi.mock("../../config/sessions.js", async () => {
-  const actual = await import("../../config/sessions.js");
-  return {
-    ...actual,
-    appendAssistantMessageToSessionTranscript: mocks.appendAssistantMessageToSessionTranscript,
-    recordSessionMetaFromInbound: mocks.recordSessionMetaFromInbound,
-  };
-});
-
-async function loadFreshSendHandlersForTest() {
-  vi.resetModules();
-  ({ sendHandlers } = await import("./send.js"));
+function createSendHandlersForTest() {
+  return createSendHandlers(sendDeps);
 }
 
 const makeContext = (): GatewayRequestContext =>
@@ -188,7 +147,7 @@ describe("gateway send mirroring", () => {
     });
     mocks.sendPoll.mockResolvedValue({ messageId: "poll-1" });
     mocks.getChannelPlugin.mockReturnValue({ outbound: { sendPoll: mocks.sendPoll } });
-    await loadFreshSendHandlersForTest();
+    sendHandlers = createSendHandlersForTest();
   });
 
   it("accepts media-only sends without message", async () => {
@@ -750,16 +709,15 @@ describe("gateway send mirroring", () => {
     );
   });
 
-  it("recovers cold plugin resolution for threaded sends", async () => {
+  it("forwards threaded sends with the resolved plugin", async () => {
     mocks.resolveOutboundTarget.mockReturnValue({ ok: true, to: "123" });
     mocks.deliverOutboundPayloads.mockResolvedValue([
       { messageId: "m-threaded", channel: "slack" },
     ]);
     const outboundPlugin = { outbound: { sendPoll: mocks.sendPoll } };
-    mocks.getChannelPlugin
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce(outboundPlugin)
-      .mockReturnValue(outboundPlugin);
+    // Cold-then-recover lives in channel-resolution itself; the send handler
+    // resolves the plugin exactly once per request.
+    mocks.getChannelPlugin.mockReturnValue(outboundPlugin);
 
     const { respond } = await runSend({
       to: "123",

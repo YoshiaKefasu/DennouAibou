@@ -8,33 +8,31 @@ import {
   createChatAbortContext,
   invokeChatAbortHandler,
 } from "./chat.abort.test-helpers.js";
+import { createChatHandlers } from "./chat.js";
 
 type TranscriptLine = {
   message?: Record<string, unknown>;
 };
 
-const sessionEntryState = vi.hoisted(() => ({
+const sessionEntryState = {
   transcriptPath: "",
   sessionId: "",
-}));
+};
 
-vi.mock("../session-utils.js", async () => {
-  const original = await import("../session-utils.js");
-  return {
-    ...original,
-    loadSessionEntry: () => ({
-      cfg: {},
-      storePath: path.join(path.dirname(sessionEntryState.transcriptPath), "sessions.json"),
-      entry: {
-        sessionId: sessionEntryState.sessionId,
-        sessionFile: sessionEntryState.transcriptPath,
-      },
-      canonicalKey: "main",
-    }),
-  };
+const chatHandlers = createChatHandlers({
+  loadSessionEntry: () => ({
+    cfg: {},
+    storePath: path.join(path.dirname(sessionEntryState.transcriptPath), "sessions.json"),
+    store: {},
+    entry: {
+      sessionId: sessionEntryState.sessionId,
+      sessionFile: sessionEntryState.transcriptPath,
+      updatedAt: Date.now(),
+    },
+    canonicalKey: "main",
+    legacyKey: undefined,
+  }),
 });
-
-const { chatHandlers } = await import("./chat.js");
 
 async function writeTranscriptHeader(transcriptPath: string, sessionId: string) {
   const header = {

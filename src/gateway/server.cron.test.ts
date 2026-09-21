@@ -16,37 +16,18 @@ import {
   waitForSystemEvent,
 } from "./test-helpers.js";
 
-const fetchWithSsrFGuardMock = vi.hoisted(() =>
-  vi.fn(async (params: GuardedFetchOptions) => ({
-    response: new Response("ok", { status: 200 }),
-    finalUrl: params.url,
-    release: async () => {},
-  })),
-);
-
-const sendFailureNotificationAnnounceMock = vi.hoisted(() => vi.fn(async () => undefined));
-
-vi.mock("../infra/net/fetch-guard.js", () => ({
-  fetchWithSsrFGuard: (...args: unknown[]) =>
-    (
-      fetchWithSsrFGuardMock as unknown as (...innerArgs: unknown[]) => Promise<{
-        response: Response;
-        finalUrl: string;
-        release: () => Promise<void>;
-      }>
-    )(...args),
+const fetchWithSsrFGuardMock = vi.fn(async (params: GuardedFetchOptions) => ({
+  response: new Response("ok", { status: 200 }),
+  finalUrl: params.url,
+  release: async () => {},
 }));
 
-vi.mock("../cron/delivery.js", async () => {
-  const actual = await import("../cron/delivery.js");
-  return {
-    ...actual,
-    sendFailureNotificationAnnounce: (...args: unknown[]) =>
-      (
-        sendFailureNotificationAnnounceMock as unknown as (...innerArgs: unknown[]) => Promise<void>
-      )(...args),
-  };
-});
+const sendFailureNotificationAnnounceMock = vi.fn(async () => undefined);
+
+const cronRuntimeDeps = {
+  fetchWithSsrFGuard: fetchWithSsrFGuardMock,
+  sendFailureNotificationAnnounce: sendFailureNotificationAnnounceMock,
+};
 
 installGatewayTestHooks({ scope: "suite" });
 const CRON_WAIT_TIMEOUT_MS = 3_000;
@@ -255,7 +236,9 @@ describe("gateway server cron", () => {
       cronEnabled: false,
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -482,7 +465,9 @@ describe("gateway server cron", () => {
       cronEnabled: false,
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -527,7 +512,9 @@ describe("gateway server cron", () => {
       tempPrefix: "openclaw-gw-cron-log-",
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -641,7 +628,9 @@ describe("gateway server cron", () => {
     });
 
     cronIsolatedRun.mockClear();
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -662,7 +651,9 @@ describe("gateway server cron", () => {
       tempPrefix: "openclaw-gw-cron-run-detached-",
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     let resolveRun: ((value: { status: "ok"; summary: string }) => void) | undefined;
@@ -746,7 +737,9 @@ describe("gateway server cron", () => {
       ],
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -799,7 +792,9 @@ describe("gateway server cron", () => {
       ],
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
     cronIsolatedRun.mockClear();
 
@@ -842,7 +837,9 @@ describe("gateway server cron", () => {
 
     fetchWithSsrFGuardMock.mockClear();
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -996,7 +993,9 @@ describe("gateway server cron", () => {
       cronEnabled: false,
     });
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {
@@ -1061,7 +1060,9 @@ describe("gateway server cron", () => {
 
     fetchWithSsrFGuardMock.mockClear();
 
-    const { server, ws } = await startServerWithClient();
+    const { server, ws } = await startServerWithClient(undefined, {
+      cronRuntimeDeps: cronRuntimeDeps as never,
+    });
     await connectOk(ws);
 
     try {

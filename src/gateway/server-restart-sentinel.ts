@@ -22,7 +22,61 @@ const log = createSubsystemLogger("gateway/restart-sentinel");
 const OUTBOUND_RETRY_DELAY_MS = 750;
 const OUTBOUND_MAX_ATTEMPTS = 2;
 
+type RestartSentinelLogger = Pick<ReturnType<typeof createSubsystemLogger>, "warn">;
+
+/** Merged shape of `{ ...defaultRestartSentinelDeps, ...overrides }` used by inner helpers. */
+type RestartSentinelRuntimeDeps = {
+  [K in keyof RestartSentinelDeps]-?: NonNullable<RestartSentinelDeps[K]>;
+};
+
+export type RestartSentinelDeps = {
+  resolveMainSessionKeyFromConfig?: typeof resolveMainSessionKeyFromConfig;
+  parseSessionThreadInfo?: typeof parseSessionThreadInfo;
+  requestWakeNow?: typeof requestWakeNow;
+  deliverOutboundPayloads?: typeof deliverOutboundPayloads;
+  ackDelivery?: typeof ackDelivery;
+  enqueueDelivery?: typeof enqueueDelivery;
+  failDelivery?: typeof failDelivery;
+  buildOutboundSessionContext?: typeof buildOutboundSessionContext;
+  resolveOutboundTarget?: typeof resolveOutboundTarget;
+  consumeRestartSentinel?: typeof consumeRestartSentinel;
+  formatRestartSentinelMessage?: typeof formatRestartSentinelMessage;
+  summarizeRestartSentinel?: typeof summarizeRestartSentinel;
+  enqueueSystemEvent?: typeof enqueueSystemEvent;
+  deliveryContextFromSession?: typeof deliveryContextFromSession;
+  mergeDeliveryContext?: typeof mergeDeliveryContext;
+  loadSessionEntry?: typeof loadSessionEntry;
+  resolveAnnounceTargetFromKey?: typeof resolveAnnounceTargetFromKey;
+  getChannelPlugin?: typeof getChannelPlugin;
+  normalizeChannelId?: typeof normalizeChannelId;
+  log?: RestartSentinelLogger;
+};
+
+const defaultRestartSentinelDeps: RestartSentinelRuntimeDeps = {
+  resolveMainSessionKeyFromConfig,
+  parseSessionThreadInfo,
+  requestWakeNow,
+  deliverOutboundPayloads,
+  ackDelivery,
+  enqueueDelivery,
+  failDelivery,
+  buildOutboundSessionContext,
+  resolveOutboundTarget,
+  consumeRestartSentinel,
+  formatRestartSentinelMessage,
+  summarizeRestartSentinel,
+  enqueueSystemEvent,
+  deliveryContextFromSession,
+  mergeDeliveryContext,
+  loadSessionEntry,
+  resolveAnnounceTargetFromKey,
+  getChannelPlugin,
+  normalizeChannelId,
+  log,
+};
+
 function enqueueRestartSentinelWake(
+  deps: RestartSentinelRuntimeDeps,
   message: string,
   sessionKey: string,
   deliveryContext?: {
@@ -32,11 +86,11 @@ function enqueueRestartSentinelWake(
     threadId?: string | number;
   },
 ) {
-  enqueueSystemEvent(message, {
+  deps.enqueueSystemEvent(message, {
     sessionKey,
     ...(deliveryContext ? { deliveryContext } : {}),
   });
-  requestWakeNow({ reason: "wake", sessionKey });
+  deps.requestWakeNow({ reason: "wake", sessionKey });
 }
 
 async function waitForOutboundRetry(delayMs: number) {
@@ -46,34 +100,39 @@ async function waitForOutboundRetry(delayMs: number) {
   });
 }
 
-async function deliverRestartSentinelNotice(params: {
-  deps: CliDeps;
-  cfg: ReturnType<typeof loadSessionEntry>["cfg"];
-  sessionKey: string;
-  summary: string;
-  message: string;
-  channel: string;
-  to: string;
-  accountId?: string;
-  replyToId?: string;
-  threadId?: string;
-  session: ReturnType<typeof buildOutboundSessionContext>;
-}) {
+async function deliverRestartSentinelNotice(
+  deps: RestartSentinelRuntimeDeps,
+  params: {
+    deps: CliDeps;
+    cfg: ReturnType<typeof loadSessionEntry>["cfg"];
+    sessionKey: string;
+    summary: string;
+    message: string;
+    channel: string;
+    to: string;
+    accountId?: string;
+    replyToId?: string;
+    threadId?: string;
+    session: ReturnType<typeof buildOutboundSessionContext>;
+  },
+) {
   const payloads = [{ text: params.message }];
   // Persist one recoverable notice across the whole retry loop so a transient
   // failure does not leave behind a stale duplicate queue entry.
-  const queueId = await enqueueDelivery({
-    channel: params.channel,
-    to: params.to,
-    accountId: params.accountId,
-    replyToId: params.replyToId,
-    threadId: params.threadId,
-    payloads,
-    bestEffort: false,
-  }).catch(() => null);
+  const queueId = await deps
+    .enqueueDelivery({
+      channel: params.channel,
+      to: params.to,
+      accountId: params.accountId,
+      replyToId: params.replyToId,
+      threadId: params.threadId,
+      payloads,
+      bestEffort: false,
+    })
+    .catch(() => null);
   for (let attempt = 1; attempt <= OUTBOUND_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const results = await deliverOutboundPayloads({
+      const results = await deps.deliverOutboundPayloads({
         cfg: params.cfg,
         channel: params.channel,
         to: params.to,
@@ -88,7 +147,7 @@ async function deliverRestartSentinelNotice(params: {
       });
       if (results.length > 0) {
         if (queueId) {
-          await ackDelivery(queueId).catch(() => {});
+          await deps.ackDelivery(queueId).catch(() => {});
         }
         return;
       }
@@ -96,7 +155,7 @@ async function deliverRestartSentinelNotice(params: {
     } catch (err) {
       const retrying = attempt < OUTBOUND_MAX_ATTEMPTS;
       const suffix = retrying ? `; retrying in ${OUTBOUND_RETRY_DELAY_MS}ms` : "";
-      log.warn(`${params.summary}: outbound delivery failed${suffix}: ${String(err)}`, {
+      deps.log.warn(`${params.summary}: outbound delivery failed${suffix}: ${String(err)}`, {
         channel: params.channel,
         to: params.to,
         sessionKey: params.sessionKey,
@@ -105,11 +164,11 @@ async function deliverRestartSentinelNotice(params: {
       });
       if (!retrying) {
         if (queueId) {
-          await failDelivery(queueId, err instanceof Error ? err.message : String(err)).catch(
-            () => {
+          await deps
+            .failDelivery(queueId, err instanceof Error ? err.message : String(err))
+            .catch(() => {
               // Best-effort queue bookkeeping.
-            },
-          );
+            });
         }
         return;
       }
@@ -118,16 +177,20 @@ async function deliverRestartSentinelNotice(params: {
   }
 }
 
-export async function scheduleRestartSentinelWake(params: { deps: CliDeps }) {
-  const sentinel = await consumeRestartSentinel();
+export async function scheduleRestartSentinelWake(
+  params: { deps: CliDeps },
+  overrides: RestartSentinelDeps = {},
+) {
+  const deps = { ...defaultRestartSentinelDeps, ...overrides };
+  const sentinel = await deps.consumeRestartSentinel();
   if (!sentinel) {
     return;
   }
   const payload = sentinel.payload;
   const sessionKey = payload.sessionKey?.trim();
-  const message = formatRestartSentinelMessage(payload);
-  const summary = summarizeRestartSentinel(payload);
-  const wakeDeliveryContext = mergeDeliveryContext(
+  const message = deps.formatRestartSentinelMessage(payload);
+  const summary = deps.summarizeRestartSentinel(payload);
+  const wakeDeliveryContext = deps.mergeDeliveryContext(
     payload.threadId != null
       ? { ...payload.deliveryContext, threadId: payload.threadId }
       : payload.deliveryContext,
@@ -135,40 +198,40 @@ export async function scheduleRestartSentinelWake(params: { deps: CliDeps }) {
   );
 
   if (!sessionKey) {
-    const mainSessionKey = resolveMainSessionKeyFromConfig();
-    enqueueSystemEvent(message, { sessionKey: mainSessionKey });
+    const mainSessionKey = deps.resolveMainSessionKeyFromConfig();
+    deps.enqueueSystemEvent(message, { sessionKey: mainSessionKey });
     return;
   }
 
-  enqueueRestartSentinelWake(message, sessionKey, wakeDeliveryContext);
+  enqueueRestartSentinelWake(deps, message, sessionKey, wakeDeliveryContext);
 
-  const { baseSessionKey, threadId: sessionThreadId } = parseSessionThreadInfo(sessionKey);
+  const { baseSessionKey, threadId: sessionThreadId } = deps.parseSessionThreadInfo(sessionKey);
 
-  const { cfg, entry } = loadSessionEntry(sessionKey);
-  const parsedTarget = resolveAnnounceTargetFromKey(baseSessionKey ?? sessionKey);
+  const { cfg, entry } = deps.loadSessionEntry(sessionKey);
+  const parsedTarget = deps.resolveAnnounceTargetFromKey(baseSessionKey ?? sessionKey);
 
   // Prefer delivery context from sentinel (captured at restart) over session store
   // Handles race condition where store wasn't flushed before restart
   const sentinelContext = payload.deliveryContext;
-  let sessionDeliveryContext = deliveryContextFromSession(entry);
+  let sessionDeliveryContext = deps.deliveryContextFromSession(entry);
   if (!sessionDeliveryContext && baseSessionKey && baseSessionKey !== sessionKey) {
-    const { entry: baseEntry } = loadSessionEntry(baseSessionKey);
-    sessionDeliveryContext = deliveryContextFromSession(baseEntry);
+    const { entry: baseEntry } = deps.loadSessionEntry(baseSessionKey);
+    sessionDeliveryContext = deps.deliveryContextFromSession(baseEntry);
   }
 
-  const origin = mergeDeliveryContext(
+  const origin = deps.mergeDeliveryContext(
     sentinelContext,
-    mergeDeliveryContext(sessionDeliveryContext, parsedTarget ?? undefined),
+    deps.mergeDeliveryContext(sessionDeliveryContext, parsedTarget ?? undefined),
   );
 
   const channelRaw = origin?.channel;
-  const channel = channelRaw ? normalizeChannelId(channelRaw) : null;
+  const channel = channelRaw ? deps.normalizeChannelId(channelRaw) : null;
   const to = origin?.to;
   if (!channel || !to) {
     return;
   }
 
-  const resolved = resolveOutboundTarget({
+  const resolved = deps.resolveOutboundTarget({
     channel,
     to,
     cfg,
@@ -186,7 +249,7 @@ export async function scheduleRestartSentinelWake(params: { deps: CliDeps }) {
     (origin?.threadId != null ? String(origin.threadId) : undefined);
 
   const replyTransport =
-    getChannelPlugin(channel)?.threading?.resolveReplyTransport?.({
+    deps.getChannelPlugin(channel)?.threading?.resolveReplyTransport?.({
       cfg,
       accountId: origin?.accountId,
       threadId,
@@ -198,12 +261,12 @@ export async function scheduleRestartSentinelWake(params: { deps: CliDeps }) {
         ? String(replyTransport.threadId)
         : undefined
       : threadId;
-  const outboundSession = buildOutboundSessionContext({
+  const outboundSession = deps.buildOutboundSessionContext({
     cfg,
     sessionKey,
   });
 
-  await deliverRestartSentinelNotice({
+  await deliverRestartSentinelNotice(deps, {
     deps: params.deps,
     cfg,
     sessionKey,

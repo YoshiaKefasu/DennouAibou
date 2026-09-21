@@ -3,6 +3,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { DeviceIdentity } from "../infra/device-identity.js";
 import { captureEnv } from "../test-utils/env.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
+import { GatewayClient as GatewayClientImpl, type GatewayClientOptions } from "./client.js";
 import {
   loadConfigMock as loadConfig,
   pickPrimaryLanIPv4Mock as pickPrimaryLanIPv4,
@@ -10,25 +11,16 @@ import {
   resolveGatewayPortMock as resolveGatewayPort,
 } from "./gateway-connection.test-mocks.js";
 
-const deviceIdentityState = vi.hoisted(() => ({
+const deviceIdentityState = {
   value: {
     deviceId: "test-device-identity",
     publicKeyPem: "test-public-key",
     privateKeyPem: "test-private-key",
   } satisfies DeviceIdentity,
   throwOnLoad: false,
-}));
+};
 
-let lastClientOptions: {
-  url?: string;
-  token?: string;
-  password?: string;
-  tlsFingerprint?: string;
-  scopes?: string[];
-  deviceIdentity?: unknown;
-  onHelloOk?: (hello: { features?: { methods?: string[] } }) => void | Promise<void>;
-  onClose?: (code: number, reason: string) => void;
-} | null = null;
+let lastClientOptions: GatewayClientOptions | null = null;
 let lastRequestOptions: {
   method?: string;
   params?: unknown;
@@ -40,77 +32,48 @@ let closeCode = 1006;
 let closeReason = "";
 let helloMethods: string[] | undefined = ["health", "secrets.resolve"];
 
-vi.mock("./client.js", () => ({
-  describeGatewayCloseCode: (code: number) => {
-    if (code === 1000) {
-      return "normal closure";
-    }
-    if (code === 1006) {
-      return "abnormal closure (no close frame)";
-    }
-    return undefined;
-  },
-  GatewayClient: class {
-    constructor(opts: {
-      url?: string;
-      token?: string;
-      password?: string;
-      scopes?: string[];
-      onHelloOk?: (hello: { features?: { methods?: string[] } }) => void | Promise<void>;
-      onClose?: (code: number, reason: string) => void;
-    }) {
-      lastClientOptions = opts;
-    }
-    async request(
-      method: string,
-      params: unknown,
-      opts?: { expectFinal?: boolean; timeoutMs?: number | null },
-    ) {
-      lastRequestOptions = { method, params, opts };
-      return { ok: true };
-    }
-    start() {
-      if (startMode === "hello") {
-        void lastClientOptions?.onHelloOk?.({
-          features: {
-            methods: helloMethods,
-          },
-        });
-      } else if (startMode === "close") {
-        lastClientOptions?.onClose?.(closeCode, closeReason);
-      }
-    }
-    stop() {}
-  },
-}));
+async function waitForGatewayClientStart(): Promise<void> {
+  for (let round = 0; round < 20 && !lastClientOptions; round += 1) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+}
 
 const { __testing, buildGatewayConnectionDetails, callGateway, callGatewayCli, callGatewayScoped } =
   await import("./call.js");
 
-class StubGatewayClient {
-  constructor(opts: {
-    url?: string;
-    token?: string;
-    password?: string;
-    scopes?: string[];
-    onHelloOk?: (hello: { features?: { methods?: string[] } }) => void | Promise<void>;
-    onClose?: (code: number, reason: string) => void;
-  }) {
+class StubGatewayClient extends GatewayClientImpl {
+  constructor(opts: ConstructorParameters<typeof GatewayClientImpl>[0]) {
+    super(opts);
     lastClientOptions = opts;
   }
-  async request(
+  async request<T = Record<string, unknown>>(
     method: string,
     params: unknown,
     opts?: { expectFinal?: boolean; timeoutMs?: number | null },
-  ) {
+  ): Promise<T> {
     lastRequestOptions = { method, params, opts };
-    return { ok: true };
+    return { ok: true } as T;
   }
   start() {
     if (startMode === "hello") {
       void lastClientOptions?.onHelloOk?.({
+        type: "hello-ok",
+        protocol: 1,
+        server: { version: "test", connId: "conn-test" },
         features: {
-          methods: helloMethods,
+          methods: helloMethods ?? [],
+          events: [],
+        },
+        snapshot: {
+          presence: [],
+          health: {},
+          stateVersion: { presence: 1, health: 1 },
+          uptimeMs: 1,
+        },
+        policy: {
+          maxPayload: 512 * 1024,
+          maxBufferedBytes: 1024 * 1024,
+          tickIntervalMs: 5,
         },
       });
     } else if (startMode === "close") {
@@ -693,13 +656,20 @@ describe("callGateway error details", () => {
     startMode = "silent";
     setLocalLoopbackGatewayConfig();
 
-    vi.useFakeTimers();
+    const hasAsyncTimers = typeof vi.advanceTimersByTimeAsync === "function";
+    if (hasAsyncTimers) {
+      vi.useFakeTimers();
+    }
     let errMessage = "";
     const promise = callGateway({ method: "health", timeoutMs: 5 }).catch((caught) => {
       errMessage = caught instanceof Error ? caught.message : String(caught);
     });
 
-    await vi.advanceTimersByTimeAsync(5);
+    if (hasAsyncTimers) {
+      await vi.advanceTimersByTimeAsync(5);
+    } else {
+      await promise;
+    }
     await promise;
 
     expect(errMessage).toContain("gateway timeout after 5ms");
@@ -712,15 +682,23 @@ describe("callGateway error details", () => {
     startMode = "silent";
     setLocalLoopbackGatewayConfig();
 
-    vi.useFakeTimers();
+    const hasAsyncTimers = typeof vi.advanceTimersByTimeAsync === "function";
+    if (hasAsyncTimers) {
+      vi.useFakeTimers();
+    }
     let errMessage = "";
     const promise = callGateway({ method: "health", timeoutMs: 2_592_010_000 }).catch((caught) => {
       errMessage = caught instanceof Error ? caught.message : String(caught);
     });
 
-    await vi.advanceTimersByTimeAsync(1);
+    if (hasAsyncTimers) {
+      await vi.advanceTimersByTimeAsync(1);
+    } else {
+      await Promise.resolve();
+    }
     expect(errMessage).toBe("");
 
+    await waitForGatewayClientStart();
     lastClientOptions?.onClose?.(1006, "");
     await promise;
 

@@ -1215,17 +1215,21 @@ src/plugin-sdk/memory-core-host-status.ts
 ### 20.2 削除対象（前任着手分 + 後任追加分）
 
 #### A. `src/acp/` ディレクトリ（前任削除済）
-- ACP 専用モジュール全体（commands.ts / client.ts / approval-classifier.ts / control-plane/* / runtime/* / persistent-bindings/* / meta.ts / conversation-id.ts / errors.ts / registry.ts / session-meta.ts / session-identifiers.ts / session-identity.ts / session-meta.ts / types.ts / etc.）
+
+- ACP 専用モジュール全体（commands.ts / client.ts / approval-classifier.ts / control-plane/_ / runtime/_ / persistent-bindings/\* / meta.ts / conversation-id.ts / errors.ts / registry.ts / session-meta.ts / session-identifiers.ts / session-identity.ts / session-meta.ts / types.ts / etc.）
 
 #### B. `src/plugin-sdk/acp-runtime.ts` / `acpx.ts`（前任削除済）
+
 - Plugin SDK の ACP runtime 公開 facade
 
 #### C. ACP harness session bindings
+
 - `extensions/discord/src/monitor/native-command.plugin-dispatch.test.ts` の ACP-`createConfiguredAcpBinding` / `createConfiguredAcpCase` ヘルパーと ACP 専用 it ブロック削除
 - `extensions/line/src/bot-message-context.test.ts` の ACP normalization / ACP-active bindings it ブロック削除
 - `extensions/telegram/src/bot-native-commands.session-meta.test.ts` の `createConfiguredAcpTopicBinding` / `createConfiguredBindingRoute(route, binding)` → 単一引数版に簡素化、ACP 専用 it ブロック削除
 
 #### D. コア統合
+
 - `src/auto-reply/reply/abort.ts`: `defaultAbortDeps.getAcpSessionManager` を削除（abort 経路から ACP を外す）
 - `src/auto-reply/reply/abort.test.ts`: ACP session manager mock と "ACP cancel" it ブロック削除
 - `src/auto-reply/reply/commands-handlers.runtime.ts`: `./commands-acp.js` import と `handleAcpCommand` 登録削除
@@ -1239,6 +1243,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/auto-reply/reply/dispatch-from-config.test.ts`: ACP test ブロック10件、ACP helper (`createAcpRuntime` / `createMockAcpSessionManager` / `MockAcpRuntime`)、ACP vi.mock、ACP `acpMocks` 削除
 
 #### E. ACP binding plugins
+
 - `src/channels/plugins/configured-binding-builtins.ts`: ACP builtin 削除（ファイルごと削除）
 - `src/channels/plugins/stateful-target-builtins.ts`: ACP stateful driver 削除（ファイルごと削除）
 - `src/channels/plugins/binding-registry.ts`: 上記参照削除（ensureConfiguredBindingBuiltinsRegistered → そのままの薄いラッパー）
@@ -1246,20 +1251,24 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/channels/plugins/binding-targets.test.ts`: `type: "acp"` を `type: "route"` に変更
 
 #### F. gateway / sessions
+
 - `src/gateway/server-startup.ts`: `getAcpSessionManager().reconcilePendingSessionIdentities` ブロック削除、ACP import 削除
 - `src/gateway/session-reset-service.ts`: `runAcpCleanupStep` / `closeAcpRuntimeForSession` 削除、`cleanupSessionBeforeMutation` から ACP close 呼び出し削除、`targetKind` を `"subagent"` 固定
 - `src/gateway/session-reset-service.test.ts`: ACP binding テスト2件削除
 - `src/gateway/server.sessions.gateway-server-sessions-a.test.ts`: `acpRuntimeMocks` / `acpManagerMocks` 削除、ACP セッション削除・reset テストのACP専用assertion除去、`targetKind: "acp"` → `"subagent"`
 
 #### G. ACP secret-file
+
 - `src/cli/gateway-cli/run.ts`: `readSecretFromFile` (from `acp/secret-file`) を `fs.readFileSync + trim` で inline 化
 - `src/cli/mcp-cli.ts`: 同上
 
 #### H. channel/conversation binding
+
 - `src/channels/conversation-binding-context.ts`: `normalizeConversationText` を `trimText` で代用
 - `src/infra/outbound/current-conversation-bindings.ts`: `normalizeConversationText` を `.trim().toLowerCase()` で代用
 
 #### I. agents
+
 - `src/agents/pi-embedded-runner/system-prompt.ts`: `acpEnabled?: boolean` 削除
 - `src/agents/pi-embedded-runner/run/attempt.ts`: `acpEnabled` 引数削除
 - `src/agents/pi-embedded-runner/compact.ts`: 同上
@@ -1273,6 +1282,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/config/plugin-auto-enable.providers.test.ts`: "auto-enables acpx when ACP is configured" 等 2件削除
 
 #### J. sessions store
+
 - `src/commands/agent.test.ts`: `__testing as acpManagerTesting` import 削除
 - `src/commands/agent/session-store.test.ts`: "preserves ACP metadata when caller has a stale session snapshot" 削除、`acpMeta` ヘルパー削除
 - `src/config/sessions/sessions.test.ts`: `upsertAcpSessionMeta` import 削除、"preserves ACP metadata when replacing a session entry" / "allows explicit ACP metadata removal through the ACP session helper" 削除
@@ -1281,6 +1291,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/commands/agent/session-store.test.ts`: `SessionEntry.acp` 削除
 
 #### K. tasks（ACP runtime harness）
+
 - `src/tasks/task-registry.types.ts`: `TaskRuntime` から `"acp"` 削除 → `"subagent" | "cli" | "cron"`
 - `src/tasks/task-executor.ts`: `task.runtime === "acp" || task.runtime === "subagent"` → `"subagent"` のみ
 - `src/tasks/task-executor-policy.ts`: ACP display title / ACP cancel guard 分岐削除
@@ -1294,6 +1305,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - `src/commands/status.summary.redaction.test.ts`: `byRuntime.acp: 1` 削除
 
 #### L. commands-flows
+
 - `src/auto-reply/reply/commands-status.test.ts`, `commands-tasks.test.ts`, `commands-tasks.ts`: `TaskRuntime` ACP 削除反映
 - `src/commands/flows.test.ts`, `src/plugins/runtime/runtime-taskflow.test.ts`, `src/plugins/runtime/runtime-tasks.test.ts`, `src/cli/program/register.status-health-sessions.test.ts`, `src/agents/openclaw-tools.session-status.test.ts`, `src/agents/tools/sessions-spawn-tool.test.ts`, `src/tasks/task-executor-policy.test.ts`, `src/tasks/task-executor.test.ts`, `src/tasks/task-flow-registry.audit.test.ts`, `src/tasks/task-flow-registry.maintenance.test.ts`, `src/tasks/task-owner-access.test.ts`, `src/tasks/task-registry.store.t
 
@@ -1305,10 +1317,10 @@ src/plugin-sdk/memory-core-host-status.ts
 
 ### 20.5 検証ゲート結果
 
-| ゲート | 結果 |
-| --- | --- |
-| `pnpm exec tsgo --noEmit` | **0 errors** |
-| `pnpm exec oxfmt --check` | **51 ファイル違反**（前任作業由来。ACP削除後の新規違反は `task-registry.test.ts` のフォーマットのみ。`pnpm exec oxfmt --write src/tasks/task-registry.test.ts` で修正済み） |
+| ゲート                                       | 結果                                                                                                                                                                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec tsgo --noEmit`                    | **0 errors**                                                                                                                                                                                                      |
+| `pnpm exec oxfmt --check`                    | **51 ファイル違反**（前任作業由来。ACP削除後の新規違反は `task-registry.test.ts` のフォーマットのみ。`pnpm exec oxfmt --write src/tasks/task-registry.test.ts` で修正済み）                                       |
 | `vitest run src/tasks/task-registry.test.ts` | **19 passed / 9 failed** — 失敗は ACP code path 削除後の session fallback / deliveryStatus 更新ロジックの挙動変化に依存するテスト群（前任作業ベースラインでも失敗していた可能性が高い、未検証）。修正は次フェーズ |
 
 ### 20.6 変更規模
@@ -1325,6 +1337,7 @@ src/plugin-sdk/memory-core-host-status.ts
 - oxfmt 前任作業分の違反51件対応（`pnpm exec oxfmt --write` で一括修正可能だが、コミット粒度の調整要）
 - `DENNOU_DOCS/ARCHIVE/OPTIMIZATION.md`（前任が ACP削除と並行に作成した別タスクのドキュメント）— 取り扱い未定
 - 前任作業中間ファイル群（`.tmp-*`）— `.gitignore` に追加済み、最終push前に削除 or 維持判断
+
 ## 21. ACP削除後の残骸完全クリーンアップ（2026-08-21 時点作業）
 
 ### 21.1 背景・ユーザー裁定
@@ -1337,36 +1350,36 @@ src/plugin-sdk/memory-core-host-status.ts
 
 `pnpm build` の `[UNRESOLVED_ENTRY]` の原因 2 ファイル：
 
-| ファイル | 行 | 削除したエントリ |
-| --- | --- | --- |
-| `scripts/lib/plugin-sdk-entrypoints.json` | 61-62 | `"acp-runtime"`, `"acp-binding-runtime"` |
-| `package.json` | 304-310 | `./plugin-sdk/acp-runtime`, `./plugin-sdk/acp-binding-runtime` の `exports` ブロック |
+| ファイル                                  | 行      | 削除したエントリ                                                                     |
+| ----------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| `scripts/lib/plugin-sdk-entrypoints.json` | 61-62   | `"acp-runtime"`, `"acp-binding-runtime"`                                             |
+| `package.json`                            | 304-310 | `./plugin-sdk/acp-runtime`, `./plugin-sdk/acp-binding-runtime` の `exports` ブロック |
 
 ### 21.3 source 残骸の除去（ACP削除の真の完了）
 
 ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-sdk/acp-runtime` の参照を完全に除去：
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `extensions/discord/src/monitor/provider-session.runtime.ts` | ACP 再 export（`getAcpSessionManager`, `isAcpRuntimeError`, `reconcileAcpThreadBindingsOnStartup`）を除去 |
-| `extensions/discord/src/monitor/thread-bindings.lifecycle.ts` | `readAcpSessionEntry`/`AcpSessionStoreEntry` の import 削除、`AcpThreadBindingReconciliationResult`/`AcpThreadBindingHealthStatus`/`AcpThreadBindingHealthProbe` 型削除、`resolveStoredAcpBindingHealth`/`reconcileAcpThreadBindingsOnStartup` 関数削除、`mapWithConcurrency`/`ACP_STARTUP_HEALTH_PROBE_CONCURRENCY_LIMIT` 削除 |
-| `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` | ACP テスト 9 件削除（"removes stale ACP bindings..." 〜 "caps ACP startup health probe concurrency"）、`hoisted.readAcpSessionEntry`/`acpRuntime`/`reconcileAcpThreadBindingsOnStartup` 関連の import・mock・destructure 除去 |
-| `extensions/discord/src/monitor/provider.test.ts` | `AcpRuntimeError` import 削除、ACP テスト 5 件削除（"treats ACP error status..." 〜 "falls back to legacy missing-session message classification"）、`getAcpSessionStatusMock`/`reconcileAcpThreadBindingsOnStartupMock` の destructure・mock セットアップ・assertion 削除、`getHealthProbe`/`ReconcileHealthProbeParams`/`ReconcileStartupParams` 削除 |
-| `extensions/discord/src/monitor/provider.ts` | `DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS`/`DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS` 定数削除、`isLegacyMissingSessionError`/`classifyAcpStatusProbeError`/`probeDiscordAcpBindingHealth` 関数削除、`monitorDiscordProvider` 内の ACP thread bindings reconciliation ブロック削除 |
-| `extensions/discord/src/test-support/provider.test-support.ts` | `reconcileAcpThreadBindingsOnStartupMock`/`getAcpSessionStatusMock` の型・実装・destructure・reset 削除、`vi.mock("openclaw/plugin-sdk/acp-runtime", ...)` ブロック削除、runtime フェイクから `reconcileAcpThreadBindingsOnStartup`/`getAcpSessionManager`/`isAcpRuntimeError` 削除 |
-| `src/plugins/contracts/plugin-sdk-runtime-api-guardrails.test.ts` | telegram bundled plugin の runtime-api ガード rail フィクスチャから `AcpRuntime*` import 2 行削除 |
+| ファイル                                                           | 変更内容                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `extensions/discord/src/monitor/provider-session.runtime.ts`       | ACP 再 export（`getAcpSessionManager`, `isAcpRuntimeError`, `reconcileAcpThreadBindingsOnStartup`）を除去                                                                                                                                                                                                                                               |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.ts`      | `readAcpSessionEntry`/`AcpSessionStoreEntry` の import 削除、`AcpThreadBindingReconciliationResult`/`AcpThreadBindingHealthStatus`/`AcpThreadBindingHealthProbe` 型削除、`resolveStoredAcpBindingHealth`/`reconcileAcpThreadBindingsOnStartup` 関数削除、`mapWithConcurrency`/`ACP_STARTUP_HEALTH_PROBE_CONCURRENCY_LIMIT` 削除                         |
+| `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` | ACP テスト 9 件削除（"removes stale ACP bindings..." 〜 "caps ACP startup health probe concurrency"）、`hoisted.readAcpSessionEntry`/`acpRuntime`/`reconcileAcpThreadBindingsOnStartup` 関連の import・mock・destructure 除去                                                                                                                           |
+| `extensions/discord/src/monitor/provider.test.ts`                  | `AcpRuntimeError` import 削除、ACP テスト 5 件削除（"treats ACP error status..." 〜 "falls back to legacy missing-session message classification"）、`getAcpSessionStatusMock`/`reconcileAcpThreadBindingsOnStartupMock` の destructure・mock セットアップ・assertion 削除、`getHealthProbe`/`ReconcileHealthProbeParams`/`ReconcileStartupParams` 削除 |
+| `extensions/discord/src/monitor/provider.ts`                       | `DISCORD_ACP_STATUS_PROBE_TIMEOUT_MS`/`DISCORD_ACP_STALE_RUNNING_ACTIVITY_MS` 定数削除、`isLegacyMissingSessionError`/`classifyAcpStatusProbeError`/`probeDiscordAcpBindingHealth` 関数削除、`monitorDiscordProvider` 内の ACP thread bindings reconciliation ブロック削除                                                                              |
+| `extensions/discord/src/test-support/provider.test-support.ts`     | `reconcileAcpThreadBindingsOnStartupMock`/`getAcpSessionStatusMock` の型・実装・destructure・reset 削除、`vi.mock("openclaw/plugin-sdk/acp-runtime", ...)` ブロック削除、runtime フェイクから `reconcileAcpThreadBindingsOnStartup`/`getAcpSessionManager`/`isAcpRuntimeError` 削除                                                                     |
+| `src/plugins/contracts/plugin-sdk-runtime-api-guardrails.test.ts`  | telegram bundled plugin の runtime-api ガード rail フィクスチャから `AcpRuntime*` import 2 行削除                                                                                                                                                                                                                                                       |
 
 ### 21.4 横断洗い出しで発見した追加残骸
 
 `grep -rli "memory-host-\|memory-lancedb\|speech-core" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` の結果、Phase 13/17/19/20 で削除済みの拡張機能（`extensions/memory-core`, `extensions/speech-core`, `extensions/image-generation-core`, `extensions/media-understanding-core`, `extensions/memory-lancedb`）に対応する plugin-sdk export が `package.json` に残っていた：
 
-| ファイル | 削除した export / 実装 |
-| --- | --- |
-| `package.json` | `./plugin-sdk/memory-host-core`, `./plugin-sdk/memory-host-events`, `./plugin-sdk/memory-host-files`, `./plugin-sdk/memory-host-markdown`, `./plugin-sdk/memory-host-search`, `./plugin-sdk/memory-host-status`, `./plugin-sdk/memory-lancedb` — `src/plugin-sdk/` に対応実装なし、`extensions/` にもディレクトリなし、参照元もゼロ（grep 済） |
-| `src/plugin-sdk/memory-lancedb.ts` | 3 行の再 export のみ（`definePluginEntry` / `resolveStateDir` / `OpenClawPluginApi`）。パッケージ export と孤立していたのでファイルごと削除 |
-| `src/plugin-sdk/facade-runtime.ts` | `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` セットから `"image-generation-core"`, `"media-understanding-core"`, `"speech-core"` を削除。セット自体は空のまま残置（`new Set<string>()`）。下流の `runtime-api.js` short-circuit は実質 dead code だが、型推論とコード構造を維持するため Set を完全削除せずコメントで意図を明記 |
-| `src/plugin-sdk/facade-runtime.test.ts` | 上記変更に伴い、`keeps shared runtime-core facades available without plugin activation` テスト（speech-core / image-generation-core / media-understanding-core を `runtime-api.js` 経由でロードする検証）を削除。テストは 9 件 → 8 件に減少 |
-| `scripts/lib/optional-bundled-clusters.mjs` | OpenClaw 上流の optional bundled cluster 設定のうち、`extensions/memory-lancedb/` が存在しないため `"memory-lancedb"` エントリを除去（他の cluster は `extensions/` に残存するため保持） |
+| ファイル                                    | 削除した export / 実装                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`                              | `./plugin-sdk/memory-host-core`, `./plugin-sdk/memory-host-events`, `./plugin-sdk/memory-host-files`, `./plugin-sdk/memory-host-markdown`, `./plugin-sdk/memory-host-search`, `./plugin-sdk/memory-host-status`, `./plugin-sdk/memory-lancedb` — `src/plugin-sdk/` に対応実装なし、`extensions/` にもディレクトリなし、参照元もゼロ（grep 済） |
+| `src/plugin-sdk/memory-lancedb.ts`          | 3 行の再 export のみ（`definePluginEntry` / `resolveStateDir` / `OpenClawPluginApi`）。パッケージ export と孤立していたのでファイルごと削除                                                                                                                                                                                                    |
+| `src/plugin-sdk/facade-runtime.ts`          | `ALWAYS_ALLOWED_RUNTIME_DIR_NAMES` セットから `"image-generation-core"`, `"media-understanding-core"`, `"speech-core"` を削除。セット自体は空のまま残置（`new Set<string>()`）。下流の `runtime-api.js` short-circuit は実質 dead code だが、型推論とコード構造を維持するため Set を完全削除せずコメントで意図を明記                           |
+| `src/plugin-sdk/facade-runtime.test.ts`     | 上記変更に伴い、`keeps shared runtime-core facades available without plugin activation` テスト（speech-core / image-generation-core / media-understanding-core を `runtime-api.js` 経由でロードする検証）を削除。テストは 9 件 → 8 件に減少                                                                                                    |
+| `scripts/lib/optional-bundled-clusters.mjs` | OpenClaw 上流の optional bundled cluster 設定のうち、`extensions/memory-lancedb/` が存在しないため `"memory-lancedb"` エントリを除去（他の cluster は `extensions/` に残存するため保持）                                                                                                                                                       |
 
 ### 21.5 温存した現役機能の参照（触らなかったもの）
 
@@ -1379,15 +1392,15 @@ ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-s
 
 ### 21.6 検証ゲート結果
 
-| ゲート | 結果 |
-| --- | --- |
-| `pnpm build` | **完走**（`tsdown-build.mjs` / `runtime-postbuild.mjs` / `build:plugin-sdk:dts` / `check-plugin-sdk-exports.mjs` / `copy-hook-metadata` / `copy-export-html-templates` / `write-build-info` / `write-cli-startup-metadata` / `write-cli-compat` 全て成功、`OK: All 4 required plugin-sdk exports verified.`） |
-| `pnpm exec tsgo --noEmit` | **0 errors** |
-| `grep -rli "openclaw/plugin-sdk/acp-runtime\|openclaw/plugin-sdk/acp-binding-runtime"` (全 .ts/.tsx/.json/.mjs) | **ヒット 0 件** — ACP plugin-sdk surface への参照は完全消滅 |
-| `grep -rli "memory-host-\|memory-lancedb" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` | **ヒット 0 件** — memory-host-* / memory-lancedb の残骸 export も全削除 |
-| `pnpm exec vitest run extensions/discord/src/monitor/provider.test.ts` | **16/16 passed** |
-| `pnpm exec vitest run extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts`（個別実行） | **22/22 passed**（並列実行で `reuses webhook credentials after unbind when rebinding in the same channel` が既存の flaky パターンで 1 件失敗するが、`-t "reuses webhook"` 単独実行・`-t` なしシリアル実行では通過。ACP 削除ロジックと無関係な webhook モックのレース条件。タスク説明「既存テストを壊さないこと」は満たす） |
-| `pnpm exec vitest run src/plugin-sdk/facade-runtime.test.ts` | 既存 pre-existing 失敗 8 件（私の修正前後で同数）。本タスクのスコープ外（DEBLOGT.md §20.7 の残作業と同じ系統、`applyPluginAutoEnable` の `record.channels` / `preferOver` 依存テストフィクスチャ問題） |
+| ゲート                                                                                                                                     | 結果                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                                                                                                                               | **完走**（`tsdown-build.mjs` / `runtime-postbuild.mjs` / `build:plugin-sdk:dts` / `check-plugin-sdk-exports.mjs` / `copy-hook-metadata` / `copy-export-html-templates` / `write-build-info` / `write-cli-startup-metadata` / `write-cli-compat` 全て成功、`OK: All 4 required plugin-sdk exports verified.`）              |
+| `pnpm exec tsgo --noEmit`                                                                                                                  | **0 errors**                                                                                                                                                                                                                                                                                                               |
+| `grep -rli "openclaw/plugin-sdk/acp-runtime\|openclaw/plugin-sdk/acp-binding-runtime"` (全 .ts/.tsx/.json/.mjs)                            | **ヒット 0 件** — ACP plugin-sdk surface への参照は完全消滅                                                                                                                                                                                                                                                                |
+| `grep -rli "memory-host-\|memory-lancedb" tsdown.config.ts scripts/lib/ package.json vitest.* ui/src/ extensions/discord/ src/plugin-sdk/` | **ヒット 0 件** — memory-host-\* / memory-lancedb の残骸 export も全削除                                                                                                                                                                                                                                                   |
+| `pnpm exec vitest run extensions/discord/src/monitor/provider.test.ts`                                                                     | **16/16 passed**                                                                                                                                                                                                                                                                                                           |
+| `pnpm exec vitest run extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts`（個別実行）                                        | **22/22 passed**（並列実行で `reuses webhook credentials after unbind when rebinding in the same channel` が既存の flaky パターンで 1 件失敗するが、`-t "reuses webhook"` 単独実行・`-t` なしシリアル実行では通過。ACP 削除ロジックと無関係な webhook モックのレース条件。タスク説明「既存テストを壊さないこと」は満たす） |
+| `pnpm exec vitest run src/plugin-sdk/facade-runtime.test.ts`                                                                               | 既存 pre-existing 失敗 8 件（私の修正前後で同数）。本タスクのスコープ外（DEBLOGT.md §20.7 の残作業と同じ系統、`applyPluginAutoEnable` の `record.channels` / `preferOver` 依存テストフィクスチャ問題）                                                                                                                     |
 
 ### 21.7 変更規模
 
@@ -1404,6 +1417,7 @@ ACP import を抱えていたソース 6 ファイルから、`openclaw/plugin-s
 - `src/tasks/` 配下の pre-existing 失敗（`task-executor.test.ts` の 2 件、`task-executor-policy.test.ts` の 1 件）— §20.7 からの継続
 - `extensions/discord/src/monitor/thread-bindings.lifecycle.test.ts` の flaky test（`reuses webhook credentials after unbind when rebinding in the same channel`）— 並列実行の webhook モックレース。ACP 削除と無関係だが次の flaky 掃除タスクで対応
 - `src/plugin-sdk/facade-runtime.test.ts` の pre-existing 失敗 8 件 — §20.7 からの継続
+
 ## 22. 生成系ツール（image_generate / music_generate / video_generate）完全削除（2026-09-12 時点作業）
 
 ### 22.1 背景・動機
@@ -1418,40 +1432,40 @@ KASOU 運用では画像・音楽・動画の生成系ツール（`image_generat
 
 ### 22.2 削除したファイル（17 件）
 
-| ファイル | 種別 |
-| --- | --- |
-| `src/agents/tools/image-generate-tool.ts` | ツール本体 |
-| `src/agents/tools/image-generate-tool.test.ts` | テスト |
-| `src/agents/tools/music-generate-tool.ts` | ツール本体 |
-| `src/agents/tools/music-generate-tool.actions.ts` | アクション実装 |
-| `src/agents/tools/music-generate-tool.test.ts` | テスト |
-| `src/agents/tools/video-generate-tool.ts` | ツール本体 |
-| `src/agents/tools/video-generate-tool.actions.ts` | アクション実装 |
-| `src/agents/tools/video-generate-tool.test.ts` | テスト |
-| `src/agents/tools/music-generate-tool.status.test.ts` | status アクションのテスト（削除した actions を import していたため） |
-| `src/agents/tools/video-generate-tool.status.test.ts` | 同上 |
-| `src/agents/tools/music-generate-background.ts` | バックグラウンド生成実装（ツール専用・削除後に死コード化） |
-| `src/agents/tools/music-generate-background.test.ts` | 同上のテスト |
-| `src/agents/tools/video-generate-background.ts` | バックグラウンド生成実装（ツール専用・削除後に死コード化） |
-| `src/agents/tools/video-generate-background.test.ts` | 同上のテスト |
-| `src/agents/tools/media-generate-background-shared.ts` | 上記 background 2 モジュール専用の共有ヘルパー |
-| `src/agents/openclaw-tools.image-generation.test.ts` | `createOpenClawTools` への image_generate 登録テスト |
-| `src/agents/openclaw-tools.video-generation.test.ts` | `createOpenClawTools` への video_generate 登録テスト |
+| ファイル                                               | 種別                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------- |
+| `src/agents/tools/image-generate-tool.ts`              | ツール本体                                                           |
+| `src/agents/tools/image-generate-tool.test.ts`         | テスト                                                               |
+| `src/agents/tools/music-generate-tool.ts`              | ツール本体                                                           |
+| `src/agents/tools/music-generate-tool.actions.ts`      | アクション実装                                                       |
+| `src/agents/tools/music-generate-tool.test.ts`         | テスト                                                               |
+| `src/agents/tools/video-generate-tool.ts`              | ツール本体                                                           |
+| `src/agents/tools/video-generate-tool.actions.ts`      | アクション実装                                                       |
+| `src/agents/tools/video-generate-tool.test.ts`         | テスト                                                               |
+| `src/agents/tools/music-generate-tool.status.test.ts`  | status アクションのテスト（削除した actions を import していたため） |
+| `src/agents/tools/video-generate-tool.status.test.ts`  | 同上                                                                 |
+| `src/agents/tools/music-generate-background.ts`        | バックグラウンド生成実装（ツール専用・削除後に死コード化）           |
+| `src/agents/tools/music-generate-background.test.ts`   | 同上のテスト                                                         |
+| `src/agents/tools/video-generate-background.ts`        | バックグラウンド生成実装（ツール専用・削除後に死コード化）           |
+| `src/agents/tools/video-generate-background.test.ts`   | 同上のテスト                                                         |
+| `src/agents/tools/media-generate-background-shared.ts` | 上記 background 2 モジュール専用の共有ヘルパー                       |
+| `src/agents/openclaw-tools.image-generation.test.ts`   | `createOpenClawTools` への image_generate 登録テスト                 |
+| `src/agents/openclaw-tools.video-generation.test.ts`   | `createOpenClawTools` への video_generate 登録テスト                 |
 
 ### 22.3 コア参照のクリーンアップ
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `src/agents/openclaw-tools.ts` | `createImageGenerateTool` / `createMusicGenerateTool` / `createVideoGenerateTool` の import・インスタンス生成・`openclawTools` 返却配列からの除去 |
-| `src/agents/pi-embedded-subscribe.handlers.tools.ts` | `COMPACT_PROVIDER_INVENTORY_TOOLS`（image_generate / video_generate 専用）と `hasProviderInventoryDetails` / `shouldEmitCompactToolOutput` を削除。対象ツールが消えたため compact provider inventory 出力機能は空になり不要に |
-| `src/agents/pi-embedded-subscribe.tools.ts` | `TRUSTED_TOOL_RESULT_MEDIA`（ローカル `MEDIA:` パスを許可するコアツール集合）から 3 ツールを除去 |
-| `src/agents/pi-embedded-subscribe.handlers.tools.media.test.ts` | image_generate / video_generate を使用するテストケースを削除・調整（structured media 検証は trusted コアツール `canvas` に置換、compact provider inventory テストは削除） |
-| `src/agents/pi-embedded-subscribe.tools.media.test.ts` | 3 ツールのメディア信頼判定テストを削除（core tool trust テストは `browser` に置換） |
-| `src/agents/tool-catalog.ts` / `tool-catalog.test.ts` | `CORE_TOOL_DEFINITIONS` と coding profile allow 検証から 3 ツールを除去 |
-| `src/agents/tool-display-config.ts` | 表示設定（emoji / title / actions）から 3 ツールを除去 |
-| `src/agents/test-helpers/fast-tool-stubs.ts` | `image-generate-tool.js` / `video-generate-tool.js` のモックを削除 |
-| `src/agents/test-helpers/fast-openclaw-tools-sessions.ts` | `createMusicGenerateTool` のスタブを削除 |
-| `src/agents/test-helpers/fast-openclaw-tools.ts` | コアツールスタブ一覧から `image_generate` / `video_generate` を除去 |
+| ファイル                                                        | 変更内容                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/agents/openclaw-tools.ts`                                  | `createImageGenerateTool` / `createMusicGenerateTool` / `createVideoGenerateTool` の import・インスタンス生成・`openclawTools` 返却配列からの除去                                                                             |
+| `src/agents/pi-embedded-subscribe.handlers.tools.ts`            | `COMPACT_PROVIDER_INVENTORY_TOOLS`（image_generate / video_generate 専用）と `hasProviderInventoryDetails` / `shouldEmitCompactToolOutput` を削除。対象ツールが消えたため compact provider inventory 出力機能は空になり不要に |
+| `src/agents/pi-embedded-subscribe.tools.ts`                     | `TRUSTED_TOOL_RESULT_MEDIA`（ローカル `MEDIA:` パスを許可するコアツール集合）から 3 ツールを除去                                                                                                                              |
+| `src/agents/pi-embedded-subscribe.handlers.tools.media.test.ts` | image_generate / video_generate を使用するテストケースを削除・調整（structured media 検証は trusted コアツール `canvas` に置換、compact provider inventory テストは削除）                                                     |
+| `src/agents/pi-embedded-subscribe.tools.media.test.ts`          | 3 ツールのメディア信頼判定テストを削除（core tool trust テストは `browser` に置換）                                                                                                                                           |
+| `src/agents/tool-catalog.ts` / `tool-catalog.test.ts`           | `CORE_TOOL_DEFINITIONS` と coding profile allow 検証から 3 ツールを除去                                                                                                                                                       |
+| `src/agents/tool-display-config.ts`                             | 表示設定（emoji / title / actions）から 3 ツールを除去                                                                                                                                                                        |
+| `src/agents/test-helpers/fast-tool-stubs.ts`                    | `image-generate-tool.js` / `video-generate-tool.js` のモックを削除                                                                                                                                                            |
+| `src/agents/test-helpers/fast-openclaw-tools-sessions.ts`       | `createMusicGenerateTool` のスタブを削除                                                                                                                                                                                      |
+| `src/agents/test-helpers/fast-openclaw-tools.ts`                | コアツールスタブ一覧から `image_generate` / `video_generate` を除去                                                                                                                                                           |
 
 ### 22.4 温存した現役機能（触らなかったもの）
 
@@ -1461,10 +1475,10 @@ KASOU 運用では画像・音楽・動画の生成系ツール（`image_generat
 
 ### 22.5 検証ゲート結果
 
-| ゲート | 結果 |
-| --- | --- |
-| `pnpm exec tsgo --noEmit` | **0 errors** |
-| `pnpm exec oxfmt --check`（変更 11 ファイル） | **clean** |
+| ゲート                                                                   | 結果                                                                                                                                                                          |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec tsgo --noEmit`                                                | **0 errors**                                                                                                                                                                  |
+| `pnpm exec oxfmt --check`（変更 11 ファイル）                            | **clean**                                                                                                                                                                     |
 | 影響範囲スコープテスト（編集モジュールを import する 24 テストファイル） | **198/198 passed**（`server.sessions-send.test.ts` のみ gateway テストヘルパーの `afterAll` フック 180 秒タイムアウトで環境要因失敗・単体再現確認済、テスト本体 2 件は pass） |
 
 ### 22.6 変更規模
@@ -1473,3 +1487,145 @@ KASOU 運用では画像・音楽・動画の生成系ツール（`image_generat
 - 修正: 11 ファイル（ソース 8・テスト 3）
 - 新規追加: なし（DEBLOAT.md 本節のみ追記）
 - コミット: 1 コミット予定（push 禁止、ユーザー指示遵守）
+
+## 23. DEBLOAT 候補台帳（2026-09-21 記録）
+
+### 23.1 目的
+
+本節は「今すぐ削除する確定対象」ではなく、**将来の DEBLOAT キャンペーンで実施する候補**を台帳として記録するもの。各候補はユーザー裁定または調査で「不要」と判断済みだが、撤去には依存解消という先行作業が必要なため、ここに残す。
+
+### 23.2 候補一覧（2026-09-21 全数棚卸し反映）
+
+2026-09-21 に `src/`（59ディレクトリ）・`extensions/`・`ui/`・`scripts/` の全数棚卸しを実施し、候補を再編した。規模は実測（ファイル数／概算行数）。
+
+| #   | 候補                                                                                                                                                                                                                          | 規模                    | ユーザー裁定               | 先行作業                                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------- | ------------------------------------------------------------------ |
+| 1   | `src/agents/sandbox/` ＋ サンドボックス関連一式                                                                                                                                                                               | 69ファイル / 約11,300行 | **削除確定**               | `/sandbox` コマンド・doctor 検査・`stage-sandbox-media` の経路解消 |
+| 2   | `src/tasks/` 一式                                                                                                                                                                                                             | 44ファイル / 約10,800行 | **削除確定**               | 依存4系統の解消（外部37ファイル参照）                              |
+| 3   | `src/memory-host-sdk/`（＋ `packages/` 側）                                                                                                                                                                                   | 83ファイル / 約10,600行 | **削除確定**               | `memory-runtime` が unavailable を返す経路の実測確認               |
+| 4   | `src/agents/auth-profiles/`                                                                                                                                                                                                   | 25ファイル / 約5,300行  | **削除確定**               | api-key 解決チェーンのフォールバック段と usage 表示の確認          |
+| 5   | 生成系残骸 `src/{image,music,video,media}-generation/`                                                                                                                                                                        | 32ファイル / 約3,500行  | **削除確定**               | google/openai の provider 登録と同時に撤去                         |
+| 6   | メディア生成プロバイダー登録（`extensions/google`, `extensions/openai`）                                                                                                                                                      | 数ファイル              | **削除確定**               | §22 の残骸（プロバイダー登録だけが生き残った状態）                 |
+| 7   | WebUI jsdom テスト                                                                                                                                                                                                            | 56ファイル / 約14,000行 | **削除確定**               | browser テスト10本は温存要判断                                     |
+| 8   | heartbeat 残骸                                                                                                                                                                                                                | 数ファイル              | **削除確定（cron 厳守）**  | cron 経路を一切壊さないこと。慎重に実施                            |
+| 9   | realtime 系（`src/realtime-transcription/`, `src/realtime-voice/`）                                                                                                                                                           | 4ファイル / 255行       | **削除確定**               | plugin-sdk 再輸出の整理                                            |
+| 10  | `src/qa-e2e/`                                                                                                                                                                                                                 | 9ファイル / 14行        | **削除確定**               | なし（中身は削除済み機能のスタブのみ）                             |
+| 11  | テスト専用ディレクトリ（`src/docs/`, `src/i18n/`, `src/scripts/`）                                                                                                                                                            | 7ファイル / 約1,250行   | **削除確定**               | 軽（runtime import 0件）                                           |
+| 12  | scripts の死参照（`test:live:media` / `test:docker:live-acp-bind*` / `test:voicecall:closedloop`）                                                                                                                            | 3件＋`package.json`     | **削除確定**               | 参照先ファイルが不在                                               |
+| 13  | scripts の死にスクリプト群（`firecrawl-compare.ts`, `readability-basic-compare.ts`, `zai-fallback-repro.ts`, `phase3-delete.ps1`, `reindex.ps1`, `debug-claude-usage.ts`, `cron_usage_report.ts`, `sqlite-vec-smoke.mjs` 等） | 13本 / 約2,500行        | **削除確定（個別確認後）** | 参照0を実測確認                                                    |
+| 14  | `skills/` 内の削除済み機能（clawhub / voice-call / sherpa-onnx-tts 等）                                                                                                                                                       | 数本                    | **削除確定**               | 軽                                                                 |
+| 15  | zai / openrouter 等の互換レイヤー                                                                                                                                                                                             | 数ファイル＋テスト群    | **削除確定**               | 本番未使用を再確認                                                 |
+| 16  | `.session-restore/`（ローカル未追跡 53MB）                                                                                                                                                                                    | ローカルのみ            | **削除確定**               | 即時削除可                                                         |
+
+**触らない（使用中とユーザーが明言）**: `extensions/line`、`extensions/raw-chat-search`、`extensions/session-integrity-guard`、`extensions/deepgram`。
+
+### 23.3 各候補の詳細
+
+#### 23.3.1 `src/tasks/`（タスク台帳サブシステム / §23.2 候補2）
+
+- **構成**: `task-registry.*`（タスク1件ごとの状態管理・SQLite永続化）、`task-flow-registry.*`（複数タスクの連鎖管理）、`task-executor.*`（実行側）、`task-owner-access.*`（権限）、`task-registry.maintenance/audit/reconcile`（掃除・監査・整合性修復）
+- **機能**: サブエージェント実行・cron ジョブ・CLI 実行を「受付票」として記録し、状態（queued / running / succeeded / failed / timed_out / cancelled / lost）と配送状況を追跡する。`/status` の `Tasks:` 行、`/tasks`・`/flows` コマンド、`session_status` ツールの実体。
+- **ユーザー裁定**: 不要（2026-09-21）
+- **撤去時に対処が必要な依存（4系統）**:
+  1. サブエージェント結果の配送 — `src/agents/subagent-registry-lifecycle.ts` / `subagent-registry-run-manager.ts`
+  2. `/status` の Tasks 表示 — `src/commands/status.scan.ts` / `status.scan.json-core.ts`、`src/auto-reply/reply/commands-status.ts`
+  3. スラッシュコマンド — `src/auto-reply/reply/commands-tasks.ts`、`src/commands/flows.ts`
+  4. セッション状態ツール — `src/agents/session-async-task-status.ts`、`src/agents/tools/session-status-tool.ts`
+- **その他**: イベントポンプの起床系統の1つ（`task`）としても接続されている（Wave 3 の7系統）。
+
+#### 23.3.2 生成系の task-status 3ファイル（§23.2 候補5 の一部）
+
+- **対象**: `src/agents/media-generation-task-status-shared.ts`、`src/agents/music-generation-task-status.ts`、`src/agents/video-generation-task-status.ts`
+- **理由**: 生成系ツール（`image_generate` / `music_generate` / `video_generate`）は §22 で完全削除済み。これらの status ヘルパーは参照元が既に消えている可能性が高い（孤立候補）。
+- **先行作業**: `grep` で参照0件を実測確認してから単独で削除可。
+
+#### 23.3.3 zai / openrouter 等の互換レイヤー（§23.2 候補15）
+
+- **対象**: `src/agents/openai-completions-compat.ts` の zai / openrouter 分岐、`provider-zai-endpoint` の plugin-sdk export、`zai-stream-wrappers.ts`、関連テスト群。加えて minimax / deepseek / together / qwen 系の残骸。
+- **理由**: KASOU 本番は `cli-router` の4モデルのみ使用中。プロバイダー一本化（Wave 1）と builtin catalog 削除を経て、これらは本番経路に存在しない。
+- **先行作業**: 本番未使用を再確認（`dennou.models.json` と config に該当プロバイダーが無いこと）。
+
+#### 23.3.4 WebUI jsdom テスト（§23.2 候補7）
+
+- **対象**: `ui/**/*.test.ts`（jsdom 環境で動く UI テスト）
+- **理由**: WebUI は ChromeDevTools / 実 Chromium で直接確認する運用のため、jsdom 模倣テストは不要（ユーザー裁定 2026-09-21）。
+- **関連**: 過去の WebUI 白画面障害では jsdom 模倣が偽グリーンを生んだ経緯があり、実機検証ゲートが正であることが実証済み（メモリ #1969 / #1976）。
+
+#### 23.3.5 `.session-restore/`（§23.2 候補16）
+
+- **対象**: リポジトリ直下の `.session-restore/`（約53MB、未追跡、`.gitignore` 済み）
+- **理由**: セッション復元作業の一時ファイル。復元は完了し KASOU へ配置済み（1741行 → 復元版配置済み）。ユーザー裁定「いらない」（2026-09-20）。
+- **注意**: Kasou のセッションデータを GitHub に出さないため、`.gitignore` 登録は維持すること。
+
+#### 23.3.6 `src/agents/sandbox/` ＋ サンドボックス関連一式（§23.2 候補1）
+
+- **対象**: `src/agents/sandbox/*`（69ファイル）、`src/agents/sandbox-paths.ts`、`sandbox-tool-policy.ts`、`sandbox-merge.ts`、`src/config/types.sandbox.ts`、`src/cli/sandbox-cli.ts`、`src/commands/sandbox*.ts`（sandbox / sandbox-display / sandbox-explain / sandbox-formatters）、`src/commands/doctor-sandbox.ts`、`src/plugin-sdk/sandbox.ts`、`src/auto-reply/reply/stage-sandbox-media.ts`（＋ runtime）、`src/cron/isolated-agent` の sandbox-config 経路、`test/helpers/sandbox-fixtures.ts`、および関連テスト群
+- **機能**: Docker コンテナでツール実行を隔離する仕組み（image / network / seccomp / capDrop / memory / pidsLimit 等）
+- **ユーザー裁定**: 不要（2026-09-21）
+- **先行作業**: `/sandbox` コマンド、doctor の sandbox 検査、`stage-sandbox-media`（受信メディアのサンドボックス配置）の経路解消
+
+#### 23.3.7 `src/memory-host-sdk/`（§23.2 候補3）
+
+- **機能**: メモリ検索エンジン（engine / host）。embedding 用に `node-llama-cpp` 依存も同 SDK 内に残る
+- **理由**: `memory-core` は §19 で完全削除済み、かつ有効プラグインに memory 種別が無い。`src/plugins/memory-runtime.ts` は「memory plugin unavailable」を返す経路になっており、呼び出し側（`agents/memory-search.ts`、`commands/status.scan.deps.runtime.ts`、`gateway/server-startup-memory.ts`）はそこへ委譲するだけ
+- **先行作業**: 「呼ばれない」ことの実測（起動ログ・呼び出し回数）と `packages/` 側の扱い決定
+
+#### 23.3.8 `src/agents/auth-profiles/`（§23.2 候補4）
+
+- **機能**: `auth-profiles.json` による「プロバイダごとの複数クレデンシャル」管理。優先順（order.ts）、使用量・クォータ追跡（usage.ts）、セッション単位の上書き（session-override.ts）、doctor / repair を含む
+- **理由**: KASOU は `cli-router` 1プロバイダ＋`.env` の静的 API キーのみで、`auth-profiles.json` は既に削除済み（2026-09-04 頃）
+- **先行作業**: api-key 解決チェーン（config 直書き → env → `models.json` apiKey → auth-profiles → fallback）が auth-profiles 無しで成立すること、および usage / クォータ表示の実体を実測確認
+
+#### 23.3.9 heartbeat 残骸（§23.2 候補8・cron 厳守）
+
+- **対象**: `src/cron/heartbeat-policy.ts`、`src/auto-reply/heartbeat-token.ts`、`src/cron/isolated-agent/helpers.ts` の heartbeat ack 上限、`src/cron/service/timer.ts` の `heartbeat: { target: "last" }`、`src/cron/types.ts` の `wakeMode: "next-heartbeat"`、`src/cron/trigger-policy.ts` の heartbeat トリガープロンプト注入
+- **状態**: Wave 3 で heartbeat 機能（定期実行・HEARTBEAT.md）は撤去済みだが、上記が cron 経路に残存している
+- **制約**: **cron を絶対に壊さない**。実施は単独（並列禁止）とし、前後で cron の動作テストを実測する
+
+### 23.4 実施順序の推奨
+
+依存の軽い順に進める。各波ごとに Executor 実装 → code-reviewer APPROVE → コミット。
+
+- **波1（即時・依存なし）**: 候補10（qa-e2e）／候補9（realtime系）／候補11（テスト専用ディレクトリ）／候補12・13（scripts 死参照・死にスクリプト）／候補14（skills 残骸）／候補16（`.session-restore/`）
+- **波2（同一機能の残骸を一括）**: 候補5（生成系残骸）＋候補6（メディア生成プロバイダー登録）
+- **波3（テスト削除）**: 候補7（WebUI jsdom テスト）
+- **波4（互換レイヤー）**: 候補15（zai / openrouter 等）
+- **波5（cron 厳守）**: 候補8（heartbeat 残骸）— **単独で実施**。cron の動作テストを前後で実測
+- **波6（大きいサブシステム）**: 候補4（auth-profiles）→ 候補3（memory-host-sdk）→ 候補2（tasks）→ 候補1（sandbox）
+
+**並列化の注意**: 波1・波2は対象ディレクトリが重複しないため 2〜3 体での並列が可能。波5 以降（auth-profiles / memory-host-sdk / tasks / sandbox）は `src/agents`・`src/config`・`src/gateway` を共有するため**1 体ずつ直列**で実施する（過去に同一ワークツリーでの並列実行がファイル消失・変更競合を起こした実績がある）。
+
+### 23.5 検証ゲート（全候補共通）
+
+- `tsgo --noEmit` が 0 errors
+- 削除対象への参照が 0 件（`grep` 実測）
+- Bun / Vitest の対象テストが pass、または対象テスト自体が削除済み
+- 本番経路（KASOU: cli-router 4モデル）に影響しないことを実測で確認
+- code-reviewer の APPROVE
+
+### 23.6 ユーザー裁定（2026-09-21 全数棚卸しレビュー）
+
+棚卸し結果を提示したうえでのユーザー決定:
+
+**削除する**
+
+- 残骸（remnants）は**全部削除**
+- メディア生成プロバイダー登録も**全部削除**
+- `src/agents/auth-profiles/`、`src/memory-host-sdk/`、`src/tasks/`、`src/agents/sandbox/` を削除
+- heartbeat 残骸は**慎重に**削除。**cron は絶対に壊さない**
+
+**触らない（使用中）**
+
+- `extensions/line`
+- `extensions/raw-chat-search`
+- `extensions/session-integrity-guard`
+- `extensions/deepgram`
+
+**棚卸しで判明した矛盾（本キャンペーンで解消する）**
+
+1. heartbeat 残骸が cron 経路に現存（`cron/heartbeat-policy.ts`、`wakeMode: "next-heartbeat"`、cron タイマーの `heartbeat: { target: "last" }`）。Wave 3 で撤去済みのはずが残存している
+2. `extensions/google`（`index.ts:167-170`）と `extensions/openai`（`index.ts:31,35`）に、削除済みのはずのメディア生成プロバイダー登録が現存（§22 との不整合）
+3. `deepgram` の記述が旧文書（「KASOU の `tools.media.audio` で実運用中」）と現状で矛盾 → **ユーザー裁定により使用中、触らない**
+4. `raw-chat-search` は Go 版 sidecar 削除済みだが TS 版拡張は残存 → **ユーザー裁定により使用中、触らない**
+
+**実装開始**: ユーザー指示「DEBLOAT は後で、今はドキュメントへ」により、本節の記録をもって計画確定。実施は次回キャンペーンで波1から順に進める。

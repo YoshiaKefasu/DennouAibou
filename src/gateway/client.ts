@@ -71,6 +71,24 @@ type StoredDeviceAuth = {
   scopes?: string[];
 };
 
+export type GatewayClientDeps = {
+  webSocket?: typeof WebSocket;
+  clearDeviceAuthToken?: typeof clearDeviceAuthToken;
+  loadDeviceAuthToken?: typeof loadDeviceAuthToken;
+  storeDeviceAuthToken?: typeof storeDeviceAuthToken;
+  logDebug?: typeof logDebug;
+  logError?: typeof logError;
+};
+
+const defaultGatewayClientDeps: Required<GatewayClientDeps> = {
+  webSocket: WebSocket,
+  clearDeviceAuthToken,
+  loadDeviceAuthToken,
+  storeDeviceAuthToken,
+  logDebug,
+  logError,
+};
+
 class GatewayClientRequestError extends Error {
   readonly gatewayCode: string;
   readonly details?: unknown;
@@ -178,8 +196,10 @@ export class GatewayClient {
   private tickTimer: NodeJS.Timeout | null = null;
   private readonly requestTimeoutMs: number;
   private pendingStop: PendingStop | null = null;
+  private readonly deps: Required<GatewayClientDeps>;
 
-  constructor(opts: GatewayClientOptions) {
+  constructor(opts: GatewayClientOptions, deps?: GatewayClientDeps) {
+    this.deps = { ...defaultGatewayClientDeps, ...deps };
     this.opts = {
       ...opts,
       deviceIdentity:
@@ -255,7 +275,7 @@ export class GatewayClient {
         return undefined;
       }) as unknown as NonNullable<ClientOptions["checkServerIdentity"]>;
     }
-    const ws = new WebSocket(url, wsOptions);
+    const ws = new this.deps.webSocket(url, wsOptions);
     this.ws = ws;
 
     ws.on("open", () => {
@@ -291,10 +311,10 @@ export class GatewayClient {
         const deviceId = this.opts.deviceIdentity.deviceId;
         const role = this.opts.role ?? "operator";
         try {
-          clearDeviceAuthToken({ deviceId, role });
-          logDebug(`cleared stale device-auth token for device ${deviceId}`);
+          this.deps.clearDeviceAuthToken({ deviceId, role });
+          this.deps.logDebug(`cleared stale device-auth token for device ${deviceId}`);
         } catch (err) {
-          logDebug(
+          this.deps.logDebug(
             `failed clearing stale device-auth token for device ${deviceId}: ${String(err)}`,
           );
         }
@@ -308,7 +328,7 @@ export class GatewayClient {
       this.opts.onClose?.(code, reasonText);
     });
     ws.on("error", (err) => {
-      logDebug(`gateway client error: ${String(err)}`);
+      this.deps.logDebug(`gateway client error: ${String(err)}`);
       if (!this.connectSent) {
         this.opts.onConnectError?.(err instanceof Error ? err : new Error(String(err)));
       }
@@ -501,7 +521,7 @@ export class GatewayClient {
         this.pendingConnectErrorDetailCode = null;
         const authInfo = helloOk?.auth;
         if (authInfo?.deviceToken && this.opts.deviceIdentity) {
-          storeDeviceAuthToken({
+          this.deps.storeDeviceAuthToken({
             deviceId: this.opts.deviceIdentity.deviceId,
             role: authInfo.role ?? role,
             token: authInfo.deviceToken,
@@ -534,9 +554,9 @@ export class GatewayClient {
         this.opts.onConnectError?.(err instanceof Error ? err : new Error(String(err)));
         const msg = `gateway connect failed: ${String(err)}`;
         if (this.opts.mode === GATEWAY_CLIENT_MODES.PROBE) {
-          logDebug(msg);
+          this.deps.logDebug(msg);
         } else {
-          logError(msg);
+          this.deps.logError(msg);
         }
         this.ws?.close(1008, "connect failed");
       });
@@ -562,7 +582,7 @@ export class GatewayClient {
     if (!this.opts.deviceIdentity) {
       return null;
     }
-    const storedAuth = loadDeviceAuthToken({
+    const storedAuth = this.deps.loadDeviceAuthToken({
       deviceId: this.opts.deviceIdentity.deviceId,
       role,
     });
@@ -759,7 +779,7 @@ export class GatewayClient {
         }
       }
     } catch (err) {
-      logDebug(`gateway client parse error: ${String(err)}`);
+      this.deps.logDebug(`gateway client parse error: ${String(err)}`);
     }
   }
 
@@ -781,7 +801,7 @@ export class GatewayClient {
     const armedAt = Date.now();
     this.clearConnectChallengeTimeout();
     this.connectTimer = setTimeout(() => {
-      if (this.connectSent || this.ws?.readyState !== WebSocket.OPEN) {
+      if (this.connectSent || this.ws?.readyState !== this.deps.webSocket.OPEN) {
         return;
       }
       const elapsedMs = Date.now() - armedAt;
@@ -873,7 +893,7 @@ export class GatewayClient {
     params?: unknown,
     opts?: { expectFinal?: boolean; timeoutMs?: number | null },
   ): Promise<T> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== this.deps.webSocket.OPEN) {
       throw new Error("gateway not connected");
     }
     const id = randomUUID();

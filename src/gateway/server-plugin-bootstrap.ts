@@ -1,6 +1,6 @@
 import { primeConfiguredBindingRegistry } from "../channels/plugins/binding-registry.js";
 import type { loadConfig } from "../config/config.js";
-import { resolvePluginActivationSnapshot } from "../plugins/activation-context.js";
+import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import { pinActivePluginChannelRegistry } from "../plugins/runtime.js";
 import { setGatewaySubagentRuntime } from "../plugins/runtime/index.js";
@@ -18,6 +18,24 @@ type GatewayPluginBootstrapLog = {
   debug: (msg: string) => void;
 };
 
+export type GatewayPluginBootstrapDeps = {
+  applyPluginAutoEnable?: typeof applyPluginAutoEnable;
+  primeConfiguredBindingRegistry?: typeof primeConfiguredBindingRegistry;
+  setPluginSubagentOverridePolicies?: typeof setPluginSubagentOverridePolicies;
+  setGatewaySubagentRuntime?: typeof setGatewaySubagentRuntime;
+  createGatewaySubagentRuntime?: typeof createGatewaySubagentRuntime;
+  loadGatewayPlugins?: typeof loadGatewayPlugins;
+};
+
+const defaultGatewayPluginBootstrapDeps: Required<GatewayPluginBootstrapDeps> = {
+  applyPluginAutoEnable,
+  primeConfiguredBindingRegistry,
+  setPluginSubagentOverridePolicies,
+  setGatewaySubagentRuntime,
+  createGatewaySubagentRuntime,
+  loadGatewayPlugins,
+};
+
 type GatewayPluginBootstrapParams = {
   cfg: ReturnType<typeof loadConfig>;
   activationSourceConfig?: ReturnType<typeof loadConfig>;
@@ -29,11 +47,15 @@ type GatewayPluginBootstrapParams = {
   preferSetupRuntimeForChannelPlugins?: boolean;
   logDiagnostics?: boolean;
   beforePrimeRegistry?: (pluginRegistry: PluginRegistry) => void;
+  deps?: GatewayPluginBootstrapDeps;
 };
 
-function installGatewayPluginRuntimeEnvironment(cfg: ReturnType<typeof loadConfig>) {
-  setPluginSubagentOverridePolicies(cfg);
-  setGatewaySubagentRuntime(createGatewaySubagentRuntime());
+function installGatewayPluginRuntimeEnvironment(
+  cfg: ReturnType<typeof loadConfig>,
+  deps: Required<GatewayPluginBootstrapDeps>,
+) {
+  deps.setPluginSubagentOverridePolicies(cfg);
+  deps.setGatewaySubagentRuntime(deps.createGatewaySubagentRuntime());
 }
 
 function logGatewayPluginDiagnostics(params: {
@@ -59,17 +81,21 @@ function logGatewayPluginDiagnostics(params: {
 }
 
 export function prepareGatewayPluginLoad(params: GatewayPluginBootstrapParams) {
-  const activation = resolvePluginActivationSnapshot({
-    rawConfig: params.activationSourceConfig ?? params.cfg,
+  const deps: Required<GatewayPluginBootstrapDeps> = {
+    ...defaultGatewayPluginBootstrapDeps,
+    ...params.deps,
+  };
+  const rawConfig = params.activationSourceConfig ?? params.cfg;
+  const autoEnabled = deps.applyPluginAutoEnable({
+    config: rawConfig,
     env: process.env,
-    applyAutoEnable: true,
   });
-  const resolvedConfig = activation.config ?? params.cfg;
-  installGatewayPluginRuntimeEnvironment(resolvedConfig);
-  const loaded = loadGatewayPlugins({
+  const resolvedConfig = autoEnabled.config ?? params.cfg;
+  installGatewayPluginRuntimeEnvironment(resolvedConfig, deps);
+  const loaded = deps.loadGatewayPlugins({
     cfg: resolvedConfig,
     activationSourceConfig: params.activationSourceConfig ?? params.cfg,
-    autoEnabledReasons: activation.autoEnabledReasons,
+    autoEnabledReasons: autoEnabled.autoEnabledReasons,
     workspaceDir: params.workspaceDir,
     log: params.log,
     coreGatewayHandlers: params.coreGatewayHandlers,
@@ -78,7 +104,7 @@ export function prepareGatewayPluginLoad(params: GatewayPluginBootstrapParams) {
     preferSetupRuntimeForChannelPlugins: params.preferSetupRuntimeForChannelPlugins,
   });
   params.beforePrimeRegistry?.(loaded.pluginRegistry);
-  primeConfiguredBindingRegistry({ cfg: resolvedConfig });
+  deps.primeConfiguredBindingRegistry({ cfg: resolvedConfig });
   if ((params.logDiagnostics ?? true) && loaded.pluginRegistry.diagnostics.length > 0) {
     logGatewayPluginDiagnostics({
       diagnostics: loaded.pluginRegistry.diagnostics,
