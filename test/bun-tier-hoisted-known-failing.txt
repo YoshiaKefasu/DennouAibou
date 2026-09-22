@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 85 files.
+# Current known-failure count: 40 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -21,73 +21,44 @@
 #   conditional: it.runIf is not exposed by bun:test
 #   hook-hang: beforeEach/afterEach hook hangs to a fixed 120s timeout; CLI --timeout is ignored for hooks
 #
-# reset/dynamic-mock (23 files)
+# reset/dynamic-mock (9 files)
 src/agents/auth-profiles.readonly-sync.test.ts
 src/agents/auth-profiles.store-cache.test.ts
 src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
-src/agents/model-fallback.run-embedded.e2e.test.ts
 src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
-src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
 src/agents/sandbox/browser.create.test.ts
 src/agents/sandbox/docker.config-hash-recreate.test.ts
 src/agents/sandbox/manage.test.ts
 src/agents/sandbox/registry.test.ts
-src/agents/subagent-registry.persistence.resume.test.ts
-src/agents/subagent-registry.test.ts
-src/agents/subagent-spawn.test.ts
-src/agents/subagent-spawn.workspace.test.ts
-src/auto-reply/reply.directive.directive-behavior.applies-inline-reasoning-mixed-messages-acks-immediately.test.ts
 src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox-workspace.test.ts
-src/auto-reply/reply/commands.test.ts
-src/auto-reply/reply/get-reply.before-agent-reply.test.ts
-src/auto-reply/reply/get-reply.config-override.test.ts
-src/auto-reply/reply/get-reply.message-hooks.test.ts
-src/auto-reply/reply/get-reply.native-audio.test.ts
-src/auto-reply/reply/get-reply.reset-hooks-fallback.test.ts
-src/auto-reply/status.test.ts
 
-# hook-hang (1 file)
+# hook-hang (0 files)
 # Loads fine; beforeEach/afterEach hook hangs to the 120s timeout; `--timeout` CLI is ignored for hooks.
-extensions/discord/src/send.webhook-activity.test.ts
 
 # wait/import (3 files)
 extensions/discord/src/monitor/message-handler.queue.test.ts
 extensions/line/src/setup-surface.test.ts
 extensions/telegram/src/bot-native-commands.session-meta.test.ts
 
-# reset/dynamic-mock (10 additional files; measured after the first 250)
-src/commands/gateway-status.test.ts
-src/commands/onboard-non-interactive.gateway.test.ts
-src/commands/onboard-non-interactive.provider-auth.test.ts
-src/gateway/client.test.ts
-src/gateway/server-methods/send.test.ts
+# reset/dynamic-mock (5 additional files; measured after the first 250)
 src/media-understanding/apply.echo-transcript.test.ts
 src/media-understanding/apply.test.ts
 src/media-understanding/runner.vision-skip.test.ts
 src/plugins/contracts/runtime-import-side-effects.contract.test.ts
 src/plugins/conversation-binding.test.ts
 
-# conditional (1 additional file; measured after the first 250)
-src/config/io.write-config.test.ts
+# conditional (0 additional files; measured after the first 250)
 
-# async-timer (2 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
-src/gateway/server-channels.test.ts
-src/gateway/server-methods/nodes.invoke-wake.test.ts
+# async-timer (0 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 
-# timeout (9 files; no conclusive result within the 40s process guard)
-src/commands/models.set.e2e.test.ts
+# timeout (5 files; no conclusive result within the 40s process guard)
 src/commands/onboard-channels.e2e.test.ts
-src/cron/isolated-agent/subagent-followup.test.ts
-src/cron/service.runs-one-shot-main-job-disables-it.test.ts
-src/gateway/server-restart-sentinel.test.ts
 src/infra/bonjour.test.ts
 src/infra/outbound/message-action-runner.media.test.ts
 test/scripts/test-report-utils.test.ts
 ui/src/ui/app-gateway.node.test.ts
 
-# runtime/export (3 files; Bun module surface differs from the Vitest runtime)
-src/gateway/call.test.ts
-src/gateway/server-plugins.test.ts
+# runtime/export (1 file; Bun module surface differs from the Vitest runtime)
 src/plugins/wired-hooks-after-tool-call.e2e.test.ts
 
 # runtime/lifecycle (4 files; measured failures not covered by the API categories above)
@@ -96,30 +67,14 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (29 files; initial after-250 batch, with reason in beyond250-results)
-src/commands/channels.add.test.ts
-src/commands/channels.adds-non-default-telegram-account.test.ts
-src/commands/channels.remove.test.ts
+# measured-failure (13 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/configure.wizard.test.ts
-src/commands/doctor-gateway-daemon-flow.test.ts
-src/commands/doctor-gateway-services.test.ts
-src/commands/doctor/shared/allowlist-policy-repair.test.ts
-src/commands/message.test.ts
-src/commands/onboard-non-interactive.workspace-provider-choice-guard.test.ts
 src/commands/status.test.ts
-src/config/validation.channel-metadata.test.ts
-src/gateway/server-cron.test.ts
-src/gateway/server-methods/agent.test.ts
-src/gateway/server-methods/agents-mutate.test.ts
-src/gateway/server-methods/chat.abort-persistence.test.ts
-src/gateway/server-methods/chat.directive-tags.test.ts
 src/gateway/server.cron.test.ts
 src/gateway/server.reload.test.ts
 src/gateway/server.sessions.gateway-server-sessions-a.test.ts
-src/gateway/tools-invoke-http.test.ts
 src/infra/exec-approvals-store.test.ts
 src/infra/net/fetch-guard.ssrf.test.ts
-src/infra/outbound/deliver.test.ts
 src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
 src/media-understanding/image.test.ts
