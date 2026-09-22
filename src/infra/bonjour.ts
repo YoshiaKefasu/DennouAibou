@@ -1,3 +1,4 @@
+import type { Protocol } from "@homebridge/ciao";
 import { logDebug, logWarn } from "../logger.js";
 import { getLogger } from "../logging.js";
 import { classifyCiaoUnhandledRejection } from "./bonjour-ciao.js";
@@ -23,6 +24,14 @@ export type GatewayBonjourAdvertiseOpts = {
    * Reduces information disclosure for better operational security.
    */
   minimal?: boolean;
+};
+
+export type GatewayBonjourAdvertiseDeps = {
+  getResponder?: () => Pick<BonjourResponder, "createService" | "shutdown">;
+  Protocol?: { TCP: "tcp" };
+  registerUnhandledRejectionHandler?: typeof registerUnhandledRejectionHandler;
+  logWarn?: typeof logWarn;
+  logDebug?: typeof logDebug;
 };
 
 function isDisabledByEnv() {
@@ -98,18 +107,23 @@ function isAnnouncedState(state: BonjourServiceState | "unknown") {
   return String(state) === "announced";
 }
 
-function handleCiaoUnhandledRejection(reason: unknown): boolean {
+function handleCiaoUnhandledRejection(
+  reason: unknown,
+  deps: GatewayBonjourAdvertiseDeps = {},
+): boolean {
+  const logWarnImpl = deps.logWarn ?? logWarn;
+  const logDebugImpl = deps.logDebug ?? logDebug;
   const classification = classifyCiaoUnhandledRejection(reason);
   if (!classification) {
     return false;
   }
 
   if (classification.kind === "interface-assertion") {
-    logWarn(`bonjour: suppressing ciao interface assertion: ${classification.formatted}`);
+    logWarnImpl(`bonjour: suppressing ciao interface assertion: ${classification.formatted}`);
     return true;
   }
 
-  logDebug(`bonjour: ignoring unhandled ciao rejection: ${classification.formatted}`);
+  logDebugImpl(`bonjour: ignoring unhandled ciao rejection: ${classification.formatted}`);
   return true;
 }
 
@@ -137,12 +151,22 @@ function installCiaoConsoleNoiseFilter(): () => void {
 
 export async function startGatewayBonjourAdvertiser(
   opts: GatewayBonjourAdvertiseOpts,
+  deps: GatewayBonjourAdvertiseDeps = {},
 ): Promise<GatewayBonjourAdvertiser> {
   if (isDisabledByEnv()) {
     return { stop: async () => {} };
   }
 
-  const { getResponder, Protocol } = await import("@homebridge/ciao");
+  const { getResponder: getResponderReal, Protocol: ProtocolReal } =
+    await import("@homebridge/ciao");
+  const getResponder = (deps.getResponder ?? getResponderReal) as typeof getResponderReal;
+  const Protocol = deps.Protocol
+    ? { TCP: deps.Protocol.TCP as Protocol }
+    : { TCP: ProtocolReal.TCP };
+  const registerUnhandledRejectionHandlerImpl =
+    deps.registerUnhandledRejectionHandler ?? registerUnhandledRejectionHandler;
+  const logWarnImpl = deps.logWarn ?? logWarn;
+  const logDebugImpl = deps.logDebug ?? logDebug;
   const restoreConsoleLog = installCiaoConsoleNoiseFilter();
   try {
     // mDNS service instance names are single DNS labels; dots in hostnames (like
@@ -214,7 +238,9 @@ export async function startGatewayBonjourAdvertiser(
 
       const cleanupUnhandledRejection =
         services.length > 0
-          ? registerUnhandledRejectionHandler(handleCiaoUnhandledRejection)
+          ? registerUnhandledRejectionHandlerImpl((reason: unknown) =>
+              handleCiaoUnhandledRejection(reason, deps),
+            )
           : undefined;
 
       return { responder, services, cleanupUnhandledRejection };
@@ -259,16 +285,18 @@ export async function startGatewayBonjourAdvertiser(
         try {
           svc.on("name-change", (name: unknown) => {
             const next = typeof name === "string" ? name : String(name);
-            logWarn(`bonjour: ${label} name conflict resolved; newName=${JSON.stringify(next)}`);
+            logWarnImpl(
+              `bonjour: ${label} name conflict resolved; newName=${JSON.stringify(next)}`,
+            );
           });
           svc.on("hostname-change", (nextHostname: unknown) => {
             const next = typeof nextHostname === "string" ? nextHostname : String(nextHostname);
-            logWarn(
+            logWarnImpl(
               `bonjour: ${label} hostname conflict resolved; newHostname=${JSON.stringify(next)}`,
             );
           });
         } catch (err) {
-          logDebug(`bonjour: failed to attach listeners for ${label}: ${String(err)}`);
+          logDebugImpl(`bonjour: failed to attach listeners for ${label}: ${String(err)}`);
         }
       }
     }
@@ -283,19 +311,19 @@ export async function startGatewayBonjourAdvertiser(
               getLogger().info(`bonjour: advertised ${serviceSummary(label, svc)}`);
             })
             .catch((err) => {
-              logWarn(
+              logWarnImpl(
                 `bonjour: advertise failed (${serviceSummary(label, svc)}): ${formatBonjourError(err)}`,
               );
             });
         } catch (err) {
-          logWarn(
+          logWarnImpl(
             `bonjour: advertise threw (${serviceSummary(label, svc)}): ${formatBonjourError(err)}`,
           );
         }
       }
     }
 
-    logDebug(
+    logDebugImpl(
       `bonjour: starting (hostname=${hostname}, instance=${JSON.stringify(
         safeServiceName(instanceName),
       )}, gatewayPort=${opts.gatewayPort}${opts.minimal ? ", minimal=true" : `, sshPort=${opts.sshPort ?? 22}`})`,
@@ -332,7 +360,7 @@ export async function startGatewayBonjourAdvertiser(
         return recreatePromise;
       }
       recreatePromise = (async () => {
-        logWarn(`bonjour: restarting advertiser (${reason})`);
+        logWarnImpl(`bonjour: restarting advertiser (${reason})`);
         const previous = cycle;
         await stopCycle(previous);
         cycle = createCycle();
@@ -389,7 +417,7 @@ export async function startGatewayBonjourAdvertiser(
         }
         lastRepairAttempt.set(key, now);
 
-        logWarn(
+        logWarnImpl(
           `bonjour: watchdog detected non-announced service; attempting re-advertise (${serviceSummary(
             label,
             svc,
@@ -397,12 +425,12 @@ export async function startGatewayBonjourAdvertiser(
         );
         try {
           void svc.advertise().catch((err) => {
-            logWarn(
+            logWarnImpl(
               `bonjour: watchdog advertise failed (${serviceSummary(label, svc)}): ${formatBonjourError(err)}`,
             );
           });
         } catch (err) {
-          logWarn(
+          logWarnImpl(
             `bonjour: watchdog advertise threw (${serviceSummary(label, svc)}): ${formatBonjourError(err)}`,
           );
         }

@@ -3,189 +3,150 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearRuntimeAuthProfileStoreSnapshots,
+  type AuthProfileStore,
+} from "../agents/auth-profiles.js";
 import { NON_ENV_SECRETREF_MARKER } from "../agents/model-auth-markers.js";
+import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelDefinitionConfig } from "../config/types.models.js";
+import { resolveProviderAuths, type ProviderUsageAuthDeps } from "./provider-usage.auth.js";
 
-vi.mock("../agents/auth-profiles.js", () => {
-  const normalizeProvider = (provider?: string | null): string =>
-    String(provider ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/^z-ai$/, "zai");
-  const dedupeProfileIds = (profileIds: string[]): string[] => [...new Set(profileIds)];
-  const listProfilesForProvider = (
-    store: { profiles?: Record<string, { provider?: string } | undefined> },
-    provider: string,
-  ): string[] =>
-    Object.entries(store.profiles ?? {})
-      .filter(([, profile]) => normalizeProvider(profile?.provider) === normalizeProvider(provider))
-      .map(([profileId]) => profileId);
-  const readStore = (agentDir?: string) => {
-    if (!agentDir) {
-      return { version: 1, profiles: {} };
-    }
-    const authPath = path.join(agentDir, "auth-profiles.json");
-    try {
-      const parsed = JSON.parse(nodeFs.readFileSync(authPath, "utf8")) as {
-        version?: number;
-        profiles?: Record<string, unknown>;
-        order?: Record<string, string[]>;
-        lastGood?: Record<string, string>;
-        usageStats?: Record<string, unknown>;
-      };
-      return {
-        version: parsed.version ?? 1,
-        profiles: parsed.profiles ?? {},
-        ...(parsed.order ? { order: parsed.order } : {}),
-        ...(parsed.lastGood ? { lastGood: parsed.lastGood } : {}),
-        ...(parsed.usageStats ? { usageStats: parsed.usageStats } : {}),
-      };
-    } catch {
-      return { version: 1, profiles: {} };
-    }
-  };
-
-  const resolveAuthProfileOrder = (params: {
-    cfg?: { auth?: { profiles?: Record<string, { provider?: string } | undefined> } };
-    store: {
-      profiles: Record<string, { provider?: string } | undefined>;
-      order?: Record<string, string[]>;
+const normalizeProvider = (provider?: string | null): string =>
+  String(provider ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^z-ai$/, "zai");
+const dedupeProfileIds = (profileIds: string[]): string[] => [...new Set(profileIds)];
+const listProfilesForProvider = (store: AuthProfileStore, provider: string): string[] =>
+  Object.entries(store.profiles)
+    .filter(([, profile]) => normalizeProvider(profile?.provider) === normalizeProvider(provider))
+    .map(([profileId]) => profileId);
+const readStore = (agentDir?: string): AuthProfileStore => {
+  if (!agentDir) {
+    return { version: 1, profiles: {} };
+  }
+  const authPath = path.join(agentDir, "auth-profiles.json");
+  try {
+    const parsed = JSON.parse(nodeFs.readFileSync(authPath, "utf8")) as Partial<AuthProfileStore>;
+    return {
+      version: parsed.version ?? 1,
+      profiles: parsed.profiles ?? {},
+      ...(parsed.order ? { order: parsed.order } : {}),
+      ...(parsed.lastGood ? { lastGood: parsed.lastGood } : {}),
+      ...(parsed.usageStats ? { usageStats: parsed.usageStats } : {}),
     };
-    provider: string;
-  }): string[] => {
-    const provider = normalizeProvider(params.provider);
-    const configured = Object.entries(params.cfg?.auth?.profiles ?? {})
-      .filter(([, profile]) => normalizeProvider(profile?.provider) === provider)
-      .map(([profileId]) => profileId);
-    if (configured.length > 0) {
-      return dedupeProfileIds(configured);
-    }
-    const ordered = params.store.order?.[params.provider] ?? params.store.order?.[provider];
-    if (ordered?.length) {
-      return dedupeProfileIds(ordered);
-    }
-    return dedupeProfileIds(listProfilesForProvider(params.store, provider));
-  };
+  } catch {
+    return { version: 1, profiles: {} };
+  }
+};
 
-  const resolveApiKeyForProfile = async (params: {
-    store: {
-      profiles: Record<
-        string,
-        | {
-            type?: string;
-            provider?: string;
-            key?: string;
-            token?: string;
-            accessToken?: string;
-            email?: string;
-            expires?: number;
-          }
-        | undefined
-      >;
-    };
-    profileId: string;
-  }): Promise<{ apiKey: string; provider: string; email?: string } | null> => {
-    const cred = params.store.profiles[params.profileId];
-    if (!cred) {
-      return null;
-    }
-    const profileProvider = normalizeProvider(params.profileId.split(":")[0] ?? "");
-    const credentialProvider = normalizeProvider(cred.provider);
-    if (profileProvider && credentialProvider && profileProvider !== credentialProvider) {
-      return null;
-    }
-    if (cred.type === "api_key") {
-      return cred.key ? { apiKey: cred.key, provider: cred.provider ?? profileProvider } : null;
-    }
-    if (cred.type === "token") {
-      if (typeof cred.expires === "number" && cred.expires <= Date.now()) {
-        return null;
-      }
-      return cred.token
-        ? { apiKey: cred.token, provider: cred.provider ?? profileProvider, email: cred.email }
-        : null;
-    }
-    if (cred.type === "oauth") {
-      if (typeof cred.expires === "number" && cred.expires <= Date.now()) {
-        return null;
-      }
-      const token = cred.accessToken ?? cred.token;
-      return token
-        ? { apiKey: token, provider: cred.provider ?? profileProvider, email: cred.email }
-        : null;
-    }
+const resolveAuthProfileOrder = (params: {
+  cfg?: { auth?: { profiles?: Record<string, { provider?: string } | undefined> } };
+  store: AuthProfileStore;
+  provider: string;
+}): string[] => {
+  const provider = normalizeProvider(params.provider);
+  const configured = Object.entries(params.cfg?.auth?.profiles ?? {})
+    .filter(([, profile]) => normalizeProvider(profile?.provider) === provider)
+    .map(([profileId]) => profileId);
+  if (configured.length > 0) {
+    return dedupeProfileIds(configured);
+  }
+  const ordered = params.store.order?.[params.provider] ?? params.store.order?.[provider];
+  if (ordered?.length) {
+    return dedupeProfileIds(ordered);
+  }
+  return dedupeProfileIds(listProfilesForProvider(params.store, provider));
+};
+
+type LooseCredential = {
+  type?: string;
+  provider?: string;
+  key?: string;
+  token?: string;
+  accessToken?: string;
+  email?: string;
+  expires?: number;
+};
+
+const resolveApiKeyForProfile = async (params: {
+  store: { profiles: Record<string, LooseCredential | undefined> };
+  profileId: string;
+}): Promise<{ apiKey: string; provider: string; email?: string } | null> => {
+  const cred = params.store.profiles[params.profileId];
+  if (!cred) {
     return null;
-  };
+  }
+  const profileProvider = normalizeProvider(params.profileId.split(":")[0] ?? "");
+  const credentialProvider = normalizeProvider(cred.provider);
+  if (profileProvider && credentialProvider && profileProvider !== credentialProvider) {
+    return null;
+  }
+  if (cred.type === "api_key") {
+    return cred.key ? { apiKey: cred.key, provider: cred.provider ?? profileProvider } : null;
+  }
+  if (cred.type === "token") {
+    if (typeof cred.expires === "number" && cred.expires <= Date.now()) {
+      return null;
+    }
+    return cred.token
+      ? { apiKey: cred.token, provider: cred.provider ?? profileProvider, email: cred.email }
+      : null;
+  }
+  if (cred.type === "oauth") {
+    if (typeof cred.expires === "number" && cred.expires <= Date.now()) {
+      return null;
+    }
+    const token = cred.accessToken ?? cred.token;
+    return token
+      ? { apiKey: token, provider: cred.provider ?? profileProvider, email: cred.email }
+      : null;
+  }
+  return null;
+};
 
+function parseGoogleUsageToken(apiKey: string): string {
+  // Mirrors the bundled `google-gemini-cli` provider's resolveUsageAuth token
+  // normalization (extensions/google/oauth-token-shared.ts) so the injected
+  // plugin boundary reproduces the real runtime path for the providers this
+  // suite exercises.
+  try {
+    const parsed = JSON.parse(apiKey) as { token?: unknown };
+    if (typeof parsed.token === "string") {
+      return parsed.token;
+    }
+  } catch {
+    // keep raw token
+  }
+  return apiKey;
+}
+
+function createAuthDeps(): ProviderUsageAuthDeps {
   return {
-    clearRuntimeAuthProfileStoreSnapshots: () => {},
     ensureAuthProfileStore: (agentDir?: string) => readStore(agentDir),
     dedupeProfileIds,
     listProfilesForProvider,
     resolveApiKeyForProfile,
     resolveAuthProfileOrder,
+    resolveProviderUsageAuthWithPlugin: async ({ provider, context }) => {
+      // All bundled providers except google-gemini-cli have no usage-auth hook;
+      // only that provider decodes OAuth JSON tokens. Nothing else is injected.
+      if (String(provider) !== "google-gemini-cli") {
+        return undefined;
+      }
+      const auth = await context.resolveOAuthToken();
+      if (!auth) {
+        return undefined;
+      }
+      return {
+        ...auth,
+        token: parseGoogleUsageToken(auth.token),
+      };
+    },
   };
-});
-
-const providerRuntimeMocks = vi.hoisted(() => ({
-  providerRuntimeMock: {
-    augmentModelCatalogWithProviderPlugins: vi.fn((catalog: unknown) => catalog),
-    buildProviderAuthDoctorHintWithPlugin: vi.fn(() => undefined),
-    buildProviderMissingAuthMessageWithPlugin: vi.fn(() => undefined),
-    buildProviderUnknownModelHintWithPlugin: vi.fn(() => undefined),
-    clearProviderRuntimeHookCache: vi.fn(() => {}),
-    createProviderEmbeddingProvider: vi.fn(() => undefined),
-    formatProviderAuthProfileApiKeyWithPlugin: vi.fn(() => undefined),
-    normalizeProviderResolvedModelWithPlugin: vi.fn(() => undefined),
-    prepareProviderDynamicModel: vi.fn(async () => {}),
-    prepareProviderExtraParams: vi.fn(() => undefined),
-    prepareProviderRuntimeAuth: vi.fn(async () => undefined),
-    refreshProviderOAuthCredentialWithPlugin: vi.fn(async () => undefined),
-    resetProviderRuntimeHookCacheForTest: vi.fn(() => {}),
-    resolveProviderBinaryThinking: vi.fn(() => undefined),
-    resolveProviderBuiltInModelSuppression: vi.fn(() => undefined),
-    resolveProviderCacheTtlEligibility: vi.fn(() => undefined),
-    resolveProviderCapabilitiesWithPlugin: vi.fn(() => undefined),
-    resolveProviderDefaultThinkingLevel: vi.fn(() => undefined),
-    resolveProviderModernModelRef: vi.fn(() => undefined),
-    resolveProviderRuntimePlugin: vi.fn(() => undefined),
-    resolveProviderStreamFn: vi.fn(() => undefined),
-    resolveProviderSyntheticAuthWithPlugin: vi.fn(() => undefined),
-    runProviderDynamicModel: vi.fn(() => undefined),
-    wrapProviderStreamFn: vi.fn(() => undefined),
-  },
-}));
-
-vi.mock("../plugins/provider-runtime.js", async () => {
-  const actual = await import("../plugins/provider-runtime.js");
-  return {
-    ...actual,
-    ...providerRuntimeMocks.providerRuntimeMock,
-  };
-});
-
-vi.mock("../plugins/provider-runtime.ts", async () => {
-  const actual = await import("../plugins/provider-runtime.ts");
-  return {
-    ...actual,
-    ...providerRuntimeMocks.providerRuntimeMock,
-  };
-});
-
-vi.mock("../agents/cli-credentials.js", () => ({
-  readCodexCliCredentialsCached: () => null,
-  readMiniMaxCliCredentialsCached: () => null,
-}));
-
-vi.mock("../agents/auth-profiles/external-cli-sync.js", () => ({
-  syncExternalCliCredentials: () => false,
-}));
-
-let resolveProviderAuths: typeof import("./provider-usage.auth.js").resolveProviderAuths;
-let clearRuntimeAuthProfileStoreSnapshots: typeof import("../agents/auth-profiles.js").clearRuntimeAuthProfileStoreSnapshots;
-let clearConfigCache: typeof import("../config/config.js").clearConfigCache;
-let clearRuntimeConfigSnapshot: typeof import("../config/config.js").clearRuntimeConfigSnapshot;
+}
 
 describe("resolveProviderAuths key normalization", () => {
   let suiteRoot = "";
@@ -201,9 +162,6 @@ describe("resolveProviderAuths key normalization", () => {
 
   beforeAll(async () => {
     suiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-provider-auth-suite-"));
-    ({ resolveProviderAuths } = await import("./provider-usage.auth.js"));
-    ({ clearRuntimeAuthProfileStoreSnapshots } = await import("../agents/auth-profiles.js"));
-    ({ clearConfigCache, clearRuntimeConfigSnapshot } = await import("../config/config.js"));
   });
 
   afterAll(async () => {
@@ -333,12 +291,15 @@ describe("resolveProviderAuths key normalization", () => {
       } satisfies OpenClawConfig;
       await writeConfig(home, config);
 
-      return await resolveProviderAuths({
-        providers: ["minimax"],
-        agentDir: agentDirForHome(home),
-        config,
-        env: buildSuiteEnv(home),
-      });
+      return await resolveProviderAuths(
+        {
+          providers: ["minimax"],
+          agentDir: agentDirForHome(home),
+          config,
+          env: buildSuiteEnv(home),
+        },
+        createAuthDeps(),
+      );
     });
   }
 
@@ -354,12 +315,15 @@ describe("resolveProviderAuths key normalization", () => {
         await params.setup(home);
       }
       const config = params.config ?? {};
-      const auths = await resolveProviderAuths({
-        providers: params.providers,
-        agentDir: agentDirForHome(home),
-        config,
-        env: buildSuiteEnv(home, params.env),
-      });
+      const auths = await resolveProviderAuths(
+        {
+          providers: params.providers,
+          agentDir: agentDirForHome(home),
+          config,
+          env: buildSuiteEnv(home, params.env),
+        },
+        createAuthDeps(),
+      );
       expect(auths).toEqual(params.expected);
     });
   }
@@ -439,10 +403,13 @@ describe("resolveProviderAuths key normalization", () => {
   });
 
   it("returns injected auth values unchanged", async () => {
-    const auths = await resolveProviderAuths({
-      providers: ["anthropic"],
-      auth: [{ provider: "anthropic", token: "token-1", accountId: "acc-1" }],
-    });
+    const auths = await resolveProviderAuths(
+      {
+        providers: ["anthropic"],
+        auth: [{ provider: "anthropic", token: "token-1", accountId: "acc-1" }],
+      },
+      createAuthDeps(),
+    );
     expect(auths).toEqual([{ provider: "anthropic", token: "token-1", accountId: "acc-1" }]);
   });
 
@@ -574,24 +541,30 @@ describe("resolveProviderAuths key normalization", () => {
         },
       });
 
-      const auths = await resolveProviderAuths({
-        providers: ["anthropic"],
-        agentDir: agentDirForHome(home),
-        config,
-        env: buildSuiteEnv(home),
-      });
+      const auths = await resolveProviderAuths(
+        {
+          providers: ["anthropic"],
+          agentDir: agentDirForHome(home),
+          config,
+          env: buildSuiteEnv(home),
+        },
+        createAuthDeps(),
+      );
       expect(auths).toEqual([]);
     });
   });
 
   it("skips providers without oauth-compatible profiles", async () => {
     await withSuiteHome(async (home) => {
-      const auths = await resolveProviderAuths({
-        providers: ["anthropic"],
-        agentDir: agentDirForHome(home),
-        config: {},
-        env: buildSuiteEnv(home),
-      });
+      const auths = await resolveProviderAuths(
+        {
+          providers: ["anthropic"],
+          agentDir: agentDirForHome(home),
+          config: {},
+          env: buildSuiteEnv(home),
+        },
+        createAuthDeps(),
+      );
       expect(auths).toEqual([]);
     });
   });
@@ -609,12 +582,15 @@ describe("resolveProviderAuths key normalization", () => {
       });
       await writeProfileOrder(home, "anthropic", ["anthropic:empty", "anthropic:valid"]);
 
-      const auths = await resolveProviderAuths({
-        providers: ["anthropic"],
-        agentDir: agentDirForHome(home),
-        config: {},
-        env: buildSuiteEnv(home),
-      });
+      const auths = await resolveProviderAuths(
+        {
+          providers: ["anthropic"],
+          agentDir: agentDirForHome(home),
+          config: {},
+          env: buildSuiteEnv(home),
+        },
+        createAuthDeps(),
+      );
       expect(auths).toEqual([{ provider: "anthropic", token: "anthropic-token" }]);
     });
   });
@@ -627,12 +603,15 @@ describe("resolveProviderAuths key normalization", () => {
       });
       await writeProfileOrder(home, "anthropic", ["anthropic:api", "anthropic:token"]);
 
-      const auths = await resolveProviderAuths({
-        providers: ["anthropic"],
-        agentDir: agentDirForHome(home),
-        config: {},
-        env: buildSuiteEnv(home),
-      });
+      const auths = await resolveProviderAuths(
+        {
+          providers: ["anthropic"],
+          agentDir: agentDirForHome(home),
+          config: {},
+          env: buildSuiteEnv(home),
+        },
+        createAuthDeps(),
+      );
       expect(auths).toEqual([{ provider: "anthropic", token: "token-1" }]);
     });
   });

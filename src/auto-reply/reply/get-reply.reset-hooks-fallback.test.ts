@@ -3,12 +3,12 @@ import type { MsgContext } from "../templating.js";
 import { getReplyFromConfig } from "./get-reply.js";
 import type { GetReplyDeps } from "./get-reply.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resolveReplyDirectives: vi.fn(),
   handleInlineActions: vi.fn(),
   emitResetCommandHooks: vi.fn(),
   initSessionState: vi.fn(),
-}));
+};
 
 function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {

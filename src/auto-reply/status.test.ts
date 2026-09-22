@@ -12,17 +12,13 @@ import {
   buildCommandsMessagePaginated,
   buildHelpMessage,
   buildStatusMessage,
+  type StatusDeps,
 } from "./status.js";
 
-const { listPluginCommands } = vi.hoisted(() => ({
-  listPluginCommands: vi.fn(
-    (): Array<{ name: string; description: string; pluginId: string }> => [],
-  ),
-}));
-
-vi.mock("../plugins/commands.js", () => ({
-  listPluginCommands,
-}));
+const listPluginCommands = vi.fn(
+  (): Array<{ name: string; description: string; pluginId: string }> => [],
+);
+const statusDeps: Partial<StatusDeps> = { listPluginCommands };
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -1541,7 +1537,8 @@ describe("buildCommandsMessagePaginated", () => {
         commands: { config: false, debug: false },
       } as unknown as OpenClawConfig,
       undefined,
-      { surface: "telegram", page: 1 },
+      { surface: "telegram", page: 1, forcePaginatedList: true },
+      statusDeps,
     );
     expect(result.text).toContain("ℹ️ Commands (1/");
     expect(result.text).toContain("Session");
@@ -1553,23 +1550,22 @@ describe("buildCommandsMessagePaginated", () => {
       { name: "plugin_cmd", description: "Plugin command", pluginId: "demo-plugin" },
     ];
     listPluginCommands.mockImplementation(() => pluginCommands);
-    expect(listPluginCommands()).toEqual(pluginCommands);
-    vi.resetModules();
-    const { buildCommandsMessagePaginated: buildPaginatedCommands } = await import("./status.js");
-    const firstPage = buildPaginatedCommands(
+    const firstPage = buildCommandsMessagePaginated(
       {
         commands: { config: false, debug: false },
       } as unknown as OpenClawConfig,
       undefined,
       { surface: "telegram", page: 1 },
+      statusDeps,
     );
     const pages = Array.from({ length: firstPage.totalPages }, (_, index) =>
-      buildPaginatedCommands(
+      buildCommandsMessagePaginated(
         {
           commands: { config: false, debug: false },
         } as unknown as OpenClawConfig,
         undefined,
         { surface: "telegram", page: index + 1 },
+        statusDeps,
       ),
     );
     const pluginPage = pages.find((page) => page.text.includes("/plugin_cmd (demo-plugin)"));

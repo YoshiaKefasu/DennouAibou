@@ -30,6 +30,12 @@ import { formatTimeAgo } from "../infra/format-time/format-relative.ts";
 import { resolveCommitHash } from "../infra/git-commit.js";
 import type { MediaUnderstandingDecision } from "../media-understanding/types.js";
 import { listPluginCommands } from "../plugins/commands.js";
+
+export type StatusDeps = {
+  listPluginCommands: typeof listPluginCommands;
+};
+
+const defaultStatusDeps: StatusDeps = { listPluginCommands };
 import { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
 import {
   estimateUsageCost,
@@ -1101,8 +1107,9 @@ export function buildCommandsMessage(
   cfg?: OpenClawConfig,
   skillCommands?: SkillCommandSpec[],
   options?: CommandsMessageOptions,
+  deps: Partial<StatusDeps> = {},
 ): string {
-  const result = buildCommandsMessagePaginated(cfg, skillCommands, options);
+  const result = buildCommandsMessagePaginated(cfg, skillCommands, options, deps);
   return result.text;
 }
 
@@ -1110,6 +1117,7 @@ export function buildCommandsMessagePaginated(
   cfg?: OpenClawConfig,
   skillCommands?: SkillCommandSpec[],
   options?: CommandsMessageOptions,
+  deps: Partial<StatusDeps> = {},
 ): CommandsMessageResult {
   const page = Math.max(1, options?.page ?? 1);
   const surface = options?.surface?.toLowerCase();
@@ -1120,7 +1128,7 @@ export function buildCommandsMessagePaginated(
   const commands = cfg
     ? listChatCommandsForConfig(cfg, { skillCommands })
     : listChatCommands({ skillCommands });
-  const pluginCommands = listPluginCommands();
+  const pluginCommands = (deps.listPluginCommands ?? defaultStatusDeps.listPluginCommands)();
   const items = buildCommandItems(commands, pluginCommands);
 
   if (!prefersPaginatedList) {

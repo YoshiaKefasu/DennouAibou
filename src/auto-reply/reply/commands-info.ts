@@ -219,7 +219,8 @@ export const handleContextCommand: CommandHandler = async (params, allowTextComm
     );
     return { shouldContinue: false };
   }
-  return { shouldContinue: false, reply: await buildContextReply(params) };
+  const buildContextReplyFn = params.deps?.buildContextReply ?? buildContextReply;
+  return { shouldContinue: false, reply: await buildContextReplyFn(params) };
 };
 
 export const handleExportSessionCommand: CommandHandler = async (params, allowTextCommands) => {

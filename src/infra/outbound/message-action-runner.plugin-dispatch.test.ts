@@ -6,117 +6,45 @@ import type { ChannelMessageActionContext, ChannelPlugin } from "../../channels/
 import type { OpenClawConfig } from "../../config/config.js";
 import { getActivePluginRegistry, setActivePluginRegistry } from "../../plugins/runtime.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
-import { runMessageAction } from "./message-action-runner.js";
+import { runMessageAction, setMessageActionRunnerDepsForTest } from "./message-action-runner.js";
 import { extractToolPayload } from "./tool-payload.js";
 
 type ChannelActionHandler = NonNullable<NonNullable<ChannelPlugin["actions"]>["handleAction"]>;
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resolveOutboundChannelPlugin: vi.fn(),
   executeSendAction: vi.fn(),
   executePollAction: vi.fn(),
-}));
-
-vi.mock("./channel-resolution.js", () => ({
-  resolveOutboundChannelPlugin: mocks.resolveOutboundChannelPlugin,
-  resetOutboundChannelResolutionStateForTest: vi.fn(),
-}));
-
-vi.mock("./outbound-send-service.js", () => ({
-  executeSendAction: mocks.executeSendAction,
-  executePollAction: mocks.executePollAction,
-}));
-
-vi.mock("./outbound-session.js", () => ({
   ensureOutboundSessionEntry: vi.fn(async () => undefined),
   resolveOutboundSessionRoute: vi.fn(async () => null),
-}));
+  resolveAndApplyOutboundThreadId: vi.fn(),
+  prepareOutboundMirrorRoute: vi.fn(),
+};
 
-vi.mock("./message-action-threading.js", () => ({
-  resolveAndApplyOutboundThreadId: vi.fn(
-    (
-      actionParams: Record<string, unknown>,
-      context: {
-        cfg: OpenClawConfig;
-        to: string;
-        accountId?: string | null;
-        toolContext?: Record<string, unknown>;
-        resolveAutoThreadId?: (params: {
-          cfg: OpenClawConfig;
-          accountId?: string | null;
-          to: string;
-          toolContext?: Record<string, unknown>;
-          replyToId?: string;
-        }) => string | undefined;
-      },
-    ) => {
-      const explicit =
-        typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
-      const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
-      const resolved =
-        explicit ??
-        context.resolveAutoThreadId?.({
-          cfg: context.cfg,
-          accountId: context.accountId,
-          to: context.to,
-          toolContext: context.toolContext,
-          replyToId,
-        });
-      if (resolved && !actionParams.threadId) {
-        actionParams.threadId = resolved;
-      }
-      return resolved ?? undefined;
-    },
-  ),
-  prepareOutboundMirrorRoute: vi.fn(
-    async ({
-      actionParams,
-      cfg,
-      to,
-      accountId,
-      toolContext,
-      agentId,
-      resolveAutoThreadId,
-    }: {
-      actionParams: Record<string, unknown>;
-      cfg: OpenClawConfig;
-      to: string;
-      accountId?: string | null;
-      toolContext?: Record<string, unknown>;
-      agentId?: string;
-      resolveAutoThreadId?: (params: {
-        cfg: OpenClawConfig;
-        accountId?: string | null;
-        to: string;
-        toolContext?: Record<string, unknown>;
-        replyToId?: string;
-      }) => string | undefined;
-    }) => {
-      const explicit =
-        typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
-      const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
-      const resolvedThreadId =
-        explicit ??
-        resolveAutoThreadId?.({
-          cfg,
-          accountId,
-          to,
-          toolContext,
-          replyToId,
-        });
-      if (resolvedThreadId && !actionParams.threadId) {
-        actionParams.threadId = resolvedThreadId;
-      }
-      if (agentId) {
-        actionParams.__agentId = agentId;
-      }
-      return {
-        resolvedThreadId,
-        outboundRoute: null,
-      };
-    },
-  ),
-}));
+function resolveThreadId(
+  actionParams: Record<string, unknown>,
+  context: { resolveAutoThreadId?: (params: { replyToId?: string }) => string | undefined },
+): string | undefined {
+  const explicit = typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
+  const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
+  const resolved = explicit ?? context.resolveAutoThreadId?.({ replyToId });
+  if (resolved && !actionParams.threadId) {
+    actionParams.threadId = resolved;
+  }
+  return resolved ?? undefined;
+}
+
+function prepareMirrorRoute(params: {
+  actionParams: Record<string, unknown>;
+  resolveAutoThreadId?: (params: { replyToId?: string }) => string | undefined;
+  agentId?: string;
+}) {
+  const resolvedThreadId = resolveThreadId(params.actionParams, params);
+  if (params.agentId) {
+    params.actionParams.__agentId = params.agentId;
+  }
+  return { resolvedThreadId, outboundRoute: null };
+}
 
 function createAlwaysConfiguredPluginConfig(account: Record<string, unknown> = { enabled: true }) {
   return {
@@ -195,6 +123,17 @@ async function executePluginAction(params: {
 
 describe("runMessageAction plugin dispatch", () => {
   beforeEach(() => {
+    setMessageActionRunnerDepsForTest({
+      resolveOutboundChannelPlugin: mocks.resolveOutboundChannelPlugin,
+      executeSendAction: mocks.executeSendAction,
+      executePollAction: mocks.executePollAction,
+      ensureOutboundSessionEntry: mocks.ensureOutboundSessionEntry,
+      resolveOutboundSessionRoute: mocks.resolveOutboundSessionRoute,
+      resolveAndApplyOutboundThreadId: mocks.resolveAndApplyOutboundThreadId,
+      prepareOutboundMirrorRoute: mocks.prepareOutboundMirrorRoute,
+    });
+    mocks.resolveAndApplyOutboundThreadId.mockImplementation(resolveThreadId);
+    mocks.prepareOutboundMirrorRoute.mockImplementation(prepareMirrorRoute);
     mocks.resolveOutboundChannelPlugin.mockReset();
     mocks.resolveOutboundChannelPlugin.mockImplementation(
       ({ channel }: { channel: string }) =>
@@ -210,6 +149,10 @@ describe("runMessageAction plugin dispatch", () => {
       async ({ ctx }: { ctx: Parameters<typeof executePluginAction>[0]["ctx"] }) =>
         await executePluginAction({ action: "poll", ctx }),
     );
+  });
+
+  afterEach(() => {
+    setMessageActionRunnerDepsForTest();
   });
 
   describe("alias-based plugin action dispatch", () => {

@@ -4,11 +4,11 @@ import type { MsgContext } from "../templating.js";
 import { getReplyFromConfig } from "./get-reply.js";
 import type { GetReplyDeps } from "./get-reply.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resolveReplyDirectives: vi.fn(),
   initSessionState: vi.fn(),
   loadConfig: vi.fn(() => ({})),
-}));
+};
 
 function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {

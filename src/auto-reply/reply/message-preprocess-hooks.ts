@@ -8,11 +8,30 @@ import {
 } from "../../hooks/message-hook-mappers.js";
 import type { FinalizedMsgContext } from "../templating.js";
 
-export function emitPreAgentMessageHooks(params: {
-  ctx: FinalizedMsgContext;
-  cfg: OpenClawConfig;
-  isFastTestEnv: boolean;
-}): void {
+export type EmitPreAgentMessageHooksDeps = {
+  fireAndForgetHook: typeof fireAndForgetHook;
+  createInternalHookEvent: typeof createInternalHookEvent;
+  triggerInternalHook: typeof triggerInternalHook;
+};
+
+const defaultEmitPreAgentMessageHooksDeps: EmitPreAgentMessageHooksDeps = {
+  fireAndForgetHook,
+  createInternalHookEvent,
+  triggerInternalHook,
+};
+
+export function emitPreAgentMessageHooks(
+  params: {
+    ctx: FinalizedMsgContext;
+    cfg: OpenClawConfig;
+    isFastTestEnv: boolean;
+  },
+  deps: Partial<EmitPreAgentMessageHooksDeps> = {},
+): void {
+  const resolvedDeps = { ...defaultEmitPreAgentMessageHooksDeps, ...deps };
+  const fireAndForgetHookFn = resolvedDeps.fireAndForgetHook;
+  const createInternalHookEventFn = resolvedDeps.createInternalHookEvent;
+  const triggerInternalHookFn = resolvedDeps.triggerInternalHook;
   if (params.isFastTestEnv) {
     return;
   }
@@ -23,9 +42,9 @@ export function emitPreAgentMessageHooks(params: {
 
   const canonical = deriveInboundMessageHookContext(params.ctx);
   if (canonical.transcript) {
-    fireAndForgetHook(
-      triggerInternalHook(
-        createInternalHookEvent(
+    fireAndForgetHookFn(
+      triggerInternalHookFn(
+        createInternalHookEventFn(
           "message",
           "transcribed",
           sessionKey,
@@ -36,9 +55,9 @@ export function emitPreAgentMessageHooks(params: {
     );
   }
 
-  fireAndForgetHook(
-    triggerInternalHook(
-      createInternalHookEvent(
+  fireAndForgetHookFn(
+    triggerInternalHookFn(
+      createInternalHookEventFn(
         "message",
         "preprocessed",
         sessionKey,

@@ -33,13 +33,15 @@ export type ModelsProviderData = {
 export async function buildModelsProviderData(
   cfg: OpenClawConfig,
   agentId?: string,
+  deps: { loadModelCatalog?: typeof loadModelCatalog } = {},
 ): Promise<ModelsProviderData> {
+  const loadModelCatalogFn = deps.loadModelCatalog ?? loadModelCatalog;
   const resolvedDefault = resolveDefaultModelForAgent({
     cfg,
     agentId,
   });
 
-  const catalog = await loadModelCatalog({ config: cfg });
+  const catalog = await loadModelCatalogFn({ config: cfg });
   const allowed = buildAllowedModelSet({
     cfg,
     catalog,
@@ -222,15 +224,18 @@ export function formatModelsAvailableHeader(params: {
   return `Models (${providerLabel}) — ${params.total} available`;
 }
 
-export async function resolveModelsCommandReply(params: {
-  cfg: OpenClawConfig;
-  commandBodyNormalized: string;
-  surface?: string;
-  currentModel?: string;
-  agentId?: string;
-  agentDir?: string;
-  sessionEntry?: SessionEntry;
-}): Promise<ReplyPayload | null> {
+export async function resolveModelsCommandReply(
+  params: {
+    cfg: OpenClawConfig;
+    commandBodyNormalized: string;
+    surface?: string;
+    currentModel?: string;
+    agentId?: string;
+    agentDir?: string;
+    sessionEntry?: SessionEntry;
+  },
+  deps: { loadModelCatalog?: typeof loadModelCatalog } = {},
+): Promise<ReplyPayload | null> {
   const body = params.commandBodyNormalized.trim();
   if (!body.startsWith("/models")) {
     return null;
@@ -242,6 +247,7 @@ export async function resolveModelsCommandReply(params: {
   const { byProvider, providers, modelNames } = await buildModelsProviderData(
     params.cfg,
     params.agentId,
+    deps,
   );
   const commandPlugin = params.surface ? getChannelPlugin(params.surface) : null;
 
@@ -388,15 +394,18 @@ export const handleModelsCommand: CommandHandler = async (params, allowTextComma
     });
   const modelsAgentDir = resolveAgentDir(params.cfg, modelsAgentId);
 
-  const reply = await resolveModelsCommandReply({
-    cfg: params.cfg,
-    commandBodyNormalized,
-    surface: params.ctx.Surface,
-    currentModel: params.model ? `${params.provider}/${params.model}` : undefined,
-    agentId: modelsAgentId,
-    agentDir: modelsAgentDir,
-    sessionEntry: params.sessionEntry,
-  });
+  const reply = await resolveModelsCommandReply(
+    {
+      cfg: params.cfg,
+      commandBodyNormalized,
+      surface: params.ctx.Surface,
+      currentModel: params.model ? `${params.provider}/${params.model}` : undefined,
+      agentId: modelsAgentId,
+      agentDir: modelsAgentDir,
+      sessionEntry: params.sessionEntry,
+    },
+    params.deps,
+  );
   if (!reply) {
     return null;
   }

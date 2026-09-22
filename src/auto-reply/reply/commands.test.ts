@@ -177,87 +177,49 @@ const whatsappCommandTestPlugin: ChannelPlugin = {
   }),
 };
 
-const readConfigFileSnapshotMock = vi.hoisted(() => vi.fn());
-const validateConfigObjectWithPluginsMock = vi.hoisted(() => vi.fn());
-const writeConfigFileMock = vi.hoisted(() => vi.fn());
+const readConfigFileSnapshotMock = vi.fn();
+const validateConfigObjectWithPluginsMock = vi.fn();
+const writeConfigFileMock = vi.fn();
+const readChannelAllowFromStoreMock = vi.fn();
+const addChannelAllowFromStoreEntryMock = vi.fn();
+const removeChannelAllowFromStoreEntryMock = vi.fn();
+const callGatewayMock = vi.fn();
+// `abortEmbeddedPiRun` / `compactEmbeddedPiSession` keep their historical
+// names so the existing `as Mock` assertions below still refer to these
+// injected test doubles instead of the production module.
+const abortEmbeddedPiRun = vi.fn();
+const compactEmbeddedPiSession = vi.fn();
+const enqueueSystemEvent = vi.fn();
+const incrementCompactionCount = vi.fn();
+const loadModelCatalogMock = vi.fn(async () => [
+  { provider: "anthropic", id: "claude-opus-4-5", name: "Claude Opus" },
+  { provider: "anthropic", id: "claude-sonnet-4-5", name: "Claude Sonnet" },
+  { provider: "openai", id: "gpt-4.1", name: "GPT-4.1" },
+  { provider: "openai", id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+  { provider: "google", id: "gemini-2.0-flash", name: "Gemini Flash" },
+]);
 
-vi.mock("../../config/config.js", async () => {
-  const actual = await import("../../config/config.js");
-  return {
-    ...actual,
-    readConfigFileSnapshot: readConfigFileSnapshotMock,
-    validateConfigObjectWithPlugins: validateConfigObjectWithPluginsMock,
-    writeConfigFile: writeConfigFileMock,
-  };
-});
-
-const readChannelAllowFromStoreMock = vi.hoisted(() => vi.fn());
-const addChannelAllowFromStoreEntryMock = vi.hoisted(() => vi.fn());
-const removeChannelAllowFromStoreEntryMock = vi.hoisted(() => vi.fn());
-
-vi.mock("../../pairing/pairing-store.js", async () => {
-  const actual = await import("../../pairing/pairing-store.js");
-  return {
-    ...actual,
-    readChannelAllowFromStore: readChannelAllowFromStoreMock,
-    addChannelAllowFromStoreEntry: addChannelAllowFromStoreEntryMock,
-    removeChannelAllowFromStoreEntry: removeChannelAllowFromStoreEntryMock,
-  };
-});
-
-vi.mock("../../channels/plugins/pairing.js", async () => {
-  const actual = await import("../../channels/plugins/pairing.js");
-  return {
-    ...actual,
-    listPairingChannels: () => ["telegram"],
-  };
-});
-
-vi.mock("../../agents/model-catalog.js", () => ({
-  loadModelCatalog: vi.fn(async () => [
-    { provider: "anthropic", id: "claude-opus-4-5", name: "Claude Opus" },
-    { provider: "anthropic", id: "claude-sonnet-4-5", name: "Claude Sonnet" },
-    { provider: "openai", id: "gpt-4.1", name: "GPT-4.1" },
-    { provider: "openai", id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
-    { provider: "google", id: "gemini-2.0-flash", name: "Gemini Flash" },
-  ]),
-}));
-
-vi.mock("../../agents/pi-embedded.js", () => {
-  const resolveEmbeddedSessionLane = (key: string) => {
-    const cleaned = key.trim() || "main";
-    return cleaned.startsWith("session:") ? cleaned : `session:${cleaned}`;
-  };
-  return {
-    abortEmbeddedPiRun: vi.fn(),
-    compactEmbeddedPiSession: vi.fn(),
-    isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
-    isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
-    queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
-    resolveEmbeddedSessionLane,
-    runEmbeddedPiAgent: vi.fn(),
-    waitForEmbeddedPiRunEnd: vi.fn().mockResolvedValue(undefined),
-  };
-});
-
-vi.mock("../../infra/system-events.js", () => ({
-  enqueueSystemEvent: vi.fn(),
-}));
-
-vi.mock("./session-updates.js", () => ({
-  incrementCompactionCount: vi.fn(),
-}));
-
-const callGatewayMock = vi.hoisted(() => vi.fn());
-vi.mock("../../gateway/call.js", () => ({
-  callGateway: callGatewayMock,
-}));
-
-import type { HandleCommandsParams } from "./commands-types.js";
-
-// Avoid expensive workspace scans during /context tests.
-vi.mock("./commands-context-report.js", () => ({
-  buildContextReply: async (params: { command: { commandBodyNormalized: string } }) => {
+// Optional DI seams consumed through HandleCommandsParams.deps. The `as never`
+// casts are the established test-injection style used by the APPROVED
+// get-reply/commands DI batches (mocks are structurally wider than the
+// production function types).
+const commandTestDeps: Partial<CommandsDeps> = {
+  readConfigFileSnapshot: readConfigFileSnapshotMock as never,
+  validateConfigObjectWithPlugins: validateConfigObjectWithPluginsMock as never,
+  writeConfigFile: writeConfigFileMock as never,
+  readChannelAllowFromStore: readChannelAllowFromStoreMock as never,
+  addChannelAllowFromStoreEntry: addChannelAllowFromStoreEntryMock as never,
+  removeChannelAllowFromStoreEntry: removeChannelAllowFromStoreEntryMock as never,
+  loadModelCatalog: loadModelCatalogMock as never,
+  abortEmbeddedPiRun: abortEmbeddedPiRun as never,
+  compactEmbeddedPiSession: compactEmbeddedPiSession as never,
+  isEmbeddedPiRunActive: (() => false) as never,
+  waitForEmbeddedPiRunEnd: (async () => undefined) as never,
+  enqueueSystemEvent: enqueueSystemEvent as never,
+  incrementCompactionCount: incrementCompactionCount as never,
+  callGateway: callGatewayMock as never,
+  // Avoid expensive workspace scans during /context tests.
+  buildContextReply: (async (params: { command: { commandBodyNormalized: string } }) => {
     const normalized = params.command.commandBodyNormalized;
     if (normalized === "/context list") {
       return { text: "Injected workspace files:\n- AGENTS.md" };
@@ -266,31 +228,31 @@ vi.mock("./commands-context-report.js", () => ({
       return { text: "Context breakdown (detailed)\nTop tools (schema size):" };
     }
     return { text: "/context\n- /context list\nInline shortcut" };
-  },
-}));
+  }) as never,
+};
 
-vi.resetModules();
-
-const { addSubagentRunForTests, listSubagentRunsForRequester, resetSubagentRegistryForTests } =
-  await import("../../agents/subagent-registry.js");
-const internalHooks = await import("../../hooks/internal-hooks.js");
-const { clearPluginCommands, registerPluginCommand } = await import("../../plugins/commands.js");
-const { abortEmbeddedPiRun, compactEmbeddedPiSession } =
-  await import("../../agents/pi-embedded.js");
-const { __testing: subagentControlTesting } = await import("../../agents/subagent-control.js");
-const { resetBashChatCommandForTests } = await import("./bash-command.js");
-const { handleCompactCommand } = await import("./commands-compact.js");
-const { extractMessageText } = await import("./commands-subagents.js");
-const { buildCommandTestParams } = await import("./commands.test-harness.js");
-const { parseConfigCommand } = await import("./config-commands.js");
-const { parseDebugCommand } = await import("./debug-commands.js");
-const { parseInlineDirectives } = await import("./directive-handling.js");
-const { buildCommandContext, handleCommands } = await import("./commands.js");
-const { createTaskRecord, resetTaskRegistryForTests } =
-  await import("../../tasks/task-registry.js");
-const { failTaskRunByRunId } = await import("../../tasks/task-executor.js");
+import { __testing as subagentControlTesting } from "../../agents/subagent-control.js";
+import {
+  addSubagentRunForTests,
+  listSubagentRunsForRequester,
+  resetSubagentRegistryForTests,
+} from "../../agents/subagent-registry.js";
+import * as internalHooks from "../../hooks/internal-hooks.js";
+import { clearPluginCommands, registerPluginCommand } from "../../plugins/commands.js";
+import { failTaskRunByRunId } from "../../tasks/task-executor.js";
+import { createTaskRecord, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
+import { resetBashChatCommandForTests } from "./bash-command.js";
+import { handleCompactCommand } from "./commands-compact.js";
+import { extractMessageText } from "./commands-subagents.js";
+import type { CommandsDeps, HandleCommandsParams } from "./commands-types.js";
+import { buildCommandContext, handleCommands } from "./commands.js";
+import { buildCommandTestParams } from "./commands.test-harness.js";
+import { parseConfigCommand } from "./config-commands.js";
+import { parseDebugCommand } from "./debug-commands.js";
+import { parseInlineDirectives } from "./directive-handling.js";
 
 let testWorkspaceDir = os.tmpdir();
+let prevVitest: string | undefined;
 
 type TelegramTestAccountConfig = {
   enabled?: boolean;
@@ -591,11 +553,21 @@ function setMinimalChannelPluginRegistryForTests(): void {
 }
 
 beforeAll(async () => {
+  // Bun's runner does not set VITEST itself; the production code gates some
+  // test-only behavior (e.g. subagent steer rate limiting) on it, matching the
+  // Vitest environment this file was written for.
+  prevVitest = process.env.VITEST;
+  process.env.VITEST ??= "true";
   testWorkspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-commands-"));
   await fs.writeFile(path.join(testWorkspaceDir, "AGENTS.md"), "# Agents\n", "utf-8");
 });
 
 afterAll(async () => {
+  if (prevVitest === undefined) {
+    delete process.env.VITEST;
+  } else {
+    process.env.VITEST = prevVitest;
+  }
   await fs.rm(testWorkspaceDir, {
     recursive: true,
     force: true,
@@ -606,7 +578,6 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.useRealTimers();
-  vi.clearAllTimers();
   resetTaskRegistryForTests();
   setMinimalChannelPluginRegistryForTests();
   readConfigFileSnapshotMock.mockImplementation(async () => {
@@ -664,7 +635,10 @@ async function readJsonFile<T>(filePath: string): Promise<T> {
 }
 
 function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Partial<MsgContext>) {
-  return buildCommandTestParams(commandBody, cfg, ctxOverrides, { workspaceDir: testWorkspaceDir });
+  return buildCommandTestParams(commandBody, cfg, ctxOverrides, {
+    workspaceDir: testWorkspaceDir,
+    deps: commandTestDeps,
+  });
 }
 
 describe("handleCommands gating", () => {
@@ -2049,6 +2023,7 @@ function buildPolicyParams(
     model: "test-model",
     contextTokens: 0,
     isGroup: false,
+    deps: commandTestDeps,
   };
   return params;
 }

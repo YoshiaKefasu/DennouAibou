@@ -976,12 +976,25 @@ export function isExecApprovalDecisionAllowed(params: {
   return resolveExecApprovalAllowedDecisions({ ask: params.ask }).includes(params.decision);
 }
 
-export async function requestExecApprovalViaSocket(params: {
-  socketPath: string;
-  token: string;
-  request: Record<string, unknown>;
-  timeoutMs?: number;
-}): Promise<ExecApprovalDecision | null> {
+export type ExecApprovalSocketDeps = {
+  requestJsonlSocket?: (params: {
+    socketPath: string;
+    requestLine: string;
+    timeoutMs: number;
+    accept: (msg: unknown) => ExecApprovalDecision | null | undefined;
+  }) => Promise<ExecApprovalDecision | null>;
+};
+
+export async function requestExecApprovalViaSocket(
+  params: {
+    socketPath: string;
+    token: string;
+    request: Record<string, unknown>;
+    timeoutMs?: number;
+  },
+  deps: ExecApprovalSocketDeps = {},
+): Promise<ExecApprovalDecision | null> {
+  const requestJsonlSocketImpl = deps.requestJsonlSocket ?? requestJsonlSocket;
   const { socketPath, token, request } = params;
   if (!socketPath || !token) {
     return null;
@@ -994,7 +1007,7 @@ export async function requestExecApprovalViaSocket(params: {
     request,
   });
 
-  return await requestJsonlSocket({
+  return await requestJsonlSocketImpl({
     socketPath,
     requestLine: payload,
     timeoutMs,

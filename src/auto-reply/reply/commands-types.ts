@@ -9,6 +9,24 @@ import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import type { TypingController } from "./typing.js";
 
+export type CommandsDeps = {
+  readConfigFileSnapshot: typeof import("../../config/config.js").readConfigFileSnapshot;
+  validateConfigObjectWithPlugins: typeof import("../../config/config.js").validateConfigObjectWithPlugins;
+  writeConfigFile: typeof import("../../config/config.js").writeConfigFile;
+  readChannelAllowFromStore: typeof import("../../pairing/pairing-store.js").readChannelAllowFromStore;
+  addChannelAllowFromStoreEntry: typeof import("../../pairing/pairing-store.js").addChannelAllowFromStoreEntry;
+  removeChannelAllowFromStoreEntry: typeof import("../../pairing/pairing-store.js").removeChannelAllowFromStoreEntry;
+  loadModelCatalog: typeof import("../../agents/model-catalog.js").loadModelCatalog;
+  abortEmbeddedPiRun: typeof import("../../agents/pi-embedded.js").abortEmbeddedPiRun;
+  compactEmbeddedPiSession: typeof import("../../agents/pi-embedded.js").compactEmbeddedPiSession;
+  isEmbeddedPiRunActive: typeof import("../../agents/pi-embedded.js").isEmbeddedPiRunActive;
+  waitForEmbeddedPiRunEnd: typeof import("../../agents/pi-embedded.js").waitForEmbeddedPiRunEnd;
+  enqueueSystemEvent: typeof import("../../infra/system-events.js").enqueueSystemEvent;
+  incrementCompactionCount: typeof import("./session-updates.js").incrementCompactionCount;
+  callGateway: typeof import("../../gateway/call.js").callGateway;
+  buildContextReply: typeof import("./commands-context-report.js").buildContextReply;
+};
+
 export type CommandContext = {
   surface: string;
   channel: string;
@@ -61,6 +79,9 @@ export type HandleCommandsParams = {
   isGroup: boolean;
   skillCommands?: SkillCommandSpec[];
   typing?: TypingController;
+  /** Optional test seams for command-runtime dependencies. When omitted, the
+   * production implementation is used exactly as before. */
+  deps?: Partial<CommandsDeps>;
 };
 
 export type CommandHandlerResult = {

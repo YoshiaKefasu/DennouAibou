@@ -19,7 +19,7 @@ import type { GetReplyDeps } from "./get-reply.js";
 // declared `input` modalities (plus a gemini-flavored name on one entry to
 // prove the decision is never name-driven).
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   applyMediaUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
   applyLinkUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
   createInternalHookEvent: vi.fn(),
@@ -29,12 +29,7 @@ const mocks = vi.hoisted(() => ({
   resolveSessionModelOverrideSnapshot: vi.fn(),
   loadModelCatalog: vi.fn(),
   hasInlineableNativeAudio: vi.fn(),
-}));
-
-vi.mock("../../hooks/internal-hooks.js", () => ({
-  createInternalHookEvent: (...args: unknown[]) => mocks.createInternalHookEvent(...args),
-  triggerInternalHook: (...args: unknown[]) => mocks.triggerInternalHook(...args),
-}));
+};
 
 function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {
@@ -64,6 +59,11 @@ function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
     applyLinkUnderstanding: mocks.applyLinkUnderstanding as never,
     loadModelCatalog: mocks.loadModelCatalog as never,
     hasInlineableNativeAudio: mocks.hasInlineableNativeAudio as never,
+    createInternalHookEvent: mocks.createInternalHookEvent as never,
+    triggerInternalHook: mocks.triggerInternalHook as never,
+    fireAndForgetHook: (task: Promise<unknown>) => {
+      void task;
+    },
     ...extra,
   };
 }

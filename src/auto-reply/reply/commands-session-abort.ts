@@ -78,13 +78,15 @@ async function applyAbortTarget(params: {
   storePath?: string;
   abortKey?: string;
   abortCutoff?: AbortCutoff;
+  abortEmbeddedPiRun?: typeof abortEmbeddedPiRun;
 }) {
   const { abortTarget } = params;
+  const abortEmbeddedPiRunFn = params.abortEmbeddedPiRun ?? abortEmbeddedPiRun;
   if (abortTarget.key) {
     replyRunRegistry.abort(abortTarget.key);
   }
   if (abortTarget.sessionId) {
-    abortEmbeddedPiRun(abortTarget.sessionId);
+    abortEmbeddedPiRunFn(abortTarget.sessionId);
   }
 
   const persisted = await persistAbortTargetEntry({
@@ -113,6 +115,7 @@ function buildAbortTargetApplyParams(
       commandSessionKey: params.sessionKey,
       targetSessionKey: abortTarget.key,
     }),
+    abortEmbeddedPiRun: params.deps?.abortEmbeddedPiRun,
   };
 }
 

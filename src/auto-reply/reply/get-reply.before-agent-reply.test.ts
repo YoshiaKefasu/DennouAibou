@@ -4,12 +4,12 @@ import { SILENT_REPLY_TOKEN } from "../tokens.js";
 import { getReplyFromConfig } from "./get-reply.js";
 import type { GetReplyDeps } from "./get-reply.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resolveReplyDirectives: vi.fn(),
   handleInlineActions: vi.fn(),
   initSessionState: vi.fn(),
   runBeforeAgentReply: vi.fn(),
-}));
+};
 
 function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {

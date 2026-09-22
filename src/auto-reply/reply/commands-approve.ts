@@ -125,6 +125,7 @@ export const handleApproveCommand: CommandHandler = async (params, allowTextComm
   if (!allowTextCommands) {
     return null;
   }
+  const callGatewayFn = params.deps?.callGateway ?? callGateway;
   const normalized = params.command.commandBodyNormalized;
   const parsed = parseApproveCommand(normalized);
   if (!parsed) {
@@ -190,7 +191,7 @@ export const handleApproveCommand: CommandHandler = async (params, allowTextComm
 
   const resolvedBy = buildResolvedByLabel(params);
   const callApprovalMethod = async (method: string): Promise<void> => {
-    await callGateway({
+    await callGatewayFn({
       method,
       params: { id: parsed.id, decision: parsed.decision },
       clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,

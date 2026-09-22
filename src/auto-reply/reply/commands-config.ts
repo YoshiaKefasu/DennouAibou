@@ -31,6 +31,11 @@ import { resolveConfigWriteDeniedText } from "./config-write-authorization.js";
 import { parseDebugCommand } from "./debug-commands.js";
 
 export const handleConfigCommand: CommandHandler = async (params, allowTextCommands) => {
+  const deps = params.deps ?? {};
+  const readConfigFileSnapshotFn = deps.readConfigFileSnapshot ?? readConfigFileSnapshot;
+  const validateConfigObjectWithPluginsFn =
+    deps.validateConfigObjectWithPlugins ?? validateConfigObjectWithPlugins;
+  const writeConfigFileFn = deps.writeConfigFile ?? writeConfigFile;
   if (!allowTextCommands) {
     return null;
   }
@@ -103,7 +108,7 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
     }
   }
 
-  const snapshot = await readConfigFileSnapshot();
+  const snapshot = await readConfigFileSnapshotFn();
   if (!snapshot.valid || !snapshot.parsed || typeof snapshot.parsed !== "object") {
     return {
       shouldContinue: false,
@@ -148,7 +153,7 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
         reply: { text: `⚙️ No config value found for ${configCommand.path}.` },
       };
     }
-    const validated = validateConfigObjectWithPlugins(parsedBase);
+    const validated = validateConfigObjectWithPluginsFn(parsedBase);
     if (!validated.ok) {
       const issue = validated.issues[0];
       return {
@@ -158,7 +163,7 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
         },
       };
     }
-    await writeConfigFile(validated.config);
+    await writeConfigFileFn(validated.config);
     return {
       shouldContinue: false,
       reply: { text: `⚙️ Config updated: ${configCommand.path} removed.` },
@@ -167,7 +172,7 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
 
   if (configCommand.action === "set") {
     setConfigValueAtPath(parsedBase, parsedWritePath ?? [], configCommand.value);
-    const validated = validateConfigObjectWithPlugins(parsedBase);
+    const validated = validateConfigObjectWithPluginsFn(parsedBase);
     if (!validated.ok) {
       const issue = validated.issues[0];
       return {
@@ -177,7 +182,7 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
         },
       };
     }
-    await writeConfigFile(validated.config);
+    await writeConfigFileFn(validated.config);
     const valueLabel =
       typeof configCommand.value === "string"
         ? `"${configCommand.value}"`

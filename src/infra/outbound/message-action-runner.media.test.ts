@@ -13,122 +13,48 @@ import {
   createTestRegistry,
 } from "../../test-utils/channel-plugins.js";
 import { resolvePreferredOpenClawTmpDir } from "../tmp-openclaw-dir.js";
-import { runMessageAction } from "./message-action-runner.js";
+import { runMessageAction, setMessageActionRunnerDepsForTest } from "./message-action-runner.js";
 
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5m8gAAAABJRU5ErkJggg==",
   "base64",
 );
 
-const channelResolutionMocks = vi.hoisted(() => ({
+const channelResolutionMocks = {
   resolveOutboundChannelPlugin: vi.fn(),
   executeSendAction: vi.fn(),
   executePollAction: vi.fn(),
-}));
-
-vi.mock("./channel-resolution.js", () => ({
-  resolveOutboundChannelPlugin: channelResolutionMocks.resolveOutboundChannelPlugin,
-  resetOutboundChannelResolutionStateForTest: vi.fn(),
-}));
-
-vi.mock("./outbound-send-service.js", () => ({
-  executeSendAction: channelResolutionMocks.executeSendAction,
-  executePollAction: channelResolutionMocks.executePollAction,
-}));
-
-vi.mock("./outbound-session.js", () => ({
   ensureOutboundSessionEntry: vi.fn(async () => undefined),
   resolveOutboundSessionRoute: vi.fn(async () => null),
-}));
+  resolveAndApplyOutboundThreadId: vi.fn(),
+  prepareOutboundMirrorRoute: vi.fn(),
+};
 
-vi.mock("./message-action-threading.js", () => ({
-  resolveAndApplyOutboundThreadId: vi.fn(
-    (
-      actionParams: Record<string, unknown>,
-      context: {
-        cfg: OpenClawConfig;
-        to: string;
-        accountId?: string | null;
-        toolContext?: Record<string, unknown>;
-        resolveAutoThreadId?: (params: {
-          cfg: OpenClawConfig;
-          accountId?: string | null;
-          to: string;
-          toolContext?: Record<string, unknown>;
-          replyToId?: string;
-        }) => string | undefined;
-      },
-    ) => {
-      const explicit =
-        typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
-      const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
-      const resolved =
-        explicit ??
-        context.resolveAutoThreadId?.({
-          cfg: context.cfg,
-          accountId: context.accountId,
-          to: context.to,
-          toolContext: context.toolContext,
-          replyToId,
-        });
-      if (resolved && !actionParams.threadId) {
-        actionParams.threadId = resolved;
-      }
-      return resolved ?? undefined;
-    },
-  ),
-  prepareOutboundMirrorRoute: vi.fn(
-    async ({
-      actionParams,
-      cfg,
-      to,
-      accountId,
-      toolContext,
-      agentId,
-      resolveAutoThreadId,
-    }: {
-      actionParams: Record<string, unknown>;
-      cfg: OpenClawConfig;
-      to: string;
-      accountId?: string | null;
-      toolContext?: Record<string, unknown>;
-      agentId?: string;
-      resolveAutoThreadId?: (params: {
-        cfg: OpenClawConfig;
-        accountId?: string | null;
-        to: string;
-        toolContext?: Record<string, unknown>;
-        replyToId?: string;
-      }) => string | undefined;
-    }) => {
-      const explicit =
-        typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
-      const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
-      const resolvedThreadId =
-        explicit ??
-        resolveAutoThreadId?.({
-          cfg,
-          accountId,
-          to,
-          toolContext,
-          replyToId,
-        });
-      if (resolvedThreadId && !actionParams.threadId) {
-        actionParams.threadId = resolvedThreadId;
-      }
-      if (agentId) {
-        actionParams.__agentId = agentId;
-      }
-      return {
-        resolvedThreadId,
-        outboundRoute: null,
-      };
-    },
-  ),
-}));
+function resolveThreadId(
+  actionParams: Record<string, unknown>,
+  context: { resolveAutoThreadId?: (params: { replyToId?: string }) => string | undefined },
+) {
+  const explicit = typeof actionParams.threadId === "string" ? actionParams.threadId : undefined;
+  const replyToId = typeof actionParams.replyTo === "string" ? actionParams.replyTo : undefined;
+  const resolved = explicit ?? context.resolveAutoThreadId?.({ replyToId });
+  if (resolved && !actionParams.threadId) actionParams.threadId = resolved;
+  return resolved;
+}
+
+function prepareMirrorRoute(params: {
+  actionParams: Record<string, unknown>;
+  resolveAutoThreadId?: (params: { replyToId?: string }) => string | undefined;
+  agentId?: string;
+}) {
+  const resolvedThreadId = resolveThreadId(params.actionParams, params);
+  if (params.agentId) params.actionParams.__agentId = params.agentId;
+  return { resolvedThreadId, outboundRoute: null };
+}
 
 vi.mock("../../media/web-media.js", async () => {
-  const actual = await import("../../media/web-media.js");
+  const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
+    "../../media/web-media.js",
+  );
   return {
     ...actual,
     loadWebMedia: vi.fn(actual.loadWebMedia),
@@ -232,6 +158,17 @@ const slackPlugin: ChannelPlugin = {
 
 describe("runMessageAction media behavior", () => {
   beforeEach(async () => {
+    setMessageActionRunnerDepsForTest({
+      resolveOutboundChannelPlugin: channelResolutionMocks.resolveOutboundChannelPlugin,
+      executeSendAction: channelResolutionMocks.executeSendAction,
+      executePollAction: channelResolutionMocks.executePollAction,
+      ensureOutboundSessionEntry: channelResolutionMocks.ensureOutboundSessionEntry,
+      resolveOutboundSessionRoute: channelResolutionMocks.resolveOutboundSessionRoute,
+      resolveAndApplyOutboundThreadId: channelResolutionMocks.resolveAndApplyOutboundThreadId,
+      prepareOutboundMirrorRoute: channelResolutionMocks.prepareOutboundMirrorRoute,
+    });
+    channelResolutionMocks.resolveAndApplyOutboundThreadId.mockImplementation(resolveThreadId);
+    channelResolutionMocks.prepareOutboundMirrorRoute.mockImplementation(prepareMirrorRoute);
     actualLoadWebMedia ??= (
       await vi.importActual<typeof import("../../media/web-media.js")>("../../media/web-media.js")
     ).loadWebMedia;
@@ -280,6 +217,10 @@ describe("runMessageAction media behavior", () => {
     });
     (loadWebMedia as Mock).mockReset();
     (loadWebMedia as Mock).mockImplementation(actualLoadWebMedia);
+  });
+
+  afterEach(() => {
+    setMessageActionRunnerDepsForTest();
   });
 
   describe("sendAttachment hydration", () => {

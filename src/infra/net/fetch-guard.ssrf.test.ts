@@ -6,7 +6,7 @@ import {
 } from "./fetch-guard.js";
 import { TEST_UNDICI_RUNTIME_DEPS_KEY } from "./undici-runtime.js";
 
-const { agentCtor, envHttpProxyAgentCtor, proxyAgentCtor } = vi.hoisted(() => ({
+const { agentCtor, envHttpProxyAgentCtor, proxyAgentCtor } = {
   agentCtor: vi.fn(function MockAgent(this: { options: unknown }, options: unknown) {
     this.options = options;
   }),
@@ -19,7 +19,7 @@ const { agentCtor, envHttpProxyAgentCtor, proxyAgentCtor } = vi.hoisted(() => ({
   proxyAgentCtor: vi.fn(function MockProxyAgent(this: { options: unknown }, options: unknown) {
     this.options = options;
   }),
-}));
+};
 
 function createPinnedDispatcherCompatibilityError(): Error {
   const cause = Object.assign(new Error("invalid onRequestStart method"), {

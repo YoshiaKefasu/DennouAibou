@@ -32,18 +32,33 @@ const loadModelCatalogMockInternal = vi.hoisted(() => {
   const originalResolvedValue = mock.mockResolvedValue.bind(mock);
   const originalResolvedValueOnce = mock.mockResolvedValueOnce.bind(mock);
   const originalReset = mock.mockReset.bind(mock);
-  mock.mockResolvedValue = ((value: unknown[]) => {
-    harnessCatalogState.latestCatalog = value;
-    return originalResolvedValue(value);
-  }) as typeof mock.mockResolvedValue;
-  mock.mockResolvedValueOnce = ((value: unknown[]) => {
-    harnessCatalogState.latestCatalog = value;
-    return originalResolvedValueOnce(value);
-  }) as typeof mock.mockResolvedValueOnce;
-  mock.mockReset = (() => {
-    harnessCatalogState.latestCatalog = undefined;
-    return originalReset();
-  }) as typeof mock.mockReset;
+  // Bun's vi.fn exposes these methods as readonly instance properties, so
+  // direct assignment throws. defineProperty keeps the catalog mirror working
+  // on both Vitest and Bun.
+  Object.defineProperty(mock, "mockResolvedValue", {
+    value: ((value: unknown[]) => {
+      harnessCatalogState.latestCatalog = value;
+      return originalResolvedValue(value);
+    }) as typeof mock.mockResolvedValue,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(mock, "mockResolvedValueOnce", {
+    value: ((value: unknown[]) => {
+      harnessCatalogState.latestCatalog = value;
+      return originalResolvedValueOnce(value);
+    }) as typeof mock.mockResolvedValueOnce,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(mock, "mockReset", {
+    value: (() => {
+      harnessCatalogState.latestCatalog = undefined;
+      return originalReset();
+    }) as typeof mock.mockReset,
+    configurable: true,
+    writable: true,
+  });
   return mock;
 });
 const getCachedModelCatalogSyncMockInternal = vi.hoisted(() =>
@@ -64,6 +79,7 @@ export const getCachedModelCatalogSyncMock: Mock = getCachedModelCatalogSyncMock
 // `getCachedModelCatalogSync`).
 vi.mock("../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
+  compactEmbeddedPiSession: vi.fn().mockResolvedValue({ ok: true, compacted: false }),
   runEmbeddedPiAgent: (...args: unknown[]) =>
     (runEmbeddedPiAgentMockInternal as unknown as Mock)(...args),
   queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),

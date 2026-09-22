@@ -16,6 +16,7 @@ import type {
 } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { resolveMirroredTranscriptText } from "../../config/sessions/transcript-mirror.js";
+import type { appendAssistantMessageToSessionTranscript } from "../../config/sessions/transcript.runtime.js";
 import { fireAndForgetHook } from "../../hooks/fire-and-forget.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import {
@@ -44,6 +45,43 @@ export { normalizeOutboundPayloads } from "./payloads.js";
 export { resolveOutboundSendDep, type OutboundSendDeps } from "./send-deps.js";
 
 const log = createSubsystemLogger("outbound/deliver");
+
+type DeliverHookRunner = {
+  hasHooks: (hookName?: string) => boolean;
+  runMessageSending: (event: unknown, ctx: unknown) => Promise<unknown>;
+  runMessageSent: (event: unknown, ctx: unknown) => Promise<void>;
+};
+
+export type DeliverDeps = {
+  appendAssistantMessageToSessionTranscript?: typeof appendAssistantMessageToSessionTranscript;
+  getGlobalHookRunner?: () => DeliverHookRunner | null;
+  createInternalHookEvent?: typeof createInternalHookEvent;
+  triggerInternalHook?: typeof triggerInternalHook;
+  enqueueDelivery?: typeof enqueueDelivery;
+  ackDelivery?: typeof ackDelivery;
+  failDelivery?: typeof failDelivery;
+  logWarn?: typeof log.warn;
+};
+
+let deliverDepsOverride: Partial<DeliverDeps> = {};
+
+export function setDeliverDepsForTest(deps?: Partial<DeliverDeps>): void {
+  deliverDepsOverride = deps ?? {};
+}
+
+function resolveDeliverDeps(): DeliverDeps {
+  return {
+    getGlobalHookRunner: getGlobalHookRunner as () => DeliverHookRunner | null,
+    createInternalHookEvent,
+    triggerInternalHook,
+    enqueueDelivery,
+    ackDelivery,
+    failDelivery,
+    logWarn: log.warn,
+    ...deliverDepsOverride,
+  };
+}
+
 let transcriptRuntimePromise:
   | Promise<typeof import("../../config/sessions/transcript.runtime.js")>
   | undefined;
@@ -376,7 +414,8 @@ function buildPayloadSummary(payload: ReplyPayload): NormalizedOutboundPayload {
 }
 
 function createMessageSentEmitter(params: {
-  hookRunner: ReturnType<typeof getGlobalHookRunner>;
+  hookRunner: DeliverHookRunner | null;
+  deps: DeliverDeps;
   channel: Exclude<OutboundChannel, "none">;
   to: string;
   accountId?: string;
@@ -410,7 +449,7 @@ function createMessageSentEmitter(params: {
         ),
         "deliverOutboundPayloads: message_sent plugin hook failed",
         (message) => {
-          log.warn(message);
+          (params.deps.logWarn ?? log.warn)(message);
         },
       );
     }
@@ -418,8 +457,8 @@ function createMessageSentEmitter(params: {
       return;
     }
     fireAndForgetHook(
-      triggerInternalHook(
-        createInternalHookEvent(
+      (params.deps.triggerInternalHook ?? triggerInternalHook)(
+        (params.deps.createInternalHookEvent ?? createInternalHookEvent)(
           "message",
           "sent",
           params.sessionKeyForInternalHooks!,
@@ -428,7 +467,7 @@ function createMessageSentEmitter(params: {
       ),
       "deliverOutboundPayloads: message:sent internal hook failed",
       (message) => {
-        log.warn(message);
+        (params.deps.logWarn ?? log.warn)(message);
       },
     );
   };
@@ -436,7 +475,7 @@ function createMessageSentEmitter(params: {
 }
 
 async function applyMessageSendingHook(params: {
-  hookRunner: ReturnType<typeof getGlobalHookRunner>;
+  hookRunner: DeliverHookRunner | null;
   enabled: boolean;
   payload: ReplyPayload;
   payloadSummary: NormalizedOutboundPayload;
@@ -471,14 +510,14 @@ async function applyMessageSendingHook(params: {
         accountId: params.accountId ?? undefined,
       },
     );
-    if (sendingResult?.cancel) {
+    if ((sendingResult as { cancel?: boolean } | undefined)?.cancel) {
       return {
         cancelled: true,
         payload: params.payload,
         payloadSummary: params.payloadSummary,
       };
     }
-    if (sendingResult?.content == null) {
+    if ((sendingResult as { content?: string } | undefined)?.content == null) {
       return {
         cancelled: false,
         payload: params.payload,
@@ -487,14 +526,14 @@ async function applyMessageSendingHook(params: {
     }
     const payload = {
       ...params.payload,
-      text: sendingResult.content,
+      text: (sendingResult as { content: string }).content,
     };
     return {
       cancelled: false,
       payload,
       payloadSummary: {
         ...params.payloadSummary,
-        text: sendingResult.content,
+        text: (sendingResult as { content: string }).content,
       },
     };
   } catch {
@@ -511,11 +550,12 @@ export async function deliverOutboundPayloads(
   params: DeliverOutboundPayloadsParams,
 ): Promise<OutboundDeliveryResult[]> {
   const { channel, to, payloads } = params;
+  const resolvedDeps = resolveDeliverDeps();
 
   // Write-ahead delivery queue: persist before sending, remove after success.
   const queueId = params.skipQueue
     ? null
-    : await enqueueDelivery({
+    : await resolvedDeps.enqueueDelivery!({
         channel,
         to,
         accountId: params.accountId,
@@ -549,20 +589,23 @@ export async function deliverOutboundPayloads(
     const results = await deliverOutboundPayloadsCore(wrappedParams);
     if (queueId) {
       if (hadPartialFailure) {
-        await failDelivery(queueId, "partial delivery failure (bestEffort)").catch(() => {});
+        await resolvedDeps.failDelivery!(queueId, "partial delivery failure (bestEffort)").catch(
+          () => {},
+        );
       } else {
-        await ackDelivery(queueId).catch(() => {}); // Best-effort cleanup.
+        await resolvedDeps.ackDelivery!(queueId).catch(() => {}); // Best-effort cleanup.
       }
     }
     return results;
   } catch (err) {
     if (queueId) {
       if (isAbortError(err)) {
-        await ackDelivery(queueId).catch(() => {});
+        await resolvedDeps.ackDelivery!(queueId).catch(() => {});
       } else {
-        await failDelivery(queueId, err instanceof Error ? err.message : String(err)).catch(
-          () => {},
-        );
+        await resolvedDeps.failDelivery!(
+          queueId,
+          err instanceof Error ? err.message : String(err),
+        ).catch(() => {});
       }
     }
     throw err;
@@ -650,12 +693,14 @@ async function deliverOutboundPayloadsCore(
     }
   };
   const normalizedPayloads = normalizePayloadsForChannelDelivery(payloads, handler);
-  const hookRunner = getGlobalHookRunner();
+  const resolvedDeps = resolveDeliverDeps();
+  const hookRunner = resolvedDeps.getGlobalHookRunner!();
   const sessionKeyForInternalHooks = params.mirror?.sessionKey ?? params.session?.key;
   const mirrorIsGroup = params.mirror?.isGroup;
   const mirrorGroupId = params.mirror?.groupId;
   const { emitMessageSent, hasMessageSentHooks } = createMessageSentEmitter({
     hookRunner,
+    deps: resolvedDeps,
     channel,
     to,
     accountId,
@@ -665,7 +710,7 @@ async function deliverOutboundPayloadsCore(
   });
   const hasMessageSendingHooks = hookRunner?.hasHooks("message_sending") ?? false;
   if (hasMessageSentHooks && params.session?.agentId && !sessionKeyForInternalHooks) {
-    log.warn(
+    (resolvedDeps.logWarn ?? log.warn)(
       "deliverOutboundPayloads: session.agentId present without session key; internal message:sent hook will be skipped",
       {
         channel,
@@ -735,7 +780,7 @@ async function deliverOutboundPayloadsCore(
       }
 
       if (!handler.supportsMedia) {
-        log.warn(
+        (resolvedDeps.logWarn ?? log.warn)(
           "Plugin outbound adapter does not implement sendMedia; media URLs will be dropped and text fallback will be used",
           {
             channel,
@@ -804,7 +849,9 @@ async function deliverOutboundPayloadsCore(
       mediaUrls: params.mirror.mediaUrls,
     });
     if (mirrorText) {
-      const { appendAssistantMessageToSessionTranscript } = await loadTranscriptRuntime();
+      const appendAssistantMessageToSessionTranscript =
+        resolvedDeps.appendAssistantMessageToSessionTranscript ??
+        (await loadTranscriptRuntime()).appendAssistantMessageToSessionTranscript;
       await appendAssistantMessageToSessionTranscript({
         agentId: params.mirror.agentId,
         sessionKey: params.mirror.sessionKey,

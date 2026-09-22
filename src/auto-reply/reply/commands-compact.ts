@@ -77,6 +77,13 @@ function formatCompactionReason(reason?: string): string | undefined {
 }
 
 export const handleCompactCommand: CommandHandler = async (params) => {
+  const deps = params.deps ?? {};
+  const abortEmbeddedPiRunFn = deps.abortEmbeddedPiRun ?? abortEmbeddedPiRun;
+  const compactEmbeddedPiSessionFn = deps.compactEmbeddedPiSession ?? compactEmbeddedPiSession;
+  const isEmbeddedPiRunActiveFn = deps.isEmbeddedPiRunActive ?? isEmbeddedPiRunActive;
+  const waitForEmbeddedPiRunEndFn = deps.waitForEmbeddedPiRunEnd ?? waitForEmbeddedPiRunEnd;
+  const enqueueSystemEventFn = deps.enqueueSystemEvent ?? enqueueSystemEvent;
+  const incrementCompactionCountFn = deps.incrementCompactionCount ?? incrementCompactionCount;
   const compactRequested =
     params.command.commandBodyNormalized === "/compact" ||
     params.command.commandBodyNormalized.startsWith("/compact ");
@@ -96,9 +103,9 @@ export const handleCompactCommand: CommandHandler = async (params) => {
     };
   }
   const sessionId = params.sessionEntry.sessionId;
-  if (isEmbeddedPiRunActive(sessionId)) {
-    abortEmbeddedPiRun(sessionId);
-    await waitForEmbeddedPiRunEnd(sessionId, 15_000);
+  if (isEmbeddedPiRunActiveFn(sessionId)) {
+    abortEmbeddedPiRunFn(sessionId);
+    await waitForEmbeddedPiRunEndFn(sessionId, 15_000);
   }
   const customInstructions = extractCompactInstructions({
     rawBody: params.ctx.CommandBody ?? params.ctx.RawBody ?? params.ctx.Body,
@@ -107,7 +114,7 @@ export const handleCompactCommand: CommandHandler = async (params) => {
     agentId: params.agentId,
     isGroup: params.isGroup,
   });
-  const result = await compactEmbeddedPiSession({
+  const result = await compactEmbeddedPiSessionFn({
     sessionId,
     sessionKey: params.sessionKey,
     allowGatewaySubagentBinding: true,
@@ -153,7 +160,7 @@ export const handleCompactCommand: CommandHandler = async (params) => {
         : "Compaction skipped"
       : "Compaction failed";
   if (result.ok && result.compacted) {
-    await incrementCompactionCount({
+    await incrementCompactionCountFn({
       cfg: params.cfg,
       sessionEntry: params.sessionEntry,
       sessionStore: params.sessionStore,
@@ -174,6 +181,6 @@ export const handleCompactCommand: CommandHandler = async (params) => {
   const line = reason
     ? `${compactLabel}: ${reason} • ${contextSummary}`
     : `${compactLabel} • ${contextSummary}`;
-  enqueueSystemEvent(line, { sessionKey: params.sessionKey });
+  enqueueSystemEventFn(line, { sessionKey: params.sessionKey });
   return { shouldContinue: false, reply: { text: `⚙️ ${line}` } };
 };

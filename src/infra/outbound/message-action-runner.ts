@@ -59,6 +59,34 @@ import { ensureOutboundSessionEntry, resolveOutboundSessionRoute } from "./outbo
 import { resolveChannelTarget, type ResolvedMessagingTarget } from "./target-resolver.js";
 import { extractToolPayload } from "./tool-payload.js";
 
+export type MessageActionRunnerDeps = {
+  resolveOutboundChannelPlugin?: typeof resolveOutboundChannelPlugin;
+  executeSendAction?: typeof executeSendAction;
+  executePollAction?: typeof executePollAction;
+  ensureOutboundSessionEntry?: typeof ensureOutboundSessionEntry;
+  resolveOutboundSessionRoute?: typeof resolveOutboundSessionRoute;
+  prepareOutboundMirrorRoute?: typeof prepareOutboundMirrorRoute;
+  resolveAndApplyOutboundThreadId?: typeof resolveAndApplyOutboundThreadId;
+};
+
+let messageActionRunnerDeps: MessageActionRunnerDeps = {};
+export function setMessageActionRunnerDepsForTest(deps?: MessageActionRunnerDeps): void {
+  messageActionRunnerDeps = deps ?? {};
+}
+
+function resolveMessageActionRunnerDeps(): Required<MessageActionRunnerDeps> {
+  return {
+    resolveOutboundChannelPlugin,
+    executeSendAction,
+    executePollAction,
+    ensureOutboundSessionEntry,
+    resolveOutboundSessionRoute,
+    prepareOutboundMirrorRoute,
+    resolveAndApplyOutboundThreadId,
+    ...messageActionRunnerDeps,
+  };
+}
+
 export type MessageActionRunnerGateway = {
   url?: string;
   token?: string;
@@ -378,6 +406,7 @@ async function handleBroadcastAction(
 }
 
 async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActionRunResult> {
+  const deps = resolveMessageActionRunnerDeps();
   const {
     cfg,
     params,
@@ -494,7 +523,7 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
   const silent = readBooleanParam(params, "silent");
 
   const replyToId = readStringParam(params, "replyTo");
-  const { resolvedThreadId, outboundRoute } = await prepareOutboundMirrorRoute({
+  const { resolvedThreadId, outboundRoute } = await deps.prepareOutboundMirrorRoute({
     cfg,
     channel,
     to,
@@ -506,13 +535,13 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
     dryRun,
     resolvedTarget,
     resolveAutoThreadId: getChannelPlugin(channel)?.threading?.resolveAutoThreadId,
-    resolveOutboundSessionRoute,
-    ensureOutboundSessionEntry,
+    resolveOutboundSessionRoute: deps.resolveOutboundSessionRoute,
+    ensureOutboundSessionEntry: deps.ensureOutboundSessionEntry,
   });
   const mirrorMediaUrls =
     mergedMediaUrls.length > 0 ? mergedMediaUrls : mediaUrl ? [mediaUrl] : undefined;
   throwIfAborted(abortSignal);
-  const send = await executeSendAction({
+  const send = await deps.executeSendAction({
     ctx: {
       cfg,
       channel,
@@ -561,13 +590,14 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
 }
 
 async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActionRunResult> {
+  const deps = resolveMessageActionRunnerDeps();
   const { cfg, params, channel, accountId, dryRun, gateway, input, abortSignal } = ctx;
   throwIfAborted(abortSignal);
   const action: ChannelMessageActionName = "poll";
   const to = readStringParam(params, "to", { required: true });
   const silent = readBooleanParam(params, "silent");
 
-  const resolvedThreadId = resolveAndApplyOutboundThreadId(params, {
+  const resolvedThreadId = deps.resolveAndApplyOutboundThreadId(params, {
     cfg,
     to,
     accountId,
@@ -588,7 +618,7 @@ async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActi
     preferComponents: false,
   });
 
-  const poll = await executePollAction({
+  const poll = await deps.executePollAction({
     ctx: {
       cfg,
       channel,
@@ -663,7 +693,7 @@ async function handlePluginAction(ctx: ResolvedActionContext): Promise<MessageAc
     };
   }
 
-  const plugin = resolveOutboundChannelPlugin({ channel, cfg });
+  const plugin = resolveMessageActionRunnerDeps().resolveOutboundChannelPlugin({ channel, cfg });
   if (!plugin?.actions?.handleAction) {
     throw new Error(`Channel ${channel} is unavailable for message actions (plugin not loaded).`);
   }

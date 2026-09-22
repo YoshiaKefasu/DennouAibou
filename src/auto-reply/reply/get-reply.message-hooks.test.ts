@@ -3,19 +3,14 @@ import type { MsgContext } from "../templating.js";
 import { getReplyFromConfig } from "./get-reply.js";
 import type { GetReplyDeps } from "./get-reply.js";
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   applyMediaUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
   applyLinkUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
   createInternalHookEvent: vi.fn(),
   triggerInternalHook: vi.fn(async (..._args: unknown[]) => undefined),
   resolveReplyDirectives: vi.fn(),
   initSessionState: vi.fn(),
-}));
-
-vi.mock("../../hooks/internal-hooks.js", () => ({
-  createInternalHookEvent: (...args: unknown[]) => mocks.createInternalHookEvent(...args),
-  triggerInternalHook: (...args: unknown[]) => mocks.triggerInternalHook(...args),
-}));
+};
 
 function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
   return {
@@ -43,6 +38,11 @@ function getTestDeps(extra?: Partial<GetReplyDeps>): Partial<GetReplyDeps> {
     initSessionState: mocks.initSessionState as never,
     applyMediaUnderstanding: mocks.applyMediaUnderstanding as never,
     applyLinkUnderstanding: mocks.applyLinkUnderstanding as never,
+    createInternalHookEvent: mocks.createInternalHookEvent as never,
+    triggerInternalHook: mocks.triggerInternalHook as never,
+    fireAndForgetHook: (task: Promise<unknown>) => {
+      void task;
+    },
     ...extra,
   };
 }

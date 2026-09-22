@@ -60,6 +60,9 @@ export type GetReplyDeps = {
   resolveDefaultModel?: typeof resolveDefaultModel;
   finalizeInboundContext?: typeof finalizeInboundContext;
   emitPreAgentMessageHooks?: typeof emitPreAgentMessageHooks;
+  fireAndForgetHook?: typeof import("../../hooks/fire-and-forget.js").fireAndForgetHook;
+  createInternalHookEvent?: typeof import("../../hooks/internal-hooks.js").createInternalHookEvent;
+  triggerInternalHook?: typeof import("../../hooks/internal-hooks.js").triggerInternalHook;
   getGlobalHookRunner?: typeof import("../../plugins/hook-runner-global.js").getGlobalHookRunner;
   applyMediaUnderstanding?: typeof import("../../media-understanding/apply.runtime.js").applyMediaUnderstanding;
   applyLinkUnderstanding?: typeof import("../../link-understanding/apply.runtime.js").applyLinkUnderstanding;
@@ -419,11 +422,25 @@ export async function getReplyFromConfig(
   }
   const emitPreAgentMessageHooksFn =
     resolvedDeps.emitPreAgentMessageHooks ?? emitPreAgentMessageHooks;
-  emitPreAgentMessageHooksFn({
-    ctx: finalized,
-    cfg,
-    isFastTestEnv,
-  });
+  const messageHookDeps = {
+    ...(resolvedDeps.fireAndForgetHook
+      ? { fireAndForgetHook: resolvedDeps.fireAndForgetHook }
+      : {}),
+    ...(resolvedDeps.createInternalHookEvent
+      ? { createInternalHookEvent: resolvedDeps.createInternalHookEvent }
+      : {}),
+    ...(resolvedDeps.triggerInternalHook
+      ? { triggerInternalHook: resolvedDeps.triggerInternalHook }
+      : {}),
+  };
+  emitPreAgentMessageHooksFn(
+    {
+      ctx: finalized,
+      cfg,
+      isFastTestEnv,
+    },
+    messageHookDeps,
+  );
 
   const commandAuthorized = finalized.CommandAuthorized;
   resolveCommandAuthorizationFn({

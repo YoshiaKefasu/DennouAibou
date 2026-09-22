@@ -1,50 +1,35 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTempDir } from "./exec-approvals-test-helpers.js";
+import {
+  addAllowlistEntry,
+  addDurableCommandApproval,
+  ensureExecApprovals,
+  mergeExecApprovalsSocketDefaults,
+  normalizeExecApprovals,
+  persistAllowAlwaysPatterns,
+  readExecApprovalsSnapshot,
+  recordAllowlistMatchesUse,
+  recordAllowlistUse,
+  requestExecApprovalViaSocket,
+  resolveExecApprovalsPath,
+  resolveExecApprovalsSocketPath,
+} from "./exec-approvals.js";
+import type { ExecApprovalDecision, ExecApprovalsFile } from "./exec-approvals.js";
 
-const requestJsonlSocketMock = vi.hoisted(() => vi.fn());
-
-vi.mock("./jsonl-socket.js", () => ({
-  requestJsonlSocket: (...args: unknown[]) => requestJsonlSocketMock(...args),
-}));
-
-import type { ExecApprovalsFile } from "./exec-approvals.js";
-
-type ExecApprovalsModule = typeof import("./exec-approvals.js");
-
-let addAllowlistEntry: ExecApprovalsModule["addAllowlistEntry"];
-let addDurableCommandApproval: ExecApprovalsModule["addDurableCommandApproval"];
-let ensureExecApprovals: ExecApprovalsModule["ensureExecApprovals"];
-let mergeExecApprovalsSocketDefaults: ExecApprovalsModule["mergeExecApprovalsSocketDefaults"];
-let normalizeExecApprovals: ExecApprovalsModule["normalizeExecApprovals"];
-let persistAllowAlwaysPatterns: ExecApprovalsModule["persistAllowAlwaysPatterns"];
-let readExecApprovalsSnapshot: ExecApprovalsModule["readExecApprovalsSnapshot"];
-let recordAllowlistMatchesUse: ExecApprovalsModule["recordAllowlistMatchesUse"];
-let recordAllowlistUse: ExecApprovalsModule["recordAllowlistUse"];
-let requestExecApprovalViaSocket: ExecApprovalsModule["requestExecApprovalViaSocket"];
-let resolveExecApprovalsPath: ExecApprovalsModule["resolveExecApprovalsPath"];
-let resolveExecApprovalsSocketPath: ExecApprovalsModule["resolveExecApprovalsSocketPath"];
+const requestJsonlSocketMock =
+  vi.fn<
+    (params: {
+      socketPath: string;
+      requestLine: string;
+      timeoutMs: number;
+      accept: (msg: unknown) => ExecApprovalDecision | null | undefined;
+    }) => Promise<ExecApprovalDecision | null>
+  >();
 
 const tempDirs: string[] = [];
 const originalOpenClawHome = process.env.DENNOU_HOME;
-
-beforeAll(async () => {
-  ({
-    addAllowlistEntry,
-    addDurableCommandApproval,
-    ensureExecApprovals,
-    mergeExecApprovalsSocketDefaults,
-    normalizeExecApprovals,
-    persistAllowAlwaysPatterns,
-    readExecApprovalsSnapshot,
-    recordAllowlistMatchesUse,
-    recordAllowlistUse,
-    requestExecApprovalViaSocket,
-    resolveExecApprovalsPath,
-    resolveExecApprovalsSocketPath,
-  } = await import("./exec-approvals.js"));
-});
 
 beforeEach(() => {
   requestJsonlSocketMock.mockReset();
@@ -393,18 +378,24 @@ describe("exec approvals store helpers", () => {
 
   it("returns null when approval socket credentials are missing", async () => {
     await expect(
-      requestExecApprovalViaSocket({
-        socketPath: "",
-        token: "secret",
-        request: { command: "echo hi" },
-      }),
+      requestExecApprovalViaSocket(
+        {
+          socketPath: "",
+          token: "secret",
+          request: { command: "echo hi" },
+        },
+        { requestJsonlSocket: requestJsonlSocketMock },
+      ),
     ).resolves.toBeNull();
     await expect(
-      requestExecApprovalViaSocket({
-        socketPath: "/tmp/socket",
-        token: "",
-        request: { command: "echo hi" },
-      }),
+      requestExecApprovalViaSocket(
+        {
+          socketPath: "/tmp/socket",
+          token: "",
+          request: { command: "echo hi" },
+        },
+        { requestJsonlSocket: requestJsonlSocketMock },
+      ),
     ).resolves.toBeNull();
     expect(requestJsonlSocketMock).not.toHaveBeenCalled();
   });
@@ -428,11 +419,14 @@ describe("exec approvals store helpers", () => {
     });
 
     await expect(
-      requestExecApprovalViaSocket({
-        socketPath: "/tmp/socket",
-        token: "secret",
-        request: { command: "echo hi" },
-      }),
+      requestExecApprovalViaSocket(
+        {
+          socketPath: "/tmp/socket",
+          token: "secret",
+          request: { command: "echo hi" },
+        },
+        { requestJsonlSocket: requestJsonlSocketMock },
+      ),
     ).resolves.toBe("deny");
   });
 });

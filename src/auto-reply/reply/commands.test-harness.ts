@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import type { MsgContext } from "../templating.js";
+import type { CommandsDeps } from "./commands-types.js";
 import type { HandleCommandsParams } from "./commands-types.js";
 import { buildCommandContext } from "./commands.js";
 import { parseInlineDirectives } from "./directive-handling.js";
@@ -10,6 +11,7 @@ export function buildCommandTestParams(
   ctxOverrides?: Partial<MsgContext>,
   options?: {
     workspaceDir?: string;
+    deps?: Partial<CommandsDeps>;
   },
 ): HandleCommandsParams {
   const ctx = {
@@ -46,6 +48,7 @@ export function buildCommandTestParams(
     model: "test-model",
     contextTokens: 0,
     isGroup: false,
+    deps: options?.deps,
   };
   return params;
 }

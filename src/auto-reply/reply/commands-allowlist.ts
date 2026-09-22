@@ -20,7 +20,7 @@ import {
   requireCommandFlagEnabled,
   requireGatewayClientScopeForInternalChannel,
 } from "./command-gates.js";
-import type { CommandHandler } from "./commands-types.js";
+import type { CommandHandler, CommandsDeps } from "./commands-types.js";
 import { resolveConfigWriteDeniedText } from "./config-write-authorization.js";
 
 type AllowlistScope = "dm" | "group" | "all";
@@ -188,25 +188,28 @@ function formatEntryList(entries: string[], resolved?: Map<string, string>): str
     .join(", ");
 }
 
-async function updatePairingStoreAllowlist(params: {
-  action: "add" | "remove";
-  channelId: ChannelId;
-  accountId?: string;
-  entry: string;
-}) {
+async function updatePairingStoreAllowlist(
+  params: {
+    action: "add" | "remove";
+    channelId: ChannelId;
+    accountId?: string;
+    entry: string;
+  },
+  deps: Pick<CommandsDeps, "addChannelAllowFromStoreEntry" | "removeChannelAllowFromStoreEntry">,
+) {
   const storeEntry = {
     channel: params.channelId,
     entry: params.entry,
     accountId: params.accountId,
   };
   if (params.action === "add") {
-    await addChannelAllowFromStoreEntry(storeEntry);
+    await deps.addChannelAllowFromStoreEntry(storeEntry);
     return;
   }
 
-  await removeChannelAllowFromStoreEntry(storeEntry);
+  await deps.removeChannelAllowFromStoreEntry(storeEntry);
   if (params.accountId === DEFAULT_ACCOUNT_ID) {
-    await removeChannelAllowFromStoreEntry({
+    await deps.removeChannelAllowFromStoreEntry({
       channel: params.channelId,
       entry: params.entry,
     });
@@ -258,6 +261,12 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
   if (!allowTextCommands) {
     return null;
   }
+  const deps = params.deps ?? {};
+  const readConfigFileSnapshotFn = deps.readConfigFileSnapshot ?? readConfigFileSnapshot;
+  const validateConfigObjectWithPluginsFn =
+    deps.validateConfigObjectWithPlugins ?? validateConfigObjectWithPlugins;
+  const writeConfigFileFn = deps.writeConfigFile ?? writeConfigFile;
+  const readChannelAllowFromStoreFn = deps.readChannelAllowFromStore ?? readChannelAllowFromStore;
   const parsed = parseAllowlistCommand(params.command.commandBodyNormalized);
   if (!parsed) {
     return null;
@@ -305,7 +314,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
       };
     }
     const storeAllowFrom = supportsStore
-      ? await readChannelAllowFromStore(channelId, process.env, accountId).catch(() => [])
+      ? await readChannelAllowFromStoreFn(channelId, process.env, accountId).catch(() => [])
       : [];
     const configState = await readAllowlistConfig({
       cfg: params.cfg,
@@ -447,7 +456,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
       };
     }
 
-    const snapshot = await readConfigFileSnapshot();
+    const snapshot = await readConfigFileSnapshotFn();
     if (!snapshot.valid || !snapshot.parsed || typeof snapshot.parsed !== "object") {
       return {
         shouldContinue: false,
@@ -496,7 +505,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
     const configChanged = editResult.changed;
 
     if (configChanged) {
-      const validated = validateConfigObjectWithPlugins(parsedConfig);
+      const validated = validateConfigObjectWithPluginsFn(parsedConfig);
       if (!validated.ok) {
         const issue = validated.issues[0];
         return {
@@ -504,7 +513,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
           reply: { text: `⚠️ Config invalid after update (${issue.path}: ${issue.message}).` },
         };
       }
-      await writeConfigFile(validated.config);
+      await writeConfigFileFn(validated.config);
     }
 
     if (!configChanged && !shouldTouchStore) {
@@ -513,12 +522,20 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
     }
 
     if (shouldTouchStore) {
-      await updatePairingStoreAllowlist({
-        action: parsed.action,
-        channelId,
-        accountId,
-        entry: parsed.entry,
-      });
+      await updatePairingStoreAllowlist(
+        {
+          action: parsed.action,
+          channelId,
+          accountId,
+          entry: parsed.entry,
+        },
+        {
+          addChannelAllowFromStoreEntry:
+            deps.addChannelAllowFromStoreEntry ?? addChannelAllowFromStoreEntry,
+          removeChannelAllowFromStoreEntry:
+            deps.removeChannelAllowFromStoreEntry ?? removeChannelAllowFromStoreEntry,
+        },
+      );
     }
 
     const actionLabel = parsed.action === "add" ? "added" : "removed";
@@ -546,12 +563,20 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
     };
   }
 
-  await updatePairingStoreAllowlist({
-    action: parsed.action,
-    channelId,
-    accountId,
-    entry: parsed.entry,
-  });
+  await updatePairingStoreAllowlist(
+    {
+      action: parsed.action,
+      channelId,
+      accountId,
+      entry: parsed.entry,
+    },
+    {
+      addChannelAllowFromStoreEntry:
+        deps.addChannelAllowFromStoreEntry ?? addChannelAllowFromStoreEntry,
+      removeChannelAllowFromStoreEntry:
+        deps.removeChannelAllowFromStoreEntry ?? removeChannelAllowFromStoreEntry,
+    },
+  );
 
   const actionLabel = parsed.action === "add" ? "added" : "removed";
   const scopeLabel = parsed.scope === "dm" ? "DM" : "group";

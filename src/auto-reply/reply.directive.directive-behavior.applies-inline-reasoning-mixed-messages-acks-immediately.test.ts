@@ -6,7 +6,6 @@ import { loadSessionStore, resolveSessionKey, saveSessionStore } from "../config
 import {
   DEFAULT_TEST_MODEL_CATALOG,
   installDirectiveBehaviorE2EHooks,
-  installFreshDirectiveBehaviorReplyMocks,
   makeEmbeddedTextResult,
   makeWhatsAppDirectiveConfig,
   replyText,
@@ -18,10 +17,43 @@ import {
   loadModelCatalogMock,
   runEmbeddedPiAgentMock,
 } from "./reply.directive.directive-behavior.e2e-mocks.js";
+import { getReplyFromConfig as getReplyFromConfigImpl } from "./reply.js";
+import { runPreparedReply as actualRunPreparedReply } from "./reply/get-reply-run.js";
+import type { GetReplyDeps } from "./reply/get-reply.js";
 
-let getReplyFromConfig: typeof import("./reply.js").getReplyFromConfig;
-let actualRunPreparedReply: typeof import("./reply/get-reply-run.js").runPreparedReply;
-const runPreparedReplyMock = vi.hoisted(() => vi.fn());
+const runPreparedReplyMock = vi.fn();
+
+// DI seam: keep the production directive/session/model resolution intact and
+// only route the reply run through the test double. Agent-scope/workspace,
+// default-model and alias lookups stay on the production implementations so
+// the per-test config (workspace, model aliases) is honored.
+function getTestDeps(): Partial<GetReplyDeps> {
+  return {
+    loadConfig: () => ({}),
+    resolveSessionAgentId: () => "main",
+    // Keep the real workspace path resolution (tests depend on the per-test
+    // config workspace) but skip the production bootstrap-file provisioning,
+    // which can stall under Vitest.
+    ensureAgentWorkspace: (async (params: { dir: string }) => ({ dir: params.dir })) as never,
+    resolveChannelModelOverride: () => null,
+    resolveCommandAuthorization: () =>
+      ({ isAuthorizedSender: true, ownerList: [], senderIsOwner: false }) as never,
+    finalizeInboundContext: (ctx: Record<string, unknown>) => ctx as never,
+    emitPreAgentMessageHooks: () => undefined,
+    resolveSessionModelOverrideSnapshot: () => null,
+    runPreparedReply: runPreparedReplyMock as never,
+  };
+}
+
+// Local wrapper keeps every existing `getReplyFromConfig(...)` call untouched
+// while injecting the test deps as the 4th argument.
+function getReplyFromConfig(
+  ctx: Parameters<typeof getReplyFromConfigImpl>[0],
+  opts?: Parameters<typeof getReplyFromConfigImpl>[1],
+  cfg?: Parameters<typeof getReplyFromConfigImpl>[2],
+) {
+  return getReplyFromConfigImpl(ctx, opts, cfg, getTestDeps());
+}
 
 async function writeSkill(params: { workspaceDir: string; name: string; description: string }) {
   const { workspaceDir, name, description } = params;
@@ -149,17 +181,9 @@ async function runInFlightVerboseToggleCase(params: {
 describe("directive behavior", () => {
   installDirectiveBehaviorE2EHooks();
 
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     loadModelCatalogMock.mockReset();
     loadModelCatalogMock.mockResolvedValue(DEFAULT_TEST_MODEL_CATALOG);
-    installFreshDirectiveBehaviorReplyMocks({
-      onActualRunPreparedReply: (runPreparedReply) => {
-        actualRunPreparedReply = runPreparedReply;
-      },
-      runPreparedReply: (...args) => runPreparedReplyMock(...args),
-    });
-    ({ getReplyFromConfig } = await import("./reply.js"));
     runPreparedReplyMock.mockReset();
     runPreparedReplyMock.mockImplementation((...args: Parameters<typeof actualRunPreparedReply>) =>
       actualRunPreparedReply(...args),
@@ -271,33 +295,38 @@ describe("directive behavior", () => {
       expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     });
   });
-  it("keeps reserved command aliases from matching after trimming", async () => {
-    await withTempHome(async (home) => {
-      const res = await getReplyFromConfig(
-        {
-          Body: "/help",
-          From: "+1222",
-          To: "+1222",
-          CommandAuthorized: true,
-        },
-        {},
-        makeWhatsAppDirectiveConfig(
-          home,
+  // Vitest: ~155s due to Vite transform graph on the /help path; Bun ~11s. Root cause tracked.
+  it(
+    "keeps reserved command aliases from matching after trimming",
+    { timeout: 300_000 },
+    async () => {
+      await withTempHome(async (home) => {
+        const res = await getReplyFromConfig(
           {
-            model: "anthropic/claude-opus-4-6",
-            models: {
-              "anthropic/claude-opus-4-6": { alias: " help " },
-            },
+            Body: "/help",
+            From: "+1222",
+            To: "+1222",
+            CommandAuthorized: true,
           },
-          { session: { store: sessionStorePath(home) } },
-        ),
-      );
+          {},
+          makeWhatsAppDirectiveConfig(
+            home,
+            {
+              model: "anthropic/claude-opus-4-6",
+              models: {
+                "anthropic/claude-opus-4-6": { alias: " help " },
+              },
+            },
+            { session: { store: sessionStorePath(home) } },
+          ),
+        );
 
-      const text = replyText(res);
-      expect(text).toContain("Help");
-      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-    });
-  });
+        const text = replyText(res);
+        expect(text).toContain("Help");
+        expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+      });
+    },
+  );
   it("treats skill commands as reserved for model aliases", async () => {
     await withTempHome(async (home) => {
       const workspace = path.join(home, "openclaw");
