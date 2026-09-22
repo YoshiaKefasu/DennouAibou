@@ -14,6 +14,10 @@ import { extensionForMime } from "../../media/mime.js";
 import { loadWebMedia } from "../../media/web-media.js";
 import { readBooleanParam as readBooleanParamShared } from "../../plugin-sdk/boolean-param.js";
 
+export type MessageActionParamsDeps = {
+  loadWebMedia: typeof loadWebMedia;
+};
+
 export const readBooleanParam = readBooleanParamShared;
 
 const SANDBOX_MEDIA_PARAM_KEYS = ["media", "path", "filePath", "mediaUrl", "fileUrl"] as const;
@@ -174,6 +178,7 @@ async function hydrateAttachmentPayload(params: {
   mediaHint?: string | null;
   fileHint?: string | null;
   mediaPolicy: AttachmentMediaPolicy;
+  deps?: MessageActionParamsDeps;
 }) {
   const contentTypeParam = params.contentTypeParam ?? undefined;
   const rawBuffer = readStringParam(params.args, "buffer", { trim: false });
@@ -197,7 +202,8 @@ async function hydrateAttachmentPayload(params: {
       channel: params.channel,
       accountId: params.accountId,
     });
-    const media = await loadWebMedia(
+    const loadWebMediaFn = params.deps?.loadWebMedia ?? loadWebMedia;
+    const media = await loadWebMediaFn(
       mediaSource,
       buildAttachmentMediaLoadOptions({ policy: params.mediaPolicy, maxBytes }),
     );
@@ -275,6 +281,7 @@ async function hydrateAttachmentActionPayload(params: {
   /** If caption is missing, copy message -> caption. */
   allowMessageCaptionFallback?: boolean;
   mediaPolicy: AttachmentMediaPolicy;
+  deps?: MessageActionParamsDeps;
 }): Promise<void> {
   const mediaHint = readAttachmentMediaHint(params.args);
   const fileHint = readAttachmentFileHint(params.args);
@@ -299,6 +306,7 @@ async function hydrateAttachmentActionPayload(params: {
     mediaHint,
     fileHint,
     mediaPolicy: params.mediaPolicy,
+    deps: params.deps,
   });
 }
 
@@ -310,6 +318,7 @@ export async function hydrateAttachmentParamsForAction(params: {
   action: ChannelMessageActionName;
   dryRun?: boolean;
   mediaPolicy: AttachmentMediaPolicy;
+  deps?: MessageActionParamsDeps;
 }): Promise<void> {
   const shouldHydrateUploadFile = params.action === "upload-file";
   if (
@@ -326,6 +335,7 @@ export async function hydrateAttachmentParamsForAction(params: {
     args: params.args,
     dryRun: params.dryRun,
     mediaPolicy: params.mediaPolicy,
+    deps: params.deps,
     allowMessageCaptionFallback: params.action === "sendAttachment" || shouldHydrateUploadFile,
   });
 }

@@ -33,6 +33,7 @@ import type { OutboundSendDeps } from "./deliver.js";
 import { normalizeMessageActionInput } from "./message-action-normalization.js";
 import {
   hydrateAttachmentParamsForAction,
+  type MessageActionParamsDeps,
   normalizeSandboxMediaList,
   normalizeSandboxMediaParams,
   parseButtonsParam,
@@ -105,7 +106,9 @@ export type RunMessageActionParams = {
   sessionId?: string;
   toolContext?: ChannelThreadingToolContext;
   gateway?: MessageActionRunnerGateway;
-  deps?: OutboundSendDeps;
+  deps?: OutboundSendDeps & {
+    loadWebMedia?: MessageActionParamsDeps["loadWebMedia"];
+  };
   sessionKey?: string;
   agentId?: string;
   sandboxRoot?: string;
@@ -795,6 +798,7 @@ export async function runMessageAction(
     action,
     dryRun,
     mediaPolicy,
+    deps: input.deps?.loadWebMedia ? { loadWebMedia: input.deps.loadWebMedia } : undefined,
   });
 
   const resolvedTarget = await resolveActionTarget({

@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { jsonResult } from "../../agents/tools/common.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
@@ -13,7 +12,10 @@ import {
   createTestRegistry,
 } from "../../test-utils/channel-plugins.js";
 import { resolvePreferredOpenClawTmpDir } from "../tmp-openclaw-dir.js";
-import { runMessageAction, setMessageActionRunnerDepsForTest } from "./message-action-runner.js";
+import {
+  runMessageAction as runMessageActionWithoutMediaDeps,
+  setMessageActionRunnerDepsForTest,
+} from "./message-action-runner.js";
 
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5m8gAAAABJRU5ErkJggg==",
@@ -50,16 +52,6 @@ function prepareMirrorRoute(params: {
   if (params.agentId) params.actionParams.__agentId = params.agentId;
   return { resolvedThreadId, outboundRoute: null };
 }
-
-vi.mock("../../media/web-media.js", async () => {
-  const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
-    "../../media/web-media.js",
-  );
-  return {
-    ...actual,
-    loadWebMedia: vi.fn(actual.loadWebMedia),
-  };
-});
 
 const slackConfig = {
   channels: {
@@ -123,7 +115,15 @@ async function expectSandboxMediaRewrite(params: {
   );
 }
 
-let actualLoadWebMedia: typeof loadWebMedia;
+const loadWebMediaMock = vi.fn(loadWebMedia);
+const runMessageAction = (params: Parameters<typeof runMessageActionWithoutMediaDeps>[0]) =>
+  runMessageActionWithoutMediaDeps({
+    ...params,
+    deps: {
+      ...params.deps,
+      loadWebMedia: loadWebMediaMock,
+    },
+  });
 
 const slackPlugin: ChannelPlugin = {
   ...createChannelTestPluginBase({
@@ -169,9 +169,6 @@ describe("runMessageAction media behavior", () => {
     });
     channelResolutionMocks.resolveAndApplyOutboundThreadId.mockImplementation(resolveThreadId);
     channelResolutionMocks.prepareOutboundMirrorRoute.mockImplementation(prepareMirrorRoute);
-    actualLoadWebMedia ??= (
-      await vi.importActual<typeof import("../../media/web-media.js")>("../../media/web-media.js")
-    ).loadWebMedia;
     vi.restoreAllMocks();
     vi.clearAllMocks();
     channelResolutionMocks.resolveOutboundChannelPlugin.mockReset();
@@ -215,8 +212,8 @@ describe("runMessageAction media behavior", () => {
     channelResolutionMocks.executePollAction.mockImplementation(async () => {
       throw new Error("executePollAction should not run in media tests");
     });
-    (loadWebMedia as Mock).mockReset();
-    (loadWebMedia as Mock).mockImplementation(actualLoadWebMedia);
+    loadWebMediaMock.mockReset();
+    loadWebMediaMock.mockImplementation(loadWebMedia);
   });
 
   afterEach(() => {
@@ -273,7 +270,7 @@ describe("runMessageAction media behavior", () => {
           },
         ]),
       );
-      (loadWebMedia as Mock).mockResolvedValue({
+      loadWebMediaMock.mockResolvedValue({
         buffer: Buffer.from("hello"),
         contentType: "image/png",
         kind: "image",
@@ -287,10 +284,7 @@ describe("runMessageAction media behavior", () => {
     });
 
     async function restoreRealMediaLoader() {
-      const actual = await vi.importActual<typeof import("../../media/web-media.js")>(
-        "../../media/web-media.js",
-      );
-      (loadWebMedia as Mock).mockImplementation(actual.loadWebMedia);
+      loadWebMediaMock.mockImplementation(loadWebMedia);
     }
 
     async function expectRejectsLocalAbsolutePathWithoutSandbox(params: {
@@ -351,7 +345,7 @@ describe("runMessageAction media behavior", () => {
       expect((result.payload as { buffer?: string }).buffer).toBe(
         Buffer.from("hello").toString("base64"),
       );
-      const call = (loadWebMedia as Mock).mock.calls[0];
+      const call = loadWebMediaMock.mock.calls[0];
       expect(call?.[1]).toEqual(
         expect.objectContaining({
           localRoots: "any",
@@ -485,7 +479,7 @@ describe("runMessageAction media behavior", () => {
           expectedPath: path.join("icons", "group.png"),
         },
       ]) {
-        (loadWebMedia as Mock).mockClear();
+        loadWebMediaMock.mockClear();
         await withSandbox(async (sandboxDir) => {
           await runMessageAction({
             cfg,
@@ -499,7 +493,7 @@ describe("runMessageAction media behavior", () => {
             sandboxRoot: sandboxDir,
           });
 
-          const call = (loadWebMedia as Mock).mock.calls[0];
+          const call = loadWebMediaMock.mock.calls[0];
           expect(call?.[0], testCase.name).toBe(path.join(sandboxDir, testCase.expectedPath));
           expect(call?.[1], testCase.name).toEqual(
             expect.objectContaining({

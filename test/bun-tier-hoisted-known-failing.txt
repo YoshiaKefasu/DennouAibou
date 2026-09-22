@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 40 files.
+# Current known-failure count: 39 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -51,10 +51,9 @@ src/plugins/conversation-binding.test.ts
 
 # async-timer (0 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 
-# timeout (5 files; no conclusive result within the 40s process guard)
+# timeout (4 files; no conclusive result within the 40s process guard)
 src/commands/onboard-channels.e2e.test.ts
 src/infra/bonjour.test.ts
-src/infra/outbound/message-action-runner.media.test.ts
 test/scripts/test-report-utils.test.ts
 ui/src/ui/app-gateway.node.test.ts
 
