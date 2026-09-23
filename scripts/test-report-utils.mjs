@@ -37,11 +37,13 @@ export function runVitestJsonReport({
   config,
   reportPath = "",
   prefix = "openclaw-vitest-report",
+  deps,
 }) {
   const resolvedReportPath = reportPath || path.join(os.tmpdir(), `${prefix}-${Date.now()}.json`);
 
   if (!(reportPath && fs.existsSync(resolvedReportPath))) {
-    const run = spawnSync(
+    const spawnSyncFn = deps?.spawnSync ?? spawnSync;
+    const run = spawnSyncFn(
       "pnpm",
       [
         "exec",

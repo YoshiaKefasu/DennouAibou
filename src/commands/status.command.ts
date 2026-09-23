@@ -85,6 +85,28 @@ function resolvePairingRecoveryContext(params: {
   return { requestId: requestId || null };
 }
 
+/**
+ * Injectable seams for the `status` command boundaries.
+ *
+ * The command keeps its delayed-import structure: every entry below is still
+ * loaded lazily when the matching `deps` field is absent. Tests supply
+ * fixtures through `deps` instead of replacing whole modules with the test
+ * runner's module-mocking hooks.
+ * Omitting `deps` keeps behaviour byte-for-byte identical to the previous
+ * implementation (each seam resolves at call time, never at module load).
+ */
+export type StatusCommandDeps = {
+  /** Replaces the delayed `./status.scan.js#scanStatus` (formatted path). */
+  scanStatus?: typeof import("./status.scan.js").scanStatus;
+  /** Replaces the delayed `./status.scan.fast-json.js#scanStatusJsonFast`. */
+  scanStatusJsonFast?: typeof import("./status.scan.fast-json.js").scanStatusJsonFast;
+  /** Replaces the delayed `../security/audit.runtime.js#runSecurityAudit`. */
+  runSecurityAudit?: typeof import("../security/audit.runtime.js").runSecurityAudit;
+  /** Replaces the statically imported `./status.daemon.js` summaries. */
+  getDaemonStatusSummary?: typeof getDaemonStatusSummary;
+  getNodeDaemonStatusSummary?: typeof getNodeDaemonStatusSummary;
+};
+
 export async function statusCommand(
   opts: {
     json?: boolean;
@@ -95,6 +117,7 @@ export async function statusCommand(
     all?: boolean;
   },
   runtime: RuntimeEnv,
+  deps: StatusCommandDeps = {},
 ) {
   if (opts.all && !opts.json) {
     await loadStatusAllModule().then(({ statusAllCommand }) =>
@@ -104,22 +127,25 @@ export async function statusCommand(
   }
 
   const scan = opts.json
-    ? await loadStatusScanFastJsonModule().then(({ scanStatusJsonFast }) =>
-        scanStatusJsonFast({ timeoutMs: opts.timeoutMs, all: opts.all }, runtime),
+    ? await (deps.scanStatusJsonFast ?? (await loadStatusScanFastJsonModule()).scanStatusJsonFast)(
+        { timeoutMs: opts.timeoutMs, all: opts.all },
+        runtime,
       )
-    : await loadStatusScanModule().then(({ scanStatus }) =>
-        scanStatus({ json: false, timeoutMs: opts.timeoutMs, all: opts.all }, runtime),
+    : await (deps.scanStatus ?? (await loadStatusScanModule()).scanStatus)(
+        { json: false, timeoutMs: opts.timeoutMs, all: opts.all },
+        runtime,
       );
-  const runSecurityAudit = async () =>
-    await loadSecurityAuditModule().then(({ runSecurityAudit }) =>
-      runSecurityAudit({
-        config: scan.cfg,
-        sourceConfig: scan.sourceConfig,
-        deep: false,
-        includeFilesystem: true,
-        includeChannelSecurity: true,
-      }),
-    );
+  const runSecurityAudit = async () => {
+    const runSecurityAuditImpl =
+      deps.runSecurityAudit ?? (await loadSecurityAuditModule()).runSecurityAudit;
+    return await runSecurityAuditImpl({
+      config: scan.cfg,
+      sourceConfig: scan.sourceConfig,
+      deep: false,
+      includeFilesystem: true,
+      includeChannelSecurity: true,
+    });
+  };
   const securityAudit = opts.json
     ? await runSecurityAudit()
     : await withProgress(
@@ -193,8 +219,8 @@ export async function statusCommand(
 
   if (opts.json) {
     const [daemon, nodeDaemon] = await Promise.all([
-      getDaemonStatusSummary(),
-      getNodeDaemonStatusSummary(),
+      (deps.getDaemonStatusSummary ?? getDaemonStatusSummary)(),
+      (deps.getNodeDaemonStatusSummary ?? getNodeDaemonStatusSummary)(),
     ]);
     writeRuntimeJson(runtime, {
       ...summary,
@@ -287,8 +313,8 @@ export async function statusCommand(
       : "disabled";
 
   const [daemon, nodeDaemon] = await Promise.all([
-    getDaemonStatusSummary(),
-    getNodeDaemonStatusSummary(),
+    (deps.getDaemonStatusSummary ?? getDaemonStatusSummary)(),
+    (deps.getNodeDaemonStatusSummary ?? getNodeDaemonStatusSummary)(),
   ]);
   const nodeOnlyGateway = await loadStatusNodeModeModule().then(({ resolveNodeOnlyGatewayInfo }) =>
     resolveNodeOnlyGatewayInfo({

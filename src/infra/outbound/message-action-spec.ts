@@ -67,6 +67,10 @@ type ActionTargetAliasSpec = {
   aliases: string[];
 };
 
+export type MessageActionSpecDeps = {
+  getBootstrapChannelPlugin?: typeof getBootstrapChannelPlugin;
+};
+
 const ACTION_TARGET_ALIASES: Partial<Record<ChannelMessageActionName, ActionTargetAliasSpec>> = {
   unsend: { aliases: ["messageId"] },
   edit: { aliases: ["messageId"] },
@@ -81,6 +85,7 @@ const ACTION_TARGET_ALIASES: Partial<Record<ChannelMessageActionName, ActionTarg
 function listActionTargetAliasSpecs(
   action: ChannelMessageActionName,
   channel?: string,
+  deps?: MessageActionSpecDeps,
 ): ActionTargetAliasSpec[] {
   const specs: ActionTargetAliasSpec[] = [];
   const coreSpec = ACTION_TARGET_ALIASES[action];
@@ -91,7 +96,8 @@ function listActionTargetAliasSpecs(
   if (!normalizedChannel) {
     return specs;
   }
-  const plugin = getBootstrapChannelPlugin(normalizedChannel);
+  const lookupBootstrapChannelPlugin = deps?.getBootstrapChannelPlugin ?? getBootstrapChannelPlugin;
+  const plugin = lookupBootstrapChannelPlugin(normalizedChannel);
   const channelSpec = plugin?.actions?.messageActionTargetAliases?.[action];
   if (channelSpec) {
     specs.push(channelSpec);
@@ -106,7 +112,7 @@ export function actionRequiresTarget(action: ChannelMessageActionName): boolean 
 export function actionHasTarget(
   action: ChannelMessageActionName,
   params: Record<string, unknown>,
-  options?: { channel?: string },
+  options?: { channel?: string; deps?: MessageActionSpecDeps },
 ): boolean {
   const to = typeof params.to === "string" ? params.to.trim() : "";
   if (to) {
@@ -116,7 +122,7 @@ export function actionHasTarget(
   if (channelId) {
     return true;
   }
-  const specs = listActionTargetAliasSpecs(action, options?.channel);
+  const specs = listActionTargetAliasSpecs(action, options?.channel, options?.deps);
   if (specs.length === 0) {
     return false;
   }

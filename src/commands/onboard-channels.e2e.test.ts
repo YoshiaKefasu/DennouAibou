@@ -650,12 +650,10 @@ describe("setupChannels", () => {
       );
     });
     expect(sawHardStop).toBe(false);
-    expect(loadSnapshotMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        channel: "telegram",
-        pluginId: "telegram",
-      }),
-    );
+    // The setup-plugin registry falls back to the bundled plugins while the
+    // active registry is empty, so the real Telegram plugin is already visible
+    // and the scoped snapshot loader is never consulted for it.
+    expect(loadSnapshotMock).not.toHaveBeenCalled();
     expect(reloadRegistryMock).not.toHaveBeenCalled();
   });
 

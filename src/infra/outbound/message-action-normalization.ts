@@ -7,12 +7,17 @@ import {
   normalizeMessageChannel,
 } from "../../utils/message-channel.js";
 import { applyTargetToParams } from "./channel-target.js";
-import { actionHasTarget, actionRequiresTarget } from "./message-action-spec.js";
+import {
+  actionHasTarget,
+  actionRequiresTarget,
+  type MessageActionSpecDeps,
+} from "./message-action-spec.js";
 
 export function normalizeMessageActionInput(params: {
   action: ChannelMessageActionName;
   args: Record<string, unknown>;
   toolContext?: ChannelThreadingToolContext;
+  deps?: MessageActionSpecDeps;
 }): Record<string, unknown> {
   const normalizedArgs = { ...params.args };
   const { action, toolContext } = params;
@@ -38,7 +43,7 @@ export function normalizeMessageActionInput(params: {
     !explicitTarget &&
     !hasLegacyTarget &&
     actionRequiresTarget(action) &&
-    !actionHasTarget(action, normalizedArgs, { channel: inferredChannel })
+    !actionHasTarget(action, normalizedArgs, { channel: inferredChannel, deps: params.deps })
   ) {
     const inferredTarget = toolContext?.currentChannelId?.trim();
     if (inferredTarget) {
@@ -67,7 +72,7 @@ export function normalizeMessageActionInput(params: {
   applyTargetToParams({ action, args: normalizedArgs });
   if (
     actionRequiresTarget(action) &&
-    !actionHasTarget(action, normalizedArgs, { channel: inferredChannel })
+    !actionHasTarget(action, normalizedArgs, { channel: inferredChannel, deps: params.deps })
   ) {
     throw new Error(`Action ${action} requires a target.`);
   }

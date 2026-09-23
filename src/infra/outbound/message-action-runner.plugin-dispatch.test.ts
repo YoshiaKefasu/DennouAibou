@@ -19,6 +19,7 @@ const mocks = {
   resolveOutboundSessionRoute: vi.fn(async () => null),
   resolveAndApplyOutboundThreadId: vi.fn(),
   prepareOutboundMirrorRoute: vi.fn(),
+  getBootstrapChannelPlugin: vi.fn(),
 };
 
 function resolveThreadId(
@@ -131,7 +132,9 @@ describe("runMessageAction plugin dispatch", () => {
       resolveOutboundSessionRoute: mocks.resolveOutboundSessionRoute,
       resolveAndApplyOutboundThreadId: mocks.resolveAndApplyOutboundThreadId,
       prepareOutboundMirrorRoute: mocks.prepareOutboundMirrorRoute,
+      getBootstrapChannelPlugin: mocks.getBootstrapChannelPlugin,
     });
+    mocks.getBootstrapChannelPlugin.mockReset();
     mocks.resolveAndApplyOutboundThreadId.mockImplementation(resolveThreadId);
     mocks.prepareOutboundMirrorRoute.mockImplementation(prepareMirrorRoute);
     mocks.resolveOutboundChannelPlugin.mockReset();
@@ -178,11 +181,18 @@ describe("runMessageAction plugin dispatch", () => {
         describeMessageTool: () => ({ actions: ["pin", "list-pins", "member-info"] }),
         supportsAction: ({ action }) =>
           action === "pin" || action === "list-pins" || action === "member-info",
+        messageActionTargetAliases: {
+          pin: { aliases: ["messageId"] },
+          "list-pins": { aliases: ["chatId"] },
+        },
         handleAction,
       },
     };
 
     beforeEach(() => {
+      mocks.getBootstrapChannelPlugin.mockImplementation((id: string) =>
+        id === "feishu" ? feishuLikePlugin : undefined,
+      );
       setActivePluginRegistry(
         createTestRegistry([
           {

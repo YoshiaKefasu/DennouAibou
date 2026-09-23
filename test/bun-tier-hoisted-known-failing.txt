@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 24 files.
+# Current known-failure count: 20 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -43,9 +43,7 @@ src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox
 
 # async-timer (0 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 
-# timeout (3 files; no conclusive result within the 40s process guard)
-src/commands/onboard-channels.e2e.test.ts
-test/scripts/test-report-utils.test.ts
+# timeout (1 file; no conclusive result within the 40s process guard)
 ui/src/ui/app-gateway.node.test.ts
 
 # runtime/export (0 files; Bun module surface differs from the Vitest runtime)
@@ -56,12 +54,10 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (8 files; initial after-250 batch, with reason in beyond250-results)
-src/commands/status.test.ts
+# measured-failure (6 files; initial after-250 batch, with reason in beyond250-results)
 src/gateway/server.cron.test.ts
 src/gateway/server.reload.test.ts
 src/gateway/server.sessions.gateway-server-sessions-a.test.ts
 src/infra/exec-approvals-store.test.ts
-src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
 src/tasks/task-executor.test.ts

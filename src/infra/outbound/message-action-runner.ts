@@ -6,6 +6,7 @@ import {
   readStringParam,
 } from "../../agents/tools/common.js";
 import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
+import { getBootstrapChannelPlugin } from "../../channels/plugins/bootstrap-registry.js";
 import { getChannelPlugin } from "../../channels/plugins/index.js";
 import { dispatchChannelMessageAction } from "../../channels/plugins/message-action-dispatch.js";
 import type {
@@ -68,6 +69,7 @@ export type MessageActionRunnerDeps = {
   resolveOutboundSessionRoute?: typeof resolveOutboundSessionRoute;
   prepareOutboundMirrorRoute?: typeof prepareOutboundMirrorRoute;
   resolveAndApplyOutboundThreadId?: typeof resolveAndApplyOutboundThreadId;
+  getBootstrapChannelPlugin?: typeof getBootstrapChannelPlugin;
 };
 
 let messageActionRunnerDeps: MessageActionRunnerDeps = {};
@@ -84,6 +86,7 @@ function resolveMessageActionRunnerDeps(): Required<MessageActionRunnerDeps> {
     resolveOutboundSessionRoute,
     prepareOutboundMirrorRoute,
     resolveAndApplyOutboundThreadId,
+    getBootstrapChannelPlugin,
     ...messageActionRunnerDeps,
   };
 }
@@ -755,6 +758,9 @@ export async function runMessageAction(
     action,
     args: params,
     toolContext: input.toolContext,
+    deps: {
+      getBootstrapChannelPlugin: resolveMessageActionRunnerDeps().getBootstrapChannelPlugin,
+    },
   });
 
   const channel = await resolveChannel(cfg, params, input.toolContext);
