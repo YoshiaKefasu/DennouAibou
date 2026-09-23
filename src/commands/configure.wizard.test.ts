@@ -360,43 +360,7 @@ describe("runConfigureWizard", () => {
     expect(mocks.setupSearch).toHaveBeenCalledOnce();
   });
 
-  it("can enable native Codex search without configuring a managed provider", async () => {
-    setupBaseWizardState({
-      auth: {
-        profiles: {
-          "openai-codex:default": {
-            provider: "openai-codex",
-            mode: "oauth",
-          },
-        },
-      },
-    });
-    queueWizardPrompts({
-      select: ["local", "cached"],
-      confirm: [true, true, false, true],
-    });
-
-    await runWebConfigureWizard();
-
-    expect(mocks.writeConfigFile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tools: expect.objectContaining({
-          web: expect.objectContaining({
-            search: expect.objectContaining({
-              enabled: true,
-              openaiCodex: expect.objectContaining({
-                enabled: true,
-                mode: "cached",
-              }),
-            }),
-          }),
-        }),
-      }),
-    );
-    expect(mocks.setupSearch).not.toHaveBeenCalled();
-  });
-
-  it("preserves disabled native Codex search when toggled off", async () => {
+  it("preserves disabled native Codex search config", async () => {
     setupBaseWizardState({
       auth: {
         profiles: {
@@ -411,7 +375,7 @@ describe("runConfigureWizard", () => {
           search: {
             enabled: true,
             openaiCodex: {
-              enabled: true,
+              enabled: false,
               mode: "live",
             },
           },

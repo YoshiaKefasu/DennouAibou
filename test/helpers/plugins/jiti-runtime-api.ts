@@ -229,7 +229,13 @@ console.log(
 );
 `;
 
-  const raw = execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
+  // Note: Bun rejects `Error.captureStackTrace(this, ...)` for the
+  // not-yet-initialized `this` that jiti's transform of `follow-redirects`
+  // passes (axios -> @line/bot-sdk -> follow-redirects), so the jiti loader
+  // subprocess always runs under Node: the current runtime's executable when
+  // it already is Node, otherwise the `node` found on PATH.
+  const execPath = process.versions.bun ? "node" : process.execPath;
+  const raw = execFileSync(execPath, ["--input-type=module", "--eval", script], {
     cwd: root,
     encoding: "utf-8",
   });

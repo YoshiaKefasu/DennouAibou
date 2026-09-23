@@ -1,5 +1,7 @@
 import os from "node:os";
+import { setTimeout as sleepReal } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../test/helpers/poll.js";
 import * as logging from "../logging.js";
 import { startGatewayBonjourAdvertiser, type GatewayBonjourAdvertiseDeps } from "./bonjour.js";
 
@@ -271,7 +273,6 @@ describe("gateway bonjour advertiser", () => {
 
   it("logs advertise failures and retries via watchdog", async () => {
     enableAdvertiserUnitMode();
-    vi.useFakeTimers();
 
     const destroy = vi.fn().mockResolvedValue(undefined);
     const advertise = vi
@@ -291,19 +292,26 @@ describe("gateway bonjour advertiser", () => {
     // initial advertise attempt happens immediately
     expect(advertise).toHaveBeenCalledTimes(1);
 
-    // allow promise rejection handler to run
-    await Promise.resolve();
-    expect(logWarn).toHaveBeenCalledWith(expect.stringContaining("advertise failed"));
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync), so the
+    // 5s watchdog ticks land in wall-clock time and are polled instead.
+    await pollUntilAssert(
+      () => expect(logWarn).toHaveBeenCalledWith(expect.stringContaining("advertise failed")),
+      { timeoutMs: 5_000 },
+    );
 
     // watchdog first retries, then recreates the advertiser after the service
     // stays unhealthy across multiple 5s ticks.
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(advertise).toHaveBeenCalledTimes(3);
-    expect(createService).toHaveBeenCalledTimes(2);
+    await pollUntilAssert(
+      () => {
+        expect(advertise).toHaveBeenCalledTimes(3);
+        expect(createService).toHaveBeenCalledTimes(2);
+      },
+      { timeoutMs: 25_000 },
+    );
 
     await started.stop();
 
-    await vi.advanceTimersByTimeAsync(60_000);
+    await sleepReal(60_000);
     expect(advertise).toHaveBeenCalledTimes(3);
   });
 
@@ -366,7 +374,6 @@ describe("gateway bonjour advertiser", () => {
 
   it("recreates the advertiser when ciao gets stuck announcing", async () => {
     enableAdvertiserUnitMode();
-    vi.useFakeTimers();
 
     const stateRef = { value: "announcing" };
     const events: string[] = [];
@@ -397,14 +404,18 @@ describe("gateway bonjour advertiser", () => {
     expect(createService).toHaveBeenCalledTimes(1);
     expect(advertise).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(15_000);
-
-    expect(logWarn).toHaveBeenCalledWith(expect.stringContaining("restarting advertiser"));
-    expect(createService).toHaveBeenCalledTimes(2);
-    expect(advertise).toHaveBeenCalledTimes(2);
-    expect(destroy).toHaveBeenCalledTimes(1);
-    expect(shutdown).toHaveBeenCalledTimes(1);
-    expect(events).toEqual(["advertise:1", "destroy", "advertise:2"]);
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync).
+    await pollUntilAssert(
+      () => {
+        expect(logWarn).toHaveBeenCalledWith(expect.stringContaining("restarting advertiser"));
+        expect(createService).toHaveBeenCalledTimes(2);
+        expect(advertise).toHaveBeenCalledTimes(2);
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(shutdown).toHaveBeenCalledTimes(1);
+        expect(events).toEqual(["advertise:1", "destroy", "advertise:2"]);
+      },
+      { timeoutMs: 25_000 },
+    );
 
     await started.stop();
     expect(destroy).toHaveBeenCalledTimes(2);
@@ -413,7 +424,6 @@ describe("gateway bonjour advertiser", () => {
 
   it("treats probing-to-announcing churn as one unhealthy window", async () => {
     enableAdvertiserUnitMode();
-    vi.useFakeTimers();
 
     const stateRef = { value: "probing" };
     let advertiseCount = 0;
@@ -441,13 +451,19 @@ describe("gateway bonjour advertiser", () => {
     expect(createService).toHaveBeenCalledTimes(1);
     expect(advertise).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(15_000);
-
-    expect(logWarn).toHaveBeenCalledWith(expect.stringContaining("service stuck in announcing"));
-    expect(createService).toHaveBeenCalledTimes(2);
-    expect(advertise).toHaveBeenCalledTimes(3);
-    expect(destroy).toHaveBeenCalledTimes(1);
-    expect(shutdown).toHaveBeenCalledTimes(1);
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync).
+    await pollUntilAssert(
+      () => {
+        expect(logWarn).toHaveBeenCalledWith(
+          expect.stringContaining("service stuck in announcing"),
+        );
+        expect(createService).toHaveBeenCalledTimes(2);
+        expect(advertise).toHaveBeenCalledTimes(3);
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(shutdown).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 25_000 },
+    );
 
     await started.stop();
   });

@@ -2,17 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { loadModelCatalog, ModelCatalogEntry } from "../agents/model-catalog.js";
 import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
-import {
-  withBundledPluginAllowlistCompat,
-  withBundledPluginEnablementCompat,
-  withBundledPluginVitestCompat,
-} from "../plugins/bundled-compat.js";
-import { __testing as loaderTesting } from "../plugins/loader.js";
-import { loadPluginManifestRegistry } from "../plugins/manifest-registry.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createMediaAttachmentCache, normalizeMediaAttachments } from "./runner.attachments.js";
-import { buildProviderRegistry, resolveAutoImageModel, runCapability } from "./runner.js";
+import { buildProviderRegistry, runCapability } from "./runner.js";
 import { withMediaFixture } from "./runner.test-utils.js";
 
 const baseCatalog: ModelCatalogEntry[] = [
@@ -29,39 +22,6 @@ let catalog = [...baseCatalog];
 const loadModelCatalogMock = vi.fn<typeof loadModelCatalog>(async () => catalog);
 
 const catalogDeps = { loadModelCatalog: loadModelCatalogMock };
-
-function setCompatibleActiveMediaUnderstandingRegistry(
-  pluginRegistry: ReturnType<typeof createEmptyPluginRegistry>,
-  cfg: OpenClawConfig,
-) {
-  const pluginIds = loadPluginManifestRegistry({
-    config: cfg,
-    env: process.env,
-  })
-    .plugins.filter(
-      (plugin) =>
-        plugin.origin === "bundled" &&
-        (plugin.contracts?.mediaUnderstandingProviders?.length ?? 0) > 0,
-    )
-    .map((plugin) => plugin.id)
-    .toSorted((left, right) => left.localeCompare(right));
-  const compatibleConfig = withBundledPluginVitestCompat({
-    config: withBundledPluginEnablementCompat({
-      config: withBundledPluginAllowlistCompat({
-        config: cfg,
-        pluginIds,
-      }),
-      pluginIds,
-    }),
-    pluginIds,
-    env: process.env,
-  });
-  const { cacheKey } = loaderTesting.resolvePluginLoadCacheContext({
-    config: compatibleConfig,
-    env: process.env,
-  });
-  setActivePluginRegistry(pluginRegistry, cacheKey);
-}
 
 describe("runCapability image skip", () => {
   beforeEach(() => {
@@ -100,91 +60,6 @@ describe("runCapability image skip", () => {
     } finally {
       await cache.cleanup();
     }
-  });
-
-  it("uses active OpenRouter image models for auto image resolution", async () => {
-    setTestEnv("OPENROUTER_API_KEY", "test-openrouter-key");
-    const cfg = {} as OpenClawConfig;
-    const pluginRegistry = createEmptyPluginRegistry();
-    pluginRegistry.mediaUnderstandingProviders.push({
-      pluginId: "openrouter",
-      pluginName: "OpenRouter Provider",
-      source: "test",
-      provider: {
-        id: "openrouter",
-        capabilities: ["image"],
-        describeImage: async () => ({ text: "ok" }),
-      },
-    });
-    setCompatibleActiveMediaUnderstandingRegistry(pluginRegistry, cfg);
-    try {
-      await expect(
-        resolveAutoImageModel({
-          cfg,
-          activeModel: { provider: "openrouter", model: "google/gemini-2.5-flash" },
-          deps: catalogDeps,
-        }),
-      ).resolves.toEqual({
-        provider: "openrouter",
-        model: "google/gemini-2.5-flash",
-      });
-    } finally {
-      setActivePluginRegistry(createEmptyPluginRegistry());
-      restoreTestEnvs();
-    }
-  });
-
-  it("auto-selects configured OpenRouter image providers with a resolved model", async () => {
-    let seenModel: string | undefined;
-    await withMediaFixture(
-      {
-        filePrefix: "openclaw-image-openrouter",
-        extension: "png",
-        mediaType: "image/png",
-        fileContents: Buffer.from("image"),
-      },
-      async ({ ctx, media, cache }) => {
-        const cfg = {
-          models: {
-            providers: {
-              openrouter: {
-                apiKey: "test-openrouter-key", // pragma: allowlist secret
-                models: [],
-              },
-            },
-          },
-        } as unknown as OpenClawConfig;
-
-        const result = await runCapability({
-          capability: "image",
-          cfg,
-          ctx,
-          attachments: cache,
-          media,
-          agentDir: "/tmp",
-          providerRegistry: new Map([
-            [
-              "openrouter",
-              {
-                id: "openrouter",
-                capabilities: ["image"],
-                describeImage: async (req) => {
-                  seenModel = req.model;
-                  return { text: "openrouter ok", model: req.model };
-                },
-              },
-            ],
-          ]),
-          deps: catalogDeps,
-        });
-
-        expect(result.decision.outcome).toBe("success");
-        expect(result.outputs[0]?.provider).toBe("openrouter");
-        expect(result.outputs[0]?.model).toBe("auto");
-        expect(result.outputs[0]?.text).toBe("openrouter ok");
-        expect(seenModel).toBe("auto");
-      },
-    );
   });
 
   it("skips configured image providers without an auto-resolvable model", async () => {

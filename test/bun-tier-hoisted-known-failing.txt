@@ -13,7 +13,7 @@
 # per-test module lifecycle semantics or rely on another unsupported API.
 # Re-check an entry when the test is split or Bun gains the missing API.
 #
-# Current known-failure count: 31 files.
+# Current known-failure count: 24 files.
 #
 # Categories:
 #   reset/dynamic-mock: vi.resetModules, vi.doMock, or a helper that uses them
@@ -35,19 +35,16 @@ src/auto-reply/reply.triggers.trigger-handling.stages-inbound-media-into-sandbox
 # hook-hang (0 files)
 # Loads fine; beforeEach/afterEach hook hangs to the 120s timeout; `--timeout` CLI is ignored for hooks.
 
-# wait/import (1 file)
-extensions/line/src/setup-surface.test.ts
+# wait/import (0 files)
 
-# reset/dynamic-mock (1 additional file; measured after the first 250)
-src/media-understanding/runner.vision-skip.test.ts
+# reset/dynamic-mock (0 additional files; measured after the first 250)
 
 # conditional (0 additional files; measured after the first 250)
 
 # async-timer (0 files; vi.advanceTimersByTimeAsync is not exposed by bun:test)
 
-# timeout (4 files; no conclusive result within the 40s process guard)
+# timeout (3 files; no conclusive result within the 40s process guard)
 src/commands/onboard-channels.e2e.test.ts
-src/infra/bonjour.test.ts
 test/scripts/test-report-utils.test.ts
 ui/src/ui/app-gateway.node.test.ts
 
@@ -59,16 +56,12 @@ ui/src/ui/app-chat.test.ts
 ui/src/ui/app-lifecycle-connect.node.test.ts
 ui/src/ui/gateway.node.test.ts
 
-# measured-failure (12 files; initial after-250 batch, with reason in beyond250-results)
-src/commands/configure.wizard.test.ts
+# measured-failure (8 files; initial after-250 batch, with reason in beyond250-results)
 src/commands/status.test.ts
 src/gateway/server.cron.test.ts
 src/gateway/server.reload.test.ts
 src/gateway/server.sessions.gateway-server-sessions-a.test.ts
 src/infra/exec-approvals-store.test.ts
-src/infra/net/fetch-guard.ssrf.test.ts
 src/infra/outbound/message-action-runner.plugin-dispatch.test.ts
 src/infra/provider-usage.auth.normalizes-keys.test.ts
-src/media-understanding/image.test.ts
-src/secrets/runtime.test.ts
 src/tasks/task-executor.test.ts

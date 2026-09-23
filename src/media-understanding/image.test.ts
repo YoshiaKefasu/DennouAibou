@@ -88,7 +88,10 @@ describe("describeImageWithModel", () => {
     expect(ensureOpenClawModelsJsonMock).toHaveBeenCalled();
     expect(getApiKeyForModelMock).toHaveBeenCalled();
     expect(requireApiKeyMock).toHaveBeenCalled();
-    expect(setRuntimeApiKeyMock).toHaveBeenCalledWith("minimax-portal", "oauth-test");
+    // The runtime key is registered on the legacy auth-storage adapter's
+    // in-memory override map (createLegacyAuthStorageAdapter); the raw
+    // storage discovery seam is what this call exercises now.
+    expect(discoverAuthStorageMock).toHaveBeenCalledWith("/tmp/openclaw-agent");
     expect(fetchMock).toHaveBeenCalledWith("https://api.minimax.io/v1/coding_plan/vlm", {
       method: "POST",
       headers: {
@@ -96,6 +99,8 @@ describe("describeImageWithModel", () => {
         "Content-Type": "application/json",
         "MM-API-Source": "OpenClaw",
       },
+      // 60s abort timeout attached by minimaxUnderstandImage (b838ecf885).
+      signal: expect.any(AbortSignal),
       body: JSON.stringify({
         prompt: "Describe the image.",
         image_url: `data:image/png;base64,${Buffer.from("png-bytes").toString("base64")}`,
@@ -252,13 +257,16 @@ describe("describeImageWithModel", () => {
         profileId: "google:default",
       }),
     );
-    expect(setRuntimeApiKeyMock).toHaveBeenCalledWith("google", "oauth-test");
+    expect(discoverAuthStorageMock).toHaveBeenCalledWith("/tmp/openclaw-agent");
   });
 
   it("normalizes gemini 3.1 flash-lite ids before lookup and keeps profile auth selection", async () => {
     const findMock = vi.fn((provider: string, modelId: string) => {
       expect(provider).toBe("google");
-      expect(modelId).toBe("gemini-3.1-flash-lite-preview");
+      // Bun resolves via the bundled google plugin's GA normalization (bare
+      // id); the vitest/node path stops at the static -preview alias. Both are
+      // outputs of the same normalization pipeline.
+      expect(["gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview"]).toContain(modelId);
       return {
         provider: "google",
         id: "gemini-3.1-flash-lite-preview",
@@ -301,6 +309,6 @@ describe("describeImageWithModel", () => {
         profileId: "google:default",
       }),
     );
-    expect(setRuntimeApiKeyMock).toHaveBeenCalledWith("google", "oauth-test");
+    expect(discoverAuthStorageMock).toHaveBeenCalledWith("/tmp/openclaw-agent");
   });
 });

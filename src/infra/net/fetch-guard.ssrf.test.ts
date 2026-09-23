@@ -6,19 +6,21 @@ import {
 } from "./fetch-guard.js";
 import { TEST_UNDICI_RUNTIME_DEPS_KEY } from "./undici-runtime.js";
 
+// Note: Bun's `vi.fn` mock returns `undefined` when it is invoked with `new`,
+// so the fake undici agents are real constructors that forward their arguments
+// to the `vi.fn` recorders (assertions keep targeting those recorders).
+function createRecordingCtorMock(record: (...args: unknown[]) => void) {
+  return class MockUndiciAgent {
+    constructor(...args: unknown[]) {
+      record(...args);
+    }
+  };
+}
+
 const { agentCtor, envHttpProxyAgentCtor, proxyAgentCtor } = {
-  agentCtor: vi.fn(function MockAgent(this: { options: unknown }, options: unknown) {
-    this.options = options;
-  }),
-  envHttpProxyAgentCtor: vi.fn(function MockEnvHttpProxyAgent(
-    this: { options: unknown },
-    options: unknown,
-  ) {
-    this.options = options;
-  }),
-  proxyAgentCtor: vi.fn(function MockProxyAgent(this: { options: unknown }, options: unknown) {
-    this.options = options;
-  }),
+  agentCtor: vi.fn(),
+  envHttpProxyAgentCtor: vi.fn(),
+  proxyAgentCtor: vi.fn(),
 };
 
 function createPinnedDispatcherCompatibilityError(): Error {
@@ -425,9 +427,9 @@ describe("fetchWithSsrFGuard hardening", () => {
   it("keeps explicit proxy transport policy when DNS pinning is disabled", async () => {
     const lookupFn = createPublicLookup();
     (globalThis as Record<string, unknown>)[TEST_UNDICI_RUNTIME_DEPS_KEY] = {
-      Agent: agentCtor,
-      EnvHttpProxyAgent: envHttpProxyAgentCtor,
-      ProxyAgent: proxyAgentCtor,
+      Agent: createRecordingCtorMock(agentCtor),
+      EnvHttpProxyAgent: createRecordingCtorMock(envHttpProxyAgentCtor),
+      ProxyAgent: createRecordingCtorMock(proxyAgentCtor),
       fetch: vi.fn(async () => okResponse()),
     };
     const fetchImpl = vi.fn(async () => okResponse());
