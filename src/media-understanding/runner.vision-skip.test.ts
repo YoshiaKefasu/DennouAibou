@@ -1,4 +1,5 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { loadModelCatalog, ModelCatalogEntry } from "../agents/model-catalog.js";
 import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
 import {
@@ -11,31 +12,23 @@ import { loadPluginManifestRegistry } from "../plugins/manifest-registry.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createMediaAttachmentCache, normalizeMediaAttachments } from "./runner.attachments.js";
+import { buildProviderRegistry, resolveAutoImageModel, runCapability } from "./runner.js";
 import { withMediaFixture } from "./runner.test-utils.js";
 
-const baseCatalog = [
+const baseCatalog: ModelCatalogEntry[] = [
   {
     id: "gpt-4.1",
     name: "GPT-4.1",
     provider: "openai",
-    input: ["text", "image"] as const,
+    input: ["text", "image"],
   },
 ];
 let catalog = [...baseCatalog];
 
-const loadModelCatalog = vi.hoisted(() => vi.fn(async () => catalog));
+// Call-time seam for the model catalog (replaces the former module-level mocks).
+const loadModelCatalogMock = vi.fn<typeof loadModelCatalog>(async () => catalog);
 
-vi.mock("../agents/model-catalog.js", async () => {
-  const actual = await import("../agents/model-catalog.js");
-  return {
-    ...actual,
-    loadModelCatalog,
-  };
-});
-
-let buildProviderRegistry: typeof import("./runner.js").buildProviderRegistry;
-let resolveAutoImageModel: typeof import("./runner.js").resolveAutoImageModel;
-let runCapability: typeof import("./runner.js").runCapability;
+const catalogDeps = { loadModelCatalog: loadModelCatalogMock };
 
 function setCompatibleActiveMediaUnderstandingRegistry(
   pluginRegistry: ReturnType<typeof createEmptyPluginRegistry>,
@@ -71,20 +64,9 @@ function setCompatibleActiveMediaUnderstandingRegistry(
 }
 
 describe("runCapability image skip", () => {
-  beforeAll(async () => {
-    vi.doMock("../agents/model-catalog.js", async () => {
-      const actual = await import("../agents/model-catalog.js");
-      return {
-        ...actual,
-        loadModelCatalog,
-      };
-    });
-    ({ buildProviderRegistry, resolveAutoImageModel, runCapability } = await import("./runner.js"));
-  });
-
   beforeEach(() => {
     catalog = [...baseCatalog];
-    loadModelCatalog.mockClear();
+    loadModelCatalogMock.mockClear();
     setActivePluginRegistry(createEmptyPluginRegistry());
     restoreTestEnvs();
   });
@@ -104,6 +86,7 @@ describe("runCapability image skip", () => {
         media,
         providerRegistry: buildProviderRegistry(),
         activeModel: { provider: "openai", model: "gpt-4.1" },
+        deps: catalogDeps,
       });
 
       expect(result.outputs).toHaveLength(0);
@@ -139,6 +122,7 @@ describe("runCapability image skip", () => {
         resolveAutoImageModel({
           cfg,
           activeModel: { provider: "openrouter", model: "google/gemini-2.5-flash" },
+          deps: catalogDeps,
         }),
       ).resolves.toEqual({
         provider: "openrouter",
@@ -191,6 +175,7 @@ describe("runCapability image skip", () => {
               },
             ],
           ]),
+          deps: catalogDeps,
         });
 
         expect(result.decision.outcome).toBe("success");
@@ -239,6 +224,7 @@ describe("runCapability image skip", () => {
               },
             ],
           ]),
+          deps: catalogDeps,
         });
 
         expect(result.outputs).toHaveLength(0);

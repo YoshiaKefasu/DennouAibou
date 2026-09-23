@@ -4,22 +4,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
  */
 import { createBaseToolHandlerState } from "../agents/pi-tool-handler-state.test-helpers.js";
 
-const hookMocks = vi.hoisted(() => ({
+const hookMocks = {
   runner: {
     hasHooks: vi.fn(() => false),
     runBeforeToolCall: vi.fn(async () => {}),
     runAfterToolCall: vi.fn(async () => {}),
   },
-}));
-
-vi.mock("../plugins/hook-runner-global.js", () => ({
-  getGlobalHookRunner: () => hookMocks.runner,
-}));
-
-// Mock agent events (used by handlers)
-vi.mock("../infra/agent-events.js", () => ({
-  emitAgentEvent: vi.fn(),
-}));
+};
 
 function createToolHandlerCtx(params: {
   runId: string;

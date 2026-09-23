@@ -88,6 +88,15 @@ export function buildMediaUnderstandingRegistry(
   return registry;
 }
 
+/**
+ * Optional call-time seam for registry construction (skips bundled-plugin
+ * discovery, which re-materializes the active plugin registry).
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type ProviderRegistryDeps = {
+  buildMediaUnderstandingRegistry?: typeof buildMediaUnderstandingRegistry;
+};
+
 export function getMediaUnderstandingProvider(
   id: string,
   registry: Map<string, MediaUnderstandingProvider>,

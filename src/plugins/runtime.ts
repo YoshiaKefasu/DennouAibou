@@ -39,6 +39,22 @@ export function recordImportedPluginId(pluginId: string): void {
   state.importedPluginIds.add(pluginId);
 }
 
+/**
+ * Test-only observation seam for import-time side-effect contracts.
+ * The probe is resolved at call time (never snapshotted at module load), and
+ * the default `null` probe leaves production behavior unchanged.
+ */
+export type ChannelRegistryCallProbe = {
+  onRequireActivePluginChannelRegistry?: () => void;
+  onActivePluginChannelRegistryVersion?: () => void;
+};
+
+let channelRegistryCallProbe: ChannelRegistryCallProbe | null = null;
+
+export function setChannelRegistryCallProbeForTest(probe: ChannelRegistryCallProbe | null): void {
+  channelRegistryCallProbe = probe;
+}
+
 function installSurfaceRegistry(
   surface: RegistrySurfaceState,
   registry: PluginRegistry | null,
@@ -167,10 +183,12 @@ export function getActivePluginChannelRegistry(): PluginRegistry | null {
 }
 
 export function getActivePluginChannelRegistryVersion(): number {
+  channelRegistryCallProbe?.onActivePluginChannelRegistryVersion?.();
   return state.channel.registry ? state.channel.version : state.activeVersion;
 }
 
 export function requireActivePluginChannelRegistry(): PluginRegistry {
+  channelRegistryCallProbe?.onRequireActivePluginChannelRegistry?.();
   const existing = getActivePluginChannelRegistry();
   if (existing) {
     return existing;

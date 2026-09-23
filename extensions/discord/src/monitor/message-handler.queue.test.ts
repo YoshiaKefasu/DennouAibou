@@ -11,7 +11,7 @@ import {
   createDiscordPreflightContext,
 } from "./message-handler.test-helpers.js";
 
-const eventualReplyDeliveredMock = vi.hoisted(() => vi.fn());
+const eventualReplyDeliveredMock = vi.fn();
 type SetStatusFn = (patch: Record<string, unknown>) => void;
 function createDeferred<T = void>() {
   let resolve: (value: T | PromiseLike<T>) => void = () => {};
@@ -119,13 +119,14 @@ async function runSingleMessageTimeout(params: {
   const handler = createDiscordMessageHandler(handlerParams);
 
   await expect(handler(createMessageData("m-1") as never, {} as never)).resolves.toBeUndefined();
-  if (vi.isFakeTimers()) {
-    await vi.advanceTimersByTimeAsync(60);
-  }
-  await Promise.resolve();
 
-  expect(handlerParams.runtime.error).toHaveBeenCalledWith(
-    expect.stringContaining("discord inbound worker timed out after"),
+  await pollUntilAssert(
+    () => {
+      expect(handlerParams.runtime.error).toHaveBeenCalledWith(
+        expect.stringContaining("discord inbound worker timed out after"),
+      );
+    },
+    { timeoutMs: 3_000 },
   );
 
   return handlerParams;
@@ -274,252 +275,214 @@ describe("createDiscordMessageHandler queue behavior", () => {
   });
 
   it("applies explicit inbound worker timeout to queued runs so stalled runs do not block the queue", async () => {
-    vi.useFakeTimers();
-    try {
-      const { handlerParams } = await queueTimedMessages();
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync), so the
+    // worker timeout fires on the wall clock and polls wait for it.
+    const { handlerParams } = await queueTimedMessages();
 
-      if (vi.isFakeTimers()) {
-        await vi.advanceTimersByTimeAsync(60);
-      }
-      await pollUntilAssert(
-        () => {
-          expect(processDiscordMessageMock).toHaveBeenCalledTimes(2);
-        },
-        { timeoutMs: 3_000 },
-      );
+    await pollUntilAssert(
+      () => {
+        expect(processDiscordMessageMock).toHaveBeenCalledTimes(2);
+      },
+      { timeoutMs: 3_000 },
+    );
 
-      const firstCtx = processDiscordMessageMock.mock.calls[0]?.[0] as
-        | { abortSignal?: AbortSignal }
-        | undefined;
-      expect(firstCtx?.abortSignal?.aborted).toBe(true);
-      expect(handlerParams.runtime.error).toHaveBeenCalledWith(
-        expect.stringContaining("discord inbound worker timed out after"),
-      );
-      expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
-      expect(deliverDiscordReplyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: "channel:ch-1",
-          token: "test-token",
-          replies: [
-            expect.objectContaining({
-              isError: true,
-              text: "Discord inbound worker timed out.",
-            }),
-          ],
-        }),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    const firstCtx = processDiscordMessageMock.mock.calls[0]?.[0] as
+      | { abortSignal?: AbortSignal }
+      | undefined;
+    expect(firstCtx?.abortSignal?.aborted).toBe(true);
+    expect(handlerParams.runtime.error).toHaveBeenCalledWith(
+      expect.stringContaining("discord inbound worker timed out after"),
+    );
+    expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
+    expect(deliverDiscordReplyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: "channel:ch-1",
+        token: "test-token",
+        replies: [
+          expect.objectContaining({
+            isError: true,
+            text: "Discord inbound worker timed out.",
+          }),
+        ],
+      }),
+    );
   });
 
   it("waits for the timeout fallback reply before starting the next queued run", async () => {
-    vi.useFakeTimers();
-    try {
-      const deliverTimeoutReply = createDeferred();
-      const { handlerParams } = await queueTimedMessages({
-        beforeCreateHandler: () => {
-          deliverDiscordReplyMock.mockReset();
-          deliverDiscordReplyMock.mockImplementationOnce(async () => {
-            await deliverTimeoutReply.promise;
-          });
-        },
-      });
+    const deliverTimeoutReply = createDeferred();
+    const { handlerParams } = await queueTimedMessages({
+      beforeCreateHandler: () => {
+        deliverDiscordReplyMock.mockReset();
+        deliverDiscordReplyMock.mockImplementationOnce(async () => {
+          await deliverTimeoutReply.promise;
+        });
+      },
+    });
 
-      if (vi.isFakeTimers()) {
-        await vi.advanceTimersByTimeAsync(60);
-      }
-      await pollUntilAssert(
-        () => {
-          expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
-        },
-        { timeoutMs: 3_000 },
-      );
+    await pollUntilAssert(
+      () => {
+        expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 3_000 },
+    );
 
-      expect(processDiscordMessageMock).toHaveBeenCalledTimes(1);
-      expect(handlerParams.runtime.error).toHaveBeenCalledWith(
-        expect.stringContaining("discord inbound worker timed out after"),
-      );
+    expect(processDiscordMessageMock).toHaveBeenCalledTimes(1);
+    expect(handlerParams.runtime.error).toHaveBeenCalledWith(
+      expect.stringContaining("discord inbound worker timed out after"),
+    );
 
-      deliverTimeoutReply.resolve();
-      await deliverTimeoutReply.promise;
+    deliverTimeoutReply.resolve();
+    await deliverTimeoutReply.promise;
 
-      await pollUntilAssert(
-        () => {
-          expect(processDiscordMessageMock).toHaveBeenCalledTimes(2);
-        },
-        { timeoutMs: 3_000 },
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    await pollUntilAssert(
+      () => {
+        expect(processDiscordMessageMock).toHaveBeenCalledTimes(2);
+      },
+      { timeoutMs: 3_000 },
+    );
   });
 
   it("does not send the timeout fallback when a final reply already went out", async () => {
-    vi.useFakeTimers();
-    try {
-      await runSingleMessageTimeout({
-        processImpl: async (
-          ctx: { abortSignal?: AbortSignal },
-          observer?: { onFinalReplyStart?: () => void; onFinalReplyDelivered?: () => void },
-        ) => {
-          observer?.onFinalReplyStart?.();
-          observer?.onFinalReplyDelivered?.();
-          await new Promise<void>((resolve) => {
-            if (ctx.abortSignal?.aborted) {
-              resolve();
-              return;
-            }
-            ctx.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
-          });
-        },
-      });
+    await runSingleMessageTimeout({
+      processImpl: async (
+        ctx: { abortSignal?: AbortSignal },
+        observer?: { onFinalReplyStart?: () => void; onFinalReplyDelivered?: () => void },
+      ) => {
+        observer?.onFinalReplyStart?.();
+        observer?.onFinalReplyDelivered?.();
+        await new Promise<void>((resolve) => {
+          if (ctx.abortSignal?.aborted) {
+            resolve();
+            return;
+          }
+          ctx.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+      },
+    });
 
-      expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
   });
 
   it("routes the timeout fallback to the created auto-thread target", async () => {
-    vi.useFakeTimers();
-    try {
-      await runSingleMessageTimeout({
-        processImpl: async (
-          ctx: { abortSignal?: AbortSignal },
-          observer?: {
-            onReplyPlanResolved?: (params: {
-              createdThreadId?: string;
-              sessionKey?: string;
-            }) => void;
-          },
-        ) => {
-          observer?.onReplyPlanResolved?.({
-            createdThreadId: "thread-1",
-            sessionKey: "agent:main:discord:channel:thread-1",
-          });
-          await new Promise<void>((resolve) => {
-            if (ctx.abortSignal?.aborted) {
-              resolve();
-              return;
-            }
-            ctx.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
-          });
+    await runSingleMessageTimeout({
+      processImpl: async (
+        ctx: { abortSignal?: AbortSignal },
+        observer?: {
+          onReplyPlanResolved?: (params: { createdThreadId?: string; sessionKey?: string }) => void;
         },
-      });
-
-      expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
-      expect(deliverDiscordReplyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: "channel:thread-1",
+      ) => {
+        observer?.onReplyPlanResolved?.({
+          createdThreadId: "thread-1",
           sessionKey: "agent:main:discord:channel:thread-1",
-          replies: [
-            expect.objectContaining({
-              isError: true,
-              text: "Discord inbound worker timed out.",
-            }),
-          ],
-        }),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+        });
+        await new Promise<void>((resolve) => {
+          if (ctx.abortSignal?.aborted) {
+            resolve();
+            return;
+          }
+          ctx.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+      },
+    });
+
+    await pollUntilAssert(
+      () => {
+        expect(deliverDiscordReplyMock).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 3_000 },
+    );
+    expect(deliverDiscordReplyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: "channel:thread-1",
+        sessionKey: "agent:main:discord:channel:thread-1",
+        replies: [
+          expect.objectContaining({
+            isError: true,
+            text: "Discord inbound worker timed out.",
+          }),
+        ],
+      }),
+    );
   });
 
   it("does not send the timeout fallback when final reply delivery is already in flight", async () => {
-    vi.useFakeTimers();
-    try {
-      preflightDiscordMessageMock.mockReset();
-      processDiscordMessageMock.mockReset();
-      deliverDiscordReplyMock.mockClear();
+    preflightDiscordMessageMock.mockReset();
+    processDiscordMessageMock.mockReset();
+    deliverDiscordReplyMock.mockClear();
 
-      const finishFinalReply = createDeferred();
-      processDiscordMessageMock.mockImplementationOnce(
-        async (
-          _ctx: { abortSignal?: AbortSignal },
-          observer?: { onFinalReplyStart?: () => void; onFinalReplyDelivered?: () => void },
-        ) => {
-          observer?.onFinalReplyStart?.();
-          await finishFinalReply.promise;
-          observer?.onFinalReplyDelivered?.();
-        },
-      );
-      preflightDiscordMessageMock.mockImplementation(
-        async (params: { data: { channel_id: string } }) =>
-          createPreflightContext(params.data.channel_id),
-      );
+    const finishFinalReply = createDeferred();
+    processDiscordMessageMock.mockImplementationOnce(
+      async (
+        _ctx: { abortSignal?: AbortSignal },
+        observer?: { onFinalReplyStart?: () => void; onFinalReplyDelivered?: () => void },
+      ) => {
+        observer?.onFinalReplyStart?.();
+        await finishFinalReply.promise;
+        observer?.onFinalReplyDelivered?.();
+      },
+    );
+    preflightDiscordMessageMock.mockImplementation(
+      async (params: { data: { channel_id: string } }) =>
+        createPreflightContext(params.data.channel_id),
+    );
 
-      const params = createDiscordHandlerParams({ workerRunTimeoutMs: 50 });
-      const handler = createDiscordMessageHandler(params);
+    const params = createDiscordHandlerParams({ workerRunTimeoutMs: 50 });
+    const handler = createDiscordMessageHandler(params);
 
-      await expect(
-        handler(createMessageData("m-1") as never, {} as never),
-      ).resolves.toBeUndefined();
-      await pollUntilAssert(
-        () => {
-          expect(processDiscordMessageMock).toHaveBeenCalledTimes(1);
-        },
-        { timeoutMs: 3_000 },
-      );
+    await expect(handler(createMessageData("m-1") as never, {} as never)).resolves.toBeUndefined();
+    await pollUntilAssert(
+      () => {
+        expect(processDiscordMessageMock).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 3_000 },
+    );
 
-      if (vi.isFakeTimers()) {
-        await vi.advanceTimersByTimeAsync(60);
-      }
-      await Promise.resolve();
+    await pollUntilAssert(
+      () => {
+        expect(params.runtime.error).toHaveBeenCalledWith(
+          expect.stringContaining("discord inbound worker timed out after"),
+        );
+      },
+      { timeoutMs: 3_000 },
+    );
+    expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
 
-      expect(params.runtime.error).toHaveBeenCalledWith(
-        expect.stringContaining("discord inbound worker timed out after"),
-      );
-      expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
+    finishFinalReply.resolve();
+    await finishFinalReply.promise;
+    await Promise.resolve();
 
-      finishFinalReply.resolve();
-      await finishFinalReply.promise;
-      await Promise.resolve();
-
-      expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(deliverDiscordReplyMock).not.toHaveBeenCalled();
   });
 
   it("does not time out queued runs when the inbound worker timeout is disabled", async () => {
-    vi.useFakeTimers();
-    try {
-      preflightDiscordMessageMock.mockReset();
-      processDiscordMessageMock.mockReset();
-      eventualReplyDeliveredMock.mockReset();
+    preflightDiscordMessageMock.mockReset();
+    processDiscordMessageMock.mockReset();
+    eventualReplyDeliveredMock.mockReset();
 
-      processDiscordMessageMock.mockImplementationOnce(
-        async (ctx: { abortSignal?: AbortSignal }) => {
-          await new Promise<void>((resolve) => {
-            setTimeout(() => {
-              if (!ctx.abortSignal?.aborted) {
-                eventualReplyDeliveredMock();
-              }
-              resolve();
-            }, 80);
-          });
-        },
-      );
-      const params = createDiscordHandlerParams({ workerRunTimeoutMs: 0 });
-      const handler = createHandlerWithDefaultPreflight({ workerRunTimeoutMs: 0 });
+    processDiscordMessageMock.mockImplementationOnce(async (ctx: { abortSignal?: AbortSignal }) => {
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (!ctx.abortSignal?.aborted) {
+            eventualReplyDeliveredMock();
+          }
+          resolve();
+        }, 80);
+      });
+    });
+    const params = createDiscordHandlerParams({ workerRunTimeoutMs: 0 });
+    const handler = createHandlerWithDefaultPreflight({ workerRunTimeoutMs: 0 });
 
-      await expect(
-        handler(createMessageData("m-1") as never, {} as never),
-      ).resolves.toBeUndefined();
+    await expect(handler(createMessageData("m-1") as never, {} as never)).resolves.toBeUndefined();
 
-      if (vi.isFakeTimers()) {
-        await vi.advanceTimersByTimeAsync(80);
-      }
-      await Promise.resolve();
-
-      expect(eventualReplyDeliveredMock).toHaveBeenCalledTimes(1);
-      expect(params.runtime.error).not.toHaveBeenCalledWith(
-        expect.stringContaining("discord inbound worker timed out after"),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    await pollUntilAssert(
+      () => {
+        expect(eventualReplyDeliveredMock).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 3_000 },
+    );
+    expect(params.runtime.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("discord inbound worker timed out after"),
+    );
   });
 
   it("refreshes run activity while active runs are in progress", async () => {

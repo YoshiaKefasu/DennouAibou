@@ -26,6 +26,19 @@ function loadPiModelDiscoveryRuntime() {
   return piModelDiscoveryRuntimePromise;
 }
 
+/**
+ * Optional call-time seams for the image description runtime.
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type ImageRuntimeDeps = {
+  complete?: typeof complete;
+  ensureOpenClawModelsJson?: typeof ensureOpenClawModelsJson;
+  getApiKeyForModel?: typeof getApiKeyForModel;
+  requireApiKey?: typeof requireApiKey;
+  discoverAuthStorage?: typeof import("../agents/pi-model-discovery-runtime.js").discoverAuthStorage;
+  discoverModels?: typeof import("../agents/pi-model-discovery-runtime.js").discoverModels;
+};
+
 function resolveImageToolMaxTokens(modelMaxTokens: number | undefined, requestedMaxTokens = 4096) {
   if (
     typeof modelMaxTokens !== "number" ||
@@ -44,12 +57,18 @@ async function resolveImageRuntime(params: {
   model: string;
   profile?: string;
   preferredProfile?: string;
+  deps?: ImageRuntimeDeps;
 }): Promise<{ apiKey: string; model: Model<Api> }> {
-  await ensureOpenClawModelsJson(params.cfg, params.agentDir);
-  const { discoverAuthStorage, discoverModels } = await loadPiModelDiscoveryRuntime();
-  const rawAuthStorage = discoverAuthStorage(params.agentDir);
+  const ensureOpenClawModelsJsonFn =
+    params.deps?.ensureOpenClawModelsJson ?? ensureOpenClawModelsJson;
+  await ensureOpenClawModelsJsonFn(params.cfg, params.agentDir);
+  const discoverAuthStorageFn =
+    params.deps?.discoverAuthStorage ?? (await loadPiModelDiscoveryRuntime()).discoverAuthStorage;
+  const discoverModelsFn =
+    params.deps?.discoverModels ?? (await loadPiModelDiscoveryRuntime()).discoverModels;
+  const rawAuthStorage = discoverAuthStorageFn(params.agentDir);
   const authStorage = await createLegacyAuthStorageAdapter(rawAuthStorage);
-  const modelRegistry = await discoverModels(rawAuthStorage, params.agentDir);
+  const modelRegistry = await discoverModelsFn(rawAuthStorage, params.agentDir);
   const resolvedRef = normalizeModelRef(params.provider, params.model);
   const model = modelRegistry.find(resolvedRef.provider, resolvedRef.model) as Model<Api> | null;
   if (!model) {
@@ -58,14 +77,16 @@ async function resolveImageRuntime(params: {
   if (!model.input?.includes("image")) {
     throw new Error(`Model does not support images: ${params.provider}/${params.model}`);
   }
-  const apiKeyInfo = await getApiKeyForModel({
+  const getApiKeyForModelFn = params.deps?.getApiKeyForModel ?? getApiKeyForModel;
+  const requireApiKeyFn = params.deps?.requireApiKey ?? requireApiKey;
+  const apiKeyInfo = await getApiKeyForModelFn({
     model,
     cfg: params.cfg,
     agentDir: params.agentDir,
     profileId: params.profile,
     preferredProfile: params.preferredProfile,
   });
-  const apiKey = requireApiKey(apiKeyInfo, model.provider);
+  const apiKey = requireApiKeyFn(apiKeyInfo, model.provider);
   authStorage.setRuntimeApiKey(model.provider, apiKey);
   return { apiKey, model };
 }
@@ -138,6 +159,7 @@ async function resolveMinimaxVlmFallbackRuntime(params: {
   provider: string;
   profile?: string;
   preferredProfile?: string;
+  deps?: ImageRuntimeDeps;
 }): Promise<{ apiKey: string; modelBaseUrl?: string }> {
   const auth = await resolveApiKeyForProvider({
     provider: params.provider,
@@ -146,14 +168,15 @@ async function resolveMinimaxVlmFallbackRuntime(params: {
     preferredProfile: params.preferredProfile,
     agentDir: params.agentDir,
   });
+  const requireApiKeyFn = params.deps?.requireApiKey ?? requireApiKey;
   return {
-    apiKey: requireApiKey(auth, params.provider),
+    apiKey: requireApiKeyFn(auth, params.provider),
     modelBaseUrl: resolveConfiguredProviderBaseUrl(params.cfg, params.provider),
   };
 }
 
 export async function describeImagesWithModel(
-  params: ImagesDescriptionRequest,
+  params: ImagesDescriptionRequest & { deps?: ImageRuntimeDeps },
 ): Promise<ImagesDescriptionResult> {
   const prompt = params.prompt ?? "Describe the image.";
   let apiKey: string;
@@ -195,7 +218,8 @@ export async function describeImagesWithModel(
     params.timeoutMs > 0
       ? setTimeout(() => controller.abort(), params.timeoutMs)
       : undefined;
-  const message = await complete(model, context, {
+  const completeFn = params.deps?.complete ?? complete;
+  const message = await completeFn(model, context, {
     apiKey,
     maxTokens: resolveImageToolMaxTokens(model.maxTokens, params.maxTokens ?? 512),
     signal: controller.signal,
@@ -211,7 +235,7 @@ export async function describeImagesWithModel(
 }
 
 export async function describeImageWithModel(
-  params: ImageDescriptionRequest,
+  params: ImageDescriptionRequest & { deps?: ImageRuntimeDeps },
 ): Promise<ImageDescriptionResult> {
   return await describeImagesWithModel({
     images: [
@@ -230,5 +254,6 @@ export async function describeImageWithModel(
     preferredProfile: params.preferredProfile,
     agentDir: params.agentDir,
     cfg: params.cfg,
+    deps: params.deps,
   });
 }

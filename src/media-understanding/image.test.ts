@@ -1,67 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ImageRuntimeDeps } from "./image.js";
 
-const hoisted = vi.hoisted(() => ({
-  completeMock: vi.fn(),
-  ensureOpenClawModelsJsonMock: vi.fn(async () => {}),
-  getApiKeyForModelMock: vi.fn(async () => ({
-    apiKey: "oauth-test", // pragma: allowlist secret
-    source: "test",
-    mode: "oauth",
-  })),
-  resolveApiKeyForProviderMock: vi.fn(async () => ({
-    apiKey: "oauth-test", // pragma: allowlist secret
-    source: "test",
-    mode: "oauth",
-  })),
-  requireApiKeyMock: vi.fn((auth: { apiKey?: string }) => auth.apiKey ?? ""),
-  setRuntimeApiKeyMock: vi.fn(),
-  discoverModelsMock: vi.fn(),
-  fetchMock: vi.fn(),
+// ---------------------------------------------------------------------------
+// Call-time dependency fakes (injected through `deps`, no module mocks)
+// ---------------------------------------------------------------------------
+
+type GetApiKeyForModel = typeof import("../agents/model-auth.js").getApiKeyForModel;
+
+const completeMock = vi.fn();
+const ensureOpenClawModelsJsonMock = vi.fn(async () => ({
+  agentDir: "/tmp/openclaw-agent",
+  wrote: false,
 }));
-const {
-  completeMock,
-  ensureOpenClawModelsJsonMock,
-  getApiKeyForModelMock,
-  resolveApiKeyForProviderMock,
-  requireApiKeyMock,
-  setRuntimeApiKeyMock,
-  discoverModelsMock,
-  fetchMock,
-} = hoisted;
+const getApiKeyForModelMock = vi.fn<GetApiKeyForModel>(async () => ({
+  apiKey: "oauth-test", // pragma: allowlist secret
+  source: "test",
+  mode: "oauth",
+}));
+const requireApiKeyMock = vi.fn((auth: { apiKey?: string }) => auth.apiKey ?? "");
+const discoverAuthStorageMock = vi.fn();
+const discoverModelsMock = vi.fn();
+const setRuntimeApiKeyMock = vi.fn();
+const fetchMock = vi.fn();
 
-vi.mock("@earendil-works/pi-ai", async () => {
-  const actual = await import("@earendil-works/pi-ai");
-  return {
-    ...actual,
-    complete: completeMock,
-  };
-});
-
-vi.mock("@earendil-works/pi-ai/compat", async () => {
-  const actual = await import("@earendil-works/pi-ai/compat");
-  return {
-    ...actual,
-    complete: completeMock,
-  };
-});
-
-vi.mock("../agents/models-config.js", async () => ({
-  ...(await import("../agents/models-config.js")),
+const imageDeps: ImageRuntimeDeps = {
+  complete: completeMock,
   ensureOpenClawModelsJson: ensureOpenClawModelsJsonMock,
-}));
-
-vi.mock("../agents/model-auth.js", () => ({
   getApiKeyForModel: getApiKeyForModelMock,
-  resolveApiKeyForProvider: resolveApiKeyForProviderMock,
   requireApiKey: requireApiKeyMock,
-}));
-
-vi.mock("../agents/pi-model-discovery-runtime.js", () => ({
-  discoverAuthStorage: () => ({
-    setRuntimeApiKey: setRuntimeApiKeyMock,
-  }),
+  discoverAuthStorage: discoverAuthStorageMock,
   discoverModels: discoverModelsMock,
-}));
+};
 
 const { describeImageWithModel } = await import("./image.js");
 
@@ -85,6 +54,9 @@ describe("describeImageWithModel", () => {
       })),
       text: vi.fn(async () => ""),
     });
+    discoverAuthStorageMock.mockReturnValue({
+      setRuntimeApiKey: setRuntimeApiKeyMock,
+    });
     discoverModelsMock.mockReturnValue({
       find: vi.fn(() => ({
         provider: "minimax-portal",
@@ -102,6 +74,7 @@ describe("describeImageWithModel", () => {
       provider: "minimax-portal",
       model: "MiniMax-VL-01",
       buffer: Buffer.from("png-bytes"),
+      deps: imageDeps,
       fileName: "image.png",
       mime: "image/png",
       prompt: "Describe the image.",
@@ -156,6 +129,7 @@ describe("describeImageWithModel", () => {
       provider: "minimax-portal",
       model: "custom-vision",
       buffer: Buffer.from("png-bytes"),
+      deps: imageDeps,
       fileName: "image.png",
       mime: "image/png",
       prompt: "Describe the image.",
@@ -195,6 +169,7 @@ describe("describeImageWithModel", () => {
       provider: "openai-codex",
       model: "gpt-5.4",
       buffer: Buffer.from("png-bytes"),
+      deps: imageDeps,
       fileName: "image.png",
       mime: "image/png",
       prompt: "Describe the image.",
@@ -260,6 +235,7 @@ describe("describeImageWithModel", () => {
       model: "gemini-3.1-flash-preview",
       profile: "google:default",
       buffer: Buffer.from("png-bytes"),
+      deps: imageDeps,
       fileName: "image.png",
       mime: "image/png",
       prompt: "Describe the image.",
@@ -308,6 +284,7 @@ describe("describeImageWithModel", () => {
       model: "gemini-3.1-flash-lite",
       profile: "google:default",
       buffer: Buffer.from("png-bytes"),
+      deps: imageDeps,
       fileName: "image.png",
       mime: "image/png",
       prompt: "Describe the image.",

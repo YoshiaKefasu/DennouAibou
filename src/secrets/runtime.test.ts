@@ -10,13 +10,7 @@ import type { PluginWebSearchProviderEntry } from "../plugins/types.js";
 
 type WebProviderUnderTest = "brave" | "gemini" | "grok" | "kimi" | "perplexity" | "firecrawl";
 
-const { resolvePluginWebSearchProvidersMock } = vi.hoisted(() => ({
-  resolvePluginWebSearchProvidersMock: vi.fn(() => buildTestWebSearchProviders()),
-}));
-
-vi.mock("../plugins/web-search-providers.runtime.js", () => ({
-  resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
-}));
+const resolvePluginWebSearchProvidersMock = vi.fn(() => buildTestWebSearchProviders());
 
 function asConfig(value: unknown): OpenClawConfig {
   return value as OpenClawConfig;
@@ -93,7 +87,18 @@ let clearRuntimeConfigSnapshot: typeof import("../config/config.js").clearRuntim
 let activateSecretsRuntimeSnapshot: typeof import("./runtime.js").activateSecretsRuntimeSnapshot;
 let clearSecretsRuntimeSnapshot: typeof import("./runtime.js").clearSecretsRuntimeSnapshot;
 let getActiveRuntimeWebToolsMetadata: typeof import("./runtime.js").getActiveRuntimeWebToolsMetadata;
-let prepareSecretsRuntimeSnapshot: typeof import("./runtime.js").prepareSecretsRuntimeSnapshot;
+let prepareSecretsRuntimeSnapshotImpl: typeof import("./runtime.js").prepareSecretsRuntimeSnapshot;
+
+async function prepareSecretsRuntimeSnapshot(
+  params: Parameters<typeof prepareSecretsRuntimeSnapshotImpl>[0],
+): ReturnType<typeof prepareSecretsRuntimeSnapshotImpl> {
+  return prepareSecretsRuntimeSnapshotImpl({
+    ...params,
+    runtimeWebToolsDeps: {
+      resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
+    },
+  });
+}
 
 function createOpenAiFileModelsConfig(): NonNullable<OpenClawConfig["models"]> {
   return {
@@ -121,7 +126,7 @@ describe("secrets runtime snapshot", () => {
       activateSecretsRuntimeSnapshot,
       clearSecretsRuntimeSnapshot,
       getActiveRuntimeWebToolsMetadata,
-      prepareSecretsRuntimeSnapshot,
+      prepareSecretsRuntimeSnapshot: prepareSecretsRuntimeSnapshotImpl,
     } = await import("./runtime.js"));
   });
 

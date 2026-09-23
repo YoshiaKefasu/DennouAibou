@@ -4,57 +4,107 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
+import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../plugins/runtime.js";
+import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/channel-plugins.js";
+import { isDeliverableMessageChannel } from "../utils/message-channel.js";
+import {
+  applyMediaUnderstanding as applyMediaUnderstandingImpl,
+  type ApplyMediaUnderstandingDeps,
+} from "./apply.js";
+import { normalizeMediaProviderId } from "./provider-registry.js";
+import { clearMediaUnderstandingBinaryCacheForTests } from "./runner.js";
 import { createSafeAudioFixtureBuffer } from "./runner.test-utils.js";
 import type { MediaUnderstandingProvider } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Module mocks
+// Call-time dependency fakes (injected through `deps`, no module mocks)
 // ---------------------------------------------------------------------------
 
 type ResolveApiKeyForProvider = typeof import("../agents/model-auth.js").resolveApiKeyForProvider;
 
-const resolveApiKeyForProviderMock = vi.hoisted(() =>
-  vi.fn<ResolveApiKeyForProvider>(async () => ({
-    apiKey: "test-key", // pragma: allowlist secret
-    source: "test",
-    mode: "api-key",
-  })),
-);
-const hasAvailableAuthForProviderMock = vi.hoisted(() =>
-  vi.fn(async (...args: Parameters<ResolveApiKeyForProvider>) => {
-    const resolved = await resolveApiKeyForProviderMock(...args);
-    return Boolean(resolved?.apiKey);
-  }),
-);
-const getApiKeyForModelMock = vi.hoisted(() =>
-  vi.fn(async () => ({ apiKey: "test-key", source: "test", mode: "api-key" })),
-);
-const fetchRemoteMediaMock = vi.hoisted(() => vi.fn());
-const runExecMock = vi.hoisted(() => vi.fn());
-const runCommandWithTimeoutMock = vi.hoisted(() => vi.fn());
-const mockDeliverOutboundPayloads = vi.hoisted(() => vi.fn());
+const resolveApiKeyForProviderMock = vi.fn<ResolveApiKeyForProvider>(async () => ({
+  apiKey: "test-key", // pragma: allowlist secret
+  source: "test",
+  mode: "api-key",
+}));
+const mockDeliverOutboundPayloads = vi.fn();
 
-const { MediaFetchErrorMock } = vi.hoisted(() => {
-  class MediaFetchErrorMock extends Error {
-    code: string;
-    constructor(message: string, code: string) {
-      super(message);
-      this.name = "MediaFetchError";
-      this.code = code;
-    }
+function createRegistryMediaProviders(): Record<string, MediaUnderstandingProvider> {
+  const createAudioProvider = (id: string): MediaUnderstandingProvider => ({
+    id,
+    capabilities: ["audio"],
+    transcribeAudio: async () => ({ text: "transcribed text" }),
+  });
+  return {
+    groq: createAudioProvider("groq"),
+    deepgram: createAudioProvider("deepgram"),
+  };
+}
+
+// Replaces the real registry builder (which walks bundled plugin discovery and
+// re-materializes the active plugin registry) with the in-test provider set.
+function buildMediaUnderstandingRegistryForTest(
+  overrides?: Record<string, MediaUnderstandingProvider>,
+): Map<string, MediaUnderstandingProvider> {
+  const registry = new Map<string, MediaUnderstandingProvider>();
+  for (const [key, provider] of Object.entries(createRegistryMediaProviders())) {
+    registry.set(normalizeMediaProviderId(key), provider);
   }
-  return { MediaFetchErrorMock };
-});
+  for (const [key, provider] of Object.entries(overrides ?? {})) {
+    const normalizedKey = normalizeMediaProviderId(key);
+    const existing = registry.get(normalizedKey);
+    registry.set(
+      normalizedKey,
+      existing
+        ? {
+            ...existing,
+            ...provider,
+            capabilities: provider.capabilities ?? existing.capabilities,
+          }
+        : provider,
+    );
+  }
+  return registry;
+}
+
+const echoTranscriptDeps: ApplyMediaUnderstandingDeps = {
+  resolveApiKeyForProvider: resolveApiKeyForProviderMock,
+  buildMediaUnderstandingRegistry: buildMediaUnderstandingRegistryForTest,
+  deliverOutboundPayloads: (...args) => mockDeliverOutboundPayloads(...args),
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-let applyMediaUnderstanding: typeof import("./apply.js").applyMediaUnderstanding;
-let clearMediaUnderstandingBinaryCacheForTests: () => void;
+const applyMediaUnderstanding = (
+  params: Parameters<typeof applyMediaUnderstandingImpl>[0],
+): ReturnType<typeof applyMediaUnderstandingImpl> =>
+  applyMediaUnderstandingImpl({ ...params, deps: { ...params.deps, ...echoTranscriptDeps } });
 
 const TEMP_MEDIA_PREFIX = "openclaw-echo-transcript-test-";
 let suiteTempMediaRootDir = "";
+let installedWhatsAppRegistry = false;
+
+// Note: under Vitest, test/setup-openclaw-runtime.ts registers a whatsapp
+// channel stub, so `whatsapp` is a deliverable message channel. The Bun preload
+// installs no plugin registry, so the same stub is registered here only when the
+// runtime has none — behaviour is untouched under Vitest.
+function ensureWhatsAppChannelRegistered(): void {
+  if (isDeliverableMessageChannel("whatsapp")) {
+    return;
+  }
+  installedWhatsAppRegistry = true;
+  setActivePluginRegistry(
+    createTestRegistry([
+      {
+        pluginId: "whatsapp",
+        plugin: createChannelTestPluginBase({ id: "whatsapp", label: "WhatsApp" }),
+        source: "test",
+      },
+    ]),
+  );
+}
 
 async function createTempAudioFile(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(suiteTempMediaRootDir, "case-"));
@@ -126,107 +176,30 @@ function createAudioConfigWithoutEchoFlag() {
   return { cfg, providers };
 }
 
-function createRegistryMediaProviders(): Record<string, MediaUnderstandingProvider> {
-  const createAudioProvider = (id: string): MediaUnderstandingProvider => ({
-    id,
-    capabilities: ["audio"],
-    transcribeAudio: async () => ({ text: "transcribed text" }),
-  });
-  return {
-    groq: createAudioProvider("groq"),
-    deepgram: createAudioProvider("deepgram"),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("applyMediaUnderstanding – echo transcript", () => {
   beforeAll(async () => {
-    vi.resetModules();
-    vi.doMock("../agents/model-auth.js", () => ({
-      resolveApiKeyForProvider: resolveApiKeyForProviderMock,
-      hasAvailableAuthForProvider: hasAvailableAuthForProviderMock,
-      requireApiKey: (auth: { apiKey?: string; mode?: string }, provider: string) => {
-        if (auth?.apiKey) {
-          return auth.apiKey;
-        }
-        throw new Error(
-          `No API key resolved for provider "${provider}" (auth mode: ${auth?.mode}).`,
-        );
-      },
-      resolveAwsSdkEnvVarName: vi.fn(() => undefined),
-      resolveEnvApiKey: vi.fn(() => null),
-      resolveModelAuthMode: vi.fn(() => "api-key"),
-      getApiKeyForModel: getApiKeyForModelMock,
-      getCustomProviderApiKey: vi.fn(() => undefined),
-      ensureAuthProfileStore: vi.fn(async () => ({})),
-      resolveAuthProfileOrder: vi.fn(() => []),
-    }));
-    vi.doMock("../media/fetch.js", () => ({
-      fetchRemoteMedia: fetchRemoteMediaMock,
-      MediaFetchError: MediaFetchErrorMock,
-    }));
-    vi.doMock("../process/exec.js", () => ({
-      runExec: runExecMock,
-      runCommandWithTimeout: runCommandWithTimeoutMock,
-    }));
-    vi.doMock("../infra/outbound/deliver-runtime.js", () => ({
-      deliverOutboundPayloads: (...args: unknown[]) => mockDeliverOutboundPayloads(...args),
-    }));
-    vi.doMock("./provider-registry.js", async () => {
-      const actual = await import("./provider-registry.js");
-      const registryProviders = createRegistryMediaProviders();
-      return {
-        ...actual,
-        buildMediaUnderstandingRegistry: (
-          overrides?: Record<string, MediaUnderstandingProvider>,
-        ) => {
-          const registry = new Map<string, MediaUnderstandingProvider>(
-            Object.entries(registryProviders),
-          );
-          for (const [key, provider] of Object.entries(overrides ?? {})) {
-            const normalizedKey = actual.normalizeMediaProviderId(key);
-            const existing = registry.get(normalizedKey);
-            registry.set(
-              normalizedKey,
-              existing
-                ? {
-                    ...existing,
-                    ...provider,
-                    capabilities: provider.capabilities ?? existing.capabilities,
-                  }
-                : provider,
-            );
-          }
-          return registry;
-        },
-      };
-    });
-
+    ensureWhatsAppChannelRegistered();
     const baseDir = resolvePreferredOpenClawTmpDir();
     await fs.mkdir(baseDir, { recursive: true });
     suiteTempMediaRootDir = await fs.mkdtemp(path.join(baseDir, TEMP_MEDIA_PREFIX));
-    const mod = await import("./apply.js");
-    applyMediaUnderstanding = mod.applyMediaUnderstanding;
-    const runner = await import("./runner.js");
-    clearMediaUnderstandingBinaryCacheForTests = runner.clearMediaUnderstandingBinaryCacheForTests;
   });
 
   beforeEach(() => {
     resolveApiKeyForProviderMock.mockClear();
-    hasAvailableAuthForProviderMock.mockClear();
-    getApiKeyForModelMock.mockClear();
-    fetchRemoteMediaMock.mockClear();
-    runExecMock.mockReset();
-    runCommandWithTimeoutMock.mockReset();
     mockDeliverOutboundPayloads.mockClear();
     mockDeliverOutboundPayloads.mockResolvedValue([{ channel: "whatsapp", messageId: "echo-1" }]);
-    clearMediaUnderstandingBinaryCacheForTests?.();
+    clearMediaUnderstandingBinaryCacheForTests();
   });
 
   afterAll(async () => {
+    if (installedWhatsAppRegistry) {
+      resetPluginRuntimeStateForTest();
+      installedWhatsAppRegistry = false;
+    }
     if (!suiteTempMediaRootDir) {
       return;
     }

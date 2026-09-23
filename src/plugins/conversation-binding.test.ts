@@ -1,19 +1,41 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  ConversationRef,
-  SessionBindingAdapter,
-  SessionBindingRecord,
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { expandHomePrefix } from "../infra/home-dir.js";
+import {
+  registerSessionBindingAdapter,
+  unregisterSessionBindingAdapter,
+  type ConversationRef,
+  type SessionBindingAdapter,
+  type SessionBindingRecord,
 } from "../infra/outbound/session-binding-service.js";
+import {
+  __testing,
+  buildPluginBindingApprovalCustomId,
+  detachPluginConversationBinding,
+  getCurrentPluginConversationBinding,
+  parsePluginBindingApprovalCustomId,
+  requestPluginConversationBinding,
+  resolvePluginConversationBindingApproval,
+  type ConversationBindingDeps,
+} from "./conversation-binding.js";
 import { createEmptyPluginRegistry } from "./registry-empty.js";
-import type { PluginRegistry } from "./registry.js";
+import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "./runtime.js";
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-plugin-binding-"));
 const approvalsPath = path.join(tempRoot, "plugin-binding-approvals.json");
 
-const sessionBindingState = vi.hoisted(() => {
+const conversationBindingDeps: ConversationBindingDeps = {
+  expandHomePrefix: (value: string) => {
+    if (value === "~/.dennou-aibou/plugin-binding-approvals.json") {
+      return approvalsPath;
+    }
+    return expandHomePrefix(value);
+  },
+};
+
+const sessionBindingState = (() => {
   const records = new Map<string, SessionBindingRecord>();
   let nextId = 1;
 
@@ -81,46 +103,7 @@ const sessionBindingState = vi.hoisted(() => {
       records.set(toKey(record.conversation), record);
     },
   };
-});
-
-const pluginRuntimeState = vi.hoisted(
-  () =>
-    ({
-      // The runtime mock is initialized before imports; beforeEach installs the real shared stub.
-      registry: null as unknown as PluginRegistry,
-    }) satisfies { registry: PluginRegistry },
-);
-
-vi.mock("../infra/home-dir.js", async () => {
-  const actual = await import("../infra/home-dir.js");
-  return {
-    ...actual,
-    expandHomePrefix: (value: string) => {
-      if (value === "~/.dennou-aibou/plugin-binding-approvals.json") {
-        return approvalsPath;
-      }
-      return actual.expandHomePrefix(value);
-    },
-  };
-});
-
-vi.mock("./runtime.js", () => ({
-  getActivePluginRegistry: () => pluginRuntimeState.registry,
-  setActivePluginRegistry: (registry: PluginRegistry) => {
-    pluginRuntimeState.registry = registry;
-  },
-}));
-
-let __testing: typeof import("./conversation-binding.js").__testing;
-let buildPluginBindingApprovalCustomId: typeof import("./conversation-binding.js").buildPluginBindingApprovalCustomId;
-let detachPluginConversationBinding: typeof import("./conversation-binding.js").detachPluginConversationBinding;
-let getCurrentPluginConversationBinding: typeof import("./conversation-binding.js").getCurrentPluginConversationBinding;
-let parsePluginBindingApprovalCustomId: typeof import("./conversation-binding.js").parsePluginBindingApprovalCustomId;
-let requestPluginConversationBinding: typeof import("./conversation-binding.js").requestPluginConversationBinding;
-let resolvePluginConversationBindingApproval: typeof import("./conversation-binding.js").resolvePluginConversationBindingApproval;
-let registerSessionBindingAdapter: typeof import("../infra/outbound/session-binding-service.js").registerSessionBindingAdapter;
-let unregisterSessionBindingAdapter: typeof import("../infra/outbound/session-binding-service.js").unregisterSessionBindingAdapter;
-let setActivePluginRegistry: typeof import("./runtime.js").setActivePluginRegistry;
+})();
 
 type PluginBindingRequest = Awaited<ReturnType<typeof requestPluginConversationBinding>>;
 type PluginBindingRequestInput = Parameters<typeof requestPluginConversationBinding>[0];
@@ -231,7 +214,7 @@ async function requestPendingBinding(
   input: PluginBindingRequestInput,
   requestBinding = requestPluginConversationBinding,
 ) {
-  const request = await requestBinding(input);
+  const request = await requestBinding(input, conversationBindingDeps);
   expect(request.status).toBe("pending");
   if (request.status !== "pending") {
     throw new Error("expected pending bind request");
@@ -244,11 +227,14 @@ async function approveBindingRequest(
   decision: PluginBindingDecision,
   resolveApproval = resolvePluginConversationBindingApproval,
 ) {
-  return await resolveApproval({
-    approvalId,
-    decision,
-    senderId: "user-1",
-  });
+  return await resolveApproval(
+    {
+      approvalId,
+      decision,
+      senderId: "user-1",
+    },
+    conversationBindingDeps,
+  );
 }
 
 async function importDuplicateConversationBindingModules() {
@@ -319,17 +305,23 @@ async function expectResolutionCallback(params: {
     handler: onResolved,
   });
 
-  const request = await requestPluginConversationBinding(params.requestInput);
+  const request = await requestPluginConversationBinding(
+    params.requestInput,
+    conversationBindingDeps,
+  );
   expect(request.status).toBe("pending");
   if (request.status !== "pending") {
     throw new Error("expected pending bind request");
   }
 
-  const result = await resolvePluginConversationBindingApproval({
-    approvalId: request.approvalId,
-    decision: params.decision,
-    senderId: "user-1",
-  });
+  const result = await resolvePluginConversationBindingApproval(
+    {
+      approvalId: request.approvalId,
+      decision: params.decision,
+      senderId: "user-1",
+    },
+    conversationBindingDeps,
+  );
 
   expect(result.status).toBe(params.expectedStatus);
   await flushMicrotasks();
@@ -349,18 +341,24 @@ async function expectResolutionDoesNotWait(params: {
     handler: onResolved,
   });
 
-  const request = await requestPluginConversationBinding(params.requestInput);
+  const request = await requestPluginConversationBinding(
+    params.requestInput,
+    conversationBindingDeps,
+  );
   expect(request.status).toBe("pending");
   if (request.status !== "pending") {
     throw new Error("expected pending bind request");
   }
 
   let settled = false;
-  const resolutionPromise = resolvePluginConversationBindingApproval({
-    approvalId: request.approvalId,
-    decision: params.decision,
-    senderId: "user-1",
-  }).then((result) => {
+  const resolutionPromise = resolvePluginConversationBindingApproval(
+    {
+      approvalId: request.approvalId,
+      decision: params.decision,
+      senderId: "user-1",
+    },
+    conversationBindingDeps,
+  ).then((result) => {
     settled = true;
     return result;
   });
@@ -376,38 +374,7 @@ async function expectResolutionDoesNotWait(params: {
 }
 
 describe("plugin conversation binding approvals", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.doMock("../infra/home-dir.js", async () => {
-      const actual = await import("../infra/home-dir.js");
-      return {
-        ...actual,
-        expandHomePrefix: (value: string) => {
-          if (value === "~/.dennou-aibou/plugin-binding-approvals.json") {
-            return approvalsPath;
-          }
-          return actual.expandHomePrefix(value);
-        },
-      };
-    });
-    vi.doMock("./runtime.js", () => ({
-      getActivePluginRegistry: () => pluginRuntimeState.registry,
-      setActivePluginRegistry: (registry: PluginRegistry) => {
-        pluginRuntimeState.registry = registry;
-      },
-    }));
-    ({
-      __testing,
-      buildPluginBindingApprovalCustomId,
-      detachPluginConversationBinding,
-      getCurrentPluginConversationBinding,
-      parsePluginBindingApprovalCustomId,
-      requestPluginConversationBinding,
-      resolvePluginConversationBindingApproval,
-    } = await import("./conversation-binding.js"));
-    ({ registerSessionBindingAdapter, unregisterSessionBindingAdapter } =
-      await import("../infra/outbound/session-binding-service.js"));
-    ({ setActivePluginRegistry } = await import("./runtime.js"));
+  beforeEach(() => {
     sessionBindingState.reset();
     __testing.reset();
     setActivePluginRegistry(createEmptyPluginRegistry());
@@ -420,6 +387,10 @@ describe("plugin conversation binding approvals", () => {
     registerSessionBindingAdapter(createAdapter("discord", "work"));
     registerSessionBindingAdapter(createAdapter("discord", "isolated"));
     registerSessionBindingAdapter(createAdapter("telegram", "default"));
+  });
+
+  afterEach(() => {
+    resetPluginRuntimeStateForTest();
   });
 
   it("keeps Telegram bind approval callback_data within Telegram's limit", () => {
@@ -446,6 +417,7 @@ describe("plugin conversation binding approvals", () => {
 
     const secondRequest = await requestPluginConversationBinding(
       createDiscordCodexBindRequest("channel:2", "Bind this conversation to Codex thread 456."),
+      conversationBindingDeps,
     );
 
     expect(secondRequest.status).toBe("pending");
@@ -461,6 +433,7 @@ describe("plugin conversation binding approvals", () => {
 
     const sameScope = await requestPluginConversationBinding(
       createDiscordCodexBindRequest("channel:2", "Bind this conversation to Codex thread 456."),
+      conversationBindingDeps,
     );
 
     expect(sameScope.status).toBe("bound");
@@ -471,6 +444,7 @@ describe("plugin conversation binding approvals", () => {
         "Bind this conversation to Codex thread 789.",
         "work",
       ),
+      conversationBindingDeps,
     );
 
     expect(differentAccount.status).toBe("pending");
@@ -533,6 +507,7 @@ describe("plugin conversation binding approvals", () => {
         "78",
         "Bind this conversation to Codex thread def.",
       ),
+      conversationBindingDeps,
     );
 
     expect(rebound.status).toBe("bound");
@@ -551,6 +526,7 @@ describe("plugin conversation binding approvals", () => {
         threadId: "77",
         summary: "Bind this conversation to Codex thread abc.",
       }),
+      conversationBindingDeps,
     );
 
     expect(request.status).toBe("pending");
@@ -558,11 +534,14 @@ describe("plugin conversation binding approvals", () => {
       throw new Error("expected pending bind request");
     }
 
-    await resolvePluginConversationBindingApproval({
-      approvalId: request.approvalId,
-      decision: "allow-always",
-      senderId: "user-1",
-    });
+    await resolvePluginConversationBindingApproval(
+      {
+        approvalId: request.approvalId,
+        decision: "allow-always",
+        senderId: "user-1",
+      },
+      conversationBindingDeps,
+    );
 
     const samePluginNewPath = await requestPluginConversationBinding(
       createCodexBindRequest({
@@ -574,6 +553,7 @@ describe("plugin conversation binding approvals", () => {
         summary: "Bind this conversation to Codex thread def.",
         pluginRoot: "/plugins/codex-b",
       }),
+      conversationBindingDeps,
     );
 
     expect(samePluginNewPath.status).toBe("pending");
@@ -800,18 +780,21 @@ describe("plugin conversation binding approvals", () => {
       metadata: { owner: "core" },
     });
 
-    const result = await requestPluginConversationBinding({
-      pluginId: "codex",
-      pluginName: "Codex App Server",
-      pluginRoot: "/plugins/codex-a",
-      requestedBySenderId: "user-1",
-      conversation: {
-        channel: "discord",
-        accountId: "default",
-        conversationId: "channel:1",
+    const result = await requestPluginConversationBinding(
+      {
+        pluginId: "codex",
+        pluginName: "Codex App Server",
+        pluginRoot: "/plugins/codex-a",
+        requestedBySenderId: "user-1",
+        conversation: {
+          channel: "discord",
+          accountId: "default",
+          conversationId: "channel:1",
+        },
+        binding: { summary: "Bind this conversation to Codex thread 123." },
       },
-      binding: { summary: "Bind this conversation to Codex thread 123." },
-    });
+      conversationBindingDeps,
+    );
 
     expect(result).toEqual({
       status: "error",
@@ -886,7 +869,7 @@ describe("plugin conversation binding approvals", () => {
       boundAt: Date.now(),
     });
 
-    const request = await requestPluginConversationBinding(requestInput);
+    const request = await requestPluginConversationBinding(requestInput, conversationBindingDeps);
     const binding = await resolveRequestedBinding(request);
 
     expect(binding).toEqual(expect.objectContaining(expectedBinding));

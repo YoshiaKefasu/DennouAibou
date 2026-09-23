@@ -11,21 +11,22 @@ import {
   type WizardPrompter,
 } from "../../../test/helpers/plugins/setup-wizard.js";
 import { createStartAccountContext } from "../../../test/helpers/plugins/start-account-context.js";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import type { OpenClawConfig, PluginRuntime, ResolvedLineAccount } from "../api.js";
 import { linePlugin } from "./channel.js";
+import type { LineProbeDeps } from "./probe.js";
 import { clearLineRuntime, setLineRuntime } from "./runtime.js";
 
-const { getBotInfoMock, MessagingApiClientMock } = vi.hoisted(() => {
-  const getBotInfoMock = vi.fn();
-  const MessagingApiClientMock = vi.fn(function () {
-    return { getBotInfo: getBotInfoMock };
-  });
-  return { getBotInfoMock, MessagingApiClientMock };
-});
+// ---------------------------------------------------------------------------
+// Call-time dependency fakes (injected through `deps`, no module mocks)
+// ---------------------------------------------------------------------------
 
-vi.mock("@line/bot-sdk", () => ({
-  messagingApi: { MessagingApiClient: MessagingApiClientMock },
-}));
+const getBotInfoMock = vi.fn();
+const createMessagingClientMock = vi.fn(() => ({ getBotInfo: getBotInfoMock }));
+
+const lineProbeDeps: LineProbeDeps = {
+  createMessagingClient: createMessagingClientMock,
+};
 
 const lineConfigure = createPluginSetupWizardConfigure(
   linePlugin as unknown as Parameters<typeof createPluginSetupWizardConfigure>[0],
@@ -299,26 +300,21 @@ describe("line setup wizard", () => {
 describe("probeLineBot", () => {
   beforeEach(() => {
     getBotInfoMock.mockReset();
-    MessagingApiClientMock.mockReset();
-    MessagingApiClientMock.mockImplementation(function () {
-      return { getBotInfo: getBotInfoMock };
-    });
+    createMessagingClientMock.mockReset();
+    createMessagingClientMock.mockImplementation(() => ({ getBotInfo: getBotInfoMock }));
   });
 
   afterEach(() => {
     clearLineRuntime();
-    vi.useRealTimers();
     getBotInfoMock.mockClear();
   });
 
   it("returns timeout when bot info stalls", async () => {
     const { probeLineBot } = await import("./probe.js");
-    vi.useFakeTimers();
     getBotInfoMock.mockImplementation(() => new Promise(() => {}));
 
-    const probePromise = probeLineBot("token", 10);
-    await vi.advanceTimersByTimeAsync(20);
-    const result = await probePromise;
+    // Note: real timers are used (Bun lacks vi.advanceTimersByTimeAsync).
+    const result = await probeLineBot("token", 10, lineProbeDeps);
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("timeout");
@@ -333,7 +329,7 @@ describe("probeLineBot", () => {
       pictureUrl: "https://example.com/bot.png",
     });
 
-    const result = await probeLineBot("token", 50);
+    const result = await probeLineBot("token", 50, lineProbeDeps);
 
     expect(result.ok).toBe(true);
     expect(result.bot?.userId).toBe("U123");
@@ -343,10 +339,8 @@ describe("probeLineBot", () => {
 describe("linePlugin status.probeAccount", () => {
   it("falls back to the direct probe helper when runtime is not initialized", async () => {
     const { probeLineBot } = await import("./probe.js");
-    MessagingApiClientMock.mockReset();
-    MessagingApiClientMock.mockImplementation(function () {
-      return { getBotInfo: getBotInfoMock };
-    });
+    createMessagingClientMock.mockReset();
+    createMessagingClientMock.mockImplementation(() => ({ getBotInfo: getBotInfoMock }));
     getBotInfoMock.mockResolvedValue({
       displayName: "OpenClaw",
       userId: "U123",
@@ -364,12 +358,13 @@ describe("linePlugin status.probeAccount", () => {
         tokenSource: "config",
       } as ResolvedLineAccount,
       timeoutMs: 50,
+      deps: lineProbeDeps,
     };
 
     clearLineRuntime();
 
     await expect(linePlugin.status!.probeAccount!(params)).resolves.toEqual(
-      await probeLineBot("token", 50),
+      await probeLineBot("token", 50, lineProbeDeps),
     );
   });
 });
@@ -485,15 +480,18 @@ describe("linePlugin gateway.startAccount", () => {
       abortSignal: abort.signal,
     });
 
-    await vi.waitFor(() => {
-      expect(monitorLineProvider).toHaveBeenCalledWith(
-        expect.objectContaining({
-          channelAccessToken: "token",
-          channelSecret: "secret",
-          accountId: "default",
-        }),
-      );
-    });
+    await pollUntilAssert(
+      () => {
+        expect(monitorLineProvider).toHaveBeenCalledWith(
+          expect.objectContaining({
+            channelAccessToken: "token",
+            channelSecret: "secret",
+            accountId: "default",
+          }),
+        );
+      },
+      { timeoutMs: 3_000 },
+    );
 
     abort.abort();
     await task;

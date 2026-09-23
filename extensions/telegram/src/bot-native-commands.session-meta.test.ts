@@ -1,6 +1,7 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { ResolvedAgentRoute } from "openclaw/plugin-sdk/routing";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { pollUntilAssert } from "../../../test/helpers/poll.js";
 import type { TelegramNativeCommandDeps } from "./bot-native-command-deps.runtime.js";
 import {
   createDeferred,
@@ -9,9 +10,13 @@ import {
   createTelegramTopicCommandContext,
   type NativeCommandTestParams,
 } from "./bot-native-commands.fixture-test-support.js";
-import { type RegisterTelegramHandlerParams } from "./bot-native-commands.js";
+import {
+  registerTelegramNativeCommands,
+  type RegisterTelegramHandlerParams,
+} from "./bot-native-commands.js";
 
-// All mocks scoped to this file only — does not affect bot-native-commands.test.ts
+// All dependency fakes below are injected through `telegramDeps` (call-time seams),
+// so this file never rewrites modules shared with bot-native-commands.test.ts.
 
 type ResolveConfiguredBindingRouteFn =
   typeof import("openclaw/plugin-sdk/conversation-runtime").resolveConfiguredBindingRoute;
@@ -32,7 +37,7 @@ const dispatchReplyResult: DispatchReplyWithBufferedBlockDispatcherResult = {
   counts: {} as DispatchReplyWithBufferedBlockDispatcherResult["counts"],
 };
 
-const persistentBindingMocks = vi.hoisted(() => ({
+const persistentBindingMocks = {
   resolveConfiguredBindingRoute: vi.fn<ResolveConfiguredBindingRouteFn>(({ route }) => ({
     bindingResolution: null,
     route,
@@ -40,94 +45,34 @@ const persistentBindingMocks = vi.hoisted(() => ({
   ensureConfiguredBindingRouteReady: vi.fn<EnsureConfiguredBindingRouteReadyFn>(async () => ({
     ok: true,
   })),
-}));
-const sessionMocks = vi.hoisted(() => ({
+};
+const sessionMocks = {
   recordSessionMetaFromInbound: vi.fn(),
   resolveStorePath: vi.fn(),
-}));
-const replyMocks = vi.hoisted(() => ({
+};
+const replyMocks = {
   dispatchReplyWithBufferedBlockDispatcher: vi.fn<DispatchReplyWithBufferedBlockDispatcherFn>(
     async () => dispatchReplyResult,
   ),
-}));
-const deliveryMocks = vi.hoisted(() => ({
+};
+const deliveryMocks = {
   deliverReplies: vi.fn<DeliverRepliesFn>(async () => ({ delivered: true })),
-}));
-const sessionBindingMocks = vi.hoisted(() => ({
-  resolveByConversation: vi.fn<
-    (ref: unknown) => { bindingId: string; targetSessionKey: string } | null
-  >(() => null),
+};
+const sessionBindingMocks = {
+  resolveByConversation: vi.fn(),
   touch: vi.fn(),
-}));
-const conversationStoreMocks = vi.hoisted(() => ({
-  readChannelAllowFromStore: vi.fn(async () => []),
-  upsertChannelPairingRequest: vi.fn(async () => ({ code: "PAIRCODE", created: true })),
-}));
+};
 
-vi.mock("openclaw/plugin-sdk/conversation-runtime", async () => {
-  const actual = await import("openclaw/plugin-sdk/conversation-runtime");
+function getSessionBindingServiceFake() {
   return {
-    ...actual,
-    resolveConfiguredBindingRoute: persistentBindingMocks.resolveConfiguredBindingRoute,
-    ensureConfiguredBindingRouteReady: persistentBindingMocks.ensureConfiguredBindingRouteReady,
-    recordInboundSessionMetaSafe: vi.fn(
-      async (params: {
-        cfg: OpenClawConfig;
-        agentId: string;
-        sessionKey: string;
-        ctx: unknown;
-        onError?: (error: unknown) => void;
-      }) => {
-        const storePath = sessionMocks.resolveStorePath(params.cfg.session?.store, {
-          agentId: params.agentId,
-        });
-        try {
-          await sessionMocks.recordSessionMetaFromInbound({
-            storePath,
-            sessionKey: params.sessionKey,
-            ctx: params.ctx,
-          });
-        } catch (error) {
-          params.onError?.(error);
-        }
-      },
-    ),
-    readChannelAllowFromStore: conversationStoreMocks.readChannelAllowFromStore,
-    upsertChannelPairingRequest: conversationStoreMocks.upsertChannelPairingRequest,
-    getSessionBindingService: () => ({
-      bind: vi.fn(),
-      getCapabilities: vi.fn(),
-      listBySession: vi.fn(),
-      resolveByConversation: (ref: unknown) => sessionBindingMocks.resolveByConversation(ref),
-      touch: (bindingId: string, at?: number) => sessionBindingMocks.touch(bindingId, at),
-      unbind: vi.fn(),
-    }),
+    bind: vi.fn(),
+    getCapabilities: vi.fn(),
+    listBySession: vi.fn(),
+    resolveByConversation: (ref: unknown) => sessionBindingMocks.resolveByConversation(ref),
+    touch: (bindingId: string, at?: number) => sessionBindingMocks.touch(bindingId, at),
+    unbind: vi.fn(),
   };
-});
-vi.mock("./bot-native-commands.runtime.js", async () => {
-  const actual = await import("./bot-native-commands.runtime.js");
-  return {
-    ...actual,
-    finalizeInboundContext: vi.fn((ctx: unknown) => ctx),
-    dispatchReplyWithBufferedBlockDispatcher: replyMocks.dispatchReplyWithBufferedBlockDispatcher,
-  };
-});
-vi.mock("../../../src/pairing/pairing-store.js", () => ({
-  readChannelAllowFromStore: vi.fn(async () => []),
-}));
-vi.mock("../../../src/plugins/commands.js", () => ({
-  getPluginCommandSpecs: vi.fn(() => []),
-  matchPluginCommand: vi.fn(() => null),
-  executePluginCommand: vi.fn(async () => ({ text: "ok" })),
-}));
-vi.mock("./bot/delivery.js", () => ({
-  deliverReplies: deliveryMocks.deliverReplies,
-}));
-vi.mock("./bot/delivery.replies.js", () => ({
-  deliverReplies: deliveryMocks.deliverReplies,
-}));
-
-let registerTelegramNativeCommands: typeof import("./bot-native-commands.js").registerTelegramNativeCommands;
+}
 
 type TelegramCommandHandler = (ctx: unknown) => Promise<void>;
 
@@ -184,6 +129,24 @@ function registerAndResolveCommandHandlerBase(params: {
     getPluginCommandSpecs: vi.fn(() => []),
     listSkillCommandsForAgents: vi.fn(() => []),
     syncTelegramMenuCommands: vi.fn(),
+    resolveConfiguredBindingRoute: persistentBindingMocks.resolveConfiguredBindingRoute,
+    getSessionBindingService: getSessionBindingServiceFake,
+    ensureConfiguredBindingRouteReady: persistentBindingMocks.ensureConfiguredBindingRouteReady,
+    recordInboundSessionMetaSafe: async (params) => {
+      const storePath = sessionMocks.resolveStorePath(params.cfg.session?.store, {
+        agentId: params.agentId,
+      });
+      try {
+        await sessionMocks.recordSessionMetaFromInbound({
+          storePath,
+          sessionKey: params.sessionKey,
+          ctx: params.ctx,
+        });
+      } catch (error) {
+        params.onError?.(error);
+      }
+    },
+    deliverReplies: deliveryMocks.deliverReplies,
   };
   registerTelegramNativeCommands({
     ...createNativeCommandTestParams({
@@ -262,10 +225,6 @@ function expectUnauthorizedNewCommandBlocked(sendMessage: ReturnType<typeof vi.f
 }
 
 describe("registerTelegramNativeCommands — session metadata", () => {
-  beforeAll(async () => {
-    ({ registerTelegramNativeCommands } = await import("./bot-native-commands.js"));
-  });
-
   beforeEach(() => {
     persistentBindingMocks.resolveConfiguredBindingRoute.mockClear();
     persistentBindingMocks.resolveConfiguredBindingRoute.mockImplementation(({ route }) =>
@@ -307,9 +266,12 @@ describe("registerTelegramNativeCommands — session metadata", () => {
     const { handler } = registerAndResolveStatusHandler({ cfg });
     const runPromise = handler(createTelegramPrivateCommandContext());
 
-    await vi.waitFor(() => {
-      expect(sessionMocks.recordSessionMetaFromInbound).toHaveBeenCalledTimes(1);
-    });
+    await pollUntilAssert(
+      () => {
+        expect(sessionMocks.recordSessionMetaFromInbound).toHaveBeenCalledTimes(1);
+      },
+      { timeoutMs: 3_000 },
+    );
     expect(replyMocks.dispatchReplyWithBufferedBlockDispatcher).not.toHaveBeenCalled();
 
     deferred.resolve();

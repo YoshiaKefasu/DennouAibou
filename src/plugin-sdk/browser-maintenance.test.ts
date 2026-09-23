@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const closeTrackedBrowserTabsForSessionsImpl = vi.hoisted(() => vi.fn());
-const movePathToTrashImpl = vi.hoisted(() => vi.fn());
+const closeTrackedBrowserTabsForSessionsImpl = vi.fn();
+const movePathToTrashImpl = vi.fn();
 
-vi.mock("../../extensions/browser/browser-maintenance.js", () => ({
+const browserMaintenanceDeps = {
   closeTrackedBrowserTabsForSessions: closeTrackedBrowserTabsForSessionsImpl,
   movePathToTrash: movePathToTrashImpl,
-}));
+};
 
 describe("browser maintenance", () => {
   beforeEach(() => {
@@ -19,7 +19,9 @@ describe("browser maintenance", () => {
 
     const { closeTrackedBrowserTabsForSessions } = await import("./browser-maintenance.js");
 
-    await expect(closeTrackedBrowserTabsForSessions({ sessionKeys: [] })).resolves.toBe(0);
+    await expect(
+      closeTrackedBrowserTabsForSessions({ sessionKeys: [] }, browserMaintenanceDeps),
+    ).resolves.toBe(0);
     expect(closeTrackedBrowserTabsForSessionsImpl).toHaveBeenCalledWith({ sessionKeys: [] });
     expect(movePathToTrashImpl).not.toHaveBeenCalled();
   });
@@ -30,7 +32,10 @@ describe("browser maintenance", () => {
     const { closeTrackedBrowserTabsForSessions } = await import("./browser-maintenance.js");
 
     await expect(
-      closeTrackedBrowserTabsForSessions({ sessionKeys: ["agent:main:test"] }),
+      closeTrackedBrowserTabsForSessions(
+        { sessionKeys: ["agent:main:test"] },
+        browserMaintenanceDeps,
+      ),
     ).resolves.toBe(2);
     expect(closeTrackedBrowserTabsForSessionsImpl).toHaveBeenCalledWith({
       sessionKeys: ["agent:main:test"],
@@ -42,7 +47,9 @@ describe("browser maintenance", () => {
 
     const { movePathToTrash } = await import("./browser-maintenance.js");
 
-    await expect(movePathToTrash("/tmp/demo")).resolves.toBe("/tmp/demo.trashed");
+    await expect(movePathToTrash("/tmp/demo", browserMaintenanceDeps)).resolves.toBe(
+      "/tmp/demo.trashed",
+    );
     expect(movePathToTrashImpl).toHaveBeenCalledWith("/tmp/demo");
   });
 });

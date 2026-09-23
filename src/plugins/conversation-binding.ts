@@ -24,6 +24,10 @@ import type {
 
 const log = createSubsystemLogger("plugins/binding");
 
+export type ConversationBindingDeps = {
+  expandHomePrefix?: typeof expandHomePrefix;
+};
+
 const APPROVALS_PATH = "~/.dennou-aibou/plugin-binding-approvals.json";
 const PLUGIN_BINDING_CUSTOM_ID_PREFIX = "pluginbind";
 const PLUGIN_BINDING_OWNER = "plugin";
@@ -132,8 +136,8 @@ function getPluginBindingGlobalState(): PluginBindingGlobalState {
   return pluginBindingGlobalState;
 }
 
-function resolveApprovalsPath(): string {
-  return expandHomePrefix(APPROVALS_PATH);
+function resolveApprovalsPath(deps?: ConversationBindingDeps): string {
+  return (deps?.expandHomePrefix ?? expandHomePrefix)(APPROVALS_PATH);
 }
 
 function normalizeChannel(value: string): string {
@@ -270,8 +274,8 @@ function createApprovalRequestId(): string {
   return crypto.randomBytes(9).toString("base64url");
 }
 
-function loadApprovalsFromDisk(): PluginBindingApprovalsFile {
-  const filePath = resolveApprovalsPath();
+function loadApprovalsFromDisk(deps?: ConversationBindingDeps): PluginBindingApprovalsFile {
+  const filePath = resolveApprovalsPath(deps);
   try {
     if (!fs.existsSync(filePath)) {
       return { version: 1, approvals: [] };
@@ -307,8 +311,11 @@ function loadApprovalsFromDisk(): PluginBindingApprovalsFile {
   }
 }
 
-async function saveApprovals(file: PluginBindingApprovalsFile): Promise<void> {
-  const filePath = resolveApprovalsPath();
+async function saveApprovals(
+  file: PluginBindingApprovalsFile,
+  deps?: ConversationBindingDeps,
+): Promise<void> {
+  const filePath = resolveApprovalsPath(deps);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const state = getPluginBindingGlobalState();
   state.approvalsCache = file;
@@ -319,22 +326,25 @@ async function saveApprovals(file: PluginBindingApprovalsFile): Promise<void> {
   });
 }
 
-function getApprovals(): PluginBindingApprovalsFile {
+function getApprovals(deps?: ConversationBindingDeps): PluginBindingApprovalsFile {
   const state = getPluginBindingGlobalState();
   if (!state.approvalsLoaded || !state.approvalsCache) {
-    state.approvalsCache = loadApprovalsFromDisk();
+    state.approvalsCache = loadApprovalsFromDisk(deps);
     state.approvalsLoaded = true;
   }
   return state.approvalsCache;
 }
 
-function hasPersistentApproval(params: {
-  pluginRoot: string;
-  channel: string;
-  accountId: string;
-}): boolean {
+function hasPersistentApproval(
+  params: {
+    pluginRoot: string;
+    channel: string;
+    accountId: string;
+  },
+  deps?: ConversationBindingDeps,
+): boolean {
   const key = buildApprovalScopeKey(params);
-  return getApprovals().approvals.some(
+  return getApprovals(deps).approvals.some(
     (entry) =>
       buildApprovalScopeKey({
         pluginRoot: entry.pluginRoot,
@@ -344,8 +354,11 @@ function hasPersistentApproval(params: {
   );
 }
 
-async function addPersistentApproval(entry: PluginBindingApprovalEntry): Promise<void> {
-  const file = getApprovals();
+async function addPersistentApproval(
+  entry: PluginBindingApprovalEntry,
+  deps?: ConversationBindingDeps,
+): Promise<void> {
+  const file = getApprovals(deps);
   const key = buildApprovalScopeKey(entry);
   const approvals = file.approvals.filter(
     (existing) =>
@@ -356,10 +369,13 @@ async function addPersistentApproval(entry: PluginBindingApprovalEntry): Promise
       }) !== key,
   );
   approvals.push(entry);
-  await saveApprovals({
-    version: 1,
-    approvals,
-  });
+  await saveApprovals(
+    {
+      version: 1,
+      approvals,
+    },
+    deps,
+  );
 }
 
 function buildBindingMetadata(params: {
@@ -586,14 +602,17 @@ export function parsePluginBindingApprovalCustomId(
   };
 }
 
-export async function requestPluginConversationBinding(params: {
-  pluginId: string;
-  pluginName?: string;
-  pluginRoot: string;
-  conversation: PluginBindingConversation;
-  requestedBySenderId?: string;
-  binding: PluginConversationBindingRequestParams | undefined;
-}): Promise<PluginConversationBindingRequestResult> {
+export async function requestPluginConversationBinding(
+  params: {
+    pluginId: string;
+    pluginName?: string;
+    pluginRoot: string;
+    conversation: PluginBindingConversation;
+    requestedBySenderId?: string;
+    binding: PluginConversationBindingRequestParams | undefined;
+  },
+  deps?: ConversationBindingDeps,
+): Promise<PluginConversationBindingRequestResult> {
   const conversation = normalizeConversation(params.conversation);
   const ref = toConversationRef(conversation);
   const existing = resolveConversationBindingRecord(ref);
@@ -639,11 +658,14 @@ export async function requestPluginConversationBinding(params: {
   }
 
   if (
-    hasPersistentApproval({
-      pluginRoot: params.pluginRoot,
-      channel: ref.channel,
-      accountId: ref.accountId,
-    })
+    hasPersistentApproval(
+      {
+        pluginRoot: params.pluginRoot,
+        channel: ref.channel,
+        accountId: ref.accountId,
+      },
+      deps,
+    )
   ) {
     const bound = await bindConversationNow({
       identity: {
@@ -719,11 +741,14 @@ export async function detachPluginConversationBinding(params: {
   return { removed: true };
 }
 
-export async function resolvePluginConversationBindingApproval(params: {
-  approvalId: string;
-  decision: PluginBindingApprovalDecision;
-  senderId?: string;
-}): Promise<PluginBindingResolveResult> {
+export async function resolvePluginConversationBindingApproval(
+  params: {
+    approvalId: string;
+    decision: PluginBindingApprovalDecision;
+    senderId?: string;
+  },
+  deps?: ConversationBindingDeps,
+): Promise<PluginBindingResolveResult> {
   const request = pendingRequests.get(params.approvalId);
   if (!request) {
     return { status: "expired" };
@@ -748,14 +773,17 @@ export async function resolvePluginConversationBindingApproval(params: {
     return { status: "denied", request };
   }
   if (params.decision === "allow-always") {
-    await addPersistentApproval({
-      pluginRoot: request.pluginRoot,
-      pluginId: request.pluginId,
-      pluginName: request.pluginName,
-      channel: request.conversation.channel,
-      accountId: request.conversation.accountId,
-      approvedAt: Date.now(),
-    });
+    await addPersistentApproval(
+      {
+        pluginRoot: request.pluginRoot,
+        pluginId: request.pluginId,
+        pluginName: request.pluginName,
+        channel: request.conversation.channel,
+        accountId: request.conversation.accountId,
+        approvedAt: Date.now(),
+      },
+      deps,
+    );
   }
   const binding = await bindConversationNow({
     identity: {

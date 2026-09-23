@@ -33,6 +33,7 @@ import { fileExists } from "./fs.js";
 import { describeImageWithModel } from "./image-runtime.js";
 import { extractGeminiResponse } from "./output-extract.js";
 import { getMediaUnderstandingProvider, normalizeMediaProviderId } from "./provider-registry.js";
+import type { ProviderRegistryDeps } from "./provider-registry.js";
 import { resolveMaxBytes, resolveMaxChars, resolvePrompt, resolveTimeoutMs } from "./resolve.js";
 import type {
   MediaUnderstandingCapability,
@@ -44,6 +45,16 @@ import type {
 import { estimateBase64Size, resolveVideoMaxBase64Bytes } from "./video.js";
 
 export type ProviderRegistry = Map<string, MediaUnderstandingProvider>;
+
+/**
+ * Optional call-time seams for the runner entry paths.
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type RunnerEntryDeps = ProviderRegistryDeps & {
+  resolveApiKeyForProvider?: typeof resolveApiKeyForProvider;
+  runFfmpeg?: typeof runFfmpeg;
+  runExec?: typeof runExec;
+};
 
 function sanitizeProviderHeaders(
   headers: Record<string, unknown> | undefined,
@@ -220,6 +231,7 @@ async function resolveCliMediaPath(params: {
   command: string;
   mediaPath: string;
   outputDir: string;
+  deps?: RunnerEntryDeps;
 }): Promise<string> {
   const commandId = commandBase(params.command);
   if (params.capability !== "audio" || commandId !== "whisper-cli") {
@@ -231,8 +243,9 @@ async function resolveCliMediaPath(params: {
     return params.mediaPath;
   }
 
+  const runFfmpegFn = params.deps?.runFfmpeg ?? runFfmpeg;
   const wavPath = path.join(params.outputDir, `${path.parse(params.mediaPath).name}.wav`);
-  await runFfmpeg([
+  await runFfmpegFn([
     "-y",
     "-i",
     params.mediaPath,
@@ -377,8 +390,11 @@ async function resolveProviderExecutionAuth(params: {
   cfg: OpenClawConfig;
   entry: MediaUnderstandingModelConfig;
   agentDir?: string;
+  deps?: RunnerEntryDeps;
 }) {
-  const auth = await resolveApiKeyForProvider({
+  const resolveApiKeyForProviderFn =
+    params.deps?.resolveApiKeyForProvider ?? resolveApiKeyForProvider;
+  const auth = await resolveApiKeyForProviderFn({
     provider: params.providerId,
     cfg: params.cfg,
     profileId: params.entry.profile,
@@ -400,12 +416,14 @@ async function resolveProviderExecutionContext(params: {
   entry: MediaUnderstandingModelConfig;
   config?: MediaUnderstandingConfig;
   agentDir?: string;
+  deps?: RunnerEntryDeps;
 }) {
   const { apiKeys, providerConfig } = await resolveProviderExecutionAuth({
     providerId: params.providerId,
     cfg: params.cfg,
     entry: params.entry,
     agentDir: params.agentDir,
+    deps: params.deps,
   });
   const baseUrl = params.entry.baseUrl ?? params.config?.baseUrl ?? providerConfig?.baseUrl;
   const mergedHeaders = {
@@ -464,6 +482,7 @@ export async function runProviderEntry(params: {
   agentDir?: string;
   providerRegistry: ProviderRegistry;
   config?: MediaUnderstandingConfig;
+  deps?: RunnerEntryDeps;
 }): Promise<MediaUnderstandingOutput | null> {
   const { entry, capability, cfg } = params;
   const providerIdRaw = entry.provider?.trim();
@@ -542,6 +561,7 @@ export async function runProviderEntry(params: {
       entry,
       config: params.config,
       agentDir: params.agentDir,
+      deps: params.deps,
     });
     const providerQuery = resolveProviderQuery({
       providerId,
@@ -554,6 +574,7 @@ export async function runProviderEntry(params: {
         cfg,
         providerId,
         capability: "audio",
+        deps: params.deps,
       }) ||
       entry.model;
     const result = await executeWithApiKeyRotation({
@@ -608,6 +629,7 @@ export async function runProviderEntry(params: {
     entry,
     config: params.config,
     agentDir: params.agentDir,
+    deps: params.deps,
   });
   const result = await executeWithApiKeyRotation({
     provider: providerId,
@@ -644,6 +666,7 @@ export async function runCliEntry(params: {
   attachmentIndex: number;
   cache: MediaAttachmentCache;
   config?: MediaUnderstandingConfig;
+  deps?: RunnerEntryDeps;
 }): Promise<MediaUnderstandingOutput | null> {
   const { entry, capability, cfg, ctx } = params;
   const command = entry.command?.trim();
@@ -674,6 +697,7 @@ export async function runCliEntry(params: {
     command,
     mediaPath: pathResult.path,
     outputDir,
+    deps: params.deps,
   });
   const outputBase = path.join(outputDir, path.parse(mediaPath).name);
 
@@ -693,7 +717,8 @@ export async function runCliEntry(params: {
     if (shouldLogVerbose()) {
       logVerbose(`Media understanding via CLI: ${argv.join(" ")}`);
     }
-    const { stdout } = await runExec(argv[0], argv.slice(1), {
+    const runExecFn = params.deps?.runExec ?? runExec;
+    const { stdout } = await runExecFn(argv[0], argv.slice(1), {
       timeoutMs,
       maxBuffer: CLI_OUTPUT_MAX_BUFFER,
     });

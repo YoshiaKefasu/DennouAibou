@@ -6,34 +6,80 @@ import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { withEnvAsync } from "../test-utils/env.js";
+import {
+  applyMediaUnderstanding as applyMediaUnderstandingImpl,
+  type ApplyMediaUnderstandingDeps,
+} from "./apply.js";
+import { normalizeMediaProviderId } from "./provider-registry.js";
+import { clearMediaUnderstandingBinaryCacheForTests } from "./runner.js";
 import { createSafeAudioFixtureBuffer } from "./runner.test-utils.js";
 import type { MediaUnderstandingProvider } from "./types.js";
 
+// ---------------------------------------------------------------------------
+// Call-time dependency fakes (injected through `deps`, no module mocks)
+// ---------------------------------------------------------------------------
+
 type ResolveApiKeyForProvider = typeof import("../agents/model-auth.js").resolveApiKeyForProvider;
+type HasAvailableAuthForProvider =
+  typeof import("../agents/model-auth.js").hasAvailableAuthForProvider;
 
-const resolveApiKeyForProviderMock = vi.hoisted(() =>
-  vi.fn<ResolveApiKeyForProvider>(async () => ({
-    apiKey: "test-key", // pragma: allowlist secret
-    source: "test",
-    mode: "api-key",
-  })),
-);
-const hasAvailableAuthForProviderMock = vi.hoisted(() =>
-  vi.fn(async (...args: Parameters<ResolveApiKeyForProvider>) => {
-    const resolved = await resolveApiKeyForProviderMock(...args);
-    return Boolean(resolved?.apiKey);
-  }),
-);
-const fetchRemoteMediaMock = vi.hoisted(() => vi.fn());
-const runFfmpegMock = vi.hoisted(() => vi.fn());
-const runExecMock = vi.hoisted(() => vi.fn());
+const resolveApiKeyForProviderMock = vi.fn<ResolveApiKeyForProvider>(async () => ({
+  apiKey: "test-key", // pragma: allowlist secret
+  source: "test",
+  mode: "api-key",
+}));
+const hasAvailableAuthForProviderMock = vi.fn<HasAvailableAuthForProvider>(async (params) => {
+  const resolved = await resolveApiKeyForProviderMock(params);
+  return Boolean(resolved?.apiKey);
+});
+const fetchRemoteMediaMock = vi.fn();
+const runFfmpegMock = vi.fn();
+const runExecMock = vi.fn();
 
-let applyMediaUnderstanding: typeof import("./apply.js").applyMediaUnderstanding;
-let clearMediaUnderstandingBinaryCacheForTests: typeof import("./runner.js").clearMediaUnderstandingBinaryCacheForTests;
 const mockedResolveApiKey = resolveApiKeyForProviderMock;
 const mockedFetchRemoteMedia = fetchRemoteMediaMock;
 const mockedRunFfmpeg = runFfmpegMock;
 const mockedRunExec = runExecMock;
+
+// Replaces the real registry builder (which walks bundled plugin discovery and
+// re-materializes the active plugin registry) with the in-test provider set.
+function buildMediaUnderstandingRegistryForTest(
+  overrides?: Record<string, MediaUnderstandingProvider>,
+): Map<string, MediaUnderstandingProvider> {
+  const registry = new Map<string, MediaUnderstandingProvider>();
+  for (const [key, provider] of Object.entries(createRegistryMediaProviders())) {
+    registry.set(normalizeMediaProviderId(key), provider);
+  }
+  for (const [key, provider] of Object.entries(overrides ?? {})) {
+    const normalizedKey = normalizeMediaProviderId(key);
+    const existing = registry.get(normalizedKey);
+    registry.set(
+      normalizedKey,
+      existing
+        ? {
+            ...existing,
+            ...provider,
+            capabilities: provider.capabilities ?? existing.capabilities,
+          }
+        : provider,
+    );
+  }
+  return registry;
+}
+
+const applyDeps: ApplyMediaUnderstandingDeps = {
+  resolveApiKeyForProvider: resolveApiKeyForProviderMock,
+  hasAvailableAuthForProvider: hasAvailableAuthForProviderMock,
+  fetchRemoteMedia: (...args) => fetchRemoteMediaMock(...args),
+  runExec: (...args) => runExecMock(...args),
+  runFfmpeg: (...args) => runFfmpegMock(...args),
+  buildMediaUnderstandingRegistry: buildMediaUnderstandingRegistryForTest,
+};
+
+const applyMediaUnderstanding = (
+  params: Parameters<typeof applyMediaUnderstandingImpl>[0],
+): ReturnType<typeof applyMediaUnderstandingImpl> =>
+  applyMediaUnderstandingImpl({ ...params, deps: { ...params.deps, ...applyDeps } });
 
 const TEMP_MEDIA_PREFIX = "openclaw-media-";
 let suiteTempMediaRootDir = "";
@@ -241,60 +287,6 @@ function expectFileNotApplied(params: {
 
 describe("applyMediaUnderstanding", () => {
   beforeAll(async () => {
-    vi.resetModules();
-    vi.doMock("../agents/model-auth.js", () => ({
-      resolveApiKeyForProvider: resolveApiKeyForProviderMock,
-      hasAvailableAuthForProvider: hasAvailableAuthForProviderMock,
-      requireApiKey: (auth: { apiKey?: string; mode?: string }, provider: string) => {
-        if (auth?.apiKey) {
-          return auth.apiKey;
-        }
-        throw new Error(
-          `No API key resolved for provider "${provider}" (auth mode: ${auth?.mode}).`,
-        );
-      },
-    }));
-    vi.doMock("../media/fetch.js", () => ({
-      fetchRemoteMedia: fetchRemoteMediaMock,
-    }));
-    vi.doMock("../media/ffmpeg-exec.js", () => ({
-      runFfmpeg: runFfmpegMock,
-    }));
-    vi.doMock("../process/exec.js", () => ({
-      runExec: runExecMock,
-    }));
-    vi.doMock("./provider-registry.js", async () => {
-      const actual = await import("./provider-registry.js");
-      const registryProviders = createRegistryMediaProviders();
-      return {
-        ...actual,
-        buildMediaUnderstandingRegistry: (
-          overrides?: Record<string, MediaUnderstandingProvider>,
-        ) => {
-          const registry = new Map<string, MediaUnderstandingProvider>(
-            Object.entries(registryProviders),
-          );
-          for (const [key, provider] of Object.entries(overrides ?? {})) {
-            const normalizedKey = actual.normalizeMediaProviderId(key);
-            const existing = registry.get(normalizedKey);
-            registry.set(
-              normalizedKey,
-              existing
-                ? {
-                    ...existing,
-                    ...provider,
-                    capabilities: provider.capabilities ?? existing.capabilities,
-                  }
-                : provider,
-            );
-          }
-          return registry;
-        },
-      };
-    });
-    ({ applyMediaUnderstanding } = await import("./apply.js"));
-    ({ clearMediaUnderstandingBinaryCacheForTests } = await import("./runner.js"));
-
     const baseDir = resolvePreferredOpenClawTmpDir();
     await fs.mkdir(baseDir, { recursive: true });
     suiteTempMediaRootDir = await fs.mkdtemp(path.join(baseDir, TEMP_MEDIA_PREFIX));

@@ -23,6 +23,15 @@ import {
   resolveTelegramDirectPeerId,
 } from "./bot/helpers.js";
 
+/**
+ * Optional call-time seams for telegram conversation routing.
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type TelegramConversationRouteDeps = {
+  resolveConfiguredBindingRoute?: typeof resolveConfiguredBindingRoute;
+  getSessionBindingService?: typeof getSessionBindingService;
+};
+
 export function resolveTelegramConversationRoute(params: {
   cfg: OpenClawConfig;
   accountId: string;
@@ -32,6 +41,7 @@ export function resolveTelegramConversationRoute(params: {
   replyThreadId?: number;
   senderId?: string | number | null;
   topicAgentId?: string | null;
+  deps?: TelegramConversationRouteDeps;
 }): {
   route: ReturnType<typeof resolveAgentRoute>;
   configuredBinding: ConfiguredBindingRouteResult["bindingResolution"];
@@ -97,7 +107,9 @@ export function resolveTelegramConversationRoute(params: {
     );
   }
 
-  const configuredRoute = resolveConfiguredBindingRoute({
+  const resolveConfiguredBindingRouteFn =
+    params.deps?.resolveConfiguredBindingRoute ?? resolveConfiguredBindingRoute;
+  const configuredRoute = resolveConfiguredBindingRouteFn({
     cfg: params.cfg,
     route,
     conversation: {
@@ -118,7 +130,9 @@ export function resolveTelegramConversationRoute(params: {
         ? String(params.chatId)
         : undefined;
   if (threadBindingConversationId) {
-    const threadBinding = getSessionBindingService().resolveByConversation({
+    const getSessionBindingServiceFn =
+      params.deps?.getSessionBindingService ?? getSessionBindingService;
+    const threadBinding = getSessionBindingServiceFn().resolveByConversation({
       channel: "telegram",
       accountId: params.accountId,
       conversationId: threadBindingConversationId,
@@ -139,7 +153,7 @@ export function resolveTelegramConversationRoute(params: {
       }
       configuredBinding = null;
       configuredBindingSessionKey = "";
-      getSessionBindingService().touch(threadBinding.bindingId);
+      getSessionBindingServiceFn().touch(threadBinding.bindingId);
       logVerbose(
         isPluginOwnedSessionBindingRecord(threadBinding)
           ? `telegram: plugin-bound conversation ${threadBindingConversationId}`

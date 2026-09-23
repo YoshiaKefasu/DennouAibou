@@ -11,6 +11,13 @@ function loadDeliverRuntime() {
   return deliverRuntimePromise;
 }
 
+type DeliverOutboundPayloadsFn =
+  (typeof import("../infra/outbound/deliver-runtime.js"))["deliverOutboundPayloads"];
+
+export type EchoTranscriptDeps = {
+  deliverOutboundPayloads?: DeliverOutboundPayloadsFn;
+};
+
 export const DEFAULT_ECHO_TRANSCRIPT_FORMAT = '📝 "{transcript}"';
 
 function formatEchoTranscript(transcript: string, format: string): string {
@@ -26,6 +33,7 @@ export async function sendTranscriptEcho(params: {
   cfg: OpenClawConfig;
   transcript: string;
   format?: string;
+  deps?: EchoTranscriptDeps;
 }): Promise<void> {
   const { ctx, cfg, transcript } = params;
   const channel = ctx.Provider ?? ctx.Surface ?? "";
@@ -51,8 +59,9 @@ export async function sendTranscriptEcho(params: {
   const text = formatEchoTranscript(transcript, params.format ?? DEFAULT_ECHO_TRANSCRIPT_FORMAT);
 
   try {
-    const { deliverOutboundPayloads } = await loadDeliverRuntime();
-    await deliverOutboundPayloads({
+    const deliverOutboundPayloadsFn =
+      params.deps?.deliverOutboundPayloads ?? (await loadDeliverRuntime()).deliverOutboundPayloads;
+    await deliverOutboundPayloadsFn({
       cfg,
       channel: normalizedChannel,
       to,

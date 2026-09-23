@@ -1,17 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setChannelRegistryCallProbeForTest } from "../runtime.js";
 import { assertNoImportTimeSideEffects } from "./testkit.js";
-
-const listChannelPlugins = vi.hoisted(() =>
-  vi.fn(() => [
-    {
-      id: "signal",
-      messaging: {
-        defaultMarkdownTableMode: "bullets",
-      },
-    },
-  ]),
-);
-const getActivePluginChannelRegistryVersion = vi.hoisted(() => vi.fn(() => 1));
 
 const CHANNEL_REGISTRY_SEAM = "listChannelPlugins()";
 const CHANNEL_REGISTRY_WHY =
@@ -19,59 +8,73 @@ const CHANNEL_REGISTRY_WHY =
 const CHANNEL_REGISTRY_FIX =
   "keep the seam behind a lazy getter/runtime boundary so import stays cold and the first real lookup loads once.";
 
-function mockChannelRegistry() {
-  vi.doMock("../../channels/plugins/registry.js", async () => {
-    const actual = await import("../../channels/plugins/registry.js");
-    return {
-      ...actual,
-      listChannelPlugins,
-    };
-  });
-  vi.doMock("../../plugins/runtime.js", async () => {
-    const actual = await import("../../plugins/runtime.js");
-    return {
-      ...actual,
-      getActivePluginChannelRegistryVersion,
-    };
-  });
+// Observes registry work through src/plugins/runtime.ts: every listChannelPlugins()
+// / getChannelPlugin() call funnels into requireActivePluginChannelRegistry(), and
+// direct version reads are observed separately.
+const listChannelRegistryProbe = vi.fn();
+const versionProbe = vi.fn();
+
+const listChannelPlugins = vi.fn(() => [
+  {
+    id: "signal",
+    messaging: {
+      defaultMarkdownTableMode: "bullets" as const,
+    },
+  },
+]);
+const getActivePluginChannelRegistryVersion = vi.fn(() => 1);
+
+let importSequence = 0;
+
+async function importFresh(pathname: string): Promise<unknown> {
+  importSequence += 1;
+  return import(`${new URL(pathname, import.meta.url).href}?cold=${importSequence}`);
 }
 
 function expectNoChannelRegistryDuringImport(moduleId: string) {
   assertNoImportTimeSideEffects({
     moduleId,
     forbiddenSeam: CHANNEL_REGISTRY_SEAM,
-    calls: listChannelPlugins.mock.calls,
+    calls: listChannelRegistryProbe.mock.calls,
     why: CHANNEL_REGISTRY_WHY,
     fixHint: CHANNEL_REGISTRY_FIX,
   });
-  expect(getActivePluginChannelRegistryVersion).not.toHaveBeenCalled();
+  expect(versionProbe).not.toHaveBeenCalled();
 }
 
 afterEach(() => {
-  vi.resetModules();
-  vi.restoreAllMocks();
-  vi.doUnmock("../../channels/plugins/registry.js");
-  vi.doUnmock("../../plugins/runtime.js");
+  setChannelRegistryCallProbeForTest(null);
 });
 
 describe("runtime import side-effect contracts", () => {
   beforeEach(() => {
+    listChannelRegistryProbe.mockClear();
+    versionProbe.mockClear();
     listChannelPlugins.mockClear();
-    getActivePluginChannelRegistryVersion.mockClear().mockReturnValue(1);
+    getActivePluginChannelRegistryVersion.mockClear();
+    setChannelRegistryCallProbeForTest({
+      onRequireActivePluginChannelRegistry: listChannelRegistryProbe,
+      onActivePluginChannelRegistryVersion: versionProbe,
+    });
   });
 
   it("keeps config/markdown-tables cold on import", async () => {
-    mockChannelRegistry();
-    await import("../../config/markdown-tables.js");
+    await importFresh("../../config/markdown-tables.ts");
 
     expectNoChannelRegistryDuringImport("src/config/markdown-tables.ts");
   });
 
   it("keeps markdown table defaults lazy and memoized after import", async () => {
-    mockChannelRegistry();
-    const markdownTables = await import("../../config/markdown-tables.js");
+    const markdownTables = (await importFresh(
+      "../../config/markdown-tables.ts",
+    )) as typeof import("../../config/markdown-tables.js");
 
     expectNoChannelRegistryDuringImport("src/config/markdown-tables.ts");
+
+    markdownTables.setMarkdownTableRegistrySourceForTests({
+      listChannelPlugins,
+      getActivePluginChannelRegistryVersion,
+    });
 
     expect(markdownTables.DEFAULT_TABLE_MODES.get("signal")).toBe("bullets");
     expect(getActivePluginChannelRegistryVersion).toHaveBeenCalled();
@@ -82,36 +85,31 @@ describe("runtime import side-effect contracts", () => {
   });
 
   it("keeps plugins/runtime/runtime-channel cold on import", async () => {
-    mockChannelRegistry();
-    await import("../runtime/runtime-channel.js");
+    await importFresh("../runtime/runtime-channel.ts");
 
     expectNoChannelRegistryDuringImport("src/plugins/runtime/runtime-channel.ts");
   });
 
   it("keeps plugins/runtime/runtime-system cold on import", async () => {
-    mockChannelRegistry();
-    await import("../runtime/runtime-system.js");
+    await importFresh("../runtime/runtime-system.ts");
 
     expectNoChannelRegistryDuringImport("src/plugins/runtime/runtime-system.ts");
   });
 
   it("keeps web-search/runtime cold on import", async () => {
-    mockChannelRegistry();
-    await import("../../web-search/runtime.js");
+    await importFresh("../../web-search/runtime.ts");
 
     expectNoChannelRegistryDuringImport("src/web-search/runtime.ts");
   });
 
   it("keeps web-fetch/runtime cold on import", async () => {
-    mockChannelRegistry();
-    await import("../../web-fetch/runtime.js");
+    await importFresh("../../web-fetch/runtime.ts");
 
     expectNoChannelRegistryDuringImport("src/web-fetch/runtime.ts");
   });
 
   it("keeps plugins/runtime/index cold on import", async () => {
-    mockChannelRegistry();
-    await import("../runtime/index.js");
+    await importFresh("../runtime/index.ts");
 
     expectNoChannelRegistryDuringImport("src/plugins/runtime/index.ts");
   });

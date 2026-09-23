@@ -3,6 +3,7 @@ import { finalizeInboundContext } from "../auto-reply/reply/inbound-context.js";
 import type { MsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { logVerbose, shouldLogVerbose } from "../globals.js";
+import type { fetchRemoteMedia } from "../media/fetch.js";
 import { renderFileContextBlock } from "../media/file-context.js";
 import {
   extractFileContentFromSource,
@@ -12,7 +13,11 @@ import {
 import { wrapExternalContent } from "../security/external-content.js";
 import { resolveAttachmentKind } from "./attachments.js";
 import { runWithConcurrency } from "./concurrency.js";
-import { DEFAULT_ECHO_TRANSCRIPT_FORMAT, sendTranscriptEcho } from "./echo-transcript.js";
+import {
+  DEFAULT_ECHO_TRANSCRIPT_FORMAT,
+  sendTranscriptEcho,
+  type EchoTranscriptDeps,
+} from "./echo-transcript.js";
 import {
   extractMediaUserText,
   formatAudioTranscripts,
@@ -23,6 +28,7 @@ import {
   type ActiveMediaModel,
   buildProviderRegistry,
   createMediaAttachmentCache,
+  type MediaUnderstandingRunnerDeps,
   normalizeMediaAttachments,
   resolveMediaAttachmentLocalRoots,
   runCapability,
@@ -42,6 +48,15 @@ export type ApplyMediaUnderstandingResult = {
   appliedVideo: boolean;
   appliedFile: boolean;
 };
+
+/**
+ * Optional call-time seams for `applyMediaUnderstanding`.
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type ApplyMediaUnderstandingDeps = MediaUnderstandingRunnerDeps &
+  EchoTranscriptDeps & {
+    fetchRemoteMedia?: typeof fetchRemoteMedia;
+  };
 
 const CAPABILITY_ORDER: MediaUnderstandingCapability[] = ["image", "audio", "video"];
 const EXTRA_TEXT_MIMES = [
@@ -461,6 +476,7 @@ export async function applyMediaUnderstanding(params: {
   providers?: Record<string, MediaUnderstandingProvider>;
   activeModel?: ActiveMediaModel;
   skipAudio?: boolean;
+  deps?: ApplyMediaUnderstandingDeps;
 }): Promise<ApplyMediaUnderstandingResult> {
   const { ctx, cfg } = params;
   const commandCandidates = [ctx.CommandBody, ctx.RawBody, ctx.Body];
@@ -470,9 +486,10 @@ export async function applyMediaUnderstanding(params: {
       .find((value) => value && value.trim()) ?? undefined;
 
   const attachments = normalizeMediaAttachments(ctx);
-  const providerRegistry = buildProviderRegistry(params.providers, cfg);
+  const providerRegistry = buildProviderRegistry(params.providers, cfg, params.deps);
   const cache = createMediaAttachmentCache(attachments, {
     localPathRoots: resolveMediaAttachmentLocalRoots({ cfg, ctx }),
+    fetchRemoteMedia: params.deps?.fetchRemoteMedia,
   });
 
   try {
@@ -498,6 +515,7 @@ export async function applyMediaUnderstanding(params: {
         providerRegistry,
         config,
         activeModel: params.activeModel,
+        deps: params.deps,
       });
     });
 
@@ -539,6 +557,7 @@ export async function applyMediaUnderstanding(params: {
             cfg,
             transcript,
             format: audioCfg.echoFormat ?? DEFAULT_ECHO_TRANSCRIPT_FORMAT,
+            deps: params.deps,
           });
         }
       } else if (originalUserText) {

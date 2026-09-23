@@ -1,5 +1,9 @@
 import type { OpenClawConfig } from "../config/config.js";
-import { buildMediaUnderstandingRegistry, normalizeMediaProviderId } from "./provider-registry.js";
+import {
+  buildMediaUnderstandingRegistry,
+  normalizeMediaProviderId,
+  type ProviderRegistryDeps,
+} from "./provider-registry.js";
 import type { MediaUnderstandingCapability, MediaUnderstandingProvider } from "./types.js";
 
 const MB = 1024 * 1024;
@@ -57,8 +61,14 @@ export function resolveDefaultMediaModel(params: {
   capability: MediaUnderstandingCapability;
   cfg?: OpenClawConfig;
   providerRegistry?: Map<string, MediaUnderstandingProvider>;
+  deps?: ProviderRegistryDeps;
 }): string | undefined {
-  const registry = params.providerRegistry ?? resolveDefaultRegistry(params.cfg);
+  const registry =
+    params.providerRegistry ??
+    (params.deps?.buildMediaUnderstandingRegistry ?? buildMediaUnderstandingRegistry)(
+      undefined,
+      params.cfg ?? ({} as OpenClawConfig),
+    );
   const provider = registry.get(normalizeMediaProviderId(params.providerId));
   return provider?.defaultModels?.[params.capability]?.trim() || undefined;
 }

@@ -40,6 +40,7 @@ import {
   formatDecisionSummary,
   runCliEntry,
   runProviderEntry,
+  type RunnerEntryDeps,
 } from "./runner.entries.js";
 import type {
   MediaAttachment,
@@ -54,6 +55,15 @@ export { createMediaAttachmentCache, normalizeMediaAttachments } from "./runner.
 export type ActiveMediaModel = {
   provider: string;
   model?: string;
+};
+
+/**
+ * Optional call-time seams for media-understanding runner paths.
+ * Unspecified fields fall back to the real implementation at call time.
+ */
+export type MediaUnderstandingRunnerDeps = RunnerEntryDeps & {
+  hasAvailableAuthForProvider?: typeof hasAvailableAuthForProvider;
+  loadModelCatalog?: typeof loadModelCatalog;
 };
 
 type ProviderRegistry = Map<string, MediaUnderstandingProvider>;
@@ -138,6 +148,7 @@ async function resolveAutoImageModelId(params: {
   cfg: OpenClawConfig;
   providerId: string;
   explicitModel?: string;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<string | undefined> {
   const explicit = params.explicitModel?.trim();
   if (explicit) {
@@ -151,11 +162,13 @@ async function resolveAutoImageModelId(params: {
     cfg: params.cfg,
     providerId: params.providerId,
     capability: "image",
+    deps: params.deps,
   });
   if (defaultModel) {
     return defaultModel;
   }
-  const catalog = await loadModelCatalog({ config: params.cfg });
+  const loadModelCatalogFn = params.deps?.loadModelCatalog ?? loadModelCatalog;
+  const catalog = await loadModelCatalogFn({ config: params.cfg });
   return resolveCatalogImageModelId({
     providerId: params.providerId,
     catalog,
@@ -165,8 +178,11 @@ async function resolveAutoImageModelId(params: {
 export function buildProviderRegistry(
   overrides?: Record<string, MediaUnderstandingProvider>,
   cfg?: OpenClawConfig,
+  deps?: MediaUnderstandingRunnerDeps,
 ): ProviderRegistry {
-  return buildMediaUnderstandingRegistry(overrides, cfg);
+  const buildMediaUnderstandingRegistryFn =
+    deps?.buildMediaUnderstandingRegistry ?? buildMediaUnderstandingRegistry;
+  return buildMediaUnderstandingRegistryFn(overrides, cfg);
 }
 
 export function resolveMediaAttachmentLocalRoots(params: {
@@ -282,7 +298,7 @@ async function hasBinary(name: string): Promise<boolean> {
   return Boolean(await findBinary(name));
 }
 
-async function probeGeminiCli(): Promise<boolean> {
+async function probeGeminiCli(deps?: MediaUnderstandingRunnerDeps): Promise<boolean> {
   const cached = geminiProbeCache.get("gemini");
   if (cached) {
     return cached;
@@ -292,7 +308,8 @@ async function probeGeminiCli(): Promise<boolean> {
       return false;
     }
     try {
-      const { stdout } = await runExec("gemini", ["--output-format", "json", "ok"], {
+      const runExecFn = deps?.runExec ?? runExec;
+      const { stdout } = await runExecFn("gemini", ["--output-format", "json", "ok"], {
         timeoutMs: 8000,
       });
       return Boolean(extractGeminiResponse(stdout) ?? stdout.toLowerCase().includes("ok"));
@@ -393,8 +410,9 @@ async function resolveLocalAudioEntry(): Promise<MediaUnderstandingModelConfig |
 
 async function resolveGeminiCliEntry(
   _capability: MediaUnderstandingCapability,
+  deps?: MediaUnderstandingRunnerDeps,
 ): Promise<MediaUnderstandingModelConfig | null> {
-  if (!(await probeGeminiCli())) {
+  if (!(await probeGeminiCli(deps))) {
     return null;
   }
   return {
@@ -419,6 +437,7 @@ async function resolveKeyEntry(params: {
   providerRegistry: ProviderRegistry;
   capability: MediaUnderstandingCapability;
   activeModel?: ActiveMediaModel;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<MediaUnderstandingModelConfig | null> {
   const { cfg, agentDir, providerRegistry, capability } = params;
   const checkProvider = async (
@@ -438,8 +457,10 @@ async function resolveKeyEntry(params: {
     if (capability === "video" && !provider.describeVideo) {
       return null;
     }
+    const hasAvailableAuthForProviderFn =
+      params.deps?.hasAvailableAuthForProvider ?? hasAvailableAuthForProvider;
     if (
-      !(await hasAvailableAuthForProvider({
+      !(await hasAvailableAuthForProviderFn({
         provider: providerId,
         cfg,
         agentDir,
@@ -569,6 +590,7 @@ async function resolveAutoEntries(params: {
   providerRegistry: ProviderRegistry;
   capability: MediaUnderstandingCapability;
   activeModel?: ActiveMediaModel;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<MediaUnderstandingModelConfig[]> {
   const activeEntry = await resolveActiveModelEntry(params);
   if (activeEntry) {
@@ -586,7 +608,7 @@ async function resolveAutoEntries(params: {
       return imageModelEntries;
     }
   }
-  const gemini = await resolveGeminiCliEntry(params.capability);
+  const gemini = await resolveGeminiCliEntry(params.capability, params.deps);
   if (gemini) {
     return [gemini];
   }
@@ -601,8 +623,9 @@ export async function resolveAutoImageModel(params: {
   cfg: OpenClawConfig;
   agentDir?: string;
   activeModel?: ActiveMediaModel;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<ActiveMediaModel | null> {
-  const providerRegistry = buildProviderRegistry(undefined, params.cfg);
+  const providerRegistry = buildProviderRegistry(undefined, params.cfg, params.deps);
   const toActive = (entry: MediaUnderstandingModelConfig | null): ActiveMediaModel | null => {
     if (!entry || entry.type === "cli") {
       return null;
@@ -620,6 +643,7 @@ export async function resolveAutoImageModel(params: {
     providerRegistry,
     capability: "image",
     activeModel: params.activeModel,
+    deps: params.deps,
   });
   const resolvedActive = toActive(activeEntry);
   if (resolvedActive) {
@@ -631,6 +655,7 @@ export async function resolveAutoImageModel(params: {
     providerRegistry,
     capability: "image",
     activeModel: params.activeModel,
+    deps: params.deps,
   });
   return toActive(keyEntry);
 }
@@ -641,6 +666,7 @@ async function resolveActiveModelEntry(params: {
   providerRegistry: ProviderRegistry;
   capability: MediaUnderstandingCapability;
   activeModel?: ActiveMediaModel;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<MediaUnderstandingModelConfig | null> {
   const activeProviderRaw = params.activeModel?.provider?.trim();
   if (!activeProviderRaw) {
@@ -663,7 +689,9 @@ async function resolveActiveModelEntry(params: {
   if (params.capability === "video" && !provider.describeVideo) {
     return null;
   }
-  const hasAuth = await hasAvailableAuthForProvider({
+  const hasAvailableAuthForProviderFn =
+    params.deps?.hasAvailableAuthForProvider ?? hasAvailableAuthForProvider;
+  const hasAuth = await hasAvailableAuthForProviderFn({
     provider: providerId,
     cfg: params.cfg,
     agentDir: params.agentDir,
@@ -677,6 +705,7 @@ async function resolveActiveModelEntry(params: {
           cfg: params.cfg,
           providerId,
           explicitModel: params.activeModel?.model,
+          deps: params.deps,
         })
       : params.activeModel?.model;
   if (params.capability === "image" && !model) {
@@ -699,6 +728,7 @@ async function runAttachmentEntries(params: {
   cache: MediaAttachmentCache;
   entries: MediaUnderstandingModelConfig[];
   config?: MediaUnderstandingConfig;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<{
   output: MediaUnderstandingOutput | null;
   attempts: MediaUnderstandingModelDecision[];
@@ -718,6 +748,7 @@ async function runAttachmentEntries(params: {
               attachmentIndex: params.attachmentIndex,
               cache: params.cache,
               config: params.config,
+              deps: params.deps,
             })
           : await runProviderEntry({
               capability,
@@ -729,6 +760,7 @@ async function runAttachmentEntries(params: {
               agentDir: params.agentDir,
               providerRegistry: params.providerRegistry,
               config: params.config,
+              deps: params.deps,
             });
       if (result) {
         const decision = buildModelDecision({ entry, entryType, outcome: "success" });
@@ -786,6 +818,7 @@ export async function runCapability(params: {
   providerRegistry: ProviderRegistry;
   config?: MediaUnderstandingConfig;
   activeModel?: ActiveMediaModel;
+  deps?: MediaUnderstandingRunnerDeps;
 }): Promise<RunCapabilityResult> {
   const { capability, cfg, ctx } = params;
   const config = params.config ?? cfg.tools?.media?.[capability];
@@ -828,7 +861,8 @@ export async function runCapability(params: {
   // The image will be injected directly into the model context instead.
   const activeProvider = params.activeModel?.provider?.trim();
   if (capability === "image" && activeProvider) {
-    const catalog = await loadModelCatalog({ config: cfg });
+    const loadModelCatalogFn = params.deps?.loadModelCatalog ?? loadModelCatalog;
+    const catalog = await loadModelCatalogFn({ config: cfg });
     const entry = findModelInCatalog(catalog, activeProvider, params.activeModel?.model ?? "");
     if (modelSupportsVision(entry)) {
       if (shouldLogVerbose()) {
@@ -874,6 +908,7 @@ export async function runCapability(params: {
       providerRegistry: params.providerRegistry,
       capability,
       activeModel: params.activeModel,
+      deps: params.deps,
     });
   }
   if (resolvedEntries.length === 0) {
@@ -900,6 +935,7 @@ export async function runCapability(params: {
       cache: params.attachments,
       entries: resolvedEntries,
       config,
+      deps: params.deps,
     });
     if (output) {
       outputs.push(output);

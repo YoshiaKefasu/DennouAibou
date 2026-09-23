@@ -112,6 +112,18 @@ async function loadTelegramNativeCommandDeliveryRuntime() {
   return await telegramNativeCommandDeliveryRuntimePromise;
 }
 
+let telegramChannelReplyPipelineRuntimePromise:
+  | Promise<typeof import("openclaw/plugin-sdk/channel-reply-pipeline")>
+  | undefined;
+
+// Split from the delivery runtime: the reply pipeline itself is cheap, while
+// `./bot/delivery.js` pulls in the heavy media graph and must stay lazy.
+async function loadChannelReplyPipelineRuntime() {
+  telegramChannelReplyPipelineRuntimePromise ??=
+    import("openclaw/plugin-sdk/channel-reply-pipeline");
+  return await telegramChannelReplyPipelineRuntimePromise;
+}
+
 let telegramNativeCommandRuntimePromise:
   | Promise<typeof import("./bot-native-commands.runtime.js")>
   | undefined;
@@ -634,10 +646,17 @@ export const registerTelegramNativeCommands = ({
       replyThreadId: threadSpec.id,
       senderId,
       topicAgentId,
+      deps: {
+        resolveConfiguredBindingRoute: telegramDeps.resolveConfiguredBindingRoute,
+        getSessionBindingService: telegramDeps.getSessionBindingService,
+      },
     });
     const nativeCommandRuntime = await loadTelegramNativeCommandRuntime();
     if (configuredBinding) {
-      const ensured = await nativeCommandRuntime.ensureConfiguredBindingRouteReady({
+      const ensureConfiguredBindingRouteReadyFn =
+        telegramDeps.ensureConfiguredBindingRouteReady ??
+        nativeCommandRuntime.ensureConfiguredBindingRouteReady;
+      const ensured = await ensureConfiguredBindingRouteReadyFn({
         cfg: runtimeCfg,
         bindingResolution: configuredBinding,
       });
@@ -891,7 +910,10 @@ export const registerTelegramNativeCommands = ({
           OriginatingTo: originatingTo,
         });
 
-        await nativeCommandRuntime.recordInboundSessionMetaSafe({
+        const recordInboundSessionMetaSafeFn =
+          telegramDeps.recordInboundSessionMetaSafe ??
+          nativeCommandRuntime.recordInboundSessionMetaSafe;
+        await recordInboundSessionMetaSafeFn({
           cfg: executionCfg,
           agentId: route.agentId,
           sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
@@ -909,8 +931,10 @@ export const registerTelegramNativeCommands = ({
           skippedNonSilent: 0,
         };
 
-        const { createChannelReplyPipeline, deliverReplies } =
-          await loadTelegramNativeCommandDeliveryRuntime();
+        const { createChannelReplyPipeline } = await loadChannelReplyPipelineRuntime();
+        const deliverReplies =
+          telegramDeps.deliverReplies ??
+          (await loadTelegramNativeCommandDeliveryRuntime()).deliverReplies;
         const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
           cfg: executionCfg,
           agentId: route.agentId,
@@ -1036,8 +1060,9 @@ export const registerTelegramNativeCommands = ({
         });
         const from = isGroup ? buildTelegramGroupFrom(chatId, threadSpec.id) : `telegram:${chatId}`;
         const to = `telegram:${chatId}`;
-        const { deliverReplies, emitTelegramMessageSentHooks } =
-          await loadTelegramNativeCommandDeliveryRuntime();
+        const deliveryRuntime = await loadTelegramNativeCommandDeliveryRuntime();
+        const { emitTelegramMessageSentHooks } = deliveryRuntime;
+        const deliverReplies = telegramDeps.deliverReplies ?? deliveryRuntime.deliverReplies;
         let progressMessageId: number | undefined;
         const progressPlaceholder = resolveTelegramProgressPlaceholder(match.command);
 
