@@ -39,25 +39,6 @@ const HEARTBEAT_RULE: LegacyConfigRule = {
     "top-level heartbeat is not a valid config path; use agents.defaults.heartbeat (cadence/target/model settings) or channels.defaults.heartbeat (showOk/showAlerts/useIndicator).",
 };
 
-const LEGACY_SANDBOX_SCOPE_RULES: LegacyConfigRule[] = [
-  {
-    path: ["agents", "defaults", "sandbox"],
-    message:
-      'agents.defaults.sandbox.perSession is legacy; use agents.defaults.sandbox.scope instead. Run "openclaw doctor --fix".',
-    match: (value) => hasLegacySandboxPerSession(value),
-  },
-  {
-    path: ["agents", "list"],
-    message:
-      'agents.list[].sandbox.perSession is legacy; use agents.list[].sandbox.scope instead. Run "openclaw doctor --fix".',
-    match: (value) => hasLegacyAgentListSandboxPerSession(value),
-  },
-];
-
-function sandboxScopeFromPerSession(perSession: boolean): "session" | "shared" {
-  return perSession ? "session" : "shared";
-}
-
 function splitLegacyHeartbeat(legacyHeartbeat: Record<string, unknown>): {
   agentHeartbeat: Record<string, unknown> | null;
   channelHeartbeat: Record<string, unknown> | null;
@@ -112,64 +93,7 @@ function mergeLegacyIntoDefaults(params: {
   params.raw[params.rootKey] = root;
 }
 
-function hasLegacySandboxPerSession(value: unknown): boolean {
-  const sandbox = getRecord(value);
-  return Boolean(sandbox && Object.prototype.hasOwnProperty.call(sandbox, "perSession"));
-}
-
-function hasLegacyAgentListSandboxPerSession(value: unknown): boolean {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-  return value.some((agent) => hasLegacySandboxPerSession(getRecord(agent)?.sandbox));
-}
-
-function migrateLegacySandboxPerSession(
-  sandbox: Record<string, unknown>,
-  pathLabel: string,
-  changes: string[],
-): void {
-  if (!Object.prototype.hasOwnProperty.call(sandbox, "perSession")) {
-    return;
-  }
-  const rawPerSession = sandbox.perSession;
-  if (typeof rawPerSession !== "boolean") {
-    return;
-  }
-  if (sandbox.scope === undefined) {
-    sandbox.scope = sandboxScopeFromPerSession(rawPerSession);
-    changes.push(`Moved ${pathLabel}.perSession → ${pathLabel}.scope (${String(sandbox.scope)}).`);
-  } else {
-    changes.push(`Removed ${pathLabel}.perSession (${pathLabel}.scope already set).`);
-  }
-  delete sandbox.perSession;
-}
-
 export const LEGACY_CONFIG_MIGRATIONS_RUNTIME_AGENTS: LegacyConfigMigrationSpec[] = [
-  defineLegacyConfigMigration({
-    id: "agents.sandbox.perSession->scope",
-    describe: "Move legacy agent sandbox perSession aliases to sandbox.scope",
-    legacyRules: LEGACY_SANDBOX_SCOPE_RULES,
-    apply: (raw, changes) => {
-      const agents = getRecord(raw.agents);
-      const defaults = getRecord(agents?.defaults);
-      const defaultSandbox = getRecord(defaults?.sandbox);
-      if (defaultSandbox) {
-        migrateLegacySandboxPerSession(defaultSandbox, "agents.defaults.sandbox", changes);
-      }
-
-      if (!Array.isArray(agents?.list)) {
-        return;
-      }
-      for (const [index, agent] of agents.list.entries()) {
-        const sandbox = getRecord(getRecord(agent)?.sandbox);
-        if (!sandbox) {
-          continue;
-        }
-        migrateLegacySandboxPerSession(sandbox, `agents.list.${index}.sandbox`, changes);
-      }
-    },
-  }),
   defineLegacyConfigMigration({
     id: "memorySearch->agents.defaults.memorySearch",
     describe: "Move top-level memorySearch to agents.defaults.memorySearch",

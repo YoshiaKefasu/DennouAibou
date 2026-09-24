@@ -5,12 +5,6 @@ import {
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
 } from "../agents/agent-scope.js";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
-import {
-  clearRuntimeAuthProfileStoreSnapshots,
-  loadAuthProfileStoreForSecretsRuntime,
-  replaceRuntimeAuthProfileStoreSnapshots,
-} from "../agents/auth-profiles.js";
 import {
   clearRuntimeConfigSnapshot,
   setRuntimeConfigSnapshotRefreshHandler,
@@ -25,7 +19,6 @@ import {
   type CommandSecretAssignment,
 } from "./command-config.js";
 import { resolveSecretRefValues } from "./resolve.js";
-import { collectAuthStoreAssignments } from "./runtime-auth-collectors.js";
 import { collectConfigAssignments } from "./runtime-config-collectors.js";
 import {
   applyResolvedAssignments,
@@ -48,7 +41,6 @@ export type { SecretResolverWarning } from "./runtime-shared.js";
 export type PreparedSecretsRuntimeSnapshot = {
   sourceConfig: OpenClawConfig;
   config: OpenClawConfig;
-  authStores: Array<{ agentDir: string; store: AuthProfileStore }>;
   warnings: SecretResolverWarning[];
   webTools: RuntimeWebToolsMetadata;
 };
@@ -56,7 +48,6 @@ export type PreparedSecretsRuntimeSnapshot = {
 type SecretsRuntimeRefreshContext = {
   env: Record<string, string | undefined>;
   explicitAgentDirs: string[] | null;
-  loadAuthStore: (agentDir?: string) => AuthProfileStore;
   loadablePluginOrigins: ReadonlyMap<string, PluginOrigin>;
 };
 
@@ -84,10 +75,6 @@ function cloneSnapshot(snapshot: PreparedSecretsRuntimeSnapshot): PreparedSecret
   return {
     sourceConfig: structuredClone(snapshot.sourceConfig),
     config: structuredClone(snapshot.config),
-    authStores: snapshot.authStores.map((entry) => ({
-      agentDir: entry.agentDir,
-      store: structuredClone(entry.store),
-    })),
     warnings: snapshot.warnings.map((warning) => ({ ...warning })),
     webTools: structuredClone(snapshot.webTools),
   };
@@ -97,7 +84,6 @@ function cloneRefreshContext(context: SecretsRuntimeRefreshContext): SecretsRunt
   return {
     env: { ...context.env },
     explicitAgentDirs: context.explicitAgentDirs ? [...context.explicitAgentDirs] : null,
-    loadAuthStore: context.loadAuthStore,
     loadablePluginOrigins: new Map(context.loadablePluginOrigins),
   };
 }
@@ -108,7 +94,6 @@ function clearActiveSecretsRuntimeState(): void {
   clearActiveRuntimeWebToolsMetadata();
   setRuntimeConfigSnapshotRefreshHandler(null);
   clearRuntimeConfigSnapshot();
-  clearRuntimeAuthProfileStoreSnapshots();
 }
 
 function collectCandidateAgentDirs(
@@ -171,8 +156,6 @@ export async function prepareSecretsRuntimeSnapshot(params: {
   config: OpenClawConfig;
   env?: NodeJS.ProcessEnv;
   agentDirs?: string[];
-  includeAuthStoreRefs?: boolean;
-  loadAuthStore?: (agentDir?: string) => AuthProfileStore;
   /** Test override for discovered loadable plugins and their origins. */
   loadablePluginOrigins?: ReadonlyMap<string, PluginOrigin>;
   /** Test override for the web-search/web-fetch provider registries. */
@@ -195,23 +178,9 @@ export async function prepareSecretsRuntimeSnapshot(params: {
     loadablePluginOrigins,
   });
 
-  const includeAuthStoreRefs = params.includeAuthStoreRefs ?? true;
-  const authStores: Array<{ agentDir: string; store: AuthProfileStore }> = [];
-  const loadAuthStore = params.loadAuthStore ?? loadAuthProfileStoreForSecretsRuntime;
   const candidateDirs = params.agentDirs?.length
     ? [...new Set(params.agentDirs.map((entry) => resolveUserPath(entry, runtimeEnv)))]
     : collectCandidateAgentDirs(resolvedConfig, runtimeEnv);
-  if (includeAuthStoreRefs) {
-    for (const agentDir of candidateDirs) {
-      const store = structuredClone(loadAuthStore(agentDir));
-      collectAuthStoreAssignments({
-        store,
-        context,
-        agentDir,
-      });
-      authStores.push({ agentDir, store });
-    }
-  }
 
   if (context.assignments.length > 0) {
     const refs = context.assignments.map((assignment) => assignment.ref);
@@ -229,7 +198,6 @@ export async function prepareSecretsRuntimeSnapshot(params: {
   const snapshot = {
     sourceConfig,
     config: resolvedConfig,
-    authStores,
     warnings: context.warnings,
     webTools: await resolveRuntimeWebTools(
       {
@@ -243,7 +211,6 @@ export async function prepareSecretsRuntimeSnapshot(params: {
   preparedSnapshotRefreshContext.set(snapshot, {
     env: runtimeEnv,
     explicitAgentDirs: params.agentDirs?.length ? [...candidateDirs] : null,
-    loadAuthStore,
     loadablePluginOrigins,
   });
   return snapshot;
@@ -257,14 +224,12 @@ export function activateSecretsRuntimeSnapshot(snapshot: PreparedSecretsRuntimeS
     ({
       env: { ...process.env } as Record<string, string | undefined>,
       explicitAgentDirs: null,
-      loadAuthStore: loadAuthProfileStoreForSecretsRuntime,
       loadablePluginOrigins: resolveLoadablePluginOrigins({
         config: next.sourceConfig,
         env: process.env,
       }),
     } satisfies SecretsRuntimeRefreshContext);
   setRuntimeConfigSnapshot(next.config, next.sourceConfig);
-  replaceRuntimeAuthProfileStoreSnapshots(next.authStores);
   activeSnapshot = next;
   activeRefreshContext = cloneRefreshContext(refreshContext);
   setActiveRuntimeWebToolsMetadata(next.webTools);
@@ -277,7 +242,6 @@ export function activateSecretsRuntimeSnapshot(snapshot: PreparedSecretsRuntimeS
         config: sourceConfig,
         env: activeRefreshContext.env,
         agentDirs: resolveRefreshAgentDirs(sourceConfig, activeRefreshContext),
-        loadAuthStore: activeRefreshContext.loadAuthStore,
         loadablePluginOrigins: activeRefreshContext.loadablePluginOrigins,
       });
       activateSecretsRuntimeSnapshot(refreshed);

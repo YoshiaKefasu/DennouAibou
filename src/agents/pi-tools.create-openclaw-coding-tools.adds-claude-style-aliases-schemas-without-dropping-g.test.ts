@@ -2,10 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import { createReadTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { describe, expect, it, vi } from "vitest";
-import { createOpenClawReadTool, createSandboxedReadTool } from "./pi-tools.read.js";
-import { createHostSandboxFsBridge } from "./test-helpers/host-sandbox-fs-bridge.js";
+import { createOpenClawReadTool } from "./pi-tools.read.js";
 
 function extractToolText(result: unknown): string {
   if (!result || typeof result !== "object") {
@@ -27,24 +27,6 @@ function extractToolText(result: unknown): string {
 }
 
 describe("createOpenClawCodingTools read behavior", () => {
-  it("applies sandbox path guards to canonical path", async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-sbx-"));
-    const outsidePath = path.join(os.tmpdir(), "openclaw-outside.txt");
-    await fs.writeFile(outsidePath, "outside", "utf8");
-    try {
-      const readTool = createSandboxedReadTool({
-        root: tmpDir,
-        bridge: createHostSandboxFsBridge(tmpDir),
-      });
-      await expect(readTool.execute("sandbox-1", { path: outsidePath })).rejects.toThrow(
-        /sandbox root/i,
-      );
-    } finally {
-      await fs.rm(outsidePath, { force: true });
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
   it("auto-pages read output across chunks when context window budget allows", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-read-autopage-"));
     const filePath = path.join(tmpDir, "big.txt");
@@ -54,9 +36,7 @@ describe("createOpenClawCodingTools read behavior", () => {
     );
     await fs.writeFile(filePath, lines.join("\n"), "utf8");
     try {
-      const readTool = createSandboxedReadTool({
-        root: tmpDir,
-        bridge: createHostSandboxFsBridge(tmpDir),
+      const readTool = createOpenClawReadTool(createReadTool(tmpDir), {
         modelContextWindowTokens: 200_000,
       });
       const result = await readTool.execute("read-autopage-1", { path: "big.txt" });
@@ -79,10 +59,7 @@ describe("createOpenClawCodingTools read behavior", () => {
     );
     await fs.writeFile(filePath, lines.join("\n"), "utf8");
     try {
-      const readTool = createSandboxedReadTool({
-        root: tmpDir,
-        bridge: createHostSandboxFsBridge(tmpDir),
-      });
+      const readTool = createOpenClawReadTool(createReadTool(tmpDir));
       const result = await readTool.execute("read-cap-1", { path: "huge.txt" });
       const text = extractToolText(result);
       expect(text).toContain("line-0001");

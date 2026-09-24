@@ -14,7 +14,6 @@ Docker is **optional**. Use it only if you want a containerized gateway or to va
 
 - **Yes**: you want an isolated, throwaway gateway environment or to run DennouAibou on a host without local installs.
 - **No**: you are running on your own machine and just want the fastest dev loop. Use the normal install flow instead.
-- **Sandboxing note**: agent sandboxing uses Docker too, but it does **not** require the full gateway to run in Docker. See [Sandboxing](/gateway/sandboxing).
 
 ## Prerequisites
 
@@ -131,7 +130,6 @@ The setup script accepts these optional environment variables:
 | `OPENCLAW_EXTENSIONS`          | Pre-install extension deps at build time (space-separated names) |
 | `OPENCLAW_EXTRA_MOUNTS`        | Extra host bind mounts (comma-separated `source:target[:opts]`)  |
 | `OPENCLAW_HOME_VOLUME`         | Persist `/home/node` in a named Docker volume                    |
-| `OPENCLAW_SANDBOX`             | Opt in to sandbox bootstrap (`1`, `true`, `yes`, `on`)           |
 | `OPENCLAW_DOCKER_SOCKET`       | Override Docker socket path                                      |
 
 ### Health checks
@@ -201,25 +199,6 @@ Then use `clawdock-start`, `clawdock-stop`, `clawdock-dashboard`, etc. Run
 See [ClawDock](/install/clawdock) for the full helper guide.
 
 <AccordionGroup>
-  <Accordion title="Enable agent sandbox for Docker gateway">
-    ```bash
-    export OPENCLAW_SANDBOX=1
-    ./scripts/docker/setup.sh
-    ```
-
-    Custom socket path (e.g. rootless Docker):
-
-    ```bash
-    export OPENCLAW_SANDBOX=1
-    export OPENCLAW_DOCKER_SOCKET=/run/user/1000/docker.sock
-    ./scripts/docker/setup.sh
-    ```
-
-    The script mounts `docker.sock` only after sandbox prerequisites pass. If
-    sandbox setup cannot complete, the script resets `agents.defaults.sandbox.mode`
-    to `off`.
-
-  </Accordion>
 
   <Accordion title="Automation / CI (non-interactive)">
     Disable Compose pseudo-TTY allocation with `-T`:
@@ -309,65 +288,9 @@ See [Hetzner (Docker VPS)](/install/hetzner) and
 [Docker VM Runtime](/install/docker-vm-runtime) for shared VM deployment steps
 including binary baking, persistence, and updates.
 
-## Agent Sandbox
-
-When `agents.defaults.sandbox` is enabled, the gateway runs agent tool execution
-(shell, file read/write, etc.) inside isolated Docker containers while the
-gateway itself stays on the host. This gives you a hard wall around untrusted or
-multi-tenant agent sessions without containerizing the entire gateway.
-
-Sandbox scope can be per-agent (default), per-session, or shared. Each scope
-gets its own workspace mounted at `/workspace`. You can also configure
-allow/deny tool policies, network isolation, resource limits, and browser
-containers.
-
-For full configuration, images, security notes, and multi-agent profiles, see:
-
-- [Sandboxing](/gateway/sandboxing) -- complete sandbox reference
-- [OpenShell](/gateway/openshell) -- interactive shell access to sandbox containers
-- [Multi-Agent Sandbox and Tools](/tools/multi-agent-sandbox-tools) -- per-agent overrides
-
-### Quick enable
-
-```json5
-{
-  agents: {
-    defaults: {
-      sandbox: {
-        mode: "non-main", // off | non-main | all
-        scope: "agent", // session | agent | shared
-      },
-    },
-  },
-}
-```
-
-Build the default sandbox image:
-
-```bash
-scripts/sandbox-setup.sh
-```
-
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Image missing or sandbox container not starting">
-    Build the sandbox image with
-    [`scripts/sandbox-setup.sh`](https://github.com/openclaw/openclaw/blob/main/scripts/sandbox-setup.sh)
-    or set `agents.defaults.sandbox.docker.image` to your custom image.
-    Containers are auto-created per session on demand.
-  </Accordion>
-
-  <Accordion title="Permission errors in sandbox">
-    Set `docker.user` to a UID:GID that matches your mounted workspace ownership,
-    or chown the workspace folder.
-  </Accordion>
-
-  <Accordion title="Custom tools not found in sandbox">
-    DennouAibou runs commands with `sh -lc` (login shell), which sources
-    `/etc/profile` and may reset PATH. Set `docker.env.PATH` to prepend your
-    custom tool paths, or add a script under `/etc/profile.d/` in your Dockerfile.
-  </Accordion>
 
   <Accordion title="OOM-killed during image build (exit 137)">
     The VM needs at least 2 GB RAM. Use a larger machine class and retry.

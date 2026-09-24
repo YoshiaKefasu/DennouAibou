@@ -34,12 +34,8 @@ import {
   resolveDefaultModelRef,
 } from "./model-config.helpers.js";
 import {
-  createSandboxBridgeReadFile,
-  resolveSandboxedBridgeMediaPath,
   runWithImageModelFallback,
   type AnyAgentTool,
-  type SandboxedBridgeMediaPathConfig,
-  type SandboxFsBridge,
   type ToolFsPolicy,
 } from "./tool-runtime.helpers.js";
 
@@ -170,11 +166,6 @@ function pickMaxBytes(cfg?: OpenClawConfig, maxBytesMb?: number): number | undef
   return undefined;
 }
 
-type ImageSandboxConfig = {
-  root: string;
-  bridge: SandboxFsBridge;
-};
-
 async function runImagePrompt(params: {
   cfg?: OpenClawConfig;
   agentDir: string;
@@ -281,7 +272,6 @@ export function createImageTool(options?: {
   config?: OpenClawConfig;
   agentDir?: string;
   workspaceDir?: string;
-  sandbox?: ImageSandboxConfig;
   fsPolicy?: ToolFsPolicy;
   /** If true, the model has native vision capability and images in the prompt are auto-injected */
   modelHasVision?: boolean;
@@ -378,15 +368,6 @@ export function createImageTool(options?: {
       const maxBytesMb = typeof record.maxBytesMb === "number" ? record.maxBytesMb : undefined;
       const maxBytes = pickMaxBytes(options?.config, maxBytesMb);
 
-      const sandboxConfig: SandboxedBridgeMediaPathConfig | null =
-        options?.sandbox && options?.sandbox.root.trim()
-          ? {
-              root: options.sandbox.root.trim(),
-              bridge: options.sandbox.bridge,
-              workspaceOnly: options.fsPolicy?.workspaceOnly === true,
-            }
-          : null;
-
       // MARK: - Load and resolve each image
       const loadedImages: Array<{
         buffer: Buffer;
@@ -427,14 +408,7 @@ export function createImageTool(options?: {
           };
         }
 
-        if (sandboxConfig && isHttpUrl) {
-          throw new Error("Sandboxed image tool does not allow remote URLs.");
-        }
-
         const resolvedImage = (() => {
-          if (sandboxConfig) {
-            return imageRaw;
-          }
           if (imageRaw.startsWith("~")) {
             return resolveUserPath(imageRaw);
           }
@@ -455,17 +429,11 @@ export function createImageTool(options?: {
         })();
         const resolvedPathInfo: { resolved: string; rewrittenFrom?: string } = isDataUrl
           ? { resolved: "" }
-          : sandboxConfig
-            ? await resolveSandboxedBridgeMediaPath({
-                sandbox: sandboxConfig,
-                mediaPath: resolvedImage,
-                inboundFallbackDir: "media/inbound",
-              })
-            : {
-                resolved: resolvedImage.startsWith("file://")
-                  ? resolvedImage.slice("file://".length)
-                  : resolvedImage,
-              };
+          : {
+              resolved: resolvedImage.startsWith("file://")
+                ? resolvedImage.slice("file://".length)
+                : resolvedImage,
+            };
         const resolvedPath = isDataUrl ? null : resolvedPathInfo.resolved;
         const mediaLocalRoots = resolveMediaToolLocalRoots(
           options?.workspaceDir,
@@ -477,16 +445,10 @@ export function createImageTool(options?: {
 
         const media = isDataUrl
           ? decodeDataUrl(resolvedImage)
-          : sandboxConfig
-            ? await loadWebMedia(resolvedPath ?? resolvedImage, {
-                maxBytes,
-                sandboxValidated: true,
-                readFile: createSandboxBridgeReadFile({ sandbox: sandboxConfig }),
-              })
-            : await loadWebMedia(resolvedPath ?? resolvedImage, {
-                maxBytes,
-                localRoots: mediaLocalRoots,
-              });
+          : await loadWebMedia(resolvedPath ?? resolvedImage, {
+              maxBytes,
+              localRoots: mediaLocalRoots,
+            });
         if (media.kind !== "image") {
           throw new Error(`Unsupported media type: ${media.kind}`);
         }

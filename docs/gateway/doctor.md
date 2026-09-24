@@ -23,7 +23,7 @@ openclaw doctor
 openclaw doctor --yes
 ```
 
-Accept defaults without prompting (including restart/service/sandbox repair steps when applicable).
+Accept defaults without prompting (including restart/service repair steps when applicable).
 
 ```bash
 openclaw doctor --repair
@@ -41,7 +41,7 @@ Apply aggressive repairs too (overwrites custom supervisor configs).
 openclaw doctor --non-interactive
 ```
 
-Run without prompts and only apply safe migrations (config normalization + on-disk state moves). Skips restart/service/sandbox actions that require human confirmation.
+Run without prompts and only apply safe migrations (config normalization + on-disk state moves). Skips restart/service actions that require human confirmation.
 Legacy state migrations run automatically when detected.
 
 ```bash
@@ -75,7 +75,6 @@ cat ~/.openclaw/openclaw.json
 - Config file permission checks (chmod 600) when running locally.
 - Model auth health: checks OAuth expiry, can refresh expiring tokens, and reports auth-profile cooldown/disabled states.
 - Extra workspace dir detection (`~/openclaw`).
-- Sandbox image repair when sandboxing is enabled.
 - Legacy service migration and extra gateway detection.
 - Matrix channel legacy state migration (in `--fix` / `--repair` mode).
 - Gateway runtime checks (service installed but not running; cached launchd label).
@@ -149,7 +148,6 @@ Current migrations:
 - `bindings[].match.accountID` → `bindings[].match.accountId`
 - For channels with named `accounts` but lingering single-account top-level channel values, move those account-scoped values into the promoted account chosen for that channel (`accounts.default` for most channels; Matrix can preserve an existing matching named/default target)
 - `identity` → `agents.list[].identity`
-- `agent.*` → `agents.defaults` + `tools.*` (tools/elevated/exec/sandbox/subagents)
 - `agent.model`/`allowedModels`/`modelAliases`/`modelFallbacks`/`imageModelFallbacks`
   → `agents.defaults.models` + `agents.defaults.model.primary/fallbacks` + `agents.defaults.imageModel.primary/fallbacks`
 - `browser.ssrfPolicy.allowPrivateNetwork` → `browser.ssrfPolicy.dangerouslyAllowPrivateNetwork`
@@ -199,7 +197,7 @@ the current Chrome MCP route limits; advanced routes like `responsebody`, PDF
 export, download interception, and batch actions still require a managed
 browser or raw CDP profile.
 
-This check does **not** apply to Docker, sandbox, remote-browser, or other
+This check does **not** apply to Docker, remote-browser, or other
 headless flows. Those continue to use raw CDP.
 
 ### 2d) OAuth TLS prerequisites
@@ -328,11 +326,6 @@ Doctor also reports auth profiles that are temporarily unusable due to:
 
 If `hooks.gmail.model` is set, doctor validates the model reference against the
 catalog and allowlist and warns when it won’t resolve or is disallowed.
-
-### 7) Sandbox image repair
-
-When sandboxing is enabled, doctor checks Docker images and offers to build or
-switch to legacy names if the current image is missing.
 
 ### 7b) Bundled plugin runtime deps
 

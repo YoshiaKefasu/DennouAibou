@@ -14,7 +14,7 @@ export * from "../agents/simple-completion-runtime.js";
 export * from "../agents/pi-embedded-block-chunker.js";
 export * from "../agents/pi-embedded-utils.js";
 export * from "../agents/provider-id.js";
-export * from "../agents/sandbox-paths.js";
+export * from "../agents/path-policy.js";
 export * from "../agents/schema/typebox.js";
 export * from "../agents/tools/common.js";
 export * from "../agents/tools/web-guarded-fetch.js";
@@ -22,51 +22,3 @@ export * from "../agents/tools/web-shared.js";
 export * from "../agents/tools/web-fetch-utils.js";
 // Intentional public runtime surface: channel plugins use ingress agent helpers directly.
 export * from "../agents/agent-command.js";
-
-export {
-  CODEX_CLI_PROFILE_ID,
-  dedupeProfileIds,
-  listProfilesForProvider,
-  markAuthProfileGood,
-  setAuthProfileOrder,
-  upsertAuthProfile,
-  upsertAuthProfileWithLock,
-  repairOAuthProfileIdMismatch,
-  suggestOAuthProfileIdForLegacyDefault,
-  clearRuntimeAuthProfileStoreSnapshots,
-  ensureAuthProfileStore,
-  loadAuthProfileStoreForSecretsRuntime,
-  loadAuthProfileStoreForRuntime,
-  replaceRuntimeAuthProfileStoreSnapshots,
-  loadAuthProfileStore,
-  saveAuthProfileStore,
-  calculateAuthProfileCooldownMs,
-  clearAuthProfileCooldown,
-  clearExpiredCooldowns,
-  getSoonestCooldownExpiry,
-  isProfileInCooldown,
-  markAuthProfileCooldown,
-  markAuthProfileFailure,
-  markAuthProfileUsed,
-  resolveProfilesUnavailableReason,
-  resolveProfileUnusableUntilForDisplay,
-  resolveApiKeyForProfile,
-  resolveAuthProfileDisplayLabel,
-  formatAuthDoctorHint,
-  resolveAuthProfileEligibility,
-  resolveAuthProfileOrder,
-  resolveAuthStorePathForDisplay,
-} from "../agents/auth-profiles.js";
-export type {
-  ApiKeyCredential,
-  AuthCredentialReasonCode,
-  AuthProfileCredential,
-  AuthProfileEligibilityReasonCode,
-  AuthProfileFailureReason,
-  AuthProfileIdRepairResult,
-  AuthProfileStore,
-  OAuthCredential,
-  ProfileUsageStats,
-  TokenCredential,
-  TokenExpiryState,
-} from "../agents/auth-profiles.js";

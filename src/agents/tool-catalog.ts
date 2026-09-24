@@ -96,7 +96,7 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
   {
     id: "code_execution",
     label: "code_execution",
-    description: "Run sandboxed remote analysis",
+    description: "Run remote analysis",
     sectionId: "runtime",
     profiles: ["coding"],
     includeInOpenClawGroup: true,

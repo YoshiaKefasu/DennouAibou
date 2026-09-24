@@ -98,7 +98,6 @@ describe("openclaw plugin tool context", () => {
     const result = resolveOpenClawPluginToolInputs({
       options: {
         config: {} as never,
-        sandboxBrowserBridgeUrl: "http://127.0.0.1:9999",
         allowHostBrowserControl: true,
       },
     });
@@ -106,7 +105,6 @@ describe("openclaw plugin tool context", () => {
     expect(result.context).toEqual(
       expect.objectContaining({
         browser: {
-          sandboxBridgeUrl: "http://127.0.0.1:9999",
           allowHostControl: true,
         },
       }),

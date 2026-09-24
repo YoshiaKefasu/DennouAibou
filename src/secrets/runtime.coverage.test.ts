@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type {
   PluginWebFetchProviderEntry,
@@ -287,41 +286,6 @@ function buildConfigForOpenClawTarget(entry: SecretRegistryEntry, envId: string)
   return config;
 }
 
-function buildAuthStoreForTarget(entry: SecretRegistryEntry, envId: string): AuthProfileStore {
-  if (entry.authProfileType === "token") {
-    return {
-      version: 1 as const,
-      profiles: {
-        sample: {
-          type: "token" as const,
-          provider: "sample-provider",
-          token: "legacy-token",
-          tokenRef: {
-            source: "env" as const,
-            provider: "default",
-            id: envId,
-          },
-        },
-      },
-    };
-  }
-  return {
-    version: 1 as const,
-    profiles: {
-      sample: {
-        type: "api_key" as const,
-        provider: "sample-provider",
-        key: "legacy-key",
-        keyRef: {
-          source: "env" as const,
-          provider: "default",
-          id: envId,
-        },
-      },
-    },
-  };
-}
-
 describe("secrets runtime target coverage", () => {
   afterEach(() => {
     clearSecretsRuntimeSnapshot();
@@ -343,7 +307,6 @@ describe("secrets runtime target coverage", () => {
         config: buildConfigForOpenClawTarget(entry, envId),
         env: { [runtimeEnvId]: expectedValue },
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
         runtimeWebToolsDeps: createRuntimeWebToolsDeps(),
       });
       const resolved = getPath(
@@ -357,27 +320,6 @@ describe("secrets runtime target coverage", () => {
           true,
         );
       }
-    }
-  });
-
-  it("handles every auth-profiles registry target", async () => {
-    const entries = listSecretTargetRegistryEntries().filter(
-      (entry) => entry.configFile === "auth-profiles.json",
-    );
-    for (const [index, entry] of entries.entries()) {
-      const envId = `DENNOU_AUTH_SECRET_TARGET_${index}`;
-      const expectedValue = `resolved-${entry.id}`;
-      const snapshot = await prepareSecretsRuntimeSnapshot({
-        config: {} as OpenClawConfig,
-        env: { [envId]: expectedValue },
-        agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => buildAuthStoreForTarget(entry, envId),
-        runtimeWebToolsDeps: createRuntimeWebToolsDeps(),
-      });
-      const store = snapshot.authStores[0]?.store;
-      expect(store).toBeDefined();
-      const resolved = getPath(store, toConcretePathSegments(entry.pathPattern));
-      expect(resolved).toBe(expectedValue);
     }
   });
 });

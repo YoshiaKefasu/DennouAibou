@@ -4,12 +4,6 @@ import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { Command } from "commander";
-import type {
-  ApiKeyCredential,
-  AuthProfileCredential,
-  OAuthCredential,
-  AuthProfileStore,
-} from "../agents/auth-profiles/types.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
 import type { FailoverReason } from "../agents/pi-embedded-helpers/types.js";
 import type { ProviderRequestTransportOverrides } from "../agents/provider-request-config.js";
@@ -24,12 +18,12 @@ import type { ChannelId, ChannelPlugin } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelProviderAuthMode, ModelProviderConfig } from "../config/types.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
+import type { SecretRef } from "../config/types.secrets.js";
 import type { OperatorScope } from "../gateway/method-scopes.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import type { InternalHookHandler } from "../hooks/internal-hooks.js";
 import type { HookEntry } from "../hooks/types.js";
 import type { ImageGenerationProvider } from "../image-generation/types.js";
-import type { ProviderUsageSnapshot } from "../infra/provider-usage.types.js";
 import type { MediaUnderstandingProvider } from "../media-understanding/types.js";
 import type { MusicGenerationProvider } from "../music-generation/types.js";
 import type {
@@ -127,7 +121,6 @@ export type OpenClawPluginToolContext = {
   /** Ephemeral session UUID - regenerated on /new and /reset. Use for per-conversation isolation. */
   sessionId?: string;
   browser?: {
-    sandboxBridgeUrl?: string;
     allowHostControl?: boolean;
   };
   messageChannel?: string;
@@ -138,7 +131,6 @@ export type OpenClawPluginToolContext = {
   requesterSenderId?: string;
   /** Whether the trusted sender is an owner. */
   senderIsOwner?: boolean;
-  sandboxed?: boolean;
 };
 
 export type OpenClawPluginToolFactory = (
@@ -156,6 +148,77 @@ export type OpenClawPluginHookOptions = {
   name?: string;
   description?: string;
   register?: boolean;
+};
+
+/** Standard credential shapes shared by provider plugin auth hooks. */
+export type ApiKeyCredential = {
+  type: "api_key";
+  provider: string;
+  key?: string;
+  keyRef?: SecretRef;
+  email?: string;
+  displayName?: string;
+  metadata?: Record<string, string>;
+};
+
+export type TokenCredential = {
+  type: "token";
+  provider: string;
+  token?: string;
+  tokenRef?: SecretRef;
+  expires?: number;
+  email?: string;
+  displayName?: string;
+};
+
+export type OAuthCredential = {
+  type: "oauth";
+  provider: string;
+  access: string;
+  refresh: string;
+  expires: number;
+  clientId?: string;
+  email?: string;
+  displayName?: string;
+  managedBy?: string;
+  enterpriseUrl?: string;
+  projectId?: string;
+  accountId?: string;
+};
+
+export type AuthProfileCredential = ApiKeyCredential | TokenCredential | OAuthCredential;
+
+export type AuthProfileFailureReason =
+  | "auth"
+  | "auth_permanent"
+  | "format"
+  | "overloaded"
+  | "rate_limit"
+  | "billing"
+  | "timeout"
+  | "model_not_found"
+  | "session_expired"
+  | "unknown";
+
+export type ProfileUsageStats = {
+  lastUsed?: number;
+  cooldownUntil?: number;
+  cooldownReason?: AuthProfileFailureReason;
+  cooldownModel?: string;
+  disabledUntil?: number;
+  disabledReason?: AuthProfileFailureReason;
+  errorCount?: number;
+  failureCounts?: Partial<Record<AuthProfileFailureReason, number>>;
+  lastFailureAt?: number;
+};
+
+/** Structural store shape retained for provider hook signatures. */
+export type AuthProfileStore = {
+  version: number;
+  profiles: Record<string, AuthProfileCredential>;
+  order?: Record<string, string[]>;
+  lastGood?: Record<string, string>;
+  usageStats?: Record<string, ProfileUsageStats>;
 };
 
 export type ProviderAuthKind = "oauth" | "api_key" | "token" | "device_code" | "custom";
@@ -218,7 +281,7 @@ export type ProviderAuthContext = {
 
 export type ProviderNonInteractiveApiKeyResult = {
   key: string;
-  source: "profile" | "env" | "flag";
+  source: "env" | "flag";
   envVarName?: string;
 };
 
@@ -449,66 +512,6 @@ export type ProviderPreparedRuntimeAuth = {
   baseUrl?: string;
   request?: ProviderRequestTransportOverrides;
   expiresAt?: number;
-};
-
-/**
- * Usage/billing auth input for providers that expose quota/usage endpoints.
- *
- * This hook is intentionally separate from `prepareRuntimeAuth`: usage
- * snapshots often need a different credential source than live inference
- * requests, and they run outside the embedded runner.
- *
- * The helper methods cover the common OpenClaw auth resolution paths:
- *
- * - `resolveApiKeyFromConfigAndStore`: env/config/plain token/api_key profiles
- * - `resolveOAuthToken`: oauth/token profiles resolved through the auth store,
- *   optionally for an explicit provider override
- *
- * Plugins can still do extra provider-specific work on top (for example parse a
- * token blob, read a legacy credential file, or pick between aliases).
- */
-export type ProviderResolveUsageAuthContext = {
-  config: OpenClawConfig;
-  agentDir?: string;
-  workspaceDir?: string;
-  env: NodeJS.ProcessEnv;
-  provider: string;
-  resolveApiKeyFromConfigAndStore: (params?: {
-    providerIds?: string[];
-    envDirect?: Array<string | undefined>;
-  }) => string | undefined;
-  resolveOAuthToken: (params?: { provider?: string }) => Promise<ProviderResolvedUsageAuth | null>;
-};
-
-/**
- * Result of `resolveUsageAuth`.
- *
- * `token` is the credential used for provider usage/billing endpoints.
- * `accountId` is optional provider-specific metadata used by some usage APIs.
- */
-export type ProviderResolvedUsageAuth = {
-  token: string;
-  accountId?: string;
-};
-
-/**
- * Usage/quota snapshot input for providers that own their usage endpoint
- * fetch/parsing behavior.
- *
- * This hook runs after `resolveUsageAuth` succeeds. Core still owns summary
- * fan-out, timeout wrapping, filtering, and formatting; the provider plugin
- * owns the provider-specific HTTP request + response normalization.
- */
-export type ProviderFetchUsageSnapshotContext = {
-  config: OpenClawConfig;
-  agentDir?: string;
-  workspaceDir?: string;
-  env: NodeJS.ProcessEnv;
-  provider: string;
-  token: string;
-  accountId?: string;
-  timeoutMs: number;
-  fetchFn: typeof fetch;
 };
 
 /**
@@ -1289,31 +1292,6 @@ export type ProviderPlugin = {
   prepareRuntimeAuth?: (
     ctx: ProviderPrepareRuntimeAuthContext,
   ) => Promise<ProviderPreparedRuntimeAuth | null | undefined>;
-  /**
-   * Usage/billing auth resolution hook.
-   *
-   * Called by provider-usage surfaces (`/usage`, status snapshots, reporting).
-   * Use this when a provider's usage endpoint needs provider-owned token
-   * extraction, blob parsing, or alias handling.
-   */
-  resolveUsageAuth?: (
-    ctx: ProviderResolveUsageAuthContext,
-  ) =>
-    | Promise<ProviderResolvedUsageAuth | null | undefined>
-    | ProviderResolvedUsageAuth
-    | null
-    | undefined;
-  /**
-   * Usage/quota snapshot fetch hook.
-   *
-   * Called after `resolveUsageAuth` by `/usage` and related reporting surfaces.
-   * Use this when the provider's usage endpoint or payload shape is
-   * provider-specific and you want that logic to live with the provider plugin
-   * instead of the core switchboard.
-   */
-  fetchUsageSnapshot?: (
-    ctx: ProviderFetchUsageSnapshotContext,
-  ) => Promise<ProviderUsageSnapshot | null | undefined> | ProviderUsageSnapshot | null | undefined;
   /**
    * Provider-owned failover context-overflow matcher.
    *

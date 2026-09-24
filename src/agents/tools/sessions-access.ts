@@ -1,5 +1,5 @@
 import type { OpenClawConfig } from "../../config/config.js";
-import { isSubagentSessionKey, resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
+import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import {
   listSpawnedSessionKeys,
   resolveInternalSessionKey,
@@ -32,59 +32,8 @@ export function resolveSessionToolsVisibility(cfg: OpenClawConfig): SessionTools
 
 export function resolveEffectiveSessionToolsVisibility(params: {
   cfg: OpenClawConfig;
-  sandboxed: boolean;
 }): SessionToolsVisibility {
-  const visibility = resolveSessionToolsVisibility(params.cfg);
-  if (!params.sandboxed) {
-    return visibility;
-  }
-  const sandboxClamp = params.cfg.agents?.defaults?.sandbox?.sessionToolsVisibility ?? "spawned";
-  if (sandboxClamp === "spawned" && visibility !== "tree") {
-    return "tree";
-  }
-  return visibility;
-}
-
-export function resolveSandboxSessionToolsVisibility(cfg: OpenClawConfig): "spawned" | "all" {
-  return cfg.agents?.defaults?.sandbox?.sessionToolsVisibility ?? "spawned";
-}
-
-export function resolveSandboxedSessionToolContext(params: {
-  cfg: OpenClawConfig;
-  agentSessionKey?: string;
-  sandboxed?: boolean;
-}): {
-  mainKey: string;
-  alias: string;
-  visibility: "spawned" | "all";
-  requesterInternalKey: string | undefined;
-  effectiveRequesterKey: string;
-  restrictToSpawned: boolean;
-} {
-  const { mainKey, alias } = resolveMainSessionAlias(params.cfg);
-  const visibility = resolveSandboxSessionToolsVisibility(params.cfg);
-  const requesterInternalKey =
-    typeof params.agentSessionKey === "string" && params.agentSessionKey.trim()
-      ? resolveInternalSessionKey({
-          key: params.agentSessionKey,
-          alias,
-          mainKey,
-        })
-      : undefined;
-  const effectiveRequesterKey = requesterInternalKey ?? alias;
-  const restrictToSpawned =
-    params.sandboxed === true &&
-    visibility === "spawned" &&
-    !!requesterInternalKey &&
-    !isSubagentSessionKey(requesterInternalKey);
-  return {
-    mainKey,
-    alias,
-    visibility,
-    requesterInternalKey,
-    effectiveRequesterKey,
-    restrictToSpawned,
-  };
+  return resolveSessionToolsVisibility(params.cfg);
 }
 
 export function createAgentToAgentPolicy(cfg: OpenClawConfig): AgentToAgentPolicy {

@@ -1575,7 +1575,7 @@ describe("config cli", () => {
 
     it("rejects blocked prototype-key segments for config set", async () => {
       await expect(
-        runConfigCommand(["config", "set", "tools.constructor.profile", '"sandbox"']),
+        runConfigCommand(["config", "set", "tools.constructor.profile", '"gateway"']),
       ).rejects.toThrow("Invalid path segment: constructor");
 
       expect(mockReadConfigFileSnapshot).not.toHaveBeenCalled();

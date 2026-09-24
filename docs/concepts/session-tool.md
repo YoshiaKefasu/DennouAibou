@@ -103,7 +103,6 @@ Key options:
 - `runtime: "subagent"` (default) or `"acp"` for external harness agents.
 - `model` and `thinking` overrides for the child session.
 - `thread: true` to bind the spawn to a chat thread (Discord, Slack, etc.).
-- `sandbox: "require"` to enforce sandboxing on the child.
 
 Default leaf sub-agents do not get session tools. When
 `maxSpawnDepth >= 2`, depth-1 orchestrator sub-agents additionally receive
@@ -130,8 +129,7 @@ Session tools are scoped to limit what the agent can see:
 | `agent` | All sessions for this agent              |
 | `all`   | All sessions (cross-agent if configured) |
 
-Default is `tree`. Sandboxed sessions are clamped to `tree` regardless of
-config.
+Default is `tree`.
 
 ## Further reading
 

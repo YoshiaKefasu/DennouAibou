@@ -43,7 +43,7 @@ For model selection rules, see [/concepts/models](/concepts/models).
   `isCacheTtlEligible`, `buildMissingAuthMessage`, `suppressBuiltInModel`,
   `augmentModelCatalog`, `isBinaryThinking`, `supportsXHighThinking`,
   `resolveDefaultThinkingLevel`, `applyConfigDefaults`, `isModernModelRef`,
-  `prepareRuntimeAuth`, `resolveUsageAuth`, `fetchUsageSnapshot`, and
+  `prepareRuntimeAuth`, and
   `onModelSelected`.
 - Note: provider runtime `capabilities` is shared runner metadata (provider
   family, transcript/tooling quirks, transport/cache hints). It is not the
@@ -132,10 +132,6 @@ Typical split:
 - `isModernModelRef`: provider owns live/smoke preferred-model matching
 - `prepareRuntimeAuth`: provider turns a configured credential into a short
   lived runtime token
-- `resolveUsageAuth`: provider resolves usage/quota credentials for `/usage`
-  and related status/reporting surfaces
-- `fetchUsageSnapshot`: provider owns the usage endpoint fetch/parsing while
-  core still owns the summary shell and formatting
 - `onModelSelected`: provider runs post-selection side effects such as
   telemetry or provider-owned session bookkeeping
 

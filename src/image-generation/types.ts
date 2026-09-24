@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export type GeneratedImageAsset = {
@@ -36,7 +35,6 @@ export type ImageGenerationRequest = {
   prompt: string;
   cfg: OpenClawConfig;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   timeoutMs?: number;
   count?: number;
   size?: string;

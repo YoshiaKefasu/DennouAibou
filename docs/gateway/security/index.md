@@ -96,7 +96,6 @@ Treat Gateway and node as one operator trust domain, with different roles:
 - `sessionKey` is routing/context selection, not per-user auth.
 - Exec approvals (allowlist + ask) are guardrails for operator intent, not hostile multi-tenant isolation.
 - DennouAibou's product default for trusted single-operator setups is that host exec on `gateway`/`node` is allowed without approval prompts (`security="full"`, `ask="off"` unless you tighten it). That default is intentional UX, not a vulnerability by itself.
-- Exec approvals bind exact request context and best-effort direct local file operands; they do not semantically model every runtime/interpreter loader path. Use sandboxing and host isolation for strong boundaries.
 
 If you need hostile-user isolation, split trust boundaries by OS user/host and run separate gateways.
 
@@ -117,7 +116,6 @@ Use this as the quick model when triaging risk:
 
 These patterns are commonly reported and are usually closed as no-action unless a real boundary bypass is shown:
 
-- Prompt-injection-only chains without a policy/auth/sandbox bypass.
 - Claims that assume hostile multi-tenant operation on one shared host/config.
 - Claims that classify normal operator read-path access (for example `sessions.list`/`sessions.preview`/`chat.history`) as IDOR in a shared-gateway setup.
 - Localhost-only deployment findings (for example HSTS on loopback-only gateway).
@@ -191,9 +189,6 @@ Set `contextVisibility` per channel or per room/conversation. See [Group Chats](
 
 Advisory triage guidance:
 
-- Claims that only show "model can see quoted or historical text from non-allowlisted senders" are hardening findings addressable with `contextVisibility`, not auth or sandbox boundary bypasses by themselves.
-- To be security-impacting, reports still need a demonstrated trust-boundary bypass (auth, policy, sandbox, approval, or another documented boundary).
-
 ## What the audit checks (high level)
 
 - **Inbound access** (DM policies, group policies, allowlists): can strangers trigger the bot?
@@ -204,8 +199,6 @@ Advisory triage guidance:
 - **Browser control exposure** (remote nodes, relay ports, remote CDP endpoints).
 - **Local disk hygiene** (permissions, symlinks, config includes, “synced folder” paths).
 - **Plugins** (extensions exist without an explicit allowlist).
-- **Policy drift/misconfig** (sandbox docker settings configured but sandbox mode off; ineffective `gateway.nodes.denyCommands` patterns because matching is exact command-name only (for example `system.run`) and does not inspect shell text; dangerous `gateway.nodes.allowCommands` entries; global `tools.profile="minimal"` overridden by per-agent profiles; extension plugin tools reachable under permissive tool policy).
-- **Runtime expectation drift** (for example assuming implicit exec still means `sandbox` when `tools.exec.host` now defaults to `auto`, or explicitly setting `tools.exec.host="sandbox"` while sandbox mode is off).
 - **Model hygiene** (warn when configured models look legacy; not a hard block).
 
 If you run `--deep`, DennouAibou also attempts a best-effort live Gateway probe.
@@ -229,7 +222,7 @@ Use this when auditing access or deciding what to back up:
 
 When the audit prints findings, treat this as a priority order:
 
-1. **Anything “open” + tools enabled**: lock down DMs/groups first (pairing/allowlists), then tighten tool policy/sandboxing.
+1. **Anything “open” + tools enabled**: lock down DMs/groups first (pairing/allowlists), then tighten tool policy.
 2. **Public network exposure** (LAN bind, Funnel, missing auth): fix immediately.
 3. **Browser control remote exposure**: treat it like operator access (tailnet-only, pair nodes deliberately, avoid public exposure).
 4. **Permissions**: make sure state/config/credentials/auth are not group/world-readable.
@@ -303,18 +296,6 @@ High-signal `checkId` values you will most likely see in real deployments (not e
 | `browser.control_no_auth`                                     | critical      | Browser control exposed without token/password auth                                  | `gateway.auth.*`                                                                                     | no       |
 | `browser.remote_cdp_http`                                     | warn          | Remote CDP over plain HTTP lacks transport encryption                                | browser profile `cdpUrl`                                                                             | no       |
 | `browser.remote_cdp_private_host`                             | warn          | Remote CDP targets a private/internal host                                           | browser profile `cdpUrl`, `browser.ssrfPolicy.*`                                                     | no       |
-| `sandbox.docker_config_mode_off`                              | warn          | Sandbox Docker config present but inactive                                           | `agents.*.sandbox.mode`                                                                              | no       |
-| `sandbox.bind_mount_non_absolute`                             | warn          | Relative bind mounts can resolve unpredictably                                       | `agents.*.sandbox.docker.binds[]`                                                                    | no       |
-| `sandbox.dangerous_bind_mount`                                | critical      | Sandbox bind mount targets blocked system, credential, or Docker socket paths        | `agents.*.sandbox.docker.binds[]`                                                                    | no       |
-| `sandbox.dangerous_network_mode`                              | critical      | Sandbox Docker network uses `host` or `container:*` namespace-join mode              | `agents.*.sandbox.docker.network`                                                                    | no       |
-| `sandbox.dangerous_seccomp_profile`                           | critical      | Sandbox seccomp profile weakens container isolation                                  | `agents.*.sandbox.docker.securityOpt`                                                                | no       |
-| `sandbox.dangerous_apparmor_profile`                          | critical      | Sandbox AppArmor profile weakens container isolation                                 | `agents.*.sandbox.docker.securityOpt`                                                                | no       |
-| `sandbox.browser_cdp_bridge_unrestricted`                     | warn          | Sandbox browser bridge is exposed without source-range restriction                   | `sandbox.browser.cdpSourceRange`                                                                     | no       |
-| `sandbox.browser_container.non_loopback_publish`              | critical      | Existing browser container publishes CDP on non-loopback interfaces                  | browser sandbox container publish config                                                             | no       |
-| `sandbox.browser_container.hash_label_missing`                | warn          | Existing browser container predates current config-hash labels                       | `openclaw sandbox recreate --browser --all`                                                          | no       |
-| `sandbox.browser_container.hash_epoch_stale`                  | warn          | Existing browser container predates current browser config epoch                     | `openclaw sandbox recreate --browser --all`                                                          | no       |
-| `tools.exec.host_sandbox_no_sandbox_defaults`                 | warn          | `exec host=sandbox` fails closed when sandbox is off                                 | `tools.exec.host`, `agents.defaults.sandbox.mode`                                                    | no       |
-| `tools.exec.host_sandbox_no_sandbox_agents`                   | warn          | Per-agent `exec host=sandbox` fails closed when sandbox is off                       | `agents.list[].tools.exec.host`, `agents.list[].sandbox.mode`                                        | no       |
 | `tools.exec.security_full_configured`                         | warn/critical | Host exec is running with `security="full"`                                          | `tools.exec.security`, `agents.list[].tools.exec.security`                                           | no       |
 | `tools.exec.auto_allow_skills_enabled`                        | warn          | Exec approvals trust skill bins implicitly                                           | `~/.openclaw/exec-approvals.json`                                                                    | no       |
 | `tools.exec.allowlist_interpreter_without_strict_inline_eval` | warn          | Interpreter allowlists permit inline eval without forced reapproval                  | `tools.exec.strictInlineEval`, `agents.list[].tools.exec.strictInlineEval`, exec approvals allowlist | no       |
@@ -334,13 +315,10 @@ High-signal `checkId` values you will most likely see in real deployments (not e
 | `skills.code_safety.scan_failed`                              | warn          | Skill code scan could not complete                                                   | skill scan environment                                                                               | no       |
 | `security.exposure.open_channels_with_exec`                   | warn/critical | Shared/public rooms can reach exec-enabled agents                                    | `channels.*.dmPolicy`, `channels.*.groupPolicy`, `tools.exec.*`, `agents.list[].tools.exec.*`        | no       |
 | `security.exposure.open_groups_with_elevated`                 | critical      | Open groups + elevated tools create high-impact prompt-injection paths               | `channels.*.groupPolicy`, `tools.elevated.*`                                                         | no       |
-| `security.exposure.open_groups_with_runtime_or_fs`            | critical/warn | Open groups can reach command/file tools without sandbox/workspace guards            | `channels.*.groupPolicy`, `tools.profile/deny`, `tools.fs.workspaceOnly`, `agents.*.sandbox.mode`    | no       |
-| `security.trust_model.multi_user_heuristic`                   | warn          | Config looks multi-user while gateway trust model is personal-assistant              | split trust boundaries, or shared-user hardening (`sandbox.mode`, tool deny/workspace scoping)       | no       |
 | `tools.profile_minimal_overridden`                            | warn          | Agent overrides bypass global minimal profile                                        | `agents.list[].tools.profile`                                                                        | no       |
 | `plugins.tools_reachable_permissive_policy`                   | warn          | Extension tools reachable in permissive contexts                                     | `tools.profile` + tool allow/deny                                                                    | no       |
 | `models.legacy`                                               | warn          | Legacy model families are still configured                                           | model selection                                                                                      | no       |
 | `models.weak_tier`                                            | warn          | Configured models are below current recommended tiers                                | model selection                                                                                      | no       |
-| `models.small_params`                                         | critical/info | Small models + unsafe tool surfaces raise injection risk                             | model choice + sandbox/tool policy                                                                   | no       |
 | `summary.attack_surface`                                      | info          | Roll-up summary of auth, channel, tool, and exposure posture                         | multiple keys (see finding detail)                                                                   | no       |
 
 ## Control UI over HTTP
@@ -404,12 +382,6 @@ schema:
 - `channels.mattermost.accounts.<accountId>.dangerouslyAllowNameMatching` (extension channel)
 - `channels.telegram.network.dangerouslyAllowPrivateNetwork`
 - `channels.telegram.accounts.<accountId>.network.dangerouslyAllowPrivateNetwork`
-- `agents.defaults.sandbox.docker.dangerouslyAllowReservedContainerTargets`
-- `agents.defaults.sandbox.docker.dangerouslyAllowExternalBindSources`
-- `agents.defaults.sandbox.docker.dangerouslyAllowContainerNamespaceJoin`
-- `agents.list[<index>].sandbox.docker.dangerouslyAllowReservedContainerTargets`
-- `agents.list[<index>].sandbox.docker.dangerouslyAllowExternalBindSources`
-- `agents.list[<index>].sandbox.docker.dangerouslyAllowContainerNamespaceJoin`
 
 ## Reverse Proxy Configuration
 
@@ -525,7 +497,6 @@ Most failures here are not fancy exploits — they’re “someone messaged the 
 DennouAibou’s stance:
 
 - **Identity first:** decide who can talk to the bot (DM pairing / allowlists / explicit “open”).
-- **Scope next:** decide where the bot is allowed to act (group allowlists + mention gating, tools, sandboxing, device permissions).
 - **Model last:** assume the model can be manipulated; design so manipulation has limited blast radius.
 
 ## Command authorization model
@@ -643,13 +614,11 @@ Details: [Configuration](/gateway/configuration) and [Groups](/channels/groups)
 
 Prompt injection is when an attacker crafts a message that manipulates the model into doing something unsafe (“ignore your instructions”, “dump your filesystem”, “follow this link and run commands”, etc.).
 
-Even with strong system prompts, **prompt injection is not solved**. System prompt guardrails are soft guidance only; hard enforcement comes from tool policy, exec approvals, sandboxing, and channel allowlists (and operators can disable these by design). What helps in practice:
+Even with strong system prompts, **prompt injection is not solved**. System prompt guardrails are soft guidance only; hard enforcement comes from tool policy, exec approvals, and channel allowlists (and operators can disable these by design). What helps in practice:
 
 - Keep inbound DMs locked down (pairing/allowlists).
 - Prefer mention gating in groups; avoid “always-on” bots in public rooms.
 - Treat links, attachments, and pasted instructions as hostile by default.
-- Run sensitive tool execution in a sandbox; keep secrets out of the agent’s reachable filesystem.
-- Note: sandboxing is opt-in. If sandbox mode is off, implicit `host=auto` resolves to the gateway host. Explicit `host=sandbox` still fails closed because no sandbox runtime is available. Set `host=gateway` if you want that behavior to be explicit in config.
 - Limit high-risk tools (`exec`, `browser`, `web_fetch`, `web_search`) to trusted agents or explicit allowlists.
 - If you allowlist interpreters (`python`, `node`, `ruby`, `perl`, `php`, `lua`, `osascript`), enable `tools.exec.strictInlineEval` so inline eval forms still need explicit approval.
 - **Model choice matters:** older/smaller/legacy models are significantly less robust against prompt injection and tool misuse. For tool-enabled agents, use the strongest latest-generation, instruction-hardened model available.
@@ -673,12 +642,10 @@ Guidance:
 
 - Keep these unset/false in production.
 - Only enable temporarily for tightly scoped debugging.
-- If enabled, isolate that agent (sandbox + minimal tools + dedicated session namespace).
 
 Hooks risk note:
 
 - Hook payloads are untrusted content, even when delivery comes from systems you control (mail/docs/web content can carry prompt injection).
-- Weak model tiers increase this risk. For hook-driven automation, prefer strong modern model tiers and keep tool policy tight (`tools.profile: "messaging"` or stricter), plus sandboxing where possible.
 
 ### Prompt injection does not require public DMs
 
@@ -705,7 +672,6 @@ tool calls. Reduce the blast radius by:
   metadata, even though this path omits the longer `SECURITY NOTICE:` banner.
 - The same marker-based wrapping is applied when media-understanding extracts text
   from attached documents before appending that text to the media prompt.
-- Enabling sandboxing and strict tool allowlists for any agent that touches untrusted input.
 - Keeping secrets out of prompts; pass them via env/config on the gateway host instead.
 
 ### Model strength (security note)
@@ -720,8 +686,6 @@ Recommendations:
 
 - **Use the latest generation, best-tier model** for any bot that can run tools or touch files/networks.
 - **Do not use older/weaker/smaller tiers** for tool-enabled agents or untrusted inboxes; the prompt-injection risk is too high.
-- If you must use a smaller model, **reduce blast radius** (read-only tools, strong sandboxing, minimal filesystem access, strict allowlists).
-- When running small models, **enable sandboxing for all sessions** and **disable web_search/web_fetch/browser** unless inputs are tightly controlled.
 - For chat-only personal assistants with trusted input and no tools, smaller models are usually fine.
 
 <a id="reasoning-verbose-output-in-groups"></a>
@@ -998,7 +962,6 @@ Assume anything under `~/.openclaw/` (or `$OPENCLAW_STATE_DIR/`) may contain sec
 - `agents/<agentId>/agent/auth.json`: legacy compatibility file. Static `api_key` entries are scrubbed when discovered.
 - `agents/<agentId>/sessions/**`: session transcripts (`*.jsonl`) + routing metadata (`sessions.json`) that can contain private messages and tool output.
 - bundled plugin packages: installed plugins (plus their `node_modules/`).
-- `sandboxes/**`: tool sandbox workspaces; can accumulate copies of files you read/write inside the sandbox.
 
 Hardening tips:
 
@@ -1061,19 +1024,6 @@ For phone-number-based channels, consider running your AI on a separate phone nu
 - Personal number: Your conversations stay private
 - Bot number: AI handles these, with appropriate boundaries
 
-### 4) Read-only mode (via sandbox + tools)
-
-You can build a read-only profile by combining:
-
-- `agents.defaults.sandbox.workspaceAccess: "ro"` (or `"none"` for no workspace access)
-- tool allow/deny lists that block `write`, `edit`, `apply_patch`, `exec`, `process`, etc.
-
-Additional hardening options:
-
-- `tools.exec.applyPatch.workspaceOnly: true` (default): ensures `apply_patch` cannot write/delete outside the workspace directory even when sandboxing is off. Set to `false` only if you intentionally want `apply_patch` to touch files outside the workspace.
-- `tools.fs.workspaceOnly: true` (optional): restricts `read`/`write`/`edit`/`apply_patch` paths and native prompt image auto-load paths to the workspace directory (useful if you allow absolute paths today and want a single guardrail).
-- Keep filesystem roots narrow: avoid broad roots like your home directory for agent workspaces/sandbox workspaces. Broad roots can expose sensitive local files (for example state/config under `~/.openclaw`) to filesystem tools.
-
 ### 5) Secure baseline (copy/paste)
 
 One “safe default” config that keeps the Gateway private, requires DM pairing, and avoids always-on group bots:
@@ -1095,40 +1045,9 @@ One “safe default” config that keeps the Gateway private, requires DM pairin
 }
 ```
 
-If you want “safer by default” tool execution too, add a sandbox + deny dangerous tools for any non-owner agent (example below under “Per-agent access profiles”).
+If you want “safer by default” tool execution too, add deny rules for dangerous tools for any non-owner agent (example below under “Per-agent access profiles”).
 
 Built-in baseline for chat-driven agent turns: non-owner senders cannot use the `cron` or `gateway` tools.
-
-## Sandboxing (recommended)
-
-Dedicated doc: [Sandboxing](/gateway/sandboxing)
-
-Two complementary approaches:
-
-- **Run the full Gateway in Docker** (container boundary): [Docker](/install/docker)
-- **Tool sandbox** (`agents.defaults.sandbox`, host gateway + Docker-isolated tools): [Sandboxing](/gateway/sandboxing)
-
-Note: to prevent cross-agent access, keep `agents.defaults.sandbox.scope` at `"agent"` (default)
-or `"session"` for stricter per-session isolation. `scope: "shared"` uses a
-single container/workspace.
-
-Also consider agent workspace access inside the sandbox:
-
-- `agents.defaults.sandbox.workspaceAccess: "none"` (default) keeps the agent workspace off-limits; tools run against a sandbox workspace under `~/.openclaw/sandboxes`
-- `agents.defaults.sandbox.workspaceAccess: "ro"` mounts the agent workspace read-only at `/agent` (disables `write`/`edit`/`apply_patch`)
-- `agents.defaults.sandbox.workspaceAccess: "rw"` mounts the agent workspace read/write at `/workspace`
-- Extra `sandbox.docker.binds` are validated against normalized and canonicalized source paths. Parent-symlink tricks and canonical home aliases still fail closed if they resolve into blocked roots such as `/etc`, `/var/run`, or credential directories under the OS home.
-
-Important: `tools.elevated` is the global baseline escape hatch that runs exec outside the sandbox. The effective host is `gateway` by default, or `node` when the exec target is configured to `node`. Keep `tools.elevated.allowFrom` tight and don’t enable it for strangers. You can further restrict elevated per agent via `agents.list[].tools.elevated`. See [Elevated Mode](/tools/elevated).
-
-### Sub-agent delegation guardrail
-
-If you allow session tools, treat delegated sub-agent runs as another boundary decision:
-
-- Deny `sessions_spawn` unless the agent truly needs delegation.
-- Keep `agents.defaults.subagents.allowAgents` and any per-agent `agents.list[].subagents.allowAgents` overrides restricted to known-safe target agents.
-- For any workflow that must remain sandboxed, call `sessions_spawn` with `sandbox: "require"` (default is `inherit`).
-- `sandbox: "require"` fails fast when the target child runtime is not sandboxed.
 
 ## Browser control risks
 
@@ -1138,7 +1057,6 @@ access those accounts and data. Treat browser profiles as **sensitive state**:
 
 - Prefer a dedicated profile for the agent (the default `openclaw` profile).
 - Avoid pointing the agent at your personal daily-driver profile.
-- Keep host browser control disabled for sandboxed agents unless you trust them.
 - The standalone loopback browser control API only honors shared-secret auth
   (gateway token bearer auth or gateway password). It does not consume
   trusted-proxy or Tailscale Serve identity headers.
@@ -1175,32 +1093,12 @@ Example strict policy:
 
 ## Per-agent access profiles (multi-agent)
 
-With multi-agent routing, each agent can have its own sandbox + tool policy:
+With multi-agent routing, each agent can have its own tool policy:
 use this to give **full access**, **read-only**, or **no access** per agent.
-See [Multi-Agent Sandbox & Tools](/tools/multi-agent-sandbox-tools) for full details
+See [Multi-agent](/concepts/multi-agent) for full details
 and precedence rules.
 
 Common use cases:
-
-- Personal agent: full access, no sandbox
-- Family/work agent: sandboxed + read-only tools
-- Public agent: sandboxed + no filesystem/shell tools
-
-### Example: full access (no sandbox)
-
-```json5
-{
-  agents: {
-    list: [
-      {
-        id: "personal",
-        workspace: "~/.openclaw/workspace-personal",
-        sandbox: { mode: "off" },
-      },
-    ],
-  },
-}
-```
 
 ### Example: read-only tools + read-only workspace
 
@@ -1211,11 +1109,6 @@ Common use cases:
       {
         id: "family",
         workspace: "~/.openclaw/workspace-family",
-        sandbox: {
-          mode: "all",
-          scope: "agent",
-          workspaceAccess: "ro",
-        },
         tools: {
           allow: ["read"],
           deny: ["write", "edit", "apply_patch", "exec", "process", "browser"],
@@ -1235,11 +1128,6 @@ Common use cases:
       {
         id: "public",
         workspace: "~/.openclaw/workspace-public",
-        sandbox: {
-          mode: "all",
-          scope: "agent",
-          workspaceAccess: "none",
-        },
         // Session tools can reveal sensitive data from transcripts. By default DennouAibou limits these tools
         // to the current session + spawned subagent sessions, but you can clamp further if needed.
         // See `tools.sessions.visibility` in the configuration reference.

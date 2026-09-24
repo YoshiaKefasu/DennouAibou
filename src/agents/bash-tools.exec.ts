@@ -43,19 +43,16 @@ import type {
   ExecToolDetails,
 } from "./bash-tools.exec-types.js";
 import {
-  buildSandboxEnv,
   clampWithDefault,
   coerceEnv,
   readEnvInt,
-  resolveSandboxWorkdir,
   resolveWorkdir,
   truncateMiddle,
 } from "./bash-tools.shared.js";
-import { assertSandboxPath } from "./sandbox-paths.js";
+import { assertPathWithinRoot } from "./path-policy.js";
 import { EXEC_TOOL_DISPLAY_SUMMARY } from "./tool-description-presets.js";
 import { type AgentToolWithMeta, failedTextResult, textResult } from "./tools/common.js";
 
-export type { BashSandboxConfig } from "./bash-tools.shared.js";
 export type {
   ExecElevatedDefaults,
   ExecToolDefaults,
@@ -793,7 +790,7 @@ async function validateScriptFileForShellBleed(params: {
     // Best-effort: only validate if file exists and is reasonably small.
     let stat: { isFile(): boolean; size: number };
     try {
-      await assertSandboxPath({
+      await assertPathWithinRoot({
         filePath: absPath,
         cwd: params.workdir,
         root: params.workdir,
@@ -1286,7 +1283,7 @@ export function createExecTool(
       const elevatedRequested = elevatedMode !== "off";
       if (elevatedRequested) {
         if (!elevatedDefaults?.enabled || !elevatedDefaults.allowed) {
-          const runtime = defaults?.sandbox ? "sandboxed" : "direct";
+          const runtime = "direct";
           const gates: string[] = [];
           const contextParts: string[] = [];
           const provider = defaults?.messageProvider?.trim();
@@ -1327,13 +1324,14 @@ export function createExecTool(
         configuredTarget: defaults?.host,
         requestedTarget: normalizeExecTarget(params.host),
         elevatedRequested,
-        sandboxAvailable: Boolean(defaults?.sandbox),
       });
       const host: ExecHost = target.effectiveHost;
 
       const approvalDefaults = loadExecApprovals().defaults;
       const configuredSecurity =
-        defaults?.security ?? approvalDefaults?.security ?? (host === "sandbox" ? "deny" : "full");
+        defaults?.security ??
+        approvalDefaults?.security ??
+        (host !== "gateway" && host !== "node" ? "deny" : "full");
       const requestedSecurity = normalizeExecSecurity(params.security);
       let security = minSecurity(configuredSecurity, requestedSecurity ?? configuredSecurity);
       if (elevatedRequested && elevatedMode === "full") {
@@ -1348,29 +1346,18 @@ export function createExecTool(
         ask = "off";
       }
 
-      const sandbox = host === "sandbox" ? defaults?.sandbox : undefined;
-      if (target.selectedTarget === "sandbox" && !sandbox) {
-        throw new Error(
-          [
-            "exec host=sandbox requires a sandbox runtime for this session.",
-            'Enable sandbox mode (`agents.defaults.sandbox.mode="non-main"` or `"all"`) or use host=auto/gateway/node.',
-          ].join("\n"),
-        );
-      }
       const explicitWorkdir = params.workdir?.trim() || undefined;
       const defaultWorkdir = defaults?.cwd?.trim() || undefined;
       let workdir: string | undefined;
-      let containerWorkdir = sandbox?.containerWorkdir;
-      if (sandbox) {
-        const sandboxWorkdir = explicitWorkdir ?? defaultWorkdir ?? process.cwd();
-        const resolved = await resolveSandboxWorkdir({
-          workdir: sandboxWorkdir,
-          sandbox,
-          warnings,
-        });
-        workdir = resolved.hostWorkdir;
-        containerWorkdir = resolved.containerWorkdir;
-      } else if (host === "node") {
+      if (host !== "gateway" && host !== "node") {
+        throw new Error(
+          [
+            `exec host=${host} requires an execution runtime that is not available in this build.`,
+            "Use host=auto/gateway/node instead.",
+          ].join("\n"),
+        );
+      }
+      if (host === "node") {
         // For remote node execution, only forward a cwd that was explicitly
         // requested on the tool call. The gateway's workspace root is wired in as a
         // local default, but it is not meaningful on the remote node and would
@@ -1388,16 +1375,12 @@ export function createExecTool(
       rejectExecApprovalShellCommand(params.command);
 
       const inheritedBaseEnv = coerceEnv(process.env);
-      const hostEnvResult =
-        host === "sandbox"
-          ? null
-          : sanitizeHostExecEnvWithDiagnostics({
-              baseEnv: inheritedBaseEnv,
-              overrides: params.env,
-              blockPathOverrides: true,
-            });
+      const hostEnvResult = sanitizeHostExecEnvWithDiagnostics({
+        baseEnv: inheritedBaseEnv,
+        overrides: params.env,
+        blockPathOverrides: true,
+      });
       if (
-        hostEnvResult &&
         params.env &&
         (hostEnvResult.rejectedOverrideBlockedKeys.length > 0 ||
           hostEnvResult.rejectedOverrideInvalidKeys.length > 0)
@@ -1431,17 +1414,9 @@ export function createExecTool(
         throw new Error(`Security Violation: ${suffix}.`);
       }
 
-      const env =
-        sandbox && host === "sandbox"
-          ? buildSandboxEnv({
-              defaultPath: DEFAULT_PATH,
-              paramsEnv: params.env,
-              sandboxEnv: sandbox.env,
-              containerWorkdir: containerWorkdir ?? sandbox.containerWorkdir,
-            })
-          : (hostEnvResult?.env ?? inheritedBaseEnv);
+      const env = hostEnvResult.env ?? inheritedBaseEnv;
 
-      if (!sandbox && host === "gateway" && !params.env?.PATH) {
+      if (host === "gateway" && !params.env?.PATH) {
         const shellPath = getShellPathFromLoginShell({
           env: process.env,
           timeoutMs: resolveShellEnvFallbackTimeoutMs(process.env),
@@ -1449,7 +1424,7 @@ export function createExecTool(
         applyShellPath(env, shellPath);
       }
 
-      // `tools.exec.pathPrepend` is only meaningful when exec runs locally (gateway) or in the sandbox.
+      // `tools.exec.pathPrepend` is only meaningful when exec runs locally (gateway).
       // Node hosts intentionally ignore request-scoped PATH overrides, so don't pretend this applies.
       if (host === "node" && defaultPathPrepend.length > 0) {
         warnings.push(
@@ -1496,7 +1471,7 @@ export function createExecTool(
           workdir,
           env,
           requestedEnv: params.env,
-          pty: params.pty === true && !sandbox,
+          pty: params.pty === true,
           timeoutSec: params.timeout,
           defaultTimeoutSec,
           security,
@@ -1535,7 +1510,7 @@ export function createExecTool(
         ? null
         : (explicitTimeoutSec ?? defaultTimeoutSec);
       const getWarningText = () => (warnings.length ? `${warnings.join("\n")}\n\n` : "");
-      const usePty = params.pty === true && !sandbox;
+      const usePty = params.pty === true;
 
       // Preflight: catch a common model failure mode (shell syntax leaking into Python/JS sources)
       // before we execute and burn tokens in cron loops.
@@ -1547,8 +1522,6 @@ export function createExecTool(
           execCommand: execCommandOverride,
           workdir,
           env,
-          sandbox,
-          containerWorkdir,
           usePty,
           warnings,
           maxOutput,

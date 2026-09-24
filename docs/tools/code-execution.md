@@ -13,7 +13,6 @@ title: "Code Execution"
 This is different from local [`exec`](/tools/exec):
 
 - `exec` runs shell commands on your machine or node
-- `code_execution` runs Python in xAI's remote sandbox
 
 Use `code_execution` for:
 

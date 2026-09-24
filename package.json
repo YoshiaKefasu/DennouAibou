@@ -53,10 +53,6 @@
       "types": "./dist/plugin-sdk/provider-setup.d.ts",
       "default": "./dist/plugin-sdk/provider-setup.js"
     },
-    "./plugin-sdk/sandbox": {
-      "types": "./dist/plugin-sdk/sandbox.d.ts",
-      "default": "./dist/plugin-sdk/sandbox.js"
-    },
     "./plugin-sdk/self-hosted-provider-setup": {
       "types": "./dist/plugin-sdk/self-hosted-provider-setup.d.ts",
       "default": "./dist/plugin-sdk/self-hosted-provider-setup.js"
@@ -793,10 +789,6 @@
       "types": "./dist/plugin-sdk/provider-tools.d.ts",
       "default": "./dist/plugin-sdk/provider-tools.js"
     },
-    "./plugin-sdk/provider-usage": {
-      "types": "./dist/plugin-sdk/provider-usage.d.ts",
-      "default": "./dist/plugin-sdk/provider-usage.js"
-    },
     "./plugin-sdk/provider-web-fetch": {
       "types": "./dist/plugin-sdk/provider-web-fetch.d.ts",
       "default": "./dist/plugin-sdk/provider-web-fetch.js"
@@ -943,7 +935,7 @@
     "canon:check:json": "node scripts/canon.mjs check --json",
     "canon:enforce": "node scripts/canon.mjs enforce --json",
     "canvas:a2ui:bundle": "bash scripts/bundle-a2ui.sh",
-    "check": "pnpm check:no-conflict-markers && pnpm tool-display:check && pnpm check:host-env-policy:swift && pnpm tsgo && pnpm lint && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope",
+    "check": "pnpm check:no-conflict-markers && pnpm tool-display:check && pnpm check:host-env-policy:swift && pnpm tsgo && pnpm lint && pnpm format:check && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope",
     "check:base-config-schema": "node --import tsx scripts/generate-base-config-schema.ts --check",
     "check:bundled-channel-config-metadata": "node --import tsx scripts/generate-bundled-channel-config-metadata.ts --check",
     "check:docs": "pnpm format:docs:check && pnpm lint:docs && pnpm docs:check-i18n-glossary && pnpm docs:check-links",
@@ -1038,7 +1030,6 @@
     "prepack": "node --import tsx scripts/dennou-aibou-prepack.ts",
     "prepare": "command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath git-hooks || exit 0",
     "prepush:ci": "bash scripts/prepush-ci.sh",
-    "probe:anthropic:prompt": "node --import tsx scripts/anthropic-prompt-probe.ts",
     "protocol:check": "pnpm protocol:gen && pnpm protocol:gen:swift && git diff --exit-code -- dist/protocol.schema.json apps/macos/Sources/OpenClawProtocol/GatewayModels.swift apps/shared/OpenClawKit/Sources/OpenClawProtocol/GatewayModels.swift",
     "protocol:gen": "node --import tsx scripts/protocol-gen.ts",
     "protocol:gen:swift": "node --import tsx scripts/protocol-gen-swift.ts",
@@ -1087,7 +1078,6 @@
     "test:docker:plugins": "bash scripts/e2e/plugins-docker.sh",
     "test:docker:qr": "bash scripts/e2e/qr-import-docker.sh",
     "test:e2e": "node scripts/run-vitest.mjs run --config vitest.e2e.config.ts",
-    "test:e2e:openshell": "DENNOU_E2E_OPENSHELL=1 node scripts/run-vitest.mjs run --config vitest.e2e.config.ts test/openshell-sandbox.e2e.test.ts",
     "test:extension": "node scripts/test-extension.mjs",
     "test:extensions": "node scripts/run-vitest.mjs run --config vitest.extensions.config.ts",
     "test:extensions:batch": "node scripts/test-extension-batch.mjs",

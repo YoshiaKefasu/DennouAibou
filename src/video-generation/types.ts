@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export type GeneratedVideoAsset = {
@@ -29,7 +28,6 @@ export type VideoGenerationRequest = {
   prompt: string;
   cfg: OpenClawConfig;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   timeoutMs?: number;
   size?: string;
   aspectRatio?: string;

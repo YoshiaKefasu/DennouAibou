@@ -77,6 +77,8 @@ describe("resolveAllowAlwaysPatterns", () => {
       platform: process.platform,
     });
     expect(second.allowlistSatisfied).toBe(false);
+    // Note: exec-approval DEBLOAT — requiresExecApproval always returns false
+    // (full allow). The allowlist evaluation itself still reports miss.
     expect(
       requiresExecApproval({
         ask: "on-miss",
@@ -84,7 +86,7 @@ describe("resolveAllowAlwaysPatterns", () => {
         analysisOk: second.analysisOk,
         allowlistSatisfied: second.allowlistSatisfied,
       }),
-    ).toBe(true);
+    ).toBe(false);
   }
 
   function createShellScriptFixture() {
@@ -853,6 +855,8 @@ $0 \\"$1\\"" touch {marker}`,
       platform: process.platform,
     });
     expect(second.allowlistSatisfied).toBe(false);
+    // Note: exec-approval DEBLOAT — requiresExecApproval always returns false
+    // (full allow). The allowlist evaluation itself still reports miss.
     expect(
       requiresExecApproval({
         ask: "on-miss",
@@ -860,7 +864,7 @@ $0 \\"$1\\"" touch {marker}`,
         analysisOk: second.analysisOk,
         allowlistSatisfied: second.allowlistSatisfied,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("prevents allow-always bypass for shell-carried awk interpreters", () => {

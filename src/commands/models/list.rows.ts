@@ -1,6 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { AuthProfileStore } from "../../agents/auth-profiles.js";
 import { shouldSuppressBuiltInModel } from "../../agents/model-suppression.js";
 import { normalizeProviderId } from "../../agents/provider-id.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -18,7 +17,6 @@ type RowFilter = {
 
 type RowBuilderContext = {
   cfg: OpenClawConfig;
-  authStore: AuthProfileStore;
   availableKeys?: Set<string>;
   configuredByKey: ConfiguredByKey;
   discoveredKeys: Set<string>;
@@ -49,7 +47,6 @@ function buildRow(params: {
     aliases: configured?.aliases ?? [],
     availableKeys: params.context.availableKeys,
     cfg: params.context.cfg,
-    authStore: params.context.authStore,
     allowProviderAvailabilityFallback: params.allowProviderAvailabilityFallback ?? false,
   });
 }
@@ -172,7 +169,6 @@ export function appendConfiguredRows(params: {
         aliases: entry.aliases,
         availableKeys: params.context.availableKeys,
         cfg: params.context.cfg,
-        authStore: params.context.authStore,
         allowProviderAvailabilityFallback: model
           ? !params.context.discoveredKeys.has(modelKey(model.provider, model.id))
           : false,

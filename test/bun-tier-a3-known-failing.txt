@@ -77,7 +77,6 @@ src/gateway/server.canvas-auth.test.ts
 src/config/config.legacy-config-detection.rejects-routing-allowfrom.test.ts
 src/config/config.legacy-config-snapshot.test.ts
 src/config/config.meta-timestamp-coercion.test.ts
-src/config/config.sandbox-docker.test.ts
 src/config/config.schema-regressions.test.ts
 src/config/config.secrets-schema.test.ts
 src/config/config.skills-entries-config.test.ts
@@ -148,7 +147,6 @@ src/cron/delivery.test.ts
 src/cron/heartbeat-policy.test.ts
 src/cron/isolated-agent.helpers.test.ts
 src/cron/isolated-agent/helpers.test.ts
-src/cron/isolated-agent/run.sandbox-config-preserved.test.ts
 src/cron/isolated-agent/run.session-key.test.ts
 src/cron/normalize.test.ts
 src/cron/schedule.test.ts

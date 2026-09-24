@@ -33,8 +33,6 @@ import {
   resolveAgentSkillsFilter,
   resolveAgentWorkspaceDir,
 } from "./agent-scope.js";
-import { ensureAuthProfileStore } from "./auth-profiles.js";
-import { clearSessionAuthProfileOverride } from "./auth-profiles/session-override.js";
 import {
   persistSessionEntry as persistSessionEntryBase,
   prependInternalEventContext,
@@ -523,22 +521,7 @@ async function agentCommandInternal(
       model = explicitRef.model;
     }
     if (sessionEntry) {
-      const authProfileId = sessionEntry.authProfileOverride;
-      if (authProfileId) {
-        const entry = sessionEntry;
-        const store = ensureAuthProfileStore();
-        const profile = store.profiles[authProfileId];
-        if (!profile || profile.provider !== providerForAuthProfileValidation) {
-          if (sessionStore && sessionKey) {
-            await clearSessionAuthProfileOverride({
-              sessionEntry: entry,
-              sessionStore,
-              sessionKey,
-              storePath,
-            });
-          }
-        }
-      }
+      // Stale auth-profile overrides (legacy data) are ignored.
     }
 
     if (!resolvedThinkLevel) {

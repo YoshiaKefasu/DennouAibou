@@ -77,10 +77,6 @@ describe("installTestEnv", () => {
       }`,
     );
     writeFile(path.join(realHome, ".openclaw", "credentials", "token.txt"), "secret\n");
-    writeFile(
-      path.join(realHome, ".openclaw", "agents", "main", "agent", "auth-profiles.json"),
-      JSON.stringify({ version: 1, profiles: { default: { provider: "openai" } } }, null, 2),
-    );
     writeFile(path.join(realHome, ".claude", ".credentials.json"), '{"accessToken":"token"}\n');
 
     process.env.HOME = realHome;
@@ -115,11 +111,6 @@ describe("installTestEnv", () => {
 
     expect(
       fs.existsSync(path.join(testEnv.tempHome, ".openclaw", "credentials", "token.txt")),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(testEnv.tempHome, ".openclaw", "agents", "main", "agent", "auth-profiles.json"),
-      ),
     ).toBe(true);
     expect(fs.existsSync(path.join(testEnv.tempHome, ".claude", ".credentials.json"))).toBe(true);
   });

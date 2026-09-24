@@ -1,15 +1,10 @@
-import {
-  ensureAuthProfileStore,
-  resolveApiKeyForProfile,
-  resolveAuthProfileOrder,
-} from "../../agents/auth-profiles.js";
 import { resolveEnvApiKey } from "../../agents/model-auth.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { normalizeOptionalSecretInput } from "../../utils/normalize-secret-input.js";
 import type { SecretInputMode } from "../onboard-types.js";
 
-export type NonInteractiveApiKeySource = "flag" | "env" | "profile";
+export type NonInteractiveApiKeySource = "flag" | "env";
 
 function parseEnvVarNameFromSourceLabel(source: string | undefined): string | undefined {
   if (!source) {
@@ -17,35 +12,6 @@ function parseEnvVarNameFromSourceLabel(source: string | undefined): string | un
   }
   const match = /^(?:shell env: |env: )([A-Z][A-Z0-9_]*)$/.exec(source.trim());
   return match?.[1];
-}
-
-async function resolveApiKeyFromProfiles(params: {
-  provider: string;
-  cfg: OpenClawConfig;
-  agentDir?: string;
-}): Promise<string | null> {
-  const store = ensureAuthProfileStore(params.agentDir);
-  const order = resolveAuthProfileOrder({
-    cfg: params.cfg,
-    store,
-    provider: params.provider,
-  });
-  for (const profileId of order) {
-    const cred = store.profiles[profileId];
-    if (cred?.type !== "api_key") {
-      continue;
-    }
-    const resolved = await resolveApiKeyForProfile({
-      cfg: params.cfg,
-      store,
-      profileId,
-      agentDir: params.agentDir,
-    });
-    if (resolved?.apiKey) {
-      return resolved.apiKey;
-    }
-  }
-  return null;
 }
 
 export async function resolveNonInteractiveApiKey(params: {
@@ -105,24 +71,11 @@ export async function resolveNonInteractiveApiKey(params: {
     return { key: resolvedEnvKey, source: "env", envVarName: resolvedEnvVarName };
   }
 
-  if (params.allowProfile ?? true) {
-    const profileKey = await resolveApiKeyFromProfiles({
-      provider: params.provider,
-      cfg: params.cfg,
-      agentDir: params.agentDir,
-    });
-    if (profileKey) {
-      return { key: profileKey, source: "profile" };
-    }
-  }
-
   if (params.required === false) {
     return null;
   }
 
-  const profileHint =
-    params.allowProfile === false ? "" : `, or existing ${params.provider} API-key profile`;
-  params.runtime.error(`Missing ${params.flagName} (or ${params.envVar} in env${profileHint}).`);
+  params.runtime.error(`Missing ${params.flagName} (or ${params.envVar} in env).`);
   params.runtime.exit(1);
   return null;
 }

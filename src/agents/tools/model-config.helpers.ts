@@ -4,7 +4,6 @@ import {
   resolveAgentModelPrimaryValue,
 } from "../../config/model-input.js";
 import type { AgentModelConfig } from "../../config/types.agents-shared.js";
-import { ensureAuthProfileStore, listProfilesForProvider } from "../auth-profiles.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
 import { resolveEnvApiKey } from "../model-auth.js";
 import { resolveConfiguredModelRef } from "../model-selection.js";
@@ -30,17 +29,7 @@ export function resolveDefaultModelRef(cfg?: OpenClawConfig): { provider: string
 }
 
 export function hasAuthForProvider(params: { provider: string; agentDir?: string }): boolean {
-  if (resolveEnvApiKey(params.provider)?.apiKey) {
-    return true;
-  }
-  const agentDir = params.agentDir?.trim();
-  if (!agentDir) {
-    return false;
-  }
-  const store = ensureAuthProfileStore(agentDir, {
-    allowKeychainPrompt: false,
-  });
-  return listProfilesForProvider(store, params.provider).length > 0;
+  return Boolean(resolveEnvApiKey(params.provider)?.apiKey);
 }
 
 export function coerceToolModelConfig(model?: AgentModelConfig): ToolModelConfig {

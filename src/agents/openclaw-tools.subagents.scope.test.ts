@@ -93,7 +93,7 @@ describe("openclaw-tools: subagents scope isolation", () => {
 
   it("leaf subagents do not inherit parent sibling control scope", async () => {
     const leafKey = "agent:main:subagent:leaf";
-    const siblingKey = "agent:main:subagent:unsandboxed";
+    const siblingKey = "agent:main:subagent:sibling";
 
     writeStore(storePath, {
       [leafKey]: {
@@ -113,7 +113,7 @@ describe("openclaw-tools: subagents scope isolation", () => {
       childSessionKey: leafKey,
       requesterSessionKey: "agent:main:main",
       requesterDisplayKey: "main",
-      task: "sandboxed leaf",
+      task: "leaf task",
       cleanup: "keep",
       createdAt: Date.now() - 30_000,
       startedAt: Date.now() - 30_000,
@@ -123,7 +123,7 @@ describe("openclaw-tools: subagents scope isolation", () => {
       childSessionKey: siblingKey,
       requesterSessionKey: "agent:main:main",
       requesterDisplayKey: "main",
-      task: "unsandboxed sibling",
+      task: "sibling task",
       cleanup: "keep",
       createdAt: Date.now() - 20_000,
       startedAt: Date.now() - 20_000,

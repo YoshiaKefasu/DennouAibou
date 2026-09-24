@@ -5,7 +5,7 @@ import {
   isDangerousHostEnvVarName,
 } from "../../infra/host-env-security.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
-import { sanitizeEnvVars, validateEnvVarValue } from "../sandbox/sanitize-env-vars.js";
+import { sanitizeEnvVars, validateEnvVarValue } from "../env-sanitize-vars.js";
 import { resolveSkillConfig } from "./config.js";
 import { resolveSkillKey } from "./frontmatter.js";
 import { resolveSkillRuntimeConfig } from "./runtime-config.js";

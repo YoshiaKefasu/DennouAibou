@@ -408,7 +408,7 @@ export async function parseMessageWithAttachments(
           // Track for cleanup if a subsequent attachment fails.
           savedMediaIds.push(savedMedia.id);
 
-          // Opaque URI — compatible with workspaceOnly sandboxes and decouples
+          // Opaque URI — compatible with workspaceOnly enforcement and decouples
           // the Gateway from the agent's filesystem layout.
           const mediaRef = `media://inbound/${savedMedia.id}`;
 

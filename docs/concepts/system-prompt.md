@@ -40,7 +40,6 @@ The prompt is intentionally compact and uses fixed sections:
 - **Workspace**: working directory (`agents.defaults.workspace`).
 - **Documentation**: local path to DennouAibou docs (repo or npm package) and when to read them.
 - **Workspace Files (injected)**: indicates bootstrap files are included below.
-- **Sandbox** (when enabled): indicates sandboxed runtime, sandbox paths, and whether elevated exec is available.
 - **Current Date & Time**: user-local time, timezone, and time format.
 - **Reply Tags**: optional reply tag syntax for supported providers.
 - **Heartbeats**: heartbeat prompt and ack behavior, when heartbeats are enabled for the default agent.
@@ -67,7 +66,7 @@ When the experimental `update_plan` tool is enabled, Tooling also tells the
 model to use it only for non-trivial multi-step work, keep exactly one
 `in_progress` step, and avoid repeating the whole plan after each update.
 
-Safety guardrails in the system prompt are advisory. They guide model behavior but do not enforce policy. Use tool policy, exec approvals, sandboxing, and channel allowlists for hard enforcement; operators can disable these by design.
+Safety guardrails in the system prompt are advisory. They guide model behavior but do not enforce policy. Use tool policy, exec approvals, and channel allowlists for hard enforcement; operators can disable these by design.
 
 On channels with native approval cards/buttons, the runtime prompt now tells the
 agent to rely on that native approval UI first. It should only include a manual
@@ -83,7 +82,7 @@ DennouAibou can render smaller system prompts for sub-agents. The runtime sets a
 - `minimal`: used for sub-agents; omits **Skills**, **Memory Recall**, **DennouAibou
   Self-Update**, **Model Aliases**, **User Identity**, **Reply Tags**,
   **Messaging**, **Silent Replies**, and **Heartbeats**. Tooling, **Safety**,
-  Workspace, Sandbox, Current Date & Time (when known), Runtime, and injected
+  Workspace, Current Date & Time (when known), Runtime, and injected
   context stay available.
 - `none`: returns only the base identity line.
 

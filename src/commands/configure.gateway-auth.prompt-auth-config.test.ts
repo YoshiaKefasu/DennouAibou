@@ -7,10 +7,6 @@ import type { WizardPrompter } from "../wizard/prompts.js";
 import { promptAuthConfig } from "./configure.gateway-auth.js";
 
 const deps = {
-  ensureAuthProfileStore: vi.fn(() => ({
-    version: 1,
-    profiles: {},
-  })),
   resolveDefaultAgentWorkspaceDir: vi.fn(() => "/tmp/workspace"),
   promptAuthChoiceGrouped: vi.fn(),
   applyAuthChoice: vi.fn(),

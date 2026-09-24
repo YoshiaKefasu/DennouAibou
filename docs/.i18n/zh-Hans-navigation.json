@@ -191,11 +191,7 @@
         },
         {
           "group": "代理协作",
-          "pages": [
-            "zh-CN/tools/agent-send",
-            "zh-CN/tools/subagents",
-            "zh-CN/tools/multi-agent-sandbox-tools"
-          ]
+          "pages": ["zh-CN/tools/agent-send", "zh-CN/tools/subagents"]
         },
         {
           "group": "技能",
@@ -346,11 +342,7 @@
             },
             {
               "group": "安全与沙箱",
-              "pages": [
-                "zh-CN/gateway/security/index",
-                "zh-CN/gateway/sandboxing",
-                "zh-CN/gateway/sandbox-vs-tool-policy-vs-elevated"
-              ]
+              "pages": ["zh-CN/gateway/security/index"]
             },
             {
               "group": "协议与 API",
@@ -438,7 +430,6 @@
             "zh-CN/cli/pairing",
             "zh-CN/cli/plugins",
             "zh-CN/cli/reset",
-            "zh-CN/cli/sandbox",
             "zh-CN/cli/security",
             "zh-CN/cli/sessions",
             "zh-CN/cli/setup",

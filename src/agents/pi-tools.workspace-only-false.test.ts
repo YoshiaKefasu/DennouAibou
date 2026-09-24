@@ -203,7 +203,7 @@ describe("FS tools with workspaceOnly=false", () => {
         path: outsideFile,
         content: "test content",
       }),
-    ).rejects.toThrow(/Path escapes (workspace|sandbox) root/);
+    ).rejects.toThrow(/Path escapes workspace root/);
   });
 
   it("restricts memory-triggered writes to append-only canonical memory files", async () => {

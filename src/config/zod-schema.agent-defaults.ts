@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { isValidNonNegativeByteSizeString } from "./byte-size.js";
 import {
+  DeprecatedSandboxSchema,
   HeartbeatSchema,
-  AgentSandboxSchema,
   AgentModelSchema,
   MemorySearchSchema,
 } from "./zod-schema.agent-runtime.js";
@@ -187,6 +187,12 @@ export const AgentDefaultsSchema = z
     typingIntervalSeconds: z.number().int().positive().optional(),
     typingMode: TypingModeSchema.optional(),
     heartbeat: HeartbeatSchema,
+    /**
+     * @deprecated The sandbox (isolated execution) feature was removed in the
+     * DEBLOAT wave. Legacy `sandbox` config keys are still accepted and ignored so
+     * existing `dennou-aibou.json` files keep loading.
+     */
+    sandbox: DeprecatedSandboxSchema,
     maxConcurrent: z.number().int().positive().optional(),
     subagents: z
       .object({
@@ -219,7 +225,6 @@ export const AgentDefaultsSchema = z
       })
       .strict()
       .optional(),
-    sandbox: AgentSandboxSchema,
   })
   .strict()
   .optional();

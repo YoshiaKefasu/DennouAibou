@@ -1,5 +1,3 @@
-import type { ApiKeyCredential, AuthProfileCredential } from "../agents/auth-profiles/types.js";
-import { upsertAuthProfileWithLock } from "../agents/auth-profiles/upsert-with-lock.js";
 import {
   SELF_HOSTED_DEFAULT_CONTEXT_WINDOW,
   SELF_HOSTED_DEFAULT_COST,
@@ -11,6 +9,7 @@ import { createSubsystemLogger } from "../logging/subsystem.js";
 import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { applyAuthProfileConfig } from "./provider-auth-helpers.js";
+import type { ApiKeyCredential, AuthProfileCredential } from "./types.js";
 import type {
   ProviderDiscoveryContext,
   ProviderAuthResult,
@@ -356,12 +355,6 @@ export async function configureOpenAICompatibleSelfHostedProviderNonInteractive(
     contextWindow: params.contextWindow,
     maxTokens: params.maxTokens,
   });
-  await upsertAuthProfileWithLock({
-    profileId: configured.profileId,
-    credential,
-    agentDir: params.ctx.agentDir,
-  });
-
   const withProfile = applyAuthProfileConfig(configured.config, {
     profileId: configured.profileId,
     provider: params.providerId,

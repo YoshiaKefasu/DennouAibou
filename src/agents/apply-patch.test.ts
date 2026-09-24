@@ -39,7 +39,9 @@ async function expectOutsideWriteRejected(params: {
   outsidePath: string;
 }) {
   const patch = buildAddFilePatch(params.patchTargetPath);
-  await expect(applyPatch(patch, { cwd: params.dir })).rejects.toThrow(/Path escapes sandbox root/);
+  await expect(applyPatch(patch, { cwd: params.dir })).rejects.toThrow(
+    /Path escapes workspace root/,
+  );
   await expect(fs.readFile(params.outsidePath, "utf8")).rejects.toBeDefined();
 }
 
@@ -183,7 +185,9 @@ describe("applyPatch", () => {
 +pwned
 *** End Patch`;
 
-      await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(/Symlink escapes sandbox root/);
+      await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(
+        /Symlink escapes workspace root/,
+      );
       const outsideContents = await fs.readFile(outside, "utf8");
       expect(outsideContents).toBe("initial\n");
       await fs.rm(outside, { force: true });
@@ -208,7 +212,7 @@ describe("applyPatch", () => {
 
       try {
         await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(
-          /Symlink escapes sandbox root/,
+          /Symlink escapes workspace root/,
         );
         await expect(fs.readFile(outsideFile, "utf8")).rejects.toBeDefined();
       } finally {
@@ -243,7 +247,7 @@ describe("applyPatch", () => {
 -initial
 +pwned
 *** End Patch`;
-        await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(/hardlink|sandbox/i);
+        await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(/hardlink|workspace/i);
         const outsideContents = await fs.readFile(outside, "utf8");
         expect(outsideContents).toBe("initial\n");
       } finally {
@@ -297,7 +301,7 @@ describe("applyPatch", () => {
 
       try {
         await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(
-          /Symlink escapes sandbox root/,
+          /Symlink escapes workspace root/,
         );
         const stillThere = await fs.readFile(outsideFile, "utf8");
         expect(stillThere).toBe("victim\n");
@@ -391,7 +395,7 @@ describe("applyPatch", () => {
             timing: "before-realpath",
             run: async () => {
               await expect(applyPatch(patch, { cwd: dir })).rejects.toThrow(
-                /symlink escapes sandbox root|under root|not found/i,
+                /symlink escapes workspace root|under root|not found/i,
               );
             },
           });
@@ -441,46 +445,4 @@ describe("applyPatch", () => {
       });
     },
   );
-
-  it("uses container paths when the sandbox bridge has no local host path", async () => {
-    const files = new Map<string, string>([["/sandbox/source.txt", "before\n"]]);
-    const bridge = {
-      resolvePath: ({ filePath }: { filePath: string }) => ({
-        relativePath: filePath,
-        containerPath: `/sandbox/${filePath}`,
-      }),
-      readFile: vi.fn(async ({ filePath }: { filePath: string }) =>
-        Buffer.from(files.get(filePath) ?? "", "utf8"),
-      ),
-      writeFile: vi.fn(async ({ filePath, data }: { filePath: string; data: Buffer | string }) => {
-        files.set(filePath, Buffer.isBuffer(data) ? data.toString("utf8") : data);
-      }),
-      remove: vi.fn(async ({ filePath }: { filePath: string }) => {
-        files.delete(filePath);
-      }),
-      mkdirp: vi.fn(async () => {}),
-    };
-
-    const patch = `*** Begin Patch
-*** Update File: source.txt
-@@
--before
-+after
-*** End Patch`;
-
-    const result = await applyPatch(patch, {
-      cwd: "/local/workspace",
-      sandbox: {
-        root: "/local/workspace",
-        bridge: bridge as never,
-      },
-    });
-
-    expect(files.get("/sandbox/source.txt")).toBe("after\n");
-    expect(result.summary.modified).toEqual(["source.txt"]);
-    expect(bridge.readFile).toHaveBeenCalledWith({
-      filePath: "/sandbox/source.txt",
-      cwd: "/local/workspace",
-    });
-  });
 });

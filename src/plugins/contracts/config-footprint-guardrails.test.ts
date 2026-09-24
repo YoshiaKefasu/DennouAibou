@@ -64,7 +64,6 @@ describe("config footprint guardrails", () => {
         "talk.providers.*.voiceAliases",
         "talk.providers.*.modelId",
         "talk.providers.*.outputFormat",
-        "agents.defaults.sandbox.perSession",
         "hooks.internal.handlers",
         "channels.telegram.groupMentionsOnly",
         "channels.telegram.streamMode",

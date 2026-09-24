@@ -79,72 +79,6 @@ export async function listSpawnedSessionKeys(params: {
   }
 }
 
-export async function isRequesterSpawnedSessionVisible(params: {
-  requesterSessionKey: string;
-  targetSessionKey: string;
-  limit?: number;
-}): Promise<boolean> {
-  if (params.requesterSessionKey === params.targetSessionKey) {
-    return true;
-  }
-  try {
-    const resolved = await sessionsResolutionDeps.callGateway<{ key?: string }>({
-      method: "sessions.resolve",
-      params: {
-        key: params.targetSessionKey,
-        spawnedBy: params.requesterSessionKey,
-      },
-    });
-    if (typeof resolved?.key === "string" && resolved.key.trim() === params.targetSessionKey) {
-      return true;
-    }
-  } catch {
-    // Fall back to the spawned-session listing path below.
-  }
-  const keys = await listSpawnedSessionKeys({
-    requesterSessionKey: params.requesterSessionKey,
-    limit: params.limit,
-  });
-  return keys.has(params.targetSessionKey);
-}
-
-export function shouldVerifyRequesterSpawnedSessionVisibility(params: {
-  requesterSessionKey: string;
-  targetSessionKey: string;
-  restrictToSpawned: boolean;
-  resolvedViaSessionId: boolean;
-}): boolean {
-  return (
-    params.restrictToSpawned &&
-    !params.resolvedViaSessionId &&
-    params.requesterSessionKey !== params.targetSessionKey
-  );
-}
-
-export async function isResolvedSessionVisibleToRequester(params: {
-  requesterSessionKey: string;
-  targetSessionKey: string;
-  restrictToSpawned: boolean;
-  resolvedViaSessionId: boolean;
-  limit?: number;
-}): Promise<boolean> {
-  if (
-    !shouldVerifyRequesterSpawnedSessionVisibility({
-      requesterSessionKey: params.requesterSessionKey,
-      targetSessionKey: params.targetSessionKey,
-      restrictToSpawned: params.restrictToSpawned,
-      resolvedViaSessionId: params.resolvedViaSessionId,
-    })
-  ) {
-    return true;
-  }
-  return await isRequesterSpawnedSessionVisible({
-    requesterSessionKey: params.requesterSessionKey,
-    targetSessionKey: params.targetSessionKey,
-    limit: params.limit,
-  });
-}
-
 export { looksLikeSessionId };
 
 export function looksLikeSessionKey(value: string): boolean {
@@ -185,25 +119,11 @@ export type SessionReferenceResolution =
     }
   | { ok: false; status: "error" | "forbidden"; error: string };
 
-export type VisibleSessionReferenceResolution =
-  | {
-      ok: true;
-      key: string;
-      displayKey: string;
-    }
-  | {
-      ok: false;
-      status: "forbidden";
-      error: string;
-      displayKey: string;
-    };
-
 async function resolveSessionKeyFromSessionId(params: {
   sessionId: string;
   alias: string;
   mainKey: string;
   requesterInternalKey?: string;
-  restrictToSpawned: boolean;
 }): Promise<SessionReferenceResolution> {
   try {
     // Resolve via gateway so we respect store routing and visibility rules.
@@ -211,9 +131,8 @@ async function resolveSessionKeyFromSessionId(params: {
       method: "sessions.resolve",
       params: {
         sessionId: params.sessionId,
-        spawnedBy: params.restrictToSpawned ? params.requesterInternalKey : undefined,
-        includeGlobal: !params.restrictToSpawned,
-        includeUnknown: !params.restrictToSpawned,
+        includeGlobal: true,
+        includeUnknown: true,
       },
     });
     const key = typeof result?.key === "string" ? result.key.trim() : "";
@@ -233,13 +152,6 @@ async function resolveSessionKeyFromSessionId(params: {
       resolvedViaSessionId: true,
     };
   } catch (err) {
-    if (params.restrictToSpawned) {
-      return {
-        ok: false,
-        status: "forbidden",
-        error: `Session not visible from this sandboxed agent session: ${params.sessionId}`,
-      };
-    }
     const message = err instanceof Error ? err.message : String(err);
     return {
       ok: false,
@@ -256,7 +168,6 @@ async function resolveSessionKeyFromKey(params: {
   alias: string;
   mainKey: string;
   requesterInternalKey?: string;
-  restrictToSpawned: boolean;
 }): Promise<SessionReferenceResolution | null> {
   try {
     // Try key-based resolution first so non-standard keys keep working.
@@ -264,7 +175,6 @@ async function resolveSessionKeyFromKey(params: {
       method: "sessions.resolve",
       params: {
         key: params.key,
-        spawnedBy: params.restrictToSpawned ? params.requesterInternalKey : undefined,
       },
     });
     const key = typeof result?.key === "string" ? result.key.trim() : "";
@@ -291,16 +201,14 @@ async function tryResolveSessionKeyFromSessionId(params: {
   alias: string;
   mainKey: string;
   requesterInternalKey?: string;
-  restrictToSpawned: boolean;
 }): Promise<Extract<SessionReferenceResolution, { ok: true }> | null> {
   try {
     const result = await sessionsResolutionDeps.callGateway<{ key?: string }>({
       method: "sessions.resolve",
       params: {
         sessionId: params.sessionId,
-        spawnedBy: params.restrictToSpawned ? params.requesterInternalKey : undefined,
-        includeGlobal: !params.restrictToSpawned,
-        includeUnknown: !params.restrictToSpawned,
+        includeGlobal: true,
+        includeUnknown: true,
       },
     });
     const key = typeof result?.key === "string" ? result.key.trim() : "";
@@ -327,28 +235,23 @@ export async function resolveSessionReference(params: {
   alias: string;
   mainKey: string;
   requesterInternalKey?: string;
-  restrictToSpawned: boolean;
 }): Promise<SessionReferenceResolution> {
   const rawInput = params.sessionKey.trim();
   if (rawInput === "current") {
-    if (!params.restrictToSpawned) {
-      const resolvedByKey = await resolveSessionKeyFromKey({
-        key: rawInput,
-        alias: params.alias,
-        mainKey: params.mainKey,
-        requesterInternalKey: params.requesterInternalKey,
-        restrictToSpawned: false,
-      });
-      if (resolvedByKey) {
-        return resolvedByKey;
-      }
+    const resolvedByKey = await resolveSessionKeyFromKey({
+      key: rawInput,
+      alias: params.alias,
+      mainKey: params.mainKey,
+      requesterInternalKey: params.requesterInternalKey,
+    });
+    if (resolvedByKey) {
+      return resolvedByKey;
     }
     const resolvedBySessionId = await tryResolveSessionKeyFromSessionId({
       sessionId: rawInput,
       alias: params.alias,
       mainKey: params.mainKey,
       requesterInternalKey: params.requesterInternalKey,
-      restrictToSpawned: params.restrictToSpawned,
     });
     if (resolvedBySessionId) {
       return resolvedBySessionId;
@@ -363,7 +266,6 @@ export async function resolveSessionReference(params: {
       alias: params.alias,
       mainKey: params.mainKey,
       requesterInternalKey: params.requesterInternalKey,
-      restrictToSpawned: params.restrictToSpawned,
     });
     if (resolvedByKey) {
       return resolvedByKey;
@@ -373,7 +275,6 @@ export async function resolveSessionReference(params: {
       alias: params.alias,
       mainKey: params.mainKey,
       requesterInternalKey: params.requesterInternalKey,
-      restrictToSpawned: params.restrictToSpawned,
     });
   }
 
@@ -389,31 +290,6 @@ export async function resolveSessionReference(params: {
     mainKey: params.mainKey,
   });
   return { ok: true, key: resolvedKey, displayKey, resolvedViaSessionId: false };
-}
-
-export async function resolveVisibleSessionReference(params: {
-  resolvedSession: Extract<SessionReferenceResolution, { ok: true }>;
-  requesterSessionKey: string;
-  restrictToSpawned: boolean;
-  visibilitySessionKey: string;
-}): Promise<VisibleSessionReferenceResolution> {
-  const resolvedKey = params.resolvedSession.key;
-  const displayKey = params.resolvedSession.displayKey;
-  const visible = await isResolvedSessionVisibleToRequester({
-    requesterSessionKey: params.requesterSessionKey,
-    targetSessionKey: resolvedKey,
-    restrictToSpawned: params.restrictToSpawned,
-    resolvedViaSessionId: params.resolvedSession.resolvedViaSessionId,
-  });
-  if (!visible) {
-    return {
-      ok: false,
-      status: "forbidden",
-      error: `Session not visible from this sandboxed agent session: ${params.visibilitySessionKey}`,
-      displayKey,
-    };
-  }
-  return { ok: true, key: resolvedKey, displayKey };
 }
 
 export function normalizeOptionalKey(value?: string) {

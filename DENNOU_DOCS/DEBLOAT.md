@@ -1629,3 +1629,309 @@ KASOU 運用では画像・音楽・動画の生成系ツール（`image_generat
 4. `raw-chat-search` は Go 版 sidecar 削除済みだが TS 版拡張は残存 → **ユーザー裁定により使用中、触らない**
 
 **実装開始**: ユーザー指示「DEBLOAT は後で、今はドキュメントへ」により、本節の記録をもって計画確定。実施は次回キャンペーンで波1から順に進める。
+
+## 24. tasks（バックグラウンド作業の管理台帳）完全撤去（2026-09-23 時点作業）
+
+### 24.1 背景・動機
+
+§23.2 候補2 の実施波。単一 KASOU 運用ではバックグラウンドタスク台帳（`src/tasks/` + SQLite レジストリ）は不要というユーザー裁定（2026-09-21）に基づく。タスク台帳はサブエージェント実行・cron・CLI 実行を「受付票」として記録し、結果配送・`/status` の `Tasks:` 行・`session_status` の `📌 Tasks:` 行・`openclaw tasks` CLI・プラグイン `runtime.tasks` 面を常時支えていたが、単一 KASOU 運用では観測需要がなく、`tasks/runs.sqlite` の永続化・maintenance タイマー・イベントポンプ起床系統（Wave 3 の7系統目）を常時稼働させるコストだけが残る。
+
+ベース: branch `main` / HEAD `82c2c653ee`。sandbox / auth-profiles / exec-approvals / provider-usage の各バッチと同一ワークツリーで並行実施。
+
+### 24.2 削除対象と行数
+
+**66 ファイル / 14,487 行削除**（全て git 追跡ファイル。行数は `git diff --numstat` 実測）
+
+| 区分                   | 内容                                                                                                                                                                          | ファイル数     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 中核                   | `src/tasks/**`（task-registry* / task-flow-registry* / task-executor* / task-owner-access* / task-status\* / maintenance / audit / reconcile / store.sqlite など）            | 44（10,804行） |
+| スラッシュコマンド     | `src/auto-reply/reply/commands-tasks.ts` + `.test.ts`（`/tasks` ハンドラ）                                                                                                    | 2              |
+| CLI コマンド           | `src/commands/tasks.ts` + `.test.ts`（`openclaw tasks`）、`src/commands/flows.ts` + `.test.ts`（`tasks flow` 実装）                                                           | 4              |
+| セッション状態ツール系 | `src/agents/session-async-task-status.ts`、`media-generation-task-status-shared.ts`、`music-generation-task-status.ts`、`video-generation-task-status.ts` + `.test.ts`        | 5              |
+| プラグインランタイム   | `src/plugins/runtime/runtime-tasks.ts` + `.test.ts`、`runtime-taskflow.ts` + `.test.ts`、`task-domain-types.ts`（`runtime.tasks` / `runtime.taskFlow` 面）                    | 5              |
+| テスト用ランタイム     | `src/test-utils/task-registry-runtime.ts`                                                                                                                                     | 1              |
+| テスト設定             | `vitest.tasks.config.ts`（＋ `vitest.config.ts` / `vitest.shared.config.ts` / `scripts/test-projects.test-support.mjs` / `test/vitest-scoped-config.test.ts` からの参照除去） | 1              |
+| ドキュメント           | `docs/automation/tasks.md`、`docs/automation/taskflow.md`、`docs/cli/flows.md`、`docs/automation/clawflow.md`                                                                 | 4              |
+
+### 24.3 参照の除去（本番）
+
+| ファイル（編集）                                                                                                           | 変更内容                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/agents/subagent-registry-run-manager.ts`                                                                              | `registerSubagentRun` 内の `createRunningTaskRun`（サブエージェント受付票の作成）ブロック削除                                                                                                                                                                                                        |
+| `src/agents/subagent-registry-lifecycle.ts`                                                                                | `completeTaskRunByRunId` / `failTaskRunByRunId` / `setDetachedTaskDeliveryStatusByRunId` の import・`safeFinalizeSubagentTaskRun`・`safeSetSubagentTaskDeliveryStatus`・3箇所の配送状態更新呼び出しを削除（announce / cleanup / give-up のフロー本体は維持）                                         |
+| `src/gateway/server-methods/agent.ts`                                                                                      | ゲートウェイ agent run の `createRunningTaskRun` 追跡（`shouldTrackTask` ブロック）削除                                                                                                                                                                                                              |
+| `src/gateway/server.impl.ts`                                                                                               | `startTaskRegistryMaintenance()` / `stopTaskRegistryMaintenance` / `getInspectableTaskRegistrySummary().active`（再起動遅延チェック）を削除                                                                                                                                                          |
+| `src/gateway/server-reload-handlers.ts`                                                                                    | config reload 時の `activeTasks` カウント削除                                                                                                                                                                                                                                                        |
+| `src/gateway/server-close.ts`                                                                                              | shutdown ハンドラの `stopTaskRegistryMaintenance` パラメータと呼び出し削除                                                                                                                                                                                                                           |
+| `src/commands/status.summary.ts` / `status.scan.ts` / `status.scan.json-core.ts` / `status.types.ts` / `status.command.ts` | `StatusSummary.tasks` / `taskAudit` フィールドと maintenance モジュールの遅延 import、`openclaw status` の「Tasks」行・audit メンテナンスヒントを削除                                                                                                                                                |
+| `src/commands/doctor-workspace-status.ts`                                                                                  | `noteFlowRecoveryHints()`（TaskFlow 回復ヒント）と `tasks flow` コマンド案内を削除                                                                                                                                                                                                                   |
+| `src/auto-reply/reply/commands-handlers.runtime.ts`                                                                        | `handleTasksCommand` の dispatch 登録削除                                                                                                                                                                                                                                                            |
+| `src/auto-reply/commands-registry.shared.ts`                                                                               | `/tasks` のコマンド仕様（textAlias）削除                                                                                                                                                                                                                                                             |
+| `src/auto-reply/reply/subagents-utils.ts`                                                                                  | `sanitizeTaskStatusText` + ヘルパーを `src/tasks/task-status.ts` から**移設**（`/subagents` ラベル整形が継続使用するため）                                                                                                                                                                           |
+| `src/auto-reply/reply/commands-subagents/action-info.ts`                                                                   | `/subagents info` から台帳連携行（TaskId / TaskStatus / Progress / Task summary / Task error / Delivery）を削除。outcome サニタイザは移設先を利用                                                                                                                                                    |
+| `src/agents/tools/session-status-tool.ts`                                                                                  | `formatSessionTaskLine`（`📌 Tasks:` 行）・`taskLineOverride` / `skipDefaultTaskLookup` への渡しを削除                                                                                                                                                                                               |
+| `src/agents/pi-embedded-runner/run/attempt.prompt-helpers.ts`                                                              | 生成系 task-status ヘルパー2本の組み込み（active media task プロンプト注入）を削除                                                                                                                                                                                                                   |
+| `src/cron/service/ops.ts` / `timer.ts`                                                                                     | cron のタスク台帳連携（`tryCreate*CronTaskRun` / `tryFinish*CronTaskRun` / `taskRunId` 配線 / warn「cron: failed to create task ledger record」）を全削除。ジョブ実行・配信・永続化ロジックは無改変                                                                                                  |
+| `src/plugins/runtime/index.ts` / `types-core.ts` / `src/plugin-sdk/index.ts`                                               | プラグインランタイムの `tasks` / `taskFlow` フィールドと plugin-sdk の Task 型 re-export を削除（`pnpm plugin-sdk:api:gen` で baseline sha256 再生成）                                                                                                                                               |
+| `src/cli/program/register.status-health-sessions.ts`                                                                       | `openclaw tasks` コマンド一式（list / show / notify / cancel / audit / maintenance / flow list / flow show / flow cancel）を削除                                                                                                                                                                     |
+| `src/cli/program/command-registry.ts` / `core-command-descriptors.ts`                                                      | `tasks` コマンドディスクリプタ削除                                                                                                                                                                                                                                                                   |
+| `ui/src/ui/_shared/chat-commands.ts`                                                                                       | `/tasks` コマンドエントリ削除                                                                                                                                                                                                                                                                        |
+| `src/agents/tools/cron-tool.ts`                                                                                            | ツール description の「background task runs that appear in `openclaw tasks`」文言削除（cron 本体は無改変）                                                                                                                                                                                           |
+| `scripts/test-projects.test-support.mjs` / `vitest.config.ts` / `vitest.shared.config.ts`                                  | `vitest.tasks.config.ts` のルーティング削除                                                                                                                                                                                                                                                          |
+| docs14ファイル + `docs/docs.json`                                                                                          | `/automation/tasks`・`/automation/taskflow`・`/cli/flows`・`/tasks` の nav / redirect / 相互リンクを除去。`docs/automation/index.md` は Tasks / Task Flow 節・判定表行・Related リンクを整理し「Automation」に再題。`docs.json` の clawflow redirect（先が削除済み taskflow を指していたため）も削除 |
+
+### 24.4 設定スキーマの @deprecated 受容（KASOU 本番保護）
+
+- `src/config/zod-schema.ts` の root `OpenClawSchema` は **`.strict()`** で、未知の root キーがあると `loadConfig` が `INVALID_CONFIG` を throw して fail closed する（`src/config/io.ts` の検証経路を実測確認）。そこで root に **`tasks: z.unknown().optional()`（`@deprecated` JSDoc 付き・受容して無視）を追加**した。KASOU の `dennou-aibou.json` に `tasks` 系キーが残っていても gateway は起動する。
+- `src/config/types.openclaw.ts` に `tasks?: unknown`（`@deprecated`）を追加し public 型面と整合。
+- 現行スキーマには元々 task 系キーが存在しなかったため、「削除して strict エラー化」は起きない。本手当ては**残存キー受容の防波堤**（過去波の `contextPruning` 受容・`keepLastTools` @deprecated と同型）。
+- `pnpm config:docs:gen` 実行済み（`docs/.generated/config-baseline.sha256` 再生成）。
+- `tasks/runs.sqlite` への参照はリポジトリ全体で **0 件**（`runs.sqlite` grep 実測0）。既存ファイルが残っていても open するコードが存在しないため起動・停止への影響なし。
+
+### 24.5 イベントポンプ（7系統目 wake 消費者）の切り離し
+
+- wake **生産者**（`src/tasks/task-registry.ts` の `requestWakeNow()` と `contextKey: \`task:\*\``の`enqueueSystemEvent`）は中核削除とともに消滅。grep 実測: `contextKey: \`task:\``0件 / `reason: "task..."`0件。
+- **`src/infra/event-pump.ts` は1行も変更していない**（カーネル基盤維持）。ポンプ内の wake reason 分類（`cron:` / `exec-event` / `notifications-event` / `hook:` / `wake` / `manual`）にも `task` 分類は元から存在せず、他6系統は無傷。
+
+### 24.6 温存したもの・判断を保留したもの
+
+- **`src/auto-reply/reply/commands-status.ts` / `commands-status.test.ts`** — 別バッチ（C）所有のため**未編集**。`/status` の `Tasks:` 行削除は後続タスク。現状 tsgo のタスク起因エラーはこの2ファイルの4件のみで、バッチCの編集待ち。
+- `test/bun-tier-*.txt`（既知失敗台帳各種）— `bun-tier-hoisted-known-failing.txt` は Kuraudo 更新のため未編集。c3b / c4b / beyond250 等の台帳も同方針で触らず、`src/tasks/...` の記述が残るが無害（参照ではなく記録）。
+- `sanitizeTaskStatusText` — 台帳データではなく汎用テキストサニタイザだったため削除せず `subagents-utils.ts` へ移設。
+- `auto-reply/status.ts` の `taskLine` / `skipDefaultTaskLookup` フィールド — バッチCの `commands-status.ts` が参照するため残置（文字列のみで `src/tasks` への依存なし）。
+- `HEARTBEAT.md` の `tasks:` ブロック（due-only チェック）と `no-tasks-due` スキップ理由 — heartbeat 機能固有で台帳とは無関係 → **§23.3.9 の heartbeat 残骸波へ委譲**。
+- UI の生成翻訳（`ui/src/i18n/.i18n/*.tm.jsonl`）は生成物のため未手編集（実装は `chat-commands.ts` から削除済み）。
+- `DENNOU_DOCS/DEBLOAT.md` §20〜23 内の `src/tasks/...` 記述 — 過去波の記録なので書き換えない。
+
+### 24.7 検証ゲート結果
+
+| ゲート                                                                                                                                                                                                                                                            | 結果                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 残存参照 grep（`tasks/` import・`createRunningTaskRun`・`runs.sqlite`・`contextKey: task:`・`/tasks` textAlias・`vitest.tasks`・`openclaw tasks`・`automation/tasks` リンク・`TaskRegistrySummary`/`TaskAuditSummary`・`runtime.tasks`・event-pump 内 task 参照） | **全項目0件**（`src/tasks/` ディレクトリ消失込み。例外はバッチC所有の `commands-status.*` の4 import のみ）                                                                                                                                                                                                                                                                                                                                                                                          |
+| `node scripts/run-tsgo.mjs --noEmit`                                                                                                                                                                                                                              | 最終実行: **4エラー/2ファイル = すべてバッチC の `commands-status.*`**（`tasks/` の4 import。`/status` の Tasks 行削除で解消）。**自身の変更52ファイルとのエラー交差 = 0件**、tasks 起因エラーもバッチC分を除き **0件**                                                                                                                                                                                                                                                                              |
+| `oxfmt --check`（自身の変更52ファイル + DEBLOAT.md + 編集docs15ファイル）                                                                                                                                                                                         | **全件 pass**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `bun run build`                                                                                                                                                                                                                                                   | `canvas:a2ui`（prebuilt 不在＝環境要因）→ `OPENCLAW_A2UI_SKIP_MISSING=1` で通過 → tsdown は最終確認時点で **バッチCの `commands-status.ts` の tasks import 2件のみ**で停止（sandbox バッチの entry 問題は解消済み）。**tasks 起因のエラー0**（build 設定に tasks entry は元から不在。バッチCの `/status` Tasks 行削除で全解消）                                                                                                                                                                      |
+| cron 全体（`vitest.cron.config.ts`）                                                                                                                                                                                                                              | **69/73ファイル pass**。赤4 = `isolated-agent.model-formatting`（バッチC import 鎖でロード不能）+ `every-jobs-fire`(2) / `restart-catchup`(4) / `store-load-invalid-main-job`(1)（いずれも未改修ファイルで HEAD 由来の時間依存・既知型の赤。cron 実装への本タスクの diff は **タスク台帳のみの純削除で追加行0** を git diff で全確認）                                                                                                                                                               |
+| cron 作用域（編集した `ops.test.ts` / `timer.test.ts`）                                                                                                                                                                                                           | **PASS**（GroupA: cron2 + event-pump2 =4ファイル/36テスト全 pass）                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| イベントポンプ（`src/infra/event-pump.test.ts` / `system-events.test.ts`）                                                                                                                                                                                        | **PASS**（ポンプ本体は無改変・システムイベント経由の wake 経路も無傷）                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 作用域テスト（status / doctor / cli / gateway close / prompt-helpers / plugin runtime / lifecycle / scoped-config / test-projects / commands-registry / status.tools ほか）                                                                                       | pass: status3ファイル20テスト、doctor + status.tools、cli3ファイル25テスト、server-close + prompt-helpers5テスト、plugin-runtime14テスト、vitest-scoped-config51テスト、subagent-registry-lifecycle3テスト。**HEAD 由来の既存赤**: `commands-registry.test`2件（slack `agentstatus` / `acp` — slack チャンネルと acpx は過去波で削除済み・当 HEAD で実装不在を git grep 実測）、`test-projects.test`1件（`OPENCLAW_VITEST_INCLUDE_FILE` vs `DENNOU_VITEST_INCLUDE_FILE` キー不一致が HEAD から存在） |
+| バッチC待ちでロード不能（編集対象外）                                                                                                                                                                                                                             | `commands-status.ts` / `commands-status.test.ts` / `agent.test.ts` / `session-status.test.ts` / `subagent-registry.persistence.resume.test.ts`（いずれも `session-status-tool → commands-status → tasks/` の import 鎖。バッチCの `/status` Tasks 行削除で解消）                                                                                                                                                                                                                                     |
+| `pnpm config:docs:gen` / `plugin-sdk:api:gen`                                                                                                                                                                                                                     | 実行済み（`config-baseline.sha256` / `plugin-sdk-api-baseline.sha256` 再生成）                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 台帳 `test/bun-tier-*.txt`                                                                                                                                                                                                                                        | 未編集（`bun-tier-hoisted-known-failing.txt` は diff 0。c3b/c4b の M は sandbox バッチの作業）                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+### 24.8 変更規模
+
+- 削除: **66 ファイル / 14,487 行**
+- 修正: **52 ファイル**（うち `status.command.ts` / `status.scan.ts` / `server.impl.ts` 等の共有ファイルには並行バッチの変更も同居）
+- 生成物再生成: `docs/.generated/config-baseline.sha256`、`docs/.generated/plugin-sdk-api-baseline.sha256`
+- コミット: 未実施（git add / commit / push は本タスクの禁止事項。Kuraudo / コーディネータが並行バッチと合流させること）
+
+## 25. provider-usage（プロバイダ別 使用量・残クォータ表示）完全撤去（2026-09-24 時点作業・完了）
+
+### 25.1 目的・背景
+
+KASOU 運用ではプロバイダ別の使用量・残クォータ表示（`/status` の Usage 行・`status --usage`・`channels list` の usage・`models list --status` の usage サフィックス・WebUI の usage タブ）は未使用。provider の quota エンドポイントへ毎回 HTTP を投げる割に表示面だけで、KASOU の cli-router＋`.env` 固定キー運用と無関係。ユーザー裁定で完全撤去。
+
+### 25.2 削除したファイル（42 件 / 約5,300行）
+
+| 区分             | ファイル                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 本体             | `src/infra/provider-usage.ts` / `.types.ts` / `.auth.ts` / `.fetch.ts` / `.fetch.claude.ts` / `.fetch.gemini.ts` / `.fetch.minimax.ts` / `.fetch.zai.ts` / `.fetch.shared.ts` / `.format.ts` / `.load.ts` / `.shared.ts` / `.test-support.ts`（＋各 `.test.ts` 計13本）                                            |
+| plugin-sdk       | `src/plugin-sdk/provider-usage.ts`、package.json の `./plugin-sdk/provider-usage` export、`scripts/lib/plugin-sdk-entrypoints.json` の `provider-usage`                                                                                                                                                            |
+| テスト支援       | `src/test-utils/provider-usage-fetch.ts`、`test/helpers/plugins/provider-usage-fetch.ts`                                                                                                                                                                                                                           |
+| WebUI usage タブ | `app-render-usage-tab.ts` / `controllers/usage.ts`(+node.test) / `views/usage.ts` / `views/usage-metrics.ts` / `views/usage-query.ts` / `views/usage-render-details.ts`(+test) / `views/usage-render-overview.ts` / `views/usageTypes.ts` / `usage-helpers.ts`(+node.test) / `usage-types.ts` / `styles/usage.css` |
+| 共有（孤立化）   | `src/shared/usage-types.ts` / `usage-aggregates.ts`(+test) / `ui/_shared/usage-aggregates.ts`                                                                                                                                                                                                                      |
+
+### 25.3 変更したファイル（約40件）
+
+- CLI/status: `status.command.ts`・`status-json.ts`・`register.status-health-sessions.ts`・`routes.ts`・`channels-cli.ts`（`--usage`/`--no-usage` フラグ撤去）・`channels/list.ts`・`models/list.status-command.ts`
+- `/status`（チャット）: `auto-reply/reply/commands-status.ts`（usage 行のみ撤去・tasks 行は tasks バッチと別途調整）・`auto-reply/status.ts`（usageLine パラメータ撤去）
+- gateway: `server-methods/usage.ts`（`usage.status`・`sessions.usage*` ハンドラ撤去）・`method-scopes.ts`・`server-methods-list.ts`・`protocol/index.ts`・`protocol/schema/{types,sessions,protocol-schemas}.ts`
+- plugin フック: `plugins/types.ts`（`resolveUsageAuth`/`fetchUsageSnapshot`/関連型を撤去）・`plugins/provider-runtime.ts`・`plugin-sdk/{core,plugin-entry}.ts`・`extensions/google/gemini-cli-provider.ts`（フック・`plugin-sdk/provider-usage` import 撤去）
+- WebUI: `navigation.ts`（usage タブ撤去）・`app.ts`（38状態フィールド撤去）・`app-view-state.ts`・`app-settings.ts`・`app-render.ts`・`views/overview.ts`・`views/overview-cards.ts`（Cost カード撤去）・`types.ts`・`styles.css`・i18n 13 ロケール（`tabs.usage`・`usage: {}` セクション・`overview.cards.cost` 撤去）
+- テスト: `status-json.test.ts`・`status.test.ts`・`models/list.status.test.ts`・`channels.adds-...test.ts`・`commands-status.thinking-default.test.ts`・`reply.triggers.trigger-handling.test-harness.ts`（+cases ファイル整理）・`openclaw-tools.session-status.test.ts`・`plugins/provider-runtime.test.ts`・`provider-runtime-contract.ts`
+- docs: `cli/status.md`・`cli/index.md`・`cli/channels.md`・`cli/models.md`・`concepts/usage-tracking.md`（全面改稿）・`gateway/protocol.md`・`plugins/{sdk-migration,sdk-overview,architecture,sdk-provider-plugins}.md`・`concepts/model-providers.md`・`reference/{api-usage-costs,token-use}.md`・`platforms/mac/menu-bar.md`・`tools/slash-commands.md`
+
+### 25.4 残したもの・理由
+
+- `usage.cost` RPC + `infra/session-cost-usage.ts` + `src/shared/session-usage-timeseries-types.ts` — セッションのトークン/コスト集計（`/usage` スラッシュコマンド・`gateway usage-cost` CLI が利用）。provider-usage とは別系統。
+- WebUI Overview の他カード・`/usage off|tokens|full`・`/usage cost` — セッション usage。残す。
+- `extensions/google/oauth-token-shared.ts` の `parseGoogleUsageToken`（生産者消滅後も自身の単体テストのみで生存 — 次波で削除候補）。
+
+### 25.5 検証結果
+
+| ゲート                                                                                | 結果                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/run-tsgo.mjs --noEmit`（Phase A 終了時点）                              | **0 errors**                                                                                                                                                                                                                  |
+| `bun run ui:build`                                                                    | **pass**                                                                                                                                                                                                                      |
+| `status.test.ts` + `status-json.test.ts`                                              | 18/18 pass                                                                                                                                                                                                                    |
+| `models/list.status.test.ts` / `channels.adds-non-default-telegram-account.test.ts`   | 9/9・21/21 pass                                                                                                                                                                                                               |
+| `commands-status.test.ts` + `.thinking-default.test.ts` + `auto-reply/status.test.ts` | 5/5 + 48/48 pass（subagent-registry mock の `registerSubagentRun` を追加 — sandbox バッチの import グラフ変更への追随）                                                                                                       |
+| `plugins/provider-runtime.test.ts`                                                    | 12/14 pass（残2件は openai-codex catalog フィクスチャの既存ドリフト。削除対象は provider-usage の usage フックのみで、失敗位置（1021/1153行）は本バッチの変更ハンク外 — 別バッチ/先行波起因）                                 |
+| 残存参照                                                                              | `provider-usage` / `usage.status` / `--usage` / `fetchUsageSnapshot` / `resolveUsageAuth` の src/scripts/extensions/docs 参照 **0件**（`test/bun-tier-*.txt` 台帳は削除済みテストのパス記録が残る — 別タスク（§27.6）で更新） |
+| oxfmt                                                                                 | 実行済み（§25.5 の後続作業で実施。§28.6 の変更9ファイルは全件 pass）                                                                                                                                                          |
+
+## 26. auth-profiles（複数クレデンシャル管理）完全撤去（2026-09-24 時点作業・完了）
+
+### 26.1 目的・背景
+
+§23.2 候補4。KASOU は cli-router 1本＋`.env` 固定キーのみで `auth-profiles.json` は撤去済み（2026-09-04 頃）。優先順管理（order.ts）・使用量/クォータ追跡（usage.ts）・セッション単位上書き（session-override.ts）・doctor/repair を含む「プロバイダごとの複数クレデンシャル」管理を完全撤去。先行作業（api-key 解決チェーンが auth-profiles 無しで成立する確認）は本波で実施。
+
+### 26.2 削除済み（41 ファイル / 約7,000行）
+
+- `src/agents/auth-profiles/`（25 ファイル / 5,315行）— store/oauth/profiles/order/usage/session-override/doctor/repair/identity/paths/constants/policy/display/credential-state/state-observation/upsert-with-lock/types 一式
+- `src/agents/auth-profiles.ts`（バレル）・`auth-profiles.runtime.ts`・flattened テスト14本（store-cache/readonly-sync/cooldown/doctor/order系5本/runtime-snapshot/save 等）
+- `src/agents/model-auth.profiles.test.ts`（撤去機能専用テスト）
+- 共有孤立化ファイル（Phase A で）：`src/shared/usage-*`
+
+### 26.3 変更済み（コア経路。API キー解決は無傷）
+
+- `src/agents/model-auth.ts` — `resolveApiKeyForProvider` から profile 解決段（`resolveAuthProfileOrder` ループ・`resolveApiKeyForProfile`・`ensureAuthProfileStore`）を撤去。「config 直書き → env → models.json apiKey → synthetic local → fallback エラー」で従来どおり解決。`profileId`/`preferredProfile`/`lockedProfile`/`agentDir` は呼び出し側互換のため `@deprecated` として受理（無視）。`resolveModelAuthMode`・`hasAvailableAuthForProvider`・`getApiKeyForModel` も同様に profile 段撤去。再 export（`ensureAuthProfileStore`/`resolveAuthProfileOrder`）を削除。
+- `src/plugin-sdk/provider-auth.ts` — バレルから auth-profiles 由来 export（型・store 操作・`CODEX_CLI_PROFILE_ID`・`suggestOAuthProfileIdForLegacyDefault`）を撤去。`isProviderApiKeyConfigured` は env のみ判定に変更。
+- `src/plugins/provider-auth-helpers.ts` — `writeOAuthCredentials`（store 書き込み）と補助関数群を削除。`applyAuthProfileConfig`（config 側メタデータ）は温存。
+
+### 26.4 残務の処理結果（2026-09-24 後任作業・完了）
+
+前任が列挙した約200件の残務を実測で切り分けた結果、**本番参照は既に0件**だった。残存は以下のみで、いずれも無害と確定：
+
+- `src/agents/pi-auth-credentials.ts` — 死に3関数（`convertAuthProfileCredentialToPi` / `resolvePiCredentialMapFromStore` / `piCredentialsEqual`）を削除。参照元0件を実測確認。`PiCredential` / `PiCredentialMap` 型は `pi-model-discovery.ts` が使用中のため温存（env-backed credential shape として継続使用）。
+- テストの stale mock（`ensureAuthProfileStore` / `listProfilesForProvider` 等）— SUT側は既に参照しておらず、vitest の余分な mock キーとして無害のため残置。
+- `AuthProfileFailureReason` / `AuthProfileCredential` / `AuthProfileStore` 型参照 — 型のみの参照（`import type`）。`plugins/types.ts` は禁止編集ファイル（`src/config/` スキーマ担当と共有）のため、リネームは見送り。tsgo 0・ビルド通過に影響なし。
+- `model-fallback.run-embedded.e2e.test.ts` の `writeAuthStore` / `readUsageStats` — 削除済みJSONへの書き込み検証だが、e2eテスト自体がデフォルト除外（`*.e2e.test.ts`）のため実行されず無害。現役フォールバック機能の検証部分は維持。
+- `tsdown.config.ts:127` の `"agents/auth-profiles.runtime"` entry — 削除済みファイルを指して build が `UNRESOLVED_ENTRY` で停止していたため除去。これにより `bun run build` は次の段階（memory-host-sdk のテスト型エラー＝別バッチ所有）まで進行。
+- `profileId` リテラルの残存 — OAuth/MCP由来・provider hook signature の別物と切り分け済み。auth-profiles 残渣ではない。
+- `scripts/claude-auth-status.sh` — 削除済み `auth-profiles.json` パス（`OPENCLAW_AUTH` 変数・`check_openclaw_auth` の legacy フォールバック・表示ラベル）を参照。削除済みJSON用の legacy フォールバックとして抑制コメント付きで温存（§26撤去の残存参照として記録）。
+
+APIキー解決チェーンの実測：`src/agents/model-auth.ts` の `resolveApiKeyForProvider` は「config直書き → env → models.json apiKey → synthetic local → fallback エラー」の順で解決し、profile 解決段は存在しないことをコード読解で確認。`model-auth.test.ts`（25,743行・現役テスト）がこの経路を検証。
+
+### 26.5 完了の記録
+
+- Phase B（auth-profiles）は完了。Phase C（exec-approval）は §28 として実施・完了。
+- Phase A（provider-usage）は完了・検証済み（§25）。
+- `src/agents/model-auth.test.ts` の it 37→36 / expect 41→40 は auth-profiles 専用テスト1件削除に伴う**意図的な減少**（§26撤去の一環）。
+
+## 27. sandbox（Docker 分離実行環境）完全撤去（2026-09-24 時点作業）
+
+### 27.1 目的
+
+`agents.defaults.sandbox` / Docker ベースの分離実行（agent sandbox、exec host=sandbox、sandbox workspace / media / skills / browser）を完全撤去し、`exec` を host（gateway / node）実行に一本化する。設定キーは **`@deprecated` 受容（無視）** に変更し、既存の `dennou-aibou.json` に sandbox 系キーが残っていても gateway は起動できるようにする（§24.4 と同型の防波堤）。
+
+### 27.2 削除対象（124 ファイル / 19,097 行）
+
+| カテゴリ                   | 削除対象                                                                                                                                                | 数  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| sandbox 実装               | `src/agents/sandbox/**`（backend / docker / ssh / fs-bridge / workspace / manage / registry / browser / tool-policy / config-hash ほか）                | 69  |
+| sandbox 単体モジュール     | `src/agents/sandbox.ts` / `sandbox-paths.ts` / `sandbox-media-paths.ts` / `sandbox-tool-policy.ts` / `pi-embedded-runner/sandbox-info.ts` ほか          | 12  |
+| CLI / コマンド             | `src/cli/sandbox-cli.ts` / `src/commands/sandbox*.ts`（`openclaw sandbox`）                                                                             | 11  |
+| inbound media ステージング | `src/auto-reply/stage-sandbox-media*` / `reply/stage-sandbox-media*`（＋ テスト）                                                                       | 5   |
+| テスト / テストヘルパー    | sandbox 系テスト 10 + `test/helpers/sandbox-fixtures.ts` / agents/test-helpers 4                                                                        | 15  |
+| ビルド資材                 | `Dockerfile.sandbox*` ×3 / `scripts/sandbox-*.sh` ×4 / `.github/workflows/sandbox-common-smoke.yml`                                                     | 8   |
+| 設定                       | `src/config/types.sandbox.ts` / `config.sandbox-docker.test.ts` / `src/plugin-sdk/sandbox.ts`                                                           | 3   |
+| ドキュメント               | `docs/cli/sandbox.md` / `docs/gateway/sandboxing.md` / `docs/gateway/sandbox-vs-tool-policy-vs-elevated.md` / `docs/tools/multi-agent-sandbox-tools.md` | 4   |
+
+### 27.3 参照の除去（本番 / テスト / スクリプト）
+
+- 本番コード（前任完了分）: `bash-tools.exec*` / `exec-defaults` / `path-policy` / `pi-embedded-runner` / `system-prompt` / `agent-scope` / `web-fetch` / `web-search` / `media` ほかから sandbox runtime 分岐・sandboxInfo / sandboxed フラグ・apiKey ペイロードを全除去。`src/config/schema.help.ts` / `schema.labels.ts` の sandbox キー、`zod-schema` 系の sandbox 定義も除去・受容化。
+- 本任（残務）: **`scripts/docker/setup.sh` の sandbox ブロック除去（−178 行）** — `OPENCLAW_SANDBOX` / Dockerfile.sandbox ビルド / `docker-compose.sandbox.yml` 生成 / `agents.defaults.sandbox.*` 設定 / `run_runtime_cli`（base スコープ）を全削除。`OPENCLAW_DOCKER_SOCKET` / `DOCKER_GID` 連動も除去。
+- テスト残骸: `docker-setup.e2e.test.ts`（sandbox ケース 4 削除＋`DockerSetupSandbox` → `DockerSetupFixture` 改名）、`docker-build-cache.test.ts`（Dockerfile.sandbox\* 参照除去）、`dockerfile.test.ts`（DENNOU_SANDBOX 言及のテスト名修正）、`commands-system-prompt` / `directive-handling.model` / `directive-handling.downgrade-persist` / `attempt.spawn-workspace.test-support` / `compact.hooks.harness` / `sessions-list-tool`（削除済み sandbox.js / sandbox-info.js への vi.mock / vi.doMock / mock 配線除去）、`reply-media-paths.test.ts`（sandbox workspace マッピング 3 ケース削除 — 本番は sandbox 非対応化済みで 5 fail していた）、`plugin-sdk-subpaths.test.ts`（sandbox サブパス契約除去）、`config-footprint-guardrails.test.ts`（`agents.defaults.sandbox.perSession` 除去）、`schema.help.quality.test.ts`（`tools.sandbox.tools` 除去）、`local-roots.test.ts`（sandboxes ディレクトリ期待値除去）、`path-alias-guards` / `boundary-path`（"sandbox root" → "workspace root"）、`bash-tools.exec.path.test.ts`（sandbox host テスト 2 削除・改名）、`doctor-config-flow.test.ts`（legacy sandbox perSession 警告テスト削除 — 本番 doctor は sandbox 非対応化済み）、`audit-extra.sync.test.ts`（sandbox 前提ケース削除 — 本番は web ツール有効時のみ critical）、`bundled-plugin-naming.test.ts`（`-sandbox` サフィックス除去）、文言・データ差し替え（wizard / config-cli / reply-utils / agent-runner-payloads / reply.triggers / subagents.scope / skills×2 / pdf-tool / splitsdktools / workspace-only-false）。
+- スクリプト: `scripts/docs-i18n/localized_links_test.go` の fixture を削除済み sandboxing.md から実在ページ（`/providers/modelstudio`）に差し替え。
+
+### 27.4 設定スキーマの @deprecated 受容と再生成
+
+- `src/config/zod-schema.agent-runtime.ts`: `tools.sandbox` / `agents.defaults.sandbox` / `agents.list[].tools.sandbox` を **`DeprecatedSandboxSchema`（`z.unknown().optional()`、`@deprecated` JSDoc 付き）** に変更 — 受容して無視。
+- `pnpm config:schema:gen` で `schema.base.generated.ts` を**再生成**（手編集なし）。sandbox は `{}`（空スキーマ）になり **−1,728 行**。
+- `config:docs:gen` で `config-baseline.sha256` 再生成、`docs/gateway/configuration-reference.md` の sandbox 記述も整理（−322 行）。
+
+### 27.5 ドキュメントの掃除（本任）
+
+`docs/` 25 ファイル・約 60 行の sandbox 機能参照（exec host / elevated / exec-approvals / faq / gateway security / secrets / agent-workspace / agent / multi-agent / session-tool / system-prompt / cli security / cli index（`sandbox` コマンド一覧）/ groups / skills / ansible / pi / nodes / plugins architecture（`-sandbox` サフィックス）/ THREAT-MODEL-ATLAS / getting-started / context ほか）を修正。削除済みページへのリンク（`/gateway/sandboxing`・`/tools/multi-agent-sandbox-tools`）も除去。前任の編集ミス（行の欠落残骸・`See  for full details` 等）も併せて修正。
+
+### 27.6 温存したもの・判断を保留したもの
+
+- `src/infra/exec-approvals.ts` — 別バッチ（C）所有。`ExecHost` に `"sandbox"` が残る（exec-approvals 波で解消）。`exec-approval-command-display` / `exec-approval-reply` のテストの host:"sandbox" ケースも同様に保留。
+- `src/auto-reply/reply/commands-status.*` — 別バッチ（C）所有（未編集）。
+- Dockerfile の `OPENCLAW_INSTALL_DOCKER_CLI` build arg / `docker-compose.yml` の関連コメント — Docker CLI 導入機能として前任の判断で残置（sandbox 単語なし）。
+- `src/config/includes.test.ts` の sandbox 受容ケース — @deprecated 受容の回帰テストとして残置。
+- `plugin-sdk-subpaths.test.ts` の `expectSourceOmits("registerSandboxBackend")` — 「含まない」検証として残置。
+- `test/bun-tier-*.txt` 台帳 — 本波で削除済みテストのパス記録を更新（a1/a3/c3b/c4b。hoisted は Kuraudo 更新のため未編集）。
+- UI 生成翻訳（`ui/src/i18n/.i18n/*.tm.jsonl`）— 生成物のため未手編集。
+- 無関係の sandbox 単語 — APNs environment（push / nodes / push-apns）、macOS `sandbox-exec`（dispatch-wrapper / exec-wrapper 系）、`browser.noSandbox`（Chromium フラグ）、Google `sandbox.googleapis.com`、xAI code_execution（外部サービス）、macOS VM・外部記事（showcase）。
+- `docker-setup.e2e.test.ts` の DENNOU*\* ↔ OPENCLAW*\* 環境変数名の不一致（14 fail）・`audit.test.ts` の browser/CDP/Feishu/Slack 系 14 fail・`dockerfile.test.ts` の Dockerfile 構造 5 fail・`sessions-list-tool` の importActual 非互換・`reply-media-paths` の Windows パス 2 fail — いずれも HEAD 由来の既存赤（sandbox と無関係・環境依存）。
+
+### 27.7 検証ゲート結果
+
+| ゲート                                             | 結果                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/run-tsgo.mjs --noEmit`               | **sandbox 起因 0 件・本波の変更ファイル 0 件**。残エラーは並行バッチ（auth-profiles 削除中）由来のみ                                                                                                                                                                                                                                                                                                  |
+| 関連テスト（本波の変更対象・auth 非依存）          | **pass** — local-roots / path-alias-guards / boundary-path / schema.help.quality / bundled-plugin-naming / config-footprint-guardrails / plugin-sdk-subpaths / commands-system-prompt / audit-extra.sync / includes / wizard / docker-build-cache・dockerfile の当該ケース。auth-profiles ロード不能（他バッチ）で実行不可: bash-tools.exec.path / directive 系 / replies 系 / skills / pdf-tool ほか |
+| `bun run build`                                    | **auth-profiles バッチの entry 欠落（`src/agents/auth-profiles.runtime.ts`）で停止**（他バッチ由来）。sandbox / tasks entry はビルド設定に残存 0                                                                                                                                                                                                                                                      |
+| `oxfmt --check`（本波の変更ファイル 30）           | **全件 pass**                                                                                                                                                                                                                                                                                                                                                                                         |
+| `config:schema:gen` / `config:docs:gen`（--write） | 再生成完了・冪等確認済み                                                                                                                                                                                                                                                                                                                                                                              |
+
+### 27.8 変更規模
+
+- 削除: **124 ファイル / 19,097 行**（前任分）＋ `scripts/docker/setup.sh` **−178 行**・`schema.base.generated.ts` **−1,728 行**（本任）
+- 修正: テスト約 35 ファイル・docs 25 ファイル・scripts 2 ファイル（本任）＋ 前任の本番参照除去・テスト修正分
+- 生成物再生成: `schema.base.generated.ts` / `config-baseline.sha256` / `configuration-reference.md`
+- コミット: 未実施（git add / commit / push は本タスクの禁止事項。Kuraudo / コーディネータが並行バッチと合流させること）
+
+### 27.9 セキュリティポスチャ変化（small-model 監査の緩和・レビュー指摘対応）
+
+- `src/security/audit-extra.sync.ts` の small-model 監査（`models.small_params`）の safe 判定が「**web tool オフのみ**」に緩和された（HEAD は `sandbox=all && web off` が safe 条件）。sandbox 撤去により `sandbox=all` を要求できなくなったため、`exposed.length === 0`（web_search / web_fetch / browser のいずれも有効でない）だけで safe となる。
+- 影響: **web-off + small model（<=300B params）構成は `critical` → `info`** に変わる。タイトルも `"Small models require sandboxing and web tools disabled"` → `"Small models require web tools disabled"`、remediation の `agents.defaults.sandbox.mode="all"` 指示も除去済み。
+- 同様に露出マトリクス（`collectRiskyToolExposureContexts` / `collectExposureMatrixFindings` / `collectLikelyMultiUserSetupFindings`）の `sandbox=...` 表示・`sandbox=all` 前提のガードも除去され、`runtimeUnguarded = runtimeTools.length > 0`（sandbox 状態を問わない）に変更された。open グループで exec / process 系が有効な構成は sandbox の有無にかかわらず risky として報告される。
+
+## 28. exec-approval（exec 承認キュー・/approve）フル許可化（2026-09-24 時点作業・完了）
+
+### 28.1 目的・背景
+
+前任報告では「Phase C（exec-approval）は未着手」だったが、実測の結果、exec-approval は削除済みではなく**現役サブシステム**だった（`src/infra/exec-approvals*.ts` 26ファイル・約12,000行・接続150超）。ファイル削除禁止の制約下では26ファイルの物理削除は不可のため、**承認判定の単一真実源を変更してフル許可化**する最小実装を選択。承認キュー・`/approve`・gateway RPC の器は残るが、承認要求は発生しなくなる（自然休眠）。
+
+### 28.2 変更内容（本番3ファイル）
+
+| ファイル                      | 変更                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/infra/exec-approvals.ts` | `requiresExecApproval()` を常に `false` を返すよう変更（パラメータは呼び出し互換のため維持）。3ゲート（gateway/node/system-run）全てが承認を要求しなくなる。`ExecHost` から `"sandbox"` を除去（`normalizeExecHost` も gateway/node のみ受理）。 |
+| `src/agents/exec-defaults.ts` | デフォルト `security` を `"deny"` → `"full"` に変更（明示設定は尊重・未設定時のみ）。fail-closed デフォルトでは承認なしで拒否されるため、フル許可にはこの変更が必須。                                                                            |
+| `tsdown.config.ts`            | `"agents/auth-profiles.runtime"` entry を除去（削除済みファイルを指して build が `UNRESOLVED_ENTRY` で停止していた。§26 の残務として対応）。                                                                                                     |
+
+### 28.3 テストの追従（6ファイル）
+
+- `src/infra/exec-approvals-policy.test.ts` — `requiresExecApproval` の期待値 `true` → `false`（2件）。
+- `src/infra/exec-approvals-allow-always.test.ts` — 同上（2件。allowlist評価自体の miss 検証は維持）。
+- `src/node-host/exec-policy.test.ts` — 「承認要求で拒否」2件を「許可」に書き換え。`security=deny` 明示設定の拒否テストは維持（pass）。
+- `src/node-host/invoke-system-run.test.ts` — `expectApprovalRequiredDenied` ヘルパーを `allowlist-miss` 期待に変更＋個別1件。allowlist明示設定時の拒否は `allowlist-miss` として継続検証。
+- `src/infra/exec-approval-command-display.test.ts` / `exec-approval-reply.test.ts` — `host: "sandbox"` → `"gateway"`（sandbox撤去で残った参照の整理。§27.6 の既知残骸を解消）。
+
+### 28.4 温存したもの・判断を保留したもの
+
+- **`/approve` コマンド**（`commands-approve.ts`）— exec と plugin の共有コマンドのため exec 側だけ外すのは危険。承認要求が発生しなくなれば自然休眠するため残置。
+- **gateway RPC**（`exec.approval.*` / `exec.approvals.*`）— 同上。受信側の器として残置。
+- **承認キュー・承認マネージャ・forwarder・reply・channel-runtime 等** — ファイル削除禁止のため残置。`requiresExecApproval=false` により到達不能（dead path）だが、tsgo 0・テスト pass に影響なし。将来の物理削除は別タスク。
+- **`security=deny` / `security=allowlist` 明示設定** — ユーザーが明示設定した場合は従来どおり拒否する（fail-closed の尊重）。デフォルトのみ `full` に変更。
+- **セッション整合性ガード・門番（`session-gatekeeper`）** — 別物として一切触っていない。
+- **`src/config/` スキーマ4ファイル** — 競合回避のため未編集。`cfg.auth` の `@deprecated` 受容は Kuraudo が後でまとめて適用（本報告の別項に変更案を記載）。
+
+### 28.5 KASOU保護
+
+- 明示的な `security` / `ask` 設定は従来どおり尊重される（デフォルトのみ変更）。
+- `session-gatekeeper`・`session-integrity-guard` とは独立した経路のため、本番セッション保護に影響なし。
+- `evaluateSystemRunPolicy` の `security=deny` 経路は温存（明示無効化は効く）。
+
+### 28.6 検証結果
+
+| ゲート                               | 結果                                                                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/run-tsgo.mjs --noEmit` | **0 errors**（維持）                                                                                                                                 |
+| 関連テスト                           | **pass** — exec-policy 13件・approvals-policy/allow-always 93件・invoke-system-run 114件・host-gateway/node/exec-defaults 11件                       |
+| 既存赤（本タスクと無関係）           | `exec-approvals-store.test.ts` 9件・`exec-approvals-config.test.ts` 1件（`.openclaw` vs `.dennou-aibou` パス不一致・HEAD由来。触っていないファイル） |
+| `bun run build`                      | auth-profiles entry 問題は解消。残りは memory-host-sdk のテスト型エラー（別バッチ所有・スコープ外）                                                  |
+| `bun run ui:build`                   | **pass**（2.44s）                                                                                                                                    |
+| `oxfmt --check`（変更9ファイル）     | **全件 pass**                                                                                                                                        |
+
+### 28.7 変更規模
+
+- 本番: 3ファイル（`exec-approvals.ts` / `exec-defaults.ts` / `tsdown.config.ts`）
+- テスト: 6ファイル（期待値更新のみ・新規テストなし）
+- 削除ファイル: 0（ファイル削除禁止のため。26ファイルの器は残置し、承認要求のみ停止）
+- コミット: 未実施（git add / commit / push は本タスクの禁止事項）

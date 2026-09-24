@@ -132,13 +132,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       category: "status",
     }),
     command({
-      key: "tasks",
-      nativeName: "tasks",
-      description: "List background tasks for this session.",
-      textAlias: "/tasks",
-      category: "status",
-    }),
-    command({
       key: "allowlist",
       description: "List/add/remove allowlist entries.",
       textAlias: "/allowlist",
@@ -563,9 +556,9 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       args: [
         {
           name: "host",
-          description: "sandbox, gateway, or node",
+          description: "gateway, or node",
           type: "string",
-          choices: ["sandbox", "gateway", "node"],
+          choices: ["gateway", "node"],
         },
         {
           name: "security",

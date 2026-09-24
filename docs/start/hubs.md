@@ -94,7 +94,6 @@ Use these hubs to discover every page, including deep dives and reference docs t
 - [Heartbeat](/gateway/heartbeat)
 - [Doctor](/gateway/doctor)
 - [Logging](/gateway/logging)
-- [Sandboxing](/gateway/sandboxing)
 - [Dashboard](/web/dashboard)
 - [Control UI](/web/control-ui)
 - [Remote access](/gateway/remote)

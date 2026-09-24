@@ -223,17 +223,6 @@ describe("test-projects args", () => {
     ]);
   });
 
-  it("routes tasks targets to the tasks config", () => {
-    expect(buildVitestRunPlans(["src/tasks/task-registry.test.ts"])).toEqual([
-      {
-        config: "vitest.tasks.config.ts",
-        forwardedArgs: [],
-        includePatterns: ["src/tasks/task-registry.test.ts"],
-        watchMode: false,
-      },
-    ]);
-  });
-
   it("routes logging targets to the logging config", () => {
     expect(buildVitestRunPlans(["src/logging/load-levels.test.ts"])).toEqual([
       {

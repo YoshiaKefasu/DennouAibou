@@ -16,7 +16,6 @@ type Tab =
   | "channels"
   | "instances"
   | "sessions"
-  | "usage"
   | "cron"
   | "skills"
   | "nodes"

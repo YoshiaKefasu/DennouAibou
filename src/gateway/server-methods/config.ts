@@ -288,7 +288,6 @@ async function ensureResolvableSecretRefsOrRespond(params: {
   try {
     await prepareSecretsRuntimeSnapshot({
       config: params.config,
-      includeAuthStoreRefs: false,
     });
     return true;
   } catch (error) {

@@ -1,6 +1,6 @@
 import { defineProject } from "vitest/config";
 import { loadPatternListFromEnv, narrowIncludePatternsForCli } from "./vitest.pattern-file.ts";
-import { resolveVitestIsolation } from "./vitest.scoped-config.ts";
+import { resolveScopedGroupOrder, resolveVitestIsolation } from "./vitest.scoped-config.ts";
 import { sharedVitestConfig } from "./vitest.shared.config.ts";
 import { boundaryTestFiles } from "./vitest.unit-paths.mjs";
 
@@ -28,6 +28,9 @@ export function createBoundaryVitestConfig(
       // Boundary workers still need the shared isolated HOME/bootstrap. Only
       // per-file module isolation is disabled here.
       setupFiles: sharedVitestConfig.test.setupFiles,
+      sequence: {
+        groupOrder: resolveScopedGroupOrder("boundary"),
+      },
     },
   });
 }

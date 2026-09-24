@@ -36,7 +36,6 @@ const ALLOWED_PACKAGE_SUFFIXES = [
   "-provider",
   "-plugin",
   "-speech",
-  "-sandbox",
   "-media-understanding",
 ] as const;
 

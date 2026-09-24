@@ -3,15 +3,10 @@ import path from "node:path";
 import { listAgentIds, resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveUserPath } from "../utils.js";
-import { listAuthProfileStorePaths as listAuthProfileStorePathsFromAuthStorePaths } from "./auth-store-paths.js";
 import { parseEnvValue } from "./shared.js";
 
 export function parseEnvAssignmentValue(raw: string): string {
   return parseEnvValue(raw);
-}
-
-export function listAuthProfileStorePaths(config: OpenClawConfig, stateDir: string): string[] {
-  return listAuthProfileStorePathsFromAuthStorePaths(config, stateDir);
 }
 
 export function listLegacyAuthJsonPaths(stateDir: string): string[] {

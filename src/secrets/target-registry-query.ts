@@ -18,9 +18,6 @@ const COMPILED_SECRET_TARGET_REGISTRY = SECRET_TARGET_REGISTRY.map(compileTarget
 const DENNOU_COMPILED_SECRET_TARGETS = COMPILED_SECRET_TARGET_REGISTRY.filter(
   (entry) => entry.configFile === "dennou-aibou.json",
 );
-const AUTH_PROFILES_COMPILED_SECRET_TARGETS = COMPILED_SECRET_TARGET_REGISTRY.filter(
-  (entry) => entry.configFile === "auth-profiles.json",
-);
 
 function buildTargetTypeIndex(): Map<string, CompiledTargetRegistryEntry[]> {
   const byType = new Map<string, CompiledTargetRegistryEntry[]>();
@@ -58,21 +55,6 @@ function buildConfigTargetIdIndex(): Map<string, CompiledTargetRegistryEntry[]> 
 }
 
 const DENNOU_TARGETS_BY_ID = buildConfigTargetIdIndex();
-
-function buildAuthProfileTargetIdIndex(): Map<string, CompiledTargetRegistryEntry[]> {
-  const byId = new Map<string, CompiledTargetRegistryEntry[]>();
-  for (const entry of AUTH_PROFILES_COMPILED_SECRET_TARGETS) {
-    const existing = byId.get(entry.id);
-    if (existing) {
-      existing.push(entry);
-      continue;
-    }
-    byId.set(entry.id, [entry]);
-  }
-  return byId;
-}
-
-const AUTH_PROFILES_TARGETS_BY_ID = buildAuthProfileTargetIdIndex();
 
 function normalizeAllowedTargetIds(targetIds?: Iterable<string>): Set<string> | null {
   if (targetIds === undefined) {
@@ -188,7 +170,6 @@ export function listSecretTargetRegistryEntries(): SecretTargetRegistryEntry[] {
     ...(entry.accountIdPathSegmentIndex !== undefined
       ? { accountIdPathSegmentIndex: entry.accountIdPathSegmentIndex }
       : {}),
-    ...(entry.authProfileType ? { authProfileType: entry.authProfileType } : {}),
     ...(entry.trackProviderShadowing ? { trackProviderShadowing: true } : {}),
   }));
 }
@@ -276,31 +257,7 @@ export function discoverConfigSecretTargetsByIds(
   return discoverSecretTargetsFromEntries(config, discoveryEntries);
 }
 
-export function discoverAuthProfileSecretTargets(store: unknown): DiscoveredConfigSecretTarget[] {
-  return discoverAuthProfileSecretTargetsByIds(store);
-}
-
-export function discoverAuthProfileSecretTargetsByIds(
-  store: unknown,
-  targetIds?: Iterable<string>,
-): DiscoveredConfigSecretTarget[] {
-  const allowedTargetIds = normalizeAllowedTargetIds(targetIds);
-  const discoveryEntries = resolveDiscoveryEntries({
-    allowedTargetIds,
-    defaultEntries: AUTH_PROFILES_COMPILED_SECRET_TARGETS,
-    entriesById: AUTH_PROFILES_TARGETS_BY_ID,
-  });
-  return discoverSecretTargetsFromEntries(store, discoveryEntries);
-}
-
-export function listAuthProfileSecretTargetEntries(): SecretTargetRegistryEntry[] {
-  return COMPILED_SECRET_TARGET_REGISTRY.filter(
-    (entry) => entry.configFile === "auth-profiles.json" && entry.includeInAudit,
-  );
-}
-
 export type {
-  AuthProfileType,
   DiscoveredConfigSecretTarget,
   ResolvedPlanTarget,
   SecretTargetConfigFile,

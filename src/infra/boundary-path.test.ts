@@ -30,7 +30,7 @@ describe("resolveBoundaryPath", () => {
       const result = await resolveBoundaryPath({
         absolutePath: unresolved,
         rootPath: root,
-        boundaryLabel: "sandbox root",
+        boundaryLabel: "workspace root",
       });
 
       const targetReal = await fs.realpath(targetDir);
@@ -59,16 +59,16 @@ describe("resolveBoundaryPath", () => {
         resolveBoundaryPath({
           absolutePath: dangling,
           rootPath: root,
-          boundaryLabel: "sandbox root",
+          boundaryLabel: "workspace root",
         }),
-      ).rejects.toThrow(/Symlink escapes sandbox root/i);
+      ).rejects.toThrow(/Symlink escapes workspace root/i);
       expect(() =>
         resolveBoundaryPathSync({
           absolutePath: dangling,
           rootPath: root,
-          boundaryLabel: "sandbox root",
+          boundaryLabel: "workspace root",
         }),
-      ).toThrow(/Symlink escapes sandbox root/i);
+      ).toThrow(/Symlink escapes workspace root/i);
     });
   });
 
@@ -91,14 +91,14 @@ describe("resolveBoundaryPath", () => {
         resolveBoundaryPath({
           absolutePath: linkPath,
           rootPath: root,
-          boundaryLabel: "sandbox root",
+          boundaryLabel: "workspace root",
         }),
-      ).rejects.toThrow(/Symlink escapes sandbox root/i);
+      ).rejects.toThrow(/Symlink escapes workspace root/i);
 
       const allowed = await resolveBoundaryPath({
         absolutePath: linkPath,
         rootPath: root,
-        boundaryLabel: "sandbox root",
+        boundaryLabel: "workspace root",
         policy: { allowFinalSymlinkForUnlink: true },
       });
       const rootReal = await fs.realpath(root);
@@ -170,7 +170,7 @@ describe("resolveBoundaryPath", () => {
         const safeResolved = await resolveBoundaryPath({
           absolutePath: safeCandidate,
           rootPath: root,
-          boundaryLabel: "sandbox root",
+          boundaryLabel: "workspace root",
         });
         expect(isPathInside(safeResolved.rootCanonicalPath, safeResolved.canonicalPath)).toBe(true);
 
@@ -179,9 +179,9 @@ describe("resolveBoundaryPath", () => {
           resolveBoundaryPath({
             absolutePath: unsafeCandidate,
             rootPath: root,
-            boundaryLabel: "sandbox root",
+            boundaryLabel: "workspace root",
           }),
-        ).rejects.toThrow(/Symlink escapes sandbox root/i);
+        ).rejects.toThrow(/Symlink escapes workspace root/i);
       }
     });
   });

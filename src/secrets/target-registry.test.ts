@@ -74,11 +74,7 @@ describe("secret target registry", () => {
       end: '[//]: # "secretref-unsupported-list-end"',
     });
 
-    const supportedFromMatrix = new Set(
-      matrix.entries.map((entry) =>
-        entry.configFile === "auth-profiles.json" && entry.refPath ? entry.refPath : entry.path,
-      ),
-    );
+    const supportedFromMatrix = new Set(matrix.entries.map((entry) => entry.path));
     const unsupportedFromMatrix = new Set(matrix.excludedMutableOrRuntimeManaged);
 
     expect([...supportedFromDocs].toSorted()).toEqual([...supportedFromMatrix].toSorted());

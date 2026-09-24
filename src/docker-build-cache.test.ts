@@ -45,9 +45,6 @@ describe("docker build cache layout", () => {
   it("uses apt cache mounts in Dockerfiles that install system packages", async () => {
     for (const path of [
       "Dockerfile",
-      "Dockerfile.sandbox",
-      "Dockerfile.sandbox-browser",
-      "Dockerfile.sandbox-common",
       "scripts/docker/cleanup-smoke/Dockerfile",
       "scripts/docker/install-sh-smoke/Dockerfile",
       "scripts/docker/install-sh-e2e/Dockerfile",
@@ -63,19 +60,8 @@ describe("docker build cache layout", () => {
     }
   });
 
-  it("does not leave empty shell continuation lines in sandbox-common", async () => {
-    const dockerfile = await readRepoFile("Dockerfile.sandbox-common");
-    expect(dockerfile).not.toContain("apt-get install -y --no-install-recommends ${PACKAGES} \\");
-    expect(dockerfile).toContain(
-      'RUN if [ "${INSTALL_PNPM}" = "1" ]; then npm install -g pnpm; fi',
-    );
-  });
-
   it("does not leave blank lines after shell continuation markers", async () => {
     for (const path of [
-      "Dockerfile.sandbox",
-      "Dockerfile.sandbox-browser",
-      "Dockerfile.sandbox-common",
       "scripts/docker/cleanup-smoke/Dockerfile",
       "scripts/docker/install-sh-smoke/Dockerfile",
       "scripts/docker/install-sh-e2e/Dockerfile",

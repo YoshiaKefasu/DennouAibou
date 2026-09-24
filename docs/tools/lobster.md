@@ -10,8 +10,6 @@ read_when:
 
 Lobster is a workflow shell that lets DennouAibou run multi-step tool sequences as a single, deterministic operation with explicit approval checkpoints.
 
-Lobster is one authoring layer above detached background work. For flow orchestration above individual tasks, see [Task Flow](/automation/taskflow) (`openclaw tasks flow`). For the task activity ledger, see [`openclaw tasks`](/automation/tasks).
-
 ## Hook
 
 Your assistant can build the tools that manage itself. Ask for a workflow, and 30 minutes later you have a CLI plus pipelines that run as one call. Lobster is the missing piece: deterministic pipelines, explicit approvals, and resumable state.
@@ -31,7 +29,6 @@ Lobster is intentionally small. The goal is not "a new language," it's a predict
 - **Approve/resume is built in**: A normal program can prompt a human, but it can’t _pause and resume_ with a durable token without you inventing that runtime yourself.
 - **Determinism + auditability**: Pipelines are data, so they’re easy to log, diff, replay, and review.
 - **Constrained surface for AI**: A tiny grammar + JSON piping reduces “creative” code paths and makes validation realistic.
-- **Safety policy baked in**: Timeouts, output caps, sandbox checks, and allowlists are enforced by the runtime, not each script.
 - **Still programmable**: Each step can call any CLI or script. If you want JS/TS, generate `.lobster` files from code.
 
 ## How it works
@@ -321,7 +318,6 @@ OpenProse pairs well with Lobster: use `/prose` to orchestrate multi-agent prep,
 
 - **Local in-process only** — workflows execute inside the gateway process; no network calls from the plugin itself.
 - **No secrets** — Lobster doesn't manage OAuth; it calls DennouAibou tools that do.
-- **Sandbox-aware** — disabled when the tool context is sandboxed.
 - **Hardened** — timeouts and output caps enforced by the embedded runner.
 
 ## Troubleshooting

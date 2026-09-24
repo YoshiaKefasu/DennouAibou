@@ -438,18 +438,6 @@ API key auth, and dynamic model resolution.
         }),
         ```
       </Tab>
-      <Tab title="Usage and billing">
-        For providers that expose usage/billing data:
-
-        ```typescript
-        resolveUsageAuth: async (ctx) => {
-          const auth = await ctx.resolveOAuthToken();
-          return auth ? { token: auth.token } : null;
-        },
-        fetchUsageSnapshot: async (ctx) => {
-          return await fetchAcmeUsage(ctx.token, ctx.timeoutMs);
-        },
-        ```
       </Tab>
     </Tabs>
 
@@ -505,8 +493,6 @@ API key auth, and dynamic model resolution.
       | 34 | `resolveDefaultThinkingLevel` | Default `/think` policy |
       | 35 | `isModernModelRef` | Live/smoke model matching |
       | 36 | `prepareRuntimeAuth` | Token exchange before inference |
-      | 37 | `resolveUsageAuth` | Custom usage credential parsing |
-      | 38 | `fetchUsageSnapshot` | Custom usage endpoint |
       | 39 | `createEmbeddingProvider` | Provider-owned embedding adapter for memory/search |
       | 40 | `buildReplayPolicy` | Custom transcript replay/compaction policy |
       | 41 | `sanitizeReplayHistory` | Provider-specific replay rewrites after generic cleanup |

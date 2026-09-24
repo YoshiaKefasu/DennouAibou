@@ -11,21 +11,9 @@ import { loadWebMediaRaw } from "../../media/web-media.js";
 import { defaultRuntime } from "../../runtime.js";
 import { resolveUserPath } from "../../utils.js";
 import { resolveMediaToolLocalRoots } from "./media-tool-shared.js";
-import {
-  createSandboxBridgeReadFile,
-  resolveSandboxedBridgeMediaPath,
-  type AnyAgentTool,
-  type SandboxedBridgeMediaPathConfig,
-  type SandboxFsBridge,
-  type ToolFsPolicy,
-} from "./tool-runtime.helpers.js";
+import { type AnyAgentTool, type ToolFsPolicy } from "./tool-runtime.helpers.js";
 
 const DEFAULT_PROMPT = "Transcribe and describe the audio content.";
-
-type AudioSandboxConfig = {
-  root: string;
-  bridge: SandboxFsBridge;
-};
 
 /**
  * `audio` tool: actively listen to an audio file (path or URL).
@@ -42,7 +30,6 @@ export function createAudioTool(options?: {
   config?: OpenClawConfig;
   agentDir?: string;
   workspaceDir?: string;
-  sandbox?: AudioSandboxConfig;
   fsPolicy?: ToolFsPolicy;
   /** Provider overrides for the media-understanding audio engine. */
   providers?: Record<string, MediaUnderstandingProvider>;
@@ -81,8 +68,8 @@ export function createAudioTool(options?: {
           ? record.prompt.trim()
           : DEFAULT_PROMPT;
 
-      // `@`-prefixed references are the sandbox inbound convention used by the
-      // read/image/pdf tools.
+      // "@"-prefixed references mark a literal path (shared convention with the
+      // read/image/pdf tools).
       const pathRaw = rawPath.startsWith("@") ? rawPath.slice(1).trim() : rawPath;
       if (!pathRaw) {
         throw new Error("path required: provide a path or URL to an audio file");
@@ -104,24 +91,7 @@ export function createAudioTool(options?: {
         };
       }
 
-      const sandboxRoot = options?.sandbox?.root.trim() ?? "";
-      const sandboxConfig: SandboxedBridgeMediaPathConfig | null =
-        options?.sandbox && sandboxRoot
-          ? {
-              root: sandboxRoot,
-              bridge: options.sandbox.bridge,
-              workspaceOnly: options.fsPolicy?.workspaceOnly === true,
-            }
-          : null;
-
-      if (sandboxConfig && isHttpUrl) {
-        throw new Error("Sandboxed audio tool does not allow remote URLs.");
-      }
-
       const resolvedAudio = (() => {
-        if (sandboxConfig) {
-          return pathRaw;
-        }
         if (pathRaw.startsWith("~")) {
           return resolveUserPath(pathRaw);
         }
@@ -139,28 +109,19 @@ export function createAudioTool(options?: {
         return pathRaw;
       })();
 
-      const resolvedPathInfo: { resolved: string; rewrittenFrom?: string } = sandboxConfig
-        ? await resolveSandboxedBridgeMediaPath({
-            sandbox: sandboxConfig,
-            mediaPath: resolvedAudio,
-            inboundFallbackDir: "media/inbound",
-          })
-        : {
-            resolved: resolvedAudio.startsWith("file://")
-              ? resolvedAudio.slice("file://".length)
-              : resolvedAudio,
-          };
+      const resolvedPathInfo: { resolved: string; rewrittenFrom?: string } = {
+        resolved: resolvedAudio.startsWith("file://")
+          ? resolvedAudio.slice("file://".length)
+          : resolvedAudio,
+      };
       const resolvedPath = resolvedPathInfo.resolved;
 
       // The media-understanding attachment cache enforces the inbound path
-      // policy. Sandboxed paths were already validated through the bridge, so
-      // the sandbox root is the allowed root; otherwise reuse the shared
-      // local-roots resolution (which honors fsPolicy.workspaceOnly).
-      const localPathRoots = sandboxConfig
-        ? [sandboxRoot]
-        : resolveMediaToolLocalRoots(options?.workspaceDir, {
-            workspaceOnly: options?.fsPolicy?.workspaceOnly === true,
-          });
+      // policy via the shared local-roots resolution (which honors
+      // fsPolicy.workspaceOnly).
+      const localPathRoots = resolveMediaToolLocalRoots(options?.workspaceDir, {
+        workspaceOnly: options?.fsPolicy?.workspaceOnly === true,
+      });
 
       const ctx: MsgContext = isHttpUrl ? { MediaUrl: pathRaw } : { MediaPath: resolvedPath };
 
@@ -203,22 +164,16 @@ export function createAudioTool(options?: {
       // tool result content into the session JSONL as-is, so the audio lands
       // in the session as `{ type: "audio", data: <base64>, mimeType }` and
       // audio-capable models hear the clip directly instead of only reading
-      // the transcription. Mirrors the image tool's sandbox-aware loading.
+      // the transcription.
       // A failed/oversized load degrades gracefully to the text-only result.
       let audioBlock: { type: "audio"; data: string; mimeType: string } | null = null;
       let audioLoadError: string | undefined;
       try {
         const maxBytes = options?.config?.tools?.media?.audio?.maxBytes ?? MAX_AUDIO_BYTES;
-        const media = sandboxConfig
-          ? await loadWebMediaRaw(resolvedPath, {
-              maxBytes,
-              sandboxValidated: true,
-              readFile: createSandboxBridgeReadFile({ sandbox: sandboxConfig }),
-            })
-          : await loadWebMediaRaw(resolvedPath, {
-              maxBytes,
-              localRoots: localPathRoots,
-            });
+        const media = await loadWebMediaRaw(resolvedPath, {
+          maxBytes,
+          localRoots: localPathRoots,
+        });
         const mimeType = resolveNativeAudioMimeType({
           path: resolvedPath,
           mimeType: media.contentType,

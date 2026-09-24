@@ -539,6 +539,60 @@ type ValidateConfigWithPluginsResult =
 
 type ConfigValidationParams = { env?: NodeJS.ProcessEnv; deps?: ConfigValidationDeps };
 
+/**
+ * Warn when a legacy `tools.exec.host: "sandbox"` is present.
+ * The sandbox (isolated execution) feature was removed in the DEBLOAT wave:
+ * zod accepts the stale value so configs keep loading, runtime resolution
+ * falls back to host="auto" (effective gateway), and this warning tells the
+ * operator to switch to "auto"/"gateway"/"node". Silent remapping to auto is banned.
+ */
+export function collectDeprecatedExecHostSandboxWarnings(raw: unknown): ConfigValidationIssue[] {
+  const warnings: ConfigValidationIssue[] = [];
+  const checkExecHost = (value: unknown, path: string) => {
+    const host =
+      value && typeof value === "object" ? (value as Record<string, unknown>).host : undefined;
+    if (typeof host === "string" && host.trim().toLowerCase() === "sandbox") {
+      warnings.push({
+        path,
+        message:
+          'tools.exec.host "sandbox" was removed with the sandbox DEBLOAT. ' +
+          'Use "auto"/"gateway"/"node" instead; exec falls back to host=auto (gateway) until this is fixed.',
+      });
+    }
+  };
+  if (!raw || typeof raw !== "object") {
+    return warnings;
+  }
+  const root = raw as Record<string, unknown>;
+  const tools = root.tools;
+  if (tools && typeof tools === "object") {
+    checkExecHost((tools as Record<string, unknown>).exec, "tools.exec.host");
+  }
+  const agents = root.agents;
+  if (agents && typeof agents === "object") {
+    const agentsRecord = agents as Record<string, unknown>;
+    // Note: agents.defaults has no top-level `tools` key (AgentDefaultsSchema
+    // is .strict()), so agents.defaults.tools.exec.host is unreachable here.
+    // Only agents.list[].tools.exec.host is checked below.
+    const list = agentsRecord.list;
+    if (Array.isArray(list)) {
+      for (const [index, entry] of list.entries()) {
+        if (!entry || typeof entry !== "object") {
+          continue;
+        }
+        const entryTools = (entry as Record<string, unknown>).tools;
+        if (entryTools && typeof entryTools === "object") {
+          checkExecHost(
+            (entryTools as Record<string, unknown>).exec,
+            `agents.list.${index}.tools.exec.host`,
+          );
+        }
+      }
+    }
+  }
+  return warnings;
+}
+
 export function validateConfigObjectWithPlugins(
   raw: unknown,
   params?: ConfigValidationParams,
@@ -577,6 +631,7 @@ function validateConfigObjectWithPluginsBase(
   const config = base.config;
   const issues: ConfigValidationIssue[] = [];
   const warnings: ConfigValidationIssue[] = [];
+  warnings.push(...collectDeprecatedExecHostSandboxWarnings(raw));
   const hasExplicitPluginsConfig =
     isRecord(raw) && Object.prototype.hasOwnProperty.call(raw, "plugins");
 

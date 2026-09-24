@@ -1,7 +1,3 @@
-import {
-  loadAuthProfileStoreForSecretsRuntime,
-  type AuthProfileStore,
-} from "../agents/auth-profiles.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { collectDurableServiceEnvVars } from "../config/state-dir-dotenv.js";
 import type { OpenClawConfig } from "../config/types.js";
@@ -29,49 +25,9 @@ export type GatewayInstallPlan = {
   environment: Record<string, string | undefined>;
 };
 
-function collectAuthProfileServiceEnvVars(params: {
-  env: Record<string, string | undefined>;
-  authStore?: AuthProfileStore;
-  warn?: DaemonInstallWarnFn;
-}): Record<string, string> {
-  const authStore = params.authStore ?? loadAuthProfileStoreForSecretsRuntime();
-  const entries: Record<string, string> = {};
-
-  for (const credential of Object.values(authStore.profiles)) {
-    const ref =
-      credential.type === "api_key"
-        ? credential.keyRef
-        : credential.type === "token"
-          ? credential.tokenRef
-          : undefined;
-    if (!ref || ref.source !== "env") {
-      continue;
-    }
-    const key = normalizeEnvVarKey(ref.id, { portable: true });
-    if (!key) {
-      continue;
-    }
-    if (isDangerousHostEnvVarName(key) || isDangerousHostEnvOverrideVarName(key)) {
-      params.warn?.(
-        `Auth profile env ref "${key}" blocked by host-env security policy`,
-        "Auth profile",
-      );
-      continue;
-    }
-    const value = params.env[key]?.trim();
-    if (!value) {
-      continue;
-    }
-    entries[key] = value;
-  }
-
-  return entries;
-}
-
 function buildGatewayInstallEnvironment(params: {
   env: Record<string, string | undefined>;
   config?: OpenClawConfig;
-  authStore?: AuthProfileStore;
   warn?: DaemonInstallWarnFn;
   serviceEnvironment: Record<string, string | undefined>;
 }): Record<string, string | undefined> {
@@ -79,11 +35,6 @@ function buildGatewayInstallEnvironment(params: {
     ...collectDurableServiceEnvVars({
       env: params.env,
       config: params.config,
-    }),
-    ...collectAuthProfileServiceEnvVars({
-      env: params.env,
-      authStore: params.authStore,
-      warn: params.warn,
     }),
   };
   Object.assign(environment, params.serviceEnvironment);
@@ -99,7 +50,6 @@ export async function buildGatewayInstallPlan(params: {
   warn?: DaemonInstallWarnFn;
   /** Full config to extract env vars from (env vars + inline env keys). */
   config?: OpenClawConfig;
-  authStore?: AuthProfileStore;
 }): Promise<GatewayInstallPlan> {
   const { devMode, nodePath } = await resolveDaemonInstallRuntimeInputs({
     env: params.env,
@@ -143,7 +93,6 @@ export async function buildGatewayInstallPlan(params: {
     environment: buildGatewayInstallEnvironment({
       env: params.env,
       config: params.config,
-      authStore: params.authStore,
       warn: params.warn,
       serviceEnvironment,
     }),

@@ -280,22 +280,6 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
         },
         extraPaths: ["../team-docs", "/srv/shared-notes"],
       },
-      sandbox: {
-        mode: "non-main",
-        scope: "session", // preferred over legacy perSession: true
-        workspaceRoot: "~/.openclaw/sandboxes",
-        docker: {
-          image: "openclaw-sandbox:bookworm-slim",
-          workdir: "/workspace",
-          readOnlyRoot: true,
-          tmpfs: ["/tmp", "/var/tmp", "/run"],
-          network: "none",
-          user: "1000:1000",
-        },
-        browser: {
-          enabled: false,
-        },
-      },
     },
     list: [
       {

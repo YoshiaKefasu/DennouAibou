@@ -93,7 +93,6 @@ function createFetchTool(fetchOverrides: Record<string, unknown> = {}) {
         },
       },
     },
-    sandboxed: false,
     lookupFn: lookupMock as unknown as LookupFn,
   });
 }

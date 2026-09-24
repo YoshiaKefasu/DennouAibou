@@ -203,7 +203,7 @@ describe("web fetch runtime", () => {
     expect(resolved?.provider.id).toBe("firecrawl");
   });
 
-  it("keeps sandboxed web fetch on bundled providers even when runtime providers are preferred", () => {
+  it("keeps bundled-credential web fetch on bundled providers even when runtime providers are preferred", () => {
     const bundled = createProvider({
       pluginId: "firecrawl",
       id: "firecrawl",
@@ -223,14 +223,14 @@ describe("web fetch runtime", () => {
 
     const resolved = resolveWebFetchDefinition({
       config: {},
-      sandboxed: true,
+
       preferRuntimeProviders: true,
     });
 
     expect(resolved?.provider.id).toBe("firecrawl");
   });
 
-  it("keeps non-sandboxed web fetch on bundled providers even when runtime providers are preferred", () => {
+  it("keeps runtime-credential web fetch preference ordering stable", () => {
     const bundled = createProvider({
       pluginId: "firecrawl",
       id: "firecrawl",
@@ -250,7 +250,7 @@ describe("web fetch runtime", () => {
 
     const resolved = resolveWebFetchDefinition({
       config: {},
-      sandboxed: false,
+
       preferRuntimeProviders: true,
     });
 

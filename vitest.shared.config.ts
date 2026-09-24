@@ -262,7 +262,6 @@ export const sharedVitestConfig = {
       "vitest.extension-providers.config.ts",
       "vitest.logging.config.ts",
       "vitest.process.config.ts",
-      "vitest.tasks.config.ts",
       "vitest.wizard.config.ts",
     ],
     include: [
@@ -336,8 +335,6 @@ export const sharedVitestConfig = {
         "src/secrets/**",
         "src/agents/model-scan.ts",
         "src/agents/pi-embedded-runner.ts",
-        "src/agents/sandbox-paths.ts",
-        "src/agents/sandbox.ts",
         "src/agents/skills-install.ts",
         "src/agents/pi-tool-definition-adapter.ts",
         "src/agents/tools/discord-actions*.ts",

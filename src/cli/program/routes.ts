@@ -41,7 +41,6 @@ const routeStatus: RouteSpec = {
     const json = hasFlag(argv, "--json");
     const deep = hasFlag(argv, "--deep");
     const all = hasFlag(argv, "--all");
-    const usage = hasFlag(argv, "--usage");
     const verbose = getVerboseFlag(argv, { includeDebug: true });
     const timeoutMs = getPositiveIntFlagValue(argv, "--timeout");
     if (timeoutMs === null) {
@@ -49,11 +48,11 @@ const routeStatus: RouteSpec = {
     }
     if (json) {
       const { statusJsonCommand } = await import("../../commands/status-json.js");
-      await statusJsonCommand({ deep, all, usage, timeoutMs }, defaultRuntime);
+      await statusJsonCommand({ deep, all, timeoutMs }, defaultRuntime);
       return true;
     }
     const { statusCommand } = await import("../../commands/status.js");
-    await statusCommand({ json, deep, all, usage, timeoutMs, verbose }, defaultRuntime);
+    await statusCommand({ json, deep, all, timeoutMs, verbose }, defaultRuntime);
     return true;
   },
 };
@@ -239,52 +238,19 @@ const routeModelsList: RouteSpec = {
 const routeModelsStatus: RouteSpec = {
   match: (path) => path[0] === "models" && path[1] === "status",
   run: async (argv) => {
-    const probeProvider = getFlagValue(argv, "--probe-provider");
-    if (probeProvider === null) {
-      return false;
-    }
-    const probeTimeout = getFlagValue(argv, "--probe-timeout");
-    if (probeTimeout === null) {
-      return false;
-    }
-    const probeConcurrency = getFlagValue(argv, "--probe-concurrency");
-    if (probeConcurrency === null) {
-      return false;
-    }
-    const probeMaxTokens = getFlagValue(argv, "--probe-max-tokens");
-    if (probeMaxTokens === null) {
-      return false;
-    }
     const agent = getFlagValue(argv, "--agent");
     if (agent === null) {
       return false;
     }
-    const probeProfileValues = getFlagValues(argv, "--probe-profile");
-    if (probeProfileValues === null) {
-      return false;
-    }
-    const probeProfile =
-      probeProfileValues.length === 0
-        ? undefined
-        : probeProfileValues.length === 1
-          ? probeProfileValues[0]
-          : probeProfileValues;
     const json = hasFlag(argv, "--json");
     const plain = hasFlag(argv, "--plain");
     const check = hasFlag(argv, "--check");
-    const probe = hasFlag(argv, "--probe");
     const { modelsStatusCommand } = await import("../../commands/models.js");
     await modelsStatusCommand(
       {
         json,
         plain,
         check,
-        probe,
-        probeProvider,
-        probeProfile,
-        probeTimeout,
-        probeConcurrency,
-        probeMaxTokens,
         agent,
       },
       defaultRuntime,

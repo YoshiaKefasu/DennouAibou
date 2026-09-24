@@ -1,6 +1,5 @@
 // Shared video-generation implementation helpers for bundled and third-party plugins.
 
-export type { AuthProfileStore } from "../agents/auth-profiles.js";
 export type { FallbackAttempt } from "../agents/model-fallback.types.js";
 export type { VideoGenerationProviderPlugin } from "../plugins/types.js";
 export type {

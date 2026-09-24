@@ -11,25 +11,9 @@ describe("splitSdkTools", () => {
     createStubTool("browser"),
   ];
 
-  it("routes all tools to customTools when sandboxed", () => {
+  it("routes all tools to customTools", () => {
     const { builtInTools, customTools } = splitSdkTools({
       tools,
-      sandboxEnabled: true,
-    });
-    expect(builtInTools).toEqual([]);
-    expect(customTools.map((tool) => tool.name)).toEqual([
-      "read",
-      "exec",
-      "edit",
-      "write",
-      "browser",
-    ]);
-  });
-
-  it("routes all tools to customTools even when not sandboxed", () => {
-    const { builtInTools, customTools } = splitSdkTools({
-      tools,
-      sandboxEnabled: false,
     });
     expect(builtInTools).toEqual([]);
     expect(customTools.map((tool) => tool.name)).toEqual([

@@ -104,23 +104,6 @@ Use per-agent tool policy (v2026.1.6+) to enforce boundaries at the Gateway leve
 }
 ```
 
-### Sandbox isolation
-
-For high-security deployments, sandbox the delegate agent so it cannot access the host filesystem or network beyond its allowed tools:
-
-```json5
-{
-  id: "delegate",
-  workspace: "~/.openclaw/workspace-delegate",
-  sandbox: {
-    mode: "all",
-    scope: "agent",
-  },
-}
-```
-
-See [Sandboxing](/gateway/sandboxing) and [Multi-Agent Sandbox & Tools](/tools/multi-agent-sandbox-tools).
-
 ### Audit trail
 
 Configure logging before the delegate handles any real data:
@@ -298,7 +281,7 @@ instead of returning a raw transcript dump.
 The delegate model works for any small organization:
 
 1. **Create one delegate agent** per organization.
-2. **Harden first** — tool restrictions, sandbox, hard blocks, audit trail.
+2. **Harden first** — tool restrictions, hard blocks, audit trail.
 3. **Grant scoped permissions** via the identity provider (least privilege).
 4. **Define [standing orders](/automation/standing-orders)** for autonomous operations.
 5. **Schedule cron jobs** for recurring tasks.

@@ -418,16 +418,6 @@ export type SessionsPatchResult = SessionsPatchResultBase<{
   };
 };
 
-export type {
-  CostUsageDailyEntry,
-  CostUsageSummary,
-  SessionsUsageEntry,
-  SessionsUsageResult,
-  SessionsUsageTotals,
-  SessionUsageTimePoint,
-  SessionUsageTimeSeries,
-} from "./usage-types.ts";
-
 export type CronRunStatus = "ok" | "error" | "skipped";
 export type CronDeliveryStatus = "delivered" | "not-delivered" | "unknown" | "not-requested";
 export type CronJobsEnabledFilter = "all" | "enabled" | "disabled";

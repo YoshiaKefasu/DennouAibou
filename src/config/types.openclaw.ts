@@ -29,12 +29,21 @@ import type { SkillsConfig } from "./types.skills.js";
 import type { ToolsConfig } from "./types.tools.js";
 
 export type OpenClawConfig = {
+  /**
+   * @deprecated Background task ledger was removed (DEBLOAT §24).
+   * Accepted and ignored; nothing reads this key.
+   */
+  tasks?: unknown;
   meta?: {
     /** Last OpenClaw version that wrote this config. */
     lastTouchedVersion?: string;
     /** ISO timestamp when this config was last written. */
     lastTouchedAt?: string;
   };
+  /**
+   * @deprecated Auth profiles (multi-credential management) were removed
+   * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+   */
   auth?: AuthConfig;
   env?: {
     /** Opt-in: import missing secrets from a login shell environment (exec `$SHELL -l -c 'env -0'`). */

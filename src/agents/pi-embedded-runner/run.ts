@@ -8,17 +8,12 @@ import {
 import { emitAgentPlanEvent } from "../../infra/agent-events.js";
 import { sleepWithAbort } from "../../infra/backoff.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
+import type { AuthProfileFailureReason } from "../../plugins/types.js";
 import { enqueueCommandInLane } from "../../process/command-queue.js";
 import { sanitizeForLog } from "../../terminal/ansi.js";
 import { isMarkdownCapableMessageChannel } from "../../utils/message-channel.js";
 import { resolveOpenClawAgentDir } from "../agent-paths.js";
 import { hasConfiguredModelFallbacks } from "../agent-scope.js";
-import {
-  type AuthProfileFailureReason,
-  markAuthProfileFailure,
-  markAuthProfileGood,
-  markAuthProfileUsed,
-} from "../auth-profiles.js";
 import {
   resolveSessionKeyForRequest,
   resolveStoredSessionKeyForSessionId,
@@ -35,10 +30,7 @@ import { shouldSwitchToLiveModel, clearLiveModelSwitchPending } from "../live-mo
 import {
   applyAuthHeaderOverride,
   applyLocalNoAuthHeaderOverride,
-  ensureAuthProfileStore,
   type ResolvedProviderAuth,
-  resolveAuthProfileOrder,
-  shouldPreferExplicitConfigApiKeyAuth,
 } from "../model-auth.js";
 import { normalizeProviderId } from "../model-selection.js";
 import { ensureOpenClawModelsJson } from "../models-config.js";
@@ -313,36 +305,8 @@ export async function runEmbeddedPiAgent(
         fallbackRatio: 0.65,
       });
 
-      const authStore = ensureAuthProfileStore(agentDir, {
-        allowKeychainPrompt: false,
-      });
       const preferredProfileId = params.authProfileId?.trim();
-      let lockedProfileId = params.authProfileIdSource === "user" ? preferredProfileId : undefined;
-      if (lockedProfileId) {
-        const lockedProfile = authStore.profiles[lockedProfileId];
-        if (
-          !lockedProfile ||
-          normalizeProviderId(lockedProfile.provider) !== normalizeProviderId(provider)
-        ) {
-          lockedProfileId = undefined;
-        }
-      }
-      const profileOrder = shouldPreferExplicitConfigApiKeyAuth(params.config, provider)
-        ? []
-        : resolveAuthProfileOrder({
-            cfg: params.config,
-            store: authStore,
-            provider,
-            preferredProfile: preferredProfileId,
-          });
-      if (lockedProfileId && !profileOrder.includes(lockedProfileId)) {
-        throw new Error(`Auth profile "${lockedProfileId}" is not configured for ${provider}.`);
-      }
-      const profileCandidates = lockedProfileId
-        ? [lockedProfileId]
-        : profileOrder.length > 0
-          ? profileOrder
-          : [undefined];
+      const profileCandidates: Array<string | undefined> = [undefined];
       let profileIndex = 0;
 
       const initialThinkLevel = params.thinkLevel ?? "off";
@@ -362,10 +326,8 @@ export async function runEmbeddedPiAgent(
           config: params.config,
           agentDir,
           workspaceDir: resolvedWorkspace,
-          authStore,
           authStorage,
           profileCandidates,
-          lockedProfileId,
           initialThinkLevel,
           attemptedThinking,
           fallbackConfigured,
@@ -462,27 +424,6 @@ export async function runEmbeddedPiAgent(
             status,
           },
         );
-      };
-      const maybeMarkAuthProfileFailure = async (failure: {
-        profileId?: string;
-        reason?: AuthProfileFailureReason | null;
-        config?: RunEmbeddedPiAgentParams["config"];
-        agentDir?: RunEmbeddedPiAgentParams["agentDir"];
-        modelId?: string;
-      }) => {
-        const { profileId, reason } = failure;
-        if (!profileId || !reason || reason === "timeout") {
-          return;
-        }
-        await markAuthProfileFailure({
-          store: authStore,
-          profileId,
-          reason,
-          cfg: params.config,
-          agentDir,
-          runId: params.runId,
-          modelId: failure.modelId,
-        });
       };
       const resolveAuthProfileFailureReason = (
         failoverReason: FailoverReason | null,
@@ -675,7 +616,7 @@ export async function runEmbeddedPiAgent(
             ),
             resolvedApiKey: resolvedStreamApiKey,
             authProfileId: lastProfileId,
-            authProfileIdSource: lockedProfileId ? "user" : "auto",
+            authProfileIdSource: "auto",
             authStorage: rawAuthStorage,
             modelRegistry,
             agentId: workspaceResolution.agentId,
@@ -1208,13 +1149,6 @@ export async function runEmbeddedPiAgent(
             }
             const promptFailoverReason =
               promptErrorDetails.reason ?? classifyFailoverReason(errorText, { provider });
-            const promptProfileFailureReason =
-              resolveAuthProfileFailureReason(promptFailoverReason);
-            await maybeMarkAuthProfileFailure({
-              profileId: lastProfileId,
-              reason: promptProfileFailureReason,
-              modelId,
-            });
             const promptFailoverFailure =
               promptFailoverReason !== null || isFailoverErrorMessage(errorText, { provider });
             // Capture the failing profile before auth-profile rotation mutates `lastProfileId`.
@@ -1224,7 +1158,7 @@ export async function runEmbeddedPiAgent(
               runId: params.runId,
               rawError: errorText,
               failoverReason: promptFailoverReason,
-              profileFailureReason: promptProfileFailureReason,
+              profileFailureReason: null,
               provider,
               model: modelId,
               profileId: failedPromptProfileId,
@@ -1411,7 +1345,6 @@ export async function runEmbeddedPiAgent(
             previousRetryFailoverReason: lastRetryFailoverReason,
             logAssistantFailoverDecision,
             warn: (message) => log.warn(message),
-            maybeMarkAuthProfileFailure,
             maybeEscalateRateLimitProfileFallback,
             maybeBackoffBeforeOverloadFailover,
             advanceAuthProfile,
@@ -1548,15 +1481,6 @@ export async function runEmbeddedPiAgent(
                 `stopReason=${incompleteStopReason} payloads=0 — surfacing error to user`,
             );
 
-            // Mark the failing profile for cooldown so multi-profile setups
-            // rotate away from the exhausted credential on the next turn.
-            if (lastProfileId) {
-              await maybeMarkAuthProfileFailure({
-                profileId: lastProfileId,
-                reason: resolveAuthProfileFailureReason(assistantFailoverReason),
-              });
-            }
-
             return {
               payloads: [
                 {
@@ -1582,19 +1506,6 @@ export async function runEmbeddedPiAgent(
           log.debug(
             `embedded run done: runId=${params.runId} sessionId=${params.sessionId} durationMs=${Date.now() - started} aborted=${aborted}`,
           );
-          if (lastProfileId) {
-            await markAuthProfileGood({
-              store: authStore,
-              provider,
-              profileId: lastProfileId,
-              agentDir: params.agentDir,
-            });
-            await markAuthProfileUsed({
-              store: authStore,
-              profileId: lastProfileId,
-              agentDir: params.agentDir,
-            });
-          }
           return {
             payloads: payloads.length ? payloads : undefined,
             meta: {

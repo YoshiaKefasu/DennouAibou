@@ -33,7 +33,7 @@ describe("discoverConfigurablePlugins", () => {
   it("returns plugins with non-advanced uiHints", () => {
     const plugins = [
       makeManifestPlugin("openshell", {
-        mode: { label: "Mode", help: "Sandbox mode" },
+        mode: { label: "Mode", help: "Reply mode" },
         gateway: { label: "Gateway", help: "Gateway name" },
         gpu: { label: "GPU", advanced: true },
       }),

@@ -5,6 +5,9 @@
 set -euo pipefail
 
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
+# Note: auth-profiles.json was removed with the §26 DEBLOAT. OPENCLAW_AUTH below
+# is a legacy-only fallback path (checked only when `openclaw models status`
+# JSON is unavailable). Kept intentionally; do not reintroduce auth-profiles usage.
 OPENCLAW_AUTH="$HOME/.openclaw/agents/main/agent/auth-profiles.json"
 
 # Colors for terminal output
@@ -228,6 +231,8 @@ else
 fi
 
 echo ""
+# Note: legacy-only label — auth-profiles.json was removed (§26 DEBLOAT).
+# Shown only in the non-JSON fallback path; kept for operator familiarity.
 echo "OpenClaw Auth (~/.openclaw/agents/main/agent/auth-profiles.json):"
 if [ "$USE_JSON" -eq 1 ]; then
     best_profile=$(json_best_anthropic_profile)

@@ -11,7 +11,6 @@ describe("unsupported SecretRef surface policy metadata", () => {
       "hooks.token",
       "hooks.gmail.pushToken",
       "hooks.mappings[].sessionKey",
-      "auth-profiles.oauth.*",
       "channels.discord.threadBindings.webhookToken",
       "channels.discord.accounts.*.threadBindings.webhookToken",
       "channels.whatsapp.creds.json",

@@ -239,8 +239,6 @@ import {
 } from "../../agents/subagent-registry.js";
 import * as internalHooks from "../../hooks/internal-hooks.js";
 import { clearPluginCommands, registerPluginCommand } from "../../plugins/commands.js";
-import { failTaskRunByRunId } from "../../tasks/task-executor.js";
-import { createTaskRecord, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
 import { resetBashChatCommandForTests } from "./bash-command.js";
 import { handleCompactCommand } from "./commands-compact.js";
 import { extractMessageText } from "./commands-subagents.js";
@@ -578,7 +576,6 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.useRealTimers();
-  resetTaskRegistryForTests();
   setMinimalChannelPluginRegistryForTests();
   readConfigFileSnapshotMock.mockImplementation(async () => {
     const configPath = process.env.DENNOU_CONFIG_PATH;
@@ -2974,16 +2971,6 @@ describe("handleCommands subagents", () => {
       endedAt: now - 1_000,
       outcome: { status: "ok" },
     });
-    createTaskRecord({
-      runtime: "subagent",
-      requesterSessionKey: "agent:main:main",
-      childSessionKey: "agent:main:subagent:abc",
-      runId: "run-1",
-      task: "do thing",
-      status: "succeeded",
-      terminalSummary: "Completed the requested task",
-      deliveryStatus: "delivered",
-    });
     const cfg = {
       commands: { text: true },
       channels: { whatsapp: { allowFrom: ["*"] } },
@@ -2995,8 +2982,6 @@ describe("handleCommands subagents", () => {
     expect(result.reply?.text).toContain("Subagent info");
     expect(result.reply?.text).toContain("Run: run-1");
     expect(result.reply?.text).toContain("Status: done");
-    expect(result.reply?.text).toContain("TaskStatus: succeeded");
-    expect(result.reply?.text).toContain("Task summary: Completed the requested task");
   });
 
   it("sanitizes leaked task details in /subagents info", async () => {
@@ -3022,27 +3007,6 @@ describe("handleCommands subagents", () => {
         ].join("\n"),
       },
     });
-    createTaskRecord({
-      runtime: "subagent",
-      requesterSessionKey: "agent:main:main",
-      childSessionKey: "agent:main:subagent:abc",
-      runId: "run-1",
-      task: "Inspect the stuck run",
-      status: "running",
-      deliveryStatus: "delivered",
-    });
-    failTaskRunByRunId({
-      runId: "run-1",
-      endedAt: now - 1_000,
-      error: [
-        "OpenClaw runtime context (internal):",
-        "This context is runtime-generated, not user-authored. Keep internal details private.",
-        "",
-        "[Internal task completion event]",
-        "source: subagent",
-      ].join("\n"),
-      terminalSummary: "Needs manual follow-up.",
-    });
     const cfg = {
       commands: { text: true },
       channels: { whatsapp: { allowFrom: ["*"] } },
@@ -3054,7 +3018,6 @@ describe("handleCommands subagents", () => {
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Subagent info");
     expect(result.reply?.text).toContain("Outcome: error");
-    expect(result.reply?.text).toContain("Task summary: Needs manual follow-up.");
     expect(result.reply?.text).not.toContain("OpenClaw runtime context (internal):");
     expect(result.reply?.text).not.toContain("Internal task completion event");
   });

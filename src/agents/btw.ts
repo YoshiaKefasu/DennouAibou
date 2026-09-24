@@ -15,7 +15,6 @@ import {
   type SessionEntry,
 } from "../config/sessions.js";
 import { diagnosticLogger as diag } from "../logging/diagnostic.js";
-import { resolveSessionAuthProfileOverride } from "./auth-profiles/session-override.js";
 import { getApiKeyForModel, requireApiKey } from "./model-auth.js";
 import { ensureOpenClawModelsJson } from "./models-config.js";
 import { EmbeddedBlockChunker, type BlockReplyChunking } from "./pi-embedded-block-chunker.js";
@@ -126,11 +125,7 @@ async function resolveRuntimeModel(params: {
   sessionKey?: string;
   storePath?: string;
   isNewSession: boolean;
-}): Promise<{
-  model: Model<Api>;
-  authProfileId?: string;
-  authProfileIdSource?: "auto" | "user";
-}> {
+}): Promise<{ model: Model<Api> }> {
   await ensureOpenClawModelsJson(params.cfg, params.agentDir);
   const authStorage = discoverAuthStorage(params.agentDir);
   const modelRegistry = await discoverModels(authStorage, params.agentDir);
@@ -144,21 +139,7 @@ async function resolveRuntimeModel(params: {
     throw new Error(`Unknown model: ${params.provider}/${params.model}`);
   }
 
-  const authProfileId = await resolveSessionAuthProfileOverride({
-    cfg: params.cfg,
-    provider: params.provider,
-    agentDir: params.agentDir,
-    sessionEntry: params.sessionEntry,
-    sessionStore: params.sessionStore,
-    sessionKey: params.sessionKey,
-    storePath: params.storePath,
-    isNewSession: params.isNewSession,
-  });
-  return {
-    model,
-    authProfileId,
-    authProfileIdSource: params.sessionEntry?.authProfileOverrideSource,
-  };
+  return { model };
 }
 
 type RunBtwSideQuestionParams = {
@@ -238,7 +219,7 @@ export async function runBtwSideQuestion(
     throw new Error("No active session context.");
   }
 
-  const { model, authProfileId } = await resolveRuntimeModel({
+  const { model } = await resolveRuntimeModel({
     cfg: params.cfg,
     provider: params.provider,
     model: params.model,
@@ -252,7 +233,6 @@ export async function runBtwSideQuestion(
   const apiKeyInfo = await getApiKeyForModel({
     model,
     cfg: params.cfg,
-    profileId: authProfileId,
     agentDir: params.agentDir,
   });
   const apiKey = requireApiKey(apiKeyInfo, model.provider);

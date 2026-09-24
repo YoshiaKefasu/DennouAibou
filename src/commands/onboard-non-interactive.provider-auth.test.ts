@@ -7,8 +7,6 @@ import {
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
 } from "../agents/agent-scope.js";
-import { ensureAuthProfileStore, upsertAuthProfile } from "../agents/auth-profiles.js";
-import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles.js";
 import { resolveDefaultAgentWorkspaceDir } from "../agents/workspace.js";
 import { resetFileLockStateForTest } from "../infra/file-lock.js";
 import { clearPluginDiscoveryCache } from "../plugins/discovery.js";
@@ -234,17 +232,6 @@ function createProviderAuthChoiceDeps() {
         if (!resolved) {
           return null;
         }
-        if (resolved.source !== "profile") {
-          const credential = ctx.toApiKeyCredential({ provider: "zai", resolved });
-          if (!credential) {
-            return null;
-          }
-          upsertAuthProfile({
-            profileId: "zai:default",
-            credential: credential as never,
-            agentDir: ctx.agentDir,
-          });
-        }
         const detected = await detectZaiEndpoint({
           apiKey: resolved.key,
           ...(choiceId === "zai-coding-global"
@@ -291,21 +278,6 @@ function createProviderAuthChoiceDeps() {
       if (!resolved) {
         return null;
       }
-      if (resolved.source !== "profile") {
-        const credential = ctx.toApiKeyCredential({
-          provider: "cloudflare-ai-gateway",
-          resolved,
-          metadata: { accountId, gatewayId },
-        });
-        if (!credential) {
-          return null;
-        }
-        upsertAuthProfile({
-          profileId: "cloudflare-ai-gateway:default",
-          credential: credential as never,
-          agentDir: ctx.agentDir,
-        });
-      }
       const withProfile = providerApiKeyAuthRuntime.applyAuthProfileConfig(ctx.config as never, {
         profileId: "cloudflare-ai-gateway:default",
         provider: "cloudflare-ai-gateway",
@@ -331,15 +303,6 @@ function createProviderAuthChoiceDeps() {
             ctx.runtime.exit(1);
             return null;
           }
-          upsertAuthProfile({
-            profileId: (ctx.opts.tokenProfileId as string | undefined) ?? "anthropic:default",
-            credential: {
-              type: "token",
-              provider: "anthropic",
-              token,
-            } as never,
-            agentDir: ctx.agentDir,
-          });
           const withProfile = providerApiKeyAuthRuntime.applyAuthProfileConfig(
             ctx.config as never,
             {
@@ -878,27 +841,8 @@ async function readCustomLocalProviderApiKeyInput(
   return cfg.models?.providers?.[CUSTOM_LOCAL_PROVIDER_ID]?.apiKey;
 }
 
-async function expectApiKeyProfile(params: {
-  profileId: string;
-  provider: string;
-  key: string;
-  metadata?: Record<string, string>;
-}): Promise<void> {
-  const store = ensureAuthProfileStore();
-  const profile = store.profiles[params.profileId];
-  expect(profile?.type).toBe("api_key");
-  if (profile?.type === "api_key") {
-    expect(profile.provider).toBe(params.provider);
-    expect(profile.key).toBe(params.key);
-    if (params.metadata) {
-      expect(profile.metadata).toEqual(params.metadata);
-    }
-  }
-}
-
 describe("onboard (non-interactive): provider auth", () => {
   beforeEach(() => {
-    clearRuntimeAuthProfileStoreSnapshots();
     resetFileLockStateForTest();
     clearPluginDiscoveryCache();
     clearPluginManifestRegistryCache();
@@ -907,7 +851,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
   afterEach(() => {
     restoreTestGlobals();
-    clearRuntimeAuthProfileStoreSnapshots();
     resetFileLockStateForTest();
     clearPluginDiscoveryCache();
     clearPluginManifestRegistryCache();
@@ -922,11 +865,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
       expect(cfg.auth?.profiles?.["minimax:global"]?.provider).toBe("minimax");
       expect(cfg.auth?.profiles?.["minimax:global"]?.mode).toBe("api_key");
-      await expectApiKeyProfile({
-        profileId: "minimax:global",
-        provider: "minimax",
-        key: "sk-minimax-test",
-      });
     });
   });
 
@@ -939,11 +877,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
       expect(cfg.auth?.profiles?.["minimax:cn"]?.provider).toBe("minimax");
       expect(cfg.auth?.profiles?.["minimax:cn"]?.mode).toBe("api_key");
-      await expectApiKeyProfile({
-        profileId: "minimax:cn",
-        provider: "minimax",
-        key: "sk-minimax-test",
-      });
     });
   });
 
@@ -967,11 +900,6 @@ describe("onboard (non-interactive): provider auth", () => {
               modelId: "glm-5",
             },
           ]);
-          await expectApiKeyProfile({
-            profileId: "zai:default",
-            provider: "zai",
-            key: "zai-test-key",
-          });
         }),
     );
   });
@@ -1001,11 +929,6 @@ describe("onboard (non-interactive): provider auth", () => {
               modelId: "glm-4.7",
             },
           ]);
-          await expectApiKeyProfile({
-            profileId: "zai:default",
-            provider: "zai",
-            key: "zai-test-key",
-          });
         }),
     );
   });
@@ -1030,11 +953,6 @@ describe("onboard (non-interactive): provider auth", () => {
               modelId: "glm-5",
             },
           ]);
-          await expectApiKeyProfile({
-            profileId: "zai:default",
-            provider: "zai",
-            key: "zai-test-key",
-          });
         }),
     );
   });
@@ -1049,7 +967,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
       expect(cfg.auth?.profiles?.["xai:default"]?.provider).toBe("xai");
       expect(cfg.auth?.profiles?.["xai:default"]?.mode).toBe("api_key");
-      await expectApiKeyProfile({ profileId: "xai:default", provider: "xai", key: "xai-test-key" });
     });
   });
 
@@ -1061,11 +978,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
       expect(cfg.auth?.profiles?.["mistral:default"]?.provider).toBe("mistral");
       expect(cfg.auth?.profiles?.["mistral:default"]?.mode).toBe("api_key");
-      await expectApiKeyProfile({
-        profileId: "mistral:default",
-        provider: "mistral",
-        key: "mistral-test-key",
-      });
     });
   });
 
@@ -1102,11 +1014,6 @@ describe("onboard (non-interactive): provider auth", () => {
       expect(cfg.agents?.defaults?.model?.primary).toBe(
         "vercel-ai-gateway/anthropic/claude-opus-4.6",
       );
-      await expectApiKeyProfile({
-        profileId: "vercel-ai-gateway:default",
-        provider: "vercel-ai-gateway",
-        key: "gateway-test-key",
-      });
     });
   });
 
@@ -1126,11 +1033,6 @@ describe("onboard (non-interactive): provider auth", () => {
       expect(cfg.auth?.profiles?.["anthropic:default"]?.provider).toBe("anthropic");
       expect(cfg.auth?.profiles?.["anthropic:default"]?.mode).toBe("token");
       expect(cfg.agents?.defaults?.model?.primary).toBe("anthropic/claude-sonnet-4-6");
-      expect(ensureAuthProfileStore().profiles["anthropic:default"]).toMatchObject({
-        provider: "anthropic",
-        type: "token",
-        token: cleanToken,
-      });
     });
   });
 
@@ -1243,20 +1145,6 @@ describe("onboard (non-interactive): provider auth", () => {
             secretInputMode: "ref", // pragma: allowlist secret
             skipSkills: true,
           });
-
-          const store = ensureAuthProfileStore();
-          for (const profileId of ["opencode:default", "opencode-go:default"]) {
-            const profile = store.profiles[profileId];
-            expect(profile?.type).toBe("api_key");
-            if (profile?.type === "api_key") {
-              expect(profile.key).toBeUndefined();
-              expect(profile.keyRef).toEqual({
-                source: "env",
-                provider: "default",
-                id: "OPENCODE_ZEN_API_KEY",
-              });
-            }
-          }
         },
       );
     });
@@ -1284,11 +1172,6 @@ describe("onboard (non-interactive): provider auth", () => {
         ],
       });
       expect(cfg.agents?.defaults?.model?.primary).toBe("vllm/Qwen/Qwen3-8B");
-      await expectApiKeyProfile({
-        profileId: "vllm:default",
-        provider: "vllm",
-        key: "vllm-test-key",
-      });
     });
   });
 
@@ -1314,11 +1197,6 @@ describe("onboard (non-interactive): provider auth", () => {
         ],
       });
       expect(cfg.agents?.defaults?.model?.primary).toBe("sglang/Qwen/Qwen3-32B");
-      await expectApiKeyProfile({
-        profileId: "sglang:default",
-        provider: "sglang",
-        key: "sglang-test-key",
-      });
     });
   });
 
@@ -1331,11 +1209,6 @@ describe("onboard (non-interactive): provider auth", () => {
 
       expect(cfg.auth?.profiles?.["litellm:default"]?.provider).toBe("litellm");
       expect(cfg.auth?.profiles?.["litellm:default"]?.mode).toBe("api_key");
-      await expectApiKeyProfile({
-        profileId: "litellm:default",
-        provider: "litellm",
-        key: "litellm-test-key",
-      });
     });
   });
 
@@ -1369,12 +1242,6 @@ describe("onboard (non-interactive): provider auth", () => {
       );
       expect(cfg.auth?.profiles?.["cloudflare-ai-gateway:default"]?.mode).toBe("api_key");
       expect(cfg.agents?.defaults?.model?.primary).toBe("cloudflare-ai-gateway/claude-sonnet-4-5");
-      await expectApiKeyProfile({
-        profileId: "cloudflare-ai-gateway:default",
-        provider: "cloudflare-ai-gateway",
-        key: "cf-gateway-test-key",
-        metadata: { accountId: "cf-account-id", gatewayId: "cf-gateway-id" },
-      });
     });
   });
 
@@ -1387,11 +1254,6 @@ describe("onboard (non-interactive): provider auth", () => {
       expect(cfg.auth?.profiles?.["together:default"]?.provider).toBe("together");
       expect(cfg.auth?.profiles?.["together:default"]?.mode).toBe("api_key");
       expect(cfg.agents?.defaults?.model?.primary).toBe("together/moonshotai/Kimi-K2.5");
-      await expectApiKeyProfile({
-        profileId: "together:default",
-        provider: "together",
-        key: "together-test-key",
-      });
     });
   });
 
@@ -1404,11 +1266,6 @@ describe("onboard (non-interactive): provider auth", () => {
       expect(cfg.auth?.profiles?.["qianfan:default"]?.provider).toBe("qianfan");
       expect(cfg.auth?.profiles?.["qianfan:default"]?.mode).toBe("api_key");
       expect(cfg.agents?.defaults?.model?.primary).toBe("qianfan/deepseek-v3.2");
-      await expectApiKeyProfile({
-        profileId: "qianfan:default",
-        provider: "qianfan",
-        key: "qianfan-test-key",
-      });
     });
   });
 
@@ -1424,11 +1281,6 @@ describe("onboard (non-interactive): provider auth", () => {
         "https://coding-intl.dashscope.aliyuncs.com/v1",
       );
       expect(cfg.agents?.defaults?.model?.primary).toBe("qwen/qwen3.5-plus");
-      await expectApiKeyProfile({
-        profileId: "qwen:default",
-        provider: "qwen",
-        key: "modelstudio-test-key",
-      });
     });
   });
 
@@ -1530,24 +1382,6 @@ describe("onboard (non-interactive): provider auth", () => {
         expect(message).not.toContain(providedSecret);
       });
     });
-  });
-
-  it("uses matching profile fallback for non-interactive custom provider auth", async () => {
-    await withOnboardEnv(
-      "openclaw-onboard-custom-provider-profile-fallback-",
-      async ({ configPath, runtime }) => {
-        upsertAuthProfile({
-          profileId: `${CUSTOM_LOCAL_PROVIDER_ID}:default`,
-          credential: {
-            type: "api_key",
-            provider: CUSTOM_LOCAL_PROVIDER_ID,
-            key: "custom-profile-key",
-          },
-        });
-        await runCustomLocalNonInteractive(runtime);
-        expect(await readCustomLocalProviderApiKey(configPath)).toBe("custom-profile-key");
-      },
-    );
   });
 
   it("fails custom provider auth when compatibility is invalid", async () => {

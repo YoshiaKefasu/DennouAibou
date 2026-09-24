@@ -57,24 +57,12 @@ describe("safeEqualSecret", () => {
 });
 
 describe("collectSmallModelRiskFindings", () => {
-  const browserOffCfg = {
-    agents: { defaults: { model: { primary: "ollama/mistral-8b" } } },
-    browser: { enabled: false },
-    tools: { web: { fetch: { enabled: false } } },
-  } satisfies OpenClawConfig;
   const browserDefaultCfg = {
     agents: { defaults: { model: { primary: "ollama/mistral-8b" } } },
     tools: { web: { fetch: { enabled: false } } },
   } satisfies OpenClawConfig;
 
   it.each([
-    {
-      name: "small model without sandbox all stays critical even when browser/web tools are off",
-      cfg: browserOffCfg,
-      env: {},
-      detailIncludes: ["web=[off]", "No web/browser tools detected"],
-      detailExcludes: ["web=[browser]"],
-    },
     {
       name: "treats browser as enabled by default when browser config is omitted",
       cfg: browserDefaultCfg,

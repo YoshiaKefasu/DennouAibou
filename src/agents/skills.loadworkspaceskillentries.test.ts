@@ -235,7 +235,7 @@ describe("loadWorkspaceSkillEntries", () => {
       dir: path.join(workspaceDir, "skills", "remote-only"),
       name: "remote-only",
       description: "Needs a remote bin",
-      metadata: '{"openclaw":{"requires":{"anyBins":["missingbin","sandboxbin"]}}}',
+      metadata: '{"openclaw":{"requires":{"anyBins":["missingbin","toolbin"]}}}',
     });
 
     const entries = loadWorkspaceSkillEntries(workspaceDir, {
@@ -252,8 +252,8 @@ describe("loadWorkspaceSkillEntries", () => {
         remote: {
           platforms: ["linux"],
           hasBin: () => false,
-          hasAnyBin: (bins: string[]) => bins.includes("sandboxbin"),
-          note: "sandbox",
+          hasAnyBin: (bins: string[]) => bins.includes("toolbin"),
+          note: "remote",
         },
       },
       managedSkillsDir: path.join(workspaceDir, ".managed"),

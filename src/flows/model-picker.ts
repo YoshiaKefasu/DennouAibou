@@ -1,4 +1,3 @@
-import { ensureAuthProfileStore, listProfilesForProvider } from "../agents/auth-profiles.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { hasUsableCustomProviderApiKey, resolveEnvApiKey } from "../agents/model-auth.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
@@ -54,14 +53,7 @@ const loadResolvedModelPickerRuntime = createLazyRuntimeSurface(
   ({ modelPickerRuntime }) => modelPickerRuntime,
 );
 
-function hasAuthForProvider(
-  provider: string,
-  cfg: OpenClawConfig,
-  store: ReturnType<typeof ensureAuthProfileStore>,
-) {
-  if (listProfilesForProvider(store, provider).length > 0) {
-    return true;
-  }
+function hasAuthForProvider(provider: string, cfg: OpenClawConfig) {
   if (resolveEnvApiKey(provider)) {
     return true;
   }
@@ -75,16 +67,13 @@ function createProviderAuthChecker(params: {
   cfg: OpenClawConfig;
   agentDir?: string;
 }): (provider: string) => boolean {
-  const authStore = ensureAuthProfileStore(params.agentDir, {
-    allowKeychainPrompt: false,
-  });
   const authCache = new Map<string, boolean>();
   return (provider: string) => {
     const cached = authCache.get(provider);
     if (cached !== undefined) {
       return cached;
     }
-    const value = hasAuthForProvider(provider, params.cfg, authStore);
+    const value = hasAuthForProvider(provider, params.cfg);
     authCache.set(provider, value);
     return value;
   };

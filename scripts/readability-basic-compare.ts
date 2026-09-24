@@ -21,7 +21,6 @@ async function runFetch(url: string, readability: boolean) {
         web: { fetch: { readability, cacheTtlMinutes: 0, firecrawl: { enabled: false } } },
       },
     },
-    sandboxed: false,
   });
   if (!tool) {
     throw new Error("web_fetch tool is disabled");

@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveFastModeState } from "../../agents/fast-mode.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -454,16 +453,6 @@ export async function runPreparedReply(
     const aborted = abortEmbeddedPiRun(activeSessionId ?? preparedSessionState.sessionId);
     logVerbose(`Interrupting ${sessionLaneKey} (cleared ${cleared}, aborted=${aborted})`);
   }
-  let authProfileId = await resolveSessionAuthProfileOverride({
-    cfg,
-    provider,
-    agentDir,
-    sessionEntry: preparedSessionState.sessionEntry,
-    sessionStore,
-    sessionKey,
-    storePath,
-    isNewSession,
-  });
   const { runReplyAgent } = await loadAgentRunnerRuntime();
   const queueKey = sessionKey ?? sessionIdFinal;
   preparedSessionState = resolvePreparedSessionState();
@@ -504,16 +493,6 @@ export async function runPreparedReply(
       await waitForEmbeddedPiRunEnd(activeSessionIdBeforeWait);
     }
     preparedSessionState = resolvePreparedSessionState();
-    authProfileId = await resolveSessionAuthProfileOverride({
-      cfg,
-      provider,
-      agentDir,
-      sessionEntry: preparedSessionState.sessionEntry,
-      sessionStore,
-      sessionKey,
-      storePath,
-      isNewSession,
-    });
     preparedSessionState = resolvePreparedSessionState();
     ({ prefixedCommandBody, queuedBody } = await rebuildPromptBodies());
     ({ activeSessionId, isActive, isStreaming } = resolveQueueBusyState());
@@ -524,7 +503,6 @@ export async function runPreparedReply(
       };
     }
   }
-  const authProfileIdSource = preparedSessionState.sessionEntry?.authProfileOverrideSource;
   const followupRun = {
     prompt: queuedBody,
     messageId: sessionCtx.MessageSidFull ?? sessionCtx.MessageSid,
@@ -563,8 +541,6 @@ export async function runPreparedReply(
       skillsSnapshot,
       provider,
       model,
-      authProfileId,
-      authProfileIdSource,
       thinkLevel: resolvedThinkLevel,
       fastMode: resolveFastModeState({
         cfg,

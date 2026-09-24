@@ -1,7 +1,7 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentConfig } from "./agent-scope.js";
-import { pickSandboxToolPolicy } from "./sandbox-tool-policy.js";
 import { isToolAllowedByPolicies } from "./tool-policy-match.js";
+import { pickToolPolicy } from "./tool-policy-pick.js";
 import { mergeAlsoAllowPolicy, resolveToolProfilePolicy } from "./tool-policy.js";
 
 export type ToolFsPolicy = {
@@ -59,7 +59,7 @@ export function resolveEffectiveToolFsRootExpansionAllowed(params: {
     resolveToolProfilePolicy(profile),
     profileAlsoAllow.size > 0 ? Array.from(profileAlsoAllow) : undefined,
   );
-  const globalPolicy = pickSandboxToolPolicy(globalTools);
-  const agentPolicy = pickSandboxToolPolicy(agentTools);
+  const globalPolicy = pickToolPolicy(globalTools);
+  const agentPolicy = pickToolPolicy(agentTools);
   return isToolAllowedByPolicies("read", [profilePolicy, globalPolicy, agentPolicy]);
 }

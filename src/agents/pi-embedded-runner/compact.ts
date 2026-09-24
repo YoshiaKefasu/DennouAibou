@@ -68,7 +68,6 @@ import { applyPiCompactionSettingsFromConfig, isCompactionEnabled } from "../pi-
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import { registerProviderStreamForModel } from "../provider-stream.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
-import { resolveSandboxContext } from "../sandbox.js";
 import { repairSessionFileIfNeeded } from "../session-file-repair.js";
 import { logSessionCheckin, requestSessionWrite } from "../session-gatekeeper.js";
 import { guardSessionManager } from "../session-tool-result-guard-wrapper.js";
@@ -114,7 +113,6 @@ import { buildEmbeddedMessageActionDiscoveryInput } from "./message-action-disco
 import { readPiModelContextTokens } from "./model-context-tokens.js";
 import { buildModelAliasLines, resolveModelAsync } from "./model.js";
 import { sanitizeSessionHistory, validateReplayTurns } from "./replay-history.js";
-import { buildEmbeddedSandboxInfo } from "./sandbox-info.js";
 import { prewarmSessionFile, trackSessionManagerAccess } from "./session-manager-cache.js";
 import { truncateSessionAfterCompaction } from "./session-truncation.js";
 import { resolveEmbeddedRunSkillEntries } from "./skills-runtime.js";
@@ -402,18 +400,8 @@ export async function compactEmbeddedPiSessionDirect(
   }
 
   await fs.mkdir(resolvedWorkspace, { recursive: true });
-  const sandboxSessionKey = params.sessionKey?.trim() || params.sessionId;
-  const sandbox = await resolveSandboxContext({
-    config: params.config,
-    sessionKey: sandboxSessionKey,
-    workspaceDir: resolvedWorkspace,
-  });
-  const effectiveWorkspace = sandbox?.enabled
-    ? sandbox.workspaceAccess === "rw"
-      ? resolvedWorkspace
-      : sandbox.workspaceDir
-    : resolvedWorkspace;
-  await fs.mkdir(effectiveWorkspace, { recursive: true });
+  const runSessionKey = params.sessionKey?.trim() || params.sessionId;
+  const effectiveWorkspace = resolvedWorkspace;
   await ensureSessionHeader({
     sessionFile: params.sessionFile,
     sessionId: params.sessionId,
@@ -492,10 +480,9 @@ export async function compactEmbeddedPiSessionDirect(
       exec: {
         elevated: params.bashElevated,
       },
-      sandbox,
       messageProvider: resolvedMessageProvider,
       agentAccountId: params.agentAccountId,
-      sessionKey: sandboxSessionKey,
+      sessionKey: runSessionKey,
       sessionId: params.sessionId,
       runId: params.runId,
       groupId: params.groupId,
@@ -641,7 +628,6 @@ export async function compactEmbeddedPiSessionDirect(
       capabilities: runtimeCapabilities,
       channelActions,
     };
-    const sandboxInfo = buildEmbeddedSandboxInfo(sandbox, params.bashElevated);
     const reasoningTagHint = isReasoningTagProvider(provider, {
       config: params.config,
       workspaceDir: effectiveWorkspace,
@@ -702,7 +688,6 @@ export async function compactEmbeddedPiSessionDirect(
             runtimeInfo,
             reactionGuidance,
             messageToolHints,
-            sandboxInfo,
             tools: effectiveTools,
             modelAliasLines: buildModelAliasLines(params.config),
             userTimezone,
@@ -776,7 +761,6 @@ export async function compactEmbeddedPiSessionDirect(
 
       const { builtInTools, customTools } = splitSdkTools({
         tools: effectiveTools,
-        sandboxEnabled: !!sandbox?.enabled,
       });
 
       const providerStreamFn = registerProviderStreamForModel({

@@ -19,7 +19,6 @@ type WebFetchConfig = NonNullable<OpenClawConfig["tools"]>["web"] extends infer 
 
 export type ResolveWebFetchDefinitionParams = {
   config?: OpenClawConfig;
-  sandboxed?: boolean;
   runtimeWebFetch?: RuntimeWebFetchMetadata;
   providerId?: string;
   preferRuntimeProviders?: boolean;
@@ -33,10 +32,7 @@ function resolveFetchConfig(cfg?: OpenClawConfig): WebFetchConfig {
   return fetch as WebFetchConfig;
 }
 
-export function resolveWebFetchEnabled(params: {
-  fetch?: WebFetchConfig;
-  sandboxed?: boolean;
-}): boolean {
+export function resolveWebFetchEnabled(params: { fetch?: WebFetchConfig }): boolean {
   if (typeof params.fetch?.enabled === "boolean") {
     return params.fetch.enabled;
   }
@@ -150,7 +146,7 @@ export function resolveWebFetchDefinition(
 ): { provider: PluginWebFetchProviderEntry; definition: WebFetchProviderToolDefinition } | null {
   const fetch = resolveFetchConfig(options?.config);
   const runtimeWebFetch = options?.runtimeWebFetch ?? getActiveRuntimeWebToolsMetadata()?.fetch;
-  if (!resolveWebFetchEnabled({ fetch, sandboxed: options?.sandboxed })) {
+  if (!resolveWebFetchEnabled({ fetch })) {
     return null;
   }
 

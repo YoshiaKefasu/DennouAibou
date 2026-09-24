@@ -52,8 +52,6 @@ let resolveProviderReplayPolicyWithPlugin: typeof import("./provider-runtime.js"
 let resolveProviderSyntheticAuthWithPlugin: typeof import("./provider-runtime.js").resolveProviderSyntheticAuthWithPlugin;
 let shouldDeferProviderSyntheticProfileAuthWithPlugin: typeof import("./provider-runtime.js").shouldDeferProviderSyntheticProfileAuthWithPlugin;
 let sanitizeProviderReplayHistoryWithPlugin: typeof import("./provider-runtime.js").sanitizeProviderReplayHistoryWithPlugin;
-let resolveProviderUsageSnapshotWithPlugin: typeof import("./provider-runtime.js").resolveProviderUsageSnapshotWithPlugin;
-let resolveProviderUsageAuthWithPlugin: typeof import("./provider-runtime.js").resolveProviderUsageAuthWithPlugin;
 let normalizeProviderToolSchemasWithPlugin: typeof import("./provider-runtime.js").normalizeProviderToolSchemasWithPlugin;
 let inspectProviderToolSchemasWithPlugin: typeof import("./provider-runtime.js").inspectProviderToolSchemasWithPlugin;
 let normalizeProviderResolvedModelWithPlugin: typeof import("./provider-runtime.js").normalizeProviderResolvedModelWithPlugin;
@@ -258,8 +256,6 @@ describe("provider-runtime", () => {
       resolveProviderSyntheticAuthWithPlugin,
       shouldDeferProviderSyntheticProfileAuthWithPlugin,
       sanitizeProviderReplayHistoryWithPlugin,
-      resolveProviderUsageSnapshotWithPlugin,
-      resolveProviderUsageAuthWithPlugin,
       normalizeProviderToolSchemasWithPlugin,
       inspectProviderToolSchemasWithPlugin,
       normalizeProviderResolvedModelWithPlugin,
@@ -595,15 +591,6 @@ describe("provider-runtime", () => {
       ...cred,
       access: "refreshed-access-token",
     }));
-    const resolveUsageAuth = vi.fn(async () => ({
-      token: "usage-token",
-      accountId: "usage-account",
-    }));
-    const fetchUsageSnapshot = vi.fn(async () => ({
-      provider: "zai" as const,
-      displayName: "Demo",
-      windows: [{ label: "Day", usedPercent: 25 }],
-    }));
     resolvePluginProvidersMock.mockImplementation((_params: unknown) => {
       return [
         {
@@ -654,8 +641,6 @@ describe("provider-runtime", () => {
           buildAuthDoctorHint: ({ provider, profileId }) =>
             provider === "demo" ? `Repair ${profileId}` : undefined,
           prepareRuntimeAuth,
-          resolveUsageAuth,
-          fetchUsageSnapshot,
           isCacheTtlEligible: ({ modelId }) => modelId.startsWith("anthropic/"),
           isBinaryThinking: () => true,
           resolveDefaultThinkingLevel: ({ reasoning }) => (reasoning ? "low" : "off"),
@@ -840,41 +825,6 @@ describe("provider-runtime", () => {
           }),
         expected: {
           access: "refreshed-access-token",
-        },
-      },
-      {
-        actual: () =>
-          resolveProviderUsageAuthWithPlugin({
-            provider: DEMO_PROVIDER_ID,
-            env: process.env,
-            context: createDemoProviderContext({
-              config: {} as never,
-              env: process.env,
-              resolveApiKeyFromConfigAndStore: () => "source-token",
-              resolveOAuthToken: async () => null,
-            }),
-          }),
-        expected: {
-          token: "usage-token",
-          accountId: "usage-account",
-        },
-      },
-      {
-        actual: () =>
-          resolveProviderUsageSnapshotWithPlugin({
-            provider: DEMO_PROVIDER_ID,
-            env: process.env,
-            context: createDemoProviderContext({
-              config: {} as never,
-              env: process.env,
-              token: "usage-token",
-              timeoutMs: 5_000,
-              fetchFn: vi.fn() as never,
-            }),
-          }),
-        expected: {
-          provider: "zai",
-          windows: [{ label: "Day", usedPercent: 25 }],
         },
       },
       {
@@ -1083,8 +1033,6 @@ describe("provider-runtime", () => {
       shouldDeferSyntheticProfileAuth,
       buildUnknownModelHint,
       prepareRuntimeAuth,
-      resolveUsageAuth,
-      fetchUsageSnapshot,
     );
   });
 

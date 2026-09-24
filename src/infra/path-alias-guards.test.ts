@@ -51,10 +51,10 @@ describe("assertNoPathAliasEscape", () => {
       const promise = assertNoPathAliasEscape({
         absolutePath,
         rootPath: root,
-        boundaryLabel: "sandbox root",
+        boundaryLabel: "workspace root",
       });
       if (rejects) {
-        await expect(promise).rejects.toThrow(/Symlink escapes sandbox root/);
+        await expect(promise).rejects.toThrow(/Symlink escapes workspace root/);
         return;
       }
       await expect(promise).resolves.toBeUndefined();

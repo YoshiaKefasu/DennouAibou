@@ -44,11 +44,6 @@ export const SUB_CLI_DESCRIPTORS = [
     hasSubcommands: true,
   },
   {
-    name: "sandbox",
-    description: "Manage sandbox containers for agent isolation",
-    hasSubcommands: true,
-  },
-  {
     name: "tui",
     description: "Open a terminal UI connected to the Gateway",
     hasSubcommands: false,

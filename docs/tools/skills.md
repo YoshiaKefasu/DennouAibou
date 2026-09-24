@@ -77,7 +77,7 @@ Rules:
   does not merge with defaults.
 
 DennouAibou applies the effective agent skill set across prompt building, skill
-slash-command discovery, sandbox sync, and skill snapshots.
+slash-command discovery, and skill snapshots.
 
 ## Plugins + skills
 
@@ -115,12 +115,11 @@ DennouAibou picks that up as `<workspace>/skills` on the next session.
 ## Security notes
 
 - Treat third-party skills as **untrusted code**. Read them before enabling.
-- Prefer sandboxed runs for untrusted inputs and risky tools. See [Sandboxing](/gateway/sandboxing).
 - Workspace and extra-dir skill discovery only accepts skill roots and `SKILL.md` files whose resolved realpath stays inside the configured root.
 - Gateway-backed skill dependency installs (`skills.install`, onboarding, and the Skills settings UI) run the built-in dangerous-code scanner before executing installer metadata. `critical` findings block by default unless the caller explicitly sets the dangerous override; suspicious findings still warn only.
 - `openclaw skills install <slug>` is different: it downloads a ClawHub skill folder into the workspace and does not use the installer-metadata path above.
 - `skills.entries.*.env` and `skills.entries.*.apiKey` inject secrets into the **host** process
-  for that agent turn (not the sandbox). Keep secrets out of prompts and logs.
+  for that agent turn. Keep secrets out of prompts and logs.
 - For a broader threat model and checklists, see [Security](/gateway/security).
 
 ## Format (AgentSkills + Pi-compatible)
@@ -183,15 +182,14 @@ Fields under `metadata.openclaw`:
 - `primaryEnv` — env var name associated with `skills.entries.<name>.apiKey`.
 - `install` — optional array of installer specs used by the macOS Skills UI (brew/node/go/uv/download).
 
-Note on sandboxing:
+Note on requirement checks:
 
 - `requires.bins` is checked on the **host** at skill load time.
-- If an agent is sandboxed, the binary must also exist **inside the container**.
-  Install it via `agents.defaults.sandbox.docker.setupCommand` (or a custom image).
-  `setupCommand` runs once after the container is created.
-  Package installs also require network egress, a writable root FS, and a root user in the sandbox.
+  Install missing binaries on the host so the skill can run (for example via
+  `brew install <bin>` or your distribution’s package manager); package installs
+  require network egress and write access to PATH locations.
   Example: the `summarize` skill (`skills/summarize/SKILL.md`) needs the `summarize` CLI
-  in the sandbox container to run there.
+  installed on the host to run there.
 
 Installer example:
 

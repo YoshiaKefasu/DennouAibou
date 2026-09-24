@@ -19,7 +19,6 @@ import {
   parseProviderModelMap,
   redactLiveApiKey,
   resolveConfiguredLiveImageModels,
-  resolveLiveImageAuthStore,
 } from "./live-test-helpers.js";
 import { generateImage } from "./runtime.js";
 
@@ -98,13 +97,9 @@ async function resolveLiveAuthForProvider(
   cfg: ReturnType<typeof loadConfig>,
   agentDir: string,
 ) {
-  const authStore = resolveLiveImageAuthStore({
-    requireProfileKeys: REQUIRE_PROFILE_KEYS,
-    hasLiveKeys: collectProviderApiKeys(provider).length > 0,
-  });
   try {
-    const auth = await resolveApiKeyForProvider({ provider, cfg, agentDir, store: authStore });
-    return { auth, authStore };
+    const auth = await resolveApiKeyForProvider({ provider, cfg, agentDir });
+    return { auth };
   } catch {
     return null;
   }
@@ -213,7 +208,6 @@ describeLive("image generation live (provider sweep)", () => {
         const result = await generateImage({
           cfg,
           agentDir,
-          authStore: resolvedAuth.authStore,
           modelOverride: testCase.modelRef,
           prompt: testCase.prompt,
           size: testCase.size,

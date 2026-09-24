@@ -14,7 +14,6 @@ DennouAibou reads an optional <Tooltip tip="JSON5 supports comments and trailing
 If the file is missing, DennouAibou uses safe defaults. Common reasons to add a config:
 
 - Connect channels and control who can message the bot
-- Set models, tools, sandboxing, or automation (cron, hooks)
 - Tune sessions, media, networking, or UI
 
 See the [full reference](/gateway/configuration-reference) for every available field.
@@ -282,28 +281,6 @@ When validation fails:
 
   </Accordion>
 
-  <Accordion title="Enable sandboxing">
-    Run agent sessions in isolated Docker containers:
-
-    ```json5
-    {
-      agents: {
-        defaults: {
-          sandbox: {
-            mode: "non-main",  // off | non-main | all
-            scope: "agent",    // session | agent | shared
-          },
-        },
-      },
-    }
-    ```
-
-    Build the image first: `scripts/sandbox-setup.sh`
-
-    See [Sandboxing](/gateway/sandboxing) for the full guide and [full reference](/gateway/configuration-reference#agentsdefaultssandbox) for all options.
-
-  </Accordion>
-
   <Accordion title="Enable relay-backed push for official iOS builds">
     Relay-backed push is configured in `openclaw.json`.
 
@@ -434,7 +411,6 @@ When validation fails:
     - `hooks.path` cannot be `/`; keep webhook ingress on a dedicated subpath such as `/hooks`.
     - Keep unsafe-content bypass flags disabled (`hooks.gmail.allowUnsafeExternalContent`, `hooks.mappings[].allowUnsafeExternalContent`) unless doing tightly scoped debugging.
     - If you enable `hooks.allowRequestSessionKey`, also set `hooks.allowedSessionKeyPrefixes` to bound caller-selected session keys.
-    - For hook-driven agents, prefer strong modern model tiers and strict tool policy (for example messaging-only plus sandboxing where possible).
 
     See [full reference](/gateway/configuration-reference#hooks) for all mapping options and Gmail integration.
 

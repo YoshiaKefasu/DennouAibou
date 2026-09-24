@@ -1,6 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { AuthProfileStore } from "../../agents/auth-profiles.js";
 import { shouldSuppressBuiltInModel } from "../../agents/model-suppression.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
@@ -12,7 +11,6 @@ import {
   discoverAuthStorage,
   discoverModels,
   hasUsableCustomProviderApiKey,
-  listProfilesForProvider,
   resolveAwsSdkEnvVarName,
   resolveEnvApiKey,
   resolveOpenClawAgentDir,
@@ -20,16 +18,9 @@ import {
 import type { ModelRow } from "./list.types.js";
 import { isLocalBaseUrl, modelKey } from "./shared.js";
 
-const hasAuthForProvider = (
-  provider: string,
-  cfg?: OpenClawConfig,
-  authStore?: AuthProfileStore,
-) => {
-  if (!cfg || !authStore) {
+const hasAuthForProvider = (provider: string, cfg?: OpenClawConfig) => {
+  if (!cfg) {
     return false;
-  }
-  if (listProfilesForProvider(authStore, provider).length > 0) {
-    return true;
   }
   if (provider === "amazon-bedrock" && resolveAwsSdkEnvVarName()) {
     return true;
@@ -135,7 +126,6 @@ export function toModelRow(params: {
   aliases?: string[];
   availableKeys?: Set<string>;
   cfg?: OpenClawConfig;
-  authStore?: AuthProfileStore;
   allowProviderAvailabilityFallback?: boolean;
 }): ModelRow {
   const {
@@ -145,7 +135,6 @@ export function toModelRow(params: {
     aliases = [],
     availableKeys,
     cfg,
-    authStore,
     allowProviderAvailabilityFallback = false,
   } = params;
   if (!model) {
@@ -170,8 +159,7 @@ export function toModelRow(params: {
   const available =
     availableKeys !== undefined && !allowProviderAvailabilityFallback
       ? modelIsAvailable
-      : modelIsAvailable ||
-        (cfg && authStore ? hasAuthForProvider(model.provider, cfg, authStore) : false);
+      : modelIsAvailable || (cfg ? hasAuthForProvider(model.provider, cfg) : false);
   const aliasTags = aliases.length > 0 ? [`alias:${aliases.join(",")}`] : [];
   const mergedTags = new Set(tags);
   if (aliasTags.length > 0) {

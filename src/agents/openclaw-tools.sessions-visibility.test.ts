@@ -17,10 +17,9 @@ vi.mock("../config/config.js", async () => {
     resolveGatewayPort: () => 18789,
   };
 });
-function getSessionsHistoryTool(options?: { sandboxed?: boolean }) {
+function getSessionsHistoryTool() {
   return createSessionsHistoryTool({
     agentSessionKey: "main",
-    sandboxed: options?.sandboxed,
     config: mockConfig as never,
     callGateway: (opts: unknown) => callGatewayMock(opts),
   });
@@ -91,26 +90,5 @@ describe("sessions tools visibility", () => {
     expect(result.details).toMatchObject({
       sessionKey: "agent:main:discord:direct:someone-else",
     });
-  });
-
-  it("clamps sandboxed sessions to tree when agents.defaults.sandbox.sessionToolsVisibility=spawned", async () => {
-    mockConfig = {
-      session: { mainKey: "main", scope: "per-sender" },
-      tools: { sessions: { visibility: "all" }, agentToAgent: { enabled: true, allow: ["*"] } },
-      agents: { defaults: { sandbox: { sessionToolsVisibility: "spawned" } } },
-    };
-    mockGatewayWithHistory((req) => {
-      if (req.method === "sessions.list" && req.params?.spawnedBy === "main") {
-        return { sessions: [] };
-      }
-      return undefined;
-    });
-
-    const tool = getSessionsHistoryTool({ sandboxed: true });
-
-    const denied = await tool.execute("call4", {
-      sessionKey: "agent:other:main",
-    });
-    expect(denied.details).toMatchObject({ status: "forbidden" });
   });
 });

@@ -14,7 +14,6 @@ type ResolveProviderPluginChoice =
 type ResolvePluginProvidersRuntime =
   typeof import("../plugins/provider-auth-choice.runtime.js").resolvePluginProviders;
 
-const ensureAuthProfileStore = vi.hoisted(() => vi.fn(() => ({ profiles: {} })));
 const promptAuthChoiceGrouped = vi.hoisted(() => vi.fn(async () => "skip"));
 const applyAuthChoice = vi.hoisted(() => vi.fn(async (args) => ({ config: args.config })));
 const resolvePreferredProviderForAuthChoice = vi.hoisted(() => vi.fn(async () => "demo-provider"));
@@ -124,10 +123,6 @@ vi.mock("../commands/onboard-channels.js", () => ({
 
 vi.mock("../commands/onboard-skills.js", () => ({
   setupSkills,
-}));
-
-vi.mock("../agents/auth-profiles.js", () => ({
-  ensureAuthProfileStore,
 }));
 
 vi.mock("../commands/auth-choice-prompt.js", () => ({

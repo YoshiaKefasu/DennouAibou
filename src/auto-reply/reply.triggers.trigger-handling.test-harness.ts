@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, expect, vi } from "vitest";
-import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resetProviderRuntimeHookCacheForTest } from "../plugins/provider-runtime.js";
 import { resolveRelativeBundledPluginPublicModuleId } from "../test-utils/bundled-plugin-public-surface.js";
@@ -62,22 +61,6 @@ const installPiEmbeddedMock = () =>
   }));
 
 installPiEmbeddedMock();
-
-const providerUsageMocks = vi.hoisted(() => ({
-  loadProviderUsageSummary: vi.fn().mockResolvedValue({
-    updatedAt: 0,
-    providers: [],
-  }),
-  formatUsageSummaryLine: vi.fn().mockReturnValue("📊 Usage: Claude 80% left"),
-  formatUsageWindowSummary: vi.fn().mockReturnValue("Claude 80% left"),
-  resolveUsageProviderId: vi.fn((provider: string) => provider.split("/")[0]),
-}));
-
-export function getProviderUsageMocks(): AnyMocks {
-  return providerUsageMocks;
-}
-
-vi.mock("../infra/provider-usage.js", () => providerUsageMocks);
 
 const modelCatalogMocks = getSharedMocks("openclaw.trigger-handling.model-catalog-mocks", () => ({
   loadModelCatalog: vi.fn().mockResolvedValue([
@@ -445,7 +428,6 @@ export async function runGreetingPromptForBareNewOrReset(params: {
 
 export function installTriggerHandlingE2eTestHooks() {
   afterEach(() => {
-    clearRuntimeAuthProfileStoreSnapshots();
     resetProviderRuntimeHookCacheForTest();
     vi.clearAllMocks();
   });

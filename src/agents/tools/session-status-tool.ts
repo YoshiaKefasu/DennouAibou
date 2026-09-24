@@ -22,8 +22,6 @@ import {
   resolveAgentIdFromSessionKey,
 } from "../../routing/session-key.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
-import { buildTaskStatusSnapshotForRelatedSessionKeyForOwner } from "../../tasks/task-owner-access.js";
-import { formatTaskStatusDetail, formatTaskStatusTitle } from "../../tasks/task-status.js";
 import { loadModelCatalog } from "../model-catalog.js";
 import {
   buildAllowedModelSet,
@@ -45,8 +43,7 @@ import {
   resolveEffectiveSessionToolsVisibility,
   resolveInternalSessionKey,
   resolveSessionReference,
-  resolveSandboxedSessionToolContext,
-  resolveVisibleSessionReference,
+  resolveSessionToolContext,
 } from "./sessions-helpers.js";
 
 const SessionStatusToolSchema = Type.Object({
@@ -120,30 +117,6 @@ function resolveStoreScopedRequesterKey(params: {
   return parsed.rest === params.mainKey ? params.mainKey : params.requesterKey;
 }
 
-function formatSessionTaskLine(params: {
-  relatedSessionKey: string;
-  callerOwnerKey: string;
-}): string | undefined {
-  const snapshot = buildTaskStatusSnapshotForRelatedSessionKeyForOwner({
-    relatedSessionKey: params.relatedSessionKey,
-    callerOwnerKey: params.callerOwnerKey,
-  });
-  const task = snapshot.focus;
-  if (!task) {
-    return undefined;
-  }
-  const headline =
-    snapshot.activeCount > 0
-      ? `${snapshot.activeCount} active`
-      : snapshot.recentFailureCount > 0
-        ? `${snapshot.recentFailureCount} recent failure${snapshot.recentFailureCount === 1 ? "" : "s"}`
-        : `latest ${task.status.replaceAll("_", " ")}`;
-  const title = formatTaskStatusTitle(task);
-  const detail = formatTaskStatusDetail(task);
-  const parts = [headline, task.runtime, title, detail].filter(Boolean);
-  return parts.length ? `📌 Tasks: ${parts.join(" · ")}` : undefined;
-}
-
 async function resolveModelOverride(params: {
   cfg: OpenClawConfig;
   raw: string;
@@ -211,7 +184,6 @@ async function resolveModelOverride(params: {
 export function createSessionStatusTool(opts?: {
   agentSessionKey?: string;
   config?: OpenClawConfig;
-  sandboxed?: boolean;
 }): AnyAgentTool {
   return {
     label: "Session Status",
@@ -222,10 +194,9 @@ export function createSessionStatusTool(opts?: {
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
       const cfg = opts?.config ?? loadConfig();
-      const { mainKey, alias, effectiveRequesterKey } = resolveSandboxedSessionToolContext({
-        cfg,
+      const { mainKey, alias, effectiveRequesterKey } = resolveSessionToolContext({
         agentSessionKey: opts?.agentSessionKey,
-        sandboxed: opts?.sandboxed,
+        config: cfg,
       });
       const a2aPolicy = createAgentToAgentPolicy(cfg);
       const requesterAgentId = resolveAgentIdFromSessionKey(
@@ -271,10 +242,7 @@ export function createSessionStatusTool(opts?: {
       const visibilityGuard = await createSessionVisibilityGuard({
         action: "status",
         requesterSessionKey: visibilityRequesterKey,
-        visibility: resolveEffectiveSessionToolsVisibility({
-          cfg,
-          sandboxed: opts?.sandboxed === true,
-        }),
+        visibility: resolveEffectiveSessionToolsVisibility({ cfg }),
         a2aPolicy,
       });
 
@@ -342,23 +310,12 @@ export function createSessionStatusTool(opts?: {
           alias,
           mainKey,
           requesterInternalKey: effectiveRequesterKey,
-          restrictToSpawned: opts?.sandboxed === true,
         });
         if (resolvedSession.ok && resolvedSession.resolvedViaSessionId) {
-          const visibleSession = await resolveVisibleSessionReference({
-            resolvedSession,
-            requesterSessionKey: effectiveRequesterKey,
-            restrictToSpawned: opts?.sandboxed === true,
-            visibilitySessionKey: requestedKeyRaw,
-          });
-          if (!visibleSession.ok) {
-            throw new Error("Session status visibility is restricted to the current session tree.");
-          }
-          // If resolution points at another agent, enforce A2A policy before switching stores.
-          ensureAgentAccess(resolveAgentIdFromSessionKey(visibleSession.key));
+          ensureAgentAccess(resolveAgentIdFromSessionKey(resolvedSession.key));
           resolvedViaSessionId = true;
-          requestedKeyRaw = visibleSession.key;
-          agentId = resolveAgentIdFromSessionKey(visibleSession.key);
+          requestedKeyRaw = resolvedSession.key;
+          agentId = resolveAgentIdFromSessionKey(resolvedSession.key);
           storePath = resolveStorePath(cfg.session?.store, { agentId });
           store = loadSessionStore(storePath);
           storeScopedRequesterKey = resolveStoreScopedRequesterKey({
@@ -373,8 +330,8 @@ export function createSessionStatusTool(opts?: {
             mainKey,
             requesterInternalKey: storeScopedRequesterKey,
           });
-        } else if (!resolvedSession.ok && opts?.sandboxed === true) {
-          throw new Error("Session status visibility is restricted to the current session tree.");
+        } else if (!resolvedSession.ok) {
+          throw new Error(resolvedSession.error);
         }
       }
 
@@ -474,10 +431,6 @@ export function createSessionStatusTool(opts?: {
         statusSessionEntry.chatType === "channel" ||
         resolved.key.includes(":group:") ||
         resolved.key.includes(":channel:");
-      const taskLine = formatSessionTaskLine({
-        relatedSessionKey: resolved.key,
-        callerOwnerKey: visibilityRequesterKey,
-      });
       const statusText = await buildStatusText({
         cfg,
         sessionEntry: statusSessionEntry,
@@ -500,22 +453,18 @@ export function createSessionStatusTool(opts?: {
         resolveDefaultThinkingLevel: async () => cfg.agents?.defaults?.thinkingDefault,
         isGroup,
         defaultGroupActivation: () => "mention",
-        taskLineOverride: taskLine,
-        skipDefaultTaskLookup: true,
         primaryModelLabelOverride: primaryModelLabel,
         ...(providerForCard ? {} : { modelAuthOverride: undefined }),
         includeTranscriptUsage: true,
       });
-      const fullStatusText =
-        taskLine && !statusText.includes(taskLine) ? `${statusText}\n${taskLine}` : statusText;
 
       return {
-        content: [{ type: "text", text: fullStatusText }],
+        content: [{ type: "text", text: statusText }],
         details: {
           ok: true,
           sessionKey: resolved.key,
           changedModel,
-          statusText: fullStatusText,
+          statusText,
         },
       };
     },

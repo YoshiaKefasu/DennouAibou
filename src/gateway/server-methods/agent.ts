@@ -28,7 +28,6 @@ import { classifySessionKeyShape, normalizeAgentId } from "../../routing/session
 import { defaultRuntime } from "../../runtime.js";
 import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import { createRunningTaskRun } from "../../tasks/task-executor.js";
 import {
   normalizeDeliveryContext,
   normalizeSessionDeliveryFields,
@@ -231,32 +230,6 @@ function dispatchAgentRunFromGateway(params: {
   respond: GatewayRequestHandlerOptions["respond"];
   context: GatewayRequestHandlerOptions["context"];
 }) {
-  const inputProvenance = normalizeInputProvenance(params.ingressOpts.inputProvenance);
-  const shouldTrackTask =
-    params.ingressOpts.sessionKey?.trim() && inputProvenance?.kind !== "inter_session";
-  if (shouldTrackTask) {
-    try {
-      createRunningTaskRun({
-        runtime: "cli",
-        sourceId: params.runId,
-        ownerKey: params.ingressOpts.sessionKey,
-        scopeKind: "session",
-        requesterOrigin: normalizeDeliveryContext({
-          channel: params.ingressOpts.channel,
-          to: params.ingressOpts.to,
-          accountId: params.ingressOpts.accountId,
-          threadId: params.ingressOpts.threadId,
-        }),
-        childSessionKey: params.ingressOpts.sessionKey,
-        runId: params.runId,
-        task: params.ingressOpts.message,
-        deliveryStatus: "not_applicable",
-        startedAt: Date.now(),
-      });
-    } catch {
-      // Best-effort only: background task tracking must not block agent runs.
-    }
-  }
   void params.deps
     .agentCommandFromIngress(params.ingressOpts, defaultRuntime, params.context.deps)
     .then((result) => {

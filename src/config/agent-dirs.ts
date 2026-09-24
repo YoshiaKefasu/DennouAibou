@@ -106,7 +106,6 @@ export function formatDuplicateAgentDirError(dups: DuplicateAgentDir[]): string 
     ...dups.map((d) => `- ${d.agentDir}: ${d.agentIds.map((id) => `"${id}"`).join(", ")}`),
     "",
     "Fix: remove the shared agents.list[].agentDir override (or give each agent its own directory).",
-    "If you want to share credentials, copy auth-profiles.json instead of sharing the entire agentDir.",
   ];
   return lines.join("\n");
 }

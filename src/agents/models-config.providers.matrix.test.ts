@@ -21,21 +21,6 @@ type MatrixCase = {
   assertProviders: (providers: ProvidersMap) => void;
 };
 
-async function writeAuthProfiles(
-  agentDir: string,
-  profiles: Record<string, unknown> | undefined,
-): Promise<void> {
-  if (!profiles) {
-    return;
-  }
-
-  await writeFile(
-    join(agentDir, "auth-profiles.json"),
-    JSON.stringify({ version: 1, profiles }, null, 2),
-    "utf8",
-  );
-}
-
 const MATRIX_CASES: MatrixCase[] = [
   {
     name: "env api key injects a simple provider",
@@ -56,20 +41,6 @@ const MATRIX_CASES: MatrixCase[] = [
     },
   },
   {
-    name: "env-backed auth profiles persist env markers",
-    env: {},
-    authProfiles: {
-      "together:default": {
-        type: "token",
-        provider: "together",
-        tokenRef: { source: "env", provider: "default", id: "TOGETHER_API_KEY" },
-      },
-    },
-    assertProviders(providers) {
-      expect(providers?.together?.apiKey).toBe("TOGETHER_API_KEY");
-    },
-  },
-  {
     name: "non-env secret refs preserve compatibility markers",
     env: {},
     authProfiles: {
@@ -83,35 +54,6 @@ const MATRIX_CASES: MatrixCase[] = [
     assertProviders(providers) {
       expect(providers?.byteplus?.apiKey).toBe(NON_ENV_SECRETREF_MARKER);
       expect(providers?.["byteplus-plan"]?.apiKey).toBe(NON_ENV_SECRETREF_MARKER);
-    },
-  },
-  {
-    name: "oauth profiles still inject compatibility providers",
-    env: {},
-    authProfiles: {
-      "openai-codex:default": {
-        type: "oauth",
-        provider: "openai-codex",
-        access: "codex-access-token",
-        refresh: "codex-refresh-token",
-        expires: Date.now() + 60_000,
-      },
-      "minimax-portal:default": {
-        type: "oauth",
-        provider: "minimax-portal",
-        access: "minimax-access-token",
-        refresh: "minimax-refresh-token",
-        expires: Date.now() + 60_000,
-      },
-    },
-    assertProviders(providers) {
-      expect(providers?.["openai-codex"]).toMatchObject({
-        baseUrl: "https://chatgpt.com/backend-api",
-        api: "openai-codex-responses",
-        models: [],
-      });
-      expect(providers?.["openai-codex"]).not.toHaveProperty("apiKey");
-      expect(providers?.["minimax-portal"]?.apiKey).toBe(MINIMAX_OAUTH_MARKER);
     },
   },
   {
@@ -161,8 +103,6 @@ describe("implicit provider resolution matrix", () => {
     "$name",
     async ({ env, authProfiles, explicitProviders, assertProviders }) => {
       const agentDir = mkdtempSync(join(tmpdir(), "openclaw-test-"));
-      await writeAuthProfiles(agentDir, authProfiles);
-
       const providers = await resolveImplicitProvidersForTest({
         agentDir,
         env,

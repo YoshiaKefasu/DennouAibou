@@ -3,7 +3,7 @@ import type { createSecretsConfigIO } from "./config-io.js";
 import { runSecretsConfigureInteractive, type SecretsConfigureDeps } from "./configure.js";
 
 describe("runSecretsConfigureInteractive", () => {
-  it("does not load auth-profiles when running providers-only", async () => {
+  it("skips credential store reads when running providers-only", async () => {
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,
       configurable: true,

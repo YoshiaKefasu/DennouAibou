@@ -36,7 +36,6 @@ const runDryAction = (params: {
   actionParams: Record<string, unknown>;
   toolContext?: Record<string, unknown>;
   abortSignal?: AbortSignal;
-  sandboxRoot?: string;
 }) =>
   runMessageAction({
     cfg: params.cfg,
@@ -45,7 +44,6 @@ const runDryAction = (params: {
     toolContext: params.toolContext as never,
     dryRun: true,
     abortSignal: params.abortSignal,
-    sandboxRoot: params.sandboxRoot,
   });
 
 const runDrySend = (params: {
@@ -53,7 +51,6 @@ const runDrySend = (params: {
   actionParams: Record<string, unknown>;
   toolContext?: Record<string, unknown>;
   abortSignal?: AbortSignal;
-  sandboxRoot?: string;
 }) =>
   runDryAction({
     ...params,

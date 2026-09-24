@@ -20,7 +20,6 @@ export function createGatewayCloseHandler(params: {
   pluginServices: PluginServicesHandle | null;
   cron: { stop: () => void };
   eventPumpDisposer?: (() => void) | null;
-  stopTaskRegistryMaintenance?: (() => void) | null;
   nodePresenceTimers: Map<string, ReturnType<typeof setInterval>>;
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
   tickInterval: ReturnType<typeof setInterval>;
@@ -83,11 +82,6 @@ export function createGatewayCloseHandler(params: {
         } catch {
           /* ignore */
         }
-      }
-      try {
-        params.stopTaskRegistryMaintenance?.();
-      } catch {
-        /* ignore */
       }
       for (const timer of params.nodePresenceTimers.values()) {
         clearInterval(timer);

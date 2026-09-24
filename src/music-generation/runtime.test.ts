@@ -80,14 +80,11 @@ describe("music-generation runtime", () => {
   });
 
   it("generates tracks through the active music-generation provider", async () => {
-    const authStore = { version: 1, profiles: {} } as const;
-    let seenAuthStore: unknown;
     mocks.resolveAgentModelPrimaryValue.mockReturnValue("music-plugin/track-v1");
     const provider: MusicGenerationProvider = {
       id: "music-plugin",
       capabilities: {},
-      async generateMusic(req: { authStore?: unknown }) {
-        seenAuthStore = req.authStore;
+      async generateMusic() {
         return {
           tracks: [
             {
@@ -112,14 +109,12 @@ describe("music-generation runtime", () => {
       } as OpenClawConfig,
       prompt: "play a synth line",
       agentDir: "/tmp/agent",
-      authStore,
     });
 
     expect(result.provider).toBe("music-plugin");
     expect(result.model).toBe("track-v1");
     expect(result.attempts).toEqual([]);
     expect(result.ignoredOverrides).toEqual([]);
-    expect(seenAuthStore).toEqual(authStore);
     expect(result.tracks).toEqual([
       {
         buffer: Buffer.from("mp3-bytes"),

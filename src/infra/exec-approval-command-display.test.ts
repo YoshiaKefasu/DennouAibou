@@ -50,7 +50,9 @@ describe("resolveExecApprovalCommandDisplay", () => {
       name: "ignores systemRunPlan fallback for non-node hosts",
       input: {
         command: "",
-        host: "sandbox" as const,
+        // Note: "sandbox" removed with sandbox DEBLOAT; gateway covers the
+        // same non-node branch.
+        host: "gateway" as const,
         systemRunPlan: {
           argv: ["echo", "hi"],
           cwd: null,

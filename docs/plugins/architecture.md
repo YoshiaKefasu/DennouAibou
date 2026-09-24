@@ -439,9 +439,8 @@ let plugins plug into it.
 
 ## Execution model
 
-Native DennouAibou plugins run **in-process** with the Gateway. They are not
-sandboxed. A loaded native plugin has the same process-level trust boundary as
-core code.
+Native DennouAibou plugins run **in-process** with the Gateway. A loaded
+native plugin has the same process-level trust boundary as core code.
 
 Implications:
 
@@ -459,7 +458,7 @@ workspace plugins as development-time code, not production defaults.
 
 For bundled workspace package names, keep the plugin id anchored in the npm
 name: `@openclaw/<id>` by default, or an approved typed suffix such as
-`-provider`, `-plugin`, `-speech`, `-sandbox`, or `-media-understanding` when
+`-provider`, `-plugin`, `-speech`, or `-media-understanding` when
 the package intentionally exposes a narrower plugin role.
 
 Important trust note:
@@ -627,7 +626,7 @@ Provider plugins now have two layers:
   `buildMissingAuthMessage`, `suppressBuiltInModel`, `augmentModelCatalog`,
   `isBinaryThinking`, `supportsXHighThinking`,
   `resolveDefaultThinkingLevel`, `isModernModelRef`, `prepareRuntimeAuth`,
-  `resolveUsageAuth`, `fetchUsageSnapshot`, `createEmbeddingProvider`,
+  `createEmbeddingProvider`,
   `buildReplayPolicy`,
   `sanitizeReplayHistory`, `validateReplayTurns`, `onModelSelected`
 
@@ -687,8 +686,6 @@ The "When to use" column is the quick decision guide.
 | 34  | `resolveDefaultThinkingLevel`     | Default `/think` level for a specific model family                                       | Provider owns default `/think` policy for a model family                                                                                    |
 | 35  | `isModernModelRef`                | Modern-model matcher for live profile filters and smoke selection                        | Provider owns live/smoke preferred-model matching                                                                                           |
 | 36  | `prepareRuntimeAuth`              | Exchange a configured credential into the actual runtime token/key just before inference | Provider needs a token exchange or short-lived request credential                                                                           |
-| 37  | `resolveUsageAuth`                | Resolve usage/billing credentials for `/usage` and related status surfaces               | Provider needs custom usage/quota token parsing or a different usage credential                                                             |
-| 38  | `fetchUsageSnapshot`              | Fetch and normalize provider-specific usage/quota snapshots after auth is resolved       | Provider needs a provider-specific usage endpoint or payload parser                                                                         |
 | 39  | `createEmbeddingProvider`         | Build a provider-owned embedding adapter for memory/search                               | Memory embedding behavior belongs with the provider plugin                                                                                  |
 | 40  | `buildReplayPolicy`               | Return a replay policy controlling transcript handling for the provider                  | Provider needs custom transcript policy (for example, thinking-block stripping)                                                             |
 | 41  | `sanitizeReplayHistory`           | Rewrite replay history after generic transcript cleanup                                  | Provider needs provider-specific replay rewrites beyond shared compaction helpers                                                           |
@@ -751,23 +748,15 @@ api.registerProvider({
       expiresAt: exchanged.expiresAt,
     };
   },
-  resolveUsageAuth: async (ctx) => {
-    const auth = await ctx.resolveOAuthToken();
-    return auth ? { token: auth.token } : null;
-  },
-  fetchUsageSnapshot: async (ctx) => {
-    return await fetchExampleProxyUsage(ctx.token, ctx.timeoutMs, ctx.fetchFn);
-  },
 });
 ```
 
 ### Built-in examples
 
 - Anthropic uses `resolveDynamicModel`, `capabilities`, `buildAuthDoctorHint`,
-  `resolveUsageAuth`, `fetchUsageSnapshot`, `isCacheTtlEligible`,
-  `resolveDefaultThinkingLevel`, `applyConfigDefaults`, `isModernModelRef`,
-  and `wrapStreamFn` because it owns Claude 4.6 forward-compat,
-  provider-family hints, auth repair guidance, usage endpoint integration,
+  `isCacheTtlEligible`, `resolveDefaultThinkingLevel`, `applyConfigDefaults`,
+  `isModernModelRef`, and `wrapStreamFn` because it owns Claude 4.6
+  forward-compat, provider-family hints, auth repair guidance,
   prompt-cache eligibility, auth-aware config defaults, Claude
   default/adaptive thinking policy, and Anthropic-specific stream shaping for
   beta headers, `/fast` / `serviceTier`, and `context1m`.
@@ -796,17 +785,15 @@ api.registerProvider({
   `passthrough-gemini` family, while the `openrouter-thinking` stream family
   owns proxy reasoning injection and the unsupported-model / `auto` skips.
 - GitHub Copilot uses `catalog`, `auth`, `resolveDynamicModel`, and
-  `capabilities` plus `prepareRuntimeAuth` and `fetchUsageSnapshot` because it
+  `capabilities` plus `prepareRuntimeAuth` because it
   needs provider-owned device login, model fallback behavior, Claude transcript
-  quirks, a GitHub token -> Copilot token exchange, and a provider-owned usage
-  endpoint.
+  quirks, and a GitHub token -> Copilot token exchange.
 - OpenAI Codex uses `catalog`, `resolveDynamicModel`,
   `normalizeResolvedModel`, `refreshOAuth`, and `augmentModelCatalog` plus
-  `prepareExtraParams`, `resolveUsageAuth`, and `fetchUsageSnapshot` because it
+  `prepareExtraParams` because it
   still runs on core OpenAI transports but owns its transport/base URL
-  normalization, OAuth refresh fallback policy, default transport choice,
-  synthetic Codex catalog rows, and ChatGPT usage endpoint integration; it
-  shares the same `openai-responses-defaults` stream family as direct OpenAI.
+  normalization, OAuth refresh fallback policy, and default transport choice;
+  it shares the same `openai-responses-defaults` stream family as direct OpenAI.
 - Google AI Studio and Gemini CLI OAuth use `resolveDynamicModel`,
   `buildReplayPolicy`, `sanitizeReplayHistory`,
   `resolveReasoningOutputMode`, `wrapStreamFn`, and `isModernModelRef` because the
@@ -814,9 +801,7 @@ api.registerProvider({
   native Gemini replay validation, bootstrap replay sanitation, tagged
   reasoning-output mode, and modern-model matching, while the
   `google-thinking` stream family owns Gemini thinking payload normalization;
-  Gemini CLI OAuth also uses `formatApiKey`, `resolveUsageAuth`, and
-  `fetchUsageSnapshot` for token formatting, token parsing, and quota endpoint
-  wiring.
+  Gemini CLI OAuth also uses `formatApiKey` for token formatting.
 - Anthropic Vertex uses `buildReplayPolicy` through the
   `anthropic-by-model` replay family so Claude-specific replay cleanup stays
   scoped to Claude ids instead of every `anthropic-messages` transport.
@@ -847,10 +832,9 @@ api.registerProvider({
   injection on the shared proxy stream path while skipping `kilo/auto` and
   other proxy model ids that do not support explicit reasoning payloads.
 - Z.AI uses `resolveDynamicModel`, `prepareExtraParams`, `wrapStreamFn`,
-  `isCacheTtlEligible`, `isBinaryThinking`, `isModernModelRef`,
-  `resolveUsageAuth`, and `fetchUsageSnapshot` because it owns GLM-5 fallback,
-  `tool_stream` defaults, binary thinking UX, modern-model matching, and both
-  usage auth + quota fetching; the `tool-stream-default-on` stream family keeps
+  `isCacheTtlEligible`, `isBinaryThinking`, and `isModernModelRef`
+  because it owns GLM-5 fallback,
+  `tool_stream` defaults, binary thinking UX, and modern-model matching; the `tool-stream-default-on` stream family keeps
   the default-on `tool_stream` wrapper out of per-provider handwritten glue.
 - xAI uses `normalizeResolvedModel`, `normalizeTransport`,
   `contributeResolvedModelCompat`, `prepareExtraParams`, `wrapStreamFn`,
@@ -869,9 +853,6 @@ api.registerProvider({
   `catalog` only.
 - Qwen uses `catalog` for its text provider plus shared media-understanding and
   video-generation registrations for its multimodal surfaces.
-- MiniMax and Xiaomi use `catalog` plus usage hooks because their `/usage`
-  behavior is plugin-owned even though inference still runs through the shared
-  transports.
 
 ## Runtime helpers
 

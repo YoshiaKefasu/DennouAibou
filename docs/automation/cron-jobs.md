@@ -34,7 +34,6 @@ openclaw cron runs --id <job-id>
 
 - Cron runs **inside the Gateway** process (not inside the model).
 - Jobs persist at `~/.openclaw/cron/jobs.json` so restarts do not lose schedules.
-- All cron executions create [background task](/automation/tasks) records.
 - One-shot jobs (`--at`) auto-delete after success by default.
 - Isolated cron runs best-effort close tracked browser tabs/processes for their `cron:<jobId>` session when the run completes, so detached browser automation does not leave orphaned processes behind.
 - Isolated cron runs also guard against stale acknowledgement replies. If the
@@ -404,7 +403,6 @@ openclaw doctor
 
 ## Related
 
-- [Automation & Tasks](/automation) — all automation mechanisms at a glance
-- [Background Tasks](/automation/tasks) — task ledger for cron executions
+- [Automation](/automation) — all automation mechanisms at a glance
 - [Heartbeat](/gateway/heartbeat) — periodic main-session turns
 - [Timezone](/concepts/timezone) — timezone configuration

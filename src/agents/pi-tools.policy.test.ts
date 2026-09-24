@@ -244,7 +244,7 @@ describe("resolveEffectiveToolPolicy", () => {
     const cfg = {
       tools: {
         profile: "messaging",
-        exec: { host: "sandbox" },
+        exec: { host: "gateway" },
       },
     } as OpenClawConfig;
     const result = resolveEffectiveToolPolicy({ config: cfg });
@@ -267,7 +267,7 @@ describe("resolveEffectiveToolPolicy", () => {
       tools: {
         profile: "messaging",
         alsoAllow: ["web_search"],
-        exec: { host: "sandbox" },
+        exec: { host: "gateway" },
       },
     } as OpenClawConfig;
     const result = resolveEffectiveToolPolicy({ config: cfg });

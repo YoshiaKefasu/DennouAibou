@@ -89,7 +89,7 @@ describe("local media roots", () => {
       name: "keeps temp, media cache, and workspace roots by default",
       stateDir: path.join("/tmp", "openclaw-media-roots-state"),
       getRoots: () => getDefaultMediaLocalRoots(),
-      expectedContained: ["media", "workspace", "sandboxes"],
+      expectedContained: ["media", "workspace"],
       expectedExcluded: ["agents"],
       minLength: 3,
     },
@@ -97,7 +97,7 @@ describe("local media roots", () => {
       name: "adds the active agent workspace without re-opening broad agent state roots",
       stateDir: path.join("/tmp", "openclaw-agent-media-roots-state"),
       getRoots: () => getAgentScopedMediaLocalRoots({}, "ops"),
-      expectedContained: ["workspace-ops", "sandboxes"],
+      expectedContained: ["workspace-ops"],
       expectedExcluded: ["agents"],
     },
   ] as const)("$name", ({ stateDir, getRoots, expectedContained, expectedExcluded, minLength }) => {
@@ -190,7 +190,6 @@ describe("local media roots", () => {
     expectNormalizedRootsContain(roots, [
       path.join(homeRoot, ".clawdbot", "media"),
       path.join(homeRoot, ".clawdbot", "workspace"),
-      path.join(homeRoot, ".clawdbot", "sandboxes"),
       path.join(homeRoot, ".openclaw", "media"),
     ]);
   });

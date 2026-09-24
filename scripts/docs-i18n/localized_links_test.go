@@ -31,8 +31,8 @@ func TestLocalizeBodyLinks(t *testing.T) {
 		},
 		{
 			name:  "redirect source resolves to canonical localized page",
-			input: `See [Sandbox](/sandboxing).`,
-			want:  `See [Sandbox](/zh-CN/gateway/sandboxing).`,
+			input: `See [Model Studio](/providers/modelstudio).`,
+			want:  `See [Model Studio](/zh-CN/concepts/model-providers).`,
 		},
 		{
 			name:  "fragment is preserved",
@@ -135,7 +135,7 @@ func setupDocsTree(t *testing.T) string {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "docs.json"), `{
   "redirects": [
-    { "source": "/sandboxing", "destination": "/gateway/sandboxing" }
+    { "source": "/providers/modelstudio", "destination": "/concepts/model-providers" }
   ]
 }`)
 
@@ -143,13 +143,13 @@ func setupDocsTree(t *testing.T) string {
 		"index.md":                              "# Home\n",
 		"channels/troubleshooting.md":           "# Troubleshooting\n",
 		"gateway/configuration.md":              "# Config\n",
-		"gateway/sandboxing.md":                 "# Sandboxing\n",
+		"concepts/model-providers.md":          "# Model Providers\n",
 		"security/formal-verification.md":       "---\npermalink: /security/formal-verification/\n---\n\n# Formal verification\n",
 		"help/faq.md":                           "# FAQ\n",
 		"zh-CN/index.md":                        "# Home\n",
 		"zh-CN/channels/troubleshooting.md":     "# Troubleshooting\n",
 		"zh-CN/gateway/configuration.md":        "# Config\n",
-		"zh-CN/gateway/sandboxing.md":           "# Sandboxing\n",
+		"zh-CN/concepts/model-providers.md":    "# Model Providers\n",
 		"zh-CN/security/formal-verification.md": "---\npermalink: /security/formal-verification/\n---\n\n# Formal verification\n",
 		"ja-JP/index.md":                        "# Home\n",
 	}

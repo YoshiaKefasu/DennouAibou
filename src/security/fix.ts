@@ -314,9 +314,6 @@ async function chmodCredentialsAndAgentState(params: {
     }
     const id =
       typeof (agent as { id?: unknown }).id === "string" ? (agent as { id: string }).id.trim() : "";
-    if (id) {
-      ids.add(id);
-    }
   }
 
   for (const agentId of ids) {
@@ -329,10 +326,6 @@ async function chmodCredentialsAndAgentState(params: {
     params.actions.push(await safeChmod({ path: agentRoot, mode: 0o700, require: "dir" }));
     // eslint-disable-next-line no-await-in-loop
     params.actions.push(await params.applyPerms({ path: agentDir, mode: 0o700, require: "dir" }));
-
-    const authPath = path.join(agentDir, "auth-profiles.json");
-    // eslint-disable-next-line no-await-in-loop
-    params.actions.push(await params.applyPerms({ path: authPath, mode: 0o600, require: "file" }));
 
     // eslint-disable-next-line no-await-in-loop
     params.actions.push(

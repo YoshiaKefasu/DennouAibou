@@ -9,14 +9,17 @@ import { requestJsonlSocket } from "./jsonl-socket.js";
 export * from "./exec-approvals-analysis.js";
 export * from "./exec-approvals-allowlist.js";
 
-export type ExecHost = "sandbox" | "gateway" | "node";
+// Note: "sandbox" was removed with the sandbox DEBLOAT. ExecHost is now
+// gateway/node only. normalizeExecHost still accepts "sandbox" input and maps
+// it to null (unknown) so stale configs fail validation instead of routing.
+export type ExecHost = "gateway" | "node";
 export type ExecTarget = "auto" | ExecHost;
 export type ExecSecurity = "deny" | "allowlist" | "full";
 export type ExecAsk = "off" | "on-miss" | "always";
 
 export function normalizeExecHost(value?: string | null): ExecHost | null {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "sandbox" || normalized === "gateway" || normalized === "node") {
+  if (normalized === "gateway" || normalized === "node") {
     return normalized;
   }
   return null;
@@ -701,24 +704,17 @@ export function resolveExecApprovalsFromFile(params: {
   };
 }
 
-export function requiresExecApproval(params: {
+export function requiresExecApproval(_params: {
   ask: ExecAsk;
   security: ExecSecurity;
   analysisOk: boolean;
   allowlistSatisfied: boolean;
   durableApprovalSatisfied?: boolean;
 }): boolean {
-  if (params.ask === "always") {
-    return true;
-  }
-  if (params.durableApprovalSatisfied === true) {
-    return false;
-  }
-  return (
-    params.ask === "on-miss" &&
-    params.security === "allowlist" &&
-    (!params.analysisOk || !params.allowlistSatisfied)
-  );
+  // Note: exec-approval DEBLOAT — always fully allow. The approval queue /
+  // /approve flow is removed; all exec commands run without prompting.
+  // Params are kept for call-site compatibility only.
+  return false;
 }
 
 export function hasDurableExecApproval(params: {

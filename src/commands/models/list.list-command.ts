@@ -25,12 +25,11 @@ export async function modelsListCommand(
   runtime: RuntimeEnv,
 ) {
   ensureFlagCompatibility(opts);
-  const { ensureAuthProfileStore, ensureOpenClawModelsJson } = await import("./list.runtime.js");
+  const { ensureOpenClawModelsJson } = await import("./list.runtime.js");
   const { sourceConfig, resolvedConfig: cfg } = await loadModelsConfigWithSource({
     commandName: "models list",
     runtime,
   });
-  const authStore = ensureAuthProfileStore();
   const providerFilter = (() => {
     const raw = opts.provider?.trim();
     if (!raw) {
@@ -69,7 +68,6 @@ export async function modelsListCommand(
   const rows: ModelRow[] = [];
   const rowContext = {
     cfg,
-    authStore,
     availableKeys,
     configuredByKey,
     discoveredKeys,

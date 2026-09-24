@@ -125,20 +125,14 @@ Agents process in order (one waits for previous to finish):
         "id": "code-reviewer",
         "name": "Code Reviewer",
         "workspace": "/path/to/code-reviewer",
-        "sandbox": { "mode": "all" }
-      },
       {
         "id": "security-auditor",
         "name": "Security Auditor",
         "workspace": "/path/to/security-auditor",
-        "sandbox": { "mode": "all" }
-      },
       {
         "id": "docs-generator",
         "name": "Documentation Generator",
         "workspace": "/path/to/docs-generator",
-        "sandbox": { "mode": "all" }
-      }
     ]
   },
   "broadcast": {
@@ -171,7 +165,6 @@ Each agent in a broadcast group maintains completely separate:
 
 - **Session keys** (`agent:alfred:whatsapp:group:120363...` vs `agent:baerbel:whatsapp:group:120363...`)
 - **Conversation history** (agent doesn't see other agents' messages)
-- **Workspace** (separate sandboxes if configured)
 - **Tool access** (different allow/deny lists)
 - **Memory/context** (separate IDENTITY.md, SOUL.md, etc.)
 - **Group context buffer** (recent group messages used for context) is shared per peer, so all broadcast agents see the same context when triggered
@@ -332,7 +325,6 @@ tail -f ~/.openclaw/logs/gateway.log | grep broadcast
 
 - Reduce number of agents per group
 - Use lighter models (sonnet instead of opus)
-- Check sandbox startup time
 
 ## Examples
 
@@ -437,6 +429,5 @@ Planned features:
 
 ## See Also
 
-- [Multi-Agent Configuration](/tools/multi-agent-sandbox-tools)
 - [Routing Configuration](/channels/channel-routing)
 - [Session Management](/concepts/session)

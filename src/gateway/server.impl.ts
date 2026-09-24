@@ -72,11 +72,6 @@ import {
 } from "../secrets/runtime.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import {
-  getInspectableTaskRegistrySummary,
-  startTaskRegistryMaintenance,
-  stopTaskRegistryMaintenance,
-} from "../tasks/task-registry.maintenance.js";
 import { runSetupWizard } from "../wizard/setup.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
 import { resolveGatewayAuth } from "./auth.js";
@@ -550,11 +545,7 @@ export async function startGatewayServer(
   }
   setGatewaySigusr1RestartPolicy({ allowExternal: isRestartEnabled(cfgAtStart) });
   setPreRestartDeferralCheck(
-    () =>
-      getTotalQueueSize() +
-      getTotalPendingReplies() +
-      getActiveEmbeddedRunCount() +
-      getInspectableTaskRegistrySummary().active,
+    () => getTotalQueueSize() + getTotalPendingReplies() + getActiveEmbeddedRunCount(),
   );
   // Unconditional startup migration: seed gateway.controlUi.allowedOrigins for existing
   // non-loopback installs that upgraded to v2026.2.26+ without required origins.
@@ -928,7 +919,6 @@ export async function startGatewayServer(
         });
 
     if (!minimalTestGateway) {
-      startTaskRegistryMaintenance();
       // Raw chat indexer (SQLite + FTS5 permanent ledger)
       try {
         const { startRawChatIndexer, backfillSessionFiles } =
@@ -1536,7 +1526,6 @@ export async function startGatewayServer(
     pluginServices,
     cron,
     eventPumpDisposer,
-    stopTaskRegistryMaintenance,
     nodePresenceTimers,
     broadcast,
     tickInterval,

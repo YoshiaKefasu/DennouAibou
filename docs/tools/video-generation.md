@@ -44,8 +44,6 @@ Video generation is asynchronous. When the agent calls `video_generate` in a ses
 3. When the video is ready, DennouAibou wakes the same session with an internal completion event.
 4. The agent posts the finished video back into the original conversation.
 
-While a job is in flight, duplicate `video_generate` calls in the same session return the current task status instead of starting another generation. Use `openclaw tasks list` or `openclaw tasks show <taskId>` to check progress from the CLI.
-
 Outside of session-backed agent runs (for example, direct tool invocations), the tool falls back to inline generation and returns the final media path in the same turn.
 
 ## Supported providers
@@ -160,7 +158,6 @@ openclaw config set agents.defaults.videoGenerationModel.primary "google/veo-3.1
 ## Related
 
 - [Tools Overview](/tools)
-- [Background Tasks](/automation/tasks) -- task tracking for async video generation
 - [Google (Gemini)](/providers/google)
 - [OpenAI](/providers/openai)
 - [Configuration Reference](/gateway/configuration-reference#agent-defaults)

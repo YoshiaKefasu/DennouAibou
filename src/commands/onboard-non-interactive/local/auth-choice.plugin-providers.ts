@@ -3,11 +3,11 @@ import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
 } from "../../../agents/agent-scope.js";
-import type { ApiKeyCredential } from "../../../agents/auth-profiles/types.js";
 import { resolveDefaultAgentWorkspaceDir } from "../../../agents/workspace.js";
 import type { OpenClawConfig } from "../../../config/config.js";
 import { enablePluginInConfig } from "../../../plugins/enable.js";
 import { resolvePreferredProviderForAuthChoice } from "../../../plugins/provider-auth-choice-preference.js";
+import type { ApiKeyCredential } from "../../../plugins/types.js";
 import type {
   ProviderAuthOptionBag,
   ProviderNonInteractiveApiKeyCredentialParams,
@@ -70,7 +70,7 @@ export async function applyNonInteractivePluginProviderChoice(params: {
   baseConfig: OpenClawConfig;
   resolveApiKey: (input: ProviderResolveNonInteractiveApiKeyParams) => Promise<{
     key: string;
-    source: "profile" | "env" | "flag";
+    source: "env" | "flag";
     envVarName?: string;
   } | null>;
   toApiKeyCredential: (

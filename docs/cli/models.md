@@ -25,11 +25,6 @@ openclaw models scan
 ```
 
 `openclaw models status` shows the resolved default/fallbacks plus an auth overview.
-When provider usage snapshots are available, the OAuth/API-key status section includes
-provider usage windows and quota snapshots.
-Current usage-window providers: Gemini CLI and OpenAI Codex. Usage auth comes
-from provider-specific hooks when available; otherwise DennouAibou falls back to
-matching OAuth/API-key credentials from auth profiles, env, or config.
 In `--json` output, `auth.providers` is the env/config/store-aware provider
 overview, while `auth.oauth` is auth-store profile health only.
 Add `--probe` to run live auth probes against each configured provider profile.

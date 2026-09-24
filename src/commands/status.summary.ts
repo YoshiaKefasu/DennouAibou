@@ -15,9 +15,6 @@ import type { HeartbeatStatus, SessionStatus, StatusSummary } from "./status.typ
 let channelSummaryModulePromise: Promise<typeof import("../infra/channel-summary.js")> | undefined;
 let linkChannelModulePromise: Promise<typeof import("./status.link-channel.js")> | undefined;
 let configIoModulePromise: Promise<typeof import("../config/io.js")> | undefined;
-let taskRegistryMaintenanceModulePromise:
-  | Promise<typeof import("../tasks/task-registry.maintenance.js")>
-  | undefined;
 
 function loadChannelSummaryModule() {
   channelSummaryModulePromise ??= import("../infra/channel-summary.js");
@@ -37,11 +34,6 @@ const loadStatusSummaryRuntimeModule = createLazyRuntimeSurface(
 function loadConfigIoModule() {
   configIoModulePromise ??= import("../config/io.js");
   return configIoModulePromise;
-}
-
-function loadTaskRegistryMaintenanceModule() {
-  taskRegistryMaintenanceModulePromise ??= import("../tasks/task-registry.maintenance.js");
-  return taskRegistryMaintenanceModulePromise;
 }
 
 const buildFlags = (entry?: SessionEntry): string[] => {
@@ -103,12 +95,11 @@ export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSumm
 
 /**
  * Injectable seams for the status-summary boundaries (config IO, channel
- * presence/summary, session store, task maintenance, and clock). Tests supply
- * fixtures instead of replacing whole modules with `vi.mock`.
+ * presence/summary, session store, and clock). Tests supply fixtures instead
+ * of replacing whole modules with `vi.mock`.
  */
 export type StatusSummaryDeps = {
   statusSummaryRuntime?: typeof import("./status.summary.runtime.js").statusSummaryRuntime;
-  taskMaintenanceModule?: typeof import("../tasks/task-registry.maintenance.js");
   loadConfig?: () => OpenClawConfig;
   hasPotentialConfiguredChannels?: typeof hasPotentialConfiguredChannels;
   resolveLinkChannelContext?: typeof import("./status.link-channel.js").resolveLinkChannelContext;
@@ -175,10 +166,6 @@ export async function getStatusSummary(
     : [];
   const mainSessionKey = (deps.resolveMainSessionKey ?? resolveMainSessionKey)(cfg);
   const queuedSystemEvents = peekSystemEventsImpl(mainSessionKey);
-  const taskMaintenanceModule =
-    deps.taskMaintenanceModule ?? (await loadTaskRegistryMaintenanceModule());
-  const tasks = taskMaintenanceModule.getInspectableTaskRegistrySummary();
-  const taskAudit = taskMaintenanceModule.getInspectableTaskAuditSummary();
 
   const resolved = resolveConfiguredStatusModelRef({
     cfg,
@@ -306,8 +293,6 @@ export async function getStatusSummary(
     },
     channelSummary,
     queuedSystemEvents,
-    tasks,
-    taskAudit,
     sessions: {
       paths: Array.from(paths),
       count: totalSessions,

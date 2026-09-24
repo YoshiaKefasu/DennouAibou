@@ -2,7 +2,6 @@ import { listAgentEntries } from "../../agents/agent-scope.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveFastModeState } from "../../agents/fast-mode.js";
 import type { ModelAliasIndex } from "../../agents/model-selection.js";
-import { resolveSandboxRuntimeStatus } from "../../agents/sandbox/runtime-status.js";
 import type { SkillCommandSpec } from "../../agents/skills.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -357,15 +356,10 @@ export async function resolveReplyDirectives(params: {
   const elevatedFailures = elevated.failures;
   if (directives.hasElevatedDirective && (!elevatedEnabled || !elevatedAllowed)) {
     typing.cleanup();
-    const runtimeSandboxed = resolveSandboxRuntimeStatus({
-      cfg,
-      sessionKey: ctx.SessionKey,
-    }).sandboxed;
     return {
       kind: "reply",
       reply: {
         text: formatElevatedUnavailableMessage({
-          runtimeSandboxed,
           failures: elevatedFailures,
           sessionKey: ctx.SessionKey,
         }),

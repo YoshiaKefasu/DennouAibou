@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearRuntimeConfigSnapshot, setRuntimeConfigSnapshot } from "../config/config.js";
 import type { ModelProviderConfig } from "../config/config.js";
 import { withFetchPreconnect } from "../test-utils/fetch-mock.js";
-import type { AuthProfileStore } from "./auth-profiles.js";
 import {
   CUSTOM_LOCAL_AUTH_MARKER,
   GCP_VERTEX_CREDENTIALS_MARKER,
@@ -192,56 +191,28 @@ describe("resolveAwsSdkEnvVarName", () => {
 });
 
 describe("resolveModelAuthMode", () => {
-  it("returns mixed when provider has both token and api key profiles", () => {
-    const store: AuthProfileStore = {
-      version: 1,
-      profiles: {
-        "openai:token": {
-          type: "token",
-          provider: "openai",
-          token: "token-value",
-        },
-        "openai:key": {
-          type: "api_key",
-          provider: "openai",
-          key: "api-key",
-        },
-      },
-    };
-
-    expect(resolveModelAuthMode("openai", undefined, store)).toBe("mixed");
-  });
-
   it("returns aws-sdk when provider auth is overridden", () => {
     expect(
-      resolveModelAuthMode(
-        "amazon-bedrock",
-        {
-          models: {
-            providers: {
-              "amazon-bedrock": {
-                baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-                models: [],
-                auth: "aws-sdk",
-              },
+      resolveModelAuthMode("amazon-bedrock", {
+        models: {
+          providers: {
+            "amazon-bedrock": {
+              baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+              models: [],
+              auth: "aws-sdk",
             },
           },
         },
-        { version: 1, profiles: {} },
-      ),
+      }),
     ).toBe("aws-sdk");
   });
 
   it("returns aws-sdk for bedrock alias without explicit auth override", () => {
-    expect(resolveModelAuthMode("bedrock", undefined, { version: 1, profiles: {} })).toBe(
-      "aws-sdk",
-    );
+    expect(resolveModelAuthMode("bedrock", undefined)).toBe("aws-sdk");
   });
 
   it("returns aws-sdk for aws-bedrock alias without explicit auth override", () => {
-    expect(resolveModelAuthMode("aws-bedrock", undefined, { version: 1, profiles: {} })).toBe(
-      "aws-sdk",
-    );
+    expect(resolveModelAuthMode("aws-bedrock", undefined)).toBe("aws-sdk");
   });
 });
 
@@ -407,7 +378,6 @@ describe("resolveApiKeyForProvider", () => {
             },
           },
         },
-        store: { version: 1, profiles: {} },
       }),
     );
 
@@ -451,7 +421,6 @@ describe("resolveApiKeyForProvider", () => {
       resolveApiKeyForProvider({
         provider: "xai",
         cfg: sourceConfig,
-        store: { version: 1, profiles: {} },
       }),
     );
 
@@ -481,7 +450,6 @@ describe("resolveApiKeyForProvider", () => {
               },
             },
           },
-          store: { version: 1, profiles: {} },
         }),
       ),
     ).rejects.toThrow('No API key found for provider "xai"');
@@ -500,16 +468,6 @@ describe("resolveApiKeyForProvider", () => {
               baseUrl: "https://api.openai.com/v1",
               models: [],
             },
-          },
-        },
-      },
-      store: {
-        version: 1,
-        profiles: {
-          "openai:default": {
-            type: "api_key",
-            provider: "openai",
-            key: "sk-profile-stale", // pragma: allowlist secret
           },
         },
       },

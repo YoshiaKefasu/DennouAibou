@@ -5,7 +5,6 @@ import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import type { HealthSummary } from "./health.js";
 import { getDaemonStatusSummary, getNodeDaemonStatusSummary } from "./status.daemon.js";
 
-let providerUsagePromise: Promise<typeof import("../infra/provider-usage.js")> | undefined;
 let securityAuditModulePromise: Promise<typeof import("../security/audit.runtime.js")> | undefined;
 let gatewayCallModulePromise: Promise<typeof import("../gateway/call.js")> | undefined;
 let statusScanModulePromise: Promise<typeof import("./status.scan.js")> | undefined;
@@ -17,11 +16,6 @@ let statusCommandTextRuntimePromise:
   | Promise<typeof import("./status.command.text-runtime.js")>
   | undefined;
 let statusNodeModeModulePromise: Promise<typeof import("./status.node-mode.js")> | undefined;
-
-function loadProviderUsage() {
-  providerUsagePromise ??= import("../infra/provider-usage.js");
-  return providerUsagePromise;
-}
 
 function loadSecurityAuditModule() {
   securityAuditModulePromise ??= import("../security/audit.runtime.js");
@@ -111,7 +105,6 @@ export async function statusCommand(
   opts: {
     json?: boolean;
     deep?: boolean;
-    usage?: boolean;
     timeoutMs?: number;
     verbose?: boolean;
     all?: boolean;
@@ -180,19 +173,6 @@ export async function statusCommand(
     pluginCompatibility,
   } = scan;
 
-  const usage = opts.usage
-    ? await withProgress(
-        {
-          label: "Fetching usage snapshot…",
-          indeterminate: true,
-          enabled: opts.json !== true,
-        },
-        async () => {
-          const { loadProviderUsageSummary } = await loadProviderUsage();
-          return await loadProviderUsageSummary({ timeoutMs: opts.timeoutMs });
-        },
-      )
-    : undefined;
   const health: HealthSummary | undefined = opts.deep
     ? await withProgress(
         {
@@ -249,7 +229,7 @@ export async function statusCommand(
         count: pluginCompatibility.length,
         warnings: pluginCompatibility,
       },
-      ...(health || usage ? { health, usage } : {}),
+      ...(health ? { health } : {}),
     });
     return;
   }
@@ -389,25 +369,6 @@ export async function statusCommand(
     : "";
   const eventsValue =
     summary.queuedSystemEvents.length > 0 ? `${summary.queuedSystemEvents.length} queued` : "none";
-  const tasksValue =
-    summary.tasks.total > 0
-      ? [
-          `${summary.tasks.active} active`,
-          `${summary.tasks.byStatus.queued} queued`,
-          `${summary.tasks.byStatus.running} running`,
-          summary.tasks.failures > 0
-            ? warn(`${summary.tasks.failures} issue${summary.tasks.failures === 1 ? "" : "s"}`)
-            : muted("no issues"),
-          summary.taskAudit.errors > 0
-            ? warn(
-                `audit ${summary.taskAudit.errors} error${summary.taskAudit.errors === 1 ? "" : "s"} · ${summary.taskAudit.warnings} warn`,
-              )
-            : summary.taskAudit.warnings > 0
-              ? muted(`audit ${summary.taskAudit.warnings} warn`)
-              : muted("audit clean"),
-          `${summary.tasks.total} tracked`,
-        ].join(" · ")
-      : muted("none");
 
   const probesValue = health ? ok("enabled") : muted("skipped (use --deep)");
 
@@ -489,7 +450,6 @@ export async function statusCommand(
     { Item: "Plugin compatibility", Value: pluginCompatibilityValue },
     { Item: "Probes", Value: probesValue },
     { Item: "Events", Value: eventsValue },
-    { Item: "Tasks", Value: tasksValue },
     {
       Item: "Sessions",
       Value: `${summary.sessions.count} active · default ${defaults.model ?? "unknown"}${defaultCtx} · ${storeLabel}`,
@@ -509,12 +469,6 @@ export async function statusCommand(
       rows: overviewRows,
     }).trimEnd(),
   );
-  if (summary.taskAudit.errors > 0) {
-    runtime.log("");
-    runtime.log(
-      theme.muted(`Task maintenance: ${formatCliCommand("openclaw tasks maintenance --apply")}`),
-    );
-  }
 
   if (pluginCompatibility.length > 0) {
     runtime.log("");
@@ -730,15 +684,6 @@ export async function statusCommand(
         rows,
       }).trimEnd(),
     );
-  }
-
-  if (usage) {
-    const { formatUsageReportLines } = await loadProviderUsage();
-    runtime.log("");
-    runtime.log(theme.heading("Usage"));
-    for (const line of formatUsageReportLines(usage)) {
-      runtime.log(line);
-    }
   }
 
   runtime.log("");

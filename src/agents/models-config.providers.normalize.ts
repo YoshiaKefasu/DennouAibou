@@ -1,5 +1,4 @@
 import type { OpenClawConfig } from "../config/config.js";
-import { ensureAuthProfileStore } from "./auth-profiles/store.js";
 import {
   normalizeProviderSpecificConfig,
   resolveProviderConfigApiKeyResolver,
@@ -9,7 +8,6 @@ import {
   normalizeConfiguredProviderApiKey,
   normalizeHeaderValues,
   normalizeResolvedEnvApiKey,
-  resolveApiKeyFromProfiles,
   resolveMissingProviderApiKey,
 } from "./models-config.providers.secrets.js";
 import { enforceSourceManagedProviderSecrets } from "./models-config.providers.source-managed.js";
@@ -30,17 +28,6 @@ export function normalizeProviders(params: {
     return providers;
   }
   const env = params.env ?? process.env;
-  let authStore: ReturnType<typeof ensureAuthProfileStore> | undefined;
-  const resolveProfileApiKey = (providerKey: string) => {
-    authStore ??= ensureAuthProfileStore(params.agentDir, {
-      allowKeychainPrompt: false,
-    });
-    return resolveApiKeyFromProfiles({
-      provider: providerKey,
-      store: authStore,
-      env,
-    });
-  };
   let mutated = false;
   const next: Record<string, ProviderConfig> = {};
 
@@ -96,7 +83,7 @@ export function normalizeProviders(params: {
         (typeof normalizedProvider.apiKey === "string" && normalizedProvider.apiKey.trim()) ||
         normalizedProvider.apiKey
       );
-    const profileApiKey = needsProfileApiKey ? resolveProfileApiKey(normalizedKey) : undefined;
+    const profileApiKey = undefined;
     const providerApiKeyResolver = needsProfileApiKey
       ? resolveProviderConfigApiKeyResolver(normalizedKey)
       : undefined;

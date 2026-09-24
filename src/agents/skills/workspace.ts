@@ -5,7 +5,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { isPathInside } from "../../infra/path-guards.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
-import { resolveSandboxPath } from "../sandbox-paths.js";
+import { resolvePathWithinRoot } from "../path-policy.js";
 import { resolveEffectiveAgentSkillFilter } from "./agent-filter.js";
 import { resolveBundledSkillsDir } from "./bundled-dir.js";
 import { shouldIncludeSkill } from "./config.js";
@@ -763,7 +763,7 @@ function resolveSyncedSkillDestinationPath(params: {
     return null;
   }
   const uniqueDirName = resolveUniqueSyncedSkillDirName(sourceDirName, params.usedDirNames);
-  return resolveSandboxPath({
+  return resolvePathWithinRoot({
     filePath: uniqueDirName,
     cwd: params.targetSkillsDir,
     root: params.targetSkillsDir,
@@ -832,7 +832,7 @@ export async function syncSkillsToWorkspace(params: {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : JSON.stringify(error);
-        skillsLogger.warn(`Failed to copy ${entry.skill.name} to sandbox: ${message}`);
+        skillsLogger.warn(`Failed to copy ${entry.skill.name} to target workspace: ${message}`);
       }
     }
   });

@@ -80,8 +80,6 @@ import {
 import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
 import { createOpenClawCodingTools, resolveToolLoopDetectionConfig } from "../../pi-tools.js";
 import { registerProviderStreamForModel } from "../../provider-stream.js";
-import { resolveSandboxContext } from "../../sandbox.js";
-import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
 import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
 import { logSessionCheckin, requestSessionWrite } from "../../session-gatekeeper.js";
 import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
@@ -127,7 +125,6 @@ import {
   setActiveEmbeddedRun,
   updateActiveEmbeddedRunSnapshot,
 } from "../runs.js";
-import { buildEmbeddedSandboxInfo } from "../sandbox-info.js";
 import { prewarmSessionFile, trackSessionManagerAccess } from "../session-manager-cache.js";
 import { prepareSessionManagerForRun } from "../session-manager-init.js";
 import { resolveEmbeddedRunSkillEntries } from "../skills-runtime.js";
@@ -183,7 +180,6 @@ import {
 import {
   appendAttemptCacheTtlIfNeeded,
   composeSystemPromptWithHookContext,
-  resolveAttemptSpawnWorkspaceDir,
 } from "./attempt.thread-helpers.js";
 import {
   shouldRepairMalformedAnthropicToolCallArguments,
@@ -212,7 +208,6 @@ import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types
 export {
   appendAttemptCacheTtlIfNeeded,
   composeSystemPromptWithHookContext,
-  resolveAttemptSpawnWorkspaceDir,
 } from "./attempt.thread-helpers.js";
 export {
   buildAfterTurnRuntimeContext,
@@ -380,17 +375,8 @@ export async function runEmbeddedAttempt(
 
   await fs.mkdir(resolvedWorkspace, { recursive: true });
 
-  const sandboxSessionKey = params.sessionKey?.trim() || params.sessionId;
-  const sandbox = await resolveSandboxContext({
-    config: params.config,
-    sessionKey: sandboxSessionKey,
-    workspaceDir: resolvedWorkspace,
-  });
-  const effectiveWorkspace = sandbox?.enabled
-    ? sandbox.workspaceAccess === "rw"
-      ? resolvedWorkspace
-      : sandbox.workspaceDir
-    : resolvedWorkspace;
+  const runSessionKey = params.sessionKey?.trim() || params.sessionId;
+  const effectiveWorkspace = resolvedWorkspace;
   await fs.mkdir(effectiveWorkspace, { recursive: true });
   const { sessionAgentId } = resolveSessionAgentIds({
     sessionKey: params.sessionKey,
@@ -488,7 +474,6 @@ export async function runEmbeddedAttempt(
               ...params.execOverrides,
               elevated: params.bashElevated,
             },
-            sandbox,
             messageProvider: params.messageChannel ?? params.messageProvider,
             agentAccountId: params.agentAccountId,
             messageTo: params.messageTo,
@@ -503,17 +488,11 @@ export async function runEmbeddedAttempt(
             senderE164: params.senderE164,
             senderIsOwner: params.senderIsOwner,
             allowGatewaySubagentBinding: params.allowGatewaySubagentBinding,
-            sessionKey: sandboxSessionKey,
+            sessionKey: runSessionKey,
             sessionId: params.sessionId,
             runId: params.runId,
             agentDir,
             workspaceDir: effectiveWorkspace,
-            // When sandboxing uses a copied workspace (`ro` or `none`), effectiveWorkspace points
-            // at the sandbox copy. Spawned subagents should inherit the real workspace instead.
-            spawnWorkspaceDir: resolveAttemptSpawnWorkspaceDir({
-              sandbox,
-              resolvedWorkspace,
-            }),
             config: params.config,
             abortSignal: runAbortController.signal,
             modelProvider: params.model.provider,
@@ -647,7 +626,6 @@ export async function runEmbeddedAttempt(
             accountId: params.agentAccountId,
           })
         : undefined;
-    const sandboxInfo = buildEmbeddedSandboxInfo(sandbox, params.bashElevated);
     const reasoningTagHint = isReasoningTagProvider(params.provider, {
       config: params.config,
       workspaceDir: effectiveWorkspace,
@@ -757,7 +735,6 @@ export async function runEmbeddedAttempt(
         promptMode: effectivePromptMode,
         runtimeInfo,
         messageToolHints,
-        sandboxInfo,
         tools: effectiveTools,
         modelAliasLines: buildModelAliasLines(params.config),
         userTimezone,
@@ -782,13 +759,6 @@ export async function runEmbeddedAttempt(
         warningMode: bootstrapPromptWarningMode,
         warning: bootstrapPromptWarning,
       }),
-      sandbox: (() => {
-        const runtime = resolveSandboxRuntimeStatus({
-          cfg: params.config,
-          sessionKey: sandboxSessionKey,
-        });
-        return { mode: runtime.mode, sandboxed: runtime.sandboxed };
-      })(),
       systemPrompt: appendPrompt,
       bootstrapFiles: hookAdjustedBootstrapFiles,
       injectedFiles: contextFiles,
@@ -925,7 +895,6 @@ export async function runEmbeddedAttempt(
 
       const { builtInTools, customTools } = splitSdkTools({
         tools: effectiveTools,
-        sandboxEnabled: !!sandbox?.enabled,
       });
 
       // Add client tools (OpenResponses hosted tools) to customTools
@@ -942,7 +911,7 @@ export async function runEmbeddedAttempt(
             },
             {
               agentId: sessionAgentId,
-              sessionKey: sandboxSessionKey,
+              sessionKey: runSessionKey,
               sessionId: params.sessionId,
               runId: params.runId,
               loopDetection: clientToolLoopDetection,
@@ -1458,7 +1427,7 @@ export async function runEmbeddedAttempt(
           enforceFinalTag: params.enforceFinalTag,
           silentExpected: params.silentExpected,
           config: params.config,
-          sessionKey: sandboxSessionKey,
+          sessionKey: runSessionKey,
           sessionId: params.sessionId,
           agentId: sessionAgentId,
           internalEvents: params.internalEvents,
@@ -1738,11 +1707,6 @@ export async function runEmbeddedAttempt(
             maxBytes: MAX_IMAGE_BYTES,
             maxDimensionPx: resolveImageSanitizationLimits(params.config).maxDimensionPx,
             workspaceOnly: effectiveFsWorkspaceOnly,
-            // Enforce sandbox path restrictions when sandbox is enabled
-            sandbox:
-              sandbox?.enabled && sandbox?.fsBridge
-                ? { root: sandbox.workspaceDir, bridge: sandbox.fsBridge }
-                : undefined,
           });
 
           cacheTrace?.recordStage("prompt:images", {

@@ -12,7 +12,6 @@ const discoverModelsMock = vi.fn();
 const resolveModelWithRegistryMock = vi.fn();
 const getApiKeyForModelMock = vi.fn();
 const requireApiKeyMock = vi.fn();
-const resolveSessionAuthProfileOverrideMock = vi.fn();
 const getActiveEmbeddedRunSnapshotMock = vi.fn();
 const diagDebugMock = vi.fn();
 
@@ -63,11 +62,6 @@ vi.mock("./model-auth.js", () => ({
 
 vi.mock("./pi-embedded-runner/runs.js", () => ({
   getActiveEmbeddedRunSnapshot: (...args: unknown[]) => getActiveEmbeddedRunSnapshotMock(...args),
-}));
-
-vi.mock("./auth-profiles/session-override.js", () => ({
-  resolveSessionAuthProfileOverride: (...args: unknown[]) =>
-    resolveSessionAuthProfileOverrideMock(...args),
 }));
 
 vi.mock("../logging/diagnostic.js", () => ({
@@ -199,7 +193,6 @@ describe("runBtwSideQuestion", () => {
     resolveModelWithRegistryMock.mockReset();
     getApiKeyForModelMock.mockReset();
     requireApiKeyMock.mockReset();
-    resolveSessionAuthProfileOverrideMock.mockReset();
     getActiveEmbeddedRunSnapshotMock.mockReset();
     diagDebugMock.mockReset();
 
@@ -214,7 +207,6 @@ describe("runBtwSideQuestion", () => {
     });
     getApiKeyForModelMock.mockResolvedValue({ apiKey: "secret", mode: "api-key", source: "test" });
     requireApiKeyMock.mockReturnValue("secret");
-    resolveSessionAuthProfileOverrideMock.mockResolvedValue("profile-1");
     getActiveEmbeddedRunSnapshotMock.mockReturnValue(undefined);
   });
 

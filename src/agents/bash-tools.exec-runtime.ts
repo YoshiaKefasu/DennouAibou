@@ -15,7 +15,6 @@ import { enqueueSystemEvent } from "../infra/system-events.js";
 import { scopedWakeOptions } from "../routing/session-key.js";
 import type { ProcessSession } from "./bash-process-registry.js";
 import type { ExecToolDetails } from "./bash-tools.exec-types.js";
-import type { BashSandboxConfig } from "./bash-tools.shared.js";
 export { applyPathPrepend, findPathKey, normalizePathPrepend } from "../infra/path-prepend.js";
 export {
   normalizeExecAsk,
@@ -35,12 +34,7 @@ import {
   tail,
 } from "./bash-process-registry.js";
 import type { ExecRuntimeDeps } from "./bash-tools.exec-types.js";
-import {
-  buildDockerExecArgs,
-  chunkString,
-  clampWithDefault,
-  readEnvInt,
-} from "./bash-tools.shared.js";
+import { chunkString, clampWithDefault, readEnvInt } from "./bash-tools.shared.js";
 import { buildCursorPositionResponse, stripDsrRequests } from "./pty-dsr.js";
 import { getShellConfig, sanitizeBinaryOutput } from "./shell-utils.js";
 
@@ -63,8 +57,7 @@ export function detectCursorKeyMode(raw: string): "application" | "normal" | nul
   return lastSmkx > lastRmkx ? "application" : "normal";
 }
 
-// Sanitize inherited host env before merge so dangerous variables from process.env
-// are not propagated into non-sandboxed executions.
+// Sanitized inherited host env is used for all executions.
 export function sanitizeHostBaseEnv(env: Record<string, string>): Record<string, string> {
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
@@ -151,7 +144,7 @@ export const execSchema = Type.Object({
   ),
   host: Type.Optional(
     Type.String({
-      description: "Exec host/target (auto|sandbox|gateway|node).",
+      description: "Exec host/target (auto|gateway|node).",
     }),
   ),
   security: Type.Optional(
@@ -211,7 +204,7 @@ export type ExecProcessHandle = {
 };
 
 export function renderExecHostLabel(host: ExecHost) {
-  return host === "sandbox" ? "sandbox" : host === "gateway" ? "gateway" : "node";
+  return host;
 }
 
 export function renderExecTargetLabel(target: ExecTarget) {
@@ -221,15 +214,11 @@ export function renderExecTargetLabel(target: ExecTarget) {
 export function isRequestedExecTargetAllowed(params: {
   configuredTarget: ExecTarget;
   requestedTarget: ExecTarget;
-  sandboxAvailable?: boolean;
 }) {
   if (params.requestedTarget === params.configuredTarget) {
     return true;
   }
   if (params.configuredTarget === "auto") {
-    if (params.sandboxAvailable && params.requestedTarget === "gateway") {
-      return false;
-    }
     return true;
   }
   return false;
@@ -239,7 +228,6 @@ export function resolveExecTarget(params: {
   configuredTarget?: ExecTarget;
   requestedTarget?: ExecTarget | null;
   elevatedRequested: boolean;
-  sandboxAvailable: boolean;
 }) {
   const configuredTarget = params.configuredTarget ?? "auto";
   const requestedTarget = params.requestedTarget ?? null;
@@ -257,12 +245,11 @@ export function resolveExecTarget(params: {
     !isRequestedExecTargetAllowed({
       configuredTarget,
       requestedTarget,
-      sandboxAvailable: params.sandboxAvailable,
     })
   ) {
     const allowedConfig = Array.from(
       new Set(
-        requestedTarget === "gateway" && !params.sandboxAvailable
+        requestedTarget === "gateway"
           ? ["gateway", "auto"]
           : [renderExecTargetLabel(requestedTarget), "auto"],
       ),
@@ -274,8 +261,7 @@ export function resolveExecTarget(params: {
     );
   }
   const selectedTarget = requestedTarget ?? configuredTarget;
-  const effectiveHost =
-    selectedTarget === "auto" ? (params.sandboxAvailable ? "sandbox" : "gateway") : selectedTarget;
+  const effectiveHost = selectedTarget === "auto" ? "gateway" : selectedTarget;
   return {
     configuredTarget,
     requestedTarget,
@@ -533,8 +519,6 @@ export async function runExecProcess(
     execCommand?: string;
     workdir: string;
     env: Record<string, string>;
-    sandbox?: BashSandboxConfig;
-    containerWorkdir?: string | null;
     usePty: boolean;
     warnings: string[];
     maxOutput: number;
@@ -635,7 +619,6 @@ export async function runExecProcess(
     typeof opts.timeoutSec === "number" && opts.timeoutSec > 0
       ? Math.floor(opts.timeoutSec * 1000)
       : undefined;
-  let sandboxFinalizeToken: unknown;
 
   const spawnSpec:
     | {
@@ -651,32 +634,6 @@ export async function runExecProcess(
         env: NodeJS.ProcessEnv;
         stdinMode: "pipe-open";
       } = await (async () => {
-    if (opts.sandbox) {
-      const backendExecSpec = await opts.sandbox.buildExecSpec?.({
-        command: execCommand,
-        workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
-        env: shellRuntimeEnv,
-        usePty: opts.usePty,
-      });
-      sandboxFinalizeToken = backendExecSpec?.finalizeToken;
-      return {
-        mode: "child" as const,
-        argv: backendExecSpec?.argv ?? [
-          "docker",
-          ...buildDockerExecArgs({
-            containerName: opts.sandbox.containerName,
-            command: execCommand,
-            workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
-            env: shellRuntimeEnv,
-            tty: opts.usePty,
-          }),
-        ],
-        env: backendExecSpec?.env ?? process.env,
-        stdinMode:
-          backendExecSpec?.stdinMode ??
-          (opts.usePty ? ("pipe-open" as const) : ("pipe-closed" as const)),
-      };
-    }
     const { shell, args: shellArgs } = getShellConfig();
     const childArgv = [shell, ...shellArgs, execCommand];
     if (opts.usePty) {
@@ -718,7 +675,7 @@ export async function runExecProcess(
     const spawnBase = {
       runId: sessionId,
       sessionId: opts.sessionKey?.trim() || sessionId,
-      backendId: opts.sandbox ? "exec-sandbox" : "exec-host",
+      backendId: "exec-host",
       scopeKey: opts.scopeKey,
       cwd: opts.workdir,
       env: spawnSpec.env,
@@ -793,14 +750,6 @@ export async function runExecProcess(
       maybeNotifyOnExit(session, outcome.status);
       if (!session.child && session.stdin) {
         session.stdin.destroyed = true;
-      }
-      if (opts.sandbox?.finalizeExec) {
-        await opts.sandbox.finalizeExec({
-          status: outcome.status,
-          exitCode: exit.exitCode ?? null,
-          timedOut: exit.timedOut,
-          token: sandboxFinalizeToken,
-        });
       }
       return outcome;
     })

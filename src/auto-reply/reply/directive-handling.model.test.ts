@@ -1,8 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  clearRuntimeAuthProfileStoreSnapshots,
-  replaceRuntimeAuthProfileStoreSnapshots,
-} from "../../agents/auth-profiles.js";
 import type { ModelAliasIndex } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -22,14 +18,12 @@ const queueMocks = vi.hoisted(() => ({
 }));
 
 // Mock dependencies for directive handling persistence.
-vi.mock("../../agents/agent-scope.js", () => ({
+vi.mock("../../agents/agent-scope.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/agent-scope.js")>()),
   resolveAgentConfig: vi.fn(() => ({})),
   resolveAgentDir: vi.fn(() => "/tmp/agent"),
+  resolveDefaultAgentId: vi.fn(() => "main"),
   resolveSessionAgentId: vi.fn(() => "main"),
-}));
-
-vi.mock("../../agents/sandbox.js", () => ({
-  resolveSandboxRuntimeStatus: vi.fn(() => ({ sandboxed: false })),
 }));
 
 vi.mock("../../config/sessions.js", () => ({
@@ -75,29 +69,13 @@ function createSessionEntry(overrides?: Partial<SessionEntry>): SessionEntry {
 }
 
 beforeEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
-  replaceRuntimeAuthProfileStoreSnapshots([
-    {
-      agentDir: TEST_AGENT_DIR,
-      store: { version: 1, profiles: {} },
-    },
-  ]);
   liveModelSwitchMocks.requestLiveSessionModelSwitch.mockReset().mockReturnValue(false);
   queueMocks.refreshQueuedFollowupSession.mockReset();
 });
 
-afterEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
-});
+afterEach(() => {});
 
-function setAuthProfiles(profiles: Record<string, ApiKeyProfile>) {
-  replaceRuntimeAuthProfileStoreSnapshots([
-    {
-      agentDir: TEST_AGENT_DIR,
-      store: { version: 1, profiles },
-    },
-  ]);
-}
+function setAuthProfiles(profiles: Record<string, ApiKeyProfile>) {}
 
 function createDateAuthProfiles(provider: string, id = OPENAI_DATE_PROFILE_ID) {
   return {
@@ -303,67 +281,6 @@ describe("/model chat UX", () => {
     });
   });
 
-  it("treats @YYYYMMDD as a profile override when that profile exists for the resolved provider", () => {
-    setAuthProfiles(createDateAuthProfiles("openai"));
-
-    const resolved = resolveModelSelectionForCommand({
-      command: `/model openai/gpt-4o@${OPENAI_DATE_PROFILE_ID}`,
-      allowedModelKeys: new Set(["openai/gpt-4o"]),
-      allowedModelCatalog: [],
-    });
-
-    expect(resolved.errorText).toBeUndefined();
-    expect(resolved.modelSelection).toEqual({
-      provider: "openai",
-      model: "gpt-4o",
-      isDefault: false,
-    });
-    expect(resolved.profileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
-  it("supports alias selections with numeric auth-profile overrides", () => {
-    setAuthProfiles(createDateAuthProfiles("openai"));
-
-    const resolved = resolveModelSelectionFromDirective({
-      directives: parseInlineDirectives(`/model gpt@${OPENAI_DATE_PROFILE_ID}`),
-      cfg: { commands: { text: true } } as unknown as OpenClawConfig,
-      agentDir: TEST_AGENT_DIR,
-      defaultProvider: "anthropic",
-      defaultModel: "claude-opus-4-6",
-      aliasIndex: createGptAliasIndex(),
-      allowedModelKeys: new Set(["openai/gpt-4o"]),
-      allowedModelCatalog: [],
-      provider: "anthropic",
-    });
-
-    expect(resolved.errorText).toBeUndefined();
-    expect(resolved.modelSelection).toEqual({
-      provider: "openai",
-      model: "gpt-4o",
-      isDefault: false,
-      alias: "gpt",
-    });
-    expect(resolved.profileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
-  it("supports providerless allowlist selections with numeric auth-profile overrides", () => {
-    setAuthProfiles(createDateAuthProfiles("openai"));
-
-    const resolved = resolveModelSelectionForCommand({
-      command: `/model gpt-4o@${OPENAI_DATE_PROFILE_ID}`,
-      allowedModelKeys: new Set(["openai/gpt-4o"]),
-      allowedModelCatalog: [],
-    });
-
-    expect(resolved.errorText).toBeUndefined();
-    expect(resolved.modelSelection).toEqual({
-      provider: "openai",
-      model: "gpt-4o",
-      isDefault: false,
-    });
-    expect(resolved.profileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
   it("keeps @YYYYMMDD as part of the model when the stored numeric profile is for another provider", () => {
     setAuthProfiles(createDateAuthProfiles("anthropic"));
 
@@ -380,61 +297,6 @@ describe("/model chat UX", () => {
       isDefault: false,
     });
     expect(resolved.profileOverride).toBeUndefined();
-  });
-
-  it("persists inferred numeric auth-profile overrides for mixed-content messages", async () => {
-    const { sessionEntry } = await persistModelDirectiveForTest({
-      command: `/model openai/gpt-4o@${OPENAI_DATE_PROFILE_ID} hello`,
-      profiles: createDateAuthProfiles("openai"),
-      allowedModelKeys: ["openai/gpt-4o", `openai/gpt-4o@${OPENAI_DATE_PROFILE_ID}`],
-    });
-
-    expect(sessionEntry.providerOverride).toBe("openai");
-    expect(sessionEntry.modelOverride).toBe("gpt-4o");
-    expect(sessionEntry.authProfileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
-  it("persists alias-based numeric auth-profile overrides for mixed-content messages", async () => {
-    const { sessionEntry } = await persistModelDirectiveForTest({
-      command: `/model gpt@${OPENAI_DATE_PROFILE_ID} hello`,
-      profiles: createDateAuthProfiles("openai"),
-      aliasIndex: createGptAliasIndex(),
-      allowedModelKeys: ["openai/gpt-4o"],
-    });
-
-    expect(sessionEntry.providerOverride).toBe("openai");
-    expect(sessionEntry.modelOverride).toBe("gpt-4o");
-    expect(sessionEntry.authProfileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
-  it("persists providerless numeric auth-profile overrides for mixed-content messages", async () => {
-    const { sessionEntry } = await persistModelDirectiveForTest({
-      command: `/model gpt-4o@${OPENAI_DATE_PROFILE_ID} hello`,
-      profiles: createDateAuthProfiles("openai"),
-      allowedModelKeys: ["openai/gpt-4o"],
-    });
-
-    expect(sessionEntry.providerOverride).toBe("openai");
-    expect(sessionEntry.modelOverride).toBe("gpt-4o");
-    expect(sessionEntry.authProfileOverride).toBe(OPENAI_DATE_PROFILE_ID);
-  });
-
-  it("persists explicit auth profiles after @YYYYMMDD version suffixes in mixed-content messages", async () => {
-    const { sessionEntry } = await persistModelDirectiveForTest({
-      command: `/model custom/vertex-ai_claude-haiku-4-5@${OPENAI_DATE_PROFILE_ID}@work hello`,
-      profiles: {
-        work: {
-          type: "api_key",
-          provider: "custom",
-          key: "sk-test",
-        },
-      },
-      allowedModelKeys: [`custom/vertex-ai_claude-haiku-4-5@${OPENAI_DATE_PROFILE_ID}`],
-    });
-
-    expect(sessionEntry.providerOverride).toBe("custom");
-    expect(sessionEntry.modelOverride).toBe(`vertex-ai_claude-haiku-4-5@${OPENAI_DATE_PROFILE_ID}`);
-    expect(sessionEntry.authProfileOverride).toBe("work");
   });
 
   it("ignores invalid mixed-content model directives during persistence", async () => {

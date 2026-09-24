@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import { describeFailoverError, isFailoverError } from "../agents/failover-error.js";
 import type { FallbackAttempt } from "../agents/model-fallback.types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -28,7 +27,6 @@ export type GenerateVideoParams = {
   cfg: OpenClawConfig;
   prompt: string;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   modelOverride?: string;
   size?: string;
   aspectRatio?: string;
@@ -170,7 +168,6 @@ export async function generateVideo(
         prompt: params.prompt,
         cfg: params.cfg,
         agentDir: params.agentDir,
-        authStore: params.authStore,
         size: sanitized.size,
         aspectRatio: sanitized.aspectRatio,
         resolution: sanitized.resolution,

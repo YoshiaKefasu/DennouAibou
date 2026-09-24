@@ -10,7 +10,6 @@ import {
   beginSecretsRuntimeIsolationForTest,
   EMPTY_LOADABLE_PLUGIN_ORIGINS,
   endSecretsRuntimeIsolationForTest,
-  loadAuthStoreWithProfiles,
   SECRETS_RUNTIME_INTEGRATION_TIMEOUT_MS,
   type SecretsRuntimeEnvSnapshot,
 } from "./runtime.integration.test-helpers.js";
@@ -58,7 +57,6 @@ describe("secrets runtime snapshot gateway-auth integration", () => {
             env: {},
             agentDirs: ["/tmp/openclaw-agent-main"],
             loadablePluginOrigins: EMPTY_LOADABLE_PLUGIN_ORIGINS,
-            loadAuthStore: () => ({ version: 1, profiles: {} }),
           }),
         ).rejects.toThrow(/MISSING_GATEWAY_AUTH_TOKEN/i);
       },
@@ -94,7 +92,6 @@ describe("secrets runtime snapshot gateway-auth integration", () => {
           },
           agentDirs: ["/tmp/openclaw-agent-main"],
           loadablePluginOrigins: EMPTY_LOADABLE_PLUGIN_ORIGINS,
-          loadAuthStore: () => loadAuthStoreWithProfiles({}),
         });
 
         activateSecretsRuntimeSnapshot(prepared);

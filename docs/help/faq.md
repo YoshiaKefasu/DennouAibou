@@ -817,7 +817,6 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
 
     - **Your devices, your data:** run the Gateway wherever you want (Mac, Linux, VPS) and keep the
       workspace + session history local.
-    - **Real channels, not a web sandbox:** WhatsApp/Telegram/Slack/Discord/Signal/iMessage/etc,
       plus mobile voice and Canvas on supported platforms.
     - **Model-agnostic:** use OpenAI, Google, and other OpenAI/Anthropic-compatible providers, with
       per-agent routing and failover.
@@ -917,7 +916,7 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
     Token tip: long tasks and sub-agents both consume tokens. If cost is a concern, set a
     cheaper model for sub-agents via `agents.defaults.subagents.model`.
 
-    Docs: [Sub-agents](/tools/subagents), [Background Tasks](/automation/tasks).
+    Docs: [Sub-agents](/tools/subagents).
 
   </Accordion>
 
@@ -955,10 +954,9 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
     Debug:
 
     ```bash
-    openclaw tasks show <runId-or-sessionKey>
     ```
 
-    Docs: [Sub-agents](/tools/subagents), [Background Tasks](/automation/tasks), [Session Tools](/concepts/session-tool).
+    Docs: [Sub-agents](/tools/subagents), [Session Tools](/concepts/session-tool).
 
   </Accordion>
 
@@ -1000,10 +998,9 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
 
     ```bash
     openclaw cron runs --id <jobId> --limit 50
-    openclaw tasks show <runId-or-sessionKey>
     ```
 
-    Docs: [Cron jobs](/automation/cron-jobs), [Background Tasks](/automation/tasks).
+    Docs: [Cron jobs](/automation/cron-jobs).
 
   </Accordion>
 
@@ -1029,7 +1026,6 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
 
     ```bash
     openclaw cron runs --id <jobId> --limit 50
-    openclaw tasks show <runId-or-sessionKey>
     ```
 
     Docs: [Cron jobs](/automation/cron-jobs), [cron CLI](/cli/cron).
@@ -1161,104 +1157,6 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   </Accordion>
 </AccordionGroup>
 
-## Sandboxing and memory
-
-<AccordionGroup>
-  <Accordion title="Is there a dedicated sandboxing doc?">
-    Yes. See [Sandboxing](/gateway/sandboxing). For Docker-specific setup (full gateway in Docker or sandbox images), see [Docker](/install/docker).
-  </Accordion>
-
-  <Accordion title="Docker feels limited - how do I enable full features?">
-    The default image is security-first and runs as the `node` user, so it does not
-    include system packages, Homebrew, or bundled browsers. For a fuller setup:
-
-    - Persist `/home/node` with `OPENCLAW_HOME_VOLUME` so caches survive.
-    - Bake system deps into the image with `OPENCLAW_DOCKER_APT_PACKAGES`.
-    - Install Playwright browsers via the bundled CLI:
-      `node /app/node_modules/playwright-core/cli.js install chromium`
-    - Set `PLAYWRIGHT_BROWSERS_PATH` and ensure the path is persisted.
-
-    Docs: [Docker](/install/docker), [Browser](/tools/browser).
-
-  </Accordion>
-
-  <Accordion title="Can I keep DMs personal but make groups public/sandboxed with one agent?">
-    Yes - if your private traffic is **DMs** and your public traffic is **groups**.
-
-    Use `agents.defaults.sandbox.mode: "non-main"` so group/channel sessions (non-main keys) run in Docker, while the main DM session stays on-host. Then restrict what tools are available in sandboxed sessions via `tools.sandbox.tools`.
-
-    Setup walkthrough + example config: [Groups: personal DMs + public groups](/channels/groups#pattern-personal-dms-public-groups-single-agent)
-
-    Key config reference: [Gateway configuration](/gateway/configuration-reference#agentsdefaultssandbox)
-
-  </Accordion>
-
-  <Accordion title="How do I bind a host folder into the sandbox?">
-    Set `agents.defaults.sandbox.docker.binds` to `["host:path:mode"]` (e.g., `"/home/user/src:/src:ro"`). Global + per-agent binds merge; per-agent binds are ignored when `scope: "shared"`. Use `:ro` for anything sensitive and remember binds bypass the sandbox filesystem walls.
-
-    DennouAibou validates bind sources against both the normalized path and the canonical path resolved through the deepest existing ancestor. That means symlink-parent escapes still fail closed even when the last path segment does not exist yet, and allowed-root checks still apply after symlink resolution.
-
-    See [Sandboxing](/gateway/sandboxing#custom-bind-mounts) and [Sandbox vs Tool Policy vs Elevated](/gateway/sandbox-vs-tool-policy-vs-elevated#bind-mounts-security-quick-check) for examples and safety notes.
-
-  </Accordion>
-
-  <Accordion title="How does memory work?">
-    DennouAibou memory is just Markdown files in the agent workspace:
-
-    - Daily notes in `memory/YYYY-MM-DD.md`
-    - Curated long-term notes in `MEMORY.md` (main/private sessions only)
-
-    DennouAibou also runs a **silent pre-compaction memory flush** to remind the model
-    to write durable notes before auto-compaction. This only runs when the workspace
-    is writable (read-only sandboxes skip it). See [Memory](/concepts/memory).
-
-  </Accordion>
-
-  <Accordion title="Memory keeps forgetting things. How do I make it stick?">
-    Ask the bot to **write the fact to memory**. Long-term notes belong in `MEMORY.md`,
-    short-term context goes into `memory/YYYY-MM-DD.md`.
-
-    This is still an area we are improving. It helps to remind the model to store memories;
-    it will know what to do. If it keeps forgetting, verify the Gateway is using the same
-    workspace on every run.
-
-    Docs: [Memory](/concepts/memory), [Agent workspace](/concepts/agent-workspace).
-
-  </Accordion>
-
-  <Accordion title="Does memory persist forever? What are the limits?">
-    Memory files live on disk and persist until you delete them. The limit is your
-    storage, not the model. The **session context** is still limited by the model
-    context window, so long conversations can compact or truncate. That is why
-    memory search exists - it pulls only the relevant parts back into context.
-
-    Docs: [Memory](/concepts/memory), [Context](/concepts/context).
-
-  </Accordion>
-
-  <Accordion title="Does semantic memory search require an OpenAI API key?">
-    Only if you use **OpenAI embeddings**. Codex OAuth covers chat/completions and
-    does **not** grant embeddings access, so **signing in with Codex (OAuth or the
-    Codex CLI login)** does not help for semantic memory search. OpenAI embeddings
-    still need a real API key (`OPENAI_API_KEY` or `models.providers.openai.apiKey`).
-
-    If you don't set a provider explicitly, DennouAibou auto-selects a provider when it
-    can resolve an API key (auth profiles, `models.providers.*.apiKey`, or env vars).
-    It prefers OpenAI if an OpenAI key resolves, otherwise Gemini if a Gemini key
-    resolves, then Voyage. If no remote key is available, memory
-    search stays disabled until you configure it. If you have a local model path
-    configured and present, DennouAibou
-    prefers `local`.
-
-    If you'd rather stay local, set `memorySearch.provider = "local"` (and optionally
-    `memorySearch.fallback = "none"`). If you want Gemini embeddings, set
-    `memorySearch.provider = "gemini"` and provide `GEMINI_API_KEY` (or
-    `memorySearch.remote.apiKey`). We support **OpenAI, Gemini, Voyage, or local** embedding
-    models - see [Memory](/concepts/memory) for the setup details.
-
-  </Accordion>
-</AccordionGroup>
-
 ## Where things live on disk
 
 <AccordionGroup>
@@ -1344,10 +1242,9 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   </Accordion>
 
   <Accordion title="Can agents work outside the workspace?">
-    Yes. The workspace is the **default cwd** and memory anchor, not a hard sandbox.
+    Yes. The workspace is the **default cwd** and memory anchor, not a hard boundary.
     Relative paths resolve inside the workspace, but absolute paths can access other
-    host locations unless sandboxing is enabled. If you need isolation, use
-    [`agents.defaults.sandbox`](/gateway/sandboxing) or per-agent sandbox settings. If you
+    host locations. If you
     want a repo to be the default working directory, point that agent's
     `workspace` to the repo root. The DennouAibou repo is just source code; keep the
     workspace separate unless you intentionally want the agent to work inside it.
@@ -1555,8 +1452,6 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
       browser: { headless: true },
       agents: {
         defaults: {
-          sandbox: { browser: { headless: true } },
-        },
       },
     }
     ```
@@ -2140,11 +2035,11 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
 
     Security note: smaller or heavily quantized models are more vulnerable to prompt
     injection. We strongly recommend **large models** for any bot that can use tools.
-    If you still want small models, enable sandboxing and strict tool allowlists.
+    If you still want small models, use strict tool allowlists.
 
     Docs: [Local models](/gateway/local-models),
     [Model providers](/concepts/model-providers), [Security](/gateway/security),
-    [Sandboxing](/gateway/sandboxing).
+    .
 
   </Accordion>
 
@@ -2818,7 +2713,6 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
 
     - The target channel supports outbound media and isn't blocked by allowlists.
     - The file is within the provider's size limits (images are resized to max 2048px).
-    - `tools.fs.workspaceOnly=true` keeps local-path sends limited to workspace, temp/media-store, and sandbox-validated files.
     - `tools.fs.workspaceOnly=false` lets `MEDIA:` send host-local files the agent can already read, but only for media plus safe document types (images, audio, video, PDF, and Office docs). Plain text and secret-like files are still blocked.
 
     See [Images](/nodes/images).
@@ -2856,7 +2750,6 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
     - treating decoded file/document text as untrusted too: OpenResponses
       `input_file` and media-attachment extraction both wrap extracted text in
       explicit external-content boundary markers instead of passing raw file text
-    - sandboxing and strict tool allowlists
 
     Details: [Security](/gateway/security).
 
@@ -2890,7 +2783,7 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
     Yes, **if** the agent is chat-only and the input is trusted. Smaller tiers are
     more susceptible to instruction hijacking, so avoid them for tool-enabled agents
     or when reading untrusted content. If you must use a smaller model, lock down
-    tools and run inside a sandbox. See [Security](/gateway/security).
+    tools. See [Security](/gateway/security).
   </Accordion>
 
   <Accordion title="I ran /start in Telegram but did not get a pairing code">

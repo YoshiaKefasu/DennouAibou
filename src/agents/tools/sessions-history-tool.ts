@@ -16,8 +16,7 @@ import {
   createAgentToAgentPolicy,
   resolveEffectiveSessionToolsVisibility,
   resolveSessionReference,
-  resolveSandboxedSessionToolContext,
-  resolveVisibleSessionReference,
+  resolveSessionToolContext,
   stripToolMessages,
 } from "./sessions-helpers.js";
 
@@ -30,8 +29,6 @@ const SessionsHistoryToolSchema = Type.Object({
 const SESSIONS_HISTORY_MAX_BYTES = 80 * 1024;
 const SESSIONS_HISTORY_TEXT_MAX_CHARS = 4000;
 type GatewayCaller = typeof callGateway;
-
-// sandbox policy handling is shared with sessions-list-tool via sessions-helpers.ts
 
 function truncateHistoryText(text: string): {
   text: string;
@@ -173,7 +170,6 @@ function enforceSessionsHistoryHardCap(params: {
 
 export function createSessionsHistoryTool(opts?: {
   agentSessionKey?: string;
-  sandboxed?: boolean;
   config?: OpenClawConfig;
   callGateway?: GatewayCaller;
 }): AnyAgentTool {
@@ -190,43 +186,25 @@ export function createSessionsHistoryTool(opts?: {
         required: true,
       });
       const cfg = opts?.config ?? loadConfig();
-      const { mainKey, alias, effectiveRequesterKey, restrictToSpawned } =
-        resolveSandboxedSessionToolContext({
-          cfg,
-          agentSessionKey: opts?.agentSessionKey,
-          sandboxed: opts?.sandboxed,
-        });
+      const { mainKey, alias, effectiveRequesterKey } = resolveSessionToolContext({
+        agentSessionKey: opts?.agentSessionKey,
+        config: cfg,
+      });
       const resolvedSession = await resolveSessionReference({
         sessionKey: sessionKeyParam,
         alias,
         mainKey,
         requesterInternalKey: effectiveRequesterKey,
-        restrictToSpawned,
       });
       if (!resolvedSession.ok) {
         return jsonResult({ status: resolvedSession.status, error: resolvedSession.error });
       }
-      const visibleSession = await resolveVisibleSessionReference({
-        resolvedSession,
-        requesterSessionKey: effectiveRequesterKey,
-        restrictToSpawned,
-        visibilitySessionKey: sessionKeyParam,
-      });
-      if (!visibleSession.ok) {
-        return jsonResult({
-          status: visibleSession.status,
-          error: visibleSession.error,
-        });
-      }
       // From here on, use the canonical key (sessionId inputs already resolved).
-      const resolvedKey = visibleSession.key;
-      const displayKey = visibleSession.displayKey;
+      const resolvedKey = resolvedSession.key;
+      const displayKey = resolvedSession.displayKey;
 
       const a2aPolicy = createAgentToAgentPolicy(cfg);
-      const visibility = resolveEffectiveSessionToolsVisibility({
-        cfg,
-        sandboxed: opts?.sandboxed === true,
-      });
+      const visibility = resolveEffectiveSessionToolsVisibility({ cfg });
       const visibilityGuard = await createSessionVisibilityGuard({
         action: "history",
         requesterSessionKey: effectiveRequesterKey,

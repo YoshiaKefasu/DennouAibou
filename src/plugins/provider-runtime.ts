@@ -1,4 +1,3 @@
-import type { AuthProfileCredential, OAuthCredential } from "../agents/auth-profiles/types.js";
 import { normalizeProviderId } from "../agents/provider-id.js";
 import type { ProviderSystemPromptContribution } from "../agents/system-prompt-contribution.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -7,6 +6,7 @@ import { resolveCatalogHookProviderPluginIds } from "./providers.js";
 import { resolvePluginProviders } from "./providers.runtime.js";
 import { resolvePluginCacheInputs } from "./roots.js";
 import { getActivePluginRegistryWorkspaceDirFromState } from "./runtime-state.js";
+import type { AuthProfileCredential, OAuthCredential } from "./types.js";
 import type {
   ProviderAuthDoctorHintContext,
   ProviderAugmentModelCatalogContext,
@@ -19,7 +19,6 @@ import type {
   ProviderResolveSyntheticAuthContext,
   ProviderCreateStreamFnContext,
   ProviderDefaultThinkingPolicyContext,
-  ProviderFetchUsageSnapshotContext,
   ProviderFailoverErrorContext,
   ProviderNormalizeToolSchemasContext,
   ProviderNormalizeConfigContext,
@@ -37,7 +36,6 @@ import type {
   ProviderApplyConfigDefaultsContext,
   ProviderResolveConfigApiKeyContext,
   ProviderSanitizeReplayHistoryContext,
-  ProviderResolveUsageAuthContext,
   ProviderPlugin,
   ProviderResolveDynamicModelContext,
   ProviderResolveTransportTurnStateContext,
@@ -604,26 +602,6 @@ export async function prepareProviderRuntimeAuth(params: {
   context: ProviderPrepareRuntimeAuthContext;
 }) {
   return await resolveProviderRuntimePlugin(params)?.prepareRuntimeAuth?.(params.context);
-}
-
-export async function resolveProviderUsageAuthWithPlugin(params: {
-  provider: string;
-  config?: OpenClawConfig;
-  workspaceDir?: string;
-  env?: NodeJS.ProcessEnv;
-  context: ProviderResolveUsageAuthContext;
-}) {
-  return await resolveProviderRuntimePlugin(params)?.resolveUsageAuth?.(params.context);
-}
-
-export async function resolveProviderUsageSnapshotWithPlugin(params: {
-  provider: string;
-  config?: OpenClawConfig;
-  workspaceDir?: string;
-  env?: NodeJS.ProcessEnv;
-  context: ProviderFetchUsageSnapshotContext;
-}) {
-  return await resolveProviderRuntimePlugin(params)?.fetchUsageSnapshot?.(params.context);
 }
 
 export function matchesProviderContextOverflowWithPlugin(params: {

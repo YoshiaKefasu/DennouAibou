@@ -180,7 +180,6 @@ async function executeSend(params: {
   return mocks.runMessageAction.mock.calls[0]?.[0] as
     | {
         params?: Record<string, unknown>;
-        sandboxRoot?: string;
         requesterSenderId?: string;
       }
     | undefined;
@@ -903,31 +902,7 @@ describe("message tool reasoning tag sanitization", () => {
   );
 });
 
-describe("message tool sandbox passthrough", () => {
-  it.each([
-    {
-      name: "forwards sandboxRoot to runMessageAction",
-      toolOptions: { sandboxRoot: "/tmp/sandbox" },
-      expected: "/tmp/sandbox",
-    },
-    {
-      name: "omits sandboxRoot when not configured",
-      toolOptions: {},
-      expected: undefined,
-    },
-  ])("$name", async ({ toolOptions, expected }) => {
-    mockSendResult({ to: "telegram:123" });
-
-    const call = await executeSend({
-      toolOptions,
-      action: {
-        target: "telegram:123",
-        message: "",
-      },
-    });
-    expect(call?.sandboxRoot).toBe(expected);
-  });
-
+describe("message tool option passthrough", () => {
   it("forwards trusted requesterSenderId to runMessageAction", async () => {
     mockSendResult({ to: "discord:123" });
 

@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 import "./test-helpers/fast-coding-tools.js";
 import "./test-helpers/fast-openclaw-tools.js";
 import { createOpenClawCodingTools } from "./pi-tools.js";
-import { createHostSandboxFsBridge } from "./test-helpers/host-sandbox-fs-bridge.js";
-import { createPiToolsSandboxContext } from "./test-helpers/pi-tools-sandbox-context.js";
 
 const defaultTools = createOpenClawCodingTools();
 const tinyPngBuffer = Buffer.from(
@@ -60,39 +58,5 @@ describe("createOpenClawCodingTools", () => {
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
-  });
-  it("filters tools by sandbox policy", () => {
-    const sandboxDir = path.join(os.tmpdir(), "openclaw-sandbox");
-    const sandbox = createPiToolsSandboxContext({
-      workspaceDir: sandboxDir,
-      agentWorkspaceDir: path.join(os.tmpdir(), "openclaw-workspace"),
-      workspaceAccess: "none" as const,
-      fsBridge: createHostSandboxFsBridge(sandboxDir),
-      tools: {
-        allow: ["bash"],
-        deny: ["browser"],
-      },
-    });
-    const tools = createOpenClawCodingTools({ sandbox });
-    expect(tools.some((tool) => tool.name === "exec")).toBe(true);
-    expect(tools.some((tool) => tool.name === "read")).toBe(false);
-    expect(tools.some((tool) => tool.name === "browser")).toBe(false);
-  });
-  it("hard-disables write/edit when sandbox workspaceAccess is ro", () => {
-    const sandboxDir = path.join(os.tmpdir(), "openclaw-sandbox");
-    const sandbox = createPiToolsSandboxContext({
-      workspaceDir: sandboxDir,
-      agentWorkspaceDir: path.join(os.tmpdir(), "openclaw-workspace"),
-      workspaceAccess: "ro" as const,
-      fsBridge: createHostSandboxFsBridge(sandboxDir),
-      tools: {
-        allow: ["read", "write", "edit"],
-        deny: [],
-      },
-    });
-    const tools = createOpenClawCodingTools({ sandbox });
-    expect(tools.some((tool) => tool.name === "read")).toBe(true);
-    expect(tools.some((tool) => tool.name === "write")).toBe(false);
-    expect(tools.some((tool) => tool.name === "edit")).toBe(false);
   });
 });

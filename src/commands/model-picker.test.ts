@@ -13,20 +13,6 @@ vi.mock("../agents/model-catalog.js", () => ({
   loadModelCatalog,
 }));
 
-const ensureAuthProfileStore = vi.hoisted(() =>
-  vi.fn(() => ({
-    version: 1,
-    profiles: {},
-  })),
-);
-const listProfilesForProvider = vi.hoisted(() => vi.fn(() => []));
-const upsertAuthProfile = vi.hoisted(() => vi.fn());
-vi.mock("../agents/auth-profiles.js", () => ({
-  ensureAuthProfileStore,
-  listProfilesForProvider,
-  upsertAuthProfile,
-}));
-
 const resolveEnvApiKey = vi.hoisted(() => vi.fn(() => undefined));
 const hasUsableCustomProviderApiKey = vi.hoisted(() => vi.fn(() => false));
 vi.mock("../agents/model-auth.js", () => ({

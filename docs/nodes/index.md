@@ -72,8 +72,8 @@ Approval note:
 - For direct shell/runtime file executions, DennouAibou also best-effort binds one concrete local
   file operand and denies the run if that file changes before execution.
 - If DennouAibou cannot identify exactly one concrete local file for an interpreter/runtime command,
-  approval-backed execution is denied instead of pretending full runtime coverage. Use sandboxing,
-  separate hosts, or an explicit trusted allowlist/full workflow for broader interpreter semantics.
+  approval-backed execution is denied instead of pretending full runtime coverage. Use separate
+  hosts or an explicit trusted allowlist/full workflow for broader interpreter semantics.
 
 ### Start a node host (foreground)
 

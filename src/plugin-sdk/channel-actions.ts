@@ -17,7 +17,7 @@ export {
 } from "../agents/tools/common.js";
 export type { ActionGate } from "../agents/tools/common.js";
 export { withNormalizedTimestamp } from "../agents/date-time.js";
-export { assertMediaNotDataUrl } from "../agents/sandbox-paths.js";
+export { assertMediaNotDataUrl } from "../agents/path-policy.js";
 export { resolvePollMaxSelections } from "../polls.js";
 export { optionalStringEnum, stringEnum } from "../agents/schema/typebox.js";
 import { Type } from "typebox";

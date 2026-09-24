@@ -31,16 +31,6 @@ DennouAibou features that can generate provider usage or paid API calls.
   `stats`, normalizes `stats.cached` into `cacheRead`, and derives input tokens
   from `stats.input_tokens - stats.cached` when needed.
 
-**CLI usage windows (provider quotas)**
-
-- `openclaw status --usage` and `openclaw channels list` show provider **usage windows**
-  (quota snapshots, not per-message costs).
-- Human output is normalized to `X% left` across providers.
-- Current usage-window providers: Gemini CLI and OpenAI Codex.
-- Usage auth for those quota windows comes from provider-specific hooks when
-  available; otherwise DennouAibou falls back to matching OAuth/API-key
-  credentials from auth profiles, env, or config.
-
 See [Token use & costs](/reference/token-use) for details and examples.
 
 ## How keys are discovered
@@ -132,16 +122,6 @@ See [Web tools](/tools/web).
 If Firecrawl isn’t configured, the tool falls back to direct fetch + readability (no paid API).
 
 See [Web tools](/tools/web).
-
-### 6) Provider usage snapshots (status/health)
-
-Some status commands call **provider usage endpoints** to display quota windows or auth health.
-These are typically low-volume calls but still hit provider APIs:
-
-- `openclaw status --usage`
-- `openclaw models status --json`
-
-See [Models CLI](/cli/models).
 
 ### 7) Compaction safeguard summarization
 

@@ -5,7 +5,6 @@ import type { ResolvedTimeFormat } from "../date-time.js";
 import type { EmbeddedContextFile } from "../pi-embedded-helpers.js";
 import type { ProviderSystemPromptContribution } from "../system-prompt-contribution.js";
 import { buildAgentSystemPrompt, type PromptMode } from "../system-prompt.js";
-import type { EmbeddedSandboxInfo } from "./types.js";
 import type { ReasoningLevel, ThinkLevel } from "./utils.js";
 
 export function buildEmbeddedSystemPrompt(params: {
@@ -41,7 +40,6 @@ export function buildEmbeddedSystemPrompt(params: {
     channelActions?: string[];
   };
   messageToolHints?: string[];
-  sandboxInfo?: EmbeddedSandboxInfo;
   tools: AgentTool[];
   modelAliasLines: string[];
   userTimezone: string;
@@ -68,7 +66,6 @@ export function buildEmbeddedSystemPrompt(params: {
     promptMode: params.promptMode,
     runtimeInfo: params.runtimeInfo,
     messageToolHints: params.messageToolHints,
-    sandboxInfo: params.sandboxInfo,
     toolNames: params.tools.map((tool) => tool.name),
     modelAliasLines: params.modelAliasLines,
     userTimezone: params.userTimezone,

@@ -36,7 +36,7 @@ export type SessionEntry = {
   sessionId: string;
   updatedAt: number;
   sessionFile?: string;
-  /** Parent session key that spawned this session (used for sandbox session-tool scoping). */
+  /** Parent session key that spawned this session (used for session-tool scoping). */
   spawnedBy?: string;
   /** Workspace inherited by spawned sessions and reused on later turns for the same child session. */
   spawnedWorkspaceDir?: string;
@@ -319,10 +319,6 @@ export type SessionSystemPromptReport = {
     truncatedFiles?: number;
     nearLimitFiles?: number;
     totalNearLimit?: boolean;
-  };
-  sandbox?: {
-    mode?: string;
-    sandboxed?: boolean;
   };
   systemPrompt: {
     chars: number;

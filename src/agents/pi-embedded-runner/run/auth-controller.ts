@@ -1,13 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ThinkLevel } from "../../../auto-reply/thinking.js";
 import { prepareProviderRuntimeAuth } from "../../../plugins/provider-runtime.js";
-import {
-  type AuthProfileStore,
-  isProfileInCooldown,
-  resolveProfilesUnavailableReason,
-} from "../../auth-profiles.js";
 import { FailoverError, resolveFailoverStatus } from "../../failover-error.js";
-import { shouldAllowCooldownProbeForReason } from "../../failover-policy.js";
 import { getApiKeyForModel, type ResolvedProviderAuth } from "../../model-auth.js";
 import {
   classifyFailoverReason,
@@ -49,7 +43,6 @@ export function createEmbeddedRunAuthController(
     config: RunEmbeddedPiAgentParams["config"];
     agentDir: string;
     workspaceDir: string;
-    authStore: AuthProfileStore;
     authStorage: RuntimeApiKeySink;
     profileCandidates: Array<string | undefined>;
     lockedProfileId?: string;
@@ -272,15 +265,7 @@ export function createEmbeddedRunAuthController(
     profileIds?: Array<string | undefined>;
   }): FailoverReason => {
     if (failoverParams.allInCooldown) {
-      const profileIds = (failoverParams.profileIds ?? params.profileCandidates).filter(
-        (id): id is string => typeof id === "string" && id.length > 0,
-      );
-      return (
-        resolveProfilesUnavailableReason({
-          store: params.authStore,
-          profileIds,
-        }) ?? "unknown"
-      );
+      return "unknown";
     }
     const classified = classifyFailoverReason(failoverParams.message, {
       provider: params.getProvider(),
@@ -325,7 +310,6 @@ export function createEmbeddedRunAuthController(
       model: params.getRuntimeModel(),
       cfg: params.config,
       profileId: candidate,
-      store: params.authStore,
       agentDir: params.agentDir,
       lockedProfile: candidate != null && candidate === params.lockedProfileId,
     });
@@ -393,13 +377,6 @@ export function createEmbeddedRunAuthController(
     let nextIndex = params.getProfileIndex() + 1;
     while (nextIndex < params.profileCandidates.length) {
       const candidate = params.profileCandidates[nextIndex];
-      if (
-        candidate &&
-        isProfileInCooldown(params.authStore, candidate, undefined, params.getModelId())
-      ) {
-        nextIndex += 1;
-        continue;
-      }
       try {
         await applyApiKeyInfo(candidate);
         params.setProfileIndex(nextIndex);
@@ -418,47 +395,7 @@ export function createEmbeddedRunAuthController(
 
   const initializeAuthProfile = async () => {
     try {
-      const autoProfileCandidates = params.profileCandidates.filter(
-        (candidate): candidate is string =>
-          typeof candidate === "string" &&
-          candidate.length > 0 &&
-          candidate !== params.lockedProfileId,
-      );
-      const modelId = params.getModelId();
-      const allAutoProfilesInCooldown =
-        autoProfileCandidates.length > 0 &&
-        autoProfileCandidates.every((candidate) =>
-          isProfileInCooldown(params.authStore, candidate, undefined, modelId),
-        );
-      const unavailableReason = allAutoProfilesInCooldown
-        ? (resolveProfilesUnavailableReason({
-            store: params.authStore,
-            profileIds: autoProfileCandidates,
-          }) ?? "unknown")
-        : null;
-      const allowTransientCooldownProbe =
-        params.allowTransientCooldownProbe &&
-        allAutoProfilesInCooldown &&
-        shouldAllowCooldownProbeForReason(unavailableReason);
-      let didTransientCooldownProbe = false;
-
       while (params.getProfileIndex() < params.profileCandidates.length) {
-        const candidate = params.profileCandidates[params.getProfileIndex()];
-        const inCooldown =
-          candidate &&
-          candidate !== params.lockedProfileId &&
-          isProfileInCooldown(params.authStore, candidate, undefined, modelId);
-        if (inCooldown) {
-          if (allowTransientCooldownProbe && !didTransientCooldownProbe) {
-            didTransientCooldownProbe = true;
-            params.log.warn(
-              `probing cooldowned auth profile for ${params.getProvider()}/${modelId} due to ${unavailableReason ?? "transient"} unavailability`,
-            );
-          } else {
-            params.setProfileIndex(params.getProfileIndex() + 1);
-            continue;
-          }
-        }
         await applyApiKeyInfo(params.profileCandidates[params.getProfileIndex()]);
         break;
       }

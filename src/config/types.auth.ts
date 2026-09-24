@@ -1,7 +1,7 @@
 export type AuthProfileConfig = {
   provider: string;
   /**
-   * Credential type expected in auth-profiles.json for this profile id.
+   * Credential mode expected for this configured auth profile id.
    * - api_key: static provider API key
    * - oauth: refreshable OAuth credentials (access+refresh+expires)
    * - token: static bearer-style token (optionally expiring; no refresh)
@@ -12,8 +12,20 @@ export type AuthProfileConfig = {
 };
 
 export type AuthConfig = {
+  /**
+   * @deprecated Auth profiles (multi-credential management) were removed
+   * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+   */
   profiles?: Record<string, AuthProfileConfig>;
+  /**
+   * @deprecated Auth profiles (multi-credential management) were removed
+   * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+   */
   order?: Record<string, string[]>;
+  /**
+   * @deprecated Auth profiles (multi-credential management) were removed
+   * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+   */
   cooldowns?: {
     /** Default billing backoff (hours). Default: 5. */
     billingBackoffHours?: number;

@@ -73,10 +73,6 @@ export const runCommandWithTimeout = vi
   .fn()
   .mockResolvedValue(createCommandWithTimeoutResult()) as unknown as MockFn;
 
-export const ensureAuthProfileStore = vi
-  .fn()
-  .mockReturnValue({ version: 1, profiles: {} }) as unknown as MockFn;
-
 export const legacyReadConfigFileSnapshot = vi
   .fn()
   .mockResolvedValue(createLegacyConfigSnapshot()) as unknown as MockFn;
@@ -250,14 +246,6 @@ vi.mock("../infra/openclaw-root.js", () => ({
   resolveOpenClawPackageRoot,
 }));
 
-vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await import("../agents/auth-profiles.js");
-  return {
-    ...actual,
-    ensureAuthProfileStore,
-  };
-});
-
 vi.mock("../daemon/service.js", () => ({
   resolveGatewayService: () => ({
     label: "LaunchAgent",
@@ -398,7 +386,6 @@ beforeEach(() => {
   }));
   runExec.mockReset().mockResolvedValue({ stdout: "", stderr: "" });
   runCommandWithTimeout.mockReset().mockResolvedValue(createCommandWithTimeoutResult());
-  ensureAuthProfileStore.mockReset().mockReturnValue({ version: 1, profiles: {} });
   migrateLegacyConfig.mockReset().mockImplementation((raw: unknown) => ({
     config: raw as Record<string, unknown>,
     changes: ["Moved routing.allowFrom → channels.whatsapp.allowFrom."],

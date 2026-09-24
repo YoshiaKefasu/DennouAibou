@@ -321,8 +321,8 @@ describe("buildWorkspaceSkillsPrompt", () => {
     await writeSkill({
       dir: path.join(sourceWorkspace, "skills", "remote-only"),
       name: "remote-only",
-      description: "Sandbox-only bin",
-      metadata: '{"openclaw":{"requires":{"anyBins":["missingbin","sandboxbin"]}}}',
+      description: "Remote-only bin",
+      metadata: '{"openclaw":{"requires":{"anyBins":["missingbin","toolbin"]}}}',
     });
 
     await withEnv({ HOME: sourceWorkspace, PATH: "" }, () =>
@@ -342,8 +342,8 @@ describe("buildWorkspaceSkillsPrompt", () => {
           remote: {
             platforms: ["linux"],
             hasBin: () => false,
-            hasAnyBin: (bins: string[]) => bins.includes("sandboxbin"),
-            note: "sandbox",
+            hasAnyBin: (bins: string[]) => bins.includes("toolbin"),
+            note: "remote",
           },
         },
         bundledSkillsDir: path.join(sourceWorkspace, ".bundled"),

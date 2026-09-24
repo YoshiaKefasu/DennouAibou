@@ -29,13 +29,6 @@ const pathResolutionEnvKeys = [
   "DENNOU_STATE_DIR",
   "DENNOU_BUNDLED_PLUGINS_DIR",
 ] as const;
-const execDockerRawUnavailable: NonNullable<SecurityAuditOptions["execDockerRawFn"]> = async () => {
-  return {
-    stdout: Buffer.alloc(0),
-    stderr: Buffer.from("docker unavailable"),
-    code: 1,
-  };
-};
 
 function stubChannelPlugin(params: {
   id: "discord" | "feishu" | "slack" | "synology-chat" | "telegram" | "zalouser";
@@ -397,7 +390,6 @@ async function runInstallMetadataAudit(
     includeChannelSecurity: false,
     stateDir,
     configPath: path.join(stateDir, "dennou-aibou.json"),
-    execDockerRawFn: execDockerRawUnavailable,
   });
 }
 
@@ -456,7 +448,6 @@ describe("security audit", () => {
       includeChannelSecurity: false,
       stateDir: sharedExtensionsStateDir,
       configPath: path.join(sharedExtensionsStateDir, "dennou-aibou.json"),
-      execDockerRawFn: execDockerRawUnavailable,
     });
   };
   beforeAll(async () => {
@@ -699,66 +690,6 @@ describe("security audit", () => {
       },
       () => ({ env: {} }),
     );
-  });
-
-  it("warns when sandbox exec host is selected while sandbox mode is off", async () => {
-    const cases: Array<{
-      name: string;
-      cfg: OpenClawConfig;
-      checkId:
-        | "tools.exec.host_sandbox_no_sandbox_defaults"
-        | "tools.exec.host_sandbox_no_sandbox_agents";
-    }> = [
-      {
-        name: "defaults host is sandbox",
-        cfg: {
-          tools: {
-            exec: {
-              host: "sandbox",
-            },
-          },
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "off",
-              },
-            },
-          },
-        },
-        checkId: "tools.exec.host_sandbox_no_sandbox_defaults",
-      },
-      {
-        name: "agent override host is sandbox",
-        cfg: {
-          tools: {
-            exec: {
-              host: "gateway",
-            },
-          },
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "off",
-              },
-            },
-            list: [
-              {
-                id: "ops",
-                tools: {
-                  exec: {
-                    host: "sandbox",
-                  },
-                },
-              },
-            ],
-          },
-        },
-        checkId: "tools.exec.host_sandbox_no_sandbox_agents",
-      },
-    ];
-    await runConfigAuditCases(cases, (res, testCase) => {
-      expect(hasFinding(res, testCase.checkId, "warn"), testCase.name).toBe(true);
-    });
   });
 
   it("warns for interpreter safeBins only when explicit profiles are missing", async () => {
@@ -1147,181 +1078,11 @@ describe("security audit", () => {
             platform: "win32",
             env: windowsAuditEnv,
             execIcacls: testCase.execIcacls,
-            execDockerRawFn: execDockerRawUnavailable,
           });
         },
         assert: testCase.assert,
       })),
     );
-  });
-
-  it("evaluates sandbox browser findings", async () => {
-    const cases = [
-      {
-        name: "warns when sandbox browser containers have missing or stale hash labels",
-        run: async () => {
-          const { stateDir, configPath } =
-            await createFilesystemAuditFixture("browser-hash-labels");
-          return runSecurityAudit({
-            config: {},
-            includeFilesystem: true,
-            includeChannelSecurity: false,
-            stateDir,
-            configPath,
-            execDockerRawFn: (async (args: string[]) => {
-              if (args[0] === "ps") {
-                return {
-                  stdout: Buffer.from(
-                    "openclaw-sbx-browser-old\nopenclaw-sbx-browser-missing-hash\n",
-                  ),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              if (args[0] === "inspect" && args.at(-1) === "openclaw-sbx-browser-old") {
-                return {
-                  stdout: Buffer.from("abc123\tepoch-v0\n"),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              if (args[0] === "inspect" && args.at(-1) === "openclaw-sbx-browser-missing-hash") {
-                return {
-                  stdout: Buffer.from("<no value>\t<no value>\n"),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              return {
-                stdout: Buffer.alloc(0),
-                stderr: Buffer.from("not found"),
-                code: 1,
-              };
-            }) as NonNullable<SecurityAuditOptions["execDockerRawFn"]>,
-          });
-        },
-        assert: (res: SecurityAuditReport) => {
-          expect(hasFinding(res, "sandbox.browser_container.hash_label_missing", "warn")).toBe(
-            true,
-          );
-          expect(hasFinding(res, "sandbox.browser_container.hash_epoch_stale", "warn")).toBe(true);
-          const staleEpoch = res.findings.find(
-            (f) => f.checkId === "sandbox.browser_container.hash_epoch_stale",
-          );
-          expect(staleEpoch?.detail).toContain("openclaw-sbx-browser-old");
-        },
-      },
-      {
-        name: "skips sandbox browser hash label checks when docker inspect is unavailable",
-        run: async () => {
-          const { stateDir, configPath } = await createFilesystemAuditFixture(
-            "browser-hash-labels-skip",
-          );
-          return runSecurityAudit({
-            config: {},
-            includeFilesystem: true,
-            includeChannelSecurity: false,
-            stateDir,
-            configPath,
-            execDockerRawFn: (async () => {
-              throw new Error("spawn docker ENOENT");
-            }) as NonNullable<SecurityAuditOptions["execDockerRawFn"]>,
-          });
-        },
-        assert: (res: SecurityAuditReport) => {
-          expect(hasFinding(res, "sandbox.browser_container.hash_label_missing")).toBe(false);
-          expect(hasFinding(res, "sandbox.browser_container.hash_epoch_stale")).toBe(false);
-        },
-      },
-      {
-        name: "flags sandbox browser containers with non-loopback published ports",
-        run: async () => {
-          const { stateDir, configPath } = await createFilesystemAuditFixture(
-            "browser-non-loopback-publish",
-          );
-          return runSecurityAudit({
-            config: {},
-            includeFilesystem: true,
-            includeChannelSecurity: false,
-            stateDir,
-            configPath,
-            execDockerRawFn: (async (args: string[]) => {
-              if (args[0] === "ps") {
-                return {
-                  stdout: Buffer.from("openclaw-sbx-browser-exposed\n"),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              if (args[0] === "inspect" && args.at(-1) === "openclaw-sbx-browser-exposed") {
-                return {
-                  stdout: Buffer.from("hash123\t2026-02-21-novnc-auth-default\n"),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              if (args[0] === "port" && args.at(-1) === "openclaw-sbx-browser-exposed") {
-                return {
-                  stdout: Buffer.from("6080/tcp -> 0.0.0.0:49101\n9222/tcp -> 127.0.0.1:49100\n"),
-                  stderr: Buffer.alloc(0),
-                  code: 0,
-                };
-              }
-              return {
-                stdout: Buffer.alloc(0),
-                stderr: Buffer.from("not found"),
-                code: 1,
-              };
-            }) as NonNullable<SecurityAuditOptions["execDockerRawFn"]>,
-          });
-        },
-        assert: (res: SecurityAuditReport) => {
-          expect(
-            hasFinding(res, "sandbox.browser_container.non_loopback_publish", "critical"),
-          ).toBe(true);
-        },
-      },
-      {
-        name: "warns when bridge network omits cdpSourceRange",
-        run: async () =>
-          audit({
-            agents: {
-              defaults: {
-                sandbox: {
-                  mode: "all",
-                  browser: { enabled: true, network: "bridge" },
-                },
-              },
-            },
-          }),
-        assert: (res: SecurityAuditReport) => {
-          const finding = res.findings.find(
-            (f) => f.checkId === "sandbox.browser_cdp_bridge_unrestricted",
-          );
-          expect(finding?.severity).toBe("warn");
-          expect(finding?.detail).toContain("agents.defaults.sandbox.browser");
-        },
-      },
-      {
-        name: "does not warn for dedicated default browser network",
-        run: async () =>
-          audit({
-            agents: {
-              defaults: {
-                sandbox: {
-                  mode: "all",
-                  browser: { enabled: true },
-                },
-              },
-            },
-          }),
-        assert: (res: SecurityAuditReport) => {
-          expect(hasFinding(res, "sandbox.browser_cdp_bridge_unrestricted")).toBe(false);
-        },
-      },
-    ] as const;
-
-    await runAuditCases(cases);
   });
 
   it("uses symlink target permissions for config checks", async () => {
@@ -1346,7 +1107,6 @@ describe("security audit", () => {
       includeChannelSecurity: false,
       stateDir,
       configPath,
-      execDockerRawFn: execDockerRawUnavailable,
     });
 
     expect(res.findings).toEqual(
@@ -1427,7 +1187,6 @@ describe("security audit", () => {
               includeChannelSecurity: false,
               stateDir: fixture.stateDir,
               configPath,
-              execDockerRawFn: execDockerRawUnavailable,
             });
 
             return { fixture, res };
@@ -1445,7 +1204,7 @@ describe("security audit", () => {
     );
   });
 
-  it("scores small-model risk by tool/sandbox exposure", async () => {
+  it("scores small-model risk by tool exposure", async () => {
     const cases: Array<{
       name: string;
       cfg: OpenClawConfig;
@@ -1463,16 +1222,16 @@ describe("security audit", () => {
         detailIncludes: ["mistral-8b", "web_search", "web_fetch", "browser"],
       },
       {
-        name: "small model with sandbox all and web/browser disabled",
+        name: "small model with web/browser disabled",
         cfg: {
           agents: {
-            defaults: { model: { primary: "ollama/mistral-8b" }, sandbox: { mode: "all" } },
+            defaults: { model: { primary: "ollama/mistral-8b" } },
           },
           tools: { web: { search: { enabled: false }, fetch: { enabled: false } } },
           browser: { enabled: false },
         },
         expectedSeverity: "info",
-        detailIncludes: ["mistral-8b", "sandbox=all"],
+        detailIncludes: ["mistral-8b"],
       },
     ];
     await runConfigAuditCases(cases, (res, testCase) => {
@@ -1482,124 +1241,6 @@ describe("security audit", () => {
         detail: finding?.detail,
         name: testCase.name,
         includes: testCase.detailIncludes,
-      });
-    });
-  });
-
-  it("evaluates sandbox docker config findings", async () => {
-    const cases = [
-      {
-        name: "mode off with docker config only",
-        cfg: {
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "off",
-                docker: { image: "ghcr.io/example/sandbox:latest" },
-              },
-            },
-          },
-        } as OpenClawConfig,
-        expectedFindings: [{ checkId: "sandbox.docker_config_mode_off" }],
-      },
-      {
-        name: "agent enables sandbox mode",
-        cfg: {
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "off",
-                docker: { image: "ghcr.io/example/sandbox:latest" },
-              },
-            },
-            list: [{ id: "ops", sandbox: { mode: "all" } }],
-          },
-        } as OpenClawConfig,
-        expectedFindings: [],
-        expectedAbsent: ["sandbox.docker_config_mode_off"],
-      },
-      {
-        name: "dangerous binds, host network, seccomp, and apparmor",
-        cfg: {
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "all",
-                docker: {
-                  binds: ["/etc/passwd:/mnt/passwd:ro", "/run:/run"],
-                  network: "host",
-                  seccompProfile: "unconfined",
-                  apparmorProfile: "unconfined",
-                },
-              },
-            },
-          },
-        } as OpenClawConfig,
-        expectedFindings: [
-          { checkId: "sandbox.dangerous_bind_mount", severity: "critical" },
-          { checkId: "sandbox.dangerous_network_mode", severity: "critical" },
-          { checkId: "sandbox.dangerous_seccomp_profile", severity: "critical" },
-          { checkId: "sandbox.dangerous_apparmor_profile", severity: "critical" },
-        ],
-      },
-      {
-        name: "home credential bind is treated as dangerous",
-        cfg: {
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "all",
-                docker: {
-                  binds: [path.join(isolatedHome, ".docker", "config.json") + ":/mnt/docker:ro"],
-                },
-              },
-            },
-          },
-        } as OpenClawConfig,
-        expectedFindings: [
-          {
-            checkId: "sandbox.dangerous_bind_mount",
-            severity: "critical",
-            title: "Dangerous bind mount in sandbox config",
-          },
-        ],
-      },
-      {
-        name: "container namespace join network mode",
-        cfg: {
-          agents: {
-            defaults: {
-              sandbox: {
-                mode: "all",
-                docker: {
-                  network: "container:peer",
-                },
-              },
-            },
-          },
-        } as OpenClawConfig,
-        expectedFindings: [
-          {
-            checkId: "sandbox.dangerous_network_mode",
-            severity: "critical",
-            title: "Dangerous network mode in sandbox config",
-          },
-        ],
-      },
-    ] as const;
-
-    await runConfigAuditCases(cases, (res, testCase) => {
-      if (testCase.expectedFindings.length > 0) {
-        expect(res.findings, testCase.name).toEqual(
-          expect.arrayContaining(
-            testCase.expectedFindings.map((finding) => expect.objectContaining(finding)),
-          ),
-        );
-      }
-      expectFindingSet({
-        res,
-        name: testCase.name,
-        expectedAbsent: "expectedAbsent" in testCase ? testCase.expectedAbsent : [],
       });
     });
   });
@@ -3402,7 +3043,6 @@ describe("security audit", () => {
         ? { ...process.env, USERNAME: "Tester", USERDOMAIN: "DESKTOP-TEST" }
         : undefined,
       execIcacls,
-      execDockerRawFn: execDockerRawUnavailable,
     });
 
     const expectedCheckId = isWindows
@@ -3684,7 +3324,6 @@ describe("security audit", () => {
       includeChannelSecurity: false,
       deep: false,
       stateDir,
-      execDockerRawFn: execDockerRawUnavailable,
     });
 
     expect(result.findings.some((f) => f.checkId === "plugins.code_safety")).toBe(false);
@@ -3724,28 +3363,6 @@ describe("security audit", () => {
               }),
             ]),
           );
-        },
-      },
-      {
-        name: "does not flag runtime/filesystem exposure for open groups when sandbox mode is all",
-        cfg: {
-          channels: { whatsapp: { groupPolicy: "open" } },
-          tools: {
-            elevated: { enabled: false },
-            profile: "coding",
-          },
-          agents: {
-            defaults: {
-              sandbox: { mode: "all" },
-            },
-          },
-        } satisfies OpenClawConfig,
-        assert: (res: SecurityAuditReport) => {
-          expect(
-            res.findings.some(
-              (f) => f.checkId === "security.exposure.open_groups_with_runtime_or_fs",
-            ),
-          ).toBe(false);
         },
       },
       {
@@ -3793,7 +3410,7 @@ describe("security audit", () => {
             'channels.discord.groupPolicy="allowlist" with configured group targets',
           );
           expect(finding?.detail).toContain("personal-assistant");
-          expect(finding?.remediation).toContain('agents.defaults.sandbox.mode="all"');
+          expect(finding?.remediation).toContain("tools.fs.workspaceOnly=true");
         },
       },
       {

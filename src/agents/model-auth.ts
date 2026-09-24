@@ -13,14 +13,6 @@ import {
 } from "../plugins/provider-runtime.js";
 import { resolveOwningPluginIdsForProvider } from "../plugins/providers.js";
 import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js";
-import {
-  type AuthProfileStore,
-  ensureAuthProfileStore,
-  listProfilesForProvider,
-  resolveApiKeyForProfile,
-  resolveAuthProfileOrder,
-  resolveAuthStorePathForDisplay,
-} from "./auth-profiles.js";
 import { resolveEnvApiKey, type EnvApiKeyResult } from "./model-auth-env.js";
 import {
   CUSTOM_LOCAL_AUTH_MARKER,
@@ -35,7 +27,6 @@ import {
 } from "./model-auth-runtime-shared.js";
 import { normalizeProviderId } from "./model-selection.js";
 
-export { ensureAuthProfileStore, resolveAuthProfileOrder } from "./auth-profiles.js";
 export { requireApiKey, resolveAwsSdkEnvVarName } from "./model-auth-runtime-shared.js";
 export type { ResolvedProviderAuth } from "./model-auth-runtime-shared.js";
 
@@ -340,52 +331,16 @@ function shouldDeferSyntheticProfileAuth(params: {
 export async function resolveApiKeyForProvider(params: {
   provider: string;
   cfg?: OpenClawConfig;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   profileId?: string;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   preferredProfile?: string;
-  store?: AuthProfileStore;
-  agentDir?: string;
-  /** When true, treat profileId as a user-locked selection that must not be
-   *  silently overridden by env/config credentials (e.g. ollama-local). */
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   lockedProfile?: boolean;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
+  agentDir?: string;
 }): Promise<ResolvedProviderAuth> {
-  const { provider, cfg, profileId, preferredProfile } = params;
-  const store = params.store ?? ensureAuthProfileStore(params.agentDir);
-
-  if (profileId) {
-    const resolved = await resolveApiKeyForProfile({
-      cfg,
-      store,
-      profileId,
-      agentDir: params.agentDir,
-    });
-    if (!resolved) {
-      throw new Error(`No credentials found for profile "${profileId}".`);
-    }
-    const mode = store.profiles[profileId]?.type;
-    const result: ResolvedProviderAuth = {
-      apiKey: resolved.apiKey,
-      profileId,
-      source: `profile:${profileId}`,
-      mode: mode === "oauth" ? "oauth" : mode === "token" ? "token" : "api-key",
-    };
-    // When the resolved key is a provider-owned synthetic profile marker and
-    // the caller has not locked this profile, fall through to env/config
-    // resolution so provider-owned real credentials take precedence. The auth
-    // controller iterates profile candidates and passes each as an explicit
-    // profileId, so we cannot assume explicit === user-locked.
-    if (
-      !params.lockedProfile &&
-      shouldDeferSyntheticProfileAuth({
-        cfg,
-        provider,
-        resolvedApiKey: resolved.apiKey,
-      })
-    ) {
-      return resolveApiKeyForProvider({ ...params, profileId: undefined, lockedProfile: true }) //
-        .catch(() => result);
-    }
-    return result;
-  }
+  const { cfg, provider } = params;
 
   const authOverride = resolveProviderAuthOverride(cfg, provider);
   if (authOverride === "aws-sdk") {
@@ -399,49 +354,6 @@ export async function resolveApiKeyForProvider(params: {
         source: customKey.source,
         mode: "api-key",
       };
-    }
-  }
-
-  const providerConfig = resolveProviderConfig(cfg, provider);
-  const order = resolveAuthProfileOrder({
-    cfg,
-    store,
-    provider,
-    preferredProfile,
-  });
-  let deferredAuthProfileResult: ResolvedProviderAuth | null = null;
-  for (const candidate of order) {
-    try {
-      const resolved = await resolveApiKeyForProfile({
-        cfg,
-        store,
-        profileId: candidate,
-        agentDir: params.agentDir,
-      });
-      if (resolved) {
-        const mode = store.profiles[candidate]?.type;
-        const resolvedMode: ResolvedProviderAuth["mode"] =
-          mode === "oauth" ? "oauth" : mode === "token" ? "token" : "api-key";
-        const result: ResolvedProviderAuth = {
-          apiKey: resolved.apiKey,
-          profileId: candidate,
-          source: `profile:${candidate}`,
-          mode: resolvedMode,
-        };
-        if (
-          shouldDeferSyntheticProfileAuth({
-            cfg,
-            provider,
-            resolvedApiKey: resolved.apiKey,
-          })
-        ) {
-          deferredAuthProfileResult ??= result;
-          continue;
-        }
-        return result;
-      }
-    } catch (err) {
-      log.debug?.(`auth profile "${candidate}" failed for provider "${provider}": ${String(err)}`);
     }
   }
 
@@ -464,10 +376,6 @@ export async function resolveApiKeyForProvider(params: {
     return result;
   }
 
-  if (deferredAuthProfileResult) {
-    return deferredAuthProfileResult;
-  }
-
   const syntheticLocalAuth = resolveSyntheticLocalProviderAuth({ cfg, provider });
   if (syntheticLocalAuth) {
     return syntheticLocalAuth;
@@ -478,6 +386,7 @@ export async function resolveApiKeyForProvider(params: {
     return resolveAwsSdkAuthInfo();
   }
 
+  const providerConfig = resolveProviderConfig(cfg, provider);
   const hasInlineConfiguredModels =
     Array.isArray(providerConfig?.models) && providerConfig.models.length > 0;
   const owningPluginIds = !hasInlineConfiguredModels
@@ -495,7 +404,7 @@ export async function resolveApiKeyForProvider(params: {
         agentDir: params.agentDir,
         env: process.env,
         provider,
-        listProfileIds: (providerId) => listProfilesForProvider(store, providerId),
+        listProfileIds: (_providerId: string) => [],
       },
     });
     if (pluginMissingAuthMessage) {
@@ -503,13 +412,10 @@ export async function resolveApiKeyForProvider(params: {
     }
   }
 
-  const authStorePath = resolveAuthStorePathForDisplay(params.agentDir);
-  const resolvedAgentDir = path.dirname(authStorePath);
   throw new Error(
     [
       `No API key found for provider "${provider}".`,
-      `Auth store: ${authStorePath} (agentDir: ${resolvedAgentDir}).`,
-      `Configure auth for this agent (${formatCliCommand("openclaw agents add <id>")}) or copy auth-profiles.json from the main agentDir.`,
+      `Configure an API key via env vars, models.providers.*.apiKey, or the API key prompt (${formatCliCommand("openclaw models auth")}).`,
     ].join(" "),
   );
 }
@@ -522,7 +428,6 @@ export type { EnvApiKeyResult } from "./model-auth-env.js";
 export function resolveModelAuthMode(
   provider?: string,
   cfg?: OpenClawConfig,
-  store?: AuthProfileStore,
 ): ModelAuthMode | undefined {
   const resolved = provider?.trim();
   if (!resolved) {
@@ -532,31 +437,6 @@ export function resolveModelAuthMode(
   const authOverride = resolveProviderAuthOverride(cfg, resolved);
   if (authOverride === "aws-sdk") {
     return "aws-sdk";
-  }
-
-  const authStore = store ?? ensureAuthProfileStore();
-  const profiles = listProfilesForProvider(authStore, resolved);
-  if (profiles.length > 0) {
-    const modes = new Set(
-      profiles
-        .map((id) => authStore.profiles[id]?.type)
-        .filter((mode): mode is "api_key" | "oauth" | "token" => Boolean(mode)),
-    );
-    const distinct = ["oauth", "token", "api_key"].filter((k) =>
-      modes.has(k as "oauth" | "token" | "api_key"),
-    );
-    if (distinct.length >= 2) {
-      return "mixed";
-    }
-    if (modes.has("oauth")) {
-      return "oauth";
-    }
-    if (modes.has("token")) {
-      return "token";
-    }
-    if (modes.has("api_key")) {
-      return "api-key";
-    }
   }
 
   if (authOverride === undefined && normalizeProviderId(resolved) === "amazon-bedrock") {
@@ -578,38 +458,16 @@ export function resolveModelAuthMode(
 export async function hasAvailableAuthForProvider(params: {
   provider: string;
   cfg?: OpenClawConfig;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   preferredProfile?: string;
-  store?: AuthProfileStore;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   agentDir?: string;
 }): Promise<boolean> {
-  const { provider, cfg, preferredProfile } = params;
-  const store = params.store ?? ensureAuthProfileStore(params.agentDir);
+  const { provider, cfg } = params;
 
   const authOverride = resolveProviderAuthOverride(cfg, provider);
   if (authOverride === "aws-sdk") {
     return true;
-  }
-
-  const order = resolveAuthProfileOrder({
-    cfg,
-    store,
-    provider,
-    preferredProfile,
-  });
-  for (const candidate of order) {
-    try {
-      const resolved = await resolveApiKeyForProfile({
-        cfg,
-        store,
-        profileId: candidate,
-        agentDir: params.agentDir,
-      });
-      if (resolved) {
-        return true;
-      }
-    } catch (err) {
-      log.debug?.(`auth profile "${candidate}" failed for provider "${provider}": ${String(err)}`);
-    }
   }
 
   if (resolveEnvApiKey(provider)) {
@@ -628,20 +486,19 @@ export async function hasAvailableAuthForProvider(params: {
 export async function getApiKeyForModel(params: {
   model: Model<Api>;
   cfg?: OpenClawConfig;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   profileId?: string;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   preferredProfile?: string;
-  store?: AuthProfileStore;
-  agentDir?: string;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
   lockedProfile?: boolean;
+  /** @deprecated Accepted for call-site compatibility only; auth profiles are removed. */
+  agentDir?: string;
 }): Promise<ResolvedProviderAuth> {
   return resolveApiKeyForProvider({
     provider: params.model.provider,
     cfg: params.cfg,
-    profileId: params.profileId,
-    preferredProfile: params.preferredProfile,
-    store: params.store,
     agentDir: params.agentDir,
-    lockedProfile: params.lockedProfile,
   });
 }
 

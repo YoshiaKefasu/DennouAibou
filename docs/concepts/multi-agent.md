@@ -46,9 +46,8 @@ configured. Use `agents.defaults.skills` for a shared baseline and
 The Gateway can host **one agent** (default) or **many agents** side-by-side.
 
 **Workspace note:** each agent’s workspace is the **default cwd**, not a hard
-sandbox. Relative paths resolve inside the workspace, but absolute paths can
-reach other host locations unless sandboxing is enabled. See
-[Sandboxing](/gateway/sandboxing).
+boundary. Relative paths resolve inside the workspace, but absolute paths can
+reach other host locations.
 
 ## Paths (quick map)
 
@@ -516,10 +515,6 @@ and a tighter tool policy:
         groupChat: {
           mentionPatterns: ["@family", "@familybot", "@Family Bot"],
         },
-        sandbox: {
-          mode: "all",
-          scope: "agent",
-        },
         tools: {
           allow: [
             "exec",
@@ -550,61 +545,9 @@ and a tighter tool policy:
 Notes:
 
 - Tool allow/deny lists are **tools**, not skills. If a skill needs to run a
-  binary, ensure `exec` is allowed and the binary exists in the sandbox.
+  binary, ensure `exec` is allowed and the binary exists on the host.
 - For stricter gating, set `agents.list[].groupChat.mentionPatterns` and keep
   group allowlists enabled for the channel.
-
-## Per-Agent Sandbox and Tool Configuration
-
-Each agent can have its own sandbox and tool restrictions:
-
-```js
-{
-  agents: {
-    list: [
-      {
-        id: "personal",
-        workspace: "~/.openclaw/workspace-personal",
-        sandbox: {
-          mode: "off",  // No sandbox for personal agent
-        },
-        // No tool restrictions - all tools available
-      },
-      {
-        id: "family",
-        workspace: "~/.openclaw/workspace-family",
-        sandbox: {
-          mode: "all",     // Always sandboxed
-          scope: "agent",  // One container per agent
-          docker: {
-            // Optional one-time setup after container creation
-            setupCommand: "apt-get update && apt-get install -y git curl",
-          },
-        },
-        tools: {
-          allow: ["read"],                    // Only read tool
-          deny: ["exec", "write", "edit", "apply_patch"],    // Deny others
-        },
-      },
-    ],
-  },
-}
-```
-
-Note: `setupCommand` lives under `sandbox.docker` and runs once on container creation.
-Per-agent `sandbox.docker.*` overrides are ignored when the resolved scope is `"shared"`.
-
-**Benefits:**
-
-- **Security isolation**: Restrict tools for untrusted agents
-- **Resource control**: Sandbox specific agents while keeping others on host
-- **Flexible policies**: Different permissions per agent
-
-Note: `tools.elevated` is **global** and sender-based; it is not configurable per agent.
-If you need per-agent boundaries, use `agents.list[].tools` to deny `exec`.
-For group targeting, use `agents.list[].groupChat.mentionPatterns` so @mentions map cleanly to the intended agent.
-
-See [Multi-Agent Sandbox & Tools](/tools/multi-agent-sandbox-tools) for detailed examples.
 
 ## Related
 

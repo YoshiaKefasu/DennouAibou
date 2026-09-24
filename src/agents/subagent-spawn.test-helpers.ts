@@ -5,7 +5,6 @@ import type { OpenClawConfig } from "../config/config.js";
 import { mergeSessionEntry, type SessionEntry } from "../config/sessions.js";
 import { isAdminOnlyMethod } from "../gateway/method-scopes.js";
 import type { SubagentLifecycleHookRunner } from "../plugins/hooks.js";
-import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
 import { resolveSpawnedWorkspaceInheritance } from "./spawned-context.js";
 import { countActiveRunsForSession, resetSubagentRegistryForTests } from "./subagent-registry.js";
 import type { SubagentSpawnDeps } from "./subagent-spawn.js";
@@ -134,7 +133,6 @@ export async function loadSubagentSpawnModuleForTest(params: {
   resolveAgentConfig?: SubagentSpawnDeps["resolveAgentConfig"];
   resolveAgentWorkspaceDir?: (cfg: OpenClawConfig, agentId: string) => string;
   resolveSubagentSpawnModelSelection?: SubagentSpawnDeps["resolveSubagentSpawnModelSelection"];
-  resolveSandboxRuntimeStatus?: SubagentSpawnDeps["resolveSandboxRuntimeStatus"];
   workspaceDir?: string;
   sessionStorePath?: string;
   resetModules?: boolean;
@@ -173,7 +171,6 @@ export async function loadSubagentSpawnModuleForTest(params: {
         typeof spawnParams.modelOverride === "string" && spawnParams.modelOverride.trim()
           ? spawnParams.modelOverride.trim()
           : "openai/gpt-4"),
-    resolveSandboxRuntimeStatus: params.resolveSandboxRuntimeStatus ?? resolveSandboxRuntimeStatus,
     resolveGatewaySessionStoreTarget: (targetParams) => ({
       agentId: "main",
       storePath: params.sessionStorePath ?? "/tmp/subagent-spawn-model-session.json",

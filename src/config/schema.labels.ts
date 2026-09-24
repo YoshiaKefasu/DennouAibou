@@ -222,8 +222,6 @@ export const FIELD_LABELS: Record<string, string> = {
   "tools.elevated.allowFrom": "Elevated Tool Allow Rules",
   "tools.subagents": "Subagent Tool Policy",
   "tools.subagents.tools": "Subagent Tool Allow/Deny Policy",
-  "tools.sandbox": "Sandbox Tool Policy",
-  "tools.sandbox.tools": "Sandbox Tool Allow/Deny Policy",
   "tools.exec.pathPrepend": "Exec PATH Prepend",
   "tools.exec.safeBins": "Exec Safe Bins",
   "tools.exec.strictInlineEval": "Require Inline-Eval Approval",
@@ -568,10 +566,6 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.heartbeat.directPolicy": "Heartbeat Direct Policy",
   "agents.list.*.heartbeat.directPolicy": "Heartbeat Direct Policy",
   "agents.defaults.heartbeat.suppressToolErrorWarnings": "Heartbeat Suppress Tool Error Warnings",
-  "agents.defaults.sandbox.browser.network": "Sandbox Browser Network",
-  "agents.defaults.sandbox.browser.cdpSourceRange": "Sandbox Browser CDP Source Port Range",
-  "agents.defaults.sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
-    "Sandbox Docker Allow Container Namespace Join",
   commands: "Commands",
   "commands.native": "Native Commands",
   "commands.nativeSkills": "Native Skill Commands",
@@ -799,10 +793,6 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.list[].identity.avatar": "Agent Avatar",
   "agents.list[].heartbeat.suppressToolErrorWarnings":
     "Agent Heartbeat Suppress Tool Error Warnings",
-  "agents.list[].sandbox.browser.network": "Agent Sandbox Browser Network",
-  "agents.list[].sandbox.browser.cdpSourceRange": "Agent Sandbox Browser CDP Source Port Range",
-  "agents.list[].sandbox.docker.dangerouslyAllowContainerNamespaceJoin":
-    "Agent Sandbox Docker Allow Container Namespace Join",
   "discovery.mdns.mode": "mDNS Discovery Mode",
   plugins: "Plugins",
   "plugins.enabled": "Enable Plugins",

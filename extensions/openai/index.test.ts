@@ -72,19 +72,16 @@ describe("openai plugin", () => {
     setTestGlobal("fetch", fetchMock);
 
     const provider = buildOpenAIImageGenerationProvider();
-    const authStore = { version: 1, profiles: {} };
     const result = await provider.generateImage({
       provider: "openai",
       model: "gpt-image-1",
       prompt: "draw a cat",
       cfg: {},
-      authStore,
     });
 
     expect(resolveApiKeySpy).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "openai",
-        store: authStore,
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
@@ -131,14 +128,12 @@ describe("openai plugin", () => {
     setTestGlobal("fetch", fetchMock);
 
     const provider = buildOpenAIImageGenerationProvider();
-    const authStore = { version: 1, profiles: {} };
 
     const result = await provider.generateImage({
       provider: "openai",
       model: "gpt-image-1",
       prompt: "Edit this image",
       cfg: {},
-      authStore,
       inputImages: [
         { buffer: Buffer.from("x"), mimeType: "image/png" },
         { buffer: Buffer.from("y"), mimeType: "image/jpeg", fileName: "ref.jpg" },
@@ -148,7 +143,6 @@ describe("openai plugin", () => {
     expect(resolveApiKeySpy).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "openai",
-        store: authStore,
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(

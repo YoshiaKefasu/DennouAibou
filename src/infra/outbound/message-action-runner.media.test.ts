@@ -62,58 +62,13 @@ const slackConfig = {
   },
 } as OpenClawConfig;
 
-async function withSandbox(test: (sandboxDir: string) => Promise<void>) {
-  const sandboxDir = await fs.mkdtemp(path.join(os.tmpdir(), "msg-sandbox-"));
-  try {
-    await test(sandboxDir);
-  } finally {
-    await fs.rm(sandboxDir, { recursive: true, force: true });
-  }
-}
-
-const runDrySend = (params: {
-  cfg: OpenClawConfig;
-  actionParams: Record<string, unknown>;
-  sandboxRoot?: string;
-}) =>
+const runDrySend = (params: { cfg: OpenClawConfig; actionParams: Record<string, unknown> }) =>
   runMessageAction({
     cfg: params.cfg,
     action: "send",
     params: params.actionParams as never,
     dryRun: true,
-    sandboxRoot: params.sandboxRoot,
   });
-
-async function expectSandboxMediaRewrite(params: {
-  sandboxDir: string;
-  media?: string;
-  mediaField?: "media" | "mediaUrl" | "fileUrl";
-  message?: string;
-  expectedRelativePath: string;
-}) {
-  const result = await runDrySend({
-    cfg: slackConfig,
-    actionParams: {
-      channel: "slack",
-      target: "#C12345678",
-      ...(params.media
-        ? {
-            [params.mediaField ?? "media"]: params.media,
-          }
-        : {}),
-      ...(params.message ? { message: params.message } : {}),
-    },
-    sandboxRoot: params.sandboxDir,
-  });
-
-  expect(result.kind).toBe("send");
-  if (result.kind !== "send") {
-    throw new Error("expected send result");
-  }
-  expect(result.sendResult?.mediaUrl).toBe(
-    path.join(params.sandboxDir, params.expectedRelativePath),
-  );
-}
 
 const loadWebMediaMock = vi.fn(loadWebMedia);
 const runMessageAction = (params: Parameters<typeof runMessageActionWithoutMediaDeps>[0]) =>
@@ -287,7 +242,7 @@ describe("runMessageAction media behavior", () => {
       loadWebMediaMock.mockImplementation(loadWebMedia);
     }
 
-    async function expectRejectsLocalAbsolutePathWithoutSandbox(params: {
+    async function expectRejectsLocalAbsolutePath(params: {
       cfg?: OpenClawConfig;
       action: "sendAttachment" | "setGroupIcon";
       target: string;
@@ -352,9 +307,6 @@ describe("runMessageAction media behavior", () => {
           readFile: expect.any(Function),
           hostReadCapability: true,
         }),
-      );
-      expect((call?.[1] as { sandboxValidated?: boolean } | undefined)?.sandboxValidated).not.toBe(
-        true,
       );
     });
 
@@ -442,103 +394,9 @@ describe("runMessageAction media behavior", () => {
         Buffer.from("hello").toString("base64"),
       );
     });
-
-    it("enforces sandboxed attachment paths for attachment actions", async () => {
-      for (const testCase of [
-        {
-          name: "sendAttachment rewrite",
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          media: "./data/pic.png",
-          message: "caption",
-          expectedPath: path.join("data", "pic.png"),
-        },
-        {
-          name: "sendAttachment mediaUrl rewrite",
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          mediaField: "mediaUrl" as const,
-          media: "./data/pic.png",
-          message: "caption",
-          expectedPath: path.join("data", "pic.png"),
-        },
-        {
-          name: "sendAttachment fileUrl rewrite",
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          mediaField: "fileUrl" as const,
-          media: "/workspace/files/report.pdf",
-          message: "caption",
-          expectedPath: path.join("files", "report.pdf"),
-        },
-        {
-          name: "setGroupIcon rewrite",
-          action: "setGroupIcon" as const,
-          target: "group:123",
-          media: "./icons/group.png",
-          expectedPath: path.join("icons", "group.png"),
-        },
-      ]) {
-        loadWebMediaMock.mockClear();
-        await withSandbox(async (sandboxDir) => {
-          await runMessageAction({
-            cfg,
-            action: testCase.action,
-            params: {
-              channel: "bluebubbles",
-              target: testCase.target,
-              [testCase.mediaField ?? "media"]: testCase.media,
-              ...(testCase.message ? { message: testCase.message } : {}),
-            },
-            sandboxRoot: sandboxDir,
-          });
-
-          const call = loadWebMediaMock.mock.calls[0];
-          expect(call?.[0], testCase.name).toBe(path.join(sandboxDir, testCase.expectedPath));
-          expect(call?.[1], testCase.name).toEqual(
-            expect.objectContaining({
-              sandboxValidated: true,
-            }),
-          );
-        });
-      }
-
-      for (const testCase of [
-        {
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          message: "caption",
-          tempPrefix: "msg-attachment-",
-        },
-        {
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          mediaField: "mediaUrl" as const,
-          message: "caption",
-          tempPrefix: "msg-attachment-media-url-",
-        },
-        {
-          action: "sendAttachment" as const,
-          target: "+15551234567",
-          mediaField: "fileUrl" as const,
-          message: "caption",
-          tempPrefix: "msg-attachment-file-url-",
-        },
-        {
-          action: "setGroupIcon" as const,
-          target: "group:123",
-          tempPrefix: "msg-group-icon-",
-        },
-      ]) {
-        await expectRejectsLocalAbsolutePathWithoutSandbox({
-          ...testCase,
-          cfg: { tools: { fs: { workspaceOnly: true } } },
-        });
-      }
-    });
   });
 
-  describe("sandboxed media validation", () => {
+  describe("media param validation", () => {
     beforeEach(() => {
       setActivePluginRegistry(
         createTestRegistry([
@@ -555,44 +413,6 @@ describe("runMessageAction media behavior", () => {
       setActivePluginRegistry(createTestRegistry([]));
     });
 
-    it.each([
-      {
-        name: "media absolute path",
-        mediaField: "media" as const,
-        media: "/etc/passwd",
-      },
-      {
-        name: "mediaUrl absolute path",
-        mediaField: "mediaUrl" as const,
-        media: "/etc/passwd",
-      },
-      {
-        name: "mediaUrl file URL",
-        mediaField: "mediaUrl" as const,
-        media: "file:///etc/passwd",
-      },
-      {
-        name: "fileUrl file URL",
-        mediaField: "fileUrl" as const,
-        media: "file:///etc/passwd",
-      },
-    ])("rejects out-of-sandbox media reference: $name", async ({ mediaField, media }) => {
-      await withSandbox(async (sandboxDir) => {
-        await expect(
-          runDrySend({
-            cfg: slackConfig,
-            actionParams: {
-              channel: "slack",
-              target: "#C12345678",
-              [mediaField]: media,
-              message: "",
-            },
-            sandboxRoot: sandboxDir,
-          }),
-        ).rejects.toThrow(/sandbox/i);
-      });
-    });
-
     it("rejects data URLs in media params", async () => {
       await expect(
         runDrySend({
@@ -605,152 +425,6 @@ describe("runMessageAction media behavior", () => {
           },
         }),
       ).rejects.toThrow(/data:/i);
-    });
-
-    it("rewrites in-sandbox media references before dry send", async () => {
-      for (const testCase of [
-        {
-          name: "relative media path",
-          media: "./data/file.txt",
-          message: "",
-          expectedRelativePath: path.join("data", "file.txt"),
-        },
-        {
-          name: "relative mediaUrl path",
-          mediaField: "mediaUrl" as const,
-          media: "./data/file.txt",
-          message: "",
-          expectedRelativePath: path.join("data", "file.txt"),
-        },
-        {
-          name: "/workspace fileUrl path",
-          mediaField: "fileUrl" as const,
-          media: "/workspace/data/file.txt",
-          message: "",
-          expectedRelativePath: path.join("data", "file.txt"),
-        },
-        {
-          name: "/workspace media path",
-          media: "/workspace/data/file.txt",
-          message: "",
-          expectedRelativePath: path.join("data", "file.txt"),
-        },
-        {
-          name: "MEDIA directive",
-          message: "Hello\nMEDIA: ./data/note.ogg",
-          expectedRelativePath: path.join("data", "note.ogg"),
-        },
-      ] as const) {
-        await withSandbox(async (sandboxDir) => {
-          await expectSandboxMediaRewrite({
-            sandboxDir,
-            media: testCase.media,
-            mediaField: testCase.mediaField,
-            message: testCase.message,
-            expectedRelativePath: testCase.expectedRelativePath,
-          });
-        });
-      }
-    });
-
-    it("prefers media over mediaUrl when both aliases are present", async () => {
-      await withSandbox(async (sandboxDir) => {
-        const result = await runDrySend({
-          cfg: slackConfig,
-          actionParams: {
-            channel: "slack",
-            target: "#C12345678",
-            media: "./data/primary.txt",
-            mediaUrl: "./data/secondary.txt",
-            message: "",
-          },
-          sandboxRoot: sandboxDir,
-        });
-
-        expect(result.kind).toBe("send");
-        if (result.kind !== "send") {
-          throw new Error("expected send result");
-        }
-        expect(result.sendResult?.mediaUrl).toBe(path.join(sandboxDir, "data", "primary.txt"));
-      });
-    });
-
-    it.each([
-      {
-        name: "mediaUrl",
-        mediaField: "mediaUrl" as const,
-      },
-      {
-        name: "fileUrl",
-        mediaField: "fileUrl" as const,
-      },
-    ])(
-      "keeps remote HTTP $name aliases unchanged under sandbox validation",
-      async ({ mediaField }) => {
-        await withSandbox(async (sandboxDir) => {
-          const remoteUrl = "https://example.com/files/report.pdf?sig=1";
-          const result = await runDrySend({
-            cfg: slackConfig,
-            actionParams: {
-              channel: "slack",
-              target: "#C12345678",
-              [mediaField]: remoteUrl,
-              message: "",
-            },
-            sandboxRoot: sandboxDir,
-          });
-
-          expect(result.kind).toBe("send");
-          if (result.kind !== "send") {
-            throw new Error("expected send result");
-          }
-          expect(result.sendResult?.mediaUrl).toBe(remoteUrl);
-        });
-      },
-    );
-
-    it("allows media paths under preferred OpenClaw tmp root", async () => {
-      const tmpRoot = resolvePreferredOpenClawTmpDir();
-      await fs.mkdir(tmpRoot, { recursive: true });
-      const sandboxDir = await fs.mkdtemp(path.join(os.tmpdir(), "msg-sandbox-"));
-      try {
-        const tmpFile = path.join(tmpRoot, "test-media-image.png");
-        const result = await runMessageAction({
-          cfg: slackConfig,
-          action: "send",
-          params: {
-            channel: "slack",
-            target: "#C12345678",
-            media: tmpFile,
-            message: "",
-          },
-          sandboxRoot: sandboxDir,
-          dryRun: true,
-        });
-
-        expect(result.kind).toBe("send");
-        if (result.kind !== "send") {
-          throw new Error("expected send result");
-        }
-        expect(result.sendResult?.mediaUrl).toBe(path.resolve(tmpFile));
-        const hostTmpOutsideOpenClaw = path.join(os.tmpdir(), "outside-openclaw", "test-media.png");
-        await expect(
-          runMessageAction({
-            cfg: slackConfig,
-            action: "send",
-            params: {
-              channel: "slack",
-              target: "#C12345678",
-              media: hostTmpOutsideOpenClaw,
-              message: "",
-            },
-            sandboxRoot: sandboxDir,
-            dryRun: true,
-          }),
-        ).rejects.toThrow(/sandbox/i);
-      } finally {
-        await fs.rm(sandboxDir, { recursive: true, force: true });
-      }
     });
   });
 });

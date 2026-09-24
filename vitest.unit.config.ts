@@ -1,6 +1,6 @@
 import { defineProject } from "vitest/config";
 import { loadPatternListFromEnv, narrowIncludePatternsForCli } from "./vitest.pattern-file.ts";
-import { resolveVitestIsolation } from "./vitest.scoped-config.ts";
+import { resolveScopedGroupOrder, resolveVitestIsolation } from "./vitest.scoped-config.ts";
 import { sharedVitestConfig } from "./vitest.shared.config.ts";
 import {
   unitTestAdditionalExcludePatterns,
@@ -53,6 +53,9 @@ export function createUnitVitestConfigWithOptions(
         ]),
       ],
       ...(cliIncludePatterns !== null ? { passWithNoTests: true } : {}),
+      sequence: {
+        groupOrder: resolveScopedGroupOrder(options.name ?? "unit"),
+      },
     },
   });
 }

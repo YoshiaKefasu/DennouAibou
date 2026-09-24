@@ -107,14 +107,16 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
     sendNodeEvent: MockedSendNodeEvent;
     sendInvokeResult: MockedSendInvokeResult;
   }) {
+    // Note: exec-approval DEBLOAT — the approval queue is removed, so
+    // allowlist-miss in allowlist mode now denies with "allowlist-miss"
+    // instead of "approval-required".
     expect(params.sendNodeEvent).toHaveBeenCalledWith(
       expect.anything(),
       "exec.denied",
-      expect.objectContaining({ reason: "approval-required" }),
+      expect.objectContaining({ reason: "allowlist-miss" }),
     );
     expectInvokeErrorMessage(params.sendInvokeResult, {
-      message: "SYSTEM_RUN_DENIED: approval required",
-      exact: true,
+      message: "SYSTEM_RUN_DENIED: allowlist miss",
     });
   }
 
@@ -1125,9 +1127,10 @@ describe("handleSystemRunInvoke mac app exec host routing", () => {
         command,
       });
       expect(runCommand, payload).not.toHaveBeenCalled();
+      // Note: exec-approval DEBLOAT — approval queue removed; allowlist-miss
+      // denies with allowlist-miss instead of approval-required.
       expectInvokeErrorMessage(sendInvokeResult, {
-        message: "SYSTEM_RUN_DENIED: approval required",
-        exact: true,
+        message: "SYSTEM_RUN_DENIED: allowlist miss",
       });
     }
   });

@@ -395,7 +395,7 @@ describe("createPdfTool", () => {
     });
   });
 
-  it("respects fsPolicy.workspaceOnly for non-sandbox pdf paths", async () => {
+  it("respects fsPolicy.workspaceOnly for host pdf paths", async () => {
     await withTempAgentDir(async (agentDir) => {
       setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
       const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-pdf-ws-"));

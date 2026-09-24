@@ -197,8 +197,9 @@ vi.mock("../utils/message-channel.js", () => ({
   resolveMessageChannel: () => "test",
 }));
 
-const resolveEffectiveModelFallbacksMock = vi.fn().mockReturnValue(undefined);
-vi.mock("./agent-scope.js", () => ({
+const resolveEffectiveModelFallbacksMock = vi.hoisted(() => vi.fn().mockReturnValue(undefined));
+vi.mock("./agent-scope.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./agent-scope.js")>()),
   listAgentIds: () => ["default"],
   resolveAgentConfig: () => undefined,
   resolveAgentDir: () => "/tmp/agent",
@@ -206,14 +207,6 @@ vi.mock("./agent-scope.js", () => ({
   resolveSessionAgentId: () => "default",
   resolveAgentSkillsFilter: () => undefined,
   resolveAgentWorkspaceDir: () => "/tmp/workspace",
-}));
-
-vi.mock("./auth-profiles.js", () => ({
-  ensureAuthProfileStore: () => ({ profiles: {} }),
-}));
-
-vi.mock("./auth-profiles/session-override.js", () => ({
-  clearSessionAuthProfileOverride: vi.fn(),
 }));
 
 vi.mock("./defaults.js", () => ({

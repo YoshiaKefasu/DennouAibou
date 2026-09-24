@@ -5,7 +5,6 @@ import { statusJsonCommand } from "./status-json.js";
 const mocks = vi.hoisted(() => ({
   scanStatusJsonFast: vi.fn(),
   runSecurityAudit: vi.fn(),
-  loadProviderUsageSummary: vi.fn(),
   callGateway: vi.fn(),
   getDaemonStatusSummary: vi.fn(),
   getNodeDaemonStatusSummary: vi.fn(),
@@ -22,10 +21,6 @@ vi.mock("./status.scan.fast-json.js", () => ({
 
 vi.mock("../security/audit.runtime.js", () => ({
   runSecurityAudit: mocks.runSecurityAudit,
-}));
-
-vi.mock("../infra/provider-usage.js", () => ({
-  loadProviderUsageSummary: mocks.loadProviderUsageSummary,
 }));
 
 vi.mock("../gateway/call.js", () => ({
@@ -85,7 +80,6 @@ describe("statusJsonCommand", () => {
     });
     mocks.getDaemonStatusSummary.mockResolvedValue({ installed: false });
     mocks.getNodeDaemonStatusSummary.mockResolvedValue({ installed: false });
-    mocks.loadProviderUsageSummary.mockResolvedValue({ providers: [] });
     mocks.callGateway.mockResolvedValue({});
   });
 

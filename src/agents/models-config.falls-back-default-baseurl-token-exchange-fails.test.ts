@@ -37,35 +37,4 @@ describe("models-config", () => {
       });
     });
   });
-
-  it("uses agentDir override auth profiles for copilot injection", async () => {
-    await withTempHome(async (home) => {
-      await withUnsetCopilotTokenEnv(async () => {
-        mockCopilotTokenExchangeSuccess();
-        const agentDir = path.join(home, "agent-override");
-        await fs.mkdir(agentDir, { recursive: true });
-        await fs.writeFile(
-          path.join(agentDir, "auth-profiles.json"),
-          JSON.stringify(
-            {
-              version: 1,
-              profiles: {
-                "github-copilot:github": {
-                  type: "token",
-                  provider: "github-copilot",
-                  token: "gh-profile-token",
-                },
-              },
-            },
-            null,
-            2,
-          ),
-        );
-
-        await ensureOpenClawModelsJson({ models: { providers: {} } }, agentDir);
-
-        expect(await readCopilotBaseUrl(agentDir)).toBe("https://api.copilot.example");
-      });
-    });
-  });
 });

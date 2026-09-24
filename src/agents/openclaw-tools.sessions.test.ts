@@ -51,7 +51,6 @@ const TEST_CONFIG = {
 function createOpenClawTools(options?: {
   agentSessionKey?: string;
   agentChannel?: string;
-  sandboxed?: boolean;
   config?: OpenClawConfig;
 }) {
   const config = options?.config ?? TEST_CONFIG;
@@ -59,20 +58,17 @@ function createOpenClawTools(options?: {
   return [
     createSessionsListTool({
       agentSessionKey: options?.agentSessionKey,
-      sandboxed: options?.sandboxed,
       config,
       callGateway: gatewayCall,
     }),
     createSessionsHistoryTool({
       agentSessionKey: options?.agentSessionKey,
-      sandboxed: options?.sandboxed,
       config,
       callGateway: gatewayCall,
     }),
     createSessionsSendTool({
       agentSessionKey: options?.agentSessionKey,
       agentChannel: options?.agentChannel as never,
-      sandboxed: options?.sandboxed,
       config,
       callGateway: gatewayCall,
     }),

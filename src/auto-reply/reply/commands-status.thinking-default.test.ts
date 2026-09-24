@@ -11,15 +11,8 @@ vi.mock("../../agents/model-auth-label.js", () => ({
 
 vi.mock("../../agents/subagent-registry.js", () => ({
   listSubagentRunsForRequester: () => [],
-}));
-
-vi.mock("../../infra/provider-usage.js", () => ({
-  resolveUsageProviderId: () => undefined,
-  loadProviderUsageSummary: async () => ({
-    updatedAt: Date.now(),
-    providers: [],
-  }),
-  formatUsageWindowSummary: () => undefined,
+  countActiveRunsForSession: () => 0,
+  registerSubagentRun: vi.fn(),
 }));
 
 vi.mock("../group-activation.js", () => ({

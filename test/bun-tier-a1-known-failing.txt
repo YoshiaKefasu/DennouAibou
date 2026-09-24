@@ -33,7 +33,6 @@ src/agents/pi-bundle-mcp-tools.materialize.test.ts
 src/agents/pi-embedded-runner/kilocode.test.ts
 src/agents/pi-embedded-runner/tool-result-context-guard.test.ts
 src/agents/pi-model-discovery.auth.test.ts
-src/agents/sandbox-explain.test.ts
 src/agents/skills.buildworkspaceskillsnapshot.test.ts
 src/agents/skills.env-path-guidance.test.ts
 src/agents/skills/compact-format.test.ts

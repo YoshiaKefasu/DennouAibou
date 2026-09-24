@@ -31,7 +31,6 @@ export const rootVitestProjects = [
   "vitest.cron.config.ts",
   "vitest.media-understanding.config.ts",
   "vitest.shared-core.config.ts",
-  "vitest.tasks.config.ts",
   "vitest.tooling.config.ts",
   "vitest.tui.config.ts",
   "vitest.ui.config.ts",

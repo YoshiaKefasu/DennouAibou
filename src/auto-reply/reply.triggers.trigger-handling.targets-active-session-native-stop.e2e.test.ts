@@ -195,9 +195,9 @@ describe("trigger handling", () => {
 
   for (const testCase of [
     {
-      error: "sandbox is not defined.",
+      error: "model is not configured.",
       expected:
-        "⚠️ Agent failed before reply: sandbox is not defined.\nLogs: openclaw logs --follow",
+        "⚠️ Agent failed before reply: model is not configured.\nLogs: openclaw logs --follow",
     },
     {
       error: "Context window exceeded",

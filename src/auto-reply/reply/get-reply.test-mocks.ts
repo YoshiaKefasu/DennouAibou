@@ -54,8 +54,8 @@ export function registerGetReplyCommonMocks(): void {
   vi.mock("./session-reset-model.runtime.js", () => ({
     applyResetModelOverride: vi.fn(async () => undefined),
   }));
-  vi.mock("./stage-sandbox-media.runtime.js", () => ({
-    stageSandboxMedia: vi.fn(async () => undefined),
+  vi.mock("./stage-inbound-media.runtime.js", () => ({
+    stageInboundMedia: vi.fn(async () => undefined),
   }));
   vi.mock("./typing.js", () => ({
     createTypingController: vi.fn(() => createMockTypingController()),

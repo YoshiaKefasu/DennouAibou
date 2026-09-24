@@ -18,7 +18,6 @@ Examples:
 ```bash
 openclaw docs
 openclaw docs browser existing-session
-openclaw docs sandbox allowHostControl
 openclaw docs gateway token secretref
 ```
 

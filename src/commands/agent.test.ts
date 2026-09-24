@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest"
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../agents/agent-scope.js";
-import * as authProfilesModule from "../agents/auth-profiles.js";
 import { resolveSession } from "../agents/command/session.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";
@@ -41,14 +40,6 @@ vi.mock("../logging/subsystem.js", () => {
   });
   return {
     createSubsystemLogger: vi.fn(() => createMockLogger()),
-  };
-});
-
-vi.mock("../agents/auth-profiles.js", async () => {
-  const actual = await import("../agents/auth-profiles.js");
-  return {
-    ...actual,
-    ensureAuthProfileStore: vi.fn(() => ({ version: 1, profiles: {} })),
   };
 });
 
@@ -973,14 +964,6 @@ describe("agentCommand", () => {
           "openai/gpt-4.1-mini": {},
         },
       });
-      (authProfilesModule.ensureAuthProfileStore as Mock).mockReturnValue({
-        version: 1,
-        profiles: {
-          "anthropic:work": {
-            provider: "anthropic",
-          },
-        },
-      } as never);
 
       await agentCommand(
         {

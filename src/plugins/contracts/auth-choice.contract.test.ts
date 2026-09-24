@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearRuntimeAuthProfileStoreSnapshots } from "../../agents/auth-profiles/store.js";
 import { resolvePreferredProviderForAuthChoice } from "../../plugins/provider-auth-choice-preference.js";
 import { buildProviderPluginMethodChoice } from "../provider-wizard.js";
 import type { ProviderPlugin } from "../types.js";
@@ -90,7 +89,6 @@ describe("provider auth-choice contract", () => {
     resolveProviderPluginChoiceMock.mockReset();
     resolveProviderPluginChoiceMock.mockReturnValue(null);
     runProviderModelSelectedHookMock.mockReset();
-    clearRuntimeAuthProfileStoreSnapshots();
   });
 
   it("maps provider-plugin choices through the shared preferred-provider fallback resolver", async () => {

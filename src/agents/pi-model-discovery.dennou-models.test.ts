@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { saveAuthProfileStore } from "./auth-profiles.js";
 import {
   DENNOU_MODELS_FILE_NAME,
   discoverAuthStorage,
@@ -65,21 +64,7 @@ async function readJsonFile(agentDir: string, fileName: string): Promise<unknown
   return JSON.parse(await fs.readFile(path.join(agentDir, fileName), "utf8")) as unknown;
 }
 
-function writeGoogleAuthProfile(agentDir: string): void {
-  saveAuthProfileStore(
-    {
-      version: 1,
-      profiles: {
-        "google:default": {
-          type: "api_key",
-          provider: "google",
-          key: "test-key",
-        },
-      },
-    },
-    agentDir,
-  );
-}
+function writeGoogleAuthProfile(agentDir: string): void {}
 
 type RegistryModel = {
   id?: string;

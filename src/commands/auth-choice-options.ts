@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveProviderSetupFlowContributions } from "../flows/provider-flow.js";
 import {
@@ -70,14 +69,12 @@ export function formatAuthChoiceChoicesForCli(params?: {
 }
 
 export function buildAuthChoiceOptions(params: {
-  store: AuthProfileStore;
   includeSkip: boolean;
   assistantVisibleOnly?: boolean;
   config?: OpenClawConfig;
   workspaceDir?: string;
   env?: NodeJS.ProcessEnv;
 }): AuthChoiceOption[] {
-  void params.store;
   const optionByValue = new Map<AuthChoice, AuthChoiceOption>();
   for (const option of CORE_AUTH_CHOICE_OPTIONS) {
     optionByValue.set(option.value, option);
@@ -104,7 +101,6 @@ export function buildAuthChoiceOptions(params: {
 }
 
 export function buildAuthChoiceGroups(params: {
-  store: AuthProfileStore;
   includeSkip: boolean;
   config?: OpenClawConfig;
   workspaceDir?: string;

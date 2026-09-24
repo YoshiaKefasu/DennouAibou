@@ -15,7 +15,6 @@ This document describes how DennouAibou integrates with [pi-coding-agent](https:
 DennouAibou uses the pi SDK to embed an AI coding agent into its messaging gateway architecture. Instead of spawning pi as a subprocess or using RPC mode, DennouAibou directly imports and instantiates pi's `AgentSession` via `createAgentSession()`. This embedded approach provides:
 
 - Full control over session lifecycle and event handling
-- Custom tool injection (messaging, sandbox, channel-specific actions)
 - System prompt customization per channel/context
 - Session persistence with branching/compaction support
 - Multi-account auth profile rotation with failover
@@ -63,7 +62,6 @@ src/agents/
 │   ├── logger.ts                  # Subsystem logger
 │   ├── model.ts                   # Model resolution via ModelRegistry
 │   ├── runs.ts                    # Active run tracking, abort, queue
-│   ├── sandbox-info.ts            # Sandbox info for system prompt
 │   ├── session-manager-cache.ts   # SessionManager instance caching
 │   ├── session-manager-init.ts    # Session file initialization
 │   ├── system-prompt.ts           # System prompt builder
@@ -109,8 +107,6 @@ src/agents/
 ├── transcript-policy.ts           # Transcript validation policy
 ├── skills.ts                      # Skill snapshot/prompt building
 ├── skills/                        # Skill subsystem
-├── sandbox.ts                     # Sandbox context resolution
-├── sandbox/                       # Sandbox subsystem
 ├── channel-tools.ts               # Channel-specific tool injection
 ├── openclaw-tools.ts              # DennouAibou-specific tools
 ├── bash-tools.ts                  # exec/process tools
@@ -246,10 +242,10 @@ to re-inject image payloads.
 ### Tool Pipeline
 
 1. **Base Tools**: pi's `codingTools` (read, bash, edit, write)
-2. **Custom Replacements**: DennouAibou replaces bash with `exec`/`process`, customizes read/edit/write for sandbox
+2. **Custom Replacements**: DennouAibou replaces bash with `exec`/`process`, customizes read/edit/write
 3. **DennouAibou Tools**: messaging, browser, canvas, sessions, cron, gateway, etc.
 4. **Channel Tools**: Discord/Telegram/Slack/WhatsApp-specific action tools
-5. **Policy Filtering**: Tools filtered by profile, provider, agent, group, sandbox policies
+5. **Policy Filtering**: Tools filtered by profile, provider, agent, and group policies
 6. **Schema Normalization**: Schemas cleaned for Gemini/OpenAI quirks
 7. **AbortSignal Wrapping**: Tools wrapped to respect abort signals
 
@@ -277,7 +273,6 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
 `splitSdkTools()` passes all tools via `customTools`:
 
 ```typescript
-export function splitSdkTools(options: { tools: AnyAgentTool[]; sandboxEnabled: boolean }) {
   return {
     builtInTools: [], // Empty. We override everything
     customTools: toToolDefinitions(options.tools),
@@ -285,11 +280,11 @@ export function splitSdkTools(options: { tools: AnyAgentTool[]; sandboxEnabled: 
 }
 ```
 
-This ensures DennouAibou's policy filtering, sandbox integration, and extended toolset remain consistent across providers.
+This ensures DennouAibou's policy filtering and extended toolset remain consistent across providers.
 
 ## System Prompt Construction
 
-The system prompt is built in `buildAgentSystemPrompt()` (`system-prompt.ts`). It assembles a full prompt with sections including Tooling, Tool Call Style, Safety guardrails, DennouAibou CLI reference, Skills, Docs, Workspace, Sandbox, Messaging, Reply Tags, Voice, Silent Replies, Heartbeats, Runtime metadata, plus Memory and Reactions when enabled, and optional context files and extra system prompt content. Sections are trimmed for minimal prompt mode used by subagents.
+The system prompt is built in `buildAgentSystemPrompt()` (`system-prompt.ts`). It assembles a full prompt with sections including Tooling, Tool Call Style, Safety guardrails, DennouAibou CLI reference, Skills, Docs, Workspace, Messaging, Reply Tags, Voice, Silent Replies, Heartbeats, Runtime metadata, plus Memory and Reactions when enabled, and optional context files and extra system prompt content. Sections are trimmed for minimal prompt mode used by subagents.
 
 The prompt is applied after session creation via `applySystemPromptOverrideToSession()`:
 
@@ -476,24 +471,6 @@ const fallbackThinking = pickFallbackThinkingLevel({
 if (fallbackThinking) {
   thinkLevel = fallbackThinking;
   continue;
-}
-```
-
-## Sandbox Integration
-
-When sandbox mode is enabled, tools and paths are constrained:
-
-```typescript
-const sandbox = await resolveSandboxContext({
-  config: params.config,
-  sessionKey: sandboxSessionKey,
-  workspaceDir: resolvedWorkspace,
-});
-
-if (sandboxRoot) {
-  // Use sandboxed read/edit/write tools
-  // Exec runs in container
-  // Browser uses bridge URL
 }
 ```
 

@@ -1,5 +1,5 @@
 import type { ChannelId } from "../channels/plugins/types.js";
-import type { AgentModelConfig, AgentSandboxConfig } from "./types.agents-shared.js";
+import type { AgentModelConfig } from "./types.agents-shared.js";
 import type {
   BlockStreamingChunkConfig,
   BlockStreamingCoalesceConfig,
@@ -198,6 +198,11 @@ export type AgentDefaultsConfig = {
     /** @deprecated Deliver reasoning payload for heartbeat runs (retired). */
     includeReasoning?: boolean;
   };
+  /**
+   * @deprecated The sandbox (isolated execution) feature was removed in the
+   * DEBLOAT wave. Accepted and ignored so legacy `dennou-aibou.json` files keep loading.
+   */
+  sandbox?: unknown;
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;
   /** Sub-agent defaults (spawned via sessions_spawn). */
@@ -223,8 +228,6 @@ export type AgentDefaultsConfig = {
     /** Require explicit agentId in sessions_spawn (no default same-as-caller). Default: false. */
     requireAgentId?: boolean;
   };
-  /** Optional sandbox settings for non-main sessions. */
-  sandbox?: AgentSandboxConfig;
 };
 
 export type AgentContextInjection = "always" | "continuation-skip";

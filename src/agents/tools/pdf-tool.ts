@@ -34,15 +34,11 @@ import {
   resolvePdfToolMaxTokens,
 } from "./pdf-tool.helpers.js";
 import {
-  createSandboxBridgeReadFile,
   discoverAuthStorage,
   discoverModels,
   ensureOpenClawModelsJson,
-  resolveSandboxedBridgeMediaPath,
   runWithImageModelFallback,
   type AnyAgentTool,
-  type SandboxedBridgeMediaPathConfig,
-  type SandboxFsBridge,
   type ToolFsPolicy,
 } from "./tool-runtime.helpers.js";
 
@@ -191,11 +187,6 @@ function buildPdfExtractionContext(prompt: string, extractions: PdfExtractedCont
 // Run PDF prompt with model fallback
 // ---------------------------------------------------------------------------
 
-type PdfSandboxConfig = {
-  root: string;
-  bridge: SandboxFsBridge;
-};
-
 async function runPdfPrompt(params: {
   cfg?: OpenClawConfig;
   agentDir: string;
@@ -328,7 +319,6 @@ export function createPdfTool(options?: {
   config?: OpenClawConfig;
   agentDir?: string;
   workspaceDir?: string;
-  sandbox?: PdfSandboxConfig;
   fsPolicy?: ToolFsPolicy;
 }): AnyAgentTool | null {
   const agentDir = options?.agentDir?.trim();
@@ -436,15 +426,6 @@ export function createPdfTool(options?: {
       const pagesRaw =
         typeof record.pages === "string" && record.pages.trim() ? record.pages.trim() : undefined;
 
-      const sandboxConfig: SandboxedBridgeMediaPathConfig | null =
-        options?.sandbox && options.sandbox.root.trim()
-          ? {
-              root: options.sandbox.root.trim(),
-              bridge: options.sandbox.bridge,
-              workspaceOnly: options.fsPolicy?.workspaceOnly === true,
-            }
-          : null;
-
       // MARK: - Load each PDF
       const loadedPdfs: Array<{
         base64: string;
@@ -474,31 +455,18 @@ export function createPdfTool(options?: {
           };
         }
 
-        if (sandboxConfig && isHttpUrl) {
-          throw new Error("Sandboxed PDF tool does not allow remote URLs.");
-        }
-
         const resolvedPdf = (() => {
-          if (sandboxConfig) {
-            return trimmed;
-          }
           if (trimmed.startsWith("~")) {
             return resolveUserPath(trimmed);
           }
           return trimmed;
         })();
 
-        const resolvedPathInfo: { resolved: string; rewrittenFrom?: string } = sandboxConfig
-          ? await resolveSandboxedBridgeMediaPath({
-              sandbox: sandboxConfig,
-              mediaPath: resolvedPdf,
-              inboundFallbackDir: "media/inbound",
-            })
-          : {
-              resolved: resolvedPdf.startsWith("file://")
-                ? resolvedPdf.slice("file://".length)
-                : resolvedPdf,
-            };
+        const resolvedPathInfo: { resolved: string; rewrittenFrom?: string } = {
+          resolved: resolvedPdf.startsWith("file://")
+            ? resolvedPdf.slice("file://".length)
+            : resolvedPdf,
+        };
         const localRoots = resolveMediaToolLocalRoots(
           options?.workspaceDir,
           {
@@ -507,16 +475,10 @@ export function createPdfTool(options?: {
           [resolvedPathInfo.resolved],
         );
 
-        const media = sandboxConfig
-          ? await loadWebMediaRaw(resolvedPathInfo.resolved, {
-              maxBytes,
-              sandboxValidated: true,
-              readFile: createSandboxBridgeReadFile({ sandbox: sandboxConfig }),
-            })
-          : await loadWebMediaRaw(resolvedPathInfo.resolved, {
-              maxBytes,
-              localRoots,
-            });
+        const media = await loadWebMediaRaw(resolvedPathInfo.resolved, {
+          maxBytes,
+          localRoots,
+        });
 
         if (media.kind !== "document") {
           // Check MIME type more specifically

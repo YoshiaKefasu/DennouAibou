@@ -342,14 +342,6 @@ export async function loadRunOverflowCompactionHarness(): Promise<{
     wrapProviderStreamFn: vi.fn((_cfg: unknown, _model: unknown, fn: unknown) => fn),
   }));
 
-  vi.doMock("../auth-profiles.js", () => ({
-    isProfileInCooldown: vi.fn(() => false),
-    markAuthProfileFailure: vi.fn(async () => {}),
-    markAuthProfileGood: vi.fn(async () => {}),
-    markAuthProfileUsed: vi.fn(async () => {}),
-    resolveProfilesUnavailableReason: vi.fn(() => undefined),
-  }));
-
   vi.doMock("../usage.js", () => ({
     normalizeUsage: vi.fn((usage?: unknown) =>
       usage && typeof usage === "object" ? usage : undefined,
@@ -420,9 +412,7 @@ export async function loadRunOverflowCompactionHarness(): Promise<{
   vi.doMock("../model-auth.js", () => ({
     applyAuthHeaderOverride: vi.fn((model: unknown) => model),
     applyLocalNoAuthHeaderOverride: vi.fn((model: unknown) => model),
-    ensureAuthProfileStore: vi.fn(() => ({})),
     getApiKeyForModel: mockedGetApiKeyForModel,
-    resolveAuthProfileOrder: mockedResolveAuthProfileOrder,
     shouldPreferExplicitConfigApiKeyAuth: mockedShouldPreferExplicitConfigApiKeyAuth,
   }));
 

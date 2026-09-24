@@ -120,7 +120,6 @@ export function buildGoogleImageGenerationProvider(): ImageGenerationProvider {
         provider: "google",
         cfg: req.cfg,
         agentDir: req.agentDir,
-        store: req.authStore,
       });
       if (!auth.apiKey) {
         throw new Error("Google API key missing");

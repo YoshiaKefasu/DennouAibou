@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export type MusicGenerationOutputFormat = "mp3" | "wav";
@@ -29,7 +28,6 @@ export type MusicGenerationRequest = {
   prompt: string;
   cfg: OpenClawConfig;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   timeoutMs?: number;
   lyrics?: string;
   instrumental?: boolean;

@@ -360,7 +360,8 @@ describe("exec approval reply helpers", () => {
       approvalSlug: "slug-2",
       approvalCommandId: " req-cmd-2 ",
       command: "echo ```danger```",
-      host: "sandbox",
+      // Note: "sandbox" removed with sandbox DEBLOAT; gateway is equivalent here.
+      host: "gateway",
     });
 
     expect(payload.text).toContain("```txt\n/approve req-cmd-2 allow-once\n```");

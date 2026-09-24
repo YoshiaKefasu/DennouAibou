@@ -6,7 +6,6 @@ const CORE_UNSUPPORTED_SECRETREF_SURFACE_PATTERNS = [
   "hooks.token",
   "hooks.gmail.pushToken",
   "hooks.mappings[].sessionKey",
-  "auth-profiles.oauth.*",
 ] as const;
 
 function collectChannelUnsupportedSecretRefSurfacePatterns(): string[] {

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { ProviderAuthChoiceMetadata } from "../plugins/provider-auth-choices.js";
 import type { ProviderWizardOption } from "../plugins/provider-wizard.js";
 import {
@@ -77,11 +76,8 @@ vi.mock("../flows/provider-flow.js", () => ({
   ),
 }));
 
-const EMPTY_STORE: AuthProfileStore = { version: 1, profiles: {} };
-
 function getOptions(includeSkip = false) {
   return buildAuthChoiceOptions({
-    store: EMPTY_STORE,
     includeSkip,
   });
 }
@@ -381,7 +377,6 @@ describe("buildAuthChoiceOptions", () => {
       },
     ]);
     const { groups } = buildAuthChoiceGroups({
-      store: EMPTY_STORE,
       includeSkip: false,
     });
     const chutesGroup = groups.find((group) => group.value === "chutes");
@@ -403,7 +398,6 @@ describe("buildAuthChoiceOptions", () => {
       },
     ]);
     const { groups } = buildAuthChoiceGroups({
-      store: EMPTY_STORE,
       includeSkip: false,
     });
     const litellmGroup = groups.find((group) => group.value === "litellm");
@@ -435,7 +429,6 @@ describe("buildAuthChoiceOptions", () => {
       },
     ]);
     const { groups } = buildAuthChoiceGroups({
-      store: EMPTY_STORE,
       includeSkip: false,
     });
     const anthropicGroup = groups.find((group) => group.value === "anthropic");
@@ -469,7 +462,6 @@ describe("buildAuthChoiceOptions", () => {
       },
     ]);
     const { groups } = buildAuthChoiceGroups({
-      store: EMPTY_STORE,
       includeSkip: false,
     });
     const openCodeGroup = groups.find((group) => group.value === "opencode");
@@ -491,7 +483,6 @@ describe("buildAuthChoiceOptions", () => {
       },
     ]);
     const { groups } = buildAuthChoiceGroups({
-      store: EMPTY_STORE,
       includeSkip: false,
     });
     const ollamaGroup = groups.find((group) => group.value === "ollama");

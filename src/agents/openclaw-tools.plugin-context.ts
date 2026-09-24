@@ -16,9 +16,7 @@ export type OpenClawPluginToolOptions = {
   requesterSenderId?: string | null;
   senderIsOwner?: boolean;
   sessionId?: string;
-  sandboxBrowserBridgeUrl?: string;
   allowHostBrowserControl?: boolean;
-  sandboxed?: boolean;
   allowGatewaySubagentBinding?: boolean;
 };
 
@@ -54,7 +52,6 @@ export function resolveOpenClawPluginToolInputs(params: {
       sessionKey: options?.agentSessionKey,
       sessionId: options?.sessionId,
       browser: {
-        sandboxBridgeUrl: options?.sandboxBrowserBridgeUrl,
         allowHostControl: options?.allowHostBrowserControl,
       },
       messageChannel: options?.agentChannel,
@@ -62,7 +59,6 @@ export function resolveOpenClawPluginToolInputs(params: {
       deliveryContext,
       requesterSenderId: options?.requesterSenderId ?? undefined,
       senderIsOwner: options?.senderIsOwner ?? undefined,
-      sandboxed: options?.sandboxed,
     },
     allowGatewaySubagentBinding: options?.allowGatewaySubagentBinding,
   };

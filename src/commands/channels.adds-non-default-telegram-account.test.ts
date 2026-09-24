@@ -1,5 +1,4 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadAuthProfileStore } from "../agents/auth-profiles.js";
 import { createPatchedAccountSetupAdapter } from "../channels/plugins/setup-helpers.js";
 import type { ChannelStatusIssue } from "../channels/plugins/types.core.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
@@ -7,25 +6,21 @@ import { createScopedChannelConfigAdapter } from "../plugin-sdk/channel-config-h
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/channel-plugins.js";
-import { configMocks, offsetMocks } from "./channels.mock-harness.js";
-import { baseConfigSnapshot, createTestRuntime } from "./test-runtime-config-helpers.js";
-
-const authStoreMock = vi.fn<typeof loadAuthProfileStore>();
-
 import {
   channelsAddCommand as channelsAddCommandImpl,
   channelsListCommand as channelsListCommandImpl,
   channelsRemoveCommand as channelsRemoveCommandImpl,
   formatGatewayChannelsStatusLines,
 } from "./channels.js";
+import { configMocks, offsetMocks } from "./channels.mock-harness.js";
 import { channelCommandDeps } from "./channels.mock-harness.js";
 import type { ChannelsAddDeps } from "./channels/add.js";
 import type { ChannelsListDeps } from "./channels/list.js";
 import type { ChannelsRemoveDeps } from "./channels/remove.js";
+import { baseConfigSnapshot, createTestRuntime } from "./test-runtime-config-helpers.js";
 
 const commandDeps: ChannelsAddDeps & ChannelsRemoveDeps & ChannelsListDeps = {
   ...channelCommandDeps,
-  loadAuthProfileStore: authStoreMock,
 };
 const channelsAddCommand = (
   opts: Parameters<typeof channelsAddCommandImpl>[0],
@@ -328,15 +323,10 @@ describe("channels command", () => {
   beforeEach(() => {
     configMocks.readConfigFileSnapshot.mockClear();
     configMocks.writeConfigFile.mockClear();
-    authStoreMock.mockClear();
     offsetMocks.deleteTelegramUpdateOffset.mockClear();
     runtime.log.mockClear();
     runtime.error.mockClear();
     runtime.exit.mockClear();
-    authStoreMock.mockReturnValue({
-      version: 1,
-      profiles: {},
-    });
     setMinimalChannelsCommandRegistryForTests();
   });
 
@@ -623,41 +613,6 @@ describe("channels command", () => {
       channels?: { discord?: { enabled?: boolean } };
     }>();
     expect(next.channels?.discord?.enabled).toBe(false);
-  });
-
-  it("includes external auth profiles in JSON output", async () => {
-    configMocks.readConfigFileSnapshot.mockResolvedValue({
-      ...baseConfigSnapshot,
-      config: {},
-      sourceConfig: {},
-    });
-    authStoreMock.mockReturnValue({
-      version: 1,
-      profiles: {
-        "anthropic:default": {
-          type: "oauth",
-          provider: "anthropic",
-          access: "token",
-          refresh: "refresh",
-          expires: 0,
-        },
-        "openai-codex:default": {
-          type: "oauth",
-          provider: "openai",
-          access: "token",
-          refresh: "refresh",
-          expires: 0,
-        },
-      },
-    });
-
-    await channelsListCommand({ json: true, usage: false }, runtime);
-    const payload = JSON.parse(runtime.log.mock.calls[0]?.[0] as string) as {
-      auth?: Array<{ id: string }>;
-    };
-    const ids = payload.auth?.map((entry) => entry.id) ?? [];
-    expect(ids).toContain("anthropic:default");
-    expect(ids).toContain("openai-codex:default");
   });
 
   it("stores default account names in accounts when multiple accounts exist", async () => {

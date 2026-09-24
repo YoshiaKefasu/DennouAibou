@@ -4,9 +4,12 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createAgentsVitestConfig } from "../vitest.agents.config.ts";
 import { createAutoReplyVitestConfig } from "../vitest.auto-reply.config.ts";
+import { createBoundaryVitestConfig } from "../vitest.boundary.config.ts";
+import bundledConfig from "../vitest.bundled.config.ts";
 import { createChannelsVitestConfig } from "../vitest.channels.config.ts";
 import { createCliVitestConfig } from "../vitest.cli.config.ts";
 import { createCommandsVitestConfig } from "../vitest.commands.config.ts";
+import { createContractsVitestConfig } from "../vitest.contracts.config.ts";
 import { createCronVitestConfig } from "../vitest.cron.config.ts";
 import { createDaemonVitestConfig } from "../vitest.daemon.config.ts";
 import { createExtensionChannelsVitestConfig } from "../vitest.extension-channels.config.ts";
@@ -29,13 +32,18 @@ import { createPluginSdkVitestConfig } from "../vitest.plugin-sdk.config.ts";
 import { createPluginsVitestConfig } from "../vitest.plugins.config.ts";
 import { createProcessVitestConfig } from "../vitest.process.config.ts";
 import { createRuntimeConfigVitestConfig } from "../vitest.runtime-config.config.ts";
-import { createScopedVitestConfig, resolveVitestIsolation } from "../vitest.scoped-config.ts";
+import {
+  createScopedVitestConfig,
+  resolveScopedGroupOrder,
+  resolveVitestIsolation,
+  SCOPED_GROUP_ORDER,
+} from "../vitest.scoped-config.ts";
 import { createSecretsVitestConfig } from "../vitest.secrets.config.ts";
 import { createSharedCoreVitestConfig } from "../vitest.shared-core.config.ts";
-import { createTasksVitestConfig } from "../vitest.tasks.config.ts";
 import { createToolingVitestConfig } from "../vitest.tooling.config.ts";
 import { createTuiVitestConfig } from "../vitest.tui.config.ts";
 import { createUiVitestConfig } from "../vitest.ui.config.ts";
+import { createUnitVitestConfig } from "../vitest.unit.config.ts";
 import { createUtilsVitestConfig } from "../vitest.utils.config.ts";
 import { createWizardVitestConfig } from "../vitest.wizard.config.ts";
 import { BUNDLED_PLUGIN_TEST_GLOB, bundledPluginFile } from "./helpers/bundled-plugin-paths.js";
@@ -132,7 +140,6 @@ describe("scoped vitest configs", () => {
   const defaultMediaConfig = createMediaVitestConfig({});
   const defaultMediaUnderstandingConfig = createMediaUnderstandingVitestConfig({});
   const defaultSharedCoreConfig = createSharedCoreVitestConfig({});
-  const defaultTasksConfig = createTasksVitestConfig({});
   const defaultCommandsConfig = createCommandsVitestConfig({});
   const defaultAutoReplyConfig = createAutoReplyVitestConfig({});
   const defaultAgentsConfig = createAgentsVitestConfig({});
@@ -141,6 +148,9 @@ describe("scoped vitest configs", () => {
   const defaultToolingConfig = createToolingVitestConfig({});
   const defaultTuiConfig = createTuiVitestConfig({});
   const defaultUiConfig = createUiVitestConfig({});
+  const defaultUnitConfig = createUnitVitestConfig({});
+  const defaultBoundaryConfig = createBoundaryVitestConfig({});
+  const defaultContractsConfig = createContractsVitestConfig();
   const defaultUtilsConfig = createUtilsVitestConfig({});
   const defaultWizardConfig = createWizardVitestConfig({});
 
@@ -404,11 +414,6 @@ describe("scoped vitest configs", () => {
     expect(defaultProcessConfig.test?.include).toEqual(["process/**/*.test.ts"]);
   });
 
-  it("normalizes tasks include patterns relative to the scoped dir", () => {
-    expect(defaultTasksConfig.test?.dir).toBe("src");
-    expect(defaultTasksConfig.test?.include).toEqual(["tasks/**/*.test.ts"]);
-  });
-
   it("normalizes wizard include patterns relative to the scoped dir", () => {
     expect(defaultWizardConfig.test?.dir).toBe("src");
     expect(defaultWizardConfig.test?.include).toEqual(["wizard/**/*.test.ts"]);
@@ -469,5 +474,79 @@ describe("scoped vitest configs", () => {
   it("normalizes utils include patterns relative to the scoped dir", () => {
     expect(defaultUtilsConfig.test?.dir).toBe("src");
     expect(defaultUtilsConfig.test?.include).toEqual(["utils/**/*.test.ts"]);
+  });
+
+  it("assigns a unique sequence.groupOrder per project lane", () => {
+    // Note: vitest throws when lanes share a groupOrder but resolve different
+    // maxWorkers. Every root project lane must have a distinct order.
+    // Note: defaultUnitConfig covers the "unit" lane; the "bundled" lane
+    // shares the unit factory with name "bundled" (see vitest.bundled.config.ts).
+    const lanes: Array<{
+      lane: string;
+      config: { test?: { sequence?: { groupOrder?: unknown } } };
+    }> = [
+      { lane: "unit", config: defaultUnitConfig },
+      { lane: "bundled", config: bundledConfig },
+      { lane: "boundary", config: defaultBoundaryConfig },
+      { lane: "contracts", config: defaultContractsConfig },
+      { lane: "channels", config: defaultChannelsConfig },
+      { lane: "cli", config: defaultCliConfig },
+      { lane: "extensions", config: defaultExtensionsConfig },
+      { lane: "extension-channels", config: defaultExtensionChannelsConfig },
+      { lane: "extension-diffs", config: defaultExtensionDiffsConfig },
+      { lane: "extension-mattermost", config: defaultExtensionMattermostConfig },
+      { lane: "extension-memory", config: defaultExtensionMemoryConfig },
+      { lane: "extension-msteams", config: defaultExtensionMsTeamsConfig },
+      { lane: "extension-messaging", config: defaultExtensionMessagingConfig },
+      { lane: "extension-providers", config: defaultExtensionProvidersConfig },
+      { lane: "extension-telegram", config: defaultExtensionTelegramConfig },
+      { lane: "extension-voice-call", config: defaultExtensionVoiceCallConfig },
+      { lane: "gateway", config: defaultGatewayConfig },
+      { lane: "hooks", config: defaultHooksConfig },
+      { lane: "infra", config: defaultInfraConfig },
+      { lane: "logging", config: defaultLoggingConfig },
+      { lane: "plugin-sdk", config: defaultPluginSdkConfig },
+      { lane: "secrets", config: defaultSecretsConfig },
+      { lane: "runtime-config", config: defaultRuntimeConfig },
+      { lane: "cron", config: defaultCronConfig },
+      { lane: "daemon", config: defaultDaemonConfig },
+      { lane: "media", config: defaultMediaConfig },
+      { lane: "media-understanding", config: defaultMediaUnderstandingConfig },
+      { lane: "shared-core", config: defaultSharedCoreConfig },
+      { lane: "commands", config: defaultCommandsConfig },
+      { lane: "auto-reply", config: defaultAutoReplyConfig },
+      { lane: "agents", config: defaultAgentsConfig },
+      { lane: "plugins", config: defaultPluginsConfig },
+      { lane: "process", config: defaultProcessConfig },
+      { lane: "tooling", config: defaultToolingConfig },
+      { lane: "tui", config: defaultTuiConfig },
+      { lane: "ui", config: defaultUiConfig },
+      { lane: "utils", config: defaultUtilsConfig },
+      { lane: "wizard", config: defaultWizardConfig },
+    ];
+    const orders = lanes.map(({ lane, config }) => {
+      const order = config.test?.sequence?.groupOrder;
+      expect(typeof order, `${lane} lane must resolve a numeric groupOrder`).toBe("number");
+      expect(order as number).toBeGreaterThan(0);
+      // Regression guard: every known lane must resolve its table-assigned
+      // order. The name-hash fallback (1001+) would also pass the checks
+      // above, so assert the table value directly to catch a forgotten
+      // SCOPED_GROUP_ORDER entry when a lane is added.
+      expect(
+        order,
+        `${lane} lane must use its SCOPED_GROUP_ORDER assignment, not the hash fallback`,
+      ).toBe(SCOPED_GROUP_ORDER[lane]);
+      return order as number;
+    });
+    expect(new Set(orders).size, "every project lane must have a distinct groupOrder").toBe(
+      lanes.length,
+    );
+  });
+
+  it("falls back to a deterministic order for unnamed or unknown lanes", () => {
+    expect(resolveScopedGroupOrder(undefined)).toBe(0);
+    const fallback = resolveScopedGroupOrder("some-future-lane");
+    expect(fallback).toBeGreaterThan(1000);
+    expect(resolveScopedGroupOrder("some-future-lane")).toBe(fallback);
   });
 });

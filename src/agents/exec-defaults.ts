@@ -1,9 +1,9 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
+import type { ExecToolConfig } from "../config/types.tools.js";
 import type { ExecAsk, ExecHost, ExecSecurity, ExecTarget } from "../infra/exec-approvals.js";
 import { resolveAgentConfig, resolveSessionAgentId } from "./agent-scope.js";
 import { isRequestedExecTargetAllowed, resolveExecTarget } from "./bash-tools.exec-runtime.js";
-import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
 
 type ResolvedExecConfig = {
   host?: ExecTarget;
@@ -20,8 +20,8 @@ function resolveExecConfigState(params: {
 }): {
   cfg: OpenClawConfig;
   host: ExecTarget;
-  agentExec?: ResolvedExecConfig;
-  globalExec?: ResolvedExecConfig;
+  agentExec?: ExecToolConfig;
+  globalExec?: ExecToolConfig;
 } {
   const cfg = params.cfg ?? {};
   const resolvedAgentId =
@@ -34,10 +34,14 @@ function resolveExecConfigState(params: {
   const agentExec = resolvedAgentId
     ? resolveAgentConfig(cfg, resolvedAgentId)?.tools?.exec
     : undefined;
+  // Note: ExecToolConfig.host accepts legacy "sandbox" (zod-level compat),
+  // but runtime resolution stays ExecTarget-only (fail-closed downstream).
+  const normalizeResolvedHost = (value: unknown): ExecTarget | undefined =>
+    value === "auto" || value === "gateway" || value === "node" ? value : undefined;
   const host =
     (params.sessionEntry?.execHost as ExecTarget | undefined) ??
-    (agentExec?.host as ExecTarget | undefined) ??
-    (globalExec?.host as ExecTarget | undefined) ??
+    normalizeResolvedHost(agentExec?.host) ??
+    normalizeResolvedHost(globalExec?.host) ??
     "auto";
   return {
     cfg,
@@ -65,7 +69,6 @@ export function resolveExecDefaults(params: {
   sessionEntry?: SessionEntry;
   agentId?: string;
   sessionKey?: string;
-  sandboxAvailable?: boolean;
 }): {
   host: ExecTarget;
   effectiveHost: ExecHost;
@@ -75,18 +78,9 @@ export function resolveExecDefaults(params: {
   canRequestNode: boolean;
 } {
   const { cfg, host, agentExec, globalExec } = resolveExecConfigState(params);
-  const sandboxAvailable =
-    params.sandboxAvailable ??
-    (params.sessionKey
-      ? resolveSandboxRuntimeStatus({
-          cfg,
-          sessionKey: params.sessionKey,
-        }).sandboxed
-      : false);
   const resolved = resolveExecTarget({
     configuredTarget: host,
     elevatedRequested: false,
-    sandboxAvailable,
   });
   return {
     host,
@@ -95,7 +89,9 @@ export function resolveExecDefaults(params: {
       (params.sessionEntry?.execSecurity as ExecSecurity | undefined) ??
       agentExec?.security ??
       globalExec?.security ??
-      "deny",
+      // Note: exec-approval DEBLOAT — default to full (was deny).
+      // Explicit config still wins; only the unset default changed.
+      "full",
     ask:
       (params.sessionEntry?.execAsk as ExecAsk | undefined) ??
       agentExec?.ask ??

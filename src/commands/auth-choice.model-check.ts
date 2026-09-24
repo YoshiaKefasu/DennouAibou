@@ -1,4 +1,3 @@
-import { ensureAuthProfileStore, listProfilesForProvider } from "../agents/auth-profiles.js";
 import { hasUsableCustomProviderApiKey, resolveEnvApiKey } from "../agents/model-auth.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import { resolveDefaultModelForAgent } from "../agents/model-selection.js";
@@ -31,11 +30,9 @@ export async function warnIfModelConfigLooksOff(
     }
   }
 
-  const store = ensureAuthProfileStore(options?.agentDir);
-  const hasProfile = listProfilesForProvider(store, ref.provider).length > 0;
   const envKey = resolveEnvApiKey(ref.provider);
   const hasCustomKey = hasUsableCustomProviderApiKey(config, ref.provider);
-  if (!hasProfile && !envKey && !hasCustomKey) {
+  if (!envKey && !hasCustomKey) {
     warnings.push(
       `No auth configured for provider "${ref.provider}". The agent may fail until credentials are added. ${buildProviderAuthRecoveryHint(
         {

@@ -248,43 +248,6 @@ describe("directive behavior", () => {
       expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     });
   });
-  it("stores auth profile overrides on /model directive", async () => {
-    await withTempHome(async (home) => {
-      const storePath = sessionStorePath(home);
-      const authDir = path.join(home, ".openclaw", "agents", "main", "agent");
-      await fs.mkdir(authDir, { recursive: true, mode: 0o700 });
-      await fs.writeFile(
-        path.join(authDir, "auth-profiles.json"),
-        JSON.stringify(
-          {
-            version: 1,
-            profiles: {
-              "anthropic:work": {
-                type: "api_key",
-                provider: "anthropic",
-                key: "sk-test-1234567890",
-              },
-            },
-          },
-          null,
-          2,
-        ),
-      );
-
-      const res = await getReplyFromConfig(
-        { Body: "/model Opus@anthropic:work", From: "+1222", To: "+1222", CommandAuthorized: true },
-        {},
-        makeModelSwitchConfig(home),
-      );
-
-      const text = replyText(res);
-      expect(text).toContain("Auth profile set to anthropic:work");
-      const store = loadSessionStore(storePath);
-      const entry = store["agent:main:main"];
-      expect(entry.authProfileOverride).toBe("anthropic:work");
-      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-    });
-  });
   it("queues system events for model, elevated, and reasoning directives", async () => {
     await withTempHome(async (home) => {
       drainSystemEvents(MAIN_SESSION_KEY);

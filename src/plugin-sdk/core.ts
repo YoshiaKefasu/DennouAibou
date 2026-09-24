@@ -54,7 +54,6 @@ export type {
   ProviderCatalogResult,
   ProviderDefaultThinkingPolicyContext,
   ProviderDiscoveryContext,
-  ProviderFetchUsageSnapshotContext,
   ProviderModernModelPolicyContext,
   ProviderNormalizeResolvedModelContext,
   ProviderNormalizeToolSchemasContext,
@@ -71,12 +70,10 @@ export type {
   ProviderResolveDynamicModelContext,
   ProviderResolveTransportTurnStateContext,
   ProviderResolveWebSocketSessionPolicyContext,
-  ProviderResolvedUsageAuth,
   RealtimeTranscriptionProviderPlugin,
   ProviderSanitizeReplayHistoryContext,
   ProviderTransportTurnState,
   ProviderToolSchemaDiagnostic,
-  ProviderResolveUsageAuthContext,
   ProviderRuntimeModel,
   ProviderThinkingPolicyContext,
   ProviderValidateReplayTurnsContext,
@@ -132,11 +129,6 @@ function createInlineTextPairingAdapter(params: {
     },
   };
 }
-export type {
-  ProviderUsageSnapshot,
-  UsageProviderId,
-  UsageWindow,
-} from "../infra/provider-usage.types.js";
 export type { ChannelMessageActionContext } from "../channels/plugins/types.js";
 export type { ChannelConfigUiHint, ChannelPlugin } from "../channels/plugins/types.plugin.js";
 export type { PluginRuntime, RuntimeLogger } from "../plugins/runtime/types.js";

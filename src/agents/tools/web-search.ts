@@ -12,7 +12,6 @@ import { SEARCH_CACHE } from "./web-search-provider-common.js";
 
 export function createWebSearchTool(options?: {
   config?: OpenClawConfig;
-  sandboxed?: boolean;
   runtimeWebSearch?: RuntimeWebSearchMetadata;
 }): AnyAgentTool | null {
   const runtimeProviderId =

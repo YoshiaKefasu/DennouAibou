@@ -47,5 +47,3 @@ agent (with a session switcher for other sessions).
 - Remote mode forwards only the Gateway WebSocket control port over SSH.
 
 ## Known limitations
-
-- The UI is optimized for chat sessions (not a full browser sandbox).

@@ -130,7 +130,7 @@ openclaw dashboard
     Control who can message your agent.
   </Card>
   <Card title="Configure the Gateway" href="/gateway/configuration" icon="settings">
-    Models, tools, sandbox, and advanced settings.
+    Models, tools, and advanced settings.
   </Card>
   <Card title="Browse tools" href="/tools" icon="wrench">
     Browser, exec, web search, skills, and plugins.

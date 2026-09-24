@@ -88,7 +88,9 @@ describe("exec approvals policy helpers", () => {
       security: "allowlist" as const,
       analysisOk: true,
       allowlistSatisfied: true,
-      expected: true,
+      // Note: exec-approval DEBLOAT — requiresExecApproval always returns
+      // false (full allow). Expected values updated from true to false.
+      expected: false,
     },
     {
       ask: "always" as const,
@@ -96,7 +98,7 @@ describe("exec approvals policy helpers", () => {
       analysisOk: true,
       allowlistSatisfied: false,
       durableApprovalSatisfied: true,
-      expected: true,
+      expected: false,
     },
     {
       ask: "off" as const,
@@ -117,7 +119,8 @@ describe("exec approvals policy helpers", () => {
       security: "allowlist" as const,
       analysisOk: false,
       allowlistSatisfied: false,
-      expected: true,
+      // Note: exec-approval DEBLOAT — always false (full allow).
+      expected: false,
     },
     {
       ask: "on-miss" as const,

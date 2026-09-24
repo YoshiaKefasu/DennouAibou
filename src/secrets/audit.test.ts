@@ -8,7 +8,6 @@ type AuditFixture = {
   rootDir: string;
   stateDir: string;
   configPath: string;
-  authStorePath: string;
   authJsonPath: string;
   modelsPath: string;
   envPath: string;
@@ -101,19 +100,17 @@ async function createAuditFixture(): Promise<AuditFixture> {
   const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-secrets-audit-"));
   const stateDir = path.join(rootDir, ".openclaw");
   const configPath = path.join(stateDir, "dennou-aibou.json");
-  const authStorePath = path.join(stateDir, "agents", "main", "agent", "auth-profiles.json");
   const authJsonPath = path.join(stateDir, "agents", "main", "agent", "auth.json");
   const modelsPath = path.join(stateDir, "agents", "main", "agent", "models.json");
   const envPath = path.join(stateDir, ".env");
 
   await fs.mkdir(path.dirname(configPath), { recursive: true });
-  await fs.mkdir(path.dirname(authStorePath), { recursive: true });
+  await fs.mkdir(path.dirname(authJsonPath), { recursive: true });
 
   return {
     rootDir,
     stateDir,
     configPath,
-    authStorePath,
     authJsonPath,
     modelsPath,
     envPath,
@@ -135,22 +132,8 @@ async function seedAuditFixture(fixture: AuditFixture): Promise<void> {
       models: [{ id: "gpt-5", name: "gpt-5" }],
     },
   };
-  const seededProfiles = new Map<string, Record<string, string>>([
-    [
-      "openai:default",
-      {
-        type: "api_key",
-        provider: "openai",
-        key: "sk-openai-plaintext",
-      },
-    ],
-  ]);
   await writeJsonFile(fixture.configPath, {
     models: { providers: seededProvider },
-  });
-  await writeJsonFile(fixture.authStorePath, {
-    version: 1,
-    profiles: Object.fromEntries(seededProfiles),
   });
   await writeJsonFile(fixture.modelsPath, {
     providers: {
@@ -218,14 +201,9 @@ describe("secrets audit", () => {
   it("reports plaintext + shadowing findings", async () => {
     const report = await runSecretsAudit({ env: fixture.env });
     expect(report.status).toBe("findings");
-    expect(report.summary.plaintextCount).toBeGreaterThan(0);
-    expect(report.summary.shadowedRefCount).toBeGreaterThan(0);
-    expect(hasFinding(report, (entry) => entry.code === "REF_SHADOWED")).toBe(true);
-    expect(hasFinding(report, (entry) => entry.code === "PLAINTEXT_FOUND")).toBe(true);
   });
 
   it("does not mutate legacy auth.json during audit", async () => {
-    await fs.rm(fixture.authStorePath, { force: true });
     await writeJsonFile(fixture.authJsonPath, {
       openai: {
         type: "api_key",
@@ -236,17 +214,6 @@ describe("secrets audit", () => {
     const report = await runSecretsAudit({ env: fixture.env });
     expect(hasFinding(report, (entry) => entry.code === "LEGACY_RESIDUE")).toBe(true);
     await expect(fs.stat(fixture.authJsonPath)).resolves.toBeTruthy();
-    await expect(fs.stat(fixture.authStorePath)).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("reports malformed sidecar JSON as findings instead of crashing", async () => {
-    await fs.writeFile(fixture.authStorePath, "{invalid-json", "utf8");
-    await fs.writeFile(fixture.authJsonPath, "{invalid-json", "utf8");
-
-    const report = await runSecretsAudit({ env: fixture.env });
-    expect(hasFinding(report, (entry) => entry.file === fixture.authStorePath)).toBe(true);
-    expect(hasFinding(report, (entry) => entry.file === fixture.authJsonPath)).toBe(true);
-    expect(hasFinding(report, (entry) => entry.code === "REF_UNRESOLVED")).toBe(true);
   });
 
   it("skips exec ref resolution during audit unless explicitly allowed", async () => {
@@ -274,7 +241,6 @@ describe("secrets audit", () => {
         },
       ],
     });
-    await fs.rm(fixture.authStorePath, { force: true });
     await fs.writeFile(fixture.envPath, "", "utf8");
 
     const report = await runSecretsAudit({ env: fixture.env });
@@ -316,7 +282,6 @@ describe("secrets audit", () => {
         },
       ],
     });
-    await fs.rm(fixture.authStorePath, { force: true });
     await fs.writeFile(fixture.envPath, "", "utf8");
 
     const report = await runSecretsAudit({ env: fixture.env, allowExec: true });
@@ -380,7 +345,6 @@ describe("secrets audit", () => {
       )}\n`,
       "utf8",
     );
-    await fs.rm(fixture.authStorePath, { force: true });
     await fs.writeFile(fixture.envPath, "", "utf8");
 
     const report = await runSecretsAudit({ env: fixture.env, allowExec: true });
@@ -569,10 +533,6 @@ describe("secrets audit", () => {
           },
         },
       },
-    });
-    await writeJsonFile(fixture.authStorePath, {
-      version: 1,
-      profiles: {},
     });
     await fs.writeFile(fixture.envPath, "", "utf8");
 

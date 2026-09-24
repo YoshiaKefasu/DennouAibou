@@ -719,8 +719,6 @@ describe("plugin-sdk subpath exports", () => {
     expectSourceOmitsSnippet("xai-model-id", "./xai.js");
     expectSourceOmitsSnippet("xai-model-id", "./facade-runtime.js");
     expectSourceOmitsSnippet("xai-model-id", "../../extensions/");
-    expectSourceMentions("sandbox", ["registerSandboxBackend", "runPluginCommandWithTimeout"]);
-
     expectSourceMentions("secret-input", [
       "buildSecretInputSchema",
       "buildOptionalSecretInputSchema",

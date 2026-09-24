@@ -15,15 +15,14 @@ afterEach(() => {
 });
 
 describe("web tools defaults", () => {
-  it("enables web_fetch by default (non-sandbox)", () => {
-    const tool = createWebFetchTool({ config: {}, sandboxed: false });
+  it("enables web_fetch by default ()", () => {
+    const tool = createWebFetchTool({ config: {} });
     expect(tool?.name).toBe("web_fetch");
   });
 
   it("disables web_fetch when explicitly disabled", () => {
     const tool = createWebFetchTool({
       config: { tools: { web: { fetch: { enabled: false } } } },
-      sandboxed: false,
     });
     expect(tool).toBeNull();
   });
@@ -55,7 +54,6 @@ describe("web tools defaults", () => {
     setActivePluginRegistry(registry);
 
     const tool = createWebSearchTool({
-      sandboxed: true,
       runtimeWebSearch: {
         providerConfigured: "custom",
         providerSource: "configured",

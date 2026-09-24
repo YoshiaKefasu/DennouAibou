@@ -3,7 +3,6 @@
 export type { OpenClawConfig } from "../config/config.js";
 export type { SecretInput } from "../config/types.secrets.js";
 
-export { upsertAuthProfile } from "../agents/auth-profiles/profiles.js";
 export {
   formatApiKeyPreview,
   normalizeApiKeyInput,

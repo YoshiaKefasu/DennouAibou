@@ -1,14 +1,9 @@
-import type {
-  OpenClawPluginApi,
-  ProviderAuthContext,
-  ProviderFetchUsageSnapshotContext,
-} from "openclaw/plugin-sdk/plugin-entry";
+import type { OpenClawPluginApi, ProviderAuthContext } from "openclaw/plugin-sdk/plugin-entry";
 import { buildOauthProviderAuthResult } from "openclaw/plugin-sdk/provider-auth-result";
 import { buildProviderReplayFamilyHooks } from "openclaw/plugin-sdk/provider-model-shared";
 import { buildProviderStreamFamilyHooks } from "openclaw/plugin-sdk/provider-stream-family";
 import { buildProviderToolCompatFamilyHooks } from "openclaw/plugin-sdk/provider-tools";
-import { fetchGeminiUsage } from "openclaw/plugin-sdk/provider-usage";
-import { formatGoogleOauthApiKey, parseGoogleUsageToken } from "./oauth-token-shared.js";
+import { formatGoogleOauthApiKey } from "./oauth-token-shared.js";
 import { isModernGoogleModel, resolveGoogleGeminiForwardCompatModel } from "./provider-models.js";
 
 const PROVIDER_ID = "google-gemini-cli";
@@ -25,10 +20,6 @@ const GOOGLE_GEMINI_CLI_PROVIDER_HOOKS = {
   ...buildProviderReplayFamilyHooks({ family: "google-gemini" }),
   ...buildProviderToolCompatFamilyHooks("gemini"),
 };
-
-async function fetchGeminiCliUsage(ctx: ProviderFetchUsageSnapshotContext) {
-  return await fetchGeminiUsage(ctx.token, ctx.timeoutMs, ctx.fetchFn, PROVIDER_ID);
-}
 
 export function registerGoogleGeminiCliProvider(api: OpenClawPluginApi) {
   api.registerProvider({
@@ -118,16 +109,5 @@ export function registerGoogleGeminiCliProvider(api: OpenClawPluginApi) {
     ...GOOGLE_GEMINI_CLI_PROVIDER_HOOKS,
     isModernModelRef: ({ modelId }) => isModernGoogleModel(modelId),
     formatApiKey: (cred) => formatGoogleOauthApiKey(cred),
-    resolveUsageAuth: async (ctx) => {
-      const auth = await ctx.resolveOAuthToken();
-      if (!auth) {
-        return null;
-      }
-      return {
-        ...auth,
-        token: parseGoogleUsageToken(auth.token),
-      };
-    },
-    fetchUsageSnapshot: async (ctx) => await fetchGeminiCliUsage(ctx),
   });
 }

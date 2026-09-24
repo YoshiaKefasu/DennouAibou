@@ -249,10 +249,6 @@ describe("security fix", () => {
 
     const agentDir = path.join(stateDir, "agents", "main", "agent");
     await fs.mkdir(agentDir, { recursive: true });
-    const authProfilesPath = path.join(agentDir, "auth-profiles.json");
-    await fs.writeFile(authProfilesPath, "{}\n", "utf-8");
-    await fs.chmod(authProfilesPath, 0o644);
-
     const sessionsDir = path.join(stateDir, "agents", "main", "sessions");
     await fs.mkdir(sessionsDir, { recursive: true });
     const sessionsStorePath = path.join(sessionsDir, "sessions.json");
@@ -272,7 +268,6 @@ describe("security fix", () => {
     const permissionChecks: Array<readonly [string, number]> = [
       [credsDir, 0o700],
       [allowFromPath, 0o600],
-      [authProfilesPath, 0o600],
       [sessionsStorePath, 0o600],
       [transcriptPath, 0o600],
       [includePath, 0o600],

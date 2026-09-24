@@ -8,15 +8,10 @@ export {
   createAgentToAgentPolicy,
   createSessionVisibilityGuard,
   resolveEffectiveSessionToolsVisibility,
-  resolveSandboxSessionToolsVisibility,
-  resolveSandboxedSessionToolContext,
   resolveSessionToolsVisibility,
 } from "./sessions-access.js";
-import { resolveSandboxedSessionToolContext } from "./sessions-access.js";
 export type { SessionReferenceResolution } from "./sessions-resolution.js";
 export {
-  isRequesterSpawnedSessionVisible,
-  isResolvedSessionVisibleToRequester,
   listSpawnedSessionKeys,
   looksLikeSessionId,
   looksLikeSessionKey,
@@ -24,9 +19,7 @@ export {
   resolveInternalSessionKey,
   resolveMainSessionAlias,
   resolveSessionReference,
-  resolveVisibleSessionReference,
   shouldResolveSessionIdInput,
-  shouldVerifyRequesterSpawnedSessionVisibility,
 } from "./sessions-resolution.js";
 export {
   extractAssistantText,
@@ -34,6 +27,7 @@ export {
   stripToolMessages,
 } from "./chat-history-text.js";
 import { type OpenClawConfig, loadConfig } from "../../config/config.js";
+import { resolveInternalSessionKey, resolveMainSessionAlias } from "./sessions-resolution.js";
 
 export type SessionKind = "main" | "group" | "cron" | "hook" | "node" | "other";
 
@@ -93,17 +87,24 @@ function normalizeKey(value?: string) {
 
 export function resolveSessionToolContext(opts?: {
   agentSessionKey?: string;
-  sandboxed?: boolean;
   config?: OpenClawConfig;
 }) {
   const cfg = opts?.config ?? loadConfig();
+  const { mainKey, alias } = resolveMainSessionAlias(cfg);
+  const requesterInternalKey =
+    typeof opts?.agentSessionKey === "string" && opts.agentSessionKey.trim()
+      ? resolveInternalSessionKey({
+          key: opts.agentSessionKey,
+          alias,
+          mainKey,
+        })
+      : undefined;
   return {
     cfg,
-    ...resolveSandboxedSessionToolContext({
-      cfg,
-      agentSessionKey: opts?.agentSessionKey,
-      sandboxed: opts?.sandboxed,
-    }),
+    mainKey,
+    alias,
+    requesterInternalKey,
+    effectiveRequesterKey: requesterInternalKey ?? alias,
   };
 }
 

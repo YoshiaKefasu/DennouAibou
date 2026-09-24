@@ -1,5 +1,5 @@
 // Stub: browser extension was removed in DennouAibou debloat.
-// Core sandbox code still references this surface at runtime; calls will throw.
+// Calls throw because no browser implementation is bundled in this fork.
 
 export const DEFAULT_AI_SNAPSHOT_MAX_CHARS = 12000;
 export const DEFAULT_BROWSER_DEFAULT_PROFILE_NAME = "default";

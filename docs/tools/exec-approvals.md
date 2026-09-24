@@ -1,15 +1,14 @@
 ---
-summary: "Exec approvals, allowlists, and sandbox escape prompts"
+summary: "Exec approvals, allowlists, and host-execution prompts"
 read_when:
   - Configuring exec approvals or allowlists
   - Implementing exec approval UX in the macOS app
-  - Reviewing sandbox escape prompts and implications
 title: "Exec Approvals"
 ---
 
 # Exec approvals
 
-Exec approvals are the **companion app / node host guardrail** for letting a sandboxed agent run
+Exec approvals are the **companion app / node host guardrail** for letting an agent run
 commands on a real host (`gateway` or `node`). Think of it like a safety interlock:
 commands are allowed only when policy + allowlist + (optional) user approval all agree.
 Exec approvals are **in addition** to tool policy and elevated gating (unless elevated is set to `full`, which skips approvals).
@@ -111,10 +110,8 @@ This is now the default host behavior unless you tighten it explicitly:
 
 Important distinction:
 
-- `tools.exec.host=auto` chooses where exec runs: sandbox when available, otherwise gateway.
 - YOLO chooses how host exec is approved: `security=full` plus `ask=off`.
 - In YOLO mode, DennouAibou does not add a separate heuristic command-obfuscation approval gate on top of the configured host exec policy.
-- `auto` does not make gateway routing a free override from a sandboxed session. A per-call `host=node` request is allowed from `auto`, and `host=gateway` is only allowed from `auto` when no sandbox runtime is active. If you want a stable non-auto default, set `tools.exec.host` or use `/exec host=...` explicitly.
 
 If you want a more conservative setup, tighten either layer back to `allowlist` / `on-miss`
 or `deny`.
@@ -400,7 +397,6 @@ Approval-backed interpreter/runtime runs are intentionally conservative:
   (for example package scripts, eval forms, runtime-specific loader chains, or ambiguous multi-file
   forms), approval-backed execution is denied instead of claiming semantic coverage it does not
   have.
-- For those workflows, prefer sandboxing, a separate host boundary, or an explicit trusted
   allowlist/full workflow where the operator accepts the broader runtime semantics.
 
 When approvals are required, the exec tool returns immediately with an approval id. Use that id to
@@ -630,6 +626,5 @@ Related:
 ## Related
 
 - [Exec](/tools/exec) — shell command execution tool
-- [Sandboxing](/gateway/sandboxing) — sandbox modes and workspace access
 - [Security](/gateway/security) — security model and hardening
-- [Sandbox vs Tool Policy vs Elevated](/gateway/sandbox-vs-tool-policy-vs-elevated) — when to use each
+- — when to use each

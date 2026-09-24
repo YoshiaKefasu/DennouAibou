@@ -62,7 +62,6 @@ Input notes:
 Reference notes:
 
 - Other URI schemes (for example `ftp://`) are rejected with `unsupported_pdf_reference`.
-- In sandbox mode, remote `http(s)` URLs are rejected.
 - With workspace-only file policy enabled, local file paths outside allowed roots are rejected.
 
 ## Execution modes
@@ -130,7 +129,6 @@ Path fields:
 
 - single PDF input: `details.pdf`
 - multiple PDF inputs: `details.pdfs[]` with `pdf` entries
-- sandbox path rewrite metadata (when applicable): `rewrittenFrom`
 
 ## Error behavior
 

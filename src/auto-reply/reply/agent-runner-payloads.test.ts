@@ -75,7 +75,7 @@ describe("buildReplyPayloads media filter integration", () => {
   it("drops only invalid media when reply media normalization fails", async () => {
     const normalizeMediaPaths = async (payload: { mediaUrl?: string }) => {
       if (payload.mediaUrl === "./bad.png") {
-        throw new Error("Path escapes sandbox root");
+        throw new Error("Path escapes workspace root");
       }
       return payload;
     };

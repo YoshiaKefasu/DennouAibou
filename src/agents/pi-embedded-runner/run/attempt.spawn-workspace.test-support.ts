@@ -41,7 +41,6 @@ type AttemptSpawnWorkspaceHoisted = {
   spawnSubagentDirectMock: UnknownMock;
   createAgentSessionMock: UnknownMock;
   sessionManagerOpenMock: UnknownMock;
-  resolveSandboxContextMock: UnknownMock;
   subscribeEmbeddedPiSessionMock: Mock<SubscribeEmbeddedPiSessionFn>;
   acquireSessionWriteLockMock: Mock<AcquireSessionWriteLockFn>;
   installToolResultContextGuardMock: UnknownMock;
@@ -57,7 +56,6 @@ const hoisted = vi.hoisted((): AttemptSpawnWorkspaceHoisted => {
   const spawnSubagentDirectMock = vi.fn();
   const createAgentSessionMock = vi.fn();
   const sessionManagerOpenMock = vi.fn();
-  const resolveSandboxContextMock = vi.fn();
   const installToolResultContextGuardMock = vi.fn(() => () => {});
   const flushPendingToolResultsAfterIdleMock = vi.fn(async () => {});
   const subscribeEmbeddedPiSessionMock = vi.fn<SubscribeEmbeddedPiSessionFn>(
@@ -104,7 +102,6 @@ const hoisted = vi.hoisted((): AttemptSpawnWorkspaceHoisted => {
     spawnSubagentDirectMock,
     createAgentSessionMock,
     sessionManagerOpenMock,
-    resolveSandboxContextMock,
     subscribeEmbeddedPiSessionMock,
     acquireSessionWriteLockMock,
     installToolResultContextGuardMock,
@@ -142,10 +139,6 @@ vi.mock("@earendil-works/pi-coding-agent", () => {
 vi.mock("../../subagent-spawn.js", () => ({
   SUBAGENT_SPAWN_MODES: ["run", "session"],
   spawnSubagentDirect: (...args: unknown[]) => hoisted.spawnSubagentDirectMock(...args),
-}));
-
-vi.mock("../../sandbox.js", () => ({
-  resolveSandboxContext: (...args: unknown[]) => hoisted.resolveSandboxContextMock(...args),
 }));
 
 vi.mock("../../session-tool-result-guard-wrapper.js", () => ({
@@ -364,17 +357,6 @@ vi.mock("../../owner-display.js", () => ({
   }),
 }));
 
-vi.mock("../../sandbox/runtime-status.js", () => ({
-  resolveSandboxRuntimeStatus: () => ({
-    agentId: "main",
-    sessionKey: "agent:main:main",
-    mainSessionKey: "agent:main:main",
-    mode: "off",
-    sandboxed: false,
-    toolPolicy: { allow: [], deny: [], sources: { allow: { key: "" }, deny: { key: "" } } },
-  }),
-}));
-
 vi.mock("../../tool-call-id.js", () => ({
   sanitizeToolCallIdsForCloudCodeAssist: <T>(messages: T) => messages,
 }));
@@ -460,10 +442,6 @@ vi.mock("../message-action-discovery-input.js", () => ({
 
 vi.mock("../model.js", () => ({
   buildModelAliasLines: () => [],
-}));
-
-vi.mock("../sandbox-info.js", () => ({
-  buildEmbeddedSandboxInfo: () => undefined,
 }));
 
 vi.mock("../thinking.js", () => ({
@@ -597,7 +575,6 @@ export function resetEmbeddedAttemptHarness(
   }
   hoisted.createAgentSessionMock.mockReset();
   hoisted.sessionManagerOpenMock.mockReset().mockReturnValue(hoisted.sessionManager);
-  hoisted.resolveSandboxContextMock.mockReset();
   hoisted.subscribeEmbeddedPiSessionMock
     .mockReset()
     .mockImplementation(() => createSubscriptionMock());

@@ -22,7 +22,7 @@ import {
   resolveDisplaySessionKey,
   resolveEffectiveSessionToolsVisibility,
   resolveInternalSessionKey,
-  resolveSandboxedSessionToolContext,
+  resolveSessionToolContext,
   type SessionListRow,
   stripToolMessages,
 } from "./sessions-helpers.js";
@@ -38,7 +38,6 @@ type GatewayCaller = typeof callGateway;
 
 export function createSessionsListTool(opts?: {
   agentSessionKey?: string;
-  sandboxed?: boolean;
   config?: OpenClawConfig;
   callGateway?: GatewayCaller;
 }): AnyAgentTool {
@@ -51,17 +50,12 @@ export function createSessionsListTool(opts?: {
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
       const cfg = opts?.config ?? loadConfig();
-      const { mainKey, alias, requesterInternalKey, restrictToSpawned } =
-        resolveSandboxedSessionToolContext({
-          cfg,
-          agentSessionKey: opts?.agentSessionKey,
-          sandboxed: opts?.sandboxed,
-        });
-      const effectiveRequesterKey = requesterInternalKey ?? alias;
-      const visibility = resolveEffectiveSessionToolsVisibility({
-        cfg,
-        sandboxed: opts?.sandboxed === true,
+      const { mainKey, alias, requesterInternalKey } = resolveSessionToolContext({
+        agentSessionKey: opts?.agentSessionKey,
+        config: cfg,
       });
+      const effectiveRequesterKey = requesterInternalKey ?? alias;
+      const visibility = resolveEffectiveSessionToolsVisibility({ cfg });
 
       const kindsRaw = readStringArrayParam(params, "kinds")?.map((value) =>
         value.trim().toLowerCase(),
@@ -91,9 +85,8 @@ export function createSessionsListTool(opts?: {
         params: {
           limit,
           activeMinutes,
-          includeGlobal: !restrictToSpawned,
-          includeUnknown: !restrictToSpawned,
-          spawnedBy: restrictToSpawned ? effectiveRequesterKey : undefined,
+          includeGlobal: true,
+          includeUnknown: true,
         },
       });
 

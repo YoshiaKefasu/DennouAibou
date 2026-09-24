@@ -28,19 +28,15 @@ export type SecretsPlanTarget = {
   pathSegments?: string[];
   ref: SecretRef;
   /**
-   * Required for auth-profiles targets so apply can resolve the correct agent store.
+   * Optional agent scope for agent-scoped targets.
    */
   agentId?: string;
   /**
-   * For provider targets, used to scrub auth-profile/static residues.
+   * For provider targets, used to scrub static residues.
    */
   providerId?: string;
   /** For account-scoped channel targets. */
   accountId?: string;
-  /**
-   * Optional auth-profile provider value used when creating new auth profile mappings.
-   */
-  authProfileProvider?: string;
 };
 
 export type SecretsApplyPlan = {
@@ -53,7 +49,6 @@ export type SecretsApplyPlan = {
   targets: SecretsPlanTarget[];
   options?: {
     scrubEnv?: boolean;
-    scrubAuthProfilesForProviderTargets?: boolean;
     scrubLegacyAuthJson?: boolean;
   };
 };
@@ -79,7 +74,6 @@ export function resolveValidatedPlanTarget(candidate: {
   agentId?: string;
   providerId?: string;
   accountId?: string;
-  authProfileProvider?: string;
 }): ResolvedPlanTarget | null {
   if (!isKnownSecretTargetType(candidate.type)) {
     return null;
@@ -124,7 +118,6 @@ export function isSecretsApplyPlan(value: unknown): value is SecretsApplyPlan {
       agentId: candidate.agentId,
       providerId: candidate.providerId,
       accountId: candidate.accountId,
-      authProfileProvider: candidate.authProfileProvider,
     });
     if (
       !isKnownSecretTargetType(candidate.type) ||
@@ -142,18 +135,6 @@ export function isSecretsApplyPlan(value: unknown): value is SecretsApplyPlan {
       (ref.source === "exec" && !isValidExecSecretRefId(ref.id))
     ) {
       return false;
-    }
-    if (resolved.entry.configFile === "auth-profiles.json") {
-      if (typeof candidate.agentId !== "string" || candidate.agentId.trim().length === 0) {
-        return false;
-      }
-      if (
-        candidate.authProfileProvider !== undefined &&
-        (typeof candidate.authProfileProvider !== "string" ||
-          candidate.authProfileProvider.trim().length === 0)
-      ) {
-        return false;
-      }
     }
   }
   if (typed.providerUpserts !== undefined) {
@@ -188,7 +169,6 @@ export function normalizeSecretsPlanOptions(
 ): Required<NonNullable<SecretsApplyPlan["options"]>> {
   return {
     scrubEnv: options?.scrubEnv ?? true,
-    scrubAuthProfilesForProviderTargets: options?.scrubAuthProfilesForProviderTargets ?? true,
     scrubLegacyAuthJson: options?.scrubLegacyAuthJson ?? true,
   };
 }

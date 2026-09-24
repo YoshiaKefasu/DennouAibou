@@ -279,6 +279,12 @@ const McpConfigSchema = z
 export const OpenClawSchema = z
   .object({
     $schema: z.string().optional(),
+    /**
+     * @deprecated Background task ledger (the `src/tasks/` subsystem) was removed
+     * in DEBLOAT §24. Leftover `tasks` keys in existing `dennou-aibou.json`
+     * files are accepted and ignored so production gateways keep starting.
+     */
+    tasks: z.unknown().optional(),
     meta: z
       .object({
         lastTouchedVersion: z.string().optional(),
@@ -472,6 +478,10 @@ export const OpenClawSchema = z
     secrets: SecretsConfigSchema,
     auth: z
       .object({
+        /**
+         * @deprecated Auth profiles (multi-credential management) were removed
+         * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+         */
         profiles: z
           .record(
             z.string(),
@@ -485,7 +495,15 @@ export const OpenClawSchema = z
               .strict(),
           )
           .optional(),
+        /**
+         * @deprecated Auth profiles (multi-credential management) were removed
+         * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+         */
         order: z.record(z.string(), z.array(z.string())).optional(),
+        /**
+         * @deprecated Auth profiles (multi-credential management) were removed
+         * (DEBLOAT §26). Accepted and ignored so legacy configs keep loading.
+         */
         cooldowns: z
           .object({
             billingBackoffHours: z.number().positive().optional(),

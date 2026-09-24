@@ -13,7 +13,6 @@ describe("resolveExecDefaults", () => {
             },
           },
         },
-        sandboxAvailable: false,
       }).canRequestNode,
     ).toBe(false);
   });
@@ -28,11 +27,10 @@ describe("resolveExecDefaults", () => {
             },
           },
         },
-        sandboxAvailable: true,
       }),
     ).toMatchObject({
       host: "auto",
-      effectiveHost: "sandbox",
+      effectiveHost: "gateway",
       canRequestNode: true,
     });
   });
@@ -51,7 +49,6 @@ describe("resolveExecDefaults", () => {
           },
         },
         sessionEntry,
-        sandboxAvailable: false,
       }).canRequestNode,
     ).toBe(true);
   });

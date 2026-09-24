@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  getProviderUsageMocks,
   getRunEmbeddedPiAgentMock,
   makeCfg,
   requireSessionStorePath,
@@ -10,8 +9,6 @@ import {
 } from "./reply.triggers.trigger-handling.test-harness.js";
 
 type GetReplyFromConfig = typeof import("./reply.js").getReplyFromConfig;
-
-const usageMocks = getProviderUsageMocks();
 
 async function readSessionStore(storePath: string): Promise<Record<string, unknown>> {
   const raw = await readFile(storePath, "utf-8");
@@ -27,25 +24,6 @@ function getReplyFromConfigNow(getReplyFromConfig: () => GetReplyFromConfig): Ge
   return getReplyFromConfig();
 }
 
-function seedUsageSummary(): void {
-  usageMocks.loadProviderUsageSummary.mockClear();
-  usageMocks.loadProviderUsageSummary.mockResolvedValue({
-    updatedAt: 0,
-    providers: [
-      {
-        provider: "anthropic",
-        displayName: "Anthropic",
-        windows: [
-          {
-            label: "5h",
-            usedPercent: 20,
-          },
-        ],
-      },
-    ],
-  });
-}
-
 export function registerTriggerHandlingUsageSummaryCases(params: {
   getReplyFromConfig: () => GetReplyFromConfig;
 }): void {
@@ -54,7 +32,6 @@ export function registerTriggerHandlingUsageSummaryCases(params: {
       await withTempHome(async (home) => {
         const runEmbeddedPiAgentMock = getRunEmbeddedPiAgentMock();
         const getReplyFromConfig = getReplyFromConfigNow(params.getReplyFromConfig);
-        seedUsageSummary();
 
         const res = await getReplyFromConfig(
           {

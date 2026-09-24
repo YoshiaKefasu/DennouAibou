@@ -2,9 +2,6 @@ import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { confirm as clackConfirm, select as clackSelect, text as clackText } from "@clack/prompts";
 import { listAgentIds, resolveAgentDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
-import { AUTH_STORE_VERSION } from "../agents/auth-profiles/constants.js";
-import { resolveAuthStorePath } from "../agents/auth-profiles/paths.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { SecretProviderConfig, SecretRef, SecretRefSource } from "../config/types.secrets.js";
 import { isSafeExecutableValue } from "../infra/exec-safety.js";
@@ -189,8 +186,6 @@ function assertNoCancel<T>(value: T | symbol, message: string): T {
   return value;
 }
 
-const AUTH_PROFILE_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/;
-
 function validateEnvNameCsv(value: string): string | undefined {
   const entries = parseCsv(value);
   for (const entry of entries) {
@@ -244,13 +239,10 @@ async function promptOptionalPositiveInt(params: {
 }
 
 function configureCandidateKey(candidate: {
-  configFile: "dennou-aibou.json" | "auth-profiles.json";
+  configFile: "dennou-aibou.json";
   path: string;
   agentId?: string;
 }): string {
-  if (candidate.configFile === "auth-profiles.json") {
-    return `auth-profiles:${String(candidate.agentId ?? "").trim()}:${candidate.path}`;
-  }
   return `openclaw:${candidate.path}`;
 }
 
@@ -262,9 +254,6 @@ function hasSourceChoice(
 }
 
 function resolveCandidateProviderHint(candidate: ConfigureCandidate): string | undefined {
-  if (typeof candidate.authProfileProvider === "string" && candidate.authProfileProvider.trim()) {
-    return candidate.authProfileProvider.trim().toLowerCase();
-  }
   if (typeof candidate.providerId === "string" && candidate.providerId.trim()) {
     return candidate.providerId.trim().toLowerCase();
   }
@@ -296,112 +285,6 @@ function resolveConfigureAgentId(config: OpenClawConfig, explicitAgentId?: strin
   throw new Error(
     `Unknown agent id "${explicitAgentId}". Known agents: ${known || "none configured"}.`,
   );
-}
-
-function normalizeAuthStoreForConfigure(
-  raw: Record<string, unknown> | null,
-  storePath: string,
-): AuthProfileStore {
-  if (!raw) {
-    return {
-      version: AUTH_STORE_VERSION,
-      profiles: {},
-    };
-  }
-  if (!isRecord(raw.profiles)) {
-    throw new Error(
-      `Cannot run interactive secrets configure because ${storePath} is invalid (missing "profiles" object).`,
-    );
-  }
-  const version = typeof raw.version === "number" && Number.isFinite(raw.version) ? raw.version : 1;
-  return {
-    version,
-    profiles: raw.profiles as AuthProfileStore["profiles"],
-    ...(isRecord(raw.order) ? { order: raw.order as AuthProfileStore["order"] } : {}),
-    ...(isRecord(raw.lastGood) ? { lastGood: raw.lastGood as AuthProfileStore["lastGood"] } : {}),
-    ...(isRecord(raw.usageStats)
-      ? { usageStats: raw.usageStats as AuthProfileStore["usageStats"] }
-      : {}),
-  };
-}
-
-function loadAuthProfileStoreForConfigure(params: {
-  config: OpenClawConfig;
-  agentId: string;
-  readJsonObjectIfExists: typeof readJsonObjectIfExists;
-}): AuthProfileStore {
-  const agentDir = resolveAgentDir(params.config, params.agentId);
-  const storePath = resolveAuthStorePath(agentDir);
-  const parsed = params.readJsonObjectIfExists(storePath);
-  if (parsed.error) {
-    throw new Error(
-      `Cannot run interactive secrets configure because ${storePath} could not be read: ${parsed.error}`,
-    );
-  }
-  return normalizeAuthStoreForConfigure(parsed.value, storePath);
-}
-
-async function promptNewAuthProfileCandidate(agentId: string): Promise<ConfigureCandidate> {
-  const profileId = assertNoCancel(
-    await text({
-      message: "Auth profile id",
-      validate: (value) => {
-        const trimmed = String(value ?? "").trim();
-        if (!trimmed) {
-          return "Required";
-        }
-        if (!AUTH_PROFILE_ID_PATTERN.test(trimmed)) {
-          return 'Use letters/numbers/":"/"_"/"-" only.';
-        }
-        return undefined;
-      },
-    }),
-    "Secrets configure cancelled.",
-  );
-
-  const credentialType = assertNoCancel(
-    await select({
-      message: "Auth profile credential type",
-      options: [
-        { value: "api_key", label: "api_key (key/keyRef)" },
-        { value: "token", label: "token (token/tokenRef)" },
-      ],
-    }),
-    "Secrets configure cancelled.",
-  );
-
-  const provider = assertNoCancel(
-    await text({
-      message: "Provider id",
-      validate: (value) => (String(value ?? "").trim().length > 0 ? undefined : "Required"),
-    }),
-    "Secrets configure cancelled.",
-  );
-
-  const profileIdTrimmed = String(profileId).trim();
-  const providerTrimmed = String(provider).trim();
-  if (credentialType === "token") {
-    return {
-      type: "auth-profiles.token.token",
-      path: `profiles.${profileIdTrimmed}.token`,
-      pathSegments: ["profiles", profileIdTrimmed, "token"],
-      label: `profiles.${profileIdTrimmed}.token (auth profile, agent ${agentId})`,
-      configFile: "auth-profiles.json",
-      agentId,
-      authProfileProvider: providerTrimmed,
-      expectedResolvedValue: "string",
-    };
-  }
-  return {
-    type: "auth-profiles.api_key.key",
-    path: `profiles.${profileIdTrimmed}.key`,
-    pathSegments: ["profiles", profileIdTrimmed, "key"],
-    label: `profiles.${profileIdTrimmed}.key (auth profile, agent ${agentId})`,
-    configFile: "auth-profiles.json",
-    agentId,
-    authProfileProvider: providerTrimmed,
-    expectedResolvedValue: "string",
-  };
 }
 
 async function promptProviderAlias(params: { existingAliases: Set<string> }): Promise<string> {
@@ -818,19 +701,9 @@ export async function runSecretsConfigureInteractive(
 
   const selectedByPath = new Map<string, ConfigureCandidate & { ref: SecretRef }>();
   if (!params.providersOnly) {
-    const configureAgentId = resolveConfigureAgentId(snapshot.config, params.agentId);
-    const authStore = loadAuthProfileStoreForConfigure({
-      config: snapshot.config,
-      agentId: configureAgentId,
-      readJsonObjectIfExists: readJsonObject,
-    });
     const candidates = buildConfigureCandidatesForScope({
       config: stagedConfig,
       authoredOpenClawConfig: snapshot.resolved,
-      authProfiles: {
-        agentId: configureAgentId,
-        store: authStore,
-      },
     });
     if (candidates.length === 0) {
       throw new Error("No configurable secret-bearing fields found for this agent scope.");
@@ -847,20 +720,10 @@ export async function runSecretsConfigureInteractive(
       const options = visibleCandidates.map((candidate) => ({
         value: configureCandidateKey(candidate),
         label: candidate.label,
-        hint: [
-          candidate.configFile === "auth-profiles.json"
-            ? "auth-profiles.json"
-            : "dennou-aibou.json",
-          candidate.isDerived === true ? "derived" : undefined,
-        ]
+        hint: ["dennou-aibou.json", candidate.isDerived === true ? "derived" : undefined]
           .filter(Boolean)
           .join(" | "),
       }));
-      options.push({
-        value: "__create_auth_profile__",
-        label: "Create auth profile mapping",
-        hint: `Add a new auth-profiles target for agent ${configureAgentId}`,
-      });
       if (hasDerivedCandidates) {
         options.push({
           value: "__toggle_derived__",
@@ -888,17 +751,6 @@ export async function runSecretsConfigureInteractive(
 
       if (selectedPath === "__done__") {
         break;
-      }
-      if (selectedPath === "__create_auth_profile__") {
-        const createdCandidate = await promptNewAuthProfileCandidate(configureAgentId);
-        const key = configureCandidateKey(createdCandidate);
-        const existingIndex = candidates.findIndex((entry) => configureCandidateKey(entry) === key);
-        if (existingIndex >= 0) {
-          candidates[existingIndex] = createdCandidate;
-        } else {
-          candidates.push(createdCandidate);
-        }
-        continue;
       }
       if (selectedPath === "__toggle_derived__") {
         showDerivedCandidates = !showDerivedCandidates;

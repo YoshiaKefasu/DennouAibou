@@ -1221,244 +1221,6 @@ See [Streaming](/concepts/streaming) for behavior + chunking details.
 
 See [Typing Indicators](/concepts/typing-indicators).
 
-<a id="agentsdefaultssandbox"></a>
-
-### `agents.defaults.sandbox`
-
-Optional sandboxing for the embedded agent. See [Sandboxing](/gateway/sandboxing) for the full guide.
-
-```json5
-{
-  agents: {
-    defaults: {
-      sandbox: {
-        mode: "non-main", // off | non-main | all
-        backend: "docker", // docker | ssh | openshell
-        scope: "agent", // session | agent | shared
-        workspaceAccess: "none", // none | ro | rw
-        workspaceRoot: "~/.openclaw/sandboxes",
-        docker: {
-          image: "openclaw-sandbox:bookworm-slim",
-          containerPrefix: "openclaw-sbx-",
-          workdir: "/workspace",
-          readOnlyRoot: true,
-          tmpfs: ["/tmp", "/var/tmp", "/run"],
-          network: "none",
-          user: "1000:1000",
-          capDrop: ["ALL"],
-          env: { LANG: "C.UTF-8" },
-          setupCommand: "apt-get update && apt-get install -y git curl jq",
-          pidsLimit: 256,
-          memory: "1g",
-          memorySwap: "2g",
-          cpus: 1,
-          ulimits: {
-            nofile: { soft: 1024, hard: 2048 },
-            nproc: 256,
-          },
-          seccompProfile: "/path/to/seccomp.json",
-          apparmorProfile: "openclaw-sandbox",
-          dns: ["1.1.1.1", "8.8.8.8"],
-          extraHosts: ["internal.service:10.0.0.5"],
-          binds: ["/home/user/source:/source:rw"],
-        },
-        ssh: {
-          target: "user@gateway-host:22",
-          command: "ssh",
-          workspaceRoot: "/tmp/openclaw-sandboxes",
-          strictHostKeyChecking: true,
-          updateHostKeys: true,
-          identityFile: "~/.ssh/id_ed25519",
-          certificateFile: "~/.ssh/id_ed25519-cert.pub",
-          knownHostsFile: "~/.ssh/known_hosts",
-          // SecretRefs / inline contents also supported:
-          // identityData: { source: "env", provider: "default", id: "SSH_IDENTITY" },
-          // certificateData: { source: "env", provider: "default", id: "SSH_CERTIFICATE" },
-          // knownHostsData: { source: "env", provider: "default", id: "SSH_KNOWN_HOSTS" },
-        },
-        browser: {
-          enabled: false,
-          image: "openclaw-sandbox-browser:bookworm-slim",
-          network: "openclaw-sandbox-browser",
-          cdpPort: 9222,
-          cdpSourceRange: "172.21.0.1/32",
-          vncPort: 5900,
-          noVncPort: 6080,
-          headless: false,
-          enableNoVnc: true,
-          allowHostControl: false,
-          autoStart: true,
-          autoStartTimeoutMs: 12000,
-        },
-        prune: {
-          idleHours: 24,
-          maxAgeDays: 7,
-        },
-      },
-    },
-  },
-  tools: {
-    sandbox: {
-      tools: {
-        allow: [
-          "exec",
-          "process",
-          "read",
-          "write",
-          "edit",
-          "apply_patch",
-          "sessions_list",
-          "sessions_history",
-          "sessions_send",
-          "sessions_spawn",
-          "session_status",
-        ],
-        deny: ["browser", "canvas", "nodes", "cron", "discord", "gateway"],
-      },
-    },
-  },
-}
-```
-
-<Accordion title="Sandbox details">
-
-**Backend:**
-
-- `docker`: local Docker runtime (default)
-- `ssh`: generic SSH-backed remote runtime
-- `openshell`: OpenShell runtime
-
-When `backend: "openshell"` is selected, runtime-specific settings move to
-`plugins.entries.openshell.config`.
-
-**SSH backend config:**
-
-- `target`: SSH target in `user@host[:port]` form
-- `command`: SSH client command (default: `ssh`)
-- `workspaceRoot`: absolute remote root used for per-scope workspaces
-- `identityFile` / `certificateFile` / `knownHostsFile`: existing local files passed to OpenSSH
-- `identityData` / `certificateData` / `knownHostsData`: inline contents or SecretRefs that DennouAibou materializes into temp files at runtime
-- `strictHostKeyChecking` / `updateHostKeys`: OpenSSH host-key policy knobs
-
-**SSH auth precedence:**
-
-- `identityData` wins over `identityFile`
-- `certificateData` wins over `certificateFile`
-- `knownHostsData` wins over `knownHostsFile`
-- SecretRef-backed `*Data` values are resolved from the active secrets runtime snapshot before the sandbox session starts
-
-**SSH backend behavior:**
-
-- seeds the remote workspace once after create or recreate
-- then keeps the remote SSH workspace canonical
-- routes `exec`, file tools, and media paths over SSH
-- does not sync remote changes back to the host automatically
-- does not support sandbox browser containers
-
-**Workspace access:**
-
-- `none`: per-scope sandbox workspace under `~/.openclaw/sandboxes`
-- `ro`: sandbox workspace at `/workspace`, agent workspace mounted read-only at `/agent`
-- `rw`: agent workspace mounted read/write at `/workspace`
-
-**Scope:**
-
-- `session`: per-session container + workspace
-- `agent`: one container + workspace per agent (default)
-- `shared`: shared container and workspace (no cross-session isolation)
-
-**OpenShell plugin config:**
-
-```json5
-{
-  plugins: {
-    entries: {
-      openshell: {
-        enabled: true,
-        config: {
-          mode: "mirror", // mirror | remote
-          from: "openclaw",
-          remoteWorkspaceDir: "/sandbox",
-          remoteAgentWorkspaceDir: "/agent",
-          gateway: "lab", // optional
-          gatewayEndpoint: "https://lab.example", // optional
-          policy: "strict", // optional OpenShell policy id
-          providers: ["openai"], // optional
-          autoProviders: true,
-          timeoutSeconds: 120,
-        },
-      },
-    },
-  },
-}
-```
-
-**OpenShell mode:**
-
-- `mirror`: seed remote from local before exec, sync back after exec; local workspace stays canonical
-- `remote`: seed remote once when the sandbox is created, then keep the remote workspace canonical
-
-In `remote` mode, host-local edits made outside DennouAibou are not synced into the sandbox automatically after the seed step.
-Transport is SSH into the OpenShell sandbox, but the plugin owns sandbox lifecycle and optional mirror sync.
-
-**`setupCommand`** runs once after container creation (via `sh -lc`). Needs network egress, writable root, root user.
-
-**Containers default to `network: "none"`** — set to `"bridge"` (or a custom bridge network) if the agent needs outbound access.
-`"host"` is blocked. `"container:<id>"` is blocked by default unless you explicitly set
-`sandbox.docker.dangerouslyAllowContainerNamespaceJoin: true` (break-glass).
-
-**Inbound attachments** are staged into `media/inbound/*` in the active workspace.
-
-**`docker.binds`** mounts additional host directories; global and per-agent binds are merged.
-
-**Sandboxed browser** (`sandbox.browser.enabled`): Chromium + CDP in a container. noVNC URL injected into system prompt. Does not require `browser.enabled` in `openclaw.json`.
-noVNC observer access uses VNC auth by default and DennouAibou emits a short-lived token URL (instead of exposing the password in the shared URL).
-
-- `allowHostControl: false` (default) blocks sandboxed sessions from targeting the host browser.
-- `network` defaults to `openclaw-sandbox-browser` (dedicated bridge network). Set to `bridge` only when you explicitly want global bridge connectivity.
-- `cdpSourceRange` optionally restricts CDP ingress at the container edge to a CIDR range (for example `172.21.0.1/32`).
-- `sandbox.browser.binds` mounts additional host directories into the sandbox browser container only. When set (including `[]`), it replaces `docker.binds` for the browser container.
-- Launch defaults are defined in `scripts/sandbox-browser-entrypoint.sh` and tuned for container hosts:
-  - `--remote-debugging-address=127.0.0.1`
-  - `--remote-debugging-port=<derived from OPENCLAW_BROWSER_CDP_PORT>`
-  - `--user-data-dir=${HOME}/.chrome`
-  - `--no-first-run`
-  - `--no-default-browser-check`
-  - `--disable-3d-apis`
-  - `--disable-gpu`
-  - `--disable-software-rasterizer`
-  - `--disable-dev-shm-usage`
-  - `--disable-background-networking`
-  - `--disable-features=TranslateUI`
-  - `--disable-breakpad`
-  - `--disable-crash-reporter`
-  - `--renderer-process-limit=2`
-  - `--no-zygote`
-  - `--metrics-recording-only`
-  - `--disable-extensions` (default enabled)
-  - `--disable-3d-apis`, `--disable-software-rasterizer`, and `--disable-gpu` are
-    enabled by default and can be disabled with
-    `OPENCLAW_BROWSER_DISABLE_GRAPHICS_FLAGS=0` if WebGL/3D usage requires it.
-  - `OPENCLAW_BROWSER_DISABLE_EXTENSIONS=0` re-enables extensions if your workflow
-    depends on them.
-  - `--renderer-process-limit=2` can be changed with
-    `OPENCLAW_BROWSER_RENDERER_PROCESS_LIMIT=<N>`; set `0` to use Chromium's
-    default process limit.
-  - plus `--no-sandbox` and `--disable-setuid-sandbox` when `noSandbox` is enabled.
-  - Defaults are the container image baseline; use a custom browser image with a custom
-    entrypoint to change container defaults.
-
-</Accordion>
-
-Browser sandboxing and `sandbox.docker.binds` are currently Docker-only.
-
-Build images:
-
-```bash
-scripts/sandbox-setup.sh           # main sandbox image
-scripts/sandbox-browser-setup.sh   # optional browser image
-```
-
 ### `agents.list` (per-agent overrides)
 
 ```json5
@@ -1484,24 +1246,6 @@ scripts/sandbox-browser-setup.sh   # optional browser image
           avatar: "avatars/samantha.png",
         },
         groupChat: { mentionPatterns: ["@openclaw"] },
-        sandbox: { mode: "off" },
-        runtime: {
-          type: "acp",
-          acp: {
-            agent: "codex",
-            backend: "acpx",
-            mode: "persistent",
-            cwd: "/workspace/openclaw",
-          },
-        },
-        subagents: { allowAgents: ["*"] },
-        tools: {
-          profile: "coding",
-          allow: ["browser"],
-          deny: ["canvas"],
-          elevated: { enabled: true },
-        },
-      },
     ],
   },
 }
@@ -1519,7 +1263,6 @@ scripts/sandbox-browser-setup.sh   # optional browser image
 - `identity.avatar`: workspace-relative path, `http(s)` URL, or `data:` URI.
 - `identity` derives defaults: `ackReaction` from `emoji`, `mentionPatterns` from `name`/`emoji`.
 - `subagents.allowAgents`: allowlist of agent ids for `sessions_spawn` (`["*"]` = any; default: same agent only).
-- Sandbox inheritance guard: if the requester session is sandboxed, `sessions_spawn` rejects targets that would run unsandboxed.
 - `subagents.requireAgentId`: when true, block `sessions_spawn` calls that omit `agentId` (forces explicit profile selection; default: false).
 
 ---
@@ -1567,24 +1310,6 @@ For `type: "acp"` entries, DennouAibou resolves by exact conversation identity (
 
 ### Per-agent access profiles
 
-<Accordion title="Full access (no sandbox)">
-
-```json5
-{
-  agents: {
-    list: [
-      {
-        id: "personal",
-        workspace: "~/.openclaw/workspace-personal",
-        sandbox: { mode: "off" },
-      },
-    ],
-  },
-}
-```
-
-</Accordion>
-
 <Accordion title="Read-only tools + workspace">
 
 ```json5
@@ -1594,19 +1319,6 @@ For `type: "acp"` entries, DennouAibou resolves by exact conversation identity (
       {
         id: "family",
         workspace: "~/.openclaw/workspace-family",
-        sandbox: { mode: "all", scope: "agent", workspaceAccess: "ro" },
-        tools: {
-          allow: [
-            "read",
-            "sessions_list",
-            "sessions_history",
-            "sessions_send",
-            "sessions_spawn",
-            "session_status",
-          ],
-          deny: ["write", "edit", "apply_patch", "exec", "process", "browser"],
-        },
-      },
     ],
   },
 }
@@ -1623,36 +1335,6 @@ For `type: "acp"` entries, DennouAibou resolves by exact conversation identity (
       {
         id: "public",
         workspace: "~/.openclaw/workspace-public",
-        sandbox: { mode: "all", scope: "agent", workspaceAccess: "none" },
-        tools: {
-          allow: [
-            "sessions_list",
-            "sessions_history",
-            "sessions_send",
-            "sessions_spawn",
-            "session_status",
-            "whatsapp",
-            "telegram",
-            "slack",
-            "discord",
-            "gateway",
-          ],
-          deny: [
-            "read",
-            "write",
-            "edit",
-            "apply_patch",
-            "exec",
-            "process",
-            "browser",
-            "canvas",
-            "nodes",
-            "cron",
-            "gateway",
-            "image",
-          ],
-        },
-      },
     ],
   },
 }
@@ -1660,7 +1342,7 @@ For `type: "acp"` entries, DennouAibou resolves by exact conversation identity (
 
 </Accordion>
 
-See [Multi-Agent Sandbox & Tools](/tools/multi-agent-sandbox-tools) for precedence details.
+See for precedence details.
 
 ---
 
@@ -1890,7 +1572,7 @@ Local onboarding defaults new local configs to `tools.profile: "coding"` when un
 
 ### `tools.allow` / `tools.deny`
 
-Global tool allow/deny policy (deny wins). Case-insensitive, supports `*` wildcards. Applied even when Docker sandbox is off.
+Global tool allow/deny policy (deny wins). Case-insensitive, supports `*` wildcards.
 
 ```json5
 {
@@ -1916,7 +1598,7 @@ Further restrict tools for specific providers or models. Order: base profile →
 
 ### `tools.elevated`
 
-Controls elevated exec access outside the sandbox:
+Controls elevated exec access:
 
 ```json5
 {
@@ -1934,7 +1616,6 @@ Controls elevated exec access outside the sandbox:
 
 - Per-agent override (`agents.list[].tools.elevated`) can only further restrict.
 - `/elevated on|off|ask|full` stores state per session; inline directives apply to single message.
-- Elevated `exec` bypasses sandboxing and uses the configured escape path (`gateway` by default, or `node` when the exec target is `node`).
 
 ### `tools.exec`
 
@@ -2118,7 +1799,6 @@ Notes:
 - `tree`: current session + sessions spawned by the current session (subagents).
 - `agent`: any session belonging to the current agent id (can include other users if you run per-sender sessions under the same agent id).
 - `all`: any session. Cross-agent targeting still requires `tools.agentToAgent`.
-- Sandbox clamp: when the current session is sandboxed and `agents.defaults.sandbox.sessionToolsVisibility="spawned"`, visibility is forced to `tree` even if `tools.sessions.visibility="all"`.
 
 ### `tools.sessions_spawn`
 
@@ -3294,7 +2974,7 @@ Applies only to one-shot cron jobs. Recurring jobs use separate failure handling
 - When neither global nor per-job failure destination is set, jobs that already deliver via `announce` now fall back to that primary announce target on failure.
 - `delivery.failureDestination` is only supported for `sessionTarget="isolated"` jobs unless the job's primary `delivery.mode` is `"webhook"`.
 
-See [Cron Jobs](/automation/cron-jobs). Isolated cron executions are tracked as [background tasks](/automation/tasks).
+See [Cron Jobs](/automation/cron-jobs).
 
 ---
 

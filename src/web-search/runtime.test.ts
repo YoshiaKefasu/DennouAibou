@@ -263,7 +263,6 @@ describe("web search runtime", () => {
     activateSecretsRuntimeSnapshot({
       sourceConfig: {},
       config: {},
-      authStores: [],
       warnings: [],
       webTools: {
         search: {

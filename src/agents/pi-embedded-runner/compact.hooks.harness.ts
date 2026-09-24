@@ -282,10 +282,6 @@ export async function loadCompactHooksHarness(): Promise<{
     resolveModelAuthMode: vi.fn(() => "env"),
   }));
 
-  vi.doMock("../sandbox.js", () => ({
-    resolveSandboxContext: vi.fn(async () => null),
-  }));
-
   vi.doMock("../session-file-repair.js", () => ({
     repairSessionFileIfNeeded: vi.fn(async () => {}),
   }));
@@ -505,10 +501,6 @@ export async function loadCompactHooksHarness(): Promise<{
     createPreparedEmbeddedPiSettingsManager: vi.fn(() => ({
       getGlobalSettings: vi.fn(() => ({})),
     })),
-  }));
-
-  vi.doMock("./sandbox-info.js", () => ({
-    buildEmbeddedSandboxInfo: vi.fn(() => undefined),
   }));
 
   vi.doMock("./model.js", () => ({

@@ -3,7 +3,7 @@ import { getUnsupportedSecretRefSurfacePatterns } from "./unsupported-surface-po
 
 type CredentialMatrixEntry = {
   id: string;
-  configFile: "dennou-aibou.json" | "auth-profiles.json";
+  configFile: "dennou-aibou.json";
   path: string;
   refPath?: string;
   when?: { type: "api_key" | "token" };
@@ -38,7 +38,6 @@ export function buildSecretRefCredentialMatrix(): SecretRefCredentialMatrixDocum
         configFile: entry.configFile,
         path: canonicalPath,
         ...(entry.refPathPattern ? { refPath: entry.refPathPattern } : {}),
-        ...(entry.authProfileType ? { when: { type: entry.authProfileType } } : {}),
         secretShape: entry.secretShape,
         optIn: true as const,
         ...(entry.secretShape === "sibling_ref" && entry.refPathPattern

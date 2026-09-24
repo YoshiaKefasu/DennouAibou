@@ -9,7 +9,6 @@ import type { OsSummary } from "../infra/os-summary.js";
 import type { PluginCompatibilityNotice } from "../plugins/status.js";
 import { createCompatibilityNotice } from "../plugins/status.test-helpers.js";
 import type { RuntimeEnv } from "../runtime.js";
-import * as taskMaintenanceModule from "../tasks/task-registry.maintenance.js";
 import { captureEnv } from "../test-utils/env.js";
 import { pickGatewaySelfPresence } from "./gateway-presence.js";
 import type { ChannelRow } from "./status-all/channels.js";
@@ -306,40 +305,6 @@ const mocks = {
   buildPluginCompatibilityNotices: vi.fn(
     (_params?: { config?: unknown }): PluginCompatibilityNotice[] => [],
   ),
-  getInspectableTaskRegistrySummary: vi.fn().mockReturnValue({
-    total: 0,
-    active: 0,
-    terminal: 0,
-    failures: 0,
-    byStatus: {
-      queued: 0,
-      running: 0,
-      succeeded: 0,
-      failed: 0,
-      timed_out: 0,
-      cancelled: 0,
-      lost: 0,
-    },
-    byRuntime: {
-      subagent: 0,
-      acp: 0,
-      cli: 0,
-      cron: 0,
-    },
-  }),
-  getInspectableTaskAuditSummary: vi.fn().mockReturnValue({
-    total: 0,
-    warnings: 0,
-    errors: 0,
-    byCode: {
-      stale_queued: 0,
-      stale_running: 0,
-      lost: 0,
-      delivery_failed: 0,
-      missing_cleanup: 0,
-      inconsistent_timestamps: 0,
-    },
-  }),
   resolveGatewayService: vi.fn().mockReturnValue({
     label: "LaunchAgent",
     loadedText: "loaded",
@@ -394,11 +359,6 @@ function createSummaryDeps(): StatusSummaryDeps {
     resolveMainSessionKey: mocks.resolveMainSessionKey,
     readSessionStoreReadOnly: mocks.loadSessionStore,
     resolveStorePath: mocks.resolveStorePath,
-    taskMaintenanceModule: {
-      ...taskMaintenanceModule,
-      getInspectableTaskRegistrySummary: mocks.getInspectableTaskRegistrySummary,
-      getInspectableTaskAuditSummary: mocks.getInspectableTaskAuditSummary,
-    },
   };
 }
 
@@ -545,42 +505,6 @@ describe("statusCommand", () => {
     });
     mocks.buildPluginCompatibilityNotices.mockReset();
     mocks.buildPluginCompatibilityNotices.mockReturnValue([]);
-    mocks.getInspectableTaskRegistrySummary.mockReset();
-    mocks.getInspectableTaskRegistrySummary.mockReturnValue({
-      total: 0,
-      active: 0,
-      terminal: 0,
-      failures: 0,
-      byStatus: {
-        queued: 0,
-        running: 0,
-        succeeded: 0,
-        failed: 0,
-        timed_out: 0,
-        cancelled: 0,
-        lost: 0,
-      },
-      byRuntime: {
-        subagent: 0,
-        acp: 0,
-        cli: 0,
-        cron: 0,
-      },
-    });
-    mocks.getInspectableTaskAuditSummary.mockReset();
-    mocks.getInspectableTaskAuditSummary.mockReturnValue({
-      total: 0,
-      warnings: 0,
-      errors: 0,
-      byCode: {
-        stale_queued: 0,
-        stale_running: 0,
-        lost: 0,
-        delivery_failed: 0,
-        missing_cleanup: 0,
-        inconsistent_timestamps: 0,
-      },
-    });
     mocks.hasPotentialConfiguredChannels.mockReset();
     mocks.hasPotentialConfiguredChannels.mockReturnValue(true);
     mocks.runSecurityAudit.mockReset();
@@ -653,13 +577,6 @@ describe("statusCommand", () => {
       count: 0,
       warnings: [],
     });
-    expect(payload.tasks).toEqual(
-      expect.objectContaining({
-        total: 0,
-        active: 0,
-        byStatus: expect.objectContaining({ queued: 0, running: 0 }),
-      }),
-    );
     expect(mocks.runSecurityAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         includeFilesystem: true,
@@ -705,7 +622,6 @@ describe("statusCommand", () => {
       "Channels",
       "WhatsApp",
       "bootstrap files",
-      "Tasks",
       "Sessions",
       "+1000",
       "50%",
@@ -735,47 +651,6 @@ describe("statusCommand", () => {
     expect(logs.some((line) => line.includes("40% hit"))).toBe(true);
     expect(logs.some((line) => line.includes("read 2.0k"))).toBe(true);
     expect(logs.some((line) => line.includes("write 1.0k"))).toBe(true);
-  });
-
-  it("shows a maintenance hint when task audit errors are present", async () => {
-    mocks.getInspectableTaskRegistrySummary.mockReturnValue({
-      total: 1,
-      active: 1,
-      terminal: 0,
-      failures: 1,
-      byStatus: {
-        queued: 0,
-        running: 1,
-        succeeded: 0,
-        failed: 0,
-        timed_out: 0,
-        cancelled: 0,
-        lost: 0,
-      },
-      byRuntime: {
-        subagent: 0,
-        acp: 1,
-        cli: 0,
-        cron: 0,
-      },
-    });
-    mocks.getInspectableTaskAuditSummary.mockReturnValue({
-      total: 1,
-      warnings: 0,
-      errors: 1,
-      byCode: {
-        stale_queued: 0,
-        stale_running: 1,
-        lost: 0,
-        delivery_failed: 0,
-        missing_cleanup: 0,
-        inconsistent_timestamps: 0,
-      },
-    });
-
-    const joined = await runStatusAndGetJoinedLogs();
-
-    expect(joined).toContain("tasks maintenance --apply");
   });
 
   it("caps cached percentage at the prompt-token denominator for legacy session totals", async () => {

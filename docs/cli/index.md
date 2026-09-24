@@ -41,12 +41,9 @@ This page describes the current CLI behavior. If commands change, update this do
 - [`devices`](/cli/devices)
 - [`node`](/cli/node)
 - [`approvals`](/cli/approvals)
-- [`sandbox`](/cli/sandbox)
 - [`tui`](/cli/tui)
 - [`browser`](/cli/browser)
 - [`cron`](/cli/cron)
-- [`tasks`](/cli/index#tasks)
-- [`flows`](/cli/flows)
 - [`dns`](/cli/dns)
 - [`docs`](/cli/docs)
 - [`hooks`](/cli/hooks)
@@ -206,14 +203,6 @@ openclaw [--dev] [--profile <name>] <command>
   health
   sessions
     cleanup
-  tasks
-    list
-    audit
-    maintenance
-    show
-    notify
-    cancel
-    flow list|show|cancel
   gateway
     call
     usage-cost
@@ -250,10 +239,6 @@ openclaw [--dev] [--profile <name>] <command>
     scan
     auth add|login|setup-token|paste-token
     auth order get|set|clear
-  sandbox
-    list
-    recreate
-    explain
   cron
     status
     list
@@ -425,21 +410,6 @@ Vector search over `MEMORY.md` + `memory/*.md`:
 - `openclaw memory index` — reindex memory files.
 - `openclaw memory search "<query>"` (or `--query "<query>"`) — semantic search over memory.
 - `openclaw memory promote` — rank short-term recalls and optionally append top entries into `MEMORY.md`.
-
-## Sandbox
-
-Manage sandbox runtimes for isolated agent execution. See [/cli/sandbox](/cli/sandbox).
-
-Subcommands:
-
-- `sandbox list [--browser] [--json]`
-- `sandbox recreate [--all] [--session <key>] [--agent <id>] [--browser] [--force]`
-- `sandbox explain [--session <key>] [--agent <id>] [--json]`
-
-Notes:
-
-- `sandbox recreate` removes existing runtimes so the next use seeds them again with current config.
-- For `ssh` and OpenShell `remote` backends, recreate deletes the canonical remote workspace for the selected scope.
 
 ## Chat slash commands
 
@@ -676,8 +646,7 @@ Common options:
 
 `channels list` options:
 
-- `--no-usage`: skip model provider usage/quota snapshots (OAuth/API-backed only).
-- `--json`: output JSON (includes usage unless `--no-usage` is set).
+- `--json`: output JSON.
 
 `channels status` options:
 
@@ -1182,7 +1151,6 @@ Options:
 - `--json`
 - `--all` (full diagnosis; read-only, pasteable)
 - `--deep` (ask the gateway for a live health probe, including channel probes when supported)
-- `--usage` (show model provider usage/quota)
 - `--timeout <ms>`
 - `--verbose`
 - `--debug` (alias for `--verbose`)
@@ -1190,25 +1158,6 @@ Options:
 Notes:
 
 - Overview includes Gateway + node host service status when available.
-- `--usage` prints normalized provider usage windows as `X% left`.
-
-### Usage tracking
-
-DennouAibou can surface provider usage/quota when OAuth/API creds are available.
-
-Surfaces:
-
-- `/status` (adds a short provider usage line when available)
-- `openclaw status --usage` (prints full provider breakdown)
-- macOS menu bar (Usage section under Context)
-
-Notes:
-
-- Data comes directly from provider usage endpoints (no estimates).
-- Human-readable output is normalized to `X% left` across providers.
-- Providers with current usage windows: Gemini CLI and OpenAI Codex.
-- Usage auth comes from provider-specific hooks when available; otherwise DennouAibou falls back to matching OAuth/API-key credentials from auth profiles, env, or config. If none resolve, usage is hidden.
-- Details: see [Usage tracking](/concepts/usage-tracking).
 
 ### `health`
 
@@ -1283,28 +1232,6 @@ Notes:
 
 - `--non-interactive` requires `--yes` and explicit scopes (or `--all`).
 - `--all` removes service, state, workspace, and app together.
-
-### `tasks`
-
-List and manage [background task](/automation/tasks) runs across agents.
-
-- `tasks list` — show active and recent task runs
-- `tasks show <id>` — show details for a specific task run
-- `tasks notify <id>` — change notification policy for a task run
-- `tasks cancel <id>` — cancel a running task
-- `tasks audit` — surface operational issues (stale, lost, delivery failures)
-- `tasks maintenance [--apply] [--json]` — preview or apply tasks and TaskFlow cleanup/reconciliation (ACP/subagent child sessions, active cron jobs, live CLI runs)
-- `tasks flow list` — list active and recent Task Flow flows
-- `tasks flow show <lookup>` — inspect a flow by id or lookup key
-- `tasks flow cancel <lookup>` — cancel a running flow and its active tasks
-
-### `flows`
-
-Legacy docs shortcut. Flow commands live under `openclaw tasks flow`:
-
-- `tasks flow list [--json]`
-- `tasks flow show <lookup>`
-- `tasks flow cancel <lookup>`
 
 ## Gateway
 

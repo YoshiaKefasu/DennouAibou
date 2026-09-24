@@ -187,16 +187,8 @@
           - "scripts/podman/setup.sh"
           - "scripts/**/*docker*"
           - "scripts/**/Dockerfile*"
-          - "scripts/sandbox-*.sh"
-          - "src/agents/sandbox*.ts"
-          - "src/commands/sandbox*.ts"
-          - "src/cli/sandbox-cli.ts"
           - "src/docker-setup.test.ts"
-          - "src/config/**/*sandbox*"
-          - "docs/cli/sandbox.md"
-          - "docs/gateway/sandbox*.md"
           - "docs/install/docker.md"
-          - "docs/multi-agent-sandbox-tools.md"
 
 "agents":
   - changed-files:

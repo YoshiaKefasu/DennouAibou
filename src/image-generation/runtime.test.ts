@@ -80,8 +80,6 @@ describe("image-generation runtime", () => {
   });
 
   it("generates images through the active image-generation provider", async () => {
-    const authStore = { version: 1, profiles: {} } as const;
-    let seenAuthStore: unknown;
     mocks.resolveAgentModelPrimaryValue.mockReturnValue("image-plugin/img-v1");
     const provider: ImageGenerationProvider = {
       id: "image-plugin",
@@ -89,8 +87,7 @@ describe("image-generation runtime", () => {
         generate: {},
         edit: { enabled: false },
       },
-      async generateImage(req: { authStore?: unknown }) {
-        seenAuthStore = req.authStore;
+      async generateImage() {
         return {
           images: [
             {
@@ -115,13 +112,11 @@ describe("image-generation runtime", () => {
       } as OpenClawConfig,
       prompt: "draw a cat",
       agentDir: "/tmp/agent",
-      authStore,
     });
 
     expect(result.provider).toBe("image-plugin");
     expect(result.model).toBe("img-v1");
     expect(result.attempts).toEqual([]);
-    expect(seenAuthStore).toEqual(authStore);
     expect(result.images).toEqual([
       {
         buffer: Buffer.from("png-bytes"),

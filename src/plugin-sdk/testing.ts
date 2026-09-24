@@ -36,7 +36,6 @@ export {
   installPinnedHostnameTestHooks,
 } from "../media-understanding/audio.test-helpers.ts";
 export { isLiveTestEnabled } from "../agents/live-test-helpers.js";
-export { createSandboxTestContext } from "../agents/sandbox/test-fixtures.js";
 export { writeSkill } from "../agents/skills.e2e-test-helpers.js";
 export { buildCommandTestParams } from "../auto-reply/reply/commands-spawn.test-harness.js";
 export { peekSystemEvents, resetSystemEventsForTest } from "../infra/system-events.js";

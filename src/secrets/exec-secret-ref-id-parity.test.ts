@@ -71,9 +71,6 @@ describe("exec SecretRef id parity", () => {
 
   function classifyTargetClass(id: string): string {
     const canonicalId = canonicalizeSecretTargetCoverageId(id);
-    if (canonicalId.startsWith("auth-profiles.")) {
-      return "auth-profiles";
-    }
     if (canonicalId.startsWith("agents.")) {
       return "agents";
     }
@@ -173,7 +170,7 @@ describe("exec SecretRef id parity", () => {
 
   function planAcceptsExecRefForSample(params: {
     type: string;
-    configFile: "dennou-aibou.json" | "auth-profiles.json";
+    configFile: "dennou-aibou.json";
     pathSegments: string[];
     id: string;
   }): boolean {
@@ -188,7 +185,6 @@ describe("exec SecretRef id parity", () => {
           path: params.pathSegments.join("."),
           pathSegments: params.pathSegments,
           ref: { source: "exec", provider: "vault", id: params.id },
-          ...(params.configFile === "auth-profiles.json" ? { agentId: "main" } : {}),
         },
       ],
     });

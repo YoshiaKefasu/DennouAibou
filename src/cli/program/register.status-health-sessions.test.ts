@@ -7,15 +7,6 @@ const mocks = vi.hoisted(() => ({
   healthCommand: vi.fn(),
   sessionsCommand: vi.fn(),
   sessionsCleanupCommand: vi.fn(),
-  tasksListCommand: vi.fn(),
-  tasksAuditCommand: vi.fn(),
-  tasksMaintenanceCommand: vi.fn(),
-  tasksShowCommand: vi.fn(),
-  tasksNotifyCommand: vi.fn(),
-  tasksCancelCommand: vi.fn(),
-  flowsListCommand: vi.fn(),
-  flowsShowCommand: vi.fn(),
-  flowsCancelCommand: vi.fn(),
   setVerbose: vi.fn(),
   runtime: {
     log: vi.fn(),
@@ -28,15 +19,6 @@ const statusCommand = mocks.statusCommand;
 const healthCommand = mocks.healthCommand;
 const sessionsCommand = mocks.sessionsCommand;
 const sessionsCleanupCommand = mocks.sessionsCleanupCommand;
-const tasksListCommand = mocks.tasksListCommand;
-const tasksAuditCommand = mocks.tasksAuditCommand;
-const tasksMaintenanceCommand = mocks.tasksMaintenanceCommand;
-const tasksShowCommand = mocks.tasksShowCommand;
-const tasksNotifyCommand = mocks.tasksNotifyCommand;
-const tasksCancelCommand = mocks.tasksCancelCommand;
-const flowsListCommand = mocks.flowsListCommand;
-const flowsShowCommand = mocks.flowsShowCommand;
-const flowsCancelCommand = mocks.flowsCancelCommand;
 const setVerbose = mocks.setVerbose;
 const runtime = mocks.runtime;
 
@@ -54,21 +36,6 @@ vi.mock("../../commands/sessions.js", () => ({
 
 vi.mock("../../commands/sessions-cleanup.js", () => ({
   sessionsCleanupCommand: mocks.sessionsCleanupCommand,
-}));
-
-vi.mock("../../commands/tasks.js", () => ({
-  tasksListCommand: mocks.tasksListCommand,
-  tasksAuditCommand: mocks.tasksAuditCommand,
-  tasksMaintenanceCommand: mocks.tasksMaintenanceCommand,
-  tasksShowCommand: mocks.tasksShowCommand,
-  tasksNotifyCommand: mocks.tasksNotifyCommand,
-  tasksCancelCommand: mocks.tasksCancelCommand,
-}));
-
-vi.mock("../../commands/flows.js", () => ({
-  flowsListCommand: mocks.flowsListCommand,
-  flowsShowCommand: mocks.flowsShowCommand,
-  flowsCancelCommand: mocks.flowsCancelCommand,
 }));
 
 vi.mock("../../globals.js", () => ({
@@ -93,28 +60,10 @@ describe("registerStatusHealthSessionsCommands", () => {
     healthCommand.mockResolvedValue(undefined);
     sessionsCommand.mockResolvedValue(undefined);
     sessionsCleanupCommand.mockResolvedValue(undefined);
-    tasksListCommand.mockResolvedValue(undefined);
-    tasksAuditCommand.mockResolvedValue(undefined);
-    tasksMaintenanceCommand.mockResolvedValue(undefined);
-    tasksShowCommand.mockResolvedValue(undefined);
-    tasksNotifyCommand.mockResolvedValue(undefined);
-    tasksCancelCommand.mockResolvedValue(undefined);
-    flowsListCommand.mockResolvedValue(undefined);
-    flowsShowCommand.mockResolvedValue(undefined);
-    flowsCancelCommand.mockResolvedValue(undefined);
   });
 
   it("runs status command with timeout and debug-derived verbose", async () => {
-    await runCli([
-      "status",
-      "--json",
-      "--all",
-      "--deep",
-      "--usage",
-      "--debug",
-      "--timeout",
-      "5000",
-    ]);
+    await runCli(["status", "--json", "--all", "--deep", "--debug", "--timeout", "5000"]);
 
     expect(setVerbose).toHaveBeenCalledWith(true);
     expect(statusCommand).toHaveBeenCalledWith(
@@ -122,7 +71,6 @@ describe("registerStatusHealthSessionsCommands", () => {
         json: true,
         all: true,
         deep: true,
-        usage: true,
         timeoutMs: 5000,
         verbose: true,
       }),
@@ -244,111 +192,6 @@ describe("registerStatusHealthSessionsCommands", () => {
     expect(sessionsCleanupCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         allAgents: true,
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks list from the parent command", async () => {
-    await runCli(["tasks", "--json", "--runtime", "acp", "--status", "running"]);
-
-    expect(tasksListCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        json: true,
-        runtime: "subagent",
-        status: "running",
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks show subcommand with lookup forwarding", async () => {
-    await runCli(["tasks", "show", "run-123", "--json"]);
-
-    expect(tasksShowCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lookup: "run-123",
-        json: true,
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks maintenance subcommand with apply forwarding", async () => {
-    await runCli(["tasks", "--json", "maintenance", "--apply"]);
-
-    expect(tasksMaintenanceCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        json: true,
-        apply: true,
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks audit subcommand with filters", async () => {
-    await runCli([
-      "tasks",
-      "--json",
-      "audit",
-      "--severity",
-      "error",
-      "--code",
-      "stale_running",
-      "--limit",
-      "5",
-    ]);
-
-    expect(tasksAuditCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        json: true,
-        severity: "error",
-        code: "stale_running",
-        limit: 5,
-      }),
-      runtime,
-    );
-  });
-
-  it("routes tasks flow commands through the TaskFlow handlers", async () => {
-    await runCli(["tasks", "flow", "list", "--json", "--status", "blocked"]);
-    expect(flowsListCommand).toHaveBeenCalledWith(expect.any(Object), runtime);
-
-    await runCli(["tasks", "flow", "show", "flow-123", "--json"]);
-    expect(flowsShowCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lookup: "flow-123",
-      }),
-      runtime,
-    );
-
-    await runCli(["tasks", "flow", "cancel", "flow-123"]);
-    expect(flowsCancelCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lookup: "flow-123",
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks notify subcommand with lookup and policy forwarding", async () => {
-    await runCli(["tasks", "notify", "run-123", "state_changes"]);
-
-    expect(tasksNotifyCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lookup: "run-123",
-        notify: "state_changes",
-      }),
-      runtime,
-    );
-  });
-
-  it("runs tasks cancel subcommand with lookup forwarding", async () => {
-    await runCli(["tasks", "cancel", "run-123"]);
-
-    expect(tasksCancelCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lookup: "run-123",
       }),
       runtime,
     );

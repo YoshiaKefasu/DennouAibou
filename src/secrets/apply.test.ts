@@ -171,7 +171,6 @@ function createOpenAiProviderHeaderTarget(params?: {
 function createOneWayScrubOptions(): NonNullable<SecretsApplyPlan["options"]> {
   return {
     scrubEnv: true,
-    scrubAuthProfilesForProviderTargets: true,
     scrubLegacyAuthJson: true,
   };
 }
@@ -210,12 +209,6 @@ describe("secrets apply", () => {
       models: { providers: { openai: { apiKey: unknown } } };
     };
     expect(nextConfig.models.providers.openai.apiKey).toEqual(OPENAI_API_KEY_ENV_REF);
-
-    const nextAuthStore = JSON.parse(await fs.readFile(fixture.authStorePath, "utf8")) as {
-      profiles: { "openai:default": { key?: string; keyRef?: unknown } };
-    };
-    expect(nextAuthStore.profiles["openai:default"].key).toBeUndefined();
-    expect(nextAuthStore.profiles["openai:default"].keyRef).toBeUndefined();
 
     const nextAuthJson = JSON.parse(await fs.readFile(fixture.authJsonPath, "utf8")) as Record<
       string,
@@ -275,7 +268,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     });
@@ -310,7 +302,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     });
@@ -332,7 +323,6 @@ describe("secrets apply", () => {
       },
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     });
@@ -340,87 +330,6 @@ describe("secrets apply", () => {
     await expect(runSecretsApply({ plan, env: fixture.env, write: true })).rejects.toThrow(
       "Plan contains exec SecretRefs/providers. Re-run with --allow-exec.",
     );
-  });
-
-  it("applies auth-profiles sibling ref targets to the scoped agent store", async () => {
-    const plan: SecretsApplyPlan = {
-      version: 1,
-      protocolVersion: 1,
-      generatedAt: new Date().toISOString(),
-      generatedBy: "manual",
-      targets: [
-        {
-          type: "auth-profiles.api_key.key",
-          path: "profiles.openai:default.key",
-          pathSegments: ["profiles", "openai:default", "key"],
-          agentId: "main",
-          ref: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-        },
-      ],
-      options: {
-        scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
-        scrubLegacyAuthJson: false,
-      },
-    };
-
-    const result = await runSecretsApply({ plan, env: fixture.env, write: true });
-    expect(result.changed).toBe(true);
-    expect(result.changedFiles).toContain(fixture.authStorePath);
-
-    const nextAuthStore = JSON.parse(await fs.readFile(fixture.authStorePath, "utf8")) as {
-      profiles: { "openai:default": { key?: string; keyRef?: unknown } };
-    };
-    expect(nextAuthStore.profiles["openai:default"].key).toBeUndefined();
-    expect(nextAuthStore.profiles["openai:default"].keyRef).toEqual({
-      source: "env",
-      provider: "default",
-      id: "OPENAI_API_KEY",
-    });
-  });
-
-  it("creates a new auth-profiles mapping when provider metadata is supplied", async () => {
-    const plan: SecretsApplyPlan = {
-      version: 1,
-      protocolVersion: 1,
-      generatedAt: new Date().toISOString(),
-      generatedBy: "manual",
-      targets: [
-        {
-          type: "auth-profiles.token.token",
-          path: "profiles.openai:bot.token",
-          pathSegments: ["profiles", "openai:bot", "token"],
-          agentId: "main",
-          authProfileProvider: "openai",
-          ref: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-        },
-      ],
-      options: {
-        scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
-        scrubLegacyAuthJson: false,
-      },
-    };
-
-    await runSecretsApply({ plan, env: fixture.env, write: true });
-    const nextAuthStore = JSON.parse(await fs.readFile(fixture.authStorePath, "utf8")) as {
-      profiles: {
-        "openai:bot": {
-          type: string;
-          provider: string;
-          tokenRef?: unknown;
-        };
-      };
-    };
-    expect(nextAuthStore.profiles["openai:bot"]).toEqual({
-      type: "token",
-      provider: "openai",
-      tokenRef: {
-        source: "env",
-        provider: "default",
-        id: "OPENAI_API_KEY",
-      },
-    });
   });
 
   it("is idempotent on repeated write applies", async () => {
@@ -469,7 +378,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     });
@@ -546,7 +454,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     };
@@ -586,7 +493,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     });
@@ -644,7 +550,6 @@ describe("secrets apply", () => {
       ],
       options: {
         scrubEnv: false,
-        scrubAuthProfilesForProviderTargets: false,
         scrubLegacyAuthJson: false,
       },
     };

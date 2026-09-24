@@ -1,4 +1,3 @@
-import { ensureAuthProfileStore } from "../agents/auth-profiles.js";
 import { resolveDefaultAgentWorkspaceDir } from "../agents/workspace.js";
 import type { OpenClawConfig, GatewayAuthConfig } from "../config/config.js";
 import { isSecretRef, type SecretInput } from "../config/types.secrets.js";
@@ -100,7 +99,6 @@ export function buildGatewayAuthConfig(params: {
 }
 
 export type PromptAuthConfigDeps = {
-  ensureAuthProfileStore?: typeof ensureAuthProfileStore;
   resolveDefaultAgentWorkspaceDir?: typeof resolveDefaultAgentWorkspaceDir;
   resolveProviderPluginChoice?: typeof resolveProviderPluginChoice;
   resolvePluginProviders?: typeof resolvePluginProviders;
@@ -118,7 +116,6 @@ export async function promptAuthConfig(
   prompter: WizardPrompter,
   deps: PromptAuthConfigDeps = {},
 ): Promise<OpenClawConfig> {
-  const ensureAuthProfileStoreImpl = deps.ensureAuthProfileStore ?? ensureAuthProfileStore;
   const resolveDefaultAgentWorkspaceDirImpl =
     deps.resolveDefaultAgentWorkspaceDir ?? resolveDefaultAgentWorkspaceDir;
   const resolveProviderPluginChoiceImpl =
@@ -133,9 +130,6 @@ export async function promptAuthConfig(
   const promptCustomApiConfigImpl = deps.promptCustomApiConfig ?? promptCustomApiConfig;
   const authChoice = await promptAuthChoiceGroupedImpl({
     prompter,
-    store: ensureAuthProfileStoreImpl(undefined, {
-      allowKeychainPrompt: false,
-    }),
     includeSkip: true,
     config: cfg,
   });

@@ -1,5 +1,4 @@
 import { isDeepStrictEqual } from "node:util";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import {
   resolveSecretInputRef,
@@ -8,24 +7,20 @@ import {
 } from "../config/types.secrets.js";
 import type { SecretsApplyPlan } from "./plan.js";
 import { isRecord } from "./shared.js";
-import {
-  discoverAuthProfileSecretTargets,
-  discoverConfigSecretTargets,
-} from "./target-registry.js";
+import { discoverConfigSecretTargets } from "./target-registry.js";
 
 export type ConfigureCandidate = {
   type: string;
   path: string;
   pathSegments: string[];
   label: string;
-  configFile: "dennou-aibou.json" | "auth-profiles.json";
+  configFile: "dennou-aibou.json";
   expectedResolvedValue: "string" | "string-or-object";
   existingRef?: SecretRef;
   isDerived?: boolean;
   agentId?: string;
   providerId?: string;
   accountId?: string;
-  authProfileProvider?: string;
 };
 
 export type ConfigureSelectedTarget = ConfigureCandidate & {
@@ -49,36 +44,12 @@ export function buildConfigureCandidates(config: OpenClawConfig): ConfigureCandi
 }
 
 function configureCandidateSortKey(candidate: ConfigureCandidate): string {
-  if (candidate.configFile === "auth-profiles.json") {
-    const agentId = candidate.agentId ?? "";
-    return `auth-profiles:${agentId}:${candidate.path}`;
-  }
   return `openclaw:${candidate.path}`;
-}
-
-function resolveAuthProfileProvider(
-  store: AuthProfileStore,
-  pathSegments: string[],
-): string | undefined {
-  const profileId = pathSegments[1];
-  if (!profileId) {
-    return undefined;
-  }
-  const profile = store.profiles?.[profileId];
-  if (!isRecord(profile) || typeof profile.provider !== "string") {
-    return undefined;
-  }
-  const provider = profile.provider.trim();
-  return provider.length > 0 ? provider : undefined;
 }
 
 export function buildConfigureCandidatesForScope(params: {
   config: OpenClawConfig;
   authoredOpenClawConfig?: OpenClawConfig;
-  authProfiles?: {
-    agentId: string;
-    store: AuthProfileStore;
-  };
 }): ConfigureCandidate[] {
   const authoredConfig = params.authoredOpenClawConfig ?? params.config;
 
@@ -111,39 +82,7 @@ export function buildConfigureCandidatesForScope(params: {
       };
     });
 
-  const authCandidates =
-    params.authProfiles === undefined
-      ? []
-      : discoverAuthProfileSecretTargets(params.authProfiles.store)
-          .filter((entry) => entry.entry.includeInConfigure)
-          .map((entry) => {
-            const authProfiles = params.authProfiles;
-            if (!authProfiles) {
-              throw new Error("Missing auth profile scope for configure candidate discovery.");
-            }
-            const authProfileProvider = resolveAuthProfileProvider(
-              authProfiles.store,
-              entry.pathSegments,
-            );
-            const resolved = resolveSecretInputRef({
-              value: entry.value,
-              refValue: entry.refValue,
-              defaults: params.config.secrets?.defaults,
-            });
-            return {
-              type: entry.entry.targetType,
-              path: entry.path,
-              pathSegments: [...entry.pathSegments],
-              label: `${entry.path} (auth profile, agent ${authProfiles.agentId})`,
-              configFile: "auth-profiles.json" as const,
-              expectedResolvedValue: entry.entry.expectedResolvedValue,
-              ...(resolved.ref ? { existingRef: resolved.ref } : {}),
-              agentId: authProfiles.agentId,
-              ...(authProfileProvider ? { authProfileProvider } : {}),
-            };
-          });
-
-  return [...openclawCandidates, ...authCandidates].toSorted((a, b) =>
+  return openclawCandidates.toSorted((a, b) =>
     configureCandidateSortKey(a).localeCompare(configureCandidateSortKey(b)),
   );
 }
@@ -242,7 +181,6 @@ export function buildSecretsConfigurePlan(params: {
       ...(entry.agentId ? { agentId: entry.agentId } : {}),
       ...(entry.providerId ? { providerId: entry.providerId } : {}),
       ...(entry.accountId ? { accountId: entry.accountId } : {}),
-      ...(entry.authProfileProvider ? { authProfileProvider: entry.authProfileProvider } : {}),
     })),
     ...(Object.keys(params.providerChanges.upserts).length > 0
       ? { providerUpserts: params.providerChanges.upserts }
@@ -252,7 +190,6 @@ export function buildSecretsConfigurePlan(params: {
       : {}),
     options: {
       scrubEnv: true,
-      scrubAuthProfilesForProviderTargets: true,
       scrubLegacyAuthJson: true,
     },
   };

@@ -35,8 +35,8 @@ import { normalizeMessageActionInput } from "./message-action-normalization.js";
 import {
   hydrateAttachmentParamsForAction,
   type MessageActionParamsDeps,
-  normalizeSandboxMediaList,
-  normalizeSandboxMediaParams,
+  normalizeAttachmentMediaParams,
+  normalizeMediaList,
   parseButtonsParam,
   parseCardParam,
   parseComponentsParam,
@@ -114,7 +114,6 @@ export type RunMessageActionParams = {
   };
   sessionKey?: string;
   agentId?: string;
-  sandboxRoot?: string;
   dryRun?: boolean;
   abortSignal?: AbortSignal;
 };
@@ -476,9 +475,8 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
   }
   pushMedia(parsed.mediaUrl);
 
-  const normalizedMediaUrls = await normalizeSandboxMediaList({
+  const normalizedMediaUrls = await normalizeMediaList({
     values: mergedMediaUrls,
-    sandboxRoot: input.sandboxRoot,
   });
   mergedMediaUrls.length = 0;
   mergedMediaUrls.push(...normalizedMediaUrls);
@@ -777,13 +775,11 @@ export async function runMessageAction(
   }
   const dryRun = Boolean(input.dryRun ?? readBooleanParam(params, "dryRun"));
   const normalizationPolicy = resolveAttachmentMediaPolicy({
-    sandboxRoot: input.sandboxRoot,
     mediaLocalRoots: getAgentScopedMediaLocalRoots(cfg, resolvedAgentId),
   });
 
-  await normalizeSandboxMediaParams({
+  await normalizeAttachmentMediaParams({
     args: params,
-    mediaPolicy: normalizationPolicy,
   });
 
   const mediaAccess = resolveAgentScopedOutboundMediaAccess({
@@ -792,7 +788,6 @@ export async function runMessageAction(
     mediaSources: collectActionMediaSourceHints(params),
   });
   const mediaPolicy = resolveAttachmentMediaPolicy({
-    sandboxRoot: input.sandboxRoot,
     mediaAccess,
   });
 

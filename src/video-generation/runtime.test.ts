@@ -80,14 +80,11 @@ describe("video-generation runtime", () => {
   });
 
   it("generates videos through the active video-generation provider", async () => {
-    const authStore = { version: 1, profiles: {} } as const;
-    let seenAuthStore: unknown;
     mocks.resolveAgentModelPrimaryValue.mockReturnValue("video-plugin/vid-v1");
     const provider: VideoGenerationProvider = {
       id: "video-plugin",
       capabilities: {},
-      async generateVideo(req: { authStore?: unknown }) {
-        seenAuthStore = req.authStore;
+      async generateVideo() {
         return {
           videos: [
             {
@@ -112,14 +109,12 @@ describe("video-generation runtime", () => {
       } as OpenClawConfig,
       prompt: "animate a cat",
       agentDir: "/tmp/agent",
-      authStore,
     });
 
     expect(result.provider).toBe("video-plugin");
     expect(result.model).toBe("vid-v1");
     expect(result.attempts).toEqual([]);
     expect(result.ignoredOverrides).toEqual([]);
-    expect(seenAuthStore).toEqual(authStore);
     expect(result.videos).toEqual([
       {
         buffer: Buffer.from("mp4-bytes"),

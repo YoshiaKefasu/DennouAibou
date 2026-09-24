@@ -1,4 +1,3 @@
-import { upsertAuthProfile } from "../agents/auth-profiles/profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { SecretInput } from "../config/types.secrets.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
@@ -162,23 +161,6 @@ export function createProviderApiKeyAuthMethod(
       }
 
       const profileIds = resolveProfileIds(params);
-      if (resolved.source !== "profile") {
-        for (const profileId of profileIds) {
-          const credential = ctx.toApiKeyCredential({
-            provider: profileId.split(":", 1)[0]?.trim() || params.providerId,
-            resolved,
-            ...(params.metadata ? { metadata: params.metadata } : {}),
-          });
-          if (!credential) {
-            return null;
-          }
-          upsertAuthProfile({
-            profileId,
-            credential,
-            agentDir: ctx.agentDir,
-          });
-        }
-      }
 
       return await applyApiKeyConfig({
         ctx,

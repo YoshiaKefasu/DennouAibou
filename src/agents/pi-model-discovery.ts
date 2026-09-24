@@ -33,11 +33,10 @@ import {
 } from "../plugins/provider-runtime.js";
 import type { ProviderRuntimeModel } from "../plugins/types.js";
 import { parseJsonWithJson5Fallback } from "../utils/parse-json-compat.js";
-import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { resolveProviderEnvApiKeyCandidates } from "./model-auth-env-vars.js";
 import { resolveEnvApiKey } from "./model-auth-env.js";
 import { detectOpenAICompletionsCompat } from "./openai-completions-compat.js";
-import { resolvePiCredentialMapFromStore, type PiCredentialMap } from "./pi-auth-credentials.js";
+import type { PiCredentialMap } from "./pi-auth-credentials.js";
 
 const PiAuthStorageClass = PiAuthStorageImpl;
 const PiModelRegistryClass = PiModelRegistryImpl;
@@ -403,9 +402,8 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
   return withRuntimeOverride;
 }
 
-function resolvePiCredentials(agentDir: string): PiCredentialMap {
-  const store = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
-  const credentials = resolvePiCredentialMapFromStore(store);
+function resolvePiCredentials(_agentDir: string): PiCredentialMap {
+  const credentials: PiCredentialMap = {};
   // pi-coding-agent hides providers from its registry when auth storage lacks
   // a matching credential entry. Mirror env-backed provider auth here so
   // live/model discovery sees the same providers runtime auth can use.

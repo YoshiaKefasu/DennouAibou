@@ -16,21 +16,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { toAgentModelListLike } from "../../config/model-input.js";
 import type { SessionEntry, SessionScope } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
-import {
-  formatUsageWindowSummary,
-  loadProviderUsageSummary,
-  resolveUsageProviderId,
-} from "../../infra/provider-usage.js";
 import type { MediaUnderstandingDecision } from "../../media-understanding/types.js";
-import {
-  listTasksForAgentIdForStatus,
-  listTasksForSessionKeyForStatus,
-} from "../../tasks/task-status-access.js";
-import {
-  buildTaskStatusSnapshot,
-  formatTaskStatusDetail,
-  formatTaskStatusTitle,
-} from "../../tasks/task-status.js";
 import { normalizeGroupActivation } from "../group-activation.js";
 import { resolveSelectedAndActiveModel } from "../model-runtime.js";
 import { buildStatusMessage } from "../status.js";
@@ -39,50 +25,6 @@ import type { ReplyPayload } from "../types.js";
 import type { CommandContext } from "./commands-types.js";
 import { getFollowupQueueDepth, resolveQueueSettings } from "./queue.js";
 import { resolveSubagentLabel } from "./subagents-utils.js";
-
-// Some usage endpoints only work with CLI/session OAuth tokens, not API keys.
-// Skip those probes when the active auth mode cannot satisfy the endpoint.
-const USAGE_OAUTH_ONLY_PROVIDERS = new Set(["anthropic", "github-copilot", "openai-codex"]);
-
-function shouldLoadUsageSummary(params: {
-  provider?: string;
-  selectedModelAuth?: string;
-}): boolean {
-  if (!params.provider) {
-    return false;
-  }
-  if (!USAGE_OAUTH_ONLY_PROVIDERS.has(params.provider)) {
-    return true;
-  }
-  const auth = params.selectedModelAuth?.trim().toLowerCase();
-  return Boolean(auth?.startsWith("oauth") || auth?.startsWith("token"));
-}
-
-function formatSessionTaskLine(sessionKey: string): string | undefined {
-  const snapshot = buildTaskStatusSnapshot(listTasksForSessionKeyForStatus(sessionKey));
-  const task = snapshot.focus;
-  if (!task) {
-    return undefined;
-  }
-  const headline =
-    snapshot.activeCount > 0
-      ? `${snapshot.activeCount} active · ${snapshot.totalCount} total`
-      : snapshot.recentFailureCount > 0
-        ? `${snapshot.recentFailureCount} recent failure${snapshot.recentFailureCount === 1 ? "" : "s"}`
-        : "recently finished";
-  const title = formatTaskStatusTitle(task);
-  const detail = formatTaskStatusDetail(task);
-  const parts = [headline, task.runtime, title, detail].filter(Boolean);
-  return parts.length ? `📌 Tasks: ${parts.join(" · ")}` : undefined;
-}
-
-function formatAgentTaskCountsLine(agentId: string): string | undefined {
-  const snapshot = buildTaskStatusSnapshot(listTasksForAgentIdForStatus(agentId));
-  if (snapshot.totalCount === 0) {
-    return undefined;
-  }
-  return `📌 Tasks: ${snapshot.activeCount} active · ${snapshot.totalCount} total · agent-local`;
-}
 
 export async function buildStatusReply(params: {
   cfg: OpenClawConfig;
@@ -139,8 +81,6 @@ export async function buildStatusText(params: {
   isGroup: boolean;
   defaultGroupActivation: () => "always" | "mention";
   mediaDecisions?: MediaUnderstandingDecision[];
-  taskLineOverride?: string;
-  skipDefaultTaskLookup?: boolean;
   primaryModelLabelOverride?: string;
   modelAuthOverride?: string;
   activeModelAuthOverride?: string;
@@ -193,56 +133,6 @@ export async function buildStatusText(params: {
           agentDir: statusAgentDir,
         })
       : selectedModelAuth;
-  const currentUsageProvider = (() => {
-    try {
-      return resolveUsageProviderId(provider);
-    } catch {
-      return undefined;
-    }
-  })();
-  let usageLine: string | null = null;
-  if (
-    currentUsageProvider &&
-    shouldLoadUsageSummary({
-      provider: currentUsageProvider,
-      selectedModelAuth,
-    })
-  ) {
-    try {
-      const usageSummaryTimeoutMs = 3500;
-      let usageTimeout: NodeJS.Timeout | undefined;
-      const usageSummary = await Promise.race([
-        loadProviderUsageSummary({
-          timeoutMs: usageSummaryTimeoutMs,
-          providers: [currentUsageProvider],
-          agentDir: statusAgentDir,
-        }),
-        new Promise<never>((_, reject) => {
-          usageTimeout = setTimeout(
-            () => reject(new Error("usage summary timeout")),
-            usageSummaryTimeoutMs,
-          );
-        }),
-      ]).finally(() => {
-        if (usageTimeout) {
-          clearTimeout(usageTimeout);
-        }
-      });
-      const usageEntry = usageSummary.providers[0];
-      if (usageEntry && !usageEntry.error && usageEntry.windows.length > 0) {
-        const summaryLine = formatUsageWindowSummary(usageEntry, {
-          now: Date.now(),
-          maxWindows: 2,
-          includeResets: true,
-        });
-        if (summaryLine) {
-          usageLine = `📊 Usage: ${summaryLine}`;
-        }
-      }
-    } catch {
-      usageLine = null;
-    }
-  }
   const queueSettings = resolveQueueSettings({
     cfg,
     channel: statusChannel,
@@ -255,16 +145,9 @@ export async function buildStatusText(params: {
   );
 
   let subagentsLine: string | undefined;
-  let taskLine: string | undefined;
   if (sessionKey) {
     const { mainKey, alias } = resolveMainSessionAlias(cfg);
     const requesterKey = resolveInternalSessionKey({ key: sessionKey, alias, mainKey });
-    taskLine = params.skipDefaultTaskLookup
-      ? params.taskLineOverride
-      : (params.taskLineOverride ?? formatSessionTaskLine(requesterKey));
-    if (!taskLine && !params.skipDefaultTaskLookup) {
-      taskLine = formatAgentTaskCountsLine(statusAgentId);
-    }
     const runs = listControlledSubagentRuns(requesterKey);
     const verboseEnabled = resolvedVerboseLevel && resolvedVerboseLevel !== "off";
     if (runs.length > 0) {
@@ -329,7 +212,6 @@ export async function buildStatusText(params: {
     resolvedElevated: resolvedElevatedLevel,
     modelAuth: selectedModelAuth,
     activeModelAuth,
-    usageLine: usageLine ?? undefined,
     queue: {
       mode: queueSettings.mode,
       depth: queueDepth,
@@ -339,7 +221,6 @@ export async function buildStatusText(params: {
       showDetails: queueOverrides,
     },
     subagentsLine,
-    taskLine,
     mediaDecisions: params.mediaDecisions,
     includeTranscriptUsage: params.includeTranscriptUsage ?? true,
   });

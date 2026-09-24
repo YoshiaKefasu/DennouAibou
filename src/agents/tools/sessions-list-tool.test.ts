@@ -7,12 +7,6 @@ const mocks = vi.hoisted(() => ({
     check: () => ({ allowed: true }),
   })),
   resolveEffectiveSessionToolsVisibility: vi.fn(() => "all"),
-  resolveSandboxedSessionToolContext: vi.fn(() => ({
-    mainKey: "main",
-    alias: "main",
-    requesterInternalKey: undefined,
-    restrictToSpawned: false,
-  })),
 }));
 
 vi.mock("../../gateway/call.js", () => ({
@@ -26,7 +20,6 @@ vi.mock("./sessions-helpers.js", async (importActual) => {
     createAgentToAgentPolicy: () => mocks.createAgentToAgentPolicy(),
     createSessionVisibilityGuard: async () => await mocks.createSessionVisibilityGuard(),
     resolveEffectiveSessionToolsVisibility: () => mocks.resolveEffectiveSessionToolsVisibility(),
-    resolveSandboxedSessionToolContext: () => mocks.resolveSandboxedSessionToolContext(),
   };
 });
 
@@ -44,12 +37,6 @@ describe("sessions-list-tool", () => {
       check: () => ({ allowed: true }),
     });
     mocks.resolveEffectiveSessionToolsVisibility.mockReturnValue("all");
-    mocks.resolveSandboxedSessionToolContext.mockReturnValue({
-      mainKey: "main",
-      alias: "main",
-      requesterInternalKey: undefined,
-      restrictToSpawned: false,
-    });
   });
 
   it("keeps deliveryContext.threadId in sessions_list results", async () => {

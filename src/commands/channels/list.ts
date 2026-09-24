@@ -1,10 +1,7 @@
-import { loadAuthProfileStore } from "../../agents/auth-profiles.js";
 import { isChannelVisibleInConfiguredLists } from "../../channels/plugins/exposure.js";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import { buildChannelAccountSnapshot } from "../../channels/plugins/status.js";
 import type { ChannelAccountSnapshot, ChannelPlugin } from "../../channels/plugins/types.js";
-import { withProgress } from "../../cli/progress.js";
-import { formatUsageReportLines, loadProviderUsageSummary } from "../../infra/provider-usage.js";
 import { defaultRuntime, type RuntimeEnv, writeRuntimeJson } from "../../runtime.js";
 import { formatDocsLink } from "../../terminal/links.js";
 import { theme } from "../../terminal/theme.js";
@@ -14,12 +11,10 @@ import { formatChannelAccountLabel, requireValidConfig } from "./shared.js";
 export type ChannelsListDeps = {
   requireValidConfig?: typeof requireValidConfig;
   configValidation?: ConfigValidationDeps;
-  loadAuthProfileStore?: typeof loadAuthProfileStore;
 };
 
 export type ChannelsListOptions = {
   json?: boolean;
-  usage?: boolean;
 };
 
 const colorValue = (value: string) => {
@@ -94,20 +89,6 @@ function formatAccountLine(params: {
   }
   return `- ${label}: ${bits.join(", ")}`;
 }
-async function loadUsageWithProgress(
-  runtime: RuntimeEnv,
-): Promise<Awaited<ReturnType<typeof loadProviderUsageSummary>> | null> {
-  try {
-    return await withProgress(
-      { label: "Fetching usage snapshot…", indeterminate: true, enabled: true },
-      async () => await loadProviderUsageSummary(),
-    );
-  } catch (err) {
-    runtime.error(String(err));
-    return null;
-  }
-}
-
 export async function channelsListCommand(
   opts: ChannelsListOptions,
   runtime: RuntimeEnv = defaultRuntime,
@@ -119,24 +100,15 @@ export async function channelsListCommand(
   if (!cfg) {
     return;
   }
-  const includeUsage = opts.usage !== false;
 
   const plugins = listChannelPlugins();
 
-  const authStore = (deps.loadAuthProfileStore ?? loadAuthProfileStore)();
-  const authProfiles = Object.entries(authStore.profiles).map(([profileId, profile]) => ({
-    id: profileId,
-    provider: profile.provider,
-    type: profile.type,
-    isExternal: false,
-  }));
   if (opts.json) {
-    const usage = includeUsage ? await loadProviderUsageSummary() : undefined;
     const chat: Record<string, string[]> = {};
     for (const plugin of plugins) {
       chat[plugin.id] = plugin.config.listAccountIds(cfg);
     }
-    const payload = { chat, auth: authProfiles, ...(usage ? { usage } : {}) };
+    const payload = { chat };
     writeRuntimeJson(runtime, payload);
     return;
   }
@@ -165,29 +137,8 @@ export async function channelsListCommand(
   }
 
   lines.push("");
-  lines.push(theme.heading("Auth providers (OAuth + API keys):"));
-  if (authProfiles.length === 0) {
-    lines.push(theme.muted("- none"));
-  } else {
-    for (const profile of authProfiles) {
-      const external = profile.isExternal ? theme.muted(" (synced)") : "";
-      lines.push(`- ${theme.accent(profile.id)} (${theme.success(profile.type)}${external})`);
-    }
-  }
 
   runtime.log(lines.join("\n"));
-
-  if (includeUsage) {
-    runtime.log("");
-    const usage = await loadUsageWithProgress(runtime);
-    if (usage) {
-      const usageLines = formatUsageReportLines(usage);
-      if (usageLines.length > 0) {
-        usageLines[0] = theme.accent(usageLines[0]);
-        runtime.log(usageLines.join("\n"));
-      }
-    }
-  }
 
   runtime.log("");
   runtime.log(`Docs: ${formatDocsLink("/gateway/configuration", "gateway/configuration")}`);

@@ -139,10 +139,7 @@ export function registerSecretsCli(program: Command) {
       "Skip provider setup and only map credential fields to existing providers",
       false,
     )
-    .option(
-      "--agent <id>",
-      "Agent id for auth-profiles targets (default: configured default agent)",
-    )
+    .option("--agent <id>", "Agent id scope for secret targets (default: configured default agent)")
     .option(
       "--allow-exec",
       "Allow exec SecretRef preflight checks (may execute provider commands)",

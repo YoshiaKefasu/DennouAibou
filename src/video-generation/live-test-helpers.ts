@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export const DEFAULT_LIVE_VIDEO_MODELS: Record<string, string> = {
@@ -97,17 +96,4 @@ export function canRunBufferBackedVideoToVideoLiveLane(params: {
       ? params.modelRef.trim()
       : params.modelRef.slice(slash + 1).trim();
   return model === "gen4_aleph";
-}
-
-export function resolveLiveVideoAuthStore(params: {
-  requireProfileKeys: boolean;
-  hasLiveKeys: boolean;
-}): AuthProfileStore | undefined {
-  if (params.requireProfileKeys || !params.hasLiveKeys) {
-    return undefined;
-  }
-  return {
-    version: 1,
-    profiles: {},
-  };
 }

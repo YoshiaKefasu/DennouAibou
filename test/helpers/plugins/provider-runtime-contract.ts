@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { registerProviders, requireProvider } from "../../../src/plugins/contracts/testkit.js";
 import type { ProviderRuntimeModel } from "../../../src/plugins/types.js";
-import {
-  createProviderUsageFetch,
-  makeResponse,
-} from "../../../src/test-utils/provider-usage-fetch.js";
 
 const providerRuntimeContractModules = vi.hoisted(() => ({
   googleIndexModuleUrl: new URL("../../../extensions/google/index.ts", import.meta.url).href,
@@ -105,26 +101,6 @@ export function describeGoogleProviderRuntimeContract() {
       });
     });
 
-    it("owns usage-token parsing", async () => {
-      const providers = await loadGoogleProviders();
-      const provider = requireProvider(providers, "google-gemini-cli");
-      await expect(
-        provider.resolveUsageAuth?.({
-          config: {} as never,
-          env: {} as NodeJS.ProcessEnv,
-          provider: "google-gemini-cli",
-          resolveApiKeyFromConfigAndStore: () => undefined,
-          resolveOAuthToken: async () => ({
-            token: '{"token":"google-oauth-token"}',
-            accountId: "google-account",
-          }),
-        }),
-      ).resolves.toEqual({
-        token: "google-oauth-token",
-        accountId: "google-account",
-      });
-    });
-
     it("owns OAuth auth-profile formatting", async () => {
       const providers = await loadGoogleProviders();
       const provider = requireProvider(providers, "google-gemini-cli");
@@ -139,39 +115,6 @@ export function describeGoogleProviderRuntimeContract() {
           projectId: "proj-123",
         }),
       ).toBe('{"token":"google-oauth-token","projectId":"proj-123"}');
-    });
-
-    it("owns usage snapshot fetching", async () => {
-      const providers = await loadGoogleProviders();
-      const provider = requireProvider(providers, "google-gemini-cli");
-      const mockFetch = createProviderUsageFetch(async (url) => {
-        if (url.includes("cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota")) {
-          return makeResponse(200, {
-            buckets: [
-              { modelId: "gemini-3.1-pro-preview", remainingFraction: 0.4 },
-              { modelId: "gemini-3.1-flash-preview", remainingFraction: 0.8 },
-            ],
-          });
-        }
-        return makeResponse(404, "not found");
-      });
-
-      const snapshot = await provider.fetchUsageSnapshot?.({
-        config: {} as never,
-        env: {} as NodeJS.ProcessEnv,
-        provider: "google-gemini-cli",
-        token: "google-oauth-token",
-        timeoutMs: 5_000,
-        fetchFn: mockFetch as unknown as typeof fetch,
-      });
-
-      expect(snapshot).toMatchObject({
-        provider: "google-gemini-cli",
-        displayName: "Gemini",
-      });
-      expect(snapshot?.windows[0]).toEqual({ label: "Pro", usedPercent: 60 });
-      expect(snapshot?.windows[1]?.label).toBe("Flash");
-      expect(snapshot?.windows[1]?.usedPercent).toBeCloseTo(20);
     });
   });
 }

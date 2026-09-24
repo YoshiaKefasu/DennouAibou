@@ -6,9 +6,7 @@ import "./test-helpers/fast-coding-tools.js";
 import "./test-helpers/fast-openclaw-tools.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { createOpenClawCodingTools } from "./pi-tools.js";
-import { createHostSandboxFsBridge } from "./test-helpers/host-sandbox-fs-bridge.js";
 import { expectReadWriteEditTools, getTextContent } from "./test-helpers/pi-tools-fs-helpers.js";
-import { createPiToolsSandboxContext } from "./test-helpers/pi-tools-sandbox-context.js";
 
 vi.mock("../infra/shell-env.js", async () => {
   const mod =
@@ -175,7 +173,7 @@ describe("workspace path resolution", () => {
       const outsideAbsolute = path.resolve(path.parse(workspaceDir).root, "outside-openclaw.txt");
       await expect(
         readTool.execute("ws-read-at-prefix", { path: `@${outsideAbsolute}` }),
-      ).rejects.toThrow(/Path escapes sandbox root/i);
+      ).rejects.toThrow(/Path escapes workspace root/i);
     });
   });
 
@@ -203,14 +201,14 @@ describe("workspace path resolution", () => {
           throw err;
         }
         await expect(readTool.execute("ws-read-hardlink", { path: "linked.txt" })).rejects.toThrow(
-          /hardlink|sandbox/i,
+          /hardlink|workspace/i,
         );
         await expect(
           writeTool.execute("ws-write-hardlink", {
             path: "linked.txt",
             content: "pwned",
           }),
-        ).rejects.toThrow(/hardlink|sandbox/i);
+        ).rejects.toThrow(/hardlink|workspace/i);
         expect(await fs.readFile(outsidePath, "utf8")).toBe("top-secret");
       } finally {
         await fs.rm(hardlinkPath, { force: true });
@@ -220,42 +218,3 @@ describe("workspace path resolution", () => {
   });
 });
 
-describe("sandboxed workspace paths", () => {
-  it("uses sandbox workspace for relative read/write/edit", async () => {
-    await withTempDir("openclaw-sandbox-", async (sandboxDir) => {
-      await withTempDir("openclaw-workspace-", async (workspaceDir) => {
-        const sandbox = createPiToolsSandboxContext({
-          workspaceDir: sandboxDir,
-          agentWorkspaceDir: workspaceDir,
-          workspaceAccess: "rw" as const,
-          fsBridge: createHostSandboxFsBridge(sandboxDir),
-          tools: { allow: [], deny: [] },
-        });
-
-        const testFile = "sandbox.txt";
-        await fs.writeFile(path.join(sandboxDir, testFile), "sandbox read", "utf8");
-        await fs.writeFile(path.join(workspaceDir, testFile), "workspace read", "utf8");
-
-        const tools = createOpenClawCodingTools({ workspaceDir, sandbox });
-        const { readTool, writeTool, editTool } = expectReadWriteEditTools(tools);
-
-        const result = await readTool?.execute("sbx-read", { path: testFile });
-        expect(getTextContent(result)).toContain("sandbox read");
-
-        await writeTool?.execute("sbx-write", {
-          path: "new.txt",
-          content: "sandbox write",
-        });
-        const written = await fs.readFile(path.join(sandboxDir, "new.txt"), "utf8");
-        expect(written).toBe("sandbox write");
-
-        await editTool?.execute("sbx-edit", {
-          path: "new.txt",
-          edits: [{ oldText: "write", newText: "edit" }],
-        });
-        const edited = await fs.readFile(path.join(sandboxDir, "new.txt"), "utf8");
-        expect(edited).toBe("sandbox edit");
-      });
-    });
-  });
-});

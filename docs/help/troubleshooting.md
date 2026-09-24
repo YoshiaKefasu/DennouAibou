@@ -292,7 +292,6 @@ flowchart TD
       What changed:
 
       - If `tools.exec.host` is unset, the default is `auto`.
-      - `host=auto` resolves to `sandbox` when a sandbox runtime is active, `gateway` otherwise.
       - `host=auto` is routing only; the no-prompt "YOLO" behavior comes from `security=full` plus `ask=off` on gateway/node.
       - On `gateway` and `node`, unset `tools.exec.security` defaults to `full`.
       - Unset `tools.exec.ask` defaults to `off`.
@@ -311,13 +310,11 @@ flowchart TD
 
       - Set only `tools.exec.host=gateway` if you just want stable host routing.
       - Use `security=allowlist` with `ask=on-miss` if you want host exec but still want review on allowlist misses.
-      - Enable sandbox mode if you want `host=auto` to resolve back to `sandbox`.
 
       Common log signatures:
 
       - `Approval required.` → command is waiting on `/approve ...`.
       - `SYSTEM_RUN_DENIED: approval required` → node-host exec approval is pending.
-      - `exec host=sandbox requires a sandbox runtime for this session` → implicit/explicit sandbox selection but sandbox mode is off.
 
       Deep pages:
 

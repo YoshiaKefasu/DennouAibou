@@ -64,7 +64,6 @@ describe("resolveAgentConfig", () => {
       identity: undefined,
       groupChat: undefined,
       subagents: undefined,
-      sandbox: undefined,
       tools: undefined,
     });
   });
@@ -321,34 +320,6 @@ describe("resolveAgentConfig", () => {
     ).toBe(false);
   });
 
-  it("should return agent-specific sandbox config", () => {
-    const cfg = {
-      agents: {
-        list: [
-          {
-            id: "work",
-            workspace: "~/openclaw-work",
-            sandbox: {
-              mode: "all",
-              scope: "agent",
-              perSession: false,
-              workspaceAccess: "ro",
-              workspaceRoot: "~/sandboxes",
-            },
-          },
-        ],
-      },
-    } as unknown as OpenClawConfig;
-    const result = resolveAgentConfig(cfg, "work");
-    expect(result?.sandbox).toEqual({
-      mode: "all",
-      scope: "agent",
-      perSession: false,
-      workspaceAccess: "ro",
-      workspaceRoot: "~/sandboxes",
-    });
-  });
-
   it("should return agent-specific tools config", () => {
     const cfg: OpenClawConfig = {
       agents: {
@@ -377,30 +348,6 @@ describe("resolveAgentConfig", () => {
         allowFrom: { whatsapp: ["+15555550123"] },
       },
     });
-  });
-
-  it("should return both sandbox and tools config", () => {
-    const cfg: OpenClawConfig = {
-      agents: {
-        list: [
-          {
-            id: "family",
-            workspace: "~/openclaw-family",
-            sandbox: {
-              mode: "all",
-              scope: "agent",
-            },
-            tools: {
-              allow: ["read"],
-              deny: ["exec"],
-            },
-          },
-        ],
-      },
-    };
-    const result = resolveAgentConfig(cfg, "family");
-    expect(result?.sandbox?.mode).toBe("all");
-    expect(result?.tools?.allow).toEqual(["read"]);
   });
 
   it("should normalize agent id", () => {

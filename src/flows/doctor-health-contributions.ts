@@ -9,12 +9,6 @@ import {
 } from "../agents/model-selection.js";
 import { runChannelPluginStartupMaintenance } from "../channels/plugins/lifecycle-startup.js";
 import { formatCliCommand } from "../cli/command-format.js";
-import { maybeRepairRemovedAnthropicClaudeCliState } from "../commands/doctor-auth-anthropic-claude-cli.js";
-import {
-  maybeRemoveDeprecatedCliAuthProfiles,
-  maybeRepairLegacyOAuthProfileIds,
-  noteAuthProfileHealth,
-} from "../commands/doctor-auth.js";
 import { noteBootstrapFileSize } from "../commands/doctor-bootstrap-size.js";
 import { noteChromeMcpBrowserReadiness } from "../commands/doctor-browser.js";
 import { maybeRepairBundledPluginRuntimeDeps } from "../commands/doctor-bundled-plugin-runtime-deps.js";
@@ -32,7 +26,6 @@ import {
 } from "../commands/doctor-platform-notes.js";
 import { maybeRepairLegacyPluginManifestContracts } from "../commands/doctor-plugin-manifests.js";
 import type { DoctorOptions, DoctorPrompter } from "../commands/doctor-prompter.js";
-import { maybeRepairSandboxImages, noteSandboxScopeWarnings } from "../commands/doctor-sandbox.js";
 import { noteSecurityWarnings } from "../commands/doctor-security.js";
 import { noteSessionLockHealth } from "../commands/doctor-session-locks.js";
 import { noteStateIntegrity, noteWorkspaceBackupTip } from "../commands/doctor-state-integrity.js";
@@ -131,21 +124,6 @@ async function runGatewayConfigHealth(ctx: DoctorHealthFlowContext): Promise<voi
       ].join("\n"),
       "Gateway auth",
     );
-  }
-}
-
-async function runAuthProfileHealth(ctx: DoctorHealthFlowContext): Promise<void> {
-  ctx.cfg = await maybeRepairRemovedAnthropicClaudeCliState(ctx.cfg, ctx.prompter);
-  ctx.cfg = await maybeRepairLegacyOAuthProfileIds(ctx.cfg, ctx.prompter);
-  ctx.cfg = await maybeRemoveDeprecatedCliAuthProfiles(ctx.cfg, ctx.prompter);
-  await noteAuthProfileHealth({
-    cfg: ctx.cfg,
-    prompter: ctx.prompter,
-    allowKeychainPrompt: ctx.options.nonInteractive !== true && Boolean(process.stdin.isTTY),
-  });
-  ctx.gatewayDetails = buildGatewayConnectionDetails({ config: ctx.cfg });
-  if (ctx.gatewayDetails.remoteFallbackNote) {
-    note(ctx.gatewayDetails.remoteFallbackNote, "Gateway");
   }
 }
 
@@ -264,11 +242,6 @@ async function runLegacyCronHealth(ctx: DoctorHealthFlowContext): Promise<void> 
     options: ctx.options,
     prompter: ctx.prompter,
   });
-}
-
-async function runSandboxHealth(ctx: DoctorHealthFlowContext): Promise<void> {
-  ctx.cfg = await maybeRepairSandboxImages(ctx.cfg, ctx.runtime, ctx.prompter);
-  noteSandboxScopeWarnings(ctx.cfg);
 }
 
 async function runGatewayServicesHealth(ctx: DoctorHealthFlowContext): Promise<void> {
@@ -464,11 +437,6 @@ export function resolveDoctorHealthContributions(): DoctorHealthContribution[] {
       run: runGatewayConfigHealth,
     }),
     createDoctorHealthContribution({
-      id: "doctor:auth-profiles",
-      label: "Auth profiles",
-      run: runAuthProfileHealth,
-    }),
-    createDoctorHealthContribution({
       id: "doctor:gateway-auth",
       label: "Gateway auth",
       run: runGatewayAuthHealth,
@@ -502,11 +470,6 @@ export function resolveDoctorHealthContributions(): DoctorHealthContribution[] {
       id: "doctor:legacy-cron",
       label: "Legacy cron",
       run: runLegacyCronHealth,
-    }),
-    createDoctorHealthContribution({
-      id: "doctor:sandbox",
-      label: "Sandbox",
-      run: runSandboxHealth,
     }),
     createDoctorHealthContribution({
       id: "doctor:gateway-services",

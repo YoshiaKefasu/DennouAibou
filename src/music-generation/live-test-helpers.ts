@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export const DEFAULT_LIVE_MUSIC_MODELS: Record<string, string> = {
@@ -68,17 +67,4 @@ export function resolveConfiguredLiveMusicModels(cfg: OpenClawConfig): Map<strin
     add(fallback);
   }
   return resolved;
-}
-
-export function resolveLiveMusicAuthStore(params: {
-  requireProfileKeys: boolean;
-  hasLiveKeys: boolean;
-}): AuthProfileStore | undefined {
-  if (params.requireProfileKeys || !params.hasLiveKeys) {
-    return undefined;
-  }
-  return {
-    version: 1,
-    profiles: {},
-  };
 }

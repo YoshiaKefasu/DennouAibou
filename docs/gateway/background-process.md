@@ -18,7 +18,6 @@ Key parameters:
 - `yieldMs` (default 10000): auto‑background after this delay
 - `background` (bool): background immediately
 - `timeout` (seconds, default 1800): kill the process after this timeout
-- `elevated` (bool): run outside the sandbox if elevated mode is enabled/allowed (`gateway` by default, or `node` when the exec target is `node`)
 - Need a real TTY? Set `pty: true`.
 - `workdir`, `env`
 

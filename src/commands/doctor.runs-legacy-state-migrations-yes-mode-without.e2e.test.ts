@@ -4,7 +4,6 @@ import {
   arrangeLegacyStateMigrationTest,
   confirm,
   createDoctorRuntime,
-  ensureAuthProfileStore,
   mockDoctorConfigSnapshot,
   serviceIsLoaded,
   serviceRestart,
@@ -62,37 +61,4 @@ describe("doctor command", () => {
     expect(serviceRestart).not.toHaveBeenCalled();
     expect(confirm).not.toHaveBeenCalled();
   });
-
-  it("migrates anthropic oauth config profile id when only email profile exists", async () => {
-    mockDoctorConfigSnapshot({
-      config: {
-        auth: {
-          profiles: {
-            "anthropic:default": { provider: "anthropic", mode: "oauth" },
-          },
-        },
-      },
-    });
-
-    ensureAuthProfileStore.mockReturnValueOnce({
-      version: 1,
-      profiles: {
-        "anthropic:me@example.com": {
-          type: "oauth",
-          provider: "anthropic",
-          access: "access",
-          refresh: "refresh",
-          expires: Date.now() + 60_000,
-          email: "me@example.com",
-        },
-      },
-    });
-
-    await doctorCommand(createDoctorRuntime(), { yes: true });
-
-    const written = writeConfigFile.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    const profiles = (written.auth as { profiles: Record<string, unknown> }).profiles;
-    expect(profiles["anthropic:me@example.com"]).toBeTruthy();
-    expect(profiles["anthropic:default"]).toBeUndefined();
-  }, 30_000);
 });

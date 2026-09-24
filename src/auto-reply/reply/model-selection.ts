@@ -1,5 +1,4 @@
 import { resolveAgentConfig } from "../../agents/agent-scope.js";
-import { clearSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import { resolveContextTokensForModel } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import type { ModelCatalogEntry } from "../../agents/model-catalog.js";
@@ -421,24 +420,6 @@ export async function createModelSelectionState(params: {
     if (allowedModelKeys.size === 0 || allowedModelKeys.has(key)) {
       provider = normalizedStoredOverride.provider;
       model = normalizedStoredOverride.model;
-    }
-  }
-
-  if (sessionEntry && sessionStore && sessionKey && sessionEntry.authProfileOverride) {
-    const { ensureAuthProfileStore } = await import("../../agents/auth-profiles.runtime.js");
-    const store = ensureAuthProfileStore(undefined, {
-      allowKeychainPrompt: false,
-    });
-    logStage("auth-profile-store-loaded", `profiles=${Object.keys(store.profiles).length}`);
-    const profile = store.profiles[sessionEntry.authProfileOverride];
-    const providerKey = normalizeProviderId(provider);
-    if (!profile || normalizeProviderId(profile.provider) !== providerKey) {
-      await clearSessionAuthProfileOverride({
-        sessionEntry,
-        sessionStore,
-        sessionKey,
-        storePath,
-      });
     }
   }
 

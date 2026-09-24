@@ -98,8 +98,8 @@ vi.mock("./reply/inbound-context.js", () => ({
 vi.mock("./reply/session-reset-model.runtime.js", () => ({
   applyResetModelOverride: vi.fn(async () => undefined),
 }));
-vi.mock("./reply/stage-sandbox-media.runtime.js", () => ({
-  stageSandboxMedia: vi.fn(async () => undefined),
+vi.mock("./reply/stage-inbound-media.runtime.js", () => ({
+  stageInboundMedia: vi.fn(async () => undefined),
 }));
 vi.mock("./reply/typing.js", () => ({
   createTypingController: vi.fn(() => createMockTypingController()),

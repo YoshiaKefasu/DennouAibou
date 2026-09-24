@@ -12,9 +12,7 @@ import {
 } from "../../config/sessions.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import { findTaskByRunId, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
 import { withTempDir } from "../../test-helpers/temp-dir.js";
-import { installInMemoryTaskRegistryRuntime } from "../../test-utils/task-registry-runtime.js";
 import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
 import { performGatewaySessionReset } from "../session-reset-service.js";
 import { reactivateCompletedSubagentSession } from "../session-subagent-reactivation.js";
@@ -257,7 +255,6 @@ describe("gateway agent handler", () => {
     } else {
       process.env.DENNOU_STATE_DIR = ORIGINAL_STATE_DIR;
     }
-    resetTaskRegistryForTests();
   });
 
   it("preserves ACP metadata from the current stored session entry", async () => {
@@ -810,7 +807,6 @@ describe("gateway agent handler", () => {
     );
 
     await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
-    expect(findTaskByRunId("music-generation-event-inter-session")).toBeUndefined();
   });
 
   it("only forwards workspaceDir for spawned sessions with stored workspace inheritance", async () => {
@@ -889,31 +885,6 @@ describe("gateway agent handler", () => {
     expect(callArgs.channel).toBe("telegram");
     expect(callArgs.messageChannel).toBe("webchat");
     expect(callArgs.runContext?.messageChannel).toBe("webchat");
-  });
-
-  it("tracks async gateway agent runs in the shared task registry", async () => {
-    await withTempDir({ prefix: "openclaw-gateway-agent-task-" }, async (root) => {
-      process.env.DENNOU_STATE_DIR = root;
-      resetTaskRegistryForTests({ persist: false });
-      installInMemoryTaskRegistryRuntime();
-      primeMainAgentRun();
-
-      await invokeAgent(
-        {
-          message: "background cli task",
-          sessionKey: "agent:main:main",
-          idempotencyKey: "task-registry-agent-run",
-        },
-        { reqId: "task-registry-agent-run" },
-      );
-
-      expect(findTaskByRunId("task-registry-agent-run")).toMatchObject({
-        runtime: "cli",
-        childSessionKey: "agent:main:main",
-        status: "running",
-      });
-      resetTaskRegistryForTests({ persist: false });
-    });
   });
 
   it("prunes legacy main alias keys when writing a canonical session entry", async () => {

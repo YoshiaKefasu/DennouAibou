@@ -1,6 +1,12 @@
+import os from "node:os";
 import path from "node:path";
+import { assertNoPathAliasEscape, type PathAliasPolicy } from "../infra/path-alias-guards.js";
 import { normalizeWindowsPathForComparison } from "../infra/path-guards.js";
-import { resolveSandboxInputPath } from "./sandbox-paths.js";
+import { resolveInputPath } from "./input-path.js";
+
+export { resolveInputPath } from "./input-path.js";
+
+const DATA_URL_RE = /^data:/i;
 
 type RelativePathOptions = {
   allowRoot?: boolean;
@@ -51,10 +57,7 @@ function toRelativePathUnderRoot(params: {
   candidate: string;
   options?: RelativePathOptions;
 }): string {
-  const resolvedInput = resolveSandboxInputPath(
-    params.candidate,
-    params.options?.cwd ?? params.root,
-  );
+  const resolvedInput = resolveInputPath(params.candidate, params.options?.cwd ?? params.root);
 
   if (process.platform === "win32") {
     const rootResolved = path.win32.resolve(params.root);
@@ -115,20 +118,57 @@ export function toRelativeWorkspacePath(
   });
 }
 
-export function toRelativeSandboxPath(
-  root: string,
-  candidate: string,
-  options?: Pick<RelativePathOptions, "allowRoot" | "cwd">,
-): string {
-  return toRelativeBoundaryPath({
-    root,
-    candidate,
-    options,
-    boundaryLabel: "sandbox root",
-    includeRootInError: true,
-  });
+export function resolvePathFromInput(filePath: string, cwd: string): string {
+  return path.normalize(resolveInputPath(filePath, cwd));
 }
 
-export function resolvePathFromInput(filePath: string, cwd: string): string {
-  return path.normalize(resolveSandboxInputPath(filePath, cwd));
+export function resolvePathWithinRoot(params: { filePath: string; cwd: string; root: string }): {
+  resolved: string;
+  relative: string;
+} {
+  const resolved = resolveInputPath(params.filePath, params.cwd);
+  const rootResolved = path.resolve(params.root);
+  const relative = path.relative(rootResolved, resolved);
+  if (!relative || relative === "") {
+    return { resolved, relative: "" };
+  }
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`Path escapes workspace root (${shortPath(rootResolved)}): ${params.filePath}`);
+  }
+  return { resolved, relative };
+}
+
+export async function assertPathWithinRoot(params: {
+  filePath: string;
+  cwd: string;
+  root: string;
+  allowFinalSymlinkForUnlink?: boolean;
+  allowFinalHardlinkForUnlink?: boolean;
+}) {
+  const resolved = resolvePathWithinRoot(params);
+  const policy: PathAliasPolicy = {
+    allowFinalSymlinkForUnlink: params.allowFinalSymlinkForUnlink,
+    allowFinalHardlinkForUnlink: params.allowFinalHardlinkForUnlink,
+  };
+  await assertNoPathAliasEscape({
+    absolutePath: resolved.resolved,
+    rootPath: params.root,
+    boundaryLabel: "workspace root",
+    policy,
+  });
+  return resolved;
+}
+
+export function assertMediaNotDataUrl(media: string): void {
+  const raw = media.trim();
+  if (DATA_URL_RE.test(raw)) {
+    throw new Error("data: URLs are not supported for media. Use buffer instead.");
+  }
+}
+
+function shortPath(value: string) {
+  if (value.startsWith(os.homedir())) {
+    return `~${value.slice(os.homedir().length)}`;
+  }
+  return value;
 }

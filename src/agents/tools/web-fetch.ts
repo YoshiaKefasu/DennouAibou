@@ -75,7 +75,7 @@ function resolveFetchConfig(cfg?: OpenClawConfig): WebFetchConfig {
   return fetch as WebFetchConfig;
 }
 
-function resolveFetchEnabled(params: { fetch?: WebFetchConfig; sandboxed?: boolean }): boolean {
+function resolveFetchEnabled(params: { fetch?: WebFetchConfig }): boolean {
   if (typeof params.fetch?.enabled === "boolean") {
     return params.fetch.enabled;
   }
@@ -568,12 +568,11 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
 
 export function createWebFetchTool(options?: {
   config?: OpenClawConfig;
-  sandboxed?: boolean;
   runtimeWebFetch?: RuntimeWebFetchMetadata;
   lookupFn?: LookupFn;
 }): AnyAgentTool | null {
   const fetch = resolveFetchConfig(options?.config);
-  if (!resolveFetchEnabled({ fetch, sandboxed: options?.sandboxed })) {
+  if (!resolveFetchEnabled({ fetch })) {
     return null;
   }
   const readabilityEnabled = resolveFetchReadabilityEnabled(fetch);
@@ -587,7 +586,6 @@ export function createWebFetchTool(options?: {
     if (!providerFallbackResolved) {
       providerFallbackCache = resolveWebFetchDefinition({
         config: options?.config,
-        sandboxed: options?.sandboxed,
         runtimeWebFetch: options?.runtimeWebFetch,
         preferRuntimeProviders: true,
       });

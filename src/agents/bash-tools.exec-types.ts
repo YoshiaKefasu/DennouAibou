@@ -2,7 +2,6 @@ import type { ExecApprovalDecision } from "../infra/exec-approvals.js";
 import type { ExecAsk, ExecHost, ExecSecurity, ExecTarget } from "../infra/exec-approvals.js";
 import type { SafeBinProfileFixture } from "../infra/exec-safe-bin-policy.js";
 import type { ProcessSupervisor } from "../process/supervisor/types.js";
-import type { BashSandboxConfig } from "./bash-tools.shared.js";
 
 /**
  * Injectable seams for the exec runtime boundaries. Tests supply a fake process
@@ -29,7 +28,6 @@ export type ExecToolDefaults = {
   backgroundMs?: number;
   timeoutSec?: number;
   approvalRunningNoticeMs?: number;
-  sandbox?: BashSandboxConfig;
   elevated?: ExecElevatedDefaults;
   allowBackground?: boolean;
   scopeKey?: string;

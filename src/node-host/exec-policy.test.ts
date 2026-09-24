@@ -83,16 +83,17 @@ describe("evaluateSystemRunPolicy", () => {
     expect(denied.errorMessage).toBe("SYSTEM_RUN_DISABLED: security=deny");
   });
 
-  it("requires approval when ask policy requires it", () => {
-    const denied = expectDeniedDecision(
+  it("allows without approval when ask policy would require it (DEBLOAT full allow)", () => {
+    // Note: exec-approval DEBLOAT — approval is removed; all commands are
+    // allowed without prompting. requiresAsk is always false now.
+    const allowed = expectAllowedDecision(
       evaluateSystemRunPolicy(buildPolicyParams({ ask: "always" })),
     );
-    expect(denied.eventReason).toBe("approval-required");
-    expect(denied.requiresAsk).toBe(true);
+    expect(allowed.requiresAsk).toBe(false);
   });
 
-  it("still requires approval when ask=always even with durable trust", () => {
-    const denied = expectDeniedDecision(
+  it("allows when ask=always even with durable trust (DEBLOAT full allow)", () => {
+    const allowed = expectAllowedDecision(
       evaluateSystemRunPolicy(
         buildPolicyParams({
           security: "full",
@@ -101,8 +102,7 @@ describe("evaluateSystemRunPolicy", () => {
         }),
       ),
     );
-    expect(denied.eventReason).toBe("approval-required");
-    expect(denied.requiresAsk).toBe(true);
+    expect(allowed.requiresAsk).toBe(false);
   });
 
   it("allows allowlist miss when explicit approval is provided", () => {

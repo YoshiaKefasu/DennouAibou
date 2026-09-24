@@ -4,26 +4,22 @@ const callGatewayMock = vi.fn();
 vi.mock("../../gateway/call.js", () => ({
   callGateway: (opts: unknown) => callGatewayMock(opts),
 }));
-let isResolvedSessionVisibleToRequester: typeof import("./sessions-resolution.js").isResolvedSessionVisibleToRequester;
 let looksLikeSessionId: typeof import("./sessions-resolution.js").looksLikeSessionId;
 let looksLikeSessionKey: typeof import("./sessions-resolution.js").looksLikeSessionKey;
 let resolveDisplaySessionKey: typeof import("./sessions-resolution.js").resolveDisplaySessionKey;
 let resolveInternalSessionKey: typeof import("./sessions-resolution.js").resolveInternalSessionKey;
 let resolveMainSessionAlias: typeof import("./sessions-resolution.js").resolveMainSessionAlias;
 let resolveSessionReference: typeof import("./sessions-resolution.js").resolveSessionReference;
-let shouldVerifyRequesterSpawnedSessionVisibility: typeof import("./sessions-resolution.js").shouldVerifyRequesterSpawnedSessionVisibility;
 let shouldResolveSessionIdInput: typeof import("./sessions-resolution.js").shouldResolveSessionIdInput;
 
 beforeAll(async () => {
   ({
-    isResolvedSessionVisibleToRequester,
     looksLikeSessionId,
     looksLikeSessionKey,
     resolveDisplaySessionKey,
     resolveInternalSessionKey,
     resolveMainSessionAlias,
     resolveSessionReference,
-    shouldVerifyRequesterSpawnedSessionVisibility,
     shouldResolveSessionIdInput,
   } = await import("./sessions-resolution.js"));
 });
@@ -131,89 +127,6 @@ describe("session reference shape detection", () => {
   });
 });
 
-describe("resolved session visibility checks", () => {
-  it("requires spawned-session verification only for sandboxed key-based cross-session access", () => {
-    expect(
-      shouldVerifyRequesterSpawnedSessionVisibility({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:worker",
-        restrictToSpawned: true,
-        resolvedViaSessionId: false,
-      }),
-    ).toBe(true);
-    expect(
-      shouldVerifyRequesterSpawnedSessionVisibility({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:worker",
-        restrictToSpawned: false,
-        resolvedViaSessionId: false,
-      }),
-    ).toBe(false);
-    expect(
-      shouldVerifyRequesterSpawnedSessionVisibility({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:worker",
-        restrictToSpawned: true,
-        resolvedViaSessionId: true,
-      }),
-    ).toBe(false);
-    expect(
-      shouldVerifyRequesterSpawnedSessionVisibility({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:main",
-        restrictToSpawned: true,
-        resolvedViaSessionId: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("returns true immediately when spawned-session verification is not required", async () => {
-    await expect(
-      isResolvedSessionVisibleToRequester({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:main",
-        restrictToSpawned: true,
-        resolvedViaSessionId: false,
-      }),
-    ).resolves.toBe(true);
-    await expect(
-      isResolvedSessionVisibleToRequester({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:other",
-        restrictToSpawned: false,
-        resolvedViaSessionId: false,
-      }),
-    ).resolves.toBe(true);
-  });
-
-  it("does not hide an exact spawned target behind the sessions.list visibility cap", async () => {
-    callGatewayMock.mockImplementation(
-      async (request: { method?: string; params?: { key?: string } }) => {
-        if (request.method === "sessions.resolve") {
-          return { key: request.params?.key };
-        }
-        if (request.method === "sessions.list") {
-          return {
-            sessions: Array.from({ length: 500 }, (_, index) => ({
-              key: `agent:main:subagent:worker-${index}`,
-            })),
-          };
-        }
-        return {};
-      },
-    );
-
-    await expect(
-      isResolvedSessionVisibleToRequester({
-        requesterSessionKey: "agent:main:main",
-        targetSessionKey: "agent:main:subagent:worker-999",
-        restrictToSpawned: true,
-        resolvedViaSessionId: false,
-      }),
-    ).resolves.toBe(true);
-  });
-});
-
 describe("resolveSessionReference", () => {
   it("prefers a literal current session key before alias fallback", async () => {
     callGatewayMock.mockResolvedValueOnce({ key: "current" });
@@ -224,7 +137,6 @@ describe("resolveSessionReference", () => {
         alias: "main",
         mainKey: "main",
         requesterInternalKey: "agent:main:subagent:child",
-        restrictToSpawned: false,
       }),
     ).resolves.toMatchObject({
       ok: true,
@@ -251,7 +163,6 @@ describe("resolveSessionReference", () => {
         alias: "main",
         mainKey: "main",
         requesterInternalKey: "agent:main:subagent:child",
-        restrictToSpawned: false,
       }),
     ).resolves.toMatchObject({
       ok: true,
@@ -275,32 +186,5 @@ describe("resolveSessionReference", () => {
         includeUnknown: true,
       },
     });
-  });
-
-  it("skips literal current key lookup when spawned visibility is restricted", async () => {
-    await expect(
-      resolveSessionReference({
-        sessionKey: "current",
-        alias: "main",
-        mainKey: "main",
-        requesterInternalKey: "agent:main:subagent:child",
-        restrictToSpawned: true,
-      }),
-    ).resolves.toMatchObject({
-      ok: true,
-      key: "agent:main:subagent:child",
-      displayKey: "agent:main:subagent:child",
-      resolvedViaSessionId: false,
-    });
-    expect(callGatewayMock).toHaveBeenNthCalledWith(1, {
-      method: "sessions.resolve",
-      params: {
-        sessionId: "current",
-        spawnedBy: "agent:main:subagent:child",
-        includeGlobal: false,
-        includeUnknown: false,
-      },
-    });
-    expect(callGatewayMock).toHaveBeenCalledTimes(1);
   });
 });

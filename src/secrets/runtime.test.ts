@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
@@ -109,13 +108,6 @@ function createOpenAiFileModelsConfig(): NonNullable<OpenClawConfig["models"]> {
         models: [],
       },
     },
-  };
-}
-
-function loadAuthStoreWithProfiles(profiles: AuthProfileStore["profiles"]): AuthProfileStore {
-  return {
-    version: 1,
-    profiles,
   };
 }
 
@@ -234,26 +226,6 @@ describe("secrets runtime snapshot", () => {
         WEB_SEARCH_API_KEY: "web-search-ref", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () =>
-        loadAuthStoreWithProfiles({
-          "openai:default": {
-            type: "api_key",
-            provider: "openai",
-            key: "old-openai",
-            keyRef: OPENAI_ENV_KEY_REF,
-          },
-          "github-copilot:default": {
-            type: "token",
-            provider: "github-copilot",
-            token: "old-gh",
-            tokenRef: { source: "env", provider: "default", id: "GITHUB_TOKEN" },
-          },
-          "openai:inline": {
-            type: "api_key",
-            provider: "openai",
-            key: "${OPENAI_API_KEY}",
-          },
-        }),
     });
 
     expect(snapshot.config.models?.providers?.openai?.apiKey).toBe("sk-env-openai");
@@ -274,211 +246,6 @@ describe("secrets runtime snapshot", () => {
     expect(snapshot.config.channels?.telegram?.webhookSecret).toBe("telegram-webhook-ref");
     expect(snapshot.config.channels?.telegram?.accounts?.work?.botToken).toBe("telegram-work-ref");
     expect(snapshot.config.tools?.web?.search?.apiKey).toBe("web-search-ref");
-    expect(snapshot.authStores[0]?.store.profiles["openai:default"]).toMatchObject({
-      type: "api_key",
-      key: "sk-env-openai",
-    });
-    expect(snapshot.authStores[0]?.store.profiles["github-copilot:default"]).toMatchObject({
-      type: "token",
-      token: "ghp-env-token",
-    });
-    expect(snapshot.authStores[0]?.store.profiles["openai:inline"]).toMatchObject({
-      type: "api_key",
-      key: "sk-env-openai",
-    });
-    // After normalization, inline SecretRef string should be promoted to keyRef
-    expect(
-      (snapshot.authStores[0].store.profiles["openai:inline"] as Record<string, unknown>).keyRef,
-    ).toEqual({ source: "env", provider: "default", id: "OPENAI_API_KEY" });
-  });
-
-  it("can skip auth-profile SecretRef resolution when includeAuthStoreRefs is false", async () => {
-    const missingEnvVar = `DENNOU_MISSING_AUTH_PROFILE_SECRET_${Date.now()}`;
-    delete process.env[missingEnvVar];
-
-    const loadAuthStore = () =>
-      loadAuthStoreWithProfiles({
-        "custom:token": {
-          type: "token",
-          provider: "custom",
-          tokenRef: { source: "env", provider: "default", id: missingEnvVar },
-        },
-      });
-
-    await expect(
-      prepareSecretsRuntimeSnapshot({
-        config: asConfig({}),
-        env: {},
-        agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore,
-      }),
-    ).rejects.toThrow(`Environment variable "${missingEnvVar}" is missing or empty.`);
-
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config: asConfig({}),
-      env: {},
-      includeAuthStoreRefs: false,
-      agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore,
-    });
-
-    expect(snapshot.authStores).toEqual([]);
-  });
-
-  it("resolves sandbox ssh secret refs for active ssh backends", async () => {
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config: asConfig({
-        agents: {
-          defaults: {
-            sandbox: {
-              mode: "all",
-              backend: "ssh",
-              ssh: {
-                target: "peter@example.com:22",
-                identityData: { source: "env", provider: "default", id: "SSH_IDENTITY_DATA" },
-                certificateData: {
-                  source: "env",
-                  provider: "default",
-                  id: "SSH_CERTIFICATE_DATA",
-                },
-                knownHostsData: {
-                  source: "env",
-                  provider: "default",
-                  id: "SSH_KNOWN_HOSTS_DATA",
-                },
-              },
-            },
-          },
-        },
-      }),
-      env: {
-        SSH_IDENTITY_DATA: "PRIVATE KEY",
-        SSH_CERTIFICATE_DATA: "SSH CERT",
-        SSH_KNOWN_HOSTS_DATA: "example.com ssh-ed25519 AAAATEST",
-      },
-    });
-
-    expect(snapshot.config.agents?.defaults?.sandbox?.ssh).toMatchObject({
-      identityData: "PRIVATE KEY",
-      certificateData: "SSH CERT",
-      knownHostsData: "example.com ssh-ed25519 AAAATEST",
-    });
-  });
-
-  it("treats sandbox ssh secret refs as inactive when ssh backend is not selected", async () => {
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config: asConfig({
-        agents: {
-          defaults: {
-            sandbox: {
-              mode: "all",
-              backend: "docker",
-              ssh: {
-                identityData: { source: "env", provider: "default", id: "SSH_IDENTITY_DATA" },
-              },
-            },
-          },
-        },
-      }),
-      env: {},
-    });
-
-    expect(snapshot.config.agents?.defaults?.sandbox?.ssh?.identityData).toEqual({
-      source: "env",
-      provider: "default",
-      id: "SSH_IDENTITY_DATA",
-    });
-    expect(snapshot.warnings).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "SECRETS_REF_IGNORED_INACTIVE_SURFACE",
-          path: "agents.defaults.sandbox.ssh.identityData",
-        }),
-      ]),
-    );
-  });
-
-  it("normalizes inline SecretRef object on token to tokenRef", async () => {
-    const config: OpenClawConfig = { models: {}, secrets: {} };
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config,
-      env: { MY_TOKEN: "resolved-token-value" },
-      agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () =>
-        loadAuthStoreWithProfiles({
-          "custom:inline-token": {
-            type: "token",
-            provider: "custom",
-            token: { source: "env", provider: "default", id: "MY_TOKEN" } as unknown as string,
-          },
-        }),
-    });
-
-    const profile = snapshot.authStores[0]?.store.profiles["custom:inline-token"] as Record<
-      string,
-      unknown
-    >;
-    // tokenRef should be set from the inline SecretRef
-    expect(profile.tokenRef).toEqual({ source: "env", provider: "default", id: "MY_TOKEN" });
-    // token should be resolved to the actual value after activation
-    activateSecretsRuntimeSnapshot(snapshot);
-    expect(profile.token).toBe("resolved-token-value");
-  });
-
-  it("normalizes inline SecretRef object on key to keyRef", async () => {
-    const config: OpenClawConfig = { models: {}, secrets: {} };
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config,
-      env: { MY_KEY: "resolved-key-value" },
-      agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () =>
-        loadAuthStoreWithProfiles({
-          "custom:inline-key": {
-            type: "api_key",
-            provider: "custom",
-            key: { source: "env", provider: "default", id: "MY_KEY" } as unknown as string,
-          },
-        }),
-    });
-
-    const profile = snapshot.authStores[0]?.store.profiles["custom:inline-key"] as Record<
-      string,
-      unknown
-    >;
-    // keyRef should be set from the inline SecretRef
-    expect(profile.keyRef).toEqual({ source: "env", provider: "default", id: "MY_KEY" });
-    // key should be resolved to the actual value after activation
-    activateSecretsRuntimeSnapshot(snapshot);
-    expect(profile.key).toBe("resolved-key-value");
-  });
-
-  it("keeps explicit keyRef when inline key SecretRef is also present", async () => {
-    const config: OpenClawConfig = { models: {}, secrets: {} };
-    const snapshot = await prepareSecretsRuntimeSnapshot({
-      config,
-      env: {
-        PRIMARY_KEY: "primary-key-value",
-        SHADOW_KEY: "shadow-key-value",
-      },
-      agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () =>
-        loadAuthStoreWithProfiles({
-          "custom:explicit-keyref": {
-            type: "api_key",
-            provider: "custom",
-            keyRef: { source: "env", provider: "default", id: "PRIMARY_KEY" },
-            key: { source: "env", provider: "default", id: "SHADOW_KEY" } as unknown as string,
-          },
-        }),
-    });
-
-    const profile = snapshot.authStores[0]?.store.profiles["custom:explicit-keyref"] as Record<
-      string,
-      unknown
-    >;
-    expect(profile.keyRef).toEqual({ source: "env", provider: "default", id: "PRIMARY_KEY" });
-    activateSecretsRuntimeSnapshot(snapshot);
-    expect(profile.key).toBe("primary-key-value");
   });
 
   it("treats non-selected web search provider refs as inactive", async () => {
@@ -509,7 +276,6 @@ describe("secrets runtime snapshot", () => {
         WEB_SEARCH_API_KEY: "web-search-ref", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.web?.search?.apiKey).toBe("web-search-ref");
@@ -563,7 +329,6 @@ describe("secrets runtime snapshot", () => {
         WEB_SEARCH_GEMINI_API_KEY: "web-search-gemini-ref", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.web?.search?.apiKey).toBe("web-search-ref");
@@ -618,7 +383,6 @@ describe("secrets runtime snapshot", () => {
         WEB_SEARCH_GEMINI_API_KEY: "web-search-gemini-ref", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
     const resolvedGoogleWebSearchConfig = snapshot.config.plugins?.entries?.google?.config as
       | { webSearch?: { apiKey?: unknown } }
@@ -659,7 +423,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow("[WEB_SEARCH_KEY_UNRESOLVED_NO_FALLBACK]");
   });
@@ -694,7 +457,6 @@ describe("secrets runtime snapshot", () => {
         WEB_SEARCH_GEMINI_API_KEY: "web-search-gemini-ref", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     activateSecretsRuntimeSnapshot(snapshot);
@@ -756,7 +518,6 @@ describe("secrets runtime snapshot", () => {
         OPENAI_PROVIDER_KEY: "client-key",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.models?.providers?.openai?.request).toEqual({
@@ -832,7 +593,6 @@ describe("secrets runtime snapshot", () => {
       const snapshot = await prepareSecretsRuntimeSnapshot({
         config,
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       });
 
       expect(snapshot.config.models?.providers?.openai?.apiKey).toBe("sk-from-file-provider");
@@ -868,7 +628,6 @@ describe("secrets runtime snapshot", () => {
             },
           }),
           agentDirs: ["/tmp/openclaw-agent-main"],
-          loadAuthStore: () => ({ version: 1, profiles: {} }),
         }),
       ).rejects.toThrow("payload is not a JSON object");
     } finally {
@@ -938,7 +697,6 @@ describe("secrets runtime snapshot", () => {
       config,
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.botToken).toEqual({
@@ -987,7 +745,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.remote?.token).toEqual({
@@ -1018,7 +775,6 @@ describe("secrets runtime snapshot", () => {
         GATEWAY_PASSWORD_REF: "resolved-gateway-password", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.auth?.password).toBe("resolved-gateway-password");
@@ -1039,7 +795,6 @@ describe("secrets runtime snapshot", () => {
         GATEWAY_TOKEN_REF: "resolved-gateway-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.auth?.token).toBe("resolved-gateway-token");
@@ -1061,7 +816,6 @@ describe("secrets runtime snapshot", () => {
         GATEWAY_TOKEN_REF: "resolved-gateway-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.auth?.token).toEqual({
@@ -1085,7 +839,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow(/MISSING_GATEWAY_TOKEN_REF/i);
   });
@@ -1167,7 +920,6 @@ describe("secrets runtime snapshot", () => {
         MEDIA_AUDIO_PROXY_CA: "proxy-ca",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.audio?.request?.headers?.["X-Tenant"]).toBe("tenant-acme");
@@ -1233,7 +985,6 @@ describe("secrets runtime snapshot", () => {
         MEDIA_SHARED_AUDIO_TOKEN: "shared-audio-token", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.models?.[0]?.request?.auth).toEqual({
@@ -1276,7 +1027,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.models?.[0]?.request?.auth).toEqual({
@@ -1327,7 +1077,6 @@ describe("secrets runtime snapshot", () => {
         MEDIA_INFERRED_AUDIO_TOKEN: "inferred-audio-token", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.models?.[0]?.request?.auth).toEqual({
@@ -1380,7 +1129,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.models?.[0]?.request?.auth).toEqual({
@@ -1422,7 +1170,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.tools?.media?.audio?.models?.[0]?.request?.auth).toEqual({
@@ -1452,7 +1199,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow(/must not include "\." or "\.\." path segments/i);
   });
@@ -1471,7 +1217,6 @@ describe("secrets runtime snapshot", () => {
         GATEWAY_PASSWORD_REF: "resolved-gateway-password", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.auth?.password).toEqual({
@@ -1499,7 +1244,6 @@ describe("secrets runtime snapshot", () => {
         REMOTE_GATEWAY_TOKEN: "remote-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.auth?.password).toEqual({
@@ -1528,7 +1272,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       });
 
       expect(snapshot.config.gateway?.remote?.token).toEqual({
@@ -1565,7 +1308,6 @@ describe("secrets runtime snapshot", () => {
         REMOTE_PASSWORD: "resolved-remote-password", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.remote?.token).toBe("resolved-remote-token");
@@ -1589,7 +1331,6 @@ describe("secrets runtime snapshot", () => {
         REMOTE_PASSWORD: "resolved-remote-password", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.remote?.password).toBe("resolved-remote-password");
@@ -1616,7 +1357,6 @@ describe("secrets runtime snapshot", () => {
         REMOTE_GATEWAY_PASSWORD: "tailscale-remote-password", // pragma: allowlist secret
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.gateway?.remote?.token).toBe("tailscale-remote-token");
@@ -1654,7 +1394,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.agents?.defaults?.memorySearch?.remote?.apiKey).toEqual({
@@ -1688,7 +1427,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow('Environment variable "MISSING_ENABLED_TELEGRAM_TOKEN" is missing or empty.');
   });
@@ -1714,7 +1452,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow('Environment variable "MISSING_ENABLED_TELEGRAM_TOKEN" is missing or empty.');
   });
@@ -1749,7 +1486,6 @@ describe("secrets runtime snapshot", () => {
         TELEGRAM_WORK_TOKEN: "telegram-work-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.accounts?.work?.botToken).toBe(
@@ -1786,7 +1522,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow(
       'Environment variable "MISSING_INHERITED_TELEGRAM_ACCOUNT_TOKEN" is missing or empty.',
@@ -1813,7 +1548,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.webhookSecret).toEqual({
@@ -1842,7 +1576,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.botToken).toEqual({
@@ -1876,7 +1609,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.accounts?.work?.botToken).toEqual({
@@ -1912,7 +1644,6 @@ describe("secrets runtime snapshot", () => {
         TELEGRAM_BASE_TOKEN: "telegram-base-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.telegram?.botToken).toBe("telegram-base-token");
@@ -1943,7 +1674,6 @@ describe("secrets runtime snapshot", () => {
         }),
         env: {},
         agentDirs: ["/tmp/openclaw-agent-main"],
-        loadAuthStore: () => ({ version: 1, profiles: {} }),
       }),
     ).rejects.toThrow('Environment variable "MISSING_DISCORD_BASE_TOKEN" is missing or empty.');
   });
@@ -1969,7 +1699,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.discord?.token).toEqual({
@@ -1998,7 +1727,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.discord?.pluralkit?.token).toEqual({
@@ -2044,7 +1772,6 @@ describe("secrets runtime snapshot", () => {
         DISCORD_BASE_PK_TOKEN: "base-pk-token",
       },
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(snapshot.config.channels?.discord?.pluralkit?.token).toBe("base-pk-token");
@@ -2088,7 +1815,6 @@ describe("secrets runtime snapshot", () => {
       config,
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect(
@@ -2114,50 +1840,6 @@ describe("secrets runtime snapshot", () => {
     });
   });
 
-  it("does not write inherited auth stores during runtime secret activation", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-secrets-runtime-"));
-    const stateDir = path.join(root, ".openclaw");
-    const mainAgentDir = path.join(stateDir, "agents", "main", "agent");
-    const workerStorePath = path.join(stateDir, "agents", "worker", "agent", "auth-profiles.json");
-    const prevStateDir = process.env.DENNOU_STATE_DIR;
-
-    try {
-      await fs.mkdir(mainAgentDir, { recursive: true });
-      await fs.writeFile(
-        path.join(mainAgentDir, "auth-profiles.json"),
-        JSON.stringify({
-          ...loadAuthStoreWithProfiles({
-            "openai:default": {
-              type: "api_key",
-              provider: "openai",
-              keyRef: OPENAI_ENV_KEY_REF,
-            },
-          }),
-        }),
-        "utf8",
-      );
-      process.env.DENNOU_STATE_DIR = stateDir;
-
-      await prepareSecretsRuntimeSnapshot({
-        config: {
-          agents: {
-            list: [{ id: "worker" }],
-          },
-        },
-        env: { OPENAI_API_KEY: "sk-runtime-worker" }, // pragma: allowlist secret
-      });
-
-      await expect(fs.access(workerStorePath)).rejects.toMatchObject({ code: "ENOENT" });
-    } finally {
-      if (prevStateDir === undefined) {
-        delete process.env.DENNOU_STATE_DIR;
-      } else {
-        process.env.DENNOU_STATE_DIR = prevStateDir;
-      }
-      await fs.rm(root, { recursive: true, force: true });
-    }
-  });
-
   it("does not force-enable xai at runtime for knob-only x_search config", async () => {
     const snapshot = await prepareSecretsRuntimeSnapshot({
       config: asConfig({
@@ -2172,7 +1854,6 @@ describe("secrets runtime snapshot", () => {
       }),
       env: {},
       agentDirs: ["/tmp/openclaw-agent-main"],
-      loadAuthStore: () => ({ version: 1, profiles: {} }),
     });
 
     expect((snapshot.config.tools?.web as Record<string, unknown> | undefined)?.x_search).toEqual({

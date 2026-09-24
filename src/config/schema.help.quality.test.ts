@@ -292,7 +292,6 @@ const TARGET_KEYS = [
   "tools.elevated.enabled",
   "tools.elevated.allowFrom",
   "tools.subagents.tools",
-  "tools.sandbox.tools",
   "web",
   "web.enabled",
   "web.heartbeatSeconds",

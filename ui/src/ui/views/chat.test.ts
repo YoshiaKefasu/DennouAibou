@@ -266,7 +266,6 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     cronEnabled: null,
     cronNext: null,
     lastChannelsRefresh: null,
-    usageResult: null,
     sessionsResult: null,
     skillsReport: null,
     cronJobs: [],

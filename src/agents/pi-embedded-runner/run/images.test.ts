@@ -2,8 +2,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createHostSandboxFsBridge } from "../../test-helpers/host-sandbox-fs-bridge.js";
-import { createUnsafeMountedSandbox } from "../../test-helpers/unsafe-mounted-sandbox.js";
 import {
   detectAndLoadPromptImages,
   detectImageReferences,
@@ -232,42 +230,7 @@ describe("modelSupportsImages", () => {
   });
 });
 
-describe("loadImageFromRef", () => {
-  it("allows sandbox-validated host paths outside default media roots", async () => {
-    const homeDir = os.homedir();
-    await fs.mkdir(homeDir, { recursive: true });
-    const sandboxParent = await fs.mkdtemp(path.join(homeDir, "openclaw-sandbox-image-"));
-    try {
-      const sandboxRoot = path.join(sandboxParent, "sandbox");
-      await fs.mkdir(sandboxRoot, { recursive: true });
-      const imagePath = path.join(sandboxRoot, "photo.png");
-      const pngB64 =
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/woAAn8B9FD5fHAAAAAASUVORK5CYII=";
-      await fs.writeFile(imagePath, Buffer.from(pngB64, "base64"));
-
-      const image = await loadImageFromRef(
-        {
-          raw: "./photo.png",
-          type: "path",
-          resolved: "./photo.png",
-        },
-        sandboxRoot,
-        {
-          sandbox: {
-            root: sandboxRoot,
-            bridge: createHostSandboxFsBridge(sandboxRoot),
-          },
-        },
-      );
-
-      expect(image).not.toBeNull();
-      expect(image?.type).toBe("image");
-      expect(image?.data.length).toBeGreaterThan(0);
-    } finally {
-      await fs.rm(sandboxParent, { recursive: true, force: true });
-    }
-  });
-});
+describe("loadImageFromRef", () => {});
 
 describe("detectAndLoadPromptImages", () => {
   it("returns no images for non-vision models even when existing images are provided", async () => {
@@ -330,38 +293,5 @@ describe("detectAndLoadPromptImages", () => {
         resolved: "media://inbound/att-b.png",
       },
     ]);
-  });
-
-  it("blocks prompt image refs outside workspace when sandbox workspaceOnly is enabled", async () => {
-    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-native-image-sandbox-"));
-    const sandboxRoot = path.join(stateDir, "sandbox");
-    const agentRoot = path.join(stateDir, "agent");
-    await fs.mkdir(sandboxRoot, { recursive: true });
-    await fs.mkdir(agentRoot, { recursive: true });
-    const pngB64 =
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/woAAn8B9FD5fHAAAAAASUVORK5CYII=";
-    await fs.writeFile(path.join(agentRoot, "secret.png"), Buffer.from(pngB64, "base64"));
-    const sandbox = createUnsafeMountedSandbox({ sandboxRoot, agentRoot });
-    const bridge = sandbox.fsBridge;
-    if (!bridge) {
-      throw new Error("sandbox fs bridge missing");
-    }
-
-    try {
-      const result = await detectAndLoadPromptImages({
-        prompt: "Inspect /agent/secret.png",
-        workspaceDir: sandboxRoot,
-        model: { input: ["text", "image"] },
-        workspaceOnly: true,
-        sandbox: { root: sandbox.workspaceDir, bridge },
-      });
-
-      expect(result.detectedRefs).toHaveLength(1);
-      expect(result.loadedCount).toBe(0);
-      expect(result.skippedCount).toBe(1);
-      expect(result.images).toHaveLength(0);
-    } finally {
-      await fs.rm(stateDir, { recursive: true, force: true });
-    }
   });
 });

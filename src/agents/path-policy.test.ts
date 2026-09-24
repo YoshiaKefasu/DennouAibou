@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const resolveSandboxInputPathMock = vi.hoisted(() => vi.fn());
+const resolveInputPathMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./sandbox-paths.js", () => ({
-  resolveSandboxInputPath: resolveSandboxInputPathMock,
+vi.mock("./input-path.js", () => ({
+  resolveInputPath: resolveInputPathMock,
 }));
 
 import { toRelativeWorkspacePath } from "./path-policy.js";
 
 describe("toRelativeWorkspacePath (windows semantics)", () => {
   beforeEach(() => {
-    resolveSandboxInputPathMock.mockReset();
-    resolveSandboxInputPathMock.mockImplementation((filePath: string) => filePath);
+    resolveInputPathMock.mockReset();
+    resolveInputPathMock.mockImplementation((filePath: string) => filePath);
   });
 
   it("accepts windows paths with mixed separators and case", () => {

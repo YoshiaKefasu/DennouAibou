@@ -28,48 +28,10 @@ const statusSummaryRuntimeMock = {
   resolveContextTokensForModel: vi.fn(() => 200_000),
 };
 
-const taskMaintenanceModuleMock = {
-  getInspectableTaskRegistrySummary: vi.fn(() => ({
-    total: 0,
-    active: 0,
-    terminal: 0,
-    failures: 0,
-    byStatus: {
-      queued: 0,
-      running: 0,
-      succeeded: 0,
-      failed: 0,
-      timed_out: 0,
-      cancelled: 0,
-      lost: 0,
-    },
-    byRuntime: {
-      subagent: 0,
-      acp: 0,
-      cli: 0,
-      cron: 0,
-    },
-  })),
-  getInspectableTaskAuditSummary: vi.fn(() => ({
-    total: 1,
-    warnings: 1,
-    errors: 0,
-    byCode: {
-      stale_queued: 0,
-      stale_running: 0,
-      lost: 0,
-      delivery_failed: 1,
-      missing_cleanup: 0,
-      inconsistent_timestamps: 0,
-    },
-  })),
-} as unknown as NonNullable<StatusSummaryDeps["taskMaintenanceModule"]>;
-
 function createDeps(): StatusSummaryDeps {
   return {
     statusSummaryRuntime:
       statusSummaryRuntimeMock as unknown as StatusSummaryDeps["statusSummaryRuntime"],
-    taskMaintenanceModule: taskMaintenanceModuleMock,
     loadConfig: () => ({}),
     hasPotentialConfiguredChannels: statusSummaryMocks.hasPotentialConfiguredChannels as never,
     resolveLinkChannelContext:
@@ -98,8 +60,6 @@ describe("getStatusSummary", () => {
     expect(summary.runtimeVersion).toBe("2026.3.8");
     expect(summary.heartbeat.defaultAgentId).toBe("main");
     expect(summary.channelSummary).toEqual(["ok"]);
-    expect(summary.tasks.active).toBe(0);
-    expect(summary.taskAudit.warnings).toBe(1);
   });
 
   it("skips channel summary imports when no channels are configured", async () => {

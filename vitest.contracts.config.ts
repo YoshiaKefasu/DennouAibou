@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { resolveScopedGroupOrder } from "./vitest.scoped-config.ts";
 import { sharedVitestConfig } from "./vitest.shared.config.ts";
 
 const base = sharedVitestConfig as Record<string, unknown>;
@@ -17,6 +18,9 @@ export function createContractsVitestConfig() {
         "src/plugins/contracts/**/*.test.ts",
       ],
       passWithNoTests: true,
+      sequence: {
+        groupOrder: resolveScopedGroupOrder("contracts"),
+      },
     },
   });
 }

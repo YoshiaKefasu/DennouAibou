@@ -11,7 +11,6 @@ import { coerceSecretRef } from "../config/types.secrets.js";
 import { resolveSecretInputRef, type SecretRef } from "../config/types.secrets.js";
 import { resolveConfigDir, resolveUserPath } from "../utils.js";
 import { runTasksWithConcurrency } from "../utils/run-with-concurrency.js";
-import { iterateAuthProfileCredentials } from "./auth-profiles-scan.js";
 import { createSecretsConfigIO } from "./config-io.js";
 import { getSkippedExecRefStaticError, selectRefsForExecPolicy } from "./exec-resolution-policy.js";
 import { listKnownSecretEnvVarNames } from "./provider-env-vars.js";
@@ -30,7 +29,6 @@ import { isNonEmptyString, isRecord } from "./shared.js";
 import { describeUnknownError } from "./shared.js";
 import {
   listAgentModelsJsonPaths,
-  listAuthProfileStorePaths,
   listLegacyAuthJsonPaths,
   parseEnvAssignmentValue,
   readJsonObjectIfExists,
@@ -256,79 +254,6 @@ function collectConfigSecrets(params: {
       message: `${target.path} is stored as plaintext.`,
       provider: target.providerId,
     });
-  }
-}
-
-function collectAuthStoreSecrets(params: {
-  authStorePath: string;
-  collector: AuditCollector;
-  defaults?: SecretDefaults;
-}): void {
-  if (!fs.existsSync(params.authStorePath)) {
-    return;
-  }
-  params.collector.filesScanned.add(params.authStorePath);
-  const parsedResult = readJsonObjectIfExists(params.authStorePath);
-  if (parsedResult.error) {
-    addFinding(params.collector, {
-      code: "REF_UNRESOLVED",
-      severity: "error",
-      file: params.authStorePath,
-      jsonPath: "<root>",
-      message: `Invalid JSON in auth-profiles store: ${parsedResult.error}`,
-    });
-    return;
-  }
-  const parsed = parsedResult.value;
-  if (!parsed || !isRecord(parsed.profiles)) {
-    return;
-  }
-  for (const entry of iterateAuthProfileCredentials(parsed.profiles)) {
-    if (entry.kind === "api_key" || entry.kind === "token") {
-      const { ref } = resolveSecretInputRef({
-        value: entry.value,
-        refValue: entry.refValue,
-        defaults: params.defaults,
-      });
-      if (ref) {
-        params.collector.refAssignments.push({
-          file: params.authStorePath,
-          path: `profiles.${entry.profileId}.${entry.valueField}`,
-          ref,
-          expected: "string",
-          provider: entry.provider,
-        });
-        trackAuthProviderState(params.collector, entry.provider, entry.kind);
-      }
-      if (isNonEmptyString(entry.value)) {
-        addFinding(params.collector, {
-          code: "PLAINTEXT_FOUND",
-          severity: "warn",
-          file: params.authStorePath,
-          jsonPath: `profiles.${entry.profileId}.${entry.valueField}`,
-          message:
-            entry.kind === "api_key"
-              ? "Auth profile API key is stored as plaintext."
-              : "Auth profile token is stored as plaintext.",
-          provider: entry.provider,
-          profileId: entry.profileId,
-        });
-        trackAuthProviderState(params.collector, entry.provider, entry.kind);
-      }
-      continue;
-    }
-    if (entry.hasAccess || entry.hasRefresh) {
-      addFinding(params.collector, {
-        code: "LEGACY_RESIDUE",
-        severity: "info",
-        file: params.authStorePath,
-        jsonPath: `profiles.${entry.profileId}`,
-        message: "OAuth credentials are present (out of scope for static SecretRef migration).",
-        provider: entry.provider,
-        profileId: entry.profileId,
-      });
-      trackAuthProviderState(params.collector, entry.provider, "oauth");
-    }
   }
 }
 
@@ -672,13 +597,6 @@ export async function runSecretsAudit(
       configPath,
       collector,
     });
-    for (const authStorePath of listAuthProfileStorePaths(config, stateDir)) {
-      collectAuthStoreSecrets({
-        authStorePath,
-        collector,
-        defaults,
-      });
-    }
     for (const modelsJsonPath of listAgentModelsJsonPaths(config, stateDir, env)) {
       collectModelsJsonSecrets({
         modelsJsonPath,

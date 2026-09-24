@@ -3,14 +3,8 @@ import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import { getDaemonStatusSummary, getNodeDaemonStatusSummary } from "./status.daemon.js";
 import { scanStatusJsonFast } from "./status.scan.fast-json.js";
 
-let providerUsagePromise: Promise<typeof import("../infra/provider-usage.js")> | undefined;
 let securityAuditModulePromise: Promise<typeof import("../security/audit.runtime.js")> | undefined;
 let gatewayCallModulePromise: Promise<typeof import("../gateway/call.js")> | undefined;
-
-function loadProviderUsage() {
-  providerUsagePromise ??= import("../infra/provider-usage.js");
-  return providerUsagePromise;
-}
 
 function loadSecurityAuditModule() {
   securityAuditModulePromise ??= import("../security/audit.runtime.js");
@@ -25,7 +19,6 @@ function loadGatewayCallModule() {
 export async function statusJsonCommand(
   opts: {
     deep?: boolean;
-    usage?: boolean;
     timeoutMs?: number;
     all?: boolean;
   },
@@ -44,11 +37,6 @@ export async function statusJsonCommand(
       )
     : undefined;
 
-  const usage = opts.usage
-    ? await loadProviderUsage().then(({ loadProviderUsageSummary }) =>
-        loadProviderUsageSummary({ timeoutMs: opts.timeoutMs }),
-      )
-    : undefined;
   const gatewayCall = opts.deep
     ? await loadGatewayCallModule().then((mod) => mod.callGateway)
     : null;
@@ -94,6 +82,6 @@ export async function statusJsonCommand(
     agents: scan.agentStatus,
     secretDiagnostics: scan.secretDiagnostics,
     ...(securityAudit ? { securityAudit } : {}),
-    ...(health || usage ? { health, usage } : {}),
+    ...(health ? { health } : {}),
   });
 }

@@ -1,10 +1,6 @@
 import path from "node:path";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
-import { resolveSessionAgentId } from "../../agents/agent-scope.js";
-import { resolvePathFromInput } from "../../agents/path-policy.js";
-import { assertMediaNotDataUrl, resolveSandboxedMediaSource } from "../../agents/sandbox-paths.js";
-import { ensureSandboxWorkspaceForSession } from "../../agents/sandbox.js";
-import { resolveEffectiveToolFsWorkspaceOnly } from "../../agents/tool-fs-policy.js";
+import { resolvePathFromInput, assertMediaNotDataUrl } from "../../agents/path-policy.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { logVerbose } from "../../globals.js";
 import { saveMediaSource } from "../../media/store.js";
@@ -45,36 +41,14 @@ export function createReplyMediaPathNormalizer(params: {
   sessionKey?: string;
   workspaceDir: string;
 }): (payload: ReplyPayload) => Promise<ReplyPayload> {
-  const agentId = params.sessionKey
-    ? resolveSessionAgentId({ sessionKey: params.sessionKey, config: params.cfg })
-    : undefined;
-  const workspaceOnly = resolveEffectiveToolFsWorkspaceOnly({
-    cfg: params.cfg,
-    agentId,
-  });
-  let sandboxRootPromise: Promise<string | undefined> | undefined;
   const persistedMediaBySource = new Map<string, Promise<string>>();
-
-  const resolveSandboxRoot = async (): Promise<string | undefined> => {
-    if (!sandboxRootPromise) {
-      sandboxRootPromise = ensureSandboxWorkspaceForSession({
-        config: params.cfg,
-        sessionKey: params.sessionKey,
-        workspaceDir: params.workspaceDir,
-      }).then((sandbox) => sandbox?.workspaceDir);
-    }
-    return await sandboxRootPromise;
-  };
 
   const persistVolatileAgentMedia = async (media: string): Promise<string> => {
     if (!path.isAbsolute(media)) {
       return media;
     }
-    const sandboxRoot = await resolveSandboxRoot();
-    const volatileRoots = [params.workspaceDir, sandboxRoot]
-      .filter((root): root is string => Boolean(root))
-      .map((root) => path.join(path.resolve(root), AGENT_STATE_MEDIA_DIRNAME));
-    if (!volatileRoots.some((root) => isPathInside(root, media))) {
+    const volatileRoot = path.join(path.resolve(params.workspaceDir), AGENT_STATE_MEDIA_DIRNAME);
+    if (!isPathInside(volatileRoot, media)) {
       return media;
     }
     const cached = persistedMediaBySource.get(media);
@@ -104,23 +78,6 @@ export function createReplyMediaPathNormalizer(params: {
     assertMediaNotDataUrl(media);
     if (HTTP_URL_RE.test(media)) {
       return media;
-    }
-    const sandboxRoot = await resolveSandboxRoot();
-    if (sandboxRoot) {
-      try {
-        return await resolveSandboxedMediaSource({
-          media,
-          sandboxRoot,
-        });
-      } catch (err) {
-        if (workspaceOnly || !isLikelyLocalMediaSource(media)) {
-          throw err;
-        }
-        if (FILE_URL_RE.test(media)) {
-          return media;
-        }
-        return resolvePathFromInput(media, params.workspaceDir);
-      }
     }
     if (!isLikelyLocalMediaSource(media)) {
       return media;

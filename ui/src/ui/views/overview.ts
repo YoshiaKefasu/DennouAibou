@@ -11,7 +11,6 @@ import type {
   CronJob,
   CronStatus,
   SessionsListResult,
-  SessionsUsageResult,
   SkillStatusReport,
 } from "../types.ts";
 import { renderConnectCommand } from "./connect-command.ts";
@@ -38,7 +37,6 @@ export type OverviewProps = {
   cronNext: number | null;
   lastChannelsRefresh: number | null;
   // New dashboard data
-  usageResult: SessionsUsageResult | null;
   sessionsResult: SessionsListResult | null;
   skillsReport: SkillStatusReport | null;
   cronJobs: CronJob[];
@@ -389,7 +387,6 @@ export function renderOverview(props: OverviewProps) {
     <div class="ov-section-divider"></div>
 
     ${renderOverviewCards({
-      usageResult: props.usageResult,
       sessionsResult: props.sessionsResult,
       skillsReport: props.skillsReport,
       cronJobs: props.cronJobs,

@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import { describeFailoverError, isFailoverError } from "../agents/failover-error.js";
 import type { FallbackAttempt } from "../agents/model-fallback.types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -24,7 +23,6 @@ export type GenerateImageParams = {
   cfg: OpenClawConfig;
   prompt: string;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   modelOverride?: string;
   count?: number;
   size?: string;
@@ -149,7 +147,6 @@ export async function generateImage(
         prompt: params.prompt,
         cfg: params.cfg,
         agentDir: params.agentDir,
-        authStore: params.authStore,
         count: params.count,
         size: sanitized.size,
         aspectRatio: sanitized.aspectRatio,

@@ -7,6 +7,7 @@ import {
 } from "./config-paths.js";
 import { validateConfigObject } from "./config.js";
 import { buildWebSearchProviderConfig } from "./test-helpers.js";
+import { collectDeprecatedExecHostSandboxWarnings } from "./validation.js";
 import { OpenClawSchema } from "./zod-schema.js";
 
 describe("$schema key in config (#14998)", () => {
@@ -423,5 +424,40 @@ describe("config paths", () => {
     expect(getConfigValueAtPath(root, parsed.path)).toBe(123);
     expect(unsetConfigValueAtPath(root, parsed.path)).toBe(true);
     expect(getConfigValueAtPath(root, parsed.path)).toBeUndefined();
+  });
+});
+
+describe("deprecated sandbox keys (DEBLOAT §27)", () => {
+  it("accepts legacy sandbox keys at all 4 positions (OpenClawSchema.safeParse)", () => {
+    for (const cfg of [
+      { tools: { sandbox: { mode: "all" } } },
+      { agents: { defaults: { sandbox: { mode: "all" } } } },
+      { agents: { list: [{ id: "main", sandbox: { mode: "all" } }] } },
+      { agents: { list: [{ id: "main", tools: { sandbox: { mode: "all" } } }] } },
+    ]) {
+      expect(OpenClawSchema.safeParse(cfg).success).toBe(true);
+    }
+  });
+
+  it("still rejects unknown keys alongside the deprecated sandbox keys", () => {
+    expect(OpenClawSchema.safeParse({ tools: { sandboxX: 1 } }).success).toBe(false);
+    expect(OpenClawSchema.safeParse({ agents: { defaults: { sandboxX: 1 } } }).success).toBe(false);
+    expect(
+      OpenClawSchema.safeParse({ agents: { list: [{ id: "main", sandboxX: 1 }] } }).success,
+    ).toBe(false);
+  });
+
+  it("warns (not rejects) on legacy tools.exec.host sandbox", () => {
+    // Note: validateConfigObjectWithPlugins cannot run in this env (pre-existing
+    // jiti ES-module load failure in the plugin manifest registry, same as the
+    // other validateConfigObject* cases in this file). Assert the building
+    // blocks directly: zod accepts, the warning collector fires.
+    expect(OpenClawSchema.safeParse({ tools: { exec: { host: "sandbox" } } }).success).toBe(true);
+    expect(
+      collectDeprecatedExecHostSandboxWarnings({ tools: { exec: { host: "sandbox" } } }),
+    ).toEqual([expect.objectContaining({ path: "tools.exec.host" })]);
+    expect(collectDeprecatedExecHostSandboxWarnings({ tools: { exec: { host: "auto" } } })).toEqual(
+      [],
+    );
   });
 });

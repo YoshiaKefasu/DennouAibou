@@ -19,11 +19,6 @@ vi.mock("../plugins/provider-auth-choice.runtime.js", () => ({
   runProviderModelSelectedHook,
 }));
 
-const upsertAuthProfile = vi.hoisted(() => vi.fn());
-vi.mock("../agents/auth-profiles.js", () => ({
-  upsertAuthProfile,
-}));
-
 const resolveDefaultAgentId = vi.hoisted(() => vi.fn(() => "default"));
 const resolveAgentWorkspaceDir = vi.hoisted(() => vi.fn(() => "/tmp/workspace"));
 const resolveAgentDir = vi.hoisted(() => vi.fn(() => "/tmp/agent"));
@@ -139,15 +134,6 @@ describe("applyAuthChoiceLoadedPluginProvider", () => {
 
     expect(result?.config.agents?.defaults?.model).toEqual({
       primary: "ollama/qwen3:4b",
-    });
-    expect(upsertAuthProfile).toHaveBeenCalledWith({
-      profileId: "ollama:default",
-      credential: {
-        type: "api_key",
-        provider: "ollama",
-        key: "ollama-local",
-      },
-      agentDir: "/tmp/agent",
     });
     expect(runProviderModelSelectedHook).toHaveBeenCalledWith({
       config: result?.config,

@@ -124,7 +124,7 @@ function buildCoreDistEntries(): Record<string, string> {
     "cli/daemon-cli": "src/cli/daemon-cli.ts",
     // Keep long-lived lazy runtime boundaries on stable filenames so rebuilt
     // dist/ trees do not strand already-running gateways on stale hashed chunks.
-    "agents/auth-profiles.runtime": "src/agents/auth-profiles.runtime.ts",
+    // Note: "agents/auth-profiles.runtime" removed with auth-profiles DEBLOAT.
     "agents/model-catalog.runtime": "src/agents/model-catalog.runtime.ts",
     "agents/models-config.runtime": "src/agents/models-config.runtime.ts",
     "agents/pi-model-discovery-runtime": "src/agents/pi-model-discovery-runtime.ts",
@@ -166,10 +166,7 @@ export default defineConfig([
     // and bundled hooks in one graph so runtime singletons are emitted once.
     entry: buildUnifiedDistEntries(),
     deps: {
-      neverBundle: [
-        "@lancedb/lancedb",
-        ...bundledPluginRuntimeDependencies,
-      ],
+      neverBundle: ["@lancedb/lancedb", ...bundledPluginRuntimeDependencies],
     },
   }),
 ]);

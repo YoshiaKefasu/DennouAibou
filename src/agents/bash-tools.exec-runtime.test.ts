@@ -56,27 +56,11 @@ describe("detectCursorKeyMode", () => {
 });
 
 describe("resolveExecTarget", () => {
-  it("keeps implicit auto on sandbox when a sandbox runtime is available", () => {
+  it("resolves implicit auto to gateway", () => {
     expect(
       resolveExecTarget({
         configuredTarget: "auto",
         elevatedRequested: false,
-        sandboxAvailable: true,
-      }),
-    ).toMatchObject({
-      configuredTarget: "auto",
-      requestedTarget: null,
-      selectedTarget: "auto",
-      effectiveHost: "sandbox",
-    });
-  });
-
-  it("keeps implicit auto on gateway when no sandbox runtime is available", () => {
-    expect(
-      resolveExecTarget({
-        configuredTarget: "auto",
-        elevatedRequested: false,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "auto",
@@ -92,7 +76,6 @@ describe("resolveExecTarget", () => {
         configuredTarget: "auto",
         requestedTarget: "node",
         elevatedRequested: false,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "auto",
@@ -102,13 +85,12 @@ describe("resolveExecTarget", () => {
     });
   });
 
-  it("allows per-call host=gateway override when configured host is auto and no sandbox", () => {
+  it("allows per-call host=gateway override when configured host is auto", () => {
     expect(
       resolveExecTarget({
         configuredTarget: "auto",
         requestedTarget: "gateway",
         elevatedRequested: false,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "auto",
@@ -118,42 +100,12 @@ describe("resolveExecTarget", () => {
     });
   });
 
-  it("rejects per-call host=gateway override from auto when sandbox is available", () => {
-    expect(() =>
-      resolveExecTarget({
-        configuredTarget: "auto",
-        requestedTarget: "gateway",
-        elevatedRequested: false,
-        sandboxAvailable: true,
-      }),
-    ).toThrow(
-      "exec host not allowed (requested gateway; configured host is auto; set tools.exec.host=gateway or auto to allow this override).",
-    );
-  });
-
-  it("allows per-call host=sandbox override when configured host is auto", () => {
-    expect(
-      resolveExecTarget({
-        configuredTarget: "auto",
-        requestedTarget: "sandbox",
-        elevatedRequested: false,
-        sandboxAvailable: true,
-      }),
-    ).toMatchObject({
-      configuredTarget: "auto",
-      requestedTarget: "sandbox",
-      selectedTarget: "sandbox",
-      effectiveHost: "sandbox",
-    });
-  });
-
   it("rejects cross-host override when configured target is a concrete host", () => {
     expect(() =>
       resolveExecTarget({
         configuredTarget: "node",
         requestedTarget: "gateway",
         elevatedRequested: false,
-        sandboxAvailable: false,
       }),
     ).toThrow(
       "exec host not allowed (requested gateway; configured host is node; set tools.exec.host=gateway or auto to allow this override).",
@@ -166,13 +118,12 @@ describe("resolveExecTarget", () => {
         configuredTarget: "auto",
         requestedTarget: "auto",
         elevatedRequested: false,
-        sandboxAvailable: true,
       }),
     ).toMatchObject({
       configuredTarget: "auto",
       requestedTarget: "auto",
       selectedTarget: "auto",
-      effectiveHost: "sandbox",
+      effectiveHost: "gateway",
     });
   });
 
@@ -182,7 +133,6 @@ describe("resolveExecTarget", () => {
         configuredTarget: "gateway",
         requestedTarget: "auto",
         elevatedRequested: false,
-        sandboxAvailable: true,
       }),
     ).toThrow(
       "exec host not allowed (requested auto; configured host is gateway; set tools.exec.host=auto to allow this override).",
@@ -195,7 +145,6 @@ describe("resolveExecTarget", () => {
         configuredTarget: "node",
         requestedTarget: "node",
         elevatedRequested: false,
-        sandboxAvailable: true,
       }),
     ).toMatchObject({
       configuredTarget: "node",
@@ -209,13 +158,12 @@ describe("resolveExecTarget", () => {
     expect(
       resolveExecTarget({
         configuredTarget: "auto",
-        requestedTarget: "sandbox",
+        requestedTarget: "node",
         elevatedRequested: true,
-        sandboxAvailable: true,
       }),
     ).toMatchObject({
       configuredTarget: "auto",
-      requestedTarget: "sandbox",
+      requestedTarget: "node",
       selectedTarget: "gateway",
       effectiveHost: "gateway",
     });
@@ -227,7 +175,6 @@ describe("resolveExecTarget", () => {
         configuredTarget: "node",
         requestedTarget: "node",
         elevatedRequested: true,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "node",
@@ -242,7 +189,6 @@ describe("resolveExecTarget", () => {
       resolveExecTarget({
         configuredTarget: "node",
         elevatedRequested: true,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "node",
@@ -258,7 +204,6 @@ describe("resolveExecTarget", () => {
         configuredTarget: "node",
         requestedTarget: "gateway",
         elevatedRequested: true,
-        sandboxAvailable: false,
       }),
     ).toMatchObject({
       configuredTarget: "node",

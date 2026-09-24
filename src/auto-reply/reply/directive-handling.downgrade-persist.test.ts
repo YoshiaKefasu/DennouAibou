@@ -1,8 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  clearRuntimeAuthProfileStoreSnapshots,
-  replaceRuntimeAuthProfileStoreSnapshots,
-} from "../../agents/auth-profiles.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { handleDirectiveOnly } from "./directive-handling.impl.js";
@@ -20,14 +16,12 @@ const queueMocks = vi.hoisted(() => ({
   refreshQueuedFollowupSession: vi.fn(),
 }));
 
-vi.mock("../../agents/agent-scope.js", () => ({
+vi.mock("../../agents/agent-scope.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/agent-scope.js")>()),
   resolveAgentConfig: vi.fn(() => ({})),
   resolveAgentDir: vi.fn(() => "/tmp/agent"),
+  resolveDefaultAgentId: vi.fn(() => "main"),
   resolveSessionAgentId: vi.fn(() => "main"),
-}));
-
-vi.mock("../../agents/sandbox.js", () => ({
-  resolveSandboxRuntimeStatus: vi.fn(() => ({ sandboxed: false })),
 }));
 
 vi.mock("../../config/sessions.js", () => ({
@@ -74,21 +68,12 @@ function createSessionEntry(overrides?: Partial<SessionEntry>): SessionEntry {
 }
 
 beforeEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
-  replaceRuntimeAuthProfileStoreSnapshots([
-    {
-      agentDir: TEST_AGENT_DIR,
-      store: { version: 1, profiles: {} },
-    },
-  ]);
   thinkingMocks.isElevatedThinkingDenied.mockReset().mockReturnValue(false);
   liveModelSwitchMocks.requestLiveSessionModelSwitch.mockReset().mockReturnValue(false);
   queueMocks.refreshQueuedFollowupSession.mockReset();
 });
 
-afterEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
-});
+afterEach(() => {});
 
 describe("handleDirectiveOnly elevated thinking downgrade persist", () => {
   const allowedModelKeys = new Set(["anthropic/claude-opus-4-6", "openai/gpt-4o"]);

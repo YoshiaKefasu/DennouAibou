@@ -74,41 +74,6 @@ describe("secrets plan validation", () => {
     expect(isValid).toBe(true);
   });
 
-  it("requires agentId for auth-profiles plan targets", () => {
-    const withoutAgent = isSecretsApplyPlan({
-      version: 1,
-      protocolVersion: 1,
-      generatedAt: "2026-02-28T00:00:00.000Z",
-      generatedBy: "manual",
-      targets: [
-        {
-          type: "auth-profiles.api_key.key",
-          path: "profiles.openai:default.key",
-          pathSegments: ["profiles", "openai:default", "key"],
-          ref: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-        },
-      ],
-    });
-    expect(withoutAgent).toBe(false);
-
-    const withAgent = isSecretsApplyPlan({
-      version: 1,
-      protocolVersion: 1,
-      generatedAt: "2026-02-28T00:00:00.000Z",
-      generatedBy: "manual",
-      targets: [
-        {
-          type: "auth-profiles.api_key.key",
-          path: "profiles.openai:default.key",
-          pathSegments: ["profiles", "openai:default", "key"],
-          agentId: "main",
-          ref: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-        },
-      ],
-    });
-    expect(withAgent).toBe(true);
-  });
-
   it("accepts valid exec secret ref ids in plans", () => {
     for (const id of VALID_EXEC_SECRET_REF_IDS) {
       const isValid = isSecretsApplyPlan({

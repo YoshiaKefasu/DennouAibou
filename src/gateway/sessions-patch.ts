@@ -321,7 +321,7 @@ export async function applySessionsPatchToStore(params: {
     } else if (raw !== undefined) {
       const normalized = normalizeExecTarget(String(raw)) ?? undefined;
       if (!normalized) {
-        return invalid('invalid execHost (use "auto"|"sandbox"|"gateway"|"node")');
+        return invalid('invalid execHost (use "auto"|"gateway"|"node")');
       }
       next.execHost = normalized;
     }

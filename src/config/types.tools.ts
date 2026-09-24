@@ -237,15 +237,19 @@ export function parseToolsBySenderTypedKey(
 export type GroupToolPolicyBySenderConfig = Record<string, GroupToolPolicyConfig>;
 
 export type ExecToolConfig = {
-  /** Exec host routing (default: auto). */
-  host?: "auto" | "sandbox" | "gateway" | "node";
+  /**
+   * Exec host routing (default: auto).
+   * @deprecated `"sandbox"` was removed with the sandbox DEBLOAT. Accepted so
+   * legacy configs keep loading, but validation warns and exec fails closed.
+   */
+  host?: "auto" | "gateway" | "node" | "sandbox";
   /** Exec security mode (default: deny). */
   security?: "deny" | "allowlist" | "full";
   /** Exec ask mode (default: on-miss). */
   ask?: "off" | "on-miss" | "always";
   /** Default node binding for exec.host=node (node id/name). */
   node?: string;
-  /** Directories to prepend to PATH when running exec (gateway/sandbox). */
+  /** Directories to prepend to PATH when running exec (gateway/node). */
   pathPrepend?: string[];
   /** Safe stdin-only binaries that can run without allowlist entries. */
   safeBins?: string[];
@@ -320,14 +324,6 @@ export type AgentToolsConfig = {
   fs?: FsToolsConfig;
   /** Runtime loop detection for repetitive/ stuck tool-call patterns. */
   loopDetection?: ToolLoopDetectionConfig;
-  sandbox?: {
-    tools?: {
-      allow?: string[];
-      /** Additional allowlist entries merged into allow and/or the sandbox default allowlist. */
-      alsoAllow?: string[];
-      deny?: string[];
-    };
-  };
 };
 
 export type MemorySearchConfig = {
@@ -621,15 +617,6 @@ export type ToolsConfig = {
     tools?: {
       allow?: string[];
       /** Additional allowlist entries merged into allow and/or default sub-agent denylist. */
-      alsoAllow?: string[];
-      deny?: string[];
-    };
-  };
-  /** Sandbox tool policy defaults (deny wins). */
-  sandbox?: {
-    tools?: {
-      allow?: string[];
-      /** Additional allowlist entries merged into allow and/or the sandbox default allowlist. */
       alsoAllow?: string[];
       deny?: string[];
     };

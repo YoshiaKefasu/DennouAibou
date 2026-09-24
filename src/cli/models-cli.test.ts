@@ -39,7 +39,6 @@ vi.mock("../commands/models.js", () => ({
 
 describe("models cli", () => {
   beforeEach(() => {
-    modelsAuthLoginCommand.mockClear();
     modelsStatusCommand.mockClear();
   });
 
@@ -56,32 +55,6 @@ describe("models cli", () => {
     });
   }
 
-  it("registers github-copilot login command", async () => {
-    const program = createProgram();
-    const models = program.commands.find((cmd) => cmd.name() === "models");
-    expect(models).toBeTruthy();
-
-    const auth = models?.commands.find((cmd) => cmd.name() === "auth");
-    expect(auth).toBeTruthy();
-
-    const login = auth?.commands.find((cmd) => cmd.name() === "login-github-copilot");
-    expect(login).toBeTruthy();
-
-    await program.parseAsync(["models", "auth", "login-github-copilot", "--yes"], {
-      from: "user",
-    });
-
-    expect(modelsAuthLoginCommand).toHaveBeenCalledTimes(1);
-    expect(modelsAuthLoginCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: "github-copilot",
-        method: "device",
-        yes: true,
-      }),
-      expect.any(Object),
-    );
-  });
-
   it.each([
     { label: "status flag", args: ["models", "status", "--agent", "poe"] },
     { label: "parent flag", args: ["models", "--agent", "poe", "status"] },
@@ -91,23 +64,5 @@ describe("models cli", () => {
       expect.objectContaining({ agent: "poe" }),
       expect.any(Object),
     );
-  });
-
-  it("shows help for models auth without error exit", async () => {
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeOut: () => {},
-      writeErr: () => {},
-    });
-    registerModelsCli(program);
-
-    try {
-      await program.parseAsync(["models", "auth"], { from: "user" });
-      expect.fail("expected help to exit");
-    } catch (err) {
-      const error = err as { exitCode?: number };
-      expect(error.exitCode).toBe(0);
-    }
   });
 });

@@ -1,7 +1,6 @@
 import { html, nothing } from "lit";
 import { t } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
-import { renderUsageTab } from "./app-render-usage-tab.ts";
 import {
   renderChatControls,
   renderChatMobileToggle,
@@ -548,7 +547,6 @@ export function renderApp(state: AppViewState) {
               cronEnabled: state.cronStatus?.enabled ?? null,
               cronNext,
               lastChannelsRefresh: state.channelsLastSuccess,
-              usageResult: state.usageResult,
               sessionsResult: state.sessionsResult,
               skillsReport: state.skillsReport,
               cronJobs: state.cronJobs,
@@ -717,7 +715,6 @@ export function renderApp(state: AppViewState) {
               }),
             )
           : nothing}
-        ${renderUsageTab(state)}
         ${state.tab === "cron"
           ? lazyRender(lazyCron, (m) =>
               m.renderCron({

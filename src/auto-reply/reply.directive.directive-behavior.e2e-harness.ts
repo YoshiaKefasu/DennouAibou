@@ -1,7 +1,6 @@
 import path from "node:path";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
-import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles.js";
 import { resetSkillsRefreshForTest } from "../agents/skills/refresh.js";
 import { clearSessionStoreCacheForTest, loadSessionStore } from "../config/sessions.js";
 import type { ReasoningEffortMap } from "../config/types.models.js";
@@ -245,7 +244,6 @@ export function assertElevatedOffStatusReply(text: string | undefined) {
 export function installDirectiveBehaviorE2EHooks() {
   beforeEach(async () => {
     await resetSkillsRefreshForTest();
-    clearRuntimeAuthProfileStoreSnapshots();
     clearSessionStoreCacheForTest();
     resetSystemEventsForTest();
     resetPluginRuntimeStateForTest();
@@ -258,7 +256,6 @@ export function installDirectiveBehaviorE2EHooks() {
 
   afterEach(async () => {
     await resetSkillsRefreshForTest();
-    clearRuntimeAuthProfileStoreSnapshots();
     clearSessionStoreCacheForTest();
     resetSystemEventsForTest();
     resetPluginRuntimeStateForTest();

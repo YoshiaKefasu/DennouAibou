@@ -13,9 +13,6 @@ import type {
 import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 import { minimaxUnderstandImage } from "../minimax-vlm.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
-import type { SandboxFsBridge } from "../sandbox/fs-bridge.js";
-import { createHostSandboxFsBridge } from "../test-helpers/host-sandbox-fs-bridge.js";
-import { createUnsafeMountedSandbox } from "../test-helpers/unsafe-mounted-sandbox.js";
 import { makeZeroUsageSnapshot } from "../usage.js";
 import { __testing, createImageTool, resolveImageModelConfigForTool } from "./image-tool.js";
 
@@ -24,8 +21,6 @@ type MockOpenClawToolsOptions = {
   config?: OpenClawConfig;
   agentDir?: string;
   workspaceDir?: string;
-  sandboxRoot?: string;
-  sandboxFsBridge?: SandboxFsBridge;
   fsPolicy?: NonNullable<Parameters<typeof createImageTool>[0]>["fsPolicy"];
   modelHasVision?: boolean;
 };
@@ -92,27 +87,6 @@ vi.mock("../pi-tools.abort.js", () => ({
   wrapToolWithAbortSignal: vi.fn((tool) => tool),
 }));
 
-vi.mock("../auth-profiles.js", () => ({
-  ensureAuthProfileStore: (agentDir?: string) => {
-    if (!agentDir) {
-      return { version: 1, profiles: {} };
-    }
-    const pathname = path.join(agentDir, "auth-profiles.json");
-    try {
-      return JSON.parse(fsSync.readFileSync(pathname, "utf8")) as {
-        version?: number;
-        profiles?: Record<string, { provider?: string }>;
-      };
-    } catch {
-      return { version: 1, profiles: {} };
-    }
-  },
-  listProfilesForProvider: (
-    store: { profiles?: Record<string, { provider?: string }> },
-    provider: string,
-  ) => Object.values(store.profiles ?? {}).filter((profile) => profile?.provider === provider),
-}));
-
 vi.mock("../model-auth.js", () => ({
   resolveEnvApiKey: (provider: string) => {
     const envVarByProvider: Record<string, string[]> = {
@@ -144,13 +118,6 @@ vi.mock("../openclaw-tools.js", async () => {
         config: options?.config,
         agentDir: options?.agentDir,
         workspaceDir: options?.workspaceDir,
-        sandbox:
-          options?.sandboxRoot && options?.sandboxFsBridge
-            ? {
-                root: options.sandboxRoot,
-                bridge: options.sandboxFsBridge,
-              }
-            : undefined,
         fsPolicy: options?.fsPolicy,
         modelHasVision: options?.modelHasVision,
       });
@@ -158,15 +125,6 @@ vi.mock("../openclaw-tools.js", async () => {
     }),
   };
 });
-
-async function writeAuthProfiles(agentDir: string, profiles: unknown) {
-  await fs.mkdir(agentDir, { recursive: true });
-  await fs.writeFile(
-    path.join(agentDir, "auth-profiles.json"),
-    `${JSON.stringify(profiles, null, 2)}\n`,
-    "utf8",
-  );
-}
 
 async function createOpenClawCodingToolsWithFreshModules(options?: CreateOpenClawCodingToolsArgs) {
   const defaultImageModels = new Map<string, string>([
@@ -533,21 +491,6 @@ function createRequiredImageTool(args: Parameters<typeof createImageTool>[0]) {
 
 type ImageToolInstance = ReturnType<typeof createRequiredImageTool>;
 
-async function withTempSandboxState(
-  run: (ctx: { stateDir: string; agentDir: string; sandboxRoot: string }) => Promise<void>,
-) {
-  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-image-sandbox-"));
-  const agentDir = path.join(stateDir, "agent");
-  const sandboxRoot = path.join(stateDir, "sandbox");
-  await fs.mkdir(agentDir, { recursive: true });
-  await fs.mkdir(sandboxRoot, { recursive: true });
-  try {
-    await run({ stateDir, agentDir, sandboxRoot });
-  } finally {
-    await fs.rm(stateDir, { recursive: true, force: true });
-  }
-}
-
 async function withMinimaxImageToolFromTempAgentDir(
   run: (tool: ImageToolInstance) => Promise<void>,
 ) {
@@ -632,32 +575,6 @@ describe("image tool implicit imageModel config", () => {
     });
   });
 
-  it("pairs minimax-portal primary with MiniMax-VL-01 (and fallbacks) when auth exists", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      await writeAuthProfiles(agentDir, {
-        version: 1,
-        profiles: {
-          "minimax-portal:default": {
-            type: "oauth",
-            provider: "minimax-portal",
-            access: "oauth-test",
-            refresh: "refresh-test",
-            expires: Date.now() + 60_000,
-          },
-        },
-      });
-      setTestEnv("OPENAI_API_KEY", "openai-test");
-      setTestEnv("ANTHROPIC_API_KEY", "anthropic-test");
-      const cfg: OpenClawConfig = {
-        agents: { defaults: { model: { primary: "minimax-portal/MiniMax-M2.7" } } },
-      };
-      expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual(
-        createDefaultImageFallbackExpectation("minimax-portal/MiniMax-VL-01"),
-      );
-      expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
-    });
-  });
-
   it("pairs zai primary with glm-4.6v (and fallbacks) when auth exists", async () => {
     await withTempAgentDir(async (agentDir) => {
       setTestEnv("ZAI_API_KEY", "zai-test");
@@ -669,68 +586,6 @@ describe("image tool implicit imageModel config", () => {
       expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual(
         createDefaultImageFallbackExpectation("zai/glm-4.6v"),
       );
-      expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
-    });
-  });
-
-  it("pairs a custom provider when it declares an image-capable model", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      await writeAuthProfiles(agentDir, {
-        version: 1,
-        profiles: {
-          "acme:default": { type: "api_key", provider: "acme", key: "sk-test" },
-        },
-      });
-      const cfg: OpenClawConfig = {
-        agents: { defaults: { model: { primary: "acme/text-1" } } },
-        models: {
-          providers: {
-            acme: {
-              baseUrl: "https://example.com",
-              models: [
-                makeModelDefinition("text-1", ["text"]),
-                makeModelDefinition("vision-1", ["text", "image"]),
-              ],
-            },
-          },
-        },
-      };
-      expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual({
-        primary: "acme/vision-1",
-      });
-      expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
-    });
-  });
-
-  it("pairs a provider when config uses an alias key", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      await writeAuthProfiles(agentDir, {
-        version: 1,
-        profiles: {
-          "amazon-bedrock:default": {
-            type: "api_key",
-            provider: "amazon-bedrock",
-            key: "sk-test",
-          },
-        },
-      });
-      const cfg: OpenClawConfig = {
-        agents: { defaults: { model: { primary: "aws-bedrock/text-1" } } },
-        models: {
-          providers: {
-            "amazon-bedrock": {
-              baseUrl: "https://example.com",
-              models: [
-                makeModelDefinition("text-1", ["text"]),
-                makeModelDefinition("vision-1", ["text", "image"]),
-              ],
-            },
-          },
-        },
-      };
-      expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual({
-        primary: "amazon-bedrock/vision-1",
-      });
       expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
     });
   });
@@ -923,37 +778,6 @@ describe("image tool implicit imageModel config", () => {
     });
   });
 
-  it("falls back to the generic image runtime when minimax-portal has no media provider registration", async () => {
-    await withTempAgentDir(async (agentDir) => {
-      installImageUnderstandingProviderStubs();
-      await writeAuthProfiles(agentDir, {
-        version: 1,
-        profiles: {
-          "minimax-portal:default": {
-            type: "oauth",
-            provider: "minimax-portal",
-            access: "oauth-test",
-            refresh: "refresh-test",
-            expires: Date.now() + 60_000,
-          },
-        },
-      });
-      const fetch = stubMinimaxOkFetch();
-      const cfg: OpenClawConfig = {
-        agents: {
-          defaults: {
-            model: { primary: "minimax-portal/MiniMax-M2.7" },
-            imageModel: { primary: "minimax-portal/MiniMax-VL-01" },
-          },
-        },
-      };
-
-      const tool = requireImageTool(createImageTool({ config: cfg, agentDir }));
-      await expectImageToolExecOk(tool, `data:image/png;base64,${ONE_PIXEL_PNG_B64}`);
-      expect(fetch).toHaveBeenCalledTimes(1);
-    });
-  });
-
   it("exposes an Anthropic-safe image schema without union keywords", async () => {
     await withMinimaxImageToolFromTempAgentDir(async (tool) => {
       const violations = findSchemaUnionKeywords(tool.parameters, "image.parameters");
@@ -1014,7 +838,7 @@ describe("image tool implicit imageModel config", () => {
     });
   });
 
-  it("respects fsPolicy.workspaceOnly for non-sandbox image paths", async () => {
+  it("respects fsPolicy.workspaceOnly for image paths", async () => {
     await withTempWorkspacePng(async ({ workspaceDir, imagePath }) => {
       const fetch = stubMinimaxOkFetch();
       await withTempAgentDir(async (agentDir) => {
@@ -1031,7 +855,7 @@ describe("image tool implicit imageModel config", () => {
         await expectImageToolExecOk(tool, imagePath);
         expect(fetch).toHaveBeenCalledTimes(1);
 
-        // File outside workspace is rejected even without sandbox.
+        // File outside workspace is rejected.
         const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-outside-"));
         const outsideImage = path.join(outsideDir, "secret.png");
         await fs.writeFile(outsideImage, Buffer.from(ONE_PIXEL_PNG_B64, "base64"));
@@ -1107,98 +931,6 @@ describe("image tool implicit imageModel config", () => {
         await expectImageToolExecOk(tool, "inbox/receipt.png");
         expect(fetch).toHaveBeenCalledTimes(1);
       });
-    });
-  });
-
-  it("sandboxes image paths like the read tool", async () => {
-    await withTempSandboxState(async ({ agentDir, sandboxRoot }) => {
-      await fs.writeFile(path.join(sandboxRoot, "img.png"), "fake", "utf8");
-      const sandbox = { root: sandboxRoot, bridge: createHostSandboxFsBridge(sandboxRoot) };
-
-      setTestEnv("OPENAI_API_KEY", "openai-test");
-      const cfg: OpenClawConfig = {
-        agents: { defaults: { model: { primary: "minimax/MiniMax-M2.7" } } },
-      };
-      const tool = createRequiredImageTool({ config: cfg, agentDir, sandbox });
-
-      await expect(tool.execute("t1", { image: "https://example.com/a.png" })).rejects.toThrow(
-        /Sandboxed image tool does not allow remote URLs/i,
-      );
-
-      await expect(tool.execute("t2", { image: "../escape.png" })).rejects.toThrow(
-        /escapes sandbox root/i,
-      );
-    });
-  });
-
-  it("applies tools.fs.workspaceOnly to image paths in sandbox mode", async () => {
-    await withTempSandboxState(async ({ agentDir, sandboxRoot }) => {
-      await fs.writeFile(
-        path.join(agentDir, "secret.png"),
-        Buffer.from(ONE_PIXEL_PNG_B64, "base64"),
-      );
-      const sandbox = createUnsafeMountedSandbox({ sandboxRoot, agentRoot: agentDir });
-      const fetch = stubMinimaxOkFetch();
-      const cfg: OpenClawConfig = {
-        ...createMinimaxImageConfig(),
-        tools: { fs: { workspaceOnly: true } },
-      };
-
-      const tools = await createOpenClawCodingToolsWithFreshModules({
-        config: cfg,
-        agentDir,
-        sandbox,
-        workspaceDir: sandboxRoot,
-      });
-      const readTool = tools.find((candidate) => candidate.name === "read");
-      if (!readTool) {
-        throw new Error("expected read tool");
-      }
-      const imageTool = requireImageTool(tools.find((candidate) => candidate.name === "image"));
-
-      await expect(readTool.execute("t1", { path: "/agent/secret.png" })).rejects.toThrow(
-        /Path escapes sandbox root/i,
-      );
-      await expect(
-        imageTool.execute("t2", {
-          prompt: "Describe the image.",
-          image: "/agent/secret.png",
-        }),
-      ).rejects.toThrow(/Path escapes sandbox root/i);
-      expect(fetch).not.toHaveBeenCalled();
-    });
-  });
-
-  it("rewrites inbound absolute paths into sandbox media/inbound", async () => {
-    await withTempSandboxState(async ({ agentDir, sandboxRoot }) => {
-      await fs.mkdir(path.join(sandboxRoot, "media", "inbound"), {
-        recursive: true,
-      });
-      await fs.writeFile(
-        path.join(sandboxRoot, "media", "inbound", "photo.png"),
-        Buffer.from(ONE_PIXEL_PNG_B64, "base64"),
-      );
-
-      const fetch = stubMinimaxOkFetch();
-
-      const cfg: OpenClawConfig = {
-        agents: {
-          defaults: {
-            model: { primary: "minimax/MiniMax-M2.7" },
-            imageModel: { primary: "minimax/MiniMax-VL-01" },
-          },
-        },
-      };
-      const sandbox = { root: sandboxRoot, bridge: createHostSandboxFsBridge(sandboxRoot) };
-      const tool = createRequiredImageTool({ config: cfg, agentDir, sandbox });
-
-      const res = await tool.execute("t1", {
-        prompt: "Describe the image.",
-        image: "@/Users/steipete/.openclaw/media/inbound/photo.png",
-      });
-
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect((res.details as { rewrittenFrom?: string }).rewrittenFrom).toContain("photo.png");
     });
   });
 });

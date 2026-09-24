@@ -1,5 +1,5 @@
 import { redactIdentifier } from "../../../logging/redact-identifier.js";
-import type { AuthProfileFailureReason } from "../../auth-profiles.js";
+import type { AuthProfileFailureReason } from "../../../plugins/types.js";
 import {
   buildApiErrorObservationFields,
   sanitizeForConsole,

@@ -1,6 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthProfileStore } from "../../auth-profiles.js";
 
 const mocks = vi.hoisted(() => ({
   prepareProviderRuntimeAuth: vi.fn(),
@@ -84,10 +83,6 @@ describe("createEmbeddedRunAuthController", () => {
       config: undefined,
       agentDir: "/tmp/agent",
       workspaceDir: "/tmp/workspace",
-      authStore: {
-        version: 1,
-        profiles: {},
-      } as AuthProfileStore,
       authStorage: { setRuntimeApiKey },
       profileCandidates: ["default"],
       initialThinkLevel: "medium",
@@ -169,10 +164,6 @@ describe("createEmbeddedRunAuthController", () => {
       config: undefined,
       agentDir: "/tmp/agent",
       workspaceDir: "/tmp/workspace",
-      authStore: {
-        version: 1,
-        profiles: {},
-      } as AuthProfileStore,
       authStorage: { setRuntimeApiKey: vi.fn() },
       profileCandidates: ["default"],
       initialThinkLevel: "medium",

@@ -28,7 +28,6 @@ The [openclaw-ansible](https://github.com/openclaw/openclaw-ansible) repo is the
 
 - **Firewall-first security** -- UFW + Docker isolation (only SSH + Tailscale accessible)
 - **Tailscale VPN** -- secure remote access without exposing services publicly
-- **Docker** -- isolated sandbox containers, localhost-only bindings
 - **Defense in depth** -- 4-layer security architecture
 - **Systemd integration** -- auto-start on boot with hardening
 - **One-command setup** -- complete deployment in minutes
@@ -47,13 +46,13 @@ The Ansible playbook installs and configures:
 
 1. **Tailscale** -- mesh VPN for secure remote access
 2. **UFW firewall** -- SSH + Tailscale ports only
-3. **Docker CE + Compose V2** -- for agent sandboxes
+3. **Docker CE + Compose V2** -- optional; no longer required by DennouAibou
 4. **Node.js 24 + pnpm** -- runtime dependencies (Node 22 LTS, currently `22.14+`, remains supported)
 5. **DennouAibou** -- host-based, not containerized
 6. **Systemd service** -- auto-start with security hardening
 
 <Note>
-The gateway runs directly on the host (not in Docker), but agent sandboxes use Docker for isolation. See [Sandboxing](/gateway/sandboxing) for details.
+The gateway runs directly on the host and does not require Docker.
 </Note>
 
 ## Post-Install Setup
@@ -118,7 +117,7 @@ nmap -p- YOUR_SERVER_IP
 
 Only port 22 (SSH) should be open. All other services (gateway, Docker) are locked down.
 
-Docker is installed for agent sandboxes (isolated tool execution), not for running the gateway itself. See [Multi-Agent Sandbox and Tools](/tools/multi-agent-sandbox-tools) for sandbox configuration.
+Docker is no longer required by DennouAibou.
 
 ## Manual Installation
 
@@ -191,20 +190,6 @@ This is idempotent and safe to run multiple times.
     ```
 
   </Accordion>
-  <Accordion title="Docker sandbox issues">
-    ```bash
-    # Verify Docker is running
-    sudo systemctl status docker
-
-    # Check sandbox image
-    sudo docker images | grep openclaw-sandbox
-
-    # Build sandbox image if missing
-    cd /opt/openclaw/openclaw
-    sudo -u openclaw ./scripts/sandbox-setup.sh
-    ```
-
-  </Accordion>
   <Accordion title="Provider login fails">
     Make sure you are running as the `openclaw` user:
     ```bash
@@ -226,5 +211,3 @@ For detailed security architecture and troubleshooting, see the openclaw-ansible
 
 - [openclaw-ansible](https://github.com/openclaw/openclaw-ansible) -- full deployment guide
 - [Docker](/install/docker) -- containerized gateway setup
-- [Sandboxing](/gateway/sandboxing) -- agent sandbox configuration
-- [Multi-Agent Sandbox and Tools](/tools/multi-agent-sandbox-tools) -- per-agent isolation

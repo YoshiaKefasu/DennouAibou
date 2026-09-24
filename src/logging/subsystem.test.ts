@@ -142,7 +142,7 @@ describe("createSubsystemLogger().isEnabled", () => {
   it("still emits non-probe warnings for embedded subsystems", () => {
     setLoggerOverride({ level: "silent", consoleLevel: "warn" });
     const warn = installConsoleMethodSpy("warn");
-    const log = createSubsystemLogger("agent/embedded").child("auth-profiles");
+    const log = createSubsystemLogger("agent/embedded").child("auth-store");
 
     log.warn("auth profile failure state updated", {
       runId: "run-123",

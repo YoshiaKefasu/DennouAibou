@@ -6,18 +6,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
-import { resolveSandboxConfigForAgent } from "../agents/sandbox/config.js";
-import { SANDBOX_BROWSER_SECURITY_HASH_EPOCH } from "../agents/sandbox/constants.js";
-import { execDockerRaw, type ExecDockerRawResult } from "../agents/sandbox/docker.js";
-import { resolveSandboxToolPolicyForAgent } from "../agents/sandbox/tool-policy.js";
-import type { SandboxToolPolicy } from "../agents/sandbox/types.js";
 import { resolveSkillSource } from "../agents/skills/source.js";
-import { isToolAllowedByPolicies } from "../agents/tool-policy-match.js";
+import { isToolAllowedByPolicies, type ToolPolicy } from "../agents/tool-policy-match.js";
 import { resolveToolProfilePolicy } from "../agents/tool-policy.js";
 import { listAgentWorkspaceDirs } from "../agents/workspace-dirs.js";
 import { listChannelPlugins } from "../channels/plugins/index.js";
 import { inspectReadOnlyChannelAccount } from "../channels/read-only-account-inspect.js";
-import { formatCliCommand } from "../cli/command-format.js";
 import { MANIFEST_KEY } from "../compat/legacy-names.js";
 import { resolveNativeSkillsEnabled } from "../config/commands.js";
 import type { OpenClawConfig, ConfigFileSnapshot } from "../config/config.js";
@@ -32,7 +26,7 @@ import {
   inspectPathPermissions,
   safeStat,
 } from "./audit-fs.js";
-import { pickSandboxToolPolicy } from "./audit-tool-policy.js";
+import { pickToolPolicy } from "./audit-tool-policy.js";
 import { extensionUsesSkippedScannerPath, isPathInside } from "./scan-paths.js";
 import type { SkillScanFinding } from "./skill-scanner.js";
 import * as skillScanner from "./skill-scanner.js";
@@ -45,11 +39,6 @@ export type SecurityAuditFinding = {
   detail: string;
   remediation?: string;
 };
-
-type ExecDockerRawFn = (
-  args: string[],
-  opts?: { allowFailure?: boolean; input?: Buffer | string; signal?: AbortSignal },
-) => Promise<ExecDockerRawResult>;
 
 type CodeSafetySummaryCache = Map<string, Promise<unknown>>;
 const MAX_WORKSPACE_SKILL_SCAN_FILES_PER_WORKSPACE = 2_000;
@@ -221,19 +210,14 @@ async function listInstalledPluginDirs(params: {
 function resolveToolPolicies(params: {
   cfg: OpenClawConfig;
   agentTools?: AgentToolsConfig;
-  sandboxMode?: "off" | "non-main" | "all";
-  agentId?: string | null;
-}): Array<SandboxToolPolicy | undefined> {
+}): Array<ToolPolicy | undefined> {
   const profile = params.agentTools?.profile ?? params.cfg.tools?.profile;
   const profilePolicy = resolveToolProfilePolicy(profile);
-  const policies: Array<SandboxToolPolicy | undefined> = [
+  const policies: Array<ToolPolicy | undefined> = [
     profilePolicy,
-    pickSandboxToolPolicy(params.cfg.tools ?? undefined),
-    pickSandboxToolPolicy(params.agentTools),
+    pickToolPolicy(params.cfg.tools ?? undefined),
+    pickToolPolicy(params.agentTools),
   ];
-  if (params.sandboxMode === "all") {
-    policies.push(resolveSandboxToolPolicyForAgent(params.cfg, params.agentId ?? undefined));
-  }
   return policies;
 }
 
@@ -431,187 +415,6 @@ async function listWorkspaceSkillMarkdownFiles(workspaceDir: string): Promise<st
 // Exported collectors
 // --------------------------------------------------------------------------
 
-function normalizeDockerLabelValue(raw: string | undefined): string | null {
-  const trimmed = raw?.trim() ?? "";
-  if (!trimmed || trimmed === "<no value>") {
-    return null;
-  }
-  return trimmed;
-}
-
-async function listSandboxBrowserContainers(
-  execDockerRawFn: ExecDockerRawFn,
-): Promise<string[] | null> {
-  try {
-    const result = await execDockerRawFn(
-      ["ps", "-a", "--filter", "label=openclaw.sandboxBrowser=1", "--format", "{{.Names}}"],
-      { allowFailure: true },
-    );
-    if (result.code !== 0) {
-      return null;
-    }
-    return result.stdout
-      .toString("utf8")
-      .split(/\r?\n/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  } catch {
-    return null;
-  }
-}
-
-async function readSandboxBrowserHashLabels(params: {
-  containerName: string;
-  execDockerRawFn: ExecDockerRawFn;
-}): Promise<{ configHash: string | null; epoch: string | null } | null> {
-  try {
-    const result = await params.execDockerRawFn(
-      [
-        "inspect",
-        "-f",
-        '{{ index .Config.Labels "openclaw.configHash" }}\t{{ index .Config.Labels "openclaw.browserConfigEpoch" }}',
-        params.containerName,
-      ],
-      { allowFailure: true },
-    );
-    if (result.code !== 0) {
-      return null;
-    }
-    const [hashRaw, epochRaw] = result.stdout.toString("utf8").split("\t");
-    return {
-      configHash: normalizeDockerLabelValue(hashRaw),
-      epoch: normalizeDockerLabelValue(epochRaw),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function parsePublishedHostFromDockerPortLine(line: string): string | null {
-  const trimmed = line.trim();
-  const rhs = trimmed.includes("->") ? (trimmed.split("->").at(-1)?.trim() ?? "") : trimmed;
-  if (!rhs) {
-    return null;
-  }
-  const bracketHost = rhs.match(/^\[([^\]]+)\]:\d+$/);
-  if (bracketHost?.[1]) {
-    return bracketHost[1];
-  }
-  const hostPort = rhs.match(/^([^:]+):\d+$/);
-  if (hostPort?.[1]) {
-    return hostPort[1];
-  }
-  return null;
-}
-
-function isLoopbackPublishHost(host: string): boolean {
-  const normalized = host.trim().toLowerCase();
-  return normalized === "127.0.0.1" || normalized === "::1" || normalized === "localhost";
-}
-
-async function readSandboxBrowserPortMappings(params: {
-  containerName: string;
-  execDockerRawFn: ExecDockerRawFn;
-}): Promise<string[] | null> {
-  try {
-    const result = await params.execDockerRawFn(["port", params.containerName], {
-      allowFailure: true,
-    });
-    if (result.code !== 0) {
-      return null;
-    }
-    return result.stdout
-      .toString("utf8")
-      .split(/\r?\n/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  } catch {
-    return null;
-  }
-}
-
-export async function collectSandboxBrowserHashLabelFindings(params?: {
-  execDockerRawFn?: ExecDockerRawFn;
-}): Promise<SecurityAuditFinding[]> {
-  const findings: SecurityAuditFinding[] = [];
-  const execFn = params?.execDockerRawFn ?? execDockerRaw;
-  const containers = await listSandboxBrowserContainers(execFn);
-  if (!containers || containers.length === 0) {
-    return findings;
-  }
-
-  const missingHash: string[] = [];
-  const staleEpoch: string[] = [];
-  const nonLoopbackPublished: string[] = [];
-
-  for (const containerName of containers) {
-    const labels = await readSandboxBrowserHashLabels({ containerName, execDockerRawFn: execFn });
-    if (!labels) {
-      continue;
-    }
-    if (!labels.configHash) {
-      missingHash.push(containerName);
-    }
-    if (labels.epoch !== SANDBOX_BROWSER_SECURITY_HASH_EPOCH) {
-      staleEpoch.push(containerName);
-    }
-    const portMappings = await readSandboxBrowserPortMappings({
-      containerName,
-      execDockerRawFn: execFn,
-    });
-    if (!portMappings?.length) {
-      continue;
-    }
-    const exposedMappings = portMappings.filter((line) => {
-      const host = parsePublishedHostFromDockerPortLine(line);
-      return Boolean(host && !isLoopbackPublishHost(host));
-    });
-    if (exposedMappings.length > 0) {
-      nonLoopbackPublished.push(`${containerName} (${exposedMappings.join("; ")})`);
-    }
-  }
-
-  if (missingHash.length > 0) {
-    findings.push({
-      checkId: "sandbox.browser_container.hash_label_missing",
-      severity: "warn",
-      title: "Sandbox browser container missing config hash label",
-      detail:
-        `Containers: ${missingHash.join(", ")}. ` +
-        "These browser containers predate hash-based drift checks and may miss security remediations until recreated.",
-      remediation: `${formatCliCommand("openclaw sandbox recreate --browser --all")} (add --force to skip prompt).`,
-    });
-  }
-
-  if (staleEpoch.length > 0) {
-    findings.push({
-      checkId: "sandbox.browser_container.hash_epoch_stale",
-      severity: "warn",
-      title: "Sandbox browser container hash epoch is stale",
-      detail:
-        `Containers: ${staleEpoch.join(", ")}. ` +
-        `Expected openclaw.browserConfigEpoch=${SANDBOX_BROWSER_SECURITY_HASH_EPOCH}.`,
-      remediation: `${formatCliCommand("openclaw sandbox recreate --browser --all")} (add --force to skip prompt).`,
-    });
-  }
-
-  if (nonLoopbackPublished.length > 0) {
-    findings.push({
-      checkId: "sandbox.browser_container.non_loopback_publish",
-      severity: "critical",
-      title: "Sandbox browser container publishes ports on non-loopback interfaces",
-      detail:
-        `Containers: ${nonLoopbackPublished.join(", ")}. ` +
-        "Sandbox browser observer/control ports should stay loopback-only to avoid unintended remote access.",
-      remediation:
-        `${formatCliCommand("openclaw sandbox recreate --browser --all")} (add --force to skip prompt), ` +
-        "then verify published ports are bound to 127.0.0.1.",
-    });
-  }
-
-  return findings;
-}
-
 export async function collectPluginsTrustFindings(params: {
   cfg: OpenClawConfig;
   stateDir: string;
@@ -687,12 +490,9 @@ export async function collectPluginsTrustFindings(params: {
       for (const context of contexts) {
         const profile = context.tools?.profile ?? params.cfg.tools?.profile;
         const restrictiveProfile = Boolean(resolveToolProfilePolicy(profile));
-        const sandboxMode = resolveSandboxConfigForAgent(params.cfg, context.agentId).mode;
         const policies = resolveToolPolicies({
           cfg: params.cfg,
           agentTools: context.tools,
-          sandboxMode,
-          agentId: context.agentId,
         });
         const broadPolicy = isToolAllowedByPolicies("__DENNOU_plugin_probe__", policies);
         const explicitPluginAllow =
@@ -1070,45 +870,6 @@ export async function collectStateDeepFilesystemFindings(params: {
 
   for (const agentId of ids) {
     const agentDir = path.join(params.stateDir, "agents", agentId, "agent");
-    const authPath = path.join(agentDir, "auth-profiles.json");
-    // eslint-disable-next-line no-await-in-loop
-    const authPerms = await inspectPathPermissions(authPath, {
-      env: params.env,
-      platform: params.platform,
-      exec: params.execIcacls,
-    });
-    if (authPerms.ok) {
-      if (authPerms.worldWritable || authPerms.groupWritable) {
-        findings.push({
-          checkId: "fs.auth_profiles.perms_writable",
-          severity: "critical",
-          title: "auth-profiles.json is writable by others",
-          detail: `${formatPermissionDetail(authPath, authPerms)}; another user could inject credentials.`,
-          remediation: formatPermissionRemediation({
-            targetPath: authPath,
-            perms: authPerms,
-            isDir: false,
-            posixMode: 0o600,
-            env: params.env,
-          }),
-        });
-      } else if (authPerms.worldReadable || authPerms.groupReadable) {
-        findings.push({
-          checkId: "fs.auth_profiles.perms_readable",
-          severity: "warn",
-          title: "auth-profiles.json is readable by others",
-          detail: `${formatPermissionDetail(authPath, authPerms)}; auth-profiles.json contains API keys and OAuth tokens.`,
-          remediation: formatPermissionRemediation({
-            targetPath: authPath,
-            perms: authPerms,
-            isDir: false,
-            posixMode: 0o600,
-            env: params.env,
-          }),
-        });
-      }
-    }
-
     const storePath = path.join(params.stateDir, "agents", agentId, "sessions", "sessions.json");
     // eslint-disable-next-line no-await-in-loop
     const storePerms = await inspectPathPermissions(storePath, {

@@ -20,7 +20,6 @@ type WebSearchConfig = NonNullable<OpenClawConfig["tools"]>["web"] extends infer
 
 export type ResolveWebSearchDefinitionParams = {
   config?: OpenClawConfig;
-  sandboxed?: boolean;
   runtimeWebSearch?: RuntimeWebSearchMetadata;
   providerId?: string;
   preferRuntimeProviders?: boolean;
@@ -38,15 +37,9 @@ function resolveSearchConfig(cfg?: OpenClawConfig): WebSearchConfig {
   return search as WebSearchConfig;
 }
 
-export function resolveWebSearchEnabled(params: {
-  search?: WebSearchConfig;
-  sandboxed?: boolean;
-}): boolean {
+export function resolveWebSearchEnabled(params: { search?: WebSearchConfig }): boolean {
   if (typeof params.search?.enabled === "boolean") {
     return params.search.enabled;
-  }
-  if (params.sandboxed) {
-    return true;
   }
   return true;
 }
@@ -178,7 +171,7 @@ export function resolveWebSearchDefinition(
 ): { provider: PluginWebSearchProviderEntry; definition: WebSearchProviderToolDefinition } | null {
   const search = resolveSearchConfig(options?.config);
   const runtimeWebSearch = options?.runtimeWebSearch ?? getActiveRuntimeWebToolsMetadata()?.search;
-  if (!resolveWebSearchEnabled({ search, sandboxed: options?.sandboxed })) {
+  if (!resolveWebSearchEnabled({ search })) {
     return null;
   }
 

@@ -1,7 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { OpenClawConfig } from "../../../config/config.js";
+import type { AuthProfileFailureReason } from "../../../plugins/types.js";
 import { sanitizeForLog } from "../../../terminal/ansi.js";
-import type { AuthProfileFailureReason } from "../../auth-profiles.js";
 import { FailoverError, resolveFailoverStatus } from "../../failover-error.js";
 import {
   formatAssistantErrorText,
@@ -60,11 +60,6 @@ export async function handleAssistantFailover(params: {
     extra?: { status?: number },
   ) => void;
   warn: (message: string) => void;
-  maybeMarkAuthProfileFailure: (failure: {
-    profileId?: string;
-    reason?: AuthProfileFailureReason | null;
-    modelId?: string;
-  }) => Promise<void>;
   maybeEscalateRateLimitProfileFallback: (params: {
     failoverProvider: string;
     failoverModel: string;
@@ -79,11 +74,6 @@ export async function handleAssistantFailover(params: {
   if (decision.action === "rotate_profile") {
     if (params.lastProfileId) {
       const reason = params.timedOut ? "timeout" : params.assistantProfileFailureReason;
-      await params.maybeMarkAuthProfileFailure({
-        profileId: params.lastProfileId,
-        reason,
-        modelId: params.modelId,
-      });
       if (params.timedOut && !params.isProbeSession) {
         params.warn(`Profile ${params.lastProfileId} timed out. Trying next account...`);
       }

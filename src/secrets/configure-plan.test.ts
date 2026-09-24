@@ -58,36 +58,6 @@ describe("secrets configure plan helpers", () => {
     expect(changes.deletes).toEqual(["legacy"]);
   });
 
-  it("discovers auth-profiles candidates for the selected agent scope", () => {
-    const candidates = buildConfigureCandidatesForScope({
-      config: {} as OpenClawConfig,
-      authProfiles: {
-        agentId: "main",
-        store: {
-          version: 1,
-          profiles: {
-            "openai:default": {
-              type: "api_key",
-              provider: "openai",
-              key: "sk",
-            },
-          },
-        },
-      },
-    });
-    expect(candidates).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: "auth-profiles.api_key.key",
-          path: "profiles.openai:default.key",
-          agentId: "main",
-          configFile: "auth-profiles.json",
-          authProfileProvider: "openai",
-        }),
-      ]),
-    );
-  });
-
   it("captures existing refs for prefilled configure prompts", () => {
     const candidates = buildConfigureCandidatesForScope({
       config: {
@@ -103,23 +73,6 @@ describe("secrets configure plan helpers", () => {
           },
         },
       } as OpenClawConfig,
-      authProfiles: {
-        agentId: "main",
-        store: {
-          version: 1,
-          profiles: {
-            "openai:default": {
-              type: "api_key",
-              provider: "openai",
-              keyRef: {
-                source: "env",
-                provider: "default",
-                id: "OPENAI_API_KEY",
-              },
-            },
-          },
-        },
-      },
     });
 
     expect(candidates).toEqual(
@@ -130,14 +83,6 @@ describe("secrets configure plan helpers", () => {
             source: "env",
             provider: "default",
             id: "TALK_API_KEY",
-          },
-        }),
-        expect.objectContaining({
-          path: "profiles.openai:default.key",
-          existingRef: {
-            source: "env",
-            provider: "default",
-            id: "OPENAI_API_KEY", // pragma: allowlist secret
           },
         }),
       ]),
@@ -211,7 +156,6 @@ describe("secrets configure plan helpers", () => {
     expect(plan.providerUpserts).toBeDefined();
     expect(plan.options).toEqual({
       scrubEnv: true,
-      scrubAuthProfilesForProviderTargets: true,
       scrubLegacyAuthJson: true,
     });
   });

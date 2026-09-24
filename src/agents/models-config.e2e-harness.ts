@@ -260,34 +260,6 @@ export function snapshotImplicitProviderEnv(env?: NodeJS.ProcessEnv): NodeJS.Pro
   return snapshot;
 }
 
-async function inferAuthProfileProviderIds(agentDir?: string): Promise<string[]> {
-  if (!agentDir) {
-    return [];
-  }
-  try {
-    const raw = await fs.readFile(path.join(agentDir, "auth-profiles.json"), "utf8");
-    const parsed = JSON.parse(raw) as {
-      profiles?: Record<string, { provider?: string }>;
-      order?: Record<string, unknown>;
-    };
-    const providers = new Set<string>();
-    for (const providerId of Object.keys(parsed.order ?? {})) {
-      if (providerId.trim()) {
-        providers.add(providerId.trim());
-      }
-    }
-    for (const profile of Object.values(parsed.profiles ?? {})) {
-      const providerId = profile?.provider?.trim();
-      if (providerId) {
-        providers.add(providerId);
-      }
-    }
-    return [...providers];
-  } catch {
-    return [];
-  }
-}
-
 async function inferImplicitProviderTestPluginIds(params: {
   agentDir?: string;
   config?: OpenClawConfig;
@@ -322,9 +294,6 @@ async function inferImplicitProviderTestPluginIds(params: {
     for (const providerId of mappedProviderIds) {
       providerIds.add(providerId);
     }
-  }
-  for (const providerId of await inferAuthProfileProviderIds(params.agentDir)) {
-    providerIds.add(providerId);
   }
   for (const [pluginId, entry] of Object.entries(params.config?.plugins?.entries ?? {})) {
     if (!pluginId.trim() || entry?.enabled === false) {

@@ -131,7 +131,6 @@ describe("web_fetch Cloudflare Markdown for Agents", () => {
           },
         },
       },
-      sandboxed: false,
       runtimeWebFetch: {
         providerConfigured: "firecrawl",
         providerSource: "configured",

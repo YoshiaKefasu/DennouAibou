@@ -8,10 +8,6 @@ import {
 } from "../config/sessions/store.js";
 import { callGateway } from "../gateway/call.js";
 import { onAgentEvent } from "../infra/agent-events.js";
-import { resetTaskFlowRegistryForTests } from "../tasks/task-flow-registry.js";
-import { configureTaskFlowRegistryRuntime } from "../tasks/task-flow-registry.store.js";
-import { resetTaskRegistryForTests } from "../tasks/task-registry.js";
-import { configureTaskRegistryRuntime } from "../tasks/task-registry.store.js";
 import { captureEnv } from "../test-utils/env.js";
 import { runSubagentAnnounceFlow } from "./subagent-announce.js";
 import {
@@ -27,31 +23,7 @@ const callGatewayMock = vi.fn<typeof callGateway>();
 const onAgentEventMock = vi.fn<typeof onAgentEvent>();
 
 beforeAll(() => {
-  // Keep task/flow registry writes in-memory so no sqlite handle pins the temp
-  // state dir on Windows (node:sqlite WAL/shm files cannot be unlinked while
-  // held open; closing the cached handles is not enough on this platform).
-  configureTaskRegistryRuntime({
-    store: {
-      loadSnapshot: () => ({ tasks: new Map(), deliveryStates: new Map() }),
-      saveSnapshot: () => {},
-      upsertTaskWithDeliveryState: () => {},
-      upsertTask: () => {},
-      deleteTaskWithDeliveryState: () => {},
-      deleteTask: () => {},
-      upsertDeliveryState: () => {},
-      deleteDeliveryState: () => {},
-      close: () => {},
-    },
-  });
-  configureTaskFlowRegistryRuntime({
-    store: {
-      loadSnapshot: () => ({ flows: new Map() }),
-      saveSnapshot: () => {},
-      upsertFlow: () => {},
-      deleteFlow: () => {},
-      close: () => {},
-    },
-  });
+  // Task/flow registries were removed (DEBLOAT); nothing to configure here.
 });
 
 describe("subagent registry persistence resume", () => {
@@ -122,9 +94,6 @@ describe("subagent registry persistence resume", () => {
     onAgentEventMock.mockClear();
     resetSubagentRegistryForTests({ persist: false });
     registryTesting.setDepsForTest();
-    // Close the sqlite handles opened by createRunningTaskRun so the temp state dir can be removed.
-    resetTaskRegistryForTests({ persist: false });
-    resetTaskFlowRegistryForTests({ persist: false });
     await drainSessionStoreLockQueuesForTest();
     clearSessionStoreCacheForTest();
     if (tempStateDir) {

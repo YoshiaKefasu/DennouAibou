@@ -111,16 +111,11 @@ Think of the suites as “increasing realism” (and increasing flakiness/cost):
 ### E2E: OpenShell backend smoke
 
 - Command: `pnpm test:e2e:openshell`
-- File: `test/openshell-sandbox.e2e.test.ts`
 - Scope:
   - Starts an isolated OpenShell gateway on the host via Docker
-  - Creates a sandbox from a temporary local Dockerfile
-  - Exercises DennouAibou's OpenShell backend over real `sandbox ssh-config` + SSH exec
-  - Verifies remote-canonical filesystem behavior through the sandbox fs bridge
 - Expectations:
   - Opt-in only; not part of the default `pnpm test:e2e` run
   - Requires a local `openshell` CLI plus a working Docker daemon
-  - Uses isolated `HOME` / `XDG_CONFIG_HOME`, then destroys the test gateway and sandbox
 - Useful overrides:
   - `OPENCLAW_E2E_OPENSHELL=1` to enable the test when running the broader e2e suite manually
   - `OPENCLAW_E2E_OPENSHELL_COMMAND=/path/to/openshell` to point at a non-default CLI binary or wrapper script
@@ -179,7 +174,6 @@ Use this decision table:
 Live tests are split into two layers so we can isolate failures:
 
 - “Direct model” tells us the provider/model can answer at all with the given key.
-- “Gateway smoke” tells us the full gateway+agent pipeline works for that model (sessions, history, tools, sandbox policy, etc.).
 
 ### Layer 1: Direct model completion (no gateway)
 
@@ -495,7 +489,6 @@ What’s still missing for skills (see [Skills](/tools/skills)):
 
 - **Decisioning:** when skills are listed in the prompt, does the agent pick the right skill (or avoid irrelevant ones)?
 - **Compliance:** does the agent read `SKILL.md` before use and follow required steps/args?
-- **Workflow contracts:** multi-turn scenarios that assert tool order, session history carryover, and sandbox boundaries.
 
 Future evals should stay deterministic first:
 

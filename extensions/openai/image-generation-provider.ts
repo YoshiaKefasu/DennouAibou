@@ -81,7 +81,6 @@ export function buildOpenAIImageGenerationProvider(): ImageGenerationProvider {
         provider: "openai",
         cfg: req.cfg,
         agentDir: req.agentDir,
-        store: req.authStore,
       });
       if (!auth.apiKey) {
         throw new Error("OpenAI API key missing");

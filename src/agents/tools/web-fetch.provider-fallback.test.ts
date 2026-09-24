@@ -57,7 +57,6 @@ describe("web_fetch provider fallback normalization", () => {
           },
         },
       } as OpenClawConfig,
-      sandboxed: false,
     });
 
     const result = await tool?.execute?.("call-provider-fallback", {
@@ -110,7 +109,6 @@ describe("web_fetch provider fallback normalization", () => {
 
     const tool = createWebFetchTool({
       config: {} as OpenClawConfig,
-      sandboxed: false,
     });
 
     const result = await tool?.execute?.("call-provider-fallback", {

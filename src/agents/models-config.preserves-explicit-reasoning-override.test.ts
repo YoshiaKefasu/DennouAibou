@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
-import { clearRuntimeAuthProfileStoreSnapshots } from "./auth-profiles/store.js";
 import {
   installModelsConfigTestHooks,
   withModelsTempHome as withTempHome,
@@ -9,20 +8,14 @@ import {
 import { ensureOpenClawModelsJson, resetModelsJsonReadyCacheForTest } from "./models-config.js";
 import { readGeneratedModelsJson } from "./models-config.test-utils.js";
 
-vi.mock("./auth-profiles/external-cli-sync.js", () => ({
-  syncExternalCliCredentials: () => false,
-}));
-
 installModelsConfigTestHooks();
 
 beforeEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
   clearRuntimeConfigSnapshot();
   clearConfigCache();
 });
 
 afterEach(() => {
-  clearRuntimeAuthProfileStoreSnapshots();
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   resetModelsJsonReadyCacheForTest();

@@ -7,7 +7,7 @@ import { ensureContextEnginesInitialized, resolveContextEngine } from "../contex
 import { sleepWithAbort } from "../infra/backoff.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { prepareProviderRuntimeAuth } from "../plugins/provider-runtime.js";
-import type { AuthProfileFailureReason } from "./auth-profiles.js";
+import type { AuthProfileFailureReason } from "../plugins/types.js";
 import { runWithModelFallback } from "./model-fallback.js";
 import { ensureOpenClawModelsJson } from "./models-config.js";
 import { resolveModelAsync } from "./pi-embedded-runner/model.js";

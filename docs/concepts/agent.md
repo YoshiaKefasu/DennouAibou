@@ -17,10 +17,6 @@ Recommended: use `openclaw setup` to create `~/.openclaw/openclaw.json` if missi
 
 Full workspace layout + backup guide: [Agent workspace](/concepts/agent-workspace)
 
-If `agents.defaults.sandbox` is enabled, non-main sessions can override this with
-per-session workspaces under `agents.defaults.sandbox.workspaceRoot` (see
-[Gateway configuration](/gateway/configuration)).
-
 ## Bootstrap files (injected)
 
 Inside `agents.defaults.workspace`, DennouAibou expects these user-editable files:

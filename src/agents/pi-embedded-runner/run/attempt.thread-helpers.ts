@@ -25,18 +25,6 @@ export function composeSystemPromptWithHookContext(params: {
   });
 }
 
-export function resolveAttemptSpawnWorkspaceDir(params: {
-  sandbox?: {
-    enabled?: boolean;
-    workspaceAccess?: string;
-  } | null;
-  resolvedWorkspace: string;
-}): string | undefined {
-  return params.sandbox?.enabled && params.sandbox.workspaceAccess !== "rw"
-    ? params.resolvedWorkspace
-    : undefined;
-}
-
 /**
  * context-pruner プラグインが有効かどうかを返す。
  *

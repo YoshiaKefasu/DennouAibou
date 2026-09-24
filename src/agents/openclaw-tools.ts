@@ -10,7 +10,6 @@ import type { GatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "./agent-scope.js";
 import { resolveOpenClawPluginToolInputs } from "./openclaw-tools.plugin-context.js";
 import { applyPluginToolDeliveryDefaults } from "./plugin-tool-delivery-defaults.js";
-import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import type { SpawnedToolContext } from "./spawned-context.js";
 import type { ToolFsPolicy } from "./tool-fs-policy.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
@@ -56,7 +55,6 @@ function isExperimentalPlanToolEnabled(config?: OpenClawConfig): boolean {
 
 export function createOpenClawTools(
   options?: {
-    sandboxBrowserBridgeUrl?: string;
     allowHostBrowserControl?: boolean;
     agentSessionKey?: string;
     agentChannel?: GatewayMessageChannel;
@@ -66,10 +64,7 @@ export function createOpenClawTools(
     /** Thread/topic identifier for routing replies to the originating thread. */
     agentThreadId?: string | number;
     agentDir?: string;
-    sandboxRoot?: string;
-    sandboxFsBridge?: SandboxFsBridge;
     fsPolicy?: ToolFsPolicy;
-    sandboxed?: boolean;
     config?: OpenClawConfig;
     pluginToolAllowlist?: string[];
     /** Current channel ID for auto-threading (Slack). */
@@ -105,8 +100,7 @@ export function createOpenClawTools(
     /**
      * Workspace directory to pass to spawned subagents for inheritance.
      * Defaults to workspaceDir. Use this to pass the actual agent workspace when the
-     * session itself is running in a copied-workspace sandbox (`ro` or `none`) so
-     * subagents inherit the real workspace path instead of the sandbox copy.
+     * session workspace should not be inherited directly.
      */
     spawnWorkspaceDir?: string;
     /** Callback invoked when sessions_yield tool is called. */
@@ -138,16 +132,11 @@ export function createOpenClawTools(
   });
   const runtimeWebTools = getActiveRuntimeWebToolsMetadata();
   const runtimeSnapshot = getActiveSecretsRuntimeSnapshot();
-  const sandbox =
-    options?.sandboxRoot && options?.sandboxFsBridge
-      ? { root: options.sandboxRoot, bridge: options.sandboxFsBridge }
-      : undefined;
   const imageTool = options?.agentDir?.trim()
     ? createImageTool({
         config: options?.config,
         agentDir: options.agentDir,
         workspaceDir,
-        sandbox,
         fsPolicy: options?.fsPolicy,
         modelHasVision: options?.modelHasVision,
       })
@@ -157,7 +146,6 @@ export function createOpenClawTools(
         config: options?.config,
         agentDir: options.agentDir,
         workspaceDir,
-        sandbox,
         fsPolicy: options?.fsPolicy,
       })
     : null;
@@ -166,18 +154,15 @@ export function createOpenClawTools(
         config: options?.config,
         agentDir: options.agentDir,
         workspaceDir,
-        sandbox,
         fsPolicy: options?.fsPolicy,
       })
     : null;
   const webSearchTool = createWebSearchTool({
     config: options?.config,
-    sandboxed: options?.sandboxed,
     runtimeWebSearch: runtimeWebTools?.search,
   });
   const webFetchTool = createWebFetchTool({
     config: options?.config,
-    sandboxed: options?.sandboxed,
     runtimeWebFetch: runtimeWebTools?.fetch,
   });
   const messageTool = options?.disableMessageTool
@@ -193,7 +178,6 @@ export function createOpenClawTools(
         currentMessageId: options?.currentMessageId,
         replyToMode: options?.replyToMode,
         hasRepliedRef: options?.hasRepliedRef,
-        sandboxRoot: options?.sandboxRoot,
         requireExplicitTarget: options?.requireExplicitMessageTarget,
         requesterSenderId: options?.requesterSenderId ?? undefined,
       });
@@ -226,20 +210,17 @@ export function createOpenClawTools(
       : []),
     createSessionsListTool({
       agentSessionKey: options?.agentSessionKey,
-      sandboxed: options?.sandboxed,
       config: resolvedConfig,
       callGateway: openClawToolsDeps.callGateway,
     }),
     createSessionsHistoryTool({
       agentSessionKey: options?.agentSessionKey,
-      sandboxed: options?.sandboxed,
       config: resolvedConfig,
       callGateway: openClawToolsDeps.callGateway,
     }),
     createSessionsSendTool({
       agentSessionKey: options?.agentSessionKey,
       agentChannel: options?.agentChannel,
-      sandboxed: options?.sandboxed,
       config: resolvedConfig,
       callGateway: openClawToolsDeps.callGateway,
     }),
@@ -256,7 +237,6 @@ export function createOpenClawTools(
       agentGroupId: options?.agentGroupId,
       agentGroupChannel: options?.agentGroupChannel,
       agentGroupSpace: options?.agentGroupSpace,
-      sandboxed: options?.sandboxed,
       requesterAgentIdOverride: options?.requesterAgentIdOverride,
       workspaceDir: spawnWorkspaceDir,
     }),
@@ -266,7 +246,6 @@ export function createOpenClawTools(
     createSessionStatusTool({
       agentSessionKey: options?.agentSessionKey,
       config: resolvedConfig,
-      sandboxed: options?.sandboxed,
     }),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),

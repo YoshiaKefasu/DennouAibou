@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 
-type DockerSetupSandbox = {
+type DockerSetupFixture = {
   rootDir: string;
   scriptPath: string;
   logPath: string;
@@ -48,7 +48,7 @@ exit 0
   await writeFile(logPath, "");
 }
 
-async function createDockerSetupSandbox(): Promise<DockerSetupSandbox> {
+async function createDockerSetupFixture(): Promise<DockerSetupFixture> {
   const rootDir = await mkdtemp(join(tmpdir(), "openclaw-docker-setup-"));
   const scriptPath = join(rootDir, "scripts", "docker", "setup.sh");
   const dockerfilePath = join(rootDir, "Dockerfile");
@@ -70,19 +70,19 @@ async function createDockerSetupSandbox(): Promise<DockerSetupSandbox> {
 }
 
 function createEnv(
-  sandbox: DockerSetupSandbox,
+  fixture: DockerSetupFixture,
   overrides: Record<string, string | undefined> = {},
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
-    PATH: `${sandbox.binDir}:${process.env.PATH ?? ""}`,
-    HOME: process.env.HOME ?? sandbox.rootDir,
+    PATH: `${fixture.binDir}:${process.env.PATH ?? ""}`,
+    HOME: process.env.HOME ?? fixture.rootDir,
     LANG: process.env.LANG,
     LC_ALL: process.env.LC_ALL,
     TMPDIR: process.env.TMPDIR,
-    DOCKER_STUB_LOG: sandbox.logPath,
+    DOCKER_STUB_LOG: fixture.logPath,
     DENNOU_GATEWAY_TOKEN: "test-token",
-    DENNOU_CONFIG_DIR: join(sandbox.rootDir, "config"),
-    DENNOU_WORKSPACE_DIR: join(sandbox.rootDir, "openclaw"),
+    DENNOU_CONFIG_DIR: join(fixture.rootDir, "config"),
+    DENNOU_WORKSPACE_DIR: join(fixture.rootDir, "openclaw"),
   };
 
   for (const [key, value] of Object.entries(overrides)) {
@@ -95,35 +95,35 @@ function createEnv(
   return env;
 }
 
-function requireSandbox(sandbox: DockerSetupSandbox | null): DockerSetupSandbox {
-  if (!sandbox) {
-    throw new Error("sandbox missing");
+function requireFixture(fixture: DockerSetupFixture | null): DockerSetupFixture {
+  if (!fixture) {
+    throw new Error("fixture missing");
   }
-  return sandbox;
+  return fixture;
 }
 
 function runDockerSetup(
-  sandbox: DockerSetupSandbox,
+  fixture: DockerSetupFixture,
   overrides: Record<string, string | undefined> = {},
 ) {
-  return spawnSync("bash", [sandbox.scriptPath], {
-    cwd: sandbox.rootDir,
-    env: createEnv(sandbox, overrides),
+  return spawnSync("bash", [fixture.scriptPath], {
+    cwd: fixture.rootDir,
+    env: createEnv(fixture, overrides),
     encoding: "utf8",
     stdio: ["ignore", "ignore", "pipe"],
   });
 }
 
-async function resetDockerLog(sandbox: DockerSetupSandbox) {
-  await writeFile(sandbox.logPath, "");
+async function resetDockerLog(fixture: DockerSetupFixture) {
+  await writeFile(fixture.logPath, "");
 }
 
-async function readDockerLog(sandbox: DockerSetupSandbox) {
-  return readFile(sandbox.logPath, "utf8");
+async function readDockerLog(fixture: DockerSetupFixture) {
+  return readFile(fixture.logPath, "utf8");
 }
 
-async function readDockerLogLines(sandbox: DockerSetupSandbox) {
-  return (await readDockerLog(sandbox)).split("\n").filter(Boolean);
+async function readDockerLogLines(fixture: DockerSetupFixture) {
+  return (await readDockerLog(fixture)).split("\n").filter(Boolean);
 }
 
 function isGatewayStartLine(line: string) {
@@ -135,21 +135,21 @@ function findGatewayStartLineIndex(lines: string[]) {
 }
 
 async function runDockerSetupWithUnsetGatewayToken(
-  sandbox: DockerSetupSandbox,
+  fixture: DockerSetupFixture,
   suffix: string,
   prepare?: (configDir: string) => Promise<void>,
 ) {
-  const configDir = join(sandbox.rootDir, `config-${suffix}`);
-  const workspaceDir = join(sandbox.rootDir, `workspace-${suffix}`);
+  const configDir = join(fixture.rootDir, `config-${suffix}`);
+  const workspaceDir = join(fixture.rootDir, `workspace-${suffix}`);
   await mkdir(configDir, { recursive: true });
   await prepare?.(configDir);
 
-  const result = runDockerSetup(sandbox, {
+  const result = runDockerSetup(fixture, {
     DENNOU_GATEWAY_TOKEN: undefined,
     DENNOU_CONFIG_DIR: configDir,
     DENNOU_WORKSPACE_DIR: workspaceDir,
   });
-  const envFile = await readFile(join(sandbox.rootDir, ".env"), "utf8");
+  const envFile = await readFile(join(fixture.rootDir, ".env"), "utf8");
 
   return { result, envFile };
 }
@@ -190,41 +190,41 @@ function resolveBashForCompatCheck(): string | null {
 }
 
 describe("scripts/docker/setup.sh", () => {
-  let sandbox: DockerSetupSandbox | null = null;
+  let fixture: DockerSetupFixture | null = null;
 
   beforeAll(async () => {
-    sandbox = await createDockerSetupSandbox();
+    fixture = await createDockerSetupFixture();
   });
 
   afterAll(async () => {
-    if (!sandbox) {
+    if (!fixture) {
       return;
     }
-    await rm(sandbox.rootDir, { recursive: true, force: true });
-    sandbox = null;
+    await rm(fixture.rootDir, { recursive: true, force: true });
+    fixture = null;
   });
 
   it("handles env defaults, home-volume mounts, and Docker build args", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_DOCKER_APT_PACKAGES: "ffmpeg build-essential",
       DENNOU_EXTRA_MOUNTS: undefined,
       DENNOU_HOME_VOLUME: "openclaw-home",
     });
     expect(result.status).toBe(0);
-    const envFile = await readFile(join(activeSandbox.rootDir, ".env"), "utf8");
+    const envFile = await readFile(join(activeFixture.rootDir, ".env"), "utf8");
     expect(envFile).toContain("DENNOU_DOCKER_APT_PACKAGES=ffmpeg build-essential");
     expect(envFile).toContain("DENNOU_EXTRA_MOUNTS=");
     expect(envFile).toContain("DENNOU_HOME_VOLUME=openclaw-home"); // pragma: allowlist secret
     const extraCompose = await readFile(
-      join(activeSandbox.rootDir, "docker-compose.extra.yml"),
+      join(activeFixture.rootDir, "docker-compose.extra.yml"),
       "utf8",
     );
     expect(extraCompose).toContain("openclaw-home:/home/node");
     expect(extraCompose).toContain("volumes:");
     expect(extraCompose).toContain("openclaw-home:");
-    const log = await readDockerLog(activeSandbox);
+    const log = await readDockerLog(activeFixture);
     expect(log).toContain("--build-arg DENNOU_DOCKER_APT_PACKAGES=ffmpeg build-essential");
     expect(log).toContain(
       "run --rm --no-deps --entrypoint node openclaw-gateway dist/index.js onboard --mode local --no-install-daemon",
@@ -236,13 +236,13 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("avoids shared-network openclaw-cli before the gateway is started", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    await resetDockerLog(activeSandbox);
-    const result = runDockerSetup(activeSandbox);
+    await resetDockerLog(activeFixture);
+    const result = runDockerSetup(activeFixture);
     expect(result.status).toBe(0);
 
-    const lines = await readDockerLogLines(activeSandbox);
+    const lines = await readDockerLogLines(activeFixture);
     const gatewayStartIdx = findGatewayStartLineIndex(lines);
     expect(gatewayStartIdx).toBeGreaterThanOrEqual(0);
 
@@ -252,29 +252,12 @@ describe("scripts/docker/setup.sh", () => {
     );
   });
 
-  it("forces BuildKit for local and sandbox docker builds", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    await writeFile(join(activeSandbox.rootDir, "Dockerfile.sandbox"), "FROM scratch\n");
-    await resetDockerLog(activeSandbox);
-
-    const result = runDockerSetup(activeSandbox, {
-      DENNOU_SANDBOX: "1",
-    });
-
-    expect(result.status).toBe(0);
-    const buildLines = (await readDockerLogLines(activeSandbox)).filter((line) =>
-      line.startsWith("build "),
-    );
-    expect(buildLines.length).toBeGreaterThanOrEqual(2);
-    expect(buildLines.every((line) => line.includes("DOCKER_BUILDKIT=1"))).toBe(true);
-  });
-
   it("precreates config identity dir for CLI device auth writes", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    const configDir = join(activeSandbox.rootDir, "config-identity");
-    const workspaceDir = join(activeSandbox.rootDir, "workspace-identity");
+    const activeFixture = requireFixture(fixture);
+    const configDir = join(activeFixture.rootDir, "config-identity");
+    const workspaceDir = join(activeFixture.rootDir, "workspace-identity");
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_CONFIG_DIR: configDir,
       DENNOU_WORKSPACE_DIR: workspaceDir,
     });
@@ -285,23 +268,23 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("writes DENNOU_TZ into .env when given a real IANA timezone", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_TZ: "Asia/Shanghai",
     });
 
     expect(result.status).toBe(0);
-    const envFile = await readFile(join(activeSandbox.rootDir, ".env"), "utf8");
+    const envFile = await readFile(join(activeFixture.rootDir, ".env"), "utf8");
     expect(envFile).toContain("DENNOU_TZ=Asia/Shanghai");
   });
 
   it("precreates agent data dirs to avoid EACCES in container", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    const configDir = join(activeSandbox.rootDir, "config-agent-dirs");
-    const workspaceDir = join(activeSandbox.rootDir, "workspace-agent-dirs");
+    const activeFixture = requireFixture(fixture);
+    const configDir = join(activeFixture.rootDir, "config-agent-dirs");
+    const workspaceDir = join(activeFixture.rootDir, "workspace-agent-dirs");
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_CONFIG_DIR: configDir,
       DENNOU_WORKSPACE_DIR: workspaceDir,
     });
@@ -313,7 +296,7 @@ describe("scripts/docker/setup.sh", () => {
     expect(sessionsDirStat.isDirectory()).toBe(true);
 
     // Verify that a root-user chown step runs before setup.
-    const log = await readDockerLog(activeSandbox);
+    const log = await readDockerLog(activeFixture);
     const chownIdx = log.indexOf("--user root");
     const onboardIdx = log.indexOf("onboard");
     expect(chownIdx).toBeGreaterThanOrEqual(0);
@@ -322,9 +305,9 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("reuses existing config token when DENNOU_GATEWAY_TOKEN is unset", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
     const { result, envFile } = await runDockerSetupWithUnsetGatewayToken(
-      activeSandbox,
+      activeFixture,
       "token-reuse",
       async (configDir) => {
         await writeFile(
@@ -339,13 +322,13 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("reuses existing .env token when DENNOU_GATEWAY_TOKEN and config token are unset", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
     await writeFile(
-      join(activeSandbox.rootDir, ".env"),
+      join(activeFixture.rootDir, ".env"),
       "DENNOU_GATEWAY_TOKEN=dotenv-token-123\nDENNOU_GATEWAY_PORT=18789\n", // pragma: allowlist secret
     );
     const { result, envFile } = await runDockerSetupWithUnsetGatewayToken(
-      activeSandbox,
+      activeFixture,
       "dotenv-token-reuse",
     );
 
@@ -355,9 +338,9 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("reuses the last non-empty .env token and strips CRLF without truncating '='", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
     await writeFile(
-      join(activeSandbox.rootDir, ".env"),
+      join(activeFixture.rootDir, ".env"),
       [
         "DENNOU_GATEWAY_TOKEN=",
         "DENNOU_GATEWAY_TOKEN=first-token",
@@ -365,7 +348,7 @@ describe("scripts/docker/setup.sh", () => {
       ].join("\n"),
     );
     const { result, envFile } = await runDockerSetupWithUnsetGatewayToken(
-      activeSandbox,
+      activeFixture,
       "dotenv-last-wins",
     );
 
@@ -375,84 +358,10 @@ describe("scripts/docker/setup.sh", () => {
     expect(envFile).not.toContain("\r");
   });
 
-  it("treats DENNOU_SANDBOX=0 as disabled", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    await resetDockerLog(activeSandbox);
-
-    const result = runDockerSetup(activeSandbox, {
-      DENNOU_SANDBOX: "0",
-    });
-
-    expect(result.status).toBe(0);
-    const envFile = await readFile(join(activeSandbox.rootDir, ".env"), "utf8");
-    expect(envFile).toContain("DENNOU_SANDBOX=");
-
-    const log = await readDockerLog(activeSandbox);
-    expect(log).toContain("--build-arg DENNOU_INSTALL_DOCKER_CLI=");
-    expect(log).not.toContain("--build-arg DENNOU_INSTALL_DOCKER_CLI=1");
-    expect(log).toContain("config set agents.defaults.sandbox.mode off");
-  });
-
-  it("resets stale sandbox mode and overlay when sandbox is not active", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    await resetDockerLog(activeSandbox);
-    await writeFile(
-      join(activeSandbox.rootDir, "docker-compose.sandbox.yml"),
-      "services:\n  openclaw-gateway:\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n",
-    );
-
-    const result = runDockerSetup(activeSandbox, {
-      DENNOU_SANDBOX: "1",
-      DOCKER_STUB_FAIL_MATCH: "--entrypoint docker openclaw-gateway --version",
-    });
-
-    expect(result.status).toBe(0);
-    expect(result.stderr).toContain("Sandbox requires Docker CLI");
-    const log = await readDockerLog(activeSandbox);
-    expect(log).toContain("config set agents.defaults.sandbox.mode off");
-    await expect(stat(join(activeSandbox.rootDir, "docker-compose.sandbox.yml"))).rejects.toThrow();
-  });
-
-  it("skips sandbox gateway restart when sandbox config writes fail", async () => {
-    const activeSandbox = requireSandbox(sandbox);
-    await resetDockerLog(activeSandbox);
-    const socketPath = join(activeSandbox.rootDir, "sandbox.sock");
-
-    await withUnixSocket(socketPath, async () => {
-      const result = runDockerSetup(activeSandbox, {
-        DENNOU_SANDBOX: "1",
-        DENNOU_DOCKER_SOCKET: socketPath,
-        DOCKER_STUB_FAIL_MATCH: "config set agents.defaults.sandbox.scope",
-      });
-
-      expect(result.status).toBe(0);
-      expect(result.stderr).toContain("Failed to set agents.defaults.sandbox.scope");
-      expect(result.stderr).toContain("Skipping gateway restart to avoid exposing Docker socket");
-
-      const log = await readDockerLog(activeSandbox);
-      const gatewayStarts = (await readDockerLogLines(activeSandbox)).filter((line) =>
-        isGatewayStartLine(line),
-      );
-      expect(gatewayStarts).toHaveLength(2);
-      expect(log).toContain(
-        "run --rm --no-deps openclaw-cli config set agents.defaults.sandbox.mode non-main",
-      );
-      expect(log).toContain("config set agents.defaults.sandbox.mode off");
-      const forceRecreateLine = log
-        .split("\n")
-        .find((line) => line.includes("up -d --force-recreate openclaw-gateway"));
-      expect(forceRecreateLine).toBeDefined();
-      expect(forceRecreateLine).not.toContain("docker-compose.sandbox.yml");
-      await expect(
-        stat(join(activeSandbox.rootDir, "docker-compose.sandbox.yml")),
-      ).rejects.toThrow();
-    });
-  });
-
   it("rejects injected multiline DENNOU_EXTRA_MOUNTS values", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_EXTRA_MOUNTS: "/tmp:/tmp\n  evil-service:\n    image: alpine",
     });
 
@@ -461,9 +370,9 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("rejects invalid DENNOU_EXTRA_MOUNTS mount format", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_EXTRA_MOUNTS: "bad mount spec",
     });
 
@@ -472,9 +381,9 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("rejects invalid DENNOU_HOME_VOLUME names", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_HOME_VOLUME: "bad name",
     });
 
@@ -483,9 +392,9 @@ describe("scripts/docker/setup.sh", () => {
   });
 
   it("rejects DENNOU_TZ values that are not present in zoneinfo", async () => {
-    const activeSandbox = requireSandbox(sandbox);
+    const activeFixture = requireFixture(fixture);
 
-    const result = runDockerSetup(activeSandbox, {
+    const result = runDockerSetup(activeFixture, {
       DENNOU_TZ: "Nope/Bad",
     });
 

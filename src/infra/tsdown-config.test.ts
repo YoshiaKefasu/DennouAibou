@@ -42,7 +42,6 @@ describe("tsdown config", () => {
     expect(distGraphs).toHaveLength(1);
     expect(entryKeys(distGraphs[0])).toEqual(
       expect.arrayContaining([
-        "agents/auth-profiles.runtime",
         "agents/model-catalog.runtime",
         "agents/models-config.runtime",
         "agents/pi-model-discovery-runtime",

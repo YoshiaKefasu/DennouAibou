@@ -120,34 +120,6 @@
     "target": "私信"
   },
   {
-    "source": "sandbox",
-    "target": "沙箱"
-  },
-  {
-    "source": "Sandbox",
-    "target": "沙箱"
-  },
-  {
-    "source": "sandboxing",
-    "target": "沙箱隔离"
-  },
-  {
-    "source": "Sandboxing",
-    "target": "沙箱隔离"
-  },
-  {
-    "source": "sandboxed",
-    "target": "沙箱隔离"
-  },
-  {
-    "source": "Sandboxed",
-    "target": "沙箱隔离"
-  },
-  {
-    "source": "Sandboxing note",
-    "target": "沙箱注意事项"
-  },
-  {
     "source": "Companion apps",
     "target": "配套应用"
   },

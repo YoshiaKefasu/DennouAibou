@@ -1,4 +1,3 @@
-import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import { describeFailoverError, isFailoverError } from "../agents/failover-error.js";
 import type { FallbackAttempt } from "../agents/model-fallback.types.js";
 import type { OpenClawConfig } from "../config/config.js";
@@ -25,7 +24,6 @@ export type GenerateMusicParams = {
   cfg: OpenClawConfig;
   prompt: string;
   agentDir?: string;
-  authStore?: AuthProfileStore;
   modelOverride?: string;
   lyrics?: string;
   instrumental?: boolean;
@@ -165,7 +163,6 @@ export async function generateMusic(
         prompt: params.prompt,
         cfg: params.cfg,
         agentDir: params.agentDir,
-        authStore: params.authStore,
         lyrics: sanitized.lyrics,
         instrumental: sanitized.instrumental,
         durationSeconds: sanitized.durationSeconds,

@@ -3,8 +3,6 @@ import { coerceSecretRef, resolveSecretInputRef } from "../config/types.secrets.
 import { resolveProviderWebSearchPluginConfig } from "../plugin-sdk/provider-web-search.js";
 import { resolveProviderSyntheticAuthWithPlugin } from "../plugins/provider-runtime.js";
 import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js";
-import { listProfilesForProvider } from "./auth-profiles/profiles.js";
-import { ensureAuthProfileStore } from "./auth-profiles/store.js";
 import { resolveEnvApiKey } from "./model-auth-env.js";
 import {
   isNonSecretApiKeyMarker,
@@ -108,80 +106,6 @@ export function normalizeHeaderValues(params: {
     return { headers, mutated: false };
   }
   return { headers: nextHeaders, mutated: true };
-}
-
-export function resolveApiKeyFromCredential(
-  cred: ReturnType<typeof ensureAuthProfileStore>["profiles"][string] | undefined,
-  env: NodeJS.ProcessEnv = process.env,
-): ProfileApiKeyResolution | undefined {
-  if (!cred) {
-    return undefined;
-  }
-  if (cred.type === "api_key") {
-    const keyRef = coerceSecretRef(cred.keyRef);
-    if (keyRef && keyRef.id.trim()) {
-      if (keyRef.source === "env") {
-        const envVar = keyRef.id.trim();
-        return {
-          apiKey: envVar,
-          source: "env-ref",
-          discoveryApiKey: toDiscoveryApiKey(env[envVar]),
-        };
-      }
-      return {
-        apiKey: resolveNonEnvSecretRefApiKeyMarker(keyRef.source),
-        source: "non-env-ref",
-      };
-    }
-    if (cred.key?.trim()) {
-      return {
-        apiKey: cred.key,
-        source: "plaintext",
-        discoveryApiKey: toDiscoveryApiKey(cred.key),
-      };
-    }
-    return undefined;
-  }
-  if (cred.type === "token") {
-    const tokenRef = coerceSecretRef(cred.tokenRef);
-    if (tokenRef && tokenRef.id.trim()) {
-      if (tokenRef.source === "env") {
-        const envVar = tokenRef.id.trim();
-        return {
-          apiKey: envVar,
-          source: "env-ref",
-          discoveryApiKey: toDiscoveryApiKey(env[envVar]),
-        };
-      }
-      return {
-        apiKey: resolveNonEnvSecretRefApiKeyMarker(tokenRef.source),
-        source: "non-env-ref",
-      };
-    }
-    if (cred.token?.trim()) {
-      return {
-        apiKey: cred.token,
-        source: "plaintext",
-        discoveryApiKey: toDiscoveryApiKey(cred.token),
-      };
-    }
-  }
-  return undefined;
-}
-
-export function resolveApiKeyFromProfiles(params: {
-  provider: string;
-  store: ReturnType<typeof ensureAuthProfileStore>;
-  env?: NodeJS.ProcessEnv;
-}): ProfileApiKeyResolution | undefined {
-  const ids = listProfilesForProvider(params.store, params.provider);
-  for (const id of ids) {
-    const resolved = resolveApiKeyFromCredential(params.store.profiles[id], params.env);
-    if (resolved) {
-      return resolved;
-    }
-  }
-  return undefined;
 }
 
 export function normalizeConfiguredProviderApiKey(params: {
@@ -320,7 +244,6 @@ export function resolveMissingProviderApiKey(params: {
 
 export function createProviderApiKeyResolver(
   env: NodeJS.ProcessEnv,
-  authStore: ReturnType<typeof ensureAuthProfileStore>,
   config?: OpenClawConfig,
 ): ProviderApiKeyResolver {
   return (provider: string): { apiKey: string | undefined; discoveryApiKey?: string } => {
@@ -329,13 +252,6 @@ export function createProviderApiKeyResolver(
       return {
         apiKey: envVar,
         discoveryApiKey: toDiscoveryApiKey(env[envVar]),
-      };
-    }
-    const fromProfiles = resolveApiKeyFromProfiles({ provider, store: authStore, env });
-    if (fromProfiles?.apiKey) {
-      return {
-        apiKey: fromProfiles.apiKey,
-        discoveryApiKey: fromProfiles.discoveryApiKey,
       };
     }
     const fromConfig = resolveConfigBackedProviderAuth({
@@ -351,51 +267,9 @@ export function createProviderApiKeyResolver(
 
 export function createProviderAuthResolver(
   env: NodeJS.ProcessEnv,
-  authStore: ReturnType<typeof ensureAuthProfileStore>,
   config?: OpenClawConfig,
 ): ProviderAuthResolver {
-  return (provider: string, options?: { oauthMarker?: string }) => {
-    const ids = listProfilesForProvider(authStore, provider);
-    let oauthCandidate:
-      | {
-          apiKey: string | undefined;
-          discoveryApiKey?: string;
-          mode: "oauth";
-          source: "profile";
-          profileId: string;
-        }
-      | undefined;
-    for (const id of ids) {
-      const cred = authStore.profiles[id];
-      if (!cred) {
-        continue;
-      }
-      if (cred.type === "oauth") {
-        oauthCandidate ??= {
-          apiKey: options?.oauthMarker,
-          discoveryApiKey: toDiscoveryApiKey(cred.access),
-          mode: "oauth",
-          source: "profile",
-          profileId: id,
-        };
-        continue;
-      }
-      const resolved = resolveApiKeyFromCredential(cred, env);
-      if (!resolved) {
-        continue;
-      }
-      return {
-        apiKey: resolved.apiKey,
-        discoveryApiKey: resolved.discoveryApiKey,
-        mode: cred.type,
-        source: "profile" as const,
-        profileId: id,
-      };
-    }
-    if (oauthCandidate) {
-      return oauthCandidate;
-    }
-
+  return (provider: string) => {
     const envVar = resolveEnvApiKeyVarName(provider, env);
     if (envVar) {
       return {

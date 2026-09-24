@@ -14,32 +14,6 @@ function listChannelSecretTargetRegistryEntries(): SecretTargetRegistryEntry[] {
 
 const CORE_SECRET_TARGET_REGISTRY: SecretTargetRegistryEntry[] = [
   {
-    id: "auth-profiles.api_key.key",
-    targetType: "auth-profiles.api_key.key",
-    configFile: "auth-profiles.json",
-    pathPattern: "profiles.*.key",
-    refPathPattern: "profiles.*.keyRef",
-    secretShape: SIBLING_REF_SHAPE,
-    expectedResolvedValue: "string",
-    includeInPlan: true,
-    includeInConfigure: true,
-    includeInAudit: true,
-    authProfileType: "api_key",
-  },
-  {
-    id: "auth-profiles.token.token",
-    targetType: "auth-profiles.token.token",
-    configFile: "auth-profiles.json",
-    pathPattern: "profiles.*.token",
-    refPathPattern: "profiles.*.tokenRef",
-    secretShape: SIBLING_REF_SHAPE,
-    expectedResolvedValue: "string",
-    includeInPlan: true,
-    includeInConfigure: true,
-    includeInAudit: true,
-    authProfileType: "token",
-  },
-  {
     id: "agents.defaults.memorySearch.remote.apiKey",
     targetType: "agents.defaults.memorySearch.remote.apiKey",
     configFile: "dennou-aibou.json",
