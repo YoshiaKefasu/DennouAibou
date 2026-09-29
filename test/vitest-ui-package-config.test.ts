@@ -6,7 +6,7 @@ describe("ui package vitest config", () => {
   it("keeps the standalone ui package on thread workers with isolation enabled", () => {
     expect(uiConfig.test?.pool).toBe("threads");
     expect(uiConfig.test?.isolate).toBe(true);
-    expect(uiConfig.test?.projects).toHaveLength(3);
+    expect(uiConfig.test?.projects).toHaveLength(1);
 
     for (const project of uiConfig.test?.projects ?? []) {
       expect(project.test?.pool).toBe("threads");

@@ -1996,3 +1996,45 @@ APIキー解決チェーンの実測：`src/agents/model-auth.ts` の `resolveAp
 | `tsgo --noEmit`  | **0 errors (exit 0)**                                                                                                                    |
 | `oxfmt --check`  | 変更対象全ファイル pass                                                                                                                  |
 | 台帳件数         | `bun-tier-c4b`: 実数一致（62件） / `bun-tier-a3`: 実数一致（559件）                                                                      |
+
+## 30. WebUI jsdom / browser テスト撤去（§23.2 候補7・波3・2026-09-29 時点作業）
+
+### 30.1 目的・背景
+
+§23.2 候補7（56ファイル / 約14,000行・削除確定）の実施波。WebUI は `*.node.test.ts`（実機寄り検証：バンドル静的走査＋子プロセスプローブ等）および ChromeDevTools 直接確認の体制が確立しており、jsdom 模倣の偽グリーンを生む旧単体テストは不要（ユーザー裁定 2026-09-21、メモリ #1969 / #1976）。
+DEBLOAT 台帳の「browser テスト10本は温存要判断」は本波で判断：`*.node.test.ts` のみ温存し、browser テストも撤去（KASOU に Playwright/Chromium が無く `pnpm test:ui` を壊す・win32 自スキップのため携帯性なし。実機検証は node テスト＋ChromeDevTools に一本化）。
+
+### 30.2 削除内容（53ファイル / 10,634行・`git diff --numstat` 実測）
+
+| 区分                 | 内容                                                                                                                                        | 数                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| jsdom テスト         | `ui/src/**` の `*.test.ts`（`*.node.test.ts`・`*.browser.test.ts` を除く全件。`controllers/`・`views/`・`chat/`・`i18n/test/translate` 等） | 38ファイル / 7,612行   |
+| browser テスト       | `ui/src/**` の `*.browser.test.ts` 全件（`webui-real-browser-load`・`chat`・`config`・`navigation`・`sidebar-status` 等）                   | 10ファイル / 約1,800行 |
+| 孤児ヘルパー         | `ui/src/ui/test-helpers/app-mount.ts`（browser テスト専用・他参照0件実測）＋空化 `test-helpers/`                                            | 1ファイル / 47行       |
+| 孤児スナップショット | `ui/src/ui/__screenshots__/`（browser テスト用ベースライン PNG 4枚）＋空化 `ui/src/i18n/test/`                                              | 4ファイル              |
+
+### 30.3 設定・参照の整合（修正4ファイル）
+
+- `ui/vitest.config.ts`：`unit`（jsdom）・`browser`（Playwright）プロジェクトを撤去し `unit-node` のみに。`@vitest/browser-playwright` import も除去。`unit-node` の jsdom 環境・setupFiles は変更なし（node テストの既存前提を維持）。
+- `vitest.shared.config.ts`：削除済み ui テストへの include 13行を除去。`ui/src/ui/chat/**/*.test.ts` と node テスト3行は温存（温存ファイルに現にマッチするため）。
+- `package.json`：`test:ui:e2e` を削除（対象 `webui-real-browser-load.browser.test.ts` が存在しなくなったため。他参照0件実測）。`test:ui` は変更なし。
+- `test/vitest-ui-package-config.test.ts`：ui プロジェクト数 assertion を 3→1 に更新。
+- 温存：`ui/src/test-helpers/lit-warnings.setup.ts`・`storage.ts`（node テストが使用中）、`vitest.ui.config.ts`（include は温存 node テストにマッチ、関連 assertion 変更不要）、ui 側 `jsdom` devDependency（`unit-node` 環境が使用中のため温存）。
+
+### 30.4 温存（15ファイル・絶対厳守）
+
+`ui/src/ui/` 直下9本（`app-gateway`・`app-gateway.sessions`・`app-lifecycle-connect`・`app-lifecycle`・`app-render.helpers`・`app-tool-stream`・`gateway`・`storage`・`webui-bundle-browser-load`）＋ `chat/` 3本（`export`・`slash-command-executor`・`slash-commands`）＋ `controllers/config/form-utils` ＋ `views/` 2本（`config-form.search`・`overview`）。全件 `*.node.test.ts`。
+
+### 30.5 検証結果
+
+| ゲート                                                                                         | 結果                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun run ui:build`                                                                             | **pass**（`✓ built in 1.72s`）                                                                                                                                                                                                                                                                   |
+| `bun run build`                                                                                | **pass**（`OPENCLAW_A2UI_SKIP_MISSING=1` 付き。素の `bun run build` は `canvas:a2ui:bundle` で失敗するが、`vendor/a2ui`・`apps/shared/OpenClawKit/Tools/CanvasA2UI` が本ツリーに不在の既存要因であり本波と無関係）                                                                               |
+| 温存 node テスト（`pnpm --dir ui test`）                                                       | 14/15ファイル・182/183件 pass。残1件（`app-gateway.node.test.ts > preserves approval prompts...`）は `execApprovalQueue` 空振りで単独再実行でも再現する既存失敗。対象テスト・SUT（`app-gateway.ts`）とも本波 diff 外であり、§28 exec-approval フル許可化波の残務として未対応（本波スコープ外）。 |
+| 設定 assertion（`vitest-ui-package-config`・`vitest-projects-config`・`vitest-scoped-config`） | 3ファイル・61/61 pass                                                                                                                                                                                                                                                                            |
+| `oxfmt --check`（変更4ファイル＋本節）                                                         | TS 3ファイル pass。`package.json` のみ flag されるが CRLF 改行の既存状態が原因であり本波 diff（1行削除）とは無関係のため改行変換は実施せず                                                                                                                                                       |
+| `pnpm exec tsgo --noEmit`                                                                      | **0 errors (exit 0)**                                                                                                                                                                                                                                                                            |
+| 残存参照                                                                                       | 削除ファイルへの参照0件（`vitest.shared.config.ts`・`package.json`・非テストソース・workflows・docs を実測）                                                                                                                                                                                     |
+
+残務：ui 側 `playwright`・`@vitest/browser-playwright` devDependencies は browser プロジェクト撤去により未使用化（lockfile 再生成を伴うため本波では温存）。`src/scripts/test-projects.test.ts` の ui routing 例示（`views/channels.test.ts`）は削除済みパスだが routing ロジック自体は有効のため温存。
