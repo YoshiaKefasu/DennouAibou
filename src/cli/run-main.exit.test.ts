@@ -8,8 +8,6 @@ const loadDotEnvMock = vi.hoisted(() => vi.fn());
 const normalizeEnvMock = vi.hoisted(() => vi.fn());
 const ensurePathMock = vi.hoisted(() => vi.fn());
 const assertRuntimeMock = vi.hoisted(() => vi.fn());
-const closeActiveMemorySearchManagersMock = vi.hoisted(() => vi.fn(async () => {}));
-const hasMemoryRuntimeMock = vi.hoisted(() => vi.fn(() => false));
 const outputRootHelpMock = vi.hoisted(() => vi.fn());
 const outputPrecomputedRootHelpTextMock = vi.hoisted(() => vi.fn(() => false));
 const buildProgramMock = vi.hoisted(() => vi.fn());
@@ -47,14 +45,6 @@ vi.mock("../infra/runtime-guard.js", () => ({
   assertSupportedRuntime: assertRuntimeMock,
 }));
 
-vi.mock("../plugins/memory-runtime.js", () => ({
-  closeActiveMemorySearchManagers: closeActiveMemorySearchManagersMock,
-}));
-
-vi.mock("../plugins/memory-state.js", () => ({
-  hasMemoryRuntime: hasMemoryRuntimeMock,
-}));
-
 vi.mock("./program/root-help.js", () => ({
   outputRootHelp: outputRootHelpMock,
 }));
@@ -82,7 +72,6 @@ vi.mock("./program/register.subclis.js", () => ({
 describe("runCli exit behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hasMemoryRuntimeMock.mockReturnValue(false);
     outputPrecomputedRootHelpTextMock.mockReturnValue(false);
     getProgramContextMock.mockReturnValue(null);
   });
@@ -97,7 +86,6 @@ describe("runCli exit behavior", () => {
 
     expect(maybeRunCliInContainerMock).toHaveBeenCalledWith(["node", "openclaw", "status"]);
     expect(tryRouteCliMock).toHaveBeenCalledWith(["node", "openclaw", "status"]);
-    expect(closeActiveMemorySearchManagersMock).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
   });
@@ -114,18 +102,8 @@ describe("runCli exit behavior", () => {
     expect(outputPrecomputedRootHelpTextMock).toHaveBeenCalledTimes(1);
     expect(outputRootHelpMock).toHaveBeenCalledTimes(1);
     expect(buildProgramMock).not.toHaveBeenCalled();
-    expect(closeActiveMemorySearchManagersMock).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
-  });
-
-  it("closes memory managers when a runtime was registered", async () => {
-    tryRouteCliMock.mockResolvedValueOnce(true);
-    hasMemoryRuntimeMock.mockReturnValue(true);
-
-    await runCli(["node", "openclaw", "status"]);
-
-    expect(closeActiveMemorySearchManagersMock).toHaveBeenCalledTimes(1);
   });
 
   it("returns after a handled container-target invocation", async () => {
@@ -142,7 +120,6 @@ describe("runCli exit behavior", () => {
     ]);
     expect(loadDotEnvMock).not.toHaveBeenCalled();
     expect(tryRouteCliMock).not.toHaveBeenCalled();
-    expect(closeActiveMemorySearchManagersMock).not.toHaveBeenCalled();
   });
 
   it("propagates a handled container-target exit code", async () => {

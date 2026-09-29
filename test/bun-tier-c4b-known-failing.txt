@@ -5,15 +5,15 @@
 # current HEAD recount is 278 vi.doMock / 56 vi.doUnmock because a701be67ef
 # removed tests before this measurement.
 #
-# Inventory: 81 files, 278 vi.doMock references, 56 vi.doUnmock references.
-# Of these, 69 files fail or time out under the split Bun probe; 12 are
+# Inventory: 73 files (62 failing/timeout + 11 helper-only).
+# Of these, 62 files fail or time out under the split Bun probe; 11 are
 # helper-only files with no standalone tests and therefore pass with no tests.
 # Split validation used:
 #   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
 #
-# Result by candidate file: 12 helper-only files pass with no standalone tests;
-# 63 files fail at the first unsupported vi.doMock/vi.doUnmock/vi.resetModules/
-# vi.hoisted call; 6 files time out before a conclusive result. The 69 files
+# Result by candidate file: 11 helper-only files pass with no standalone tests;
+# 60 files fail at the first unsupported vi.doMock/vi.doUnmock/vi.resetModules/
+# vi.hoisted call; 2 files time out before a conclusive result. The 62 files
 # below are kept out of a green Bun lane until Bun provides the missing dynamic
 # module-mock lifecycle APIs or the tests are split into statically mocked files.
 #
@@ -27,7 +27,7 @@
 # Keep in sync when a file starts passing:
 #   bun test --isolate --timeout 120000 <the file>
 
-# unsupported dynamic module-mock lifecycle (63 files)
+# unsupported dynamic module-mock lifecycle (60 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
 extensions/discord/src/monitor/provider.test.ts
 extensions/telegram/src/audit.test.ts
@@ -89,16 +89,12 @@ src/tasks/task-registry.test.ts
 test/test-env.test.ts
 ui/src/ui/app-chat.test.ts
 
-# timeout during isolated measurement (6 files)
-packages/memory-host-sdk/src/host/embeddings-gemini.test.ts
-packages/memory-host-sdk/src/host/embeddings-voyage.test.ts
+# timeout during isolated measurement (2 files)
 src/commands/agent.test.ts
 src/cron/isolated-agent.lane.test.ts
-src/memory-host-sdk/host/embeddings-gemini.test.ts
-src/memory-host-sdk/host/embeddings-voyage.test.ts
 
-# helper-only files in the 81-file inventory (pass-with-no-tests; not listed as
-# failures above because they contain no standalone test cases; 12 files)
+# helper-only files in the 73-file inventory (pass-with-no-tests; not listed as
+# failures above because they contain no standalone test cases; 11 files)
 # extensions/telegram/src/bot.create-telegram-bot.test-harness.ts
 # extensions/telegram/src/bot.media.e2e-harness.ts
 # src/agents/pi-embedded-runner/compact.hooks.harness.ts

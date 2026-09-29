@@ -6,11 +6,6 @@ type MockResolvedModel = {
   authStorage: { setRuntimeApiKey: Mock<(provider?: string, apiKey?: string) => void> };
   modelRegistry: Record<string, never>;
 };
-type MockMemorySearchManager = {
-  manager: {
-    sync: (params?: unknown) => Promise<void>;
-  };
-};
 type MockEmbeddedAgentStreamFn = Mock<
   (model?: unknown, context?: unknown, options?: unknown) => unknown
 >;
@@ -53,13 +48,6 @@ export const triggerInternalHook: Mock<(event?: unknown) => void> = vi.fn();
 export const sanitizeSessionHistoryMock = vi.fn(
   async (params: { messages: unknown[] }) => params.messages,
 );
-export const getMemorySearchManagerMock: Mock<
-  (params?: unknown) => Promise<MockMemorySearchManager>
-> = vi.fn(async () => ({
-  manager: {
-    sync: vi.fn(async (_params?: unknown) => {}),
-  },
-}));
 export const resolveMemorySearchConfigMock = vi.fn(() => ({
   sources: ["sessions"],
   sync: {
@@ -97,12 +85,6 @@ export function resetCompactSessionStateMocks(): void {
     return params.messages;
   });
 
-  getMemorySearchManagerMock.mockReset();
-  getMemorySearchManagerMock.mockResolvedValue({
-    manager: {
-      sync: vi.fn(async () => {}),
-    },
-  });
   resolveMemorySearchConfigMock.mockReset();
   resolveMemorySearchConfigMock.mockReturnValue({
     sources: ["sessions"],
@@ -448,10 +430,6 @@ export async function loadCompactHooksHarness(): Promise<{
 
   vi.doMock("../memory-search.js", () => ({
     resolveMemorySearchConfig: resolveMemorySearchConfigMock,
-  }));
-
-  vi.doMock("../../plugins/memory-runtime.js", () => ({
-    getActiveMemorySearchManager: getMemorySearchManagerMock,
   }));
 
   vi.doMock("../date-time.js", () => ({

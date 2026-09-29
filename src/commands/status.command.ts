@@ -1,9 +1,9 @@
 import { withProgress } from "../cli/progress.js";
 import { normalizeUpdateChannel, resolveUpdateChannelDisplay } from "../infra/update-channels.js";
-import type { Tone } from "../memory-host-sdk/status.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import type { HealthSummary } from "./health.js";
 import { getDaemonStatusSummary, getNodeDaemonStatusSummary } from "./status.daemon.js";
+import type { Tone } from "./status.memory-types.js";
 
 let securityAuditModulePromise: Promise<typeof import("../security/audit.runtime.js")> | undefined;
 let gatewayCallModulePromise: Promise<typeof import("../gateway/call.js")> | undefined;

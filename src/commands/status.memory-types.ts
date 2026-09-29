@@ -1,14 +1,9 @@
-export type MemorySource = "memory" | "sessions";
+// Local memory-status types.
+// Type-only: behavior is unchanged.
 
-export type MemorySearchResult = {
-  path: string;
-  startLine: number;
-  endLine: number;
-  score: number;
-  snippet: string;
-  source: MemorySource;
-  citation?: string;
-};
+export type Tone = "ok" | "warn" | "muted";
+
+export type MemorySource = "memory" | "sessions";
 
 export type MemoryEmbeddingProbeResult = {
   ok: boolean;
@@ -58,24 +53,20 @@ export type MemoryProviderStatus = {
   custom?: Record<string, unknown>;
 };
 
-export interface MemorySearchManager {
-  search(
-    query: string,
-    opts?: { maxResults?: number; minScore?: number; sessionKey?: string },
-  ): Promise<MemorySearchResult[]>;
-  readFile(params: {
-    relPath: string;
-    from?: number;
-    lines?: number;
-  }): Promise<{ text: string; path: string }>;
-  status(): MemoryProviderStatus;
-  sync?(params?: {
-    reason?: string;
-    force?: boolean;
-    sessionFiles?: string[];
-    progress?: (update: MemorySyncProgressUpdate) => void;
-  }): Promise<void>;
-  probeEmbeddingAvailability(): Promise<MemoryEmbeddingProbeResult>;
-  probeVectorAvailability(): Promise<boolean>;
-  close?(): Promise<void>;
-}
+export type EmbeddingInputTextPart = {
+  type: "text";
+  text: string;
+};
+
+export type EmbeddingInputInlineDataPart = {
+  type: "inline-data";
+  mimeType: string;
+  data: string;
+};
+
+export type EmbeddingInputPart = EmbeddingInputTextPart | EmbeddingInputInlineDataPart;
+
+export type EmbeddingInput = {
+  text: string;
+  parts?: EmbeddingInputPart[];
+};

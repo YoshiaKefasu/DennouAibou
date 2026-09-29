@@ -1,16 +1,7 @@
-/**
- * Query expansion for FTS-only search mode.
- *
- * When no embedding provider is available, we fall back to FTS (full-text search).
- * FTS works best with specific keywords, but users often ask conversational queries
- * like "that thing we discussed yesterday" or "之前讨论的那个方案".
- *
- * This module extracts meaningful keywords from such queries to improve FTS results.
- */
+// Local query keyword extraction and stop-word helpers.
+// Pure functions, behavior unchanged.
 
-// Common stop words that don't add search value
 const STOP_WORDS_EN = new Set([
-  // Articles and determiners
   "a",
   "an",
   "the",
@@ -18,7 +9,6 @@ const STOP_WORDS_EN = new Set([
   "that",
   "these",
   "those",
-  // Pronouns
   "i",
   "me",
   "my",
@@ -31,7 +21,6 @@ const STOP_WORDS_EN = new Set([
   "it",
   "they",
   "them",
-  // Common verbs
   "is",
   "are",
   "was",
@@ -52,7 +41,6 @@ const STOP_WORDS_EN = new Set([
   "can",
   "may",
   "might",
-  // Prepositions
   "in",
   "on",
   "at",
@@ -73,7 +61,6 @@ const STOP_WORDS_EN = new Set([
   "between",
   "under",
   "over",
-  // Conjunctions
   "and",
   "or",
   "but",
@@ -89,7 +76,6 @@ const STOP_WORDS_EN = new Set([
   "who",
   "how",
   "why",
-  // Time references (vague, not useful for FTS)
   "yesterday",
   "today",
   "tomorrow",
@@ -100,7 +86,6 @@ const STOP_WORDS_EN = new Set([
   "ago",
   "just",
   "now",
-  // Vague references
   "thing",
   "things",
   "stuff",
@@ -108,7 +93,6 @@ const STOP_WORDS_EN = new Set([
   "anything",
   "everything",
   "nothing",
-  // Question words
   "please",
   "help",
   "find",
@@ -119,7 +103,6 @@ const STOP_WORDS_EN = new Set([
 ]);
 
 const STOP_WORDS_ES = new Set([
-  // Articles and determiners
   "el",
   "la",
   "los",
@@ -132,7 +115,6 @@ const STOP_WORDS_ES = new Set([
   "esta",
   "ese",
   "esa",
-  // Pronouns
   "yo",
   "me",
   "mi",
@@ -144,7 +126,6 @@ const STOP_WORDS_ES = new Set([
   "ustedes",
   "ellos",
   "ellas",
-  // Prepositions and conjunctions
   "de",
   "del",
   "a",
@@ -160,7 +141,6 @@ const STOP_WORDS_ES = new Set([
   "si",
   "porque",
   "como",
-  // Common verbs / auxiliaries
   "es",
   "son",
   "fue",
@@ -170,7 +150,6 @@ const STOP_WORDS_ES = new Set([
   "haber",
   "tener",
   "hacer",
-  // Time references (vague)
   "ayer",
   "hoy",
   "mañana",
@@ -179,7 +158,6 @@ const STOP_WORDS_ES = new Set([
   "después",
   "ahora",
   "recientemente",
-  // Question/request words
   "que",
   "qué",
   "cómo",
@@ -193,7 +171,6 @@ const STOP_WORDS_ES = new Set([
 ]);
 
 const STOP_WORDS_PT = new Set([
-  // Articles and determiners
   "o",
   "a",
   "os",
@@ -206,7 +183,6 @@ const STOP_WORDS_PT = new Set([
   "esta",
   "esse",
   "essa",
-  // Pronouns
   "eu",
   "me",
   "meu",
@@ -219,7 +195,6 @@ const STOP_WORDS_PT = new Set([
   "ela",
   "eles",
   "elas",
-  // Prepositions and conjunctions
   "de",
   "do",
   "da",
@@ -235,7 +210,6 @@ const STOP_WORDS_PT = new Set([
   "se",
   "porque",
   "como",
-  // Common verbs / auxiliaries
   "é",
   "são",
   "foi",
@@ -244,7 +218,6 @@ const STOP_WORDS_PT = new Set([
   "estar",
   "ter",
   "fazer",
-  // Time references (vague)
   "ontem",
   "hoje",
   "amanhã",
@@ -252,7 +225,6 @@ const STOP_WORDS_PT = new Set([
   "depois",
   "agora",
   "recentemente",
-  // Question/request words
   "que",
   "quê",
   "quando",
@@ -263,14 +235,12 @@ const STOP_WORDS_PT = new Set([
 ]);
 
 const STOP_WORDS_AR = new Set([
-  // Articles and connectors
   "ال",
   "و",
   "أو",
   "لكن",
   "ثم",
   "بل",
-  // Pronouns / references
   "أنا",
   "نحن",
   "هو",
@@ -282,7 +252,6 @@ const STOP_WORDS_AR = new Set([
   "تلك",
   "هنا",
   "هناك",
-  // Common prepositions
   "من",
   "إلى",
   "الى",
@@ -294,7 +263,6 @@ const STOP_WORDS_AR = new Set([
   "ل",
   "ب",
   "ك",
-  // Common auxiliaries / vague verbs
   "كان",
   "كانت",
   "يكون",
@@ -303,7 +271,6 @@ const STOP_WORDS_AR = new Set([
   "أصبح",
   "يمكن",
   "ممكن",
-  // Time references (vague)
   "بالأمس",
   "امس",
   "اليوم",
@@ -312,7 +279,6 @@ const STOP_WORDS_AR = new Set([
   "قبل",
   "بعد",
   "مؤخرا",
-  // Question/request words
   "لماذا",
   "كيف",
   "ماذا",
@@ -325,7 +291,6 @@ const STOP_WORDS_AR = new Set([
 ]);
 
 const STOP_WORDS_KO = new Set([
-  // Particles (조사)
   "은",
   "는",
   "이",
@@ -352,7 +317,6 @@ const STOP_WORDS_KO = new Set([
   "마다",
   "밖에",
   "대로",
-  // Pronouns (대명사)
   "나",
   "나는",
   "내가",
@@ -370,7 +334,6 @@ const STOP_WORDS_KO = new Set([
   "여기",
   "저기",
   "거기",
-  // Common verbs / auxiliaries (일반 동사/보조 동사)
   "있다",
   "없다",
   "하다",
@@ -381,7 +344,6 @@ const STOP_WORDS_KO = new Set([
   "주다",
   "오다",
   "가다",
-  // Nouns (의존 명사 / vague)
   "것",
   "거",
   "등",
@@ -390,7 +352,6 @@ const STOP_WORDS_KO = new Set([
   "곳",
   "중",
   "분",
-  // Adverbs
   "잘",
   "더",
   "또",
@@ -400,7 +361,6 @@ const STOP_WORDS_KO = new Set([
   "많이",
   "너무",
   "좀",
-  // Conjunctions
   "그리고",
   "하지만",
   "그래서",
@@ -408,7 +368,6 @@ const STOP_WORDS_KO = new Set([
   "그러나",
   "또는",
   "그러면",
-  // Question words
   "왜",
   "어떻게",
   "뭐",
@@ -417,7 +376,6 @@ const STOP_WORDS_KO = new Set([
   "누구",
   "무엇",
   "어떤",
-  // Time (vague)
   "어제",
   "오늘",
   "내일",
@@ -426,13 +384,10 @@ const STOP_WORDS_KO = new Set([
   "아까",
   "나중",
   "전에",
-  // Request words
   "제발",
   "부탁",
 ]);
 
-// Common Korean trailing particles to strip from words for tokenization
-// Sorted by descending length so longest-match-first is guaranteed.
 const KO_TRAILING_PARTICLES = [
   "에서",
   "으로",
@@ -471,16 +426,13 @@ function stripKoreanTrailingParticle(token: string): string | null {
 }
 
 function isUsefulKoreanStem(stem: string): boolean {
-  // Prevent bogus one-syllable stems from words like "논의" -> "논".
   if (/[\uac00-\ud7af]/.test(stem)) {
     return stem.length >= 2;
   }
-  // Keep stripped ASCII stems for mixed tokens like "API를" -> "api".
   return /^[a-z0-9_]+$/i.test(stem);
 }
 
 const STOP_WORDS_JA = new Set([
-  // Pronouns and references
   "これ",
   "それ",
   "あれ",
@@ -490,7 +442,6 @@ const STOP_WORDS_JA = new Set([
   "ここ",
   "そこ",
   "あそこ",
-  // Common auxiliaries / vague verbs
   "する",
   "した",
   "して",
@@ -500,7 +451,6 @@ const STOP_WORDS_JA = new Set([
   "ある",
   "なる",
   "できる",
-  // Particles / connectors
   "の",
   "こと",
   "もの",
@@ -513,7 +463,6 @@ const STOP_WORDS_JA = new Set([
   "まで",
   "より",
   "だけ",
-  // Question words
   "なぜ",
   "どう",
   "何",
@@ -521,7 +470,6 @@ const STOP_WORDS_JA = new Set([
   "どこ",
   "誰",
   "どれ",
-  // Time (vague)
   "昨日",
   "今日",
   "明日",
@@ -533,7 +481,6 @@ const STOP_WORDS_JA = new Set([
 ]);
 
 const STOP_WORDS_ZH = new Set([
-  // Pronouns
   "我",
   "我们",
   "你",
@@ -548,7 +495,6 @@ const STOP_WORDS_ZH = new Set([
   "那个",
   "这些",
   "那些",
-  // Auxiliary words
   "的",
   "了",
   "着",
@@ -562,7 +508,6 @@ const STOP_WORDS_ZH = new Set([
   "呀",
   "嘛",
   "啦",
-  // Verbs (common, vague)
   "是",
   "有",
   "在",
@@ -583,7 +528,6 @@ const STOP_WORDS_ZH = new Set([
   "能",
   "会",
   "可以",
-  // Prepositions and conjunctions
   "和",
   "与",
   "或",
@@ -602,7 +546,6 @@ const STOP_WORDS_ZH = new Set([
   "再",
   "才",
   "只",
-  // Time (vague)
   "之前",
   "以前",
   "之后",
@@ -613,7 +556,6 @@ const STOP_WORDS_ZH = new Set([
   "今天",
   "明天",
   "最近",
-  // Vague references
   "东西",
   "事情",
   "事",
@@ -623,7 +565,6 @@ const STOP_WORDS_ZH = new Set([
   "怎么",
   "为什么",
   "多少",
-  // Question/request words
   "请",
   "帮",
   "帮忙",
@@ -642,45 +583,30 @@ export function isQueryStopWordToken(token: string): boolean {
   );
 }
 
-/**
- * Check if a token looks like a meaningful keyword.
- * Returns false for short tokens, numbers-only, etc.
- */
 function isValidKeyword(token: string): boolean {
   if (!token || token.length === 0) {
     return false;
   }
-  // Skip very short English words (likely stop words or fragments)
   if (/^[a-zA-Z]+$/.test(token) && token.length < 3) {
     return false;
   }
-  // Skip pure numbers (not useful for semantic search)
   if (/^\d+$/.test(token)) {
     return false;
   }
-  // Skip tokens that are all punctuation
   if (/^[\p{P}\p{S}]+$/u.test(token)) {
     return false;
   }
   return true;
 }
 
-/**
- * Simple tokenizer that handles English, Chinese, Korean, and Japanese text.
- * For Chinese, we do character-based splitting since we don't have a proper segmenter.
- * For English, we split on whitespace and punctuation.
- */
 function tokenize(text: string, opts?: { ftsTokenizer?: "unicode61" | "trigram" }): string[] {
   const useTrigram = opts?.ftsTokenizer === "trigram";
   const tokens: string[] = [];
   const normalized = text.toLowerCase().trim();
 
-  // Split into segments (English words, Chinese character sequences, etc.)
   const segments = normalized.split(/[\s\p{P}]+/u).filter(Boolean);
 
   for (const segment of segments) {
-    // Japanese text often mixes scripts (kanji/kana/ASCII) without spaces.
-    // Extract script-specific chunks so technical terms like "API" / "バグ" are retained.
     if (/[\u3040-\u30ff]/.test(segment)) {
       const jpParts =
         segment.match(/[a-z0-9_]+|[\u30a0-\u30ffー]+|[\u4e00-\u9fff]+|[\u3040-\u309f]{2,}/g) ?? [];
@@ -697,37 +623,28 @@ function tokenize(text: string, opts?: { ftsTokenizer?: "unicode61" | "trigram" 
         }
       }
     } else if (/[\u4e00-\u9fff]/.test(segment)) {
-      // Check if segment contains CJK characters (Chinese)
       const chars = Array.from(segment).filter((c) => /[\u4e00-\u9fff]/.test(c));
       if (useTrigram) {
-        // In trigram mode, push the whole contiguous CJK block (mirroring the
-        // Japanese kanji path). SQLite's trigram FTS requires at least 3 characters
-        // per query term — individual characters silently return no results.
         const block = chars.join("");
         if (block.length > 0) {
           tokens.push(block);
         }
       } else {
-        // Default mode: unigrams + bigrams for phrase matching
         tokens.push(...chars);
         for (let i = 0; i < chars.length - 1; i++) {
           tokens.push(chars[i] + chars[i + 1]);
         }
       }
     } else if (/[\uac00-\ud7af\u3131-\u3163]/.test(segment)) {
-      // For Korean (Hangul syllables and jamo), keep the word as-is unless it is
-      // effectively a stop word once trailing particles are removed.
       const stem = stripKoreanTrailingParticle(segment);
       const stemIsStopWord = stem !== null && STOP_WORDS_KO.has(stem);
       if (!STOP_WORDS_KO.has(segment) && !stemIsStopWord) {
         tokens.push(segment);
       }
-      // Also emit particle-stripped stems when they are useful keywords.
       if (stem && !STOP_WORDS_KO.has(stem) && isUsefulKoreanStem(stem)) {
         tokens.push(stem);
       }
     } else {
-      // For non-CJK, keep as single token
       tokens.push(segment);
     }
   }
@@ -735,14 +652,6 @@ function tokenize(text: string, opts?: { ftsTokenizer?: "unicode61" | "trigram" 
   return tokens;
 }
 
-/**
- * Extract keywords from a conversational query for FTS search.
- *
- * Examples:
- * - "that thing we discussed about the API" → ["discussed", "API"]
- * - "之前讨论的那个方案" → ["讨论", "方案"]
- * - "what was the solution for the bug" → ["solution", "bug"]
- */
 export function extractKeywords(
   query: string,
   opts?: { ftsTokenizer?: "unicode61" | "trigram" },
@@ -752,15 +661,12 @@ export function extractKeywords(
   const seen = new Set<string>();
 
   for (const token of tokens) {
-    // Skip stop words
     if (isQueryStopWordToken(token)) {
       continue;
     }
-    // Skip invalid keywords
     if (!isValidKeyword(token)) {
       continue;
     }
-    // Skip duplicates
     if (seen.has(token)) {
       continue;
     }
@@ -769,60 +675,4 @@ export function extractKeywords(
   }
 
   return keywords;
-}
-
-/**
- * Expand a query for FTS search.
- * Returns both the original query and extracted keywords for OR-matching.
- *
- * @param query - User's original query
- * @returns Object with original query and extracted keywords
- */
-export function expandQueryForFts(
-  query: string,
-  opts?: { ftsTokenizer?: "unicode61" | "trigram" },
-): {
-  original: string;
-  keywords: string[];
-  expanded: string;
-} {
-  const original = query.trim();
-  const keywords = extractKeywords(original, opts);
-
-  // Build expanded query: original terms OR extracted keywords
-  // This ensures both exact matches and keyword matches are found
-  const expanded = keywords.length > 0 ? `${original} OR ${keywords.join(" OR ")}` : original;
-
-  return { original, keywords, expanded };
-}
-
-/**
- * Type for an optional LLM-based query expander.
- * Can be provided to enhance keyword extraction with semantic understanding.
- */
-export type LlmQueryExpander = (query: string) => Promise<string[]>;
-
-/**
- * Expand query with optional LLM assistance.
- * Falls back to local extraction if LLM is unavailable or fails.
- */
-export async function expandQueryWithLlm(
-  query: string,
-  llmExpander?: LlmQueryExpander,
-  opts?: { ftsTokenizer?: "unicode61" | "trigram" },
-): Promise<string[]> {
-  // If LLM expander is provided, try it first
-  if (llmExpander) {
-    try {
-      const llmKeywords = await llmExpander(query);
-      if (llmKeywords.length > 0) {
-        return llmKeywords;
-      }
-    } catch {
-      // LLM failed, fall back to local extraction
-    }
-  }
-
-  // Fall back to local keyword extraction
-  return extractKeywords(query, opts);
 }

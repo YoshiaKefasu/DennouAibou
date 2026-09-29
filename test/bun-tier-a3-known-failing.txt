@@ -2,12 +2,12 @@
 #
 # Measured on bun 1.4.0 / Windows / Phase 2-A3 tree:
 #   bun test --isolate --timeout 120000 <all 1097 Tier A files>
-#   -> 505 files ran, 51 known failures, 573 not reached (592 originally, 19 reclassified as pre-existing; timeout on 900s shell)
+#   -> 505 files ran, 51 known failures, 559 not reached (timeout on 900s shell)
 #
 # Tier A = tests that exist under src/ or extensions/ (excl. discord/context-pruner)
 # and classifiable as "no vi.* API use" by run-bun-tier-b.mjs's analyzer.
 #
-# The 592 unreached files could not be assessed. They WILL run when the
+# The 559 unreached files could not be assessed. They WILL run when the
 # test file count per shard decreases, but are treated as unknown until
 # confirmed — treat as potentially failing.
 #
@@ -71,7 +71,7 @@ src/gateway/gateway.test.ts
 src/gateway/model-pricing-cache.test.ts
 src/gateway/server.canvas-auth.test.ts
 
-# unknown / not-reached (573; 592 originally, 19 reclassified as pre-existing)
+# unknown / not-reached (559)
 # These files were not reached within the 900s shell timeout during the
 # Phase 2-A3 measurement run. Keep this complete list to track coverage.
 src/config/config.legacy-config-detection.rejects-routing-allowfrom.test.ts
@@ -415,18 +415,6 @@ src/media/mime.test.ts
 src/media/native-audio.test.ts
 src/media/parse.test.ts
 src/media/read-capability.test.ts
-src/memory-host-sdk/host/backend-config.test.ts
-src/memory-host-sdk/host/batch-error-utils.test.ts
-src/memory-host-sdk/host/batch-output.test.ts
-src/memory-host-sdk/host/batch-status.test.ts
-src/memory-host-sdk/host/embedding-chunk-limits.test.ts
-src/memory-host-sdk/host/embeddings-mistral.test.ts
-src/memory-host-sdk/host/embeddings-model-normalize.test.ts
-src/memory-host-sdk/host/internal.test.ts
-src/memory-host-sdk/host/qmd-query-parser.test.ts
-src/memory-host-sdk/host/qmd-scope.test.ts
-src/memory-host-sdk/host/query-expansion.test.ts
-src/memory-host-sdk/host/session-files.test.ts
 src/music-generation/capabilities.test.ts
 src/music-generation/provider-capabilities.contract.test.ts
 src/node-host/exec-policy.test.ts

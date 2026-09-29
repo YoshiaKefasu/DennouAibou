@@ -1,10 +1,10 @@
-import type { OpenClawConfig } from "../config/config.js";
-import type { MemoryCitationsMode } from "../config/types.memory.js";
 import type {
   MemoryEmbeddingProbeResult,
   MemoryProviderStatus,
   MemorySyncProgressUpdate,
-} from "../memory-host-sdk/engine-storage.js";
+} from "../commands/status.memory-types.js";
+import type { OpenClawConfig } from "../config/config.js";
+import type { MemoryCitationsMode } from "../config/types.memory.js";
 
 export type MemoryPromptSectionBuilder = (params: {
   availableTools: Set<string>;

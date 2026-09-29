@@ -1564,7 +1564,7 @@ KASOU 運用では画像・音楽・動画の生成系ツール（`image_generat
 - **ユーザー裁定**: 不要（2026-09-21）
 - **先行作業**: `/sandbox` コマンド、doctor の sandbox 検査、`stage-sandbox-media`（受信メディアのサンドボックス配置）の経路解消
 
-#### 23.3.7 `src/memory-host-sdk/`（§23.2 候補3）
+#### 23.3.7 `src/memory-host-sdk/`（§23.2 候補3・実施済み — 詳細は §29 参照）
 
 - **機能**: メモリ検索エンジン（engine / host）。embedding 用に `node-llama-cpp` 依存も同 SDK 内に残る
 - **理由**: `memory-core` は §19 で完全削除済み、かつ有効プラグインに memory 種別が無い。`src/plugins/memory-runtime.ts` は「memory plugin unavailable」を返す経路になっており、呼び出し側（`agents/memory-search.ts`、`commands/status.scan.deps.runtime.ts`、`gateway/server-startup-memory.ts`）はそこへ委譲するだけ
@@ -1935,3 +1935,64 @@ APIキー解決チェーンの実測：`src/agents/model-auth.ts` の `resolveAp
 - テスト: 6ファイル（期待値更新のみ・新規テストなし）
 - 削除ファイル: 0（ファイル削除禁止のため。26ファイルの器は残置し、承認要求のみ停止）
 - コミット: 未実施（git add / commit / push は本タスクの禁止事項）
+
+## 29. memory-host-sdk 完全撤去・残存参照の剥がし（2026-09-24 時点作業・完了）
+
+### 29.1 目的・背景
+
+`memory-core` プラグインは先行波（§19）で削除済みであり、有効プラグインに memory 種別は存在しなかった。しかし `src/memory-host-sdk/`（83ファイル/10,559行）および `packages/memory-host-sdk/`（84ファイル）がツリーに残存し、ビルドやテスト台帳でノイズとなっていた。本作業では、先行して物理削除された 167 ファイルに対する残存参照を本番コード・テスト・設定・台帳から完全に剥がし、自立可能な最小構成へ移行した。
+
+### 29.2 削除規模
+
+- `src/memory-host-sdk/`（83 ファイル / 10,559 行）: 物理削除済み
+- `packages/memory-host-sdk/`（84 ファイル）: 物理削除済み
+- 死んだ runtime 経路モジュールの追加削除（4 ファイル）:
+  - `src/plugins/memory-runtime.ts`
+  - `src/gateway/server-startup-memory.ts`
+  - `src/plugins/memory-runtime.test.ts`
+  - `src/gateway/server-startup-memory.test.ts`
+- 合計削除: 171 ファイル
+
+### 29.3 剥がした参照一覧と対応
+
+| ファイル                                              | 参照内容                                               | 対応                                                                                                                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/commands/status.memory-types.ts`（新規）         | 共有型のみ                                             | `Tone`, `MemoryProviderStatus`, `EmbeddingInput` 等の型のみローカル化（3関数は `status.command.text-runtime.ts` へ配置）                                                      |
+| `src/commands/status.command.ts`                      | `Tone` 型 import                                       | `status.memory-types.ts` へ差し替え                                                                                                                                           |
+| `src/commands/status.command.text-runtime.ts`         | status ヘルパー3関数                                   | `status-format.ts` から3関数（`resolveMemoryVectorState`/`resolveMemoryFtsState`/`resolveMemoryCacheSummary`）を逐語移設                                                      |
+| `src/commands/status.scan.shared.ts`                  | `MemoryProviderStatus` 型 import                       | `status.memory-types.ts` へ差し替え                                                                                                                                           |
+| `src/commands/status.scan.deps.runtime.ts`            | `getActiveMemorySearchManager`, `MemoryProviderStatus` | 型差し替え、マネージャ取得は `{ manager: null }` のダミー解決に変更                                                                                                           |
+| `src/plugins/memory-embedding-providers.ts`           | `EmbeddingInput` 型 import                             | `status.memory-types.ts` へ差し替え                                                                                                                                           |
+| `src/plugins/memory-state.ts`                         | probe/status 型 import                                 | `status.memory-types.ts` へ差し替え                                                                                                                                           |
+| `src/commands/doctor-state-integrity.ts`              | `resolveMemoryBackendConfig` import                    | 存在しないため import 削除、警告抑止判定は `false` を返すよう変更（理由をコメント明記）                                                                                       |
+| `src/agents/pi-hooks/query-keywords.ts`（新規）       | `extractKeywords`, `isQueryStopWordToken`              | `src/agents/pi-hooks/compaction-safeguard-quality.ts` 用に純関数・定数のみローカル化（828行の全文は不要）                                                                     |
+| `src/agents/pi-hooks/compaction-safeguard-quality.ts` | query ヘルパー import                                  | `./query-keywords.js` へ差し替え                                                                                                                                              |
+| `src/agents/memory-search.ts`                         | multimodal ヘルパー import                             | 他モジュールから参照されているためファイル温存。`isMemoryMultimodalEnabled`, `normalizeMemoryMultimodalSettings`, `supportsMemoryMultimodalEmbeddings` 等を内部にローカル定義 |
+| `src/gateway/server-startup.ts`                       | `startGatewayMemoryBackend`                            | import および startup での呼び出しを除去                                                                                                                                      |
+| `src/plugins/loader.ts`                               | `memoryRuntime` フィールド・代入                       | memoryRuntime スロットは温存（非activate時のスナップショット復元契約を維持）                                                                                                  |
+| `src/cli/run-main.ts`                                 | `closeActiveMemorySearchManagers`                      | 動的 import と呼び出しを除去、`closeCliMemoryManagers` を関数ごと呼び出しごと完全削除                                                                                         |
+| `src/agents/pi-embedded-runner/compaction-hooks.ts`   | `getActiveMemorySearchManager`                         | import および compaction 後の memory sync 呼び出しを除去                                                                                                                      |
+
+### 29.4 raw-chat-search プラグインの扱い（温存）
+
+- `extensions/raw-chat-search/` は raw-chat 履歴検索のための現役・温存プラグインであり、壊さない方針を徹底。
+- `extensions/raw-chat-search/src/runtime-core.local.ts` を新設し、`tools.ts` が必要としていた `readNumberParam`, `readStringParam`, `resolveSessionAgentId`, `AnyAgentTool` をコアから直接ローカル import して再エクスポート。
+- `extensions/raw-chat-search/src/tools.ts` から `memory-host-sdk/runtime-core.js` への依存を解消。
+
+### 29.5 テスト・設定・台帳の整合
+
+- `src/cli/run-main.exit.test.ts`: `closeActiveMemorySearchManagersMock` および `vi.mock("../plugins/memory-runtime.js")` を削除。終了時のメモリマネージャ呼び出しテストを除去し、他の終了コード検証テスト（5件）は完全維持（pass）。
+- `src/agents/pi-embedded-runner/compact.hooks.harness.ts`: `vi.doMock("../../plugins/memory-runtime.js")` および死に mock を削除。
+- `src/agents/pi-embedded-runner/compact.hooks.test.ts`: compaction 後のメモリ同期マネージャ呼び出し検証を整理。
+- `tsconfig.plugin-sdk.dts.json`: `include` から `"packages/memory-host-sdk/src/**/*.ts"` を除去。
+- `test/bun-tier-c4b-known-failing.txt`: timeout リストから削除済み4ファイルを削除、ヘッダ件数を実数（62件 failing + 11件 helper-only = 73件）に修正。
+- `test/bun-tier-a3-known-failing.txt`: 削除済みテスト 12 ファイルを削除、ヘッダ件数を実数（559件 not reached）に修正。
+
+### 29.6 検証結果
+
+| ゲート           | 結果                                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 残存参照チェック | 削除モジュールへの **import** 参照は0件（`resolveMemoryBackendConfig` は `memory-state.ts` のプラグインAPI型定義＋テストmockとして残存） |
+| `tsgo --noEmit`  | **0 errors (exit 0)**                                                                                                                    |
+| `oxfmt --check`  | 変更対象全ファイル pass                                                                                                                  |
+| 台帳件数         | `bun-tier-c4b`: 実数一致（62件） / `bun-tier-a3`: 実数一致（559件）                                                                      |

@@ -18,7 +18,6 @@ import {
   resolveStorePath,
 } from "../config/sessions.js";
 import { resolveRequiredHomeDir } from "../infra/home-dir.js";
-import { resolveMemoryBackendConfig } from "../memory-host-sdk/engine-storage.js";
 import { parseAgentSessionKey } from "../sessions/session-key-utils.js";
 import { note } from "../terminal/note.js";
 import { shortenHomePath } from "../utils.js";
@@ -481,9 +480,9 @@ function shouldRequireOAuthDir(cfg: OpenClawConfig, env: NodeJS.ProcessEnv): boo
   return false;
 }
 
-function shouldSuppressOrphanTranscriptWarning(cfg: OpenClawConfig, agentId: string): boolean {
-  const backendConfig = resolveMemoryBackendConfig({ cfg, agentId });
-  return backendConfig?.backend === "qmd" && backendConfig.qmd?.sessions.enabled === true;
+// Memory backend no longer exists (memory-host-sdk removed); orphan-transcript warnings are never suppressed.
+function shouldSuppressOrphanTranscriptWarning(_cfg: OpenClawConfig, _agentId: string): boolean {
+  return false;
 }
 
 export async function noteStateIntegrity(

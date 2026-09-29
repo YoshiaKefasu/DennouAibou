@@ -2,81 +2,8 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { OpenClawConfig } from "../../config/config.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
-import { getActiveMemorySearchManager } from "../../plugins/memory-runtime.js";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
-import { resolveSessionAgentId } from "../agent-scope.js";
-import { resolveMemorySearchConfig } from "../memory-search.js";
 import { log } from "./logger.js";
-
-function resolvePostCompactionIndexSyncMode(config?: OpenClawConfig): "off" | "async" | "await" {
-  const mode = config?.agents?.defaults?.compaction?.postIndexSync;
-  if (mode === "off" || mode === "async" || mode === "await") {
-    return mode;
-  }
-  return "async";
-}
-
-async function runPostCompactionSessionMemorySync(params: {
-  config?: OpenClawConfig;
-  sessionKey?: string;
-  sessionFile: string;
-}): Promise<void> {
-  if (!params.config) {
-    return;
-  }
-  try {
-    const sessionFile = params.sessionFile.trim();
-    if (!sessionFile) {
-      return;
-    }
-    const agentId = resolveSessionAgentId({
-      sessionKey: params.sessionKey,
-      config: params.config,
-    });
-    const resolvedMemory = resolveMemorySearchConfig(params.config, agentId);
-    if (!resolvedMemory || !resolvedMemory.sources.includes("sessions")) {
-      return;
-    }
-    if (!resolvedMemory.sync.sessions.postCompactionForce) {
-      return;
-    }
-    const { manager } = await getActiveMemorySearchManager({
-      cfg: params.config,
-      agentId,
-    });
-    if (!manager?.sync) {
-      return;
-    }
-    await manager.sync({
-      reason: "post-compaction",
-      sessionFiles: [sessionFile],
-    });
-  } catch (err) {
-    log.warn(`memory sync skipped (post-compaction): ${String(err)}`);
-  }
-}
-
-function syncPostCompactionSessionMemory(params: {
-  config?: OpenClawConfig;
-  sessionKey?: string;
-  sessionFile: string;
-  mode: "off" | "async" | "await";
-}): Promise<void> {
-  if (params.mode === "off" || !params.config) {
-    return Promise.resolve();
-  }
-
-  const syncTask = runPostCompactionSessionMemorySync({
-    config: params.config,
-    sessionKey: params.sessionKey,
-    sessionFile: params.sessionFile,
-  });
-  if (params.mode === "await") {
-    return syncTask;
-  }
-  void syncTask;
-  return Promise.resolve();
-}
 
 export async function runPostCompactionSideEffects(params: {
   config?: OpenClawConfig;
@@ -88,12 +15,6 @@ export async function runPostCompactionSideEffects(params: {
     return;
   }
   emitSessionTranscriptUpdate(sessionFile);
-  await syncPostCompactionSessionMemory({
-    config: params.config,
-    sessionKey: params.sessionKey,
-    sessionFile,
-    mode: resolvePostCompactionIndexSyncMode(params.config),
-  });
 }
 
 export type CompactionHookRunner = {

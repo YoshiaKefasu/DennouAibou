@@ -1,14 +1,14 @@
 import { Type } from "typebox";
 import { textResult } from "../../../src/agents/tools/common.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
+import { getRawChatDatabase, type RawChatDatabase } from "./database.js";
+import { isRawChatIndexingEnabled } from "./hook.js";
 import {
   readNumberParam,
   readStringParam,
   resolveSessionAgentId,
   type AnyAgentTool,
-} from "../../../src/memory-host-sdk/runtime-core.js";
-import { getRawChatDatabase, type RawChatDatabase } from "./database.js";
-import { isRawChatIndexingEnabled } from "./hook.js";
+} from "./runtime-core.local.js";
 import type { SearchParams } from "./types.js";
 
 export const ChatSearchSchema = Type.Object({

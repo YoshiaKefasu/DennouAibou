@@ -7,13 +7,11 @@ import {
   contextEngineCompactMock,
   ensureRuntimePluginsLoaded,
   estimateTokensMock,
-  getMemorySearchManagerMock,
   hookRunner,
   loadCompactHooksHarness,
   resolveAgentTransportOverrideMock,
   resolveContextEngineMock,
   resolveEmbeddedAgentStreamFnMock,
-  resolveMemorySearchConfigMock,
   resolveModelMock,
   resolveSessionAgentIdMock,
   resetCompactHooksHarnessMocks,
@@ -40,11 +38,6 @@ type SessionHookEvent = {
   sessionKey?: string;
   context?: Record<string, unknown>;
 };
-type PostCompactionSyncParams = {
-  reason: string;
-  sessionFiles: string[];
-};
-type PostCompactionSync = (params?: unknown) => Promise<void>;
 type Deferred<T> = {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -404,111 +397,6 @@ describe("compactEmbeddedPiSessionDirect hooks", () => {
     expect(tokensAfter).toBe(30);
   });
 
-  it("skips sync in await mode when postCompactionForce is false", async () => {
-    const sync = vi.fn(async () => {});
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
-    resolveMemorySearchConfigMock.mockReturnValue({
-      sources: ["sessions"],
-      sync: {
-        sessions: {
-          postCompactionForce: false,
-        },
-      },
-    });
-
-    await compactTesting.runPostCompactionSideEffects({
-      config: compactionConfig("await"),
-      sessionKey: TEST_SESSION_KEY,
-      sessionFile: TEST_SESSION_FILE,
-    });
-
-    expect(resolveSessionAgentIdMock).toHaveBeenCalledWith({
-      sessionKey: TEST_SESSION_KEY,
-      config: expect.any(Object),
-    });
-    expect(getMemorySearchManagerMock).not.toHaveBeenCalled();
-    expect(sync).not.toHaveBeenCalled();
-  });
-
-  it("awaits post-compaction memory sync in await mode when postCompactionForce is true", async () => {
-    const syncStarted = createDeferred<PostCompactionSyncParams>();
-    const syncRelease = createDeferred<void>();
-    const sync = vi.fn<PostCompactionSync>(async (params) => {
-      syncStarted.resolve(params as PostCompactionSyncParams);
-      await syncRelease.promise;
-    });
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
-    let settled = false;
-
-    const resultPromise = compactTesting.runPostCompactionSideEffects({
-      config: compactionConfig("await"),
-      sessionKey: TEST_SESSION_KEY,
-      sessionFile: TEST_SESSION_FILE,
-    });
-
-    void resultPromise.then(() => {
-      settled = true;
-    });
-    await expect(syncStarted.promise).resolves.toEqual({
-      reason: "post-compaction",
-      sessionFiles: [TEST_SESSION_FILE],
-    });
-    expect(settled).toBe(false);
-    syncRelease.resolve(undefined);
-    await resultPromise;
-    expect(settled).toBe(true);
-  });
-
-  it("skips post-compaction memory sync when the mode is off", async () => {
-    const sync = vi.fn(async () => {});
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
-
-    await compactTesting.runPostCompactionSideEffects({
-      config: compactionConfig("off"),
-      sessionKey: TEST_SESSION_KEY,
-      sessionFile: TEST_SESSION_FILE,
-    });
-
-    expect(resolveSessionAgentIdMock).not.toHaveBeenCalled();
-    expect(getMemorySearchManagerMock).not.toHaveBeenCalled();
-    expect(sync).not.toHaveBeenCalled();
-  });
-
-  it("fires post-compaction memory sync without awaiting it in async mode", async () => {
-    const sync = vi.fn<PostCompactionSync>(async () => {});
-    const managerRequested = createDeferred<void>();
-    const managerGate = createDeferred<{ manager: { sync: PostCompactionSync } }>();
-    const syncStarted = createDeferred<PostCompactionSyncParams>();
-    sync.mockImplementation(async (params) => {
-      syncStarted.resolve(params as PostCompactionSyncParams);
-    });
-    getMemorySearchManagerMock.mockImplementation(async () => {
-      managerRequested.resolve(undefined);
-      return await managerGate.promise;
-    });
-    let settled = false;
-
-    const resultPromise = compactTesting.runPostCompactionSideEffects({
-      config: compactionConfig("async"),
-      sessionKey: TEST_SESSION_KEY,
-      sessionFile: TEST_SESSION_FILE,
-    });
-
-    await managerRequested.promise;
-    void resultPromise.then(() => {
-      settled = true;
-    });
-    await resultPromise;
-    expect(getMemorySearchManagerMock).toHaveBeenCalledTimes(1);
-    expect(settled).toBe(true);
-    expect(sync).not.toHaveBeenCalled();
-    managerGate.resolve({ manager: { sync } });
-    await expect(syncStarted.promise).resolves.toEqual({
-      reason: "post-compaction",
-      sessionFiles: [TEST_SESSION_FILE],
-    });
-  });
-
   it("skips compaction when the transcript only contains boilerplate replies and tool output", async () => {
     const messages = [
       { role: "user", content: "<b>HEARTBEAT_OK</b>", timestamp: 1 },
@@ -700,11 +588,9 @@ describe("compactEmbeddedPiSession hooks (ownsCompaction engine)", () => {
     );
   });
 
-  it("emits a transcript update and post-compaction memory sync on the engine-owned path", async () => {
+  it("emits a transcript update on the engine-owned path", async () => {
     const listener = vi.fn();
     const cleanup = onSessionTranscriptUpdate(listener);
-    const sync = vi.fn(async () => {});
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
 
     try {
       const result = await compactEmbeddedPiSession(
@@ -717,10 +603,6 @@ describe("compactEmbeddedPiSession hooks (ownsCompaction engine)", () => {
       expect(result.ok).toBe(true);
       expect(listener).toHaveBeenCalledTimes(1);
       expect(listener).toHaveBeenCalledWith({ sessionFile: TEST_SESSION_FILE });
-      expect(sync).toHaveBeenCalledWith({
-        reason: "post-compaction",
-        sessionFiles: [TEST_SESSION_FILE],
-      });
     } finally {
       cleanup();
     }
@@ -793,8 +675,6 @@ describe("compactEmbeddedPiSession hooks (ownsCompaction engine)", () => {
 
   it("does not fire after_compaction when compaction fails", async () => {
     hookRunner.hasHooks.mockReturnValue(true);
-    const sync = vi.fn(async () => {});
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
     contextEngineCompactMock.mockResolvedValue({
       ok: false,
       compacted: false,
@@ -807,14 +687,11 @@ describe("compactEmbeddedPiSession hooks (ownsCompaction engine)", () => {
     expect(result.ok).toBe(false);
     expect(hookRunner.runBeforeCompaction).toHaveBeenCalled();
     expect(hookRunner.runAfterCompaction).not.toHaveBeenCalled();
-    expect(sync).not.toHaveBeenCalled();
   });
 
-  it("does not duplicate transcript updates or sync in the wrapper when the engine delegates compaction", async () => {
+  it("does not duplicate transcript updates in the wrapper when the engine delegates compaction", async () => {
     const listener = vi.fn();
     const cleanup = onSessionTranscriptUpdate(listener);
-    const sync = vi.fn(async () => {});
-    getMemorySearchManagerMock.mockResolvedValue({ manager: { sync } });
     resolveContextEngineMock.mockResolvedValue({
       info: { ownsCompaction: false },
       compact: contextEngineCompactMock,
@@ -829,7 +706,6 @@ describe("compactEmbeddedPiSession hooks (ownsCompaction engine)", () => {
 
       expect(result.ok).toBe(true);
       expect(listener).not.toHaveBeenCalled();
-      expect(sync).not.toHaveBeenCalled();
     } finally {
       cleanup();
     }
