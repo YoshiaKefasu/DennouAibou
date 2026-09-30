@@ -142,7 +142,7 @@ describe("RAW_CHAT_SEARCH Phase 3 vector recall", () => {
   it("uses the documented defaults", () => {
     expect(HIGH_RELEVANCE_THRESHOLD).toBe(0.85);
     expect(MEDIUM_RELEVANCE_THRESHOLD).toBe(0.6);
-    expect(DEFAULT_RECALL_TIMEOUT_MS).toBe(400);
+    expect(DEFAULT_RECALL_TIMEOUT_MS).toBe(1_000);
     expect(DEFAULT_CONTEXT_WINDOW_ROUNDS).toBe(2);
   });
 

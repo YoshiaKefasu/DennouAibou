@@ -4,7 +4,7 @@ import { cosineSimilarityBatch } from "./vector-math.js";
 
 export const HIGH_RELEVANCE_THRESHOLD = 0.85;
 export const MEDIUM_RELEVANCE_THRESHOLD = 0.6;
-export const DEFAULT_RECALL_TIMEOUT_MS = 400;
+export const DEFAULT_RECALL_TIMEOUT_MS = 1_000;
 export const DEFAULT_CONTEXT_WINDOW_ROUNDS = 2;
 
 export type RecallOptions = {

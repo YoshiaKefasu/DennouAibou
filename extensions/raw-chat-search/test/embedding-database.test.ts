@@ -335,7 +335,7 @@ describe("Gemini Embedding 2 client", () => {
     expect(GEMINI_EMBEDDING_ENDPOINT).toBe(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent",
     );
-    expect(GEMINI_EMBEDDING_TIMEOUT_MS).toBe(400);
+    expect(GEMINI_EMBEDDING_TIMEOUT_MS).toBe(1_000);
 
     const values = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
     values[0] = 1;

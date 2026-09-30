@@ -2,7 +2,7 @@
  * Google Gemini Embedding 2 REST client for RAW_CHAT_SEARCH (design doc §2, §6).
  *
  * Direct `fetch` to Google AI Studio keeps the call path short (no proxy hop)
- * and the strict 400ms timeout keeps the recall path fail-open: a slow or
+ * and the strict 1000ms timeout keeps the recall path fail-open: a slow or
  * failing embedding API must never block a reply.
  */
 import { blobToVector, EMBEDDING_DIMENSIONS, normalizeL2, vectorToBlob } from "./vector-math.js";
@@ -10,7 +10,7 @@ import { blobToVector, EMBEDDING_DIMENSIONS, normalizeL2, vectorToBlob } from ".
 export const GEMINI_EMBEDDING_MODEL = "gemini-embedding-2";
 export const GEMINI_EMBEDDING_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent";
-export const GEMINI_EMBEDDING_TIMEOUT_MS = 400;
+export const GEMINI_EMBEDDING_TIMEOUT_MS = 1_000;
 
 export type GeminiEmbeddingFailureCode =
   | "missing-api-key"
@@ -45,7 +45,7 @@ export type GeminiEmbedOptions = {
   apiKey?: string;
   /** Environment used to resolve the fallback API key. */
   env?: NodeJS.ProcessEnv;
-  /** Request timeout in milliseconds. Defaults to 400ms. */
+  /** Request timeout in milliseconds. Defaults to 1000ms. */
   timeoutMs?: number;
   /** Expected vector length. Defaults to 1280. */
   dimensions?: number;

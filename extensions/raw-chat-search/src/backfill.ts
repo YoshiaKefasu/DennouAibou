@@ -72,7 +72,7 @@ export type EmbedPendingOptions = {
   delayMs?: number;
   /** Expected embedding dimensions (defaults to 1280). */
   dimensions?: number;
-  /** Per-request timeout in milliseconds (defaults to the client's 400ms). */
+  /** Per-request timeout in milliseconds (defaults to the client's 1000ms). */
   timeoutMs?: number;
   /** Injected fetch implementation for tests. */
   fetchImpl?: typeof fetch;
