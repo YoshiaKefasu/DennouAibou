@@ -2,12 +2,12 @@
 #
 # Measured on bun 1.4.0 / Windows / Phase 2-A3 tree:
 #   bun test --isolate --timeout 120000 <all 1097 Tier A files>
-#   -> 505 files ran, 51 known failures, 559 not reached (timeout on 900s shell)
+#   -> 505 files ran, 48 known failures, 531 not reached (timeout on 900s shell)
 #
 # Tier A = tests that exist under src/ or extensions/ (excl. discord/context-pruner)
 # and classifiable as "no vi.* API use" by run-bun-tier-b.mjs's analyzer.
 #
-# The 559 unreached files could not be assessed. They WILL run when the
+# The 531 unreached files could not be assessed. They WILL run when the
 # test file count per shard decreases, but are treated as unknown until
 # confirmed — treat as potentially failing.
 #
@@ -22,14 +22,11 @@ extensions/raw-chat-search/src/raw-chat.test.ts
 extensions/telegram/src/update-offset-store.test.ts
 src/agents/workspace.test.ts
 
-# pre-existing (47)
+# pre-existing (44)
 src/agents/bash-tools.exec.pty.test.ts
 src/agents/live-auth-keys.test.ts
 src/agents/models-config.fills-missing-provider-apikey-from-env-var.test.ts
-src/agents/models-config.providers.moonshot.test.ts
 src/agents/pi-bundle-mcp-tools.materialize.test.ts
-src/agents/pi-embedded-runner/kilocode.test.ts
-src/agents/pi-model-discovery.auth.test.ts
 src/agents/skills.env-path-guidance.test.ts
 src/agents/spawned-context.test.ts
 src/auto-reply/commands-registry.test.ts
@@ -71,7 +68,7 @@ src/gateway/gateway.test.ts
 src/gateway/model-pricing-cache.test.ts
 src/gateway/server.canvas-auth.test.ts
 
-# unknown / not-reached (559)
+# unknown / not-reached (531)
 # These files were not reached within the 900s shell timeout during the
 # Phase 2-A3 measurement run. Keep this complete list to track coverage.
 src/config/config.legacy-config-detection.rejects-routing-allowfrom.test.ts
@@ -172,7 +169,6 @@ src/dennou-soul/prune-closed-sessions.test.ts
 src/dennou-soul/prune-engine.test.ts
 src/dennou-soul/raw-chat/raw-chat.test.ts
 src/docker-image-digests.test.ts
-src/docs/slash-commands-doc.test.ts
 src/gateway/agent-prompt.test.ts
 src/gateway/android-node.capabilities.policy-config.test.ts
 src/gateway/android-node.capabilities.policy-source.test.ts
@@ -238,8 +234,6 @@ src/hooks/module-loader.test.ts
 src/hooks/plugin-hooks.test.ts
 src/hooks/policy.test.ts
 src/hooks/workspace.test.ts
-src/i18n/registry.test.ts
-src/image-generation/live-test-helpers.test.ts
 src/index.test.ts
 src/infra/abort-signal.test.ts
 src/infra/agent-events.test.ts
@@ -335,7 +329,6 @@ src/infra/plugin-install-path-warnings.test.ts
 src/infra/ports-format.test.ts
 src/infra/ports-probe.test.ts
 src/infra/prototype-keys.test.ts
-src/infra/provider-usage.format.test.ts
 src/infra/push-apns.auth.test.ts
 src/infra/resolve-system-bin.test.ts
 src/infra/restart-sentinel.test.ts
@@ -415,8 +408,6 @@ src/media/mime.test.ts
 src/media/native-audio.test.ts
 src/media/parse.test.ts
 src/media/read-capability.test.ts
-src/music-generation/capabilities.test.ts
-src/music-generation/provider-capabilities.contract.test.ts
 src/node-host/exec-policy.test.ts
 src/node-host/invoke.sanitize-env.test.ts
 src/node-host/runner.credentials.test.ts
@@ -471,7 +462,6 @@ src/plugins/contracts/plugin-registration.deepgram.contract.test.ts
 src/plugins/contracts/plugin-registration.exa.contract.test.ts
 src/plugins/contracts/plugin-registration.google.contract.test.ts
 src/plugins/contracts/plugin-registration.openai.contract.test.ts
-src/plugins/contracts/plugin-sdk-index.bundle.test.ts
 src/plugins/contracts/plugin-sdk-index.test.ts
 src/plugins/contracts/plugin-sdk-package-contract-guardrails.test.ts
 src/plugins/contracts/plugin-sdk-root-alias.test.ts
@@ -510,7 +500,6 @@ src/plugins/provider-replay-helpers.test.ts
 src/plugins/provider-validation.test.ts
 src/plugins/registry.dual-kind-memory-gate.test.ts
 src/plugins/runtime-live-state-guardrails.test.ts
-src/plugins/runtime-plugin-boundary.whatsapp.test.ts
 src/plugins/runtime.channel-pin.test.ts
 src/plugins/runtime.test.ts
 src/plugins/runtime/local-runtime-module.test.ts
@@ -526,11 +515,6 @@ src/routing/account-id.test.ts
 src/routing/account-lookup.test.ts
 src/routing/session-key.continuity.test.ts
 src/routing/session-key.test.ts
-src/scripts/canvas-a2ui-copy.test.ts
-src/scripts/ci-changed-scope.test.ts
-src/scripts/docs-link-audit.test.ts
-src/scripts/sync-plugin-versions.test.ts
-src/scripts/test-projects.test.ts
 src/secrets/apply.test.ts
 src/secrets/audit.test.ts
 src/secrets/channel-contract-surface-guardrails.test.ts
@@ -541,7 +525,6 @@ src/secrets/path-utils.test.ts
 src/secrets/plan.test.ts
 src/secrets/provider-env-vars.test.ts
 src/secrets/ref-contract.test.ts
-src/secrets/runtime-auth-profiles-oauth-policy.test.ts
 src/secrets/runtime-config-collectors-plugins.test.ts
 src/secrets/runtime-gateway-auth-surfaces.test.ts
 src/secrets/target-registry-pattern.test.ts
@@ -587,17 +570,6 @@ src/shared/text/assistant-visible-text.test.ts
 src/shared/text/code-regions.test.ts
 src/shared/text/join-segments.test.ts
 src/shared/text/reasoning-tags.test.ts
-src/shared/usage-aggregates.test.ts
-src/tasks/task-executor-boundary.test.ts
-src/tasks/task-executor-policy.test.ts
-src/tasks/task-flow-owner-access.test.ts
-src/tasks/task-flow-registry-import-boundary.test.ts
-src/tasks/task-flow-registry.audit.test.ts
-src/tasks/task-flow-registry.maintenance.test.ts
-src/tasks/task-owner-access.test.ts
-src/tasks/task-registry-import-boundary.test.ts
-src/tasks/task-registry.audit.test.ts
-src/tasks/task-status.test.ts
 src/terminal/ansi.test.ts
 src/terminal/safe-text.test.ts
 src/test-helpers/state-dir-env.test.ts
@@ -627,9 +599,6 @@ src/utils/transcript-tools.test.ts
 src/utils/usage-format.test.ts
 src/utils/utils-misc.test.ts
 src/version.test.ts
-src/video-generation/capabilities.test.ts
-src/video-generation/live-test-helpers.test.ts
-src/video-generation/provider-capabilities.contract.test.ts
 src/wizard/clack-prompter.test.ts
 src/wizard/session.test.ts
 src/wizard/setup.secret-input.test.ts

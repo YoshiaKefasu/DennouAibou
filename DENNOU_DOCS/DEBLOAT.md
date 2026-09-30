@@ -2118,7 +2118,44 @@ KASOU 本番は `cli-router`（CPA）経由のみを使用しており、過去�
 | ------------------------------------ | ------------------------------------------------------------------ |
 | `node scripts/run-tsgo.mjs --noEmit` | **exit 0**（本波内1回のみ実行）                                    |
 | `oxfmt --check`（変更ファイル）      | **pass**                                                           |
-| `plugin-sdk:api:check`               | **pass**（baseline 再生成不要・`--check` そのまま pass）            |
+| `plugin-sdk:api:check`               | **pass**（baseline 再生成不要・`--check` そのまま pass）           |
 | 残存参照                             | 削除モジュールへの import・re-export・`vi.mock` 0件（`grep` 実測） |
 
 残務：`docs/plugins/sdk-overview.md` の `plugin-sdk/provider-zai-endpoint` 行・`docs/plugins/sdk-provider-plugins.md` の `createZaiToolStreamWrapper` 言及は本波スコープ外（docs 整理波で対応）。`src/commands/onboard-types.ts` の `AuthChoice` union 内 zai 選択肢文字列（`"zai-api-key"` 等）は型文字列のみで削除モジュールを import しないため温存（onboard 選択肢体系の整理は別波で判断要）。温存プラグイン（line, raw-chat-search, session-integrity-guard, deepgram）は無変更。
+
+## 33. message-action 残存テスト修正＋Bun 既知失敗台帳クリーンアップ（2026-09-30 時点作業）
+
+### 33.1 目的・背景
+
+`82c2c653ee` で「両ランナーで失敗するため台帳対象外・別途対応」と特定されていた HEAD 起因の壊れテスト2件（feishu/slack 撤去に追随していない）と、DEBLOAT 削除済みテストファイルの行が残存していた Bun 既知失敗台帳4件を整理した。
+
+根因：feishu/slack チャンネルプラグイン撤去により `messageActionTargetAliases` 定義がコード内にゼロ化（`grep` 実測0件）し、`getBootstrapChannelPlugin("feishu")` が undefined を返すため、alias 経由の target 解決を期待するケースが両ランナーで失敗。alias 経路自体は `message-action-runner.plugin-dispatch.test.ts` の deps 注入（feishuLikePlugin）でカバー中のため、削除ケースのカバレッジ欠落はない。
+
+### 33.2 テスト修正（2ファイル）
+
+- `src/infra/outbound/message-action-spec.test.ts`：`ctx: { channel: "feishu" }` で `expected: true` の5ケース（read/pin/unpin/list-pins/channel-info）を除去。pass 済みの `slack`→false・`discord`→false ケースは「alias なし→false」の文書化として温存。
+- `src/infra/outbound/message-action-normalization.test.ts`：send ケースの `currentChannelProvider: "slack"`→`"discord"`（期待 `channel` も同値更新・現行 deliverable `line/discord/telegram` を `bun -e` 実測確認）。`channel: "feishu"` の pin/list-pins 2ケース（`Action ... requires a target` で throw）は除去。pass 済みの read+slack ケースは挙動不変のため温存。
+- アサーション弱体化・型逃げ（`as any` 等）の追加なし（既存 `as never` のみ）。
+
+### 33.3 台帳整理（4ファイル・存在しないパスの行のみ除去、`fs.existsSync` 実測）
+
+| 台帳                                      | 除去 | 更新前後    | ヘッダ更新                                                                                     |
+| ----------------------------------------- | ---- | ----------- | ---------------------------------------------------------------------------------------------- |
+| `test/bun-tier-hoisted-known-failing.txt` | 13行 | 20件→7件    | count 20→7、`reset/dynamic-mock` (9→0)、`runtime/lifecycle` (4→2)、`measured-failure` (6→4)    |
+| `test/bun-tier-a3-known-failing.txt`      | 31行 | 610件→579件 | `pre-existing` (47→44)、`unknown` (559→531)、計測行 51→48 known / 559→531 not reached          |
+| `test/bun-tier-c4b-known-failing.txt`     | 5行  | 62件→57件   | Inventory 73→68（57 failing/timeout + 11 helper-only）、unsupported (60→55)、`The 62 files`→57 |
+| `test/bun-tier-b-known-failing.txt`       | 19行 | 83件→64件   | `bun-only` (28→24)・`pre-existing` (44→32)・structural 8件（重複行含む実数と一致）             |
+
+除去内訳は tasks/sandbox/auth-profiles/memory-host-sdk/provider-usage 等の DEBLOAT 削除済み（`ac79a084ca`・`d2880de6ad`・`a701be67ef` 波）。b 台帳の `bun-only (28)` は重複 `tasks.test.ts` 行により実態29行だったものが24行に一致し、ずれも解消。
+
+### 33.4 検証結果
+
+| ゲート                                                                                                            | 結果                                                |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `bun test src/infra/outbound/message-action-spec.test.ts src/infra/outbound/message-action-normalization.test.ts` | **30 pass / 0 fail**（修正前 29 pass / 8 fail）     |
+| `vitest run`（同2ファイル）                                                                                       | **30 passed（2 files）**                            |
+| `oxfmt --check`（変更テスト2ファイル）                                                                            | **pass**                                            |
+| `pnpm exec tsgo --noEmit`                                                                                         | **exit 0**（本波内1回のみ実行）                     |
+| 台帳残存欠落                                                                                                      | 4台帳とも missing 0件（`fs.existsSync` 再検証済み） |
+
+注：git 操作（add/commit/push 等）は未実施・Kuraudo 担当。`.pi/`・`__DENNOU_vitest__/` 不使用、KASOU 実機不接触。

@@ -5,15 +5,15 @@
 # current HEAD recount is 278 vi.doMock / 56 vi.doUnmock because a701be67ef
 # removed tests before this measurement.
 #
-# Inventory: 73 files (62 failing/timeout + 11 helper-only).
-# Of these, 62 files fail or time out under the split Bun probe; 11 are
+# Inventory: 68 files (57 failing/timeout + 11 helper-only).
+# Of these, 57 files fail or time out under the split Bun probe; 11 are
 # helper-only files with no standalone tests and therefore pass with no tests.
 # Split validation used:
 #   bun test --isolate --pass-with-no-tests --bail=1 --timeout 120000 <file>
 #
 # Result by candidate file: 11 helper-only files pass with no standalone tests;
-# 60 files fail at the first unsupported vi.doMock/vi.doUnmock/vi.resetModules/
-# vi.hoisted call; 2 files time out before a conclusive result. The 62 files
+# 55 files fail at the first unsupported vi.doMock/vi.doUnmock/vi.resetModules/
+# vi.hoisted call; 2 files time out before a conclusive result. The 57 files
 # below are kept out of a green Bun lane until Bun provides the missing dynamic
 # module-mock lifecycle APIs or the tests are split into statically mocked files.
 #
@@ -27,7 +27,7 @@
 # Keep in sync when a file starts passing:
 #   bun test --isolate --timeout 120000 <the file>
 
-# unsupported dynamic module-mock lifecycle (60 files)
+# unsupported dynamic module-mock lifecycle (55 files)
 extensions/discord/src/monitor/native-command.think-autocomplete.test.ts
 extensions/discord/src/monitor/provider.test.ts
 extensions/telegram/src/audit.test.ts
@@ -35,7 +35,6 @@ src/agents/context.lookup.test.ts
 src/agents/model-fallback.run-embedded.e2e.test.ts
 src/agents/openclaw-tools.subagents.sessions-spawn-depth-limits.test.ts
 src/agents/pi-embedded-runner.e2e.test.ts
-src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
 src/agents/pi-model-discovery.compat.e2e.test.ts
 src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
 src/agents/tools-effective-inventory.test.ts
@@ -56,7 +55,6 @@ src/channels/plugins/setup-helpers.import-safety.test.ts
 src/cli/command-secret-targets.import.test.ts
 src/commands/health.snapshot.test.ts
 src/commands/models/list.list-command.forward-compat.test.ts
-src/commands/models/list.probe.test.ts
 src/commands/models/list.status.test.ts
 src/config/bundled-channel-config-runtime.test.ts
 src/config/load-channel-config-surface.test.ts
@@ -84,16 +82,13 @@ src/plugins/conversation-binding.test.ts
 src/plugins/provider-runtime.test.ts
 src/plugins/providers.test.ts
 src/process/exec.test.ts
-src/tasks/task-registry.maintenance.issue-60299.test.ts
-src/tasks/task-registry.test.ts
 test/test-env.test.ts
-ui/src/ui/app-chat.test.ts
 
 # timeout during isolated measurement (2 files)
 src/commands/agent.test.ts
 src/cron/isolated-agent.lane.test.ts
 
-# helper-only files in the 73-file inventory (pass-with-no-tests; not listed as
+# helper-only files in the 68-file inventory (pass-with-no-tests; not listed as
 # failures above because they contain no standalone test cases; 11 files)
 # extensions/telegram/src/bot.create-telegram-bot.test-harness.ts
 # extensions/telegram/src/bot.media.e2e-harness.ts

@@ -20,14 +20,13 @@
 #
 # Keep in sync when a file starts passing: node scripts/run-bun-tier-b.mjs --all
 
-# bun-only (28)
+# bun-only (24)
 extensions/raw-chat-search/test/embedding-indexer.test.ts
 src/agents/pi-embedded-error-observation.test.ts
 src/agents/pi-tools.whatsapp-login-gating.test.ts
 src/agents/simple-completion-transport.test.ts
 src/agents/tools/web-fetch.cf-markdown.test.ts
 src/auto-reply/reply/commands-status.thinking-default.test.ts
-src/auto-reply/reply/directive-handling.auth.test.ts
 src/cli/plugins-cli.install.test.ts
 src/cli/plugins-cli.list.test.ts
 src/cli/plugins-cli.uninstall.test.ts
@@ -41,21 +40,14 @@ src/hooks/internal-hooks.test.ts
 src/hooks/message-hooks.test.ts
 src/infra/http-body.test.ts
 src/infra/outbound/session-binding-service.test.ts
-src/infra/provider-usage.load.plugin.test.ts
 src/plugins/status.test.ts
 src/plugins/uninstall.test.ts
 src/shared/pid-alive.test.ts
-src/tasks/task-flow-registry.store.test.ts
-src/commands/tasks.test.ts
 src/agents/bash-tools.exec-approval-followup.test.ts
 src/gateway/http-utils.authorize-request.test.ts
-src/commands/tasks.test.ts
 
-# pre-existing (44)
+# pre-existing (32)
 extensions/google/media-understanding-provider.video.test.ts
-src/agents/auth-profiles.ensureauthprofilestore.test.ts
-src/agents/auth-profiles/state-observation.test.ts
-src/agents/model-auth.profiles.test.ts
 src/agents/model-catalog.test.ts
 src/agents/model-fallback.test.ts
 src/agents/model-selection.test.ts
@@ -63,29 +55,21 @@ src/agents/models-config.applies-config-env-vars.test.ts
 src/agents/models-config.auto-injects-github-copilot-provider-token-is.test.ts
 src/agents/models-config.falls-back-default-baseurl-token-exchange-fails.test.ts
 src/agents/models-config.normalizes-gemini-3-ids-preview-google-providers.test.ts
-src/agents/models-config.providers.chutes.test.ts
-src/agents/models-config.providers.kilocode.test.ts
-src/agents/models-config.providers.kimi-coding.test.ts
 src/agents/models-config.providers.matrix.test.ts
-src/agents/models-config.providers.nvidia.test.ts
 src/agents/pi-bundle-mcp-runtime.test.ts
 src/auto-reply/reply/commands-btw.test.ts
 src/cli/program/preaction.test.ts
 src/cli/skills-cli.test.ts
 src/commands/auth-choice.apply-helpers.test.ts
-src/commands/auth-choice.moonshot.test.ts
 src/commands/backup-verify.test.ts
 src/commands/doctor-browser.test.ts
 src/commands/doctor-state-migrations.test.ts
 src/commands/doctor/shared/stale-plugin-config.test.ts
-src/commands/models.list.auth-sync.test.ts
-src/commands/onboard-auth.credentials.test.ts
 src/commands/onboard-search.test.ts
 src/config/io.validation-fails-closed.test.ts
 src/gateway/server-startup.test.ts
 src/gateway/server.plugin-http-auth.test.ts
 src/infra/plugin-approval-forwarder.test.ts
-src/infra/provider-usage.test.ts
 src/infra/update-global.test.ts
 src/infra/watch-node.test.ts
 src/plugin-sdk/browser-host-inspection.test.ts
@@ -93,15 +77,12 @@ src/plugins/copy-bundled-plugin-metadata.test.ts
 src/plugins/sdk-alias.test.ts
 src/plugins/web-search-providers.runtime.test.ts
 src/security/audit.test.ts
-src/tasks/task-flow-registry.test.ts
 src/agents/subagent-orphan-recovery.test.ts
 src/commands/doctor-state-integrity.test.ts
 
 # structural / unattributed (Phase 3-C1/C2/C4a; Bun mock-module API gap)
 src/agents/tools/audio-tool.test.ts
-src/gateway/server-methods/usage.test.ts
 src/agents/tools/audio-tool.test.ts
-src/gateway/server-methods/usage.test.ts
 src/commands/doctor-config-flow.missing-default-account-bindings.integration.test.ts
 src/agents/btw.test.ts
 src/cron/isolated-agent.hook-content-wrapping.test.ts

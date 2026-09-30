@@ -60,10 +60,10 @@ describe("normalizeMessageActionInput", () => {
         },
         toolContext: {
           currentChannelId: "C1",
-          currentChannelProvider: "slack",
+          currentChannelProvider: "discord",
         },
       },
-      expectedFields: { channel: "slack" },
+      expectedFields: { channel: "discord" },
     },
     {
       input: {
@@ -98,28 +98,6 @@ describe("normalizeMessageActionInput", () => {
         },
       },
       expectedFields: { messageId: "msg_123" },
-      absentFields: ["target", "to"],
-    },
-    {
-      input: {
-        action: "pin",
-        args: {
-          channel: "feishu",
-          messageId: "om_123",
-        },
-      },
-      expectedFields: { messageId: "om_123" },
-      absentFields: ["target", "to"],
-    },
-    {
-      input: {
-        action: "list-pins",
-        args: {
-          channel: "feishu",
-          chatId: "oc_123",
-        },
-      },
-      expectedFields: { chatId: "oc_123" },
       absentFields: ["target", "to"],
     },
     {
