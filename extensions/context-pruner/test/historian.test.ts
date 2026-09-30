@@ -320,11 +320,11 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
   const { input, recent, block1, block2, blockRecent } = makeEvictionScenario();
   const summary1 = makeSummary(block1, "午前の設計検討", "アーキテクチャの設計を検討した。");
   const summary2 = makeSummary(block2, "夜のバグ修正", "3件のバグを修正した。");
-  // 合計 750 トークン > 閾値 500。保護 250 → 境界は index 100（ブロック境界と一致）
+  // 合計 750 トークン。漸進退避では超過分に届く最初の章境界で止まる（閾値ごとに異なる）。
 
   it("replaces fully-evicted summarized blocks with the TOC message and keeps the recent 250K byte-for-byte", () => {
     const result = applyPromptEvictionSafetyValve(input, {
-      evictionThresholdTokens: 500,
+      evictionThresholdTokens: 250,
       protectedRecentTokens: 250,
       summaries: [summary2, summary1], // 順不同でも開始時刻順に整形される
     });
@@ -365,7 +365,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
 
   it("keeps the temporary eviction notice alongside the TOC while some evicted blocks are not summarized", () => {
     const result = applyPromptEvictionSafetyValve(input, {
-      evictionThresholdTokens: 500,
+      evictionThresholdTokens: 250,
       protectedRecentTokens: 250,
       summaries: [summary1], // block-2 は未要約のまま
     });
@@ -390,14 +390,14 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
     });
 
     expect(result.appliedSummaryCount).toBe(0);
-    expect(result.messages).toHaveLength(1 + recent.length);
+    // 漸進退避で cut は index 50（第1章のみ退避）。block-recent の要約は保持テール内のため適用外。
+    expect(result.evictedMessageCount).toBe(50);
+    expect(result.messages).toHaveLength(1 + 60);
     expect((result.messages[0] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
     expect((result.messages[0] as { content?: string }).content ?? "").not.toContain(
       TABLE_OF_CONTENTS_HEADER,
     );
-    for (let i = 0; i < recent.length; i++) {
-      expect(result.messages[i + 1]).toBe(recent[i]);
-    }
+    expect(result.messages[1]).toBe(input[50]);
   });
 
   it("accepts summaries via a blockId-keyed map (reconcileBlockSummaries output shape)", () => {
@@ -406,7 +406,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
       ["block-2", summary2],
     ]);
     const result = applyPromptEvictionSafetyValve(input, {
-      evictionThresholdTokens: 500,
+      evictionThresholdTokens: 250,
       protectedRecentTokens: 250,
       summaryMap,
     });
@@ -428,7 +428,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
       ...input.slice(101),
     ] as unknown as AgentMessage[];
     const result = applyPromptEvictionSafetyValve(swapped, {
-      evictionThresholdTokens: 500,
+      evictionThresholdTokens: 250,
       protectedRecentTokens: 250,
       summaries: [summary1, summary2],
     });
@@ -458,10 +458,13 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
 
     expect(result.evicted).toBe(true);
     expect(result.appliedSummaryCount).toBe(0);
-    expect(result.messages).toHaveLength(1 + recent.length);
+    // 漸進退避で cut は index 50（第1章のみ退避）。注記 + 60件の生保持。
+    expect(result.evictedMessageCount).toBe(50);
+    expect(result.messages).toHaveLength(1 + 60);
     expect((result.messages[0] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
-    for (let i = 0; i < recent.length; i++) {
-      expect(result.messages[i + 1]).toBe(recent[i]);
+    expect(result.messages[1]).toBe(input[50]);
+    for (let i = 0; i < 60; i++) {
+      expect(result.messages[i + 1]).toBe(input[50 + i]);
     }
   });
 });

@@ -6,8 +6,9 @@
  *
  * コンテキストが evictionThresholdTokens（既定 950K = 1M - reserve 50K）を超え、
  * 裏方 Historian の要約が未完了のまま上限 1M に迫った場合、プロンプト構築時に
- * 「直近 protectedRecentTokens（既定 250K）より古い過去ブロック群」を一時的に
- * 除外（テンポラリ退避）するフェイルセーフ。
+ * 超過分が解消するまで最古の章から1章ずつ段階的に押し出す（漸進的スライディング
+ * 退避）。直近 protectedRecentTokens（既定 250K）は不可侵の下限フロアであり、
+ * 950K→250K の一括崖落ちドロップは行わない。
  *
  * ステップ 3 の拡張（§7.5 の「要約完成時の復帰・差し替え」）:
  * 退避対象となった過去領域のうち、要約（BlockSummary）が完成しているブロック群は
@@ -26,9 +27,12 @@
  *   退避対象は常にそれより古い過去分のみ。トークン推定はステップ 1
  *   （compartment.ts の estimateMessageChars / estimateMessageTokens、約4文字=1
  *   トークン）に統一する。
- * - 250K 境界はステップ 1 の時間認識（detectTemporalPauses、§7.1）で求まる
- *   「会話の間（ま）」のうち、境界の手前で最も新しいものを優先して自然分割する。
- *   「間」が無い場合はメッセージ境界でフォールバック分割する。
+ * - 章境界はステップ 1 の時間認識（detectTemporalPauses、§7.1）で求まる
+ *   「会話の間（ま）」と partitionHistoryBlocks のブロック終端の和集合から、
+ *   古い順に「先頭からの累積が超過分（total - threshold）に届く最初の境界」を
+ *   採用する。第1章だけで収まれば第1章のみ退避し、第2章以降は生のまま残す。
+ *   候補が無い・届かない場合は超過分に達する最小メッセージ境界まで進める
+ *   （上限は直近保護フロアにクランプ）。
  * - 要約の差し替え適否判定: 退避領域へ完全に含まれるブロック（要約の endTime が
  *   保持テール先頭メッセージのタイムスタンプより前）の要約のみを目次へ適用する
  *   （保持テール途中にまでかかるブロックの要約は適用しない = 直近 250K は決して
@@ -45,6 +49,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   detectTemporalPauses,
   estimateMessageTokens,
+  partitionHistoryBlocks,
   resolveMeasuredPromptTokens,
   toEpochMs,
   DEFAULT_MIN_PAUSE_THRESHOLD_MS,
@@ -258,16 +263,21 @@ function findToolCallParentIndex(
 }
 
 /**
- * 一時退避安全弁（§7.3 / §7.4 / §7.5）。
+ * 一時退避安全弁（§7.3 / §7.4 / §7.5）。人間らしい漸進的忘却。
  *
  * 1. provider/session の実測 prompt tokens（利用可能な場合）を優先し、無ければ
  *    CJK 補正済みの入力推定トークン数を使う。閾値以下なら退避しない（元の配列をそのまま返す）。
- * 2. 超過時は末尾から逆走査し、直近の累積トークンが protectedRecentTokens に
- *    達する最小境界を特定する（直近保護ウィンドウは不可侵）。
- * 3. ステップ 1 の時間認識（detectTemporalPauses）で求まる「会話の間（ま）」の
- *    うち、境界手前で最も新しいものを優先して自然分割する。
+ * 2. 超過時は必要な最小退避量 neededEvictionTokens = total - threshold を求め、
+ *    末尾から逆走査し直近 protectedRecentTokens に達する最小境界 maxCutIndex を
+ *    特定する（直近保護ウィンドウは不可侵の下限フロア）。
+ * 3. 時間認識の「間」（detectTemporalPauses）と partitionHistoryBlocks のブロック
+ *    終端の和集合を章境界候補とし、古い順に「先頭からの累積が超過分に届く最初の
+ *    境界」を cut に採用する（第1章だけで収まれば第1章のみ退避）。
+ *    候補が無い・届かない場合は超過分に達する最小メッセージ境界まで進める
+ *    （上限は maxCutIndex にクランプ）。
  * 4. toolCall/toolResult のペアリング整合性を保つ（先頭に孤児 toolResult を置かない）。
- * 5. 250K より古いメッセージをプロンプトから除外し、先頭にシステム注記を付与する。
+ * 5. 退避領域 [0..cut-1] に完全に含まれる要約済みブロックだけを目次化し先頭へ注入。
+ *    退避されなかった章は生メッセージのまま残る。
  *
  * 純粋なインメモリ変換であり、セッションファイル（.jsonl）への読み書きは一切行わない。
  */
@@ -316,32 +326,74 @@ export function applyPromptEvictionSafetyValve(
     return noEviction();
   }
 
-  // ── 直近保護ウィンドウの境界特定（末尾から逆走査）──
-  // boundary = suffixTokens[boundary..end] >= protectedRecentTokens を満たす最小 index
+  // ── 超過分と直近保護フロア（§7.4）──
+  // neededEvictionTokens: 閾値以下に収めるために最低限退避すべきトークン量。
+  // maxCutIndex: suffixTokens[maxCutIndex..end] >= protectedRecentTokens を満たす
+  // 最小 index。cut はこれを超えられない（直近保護ウィンドウは不可侵）。
+  const neededEvictionTokens = totalTokens - opts.evictionThresholdTokens;
   const minProtected = Math.max(1, opts.protectedRecentTokens);
-  let boundary = messages.length;
+  let maxCutIndex = messages.length;
   let suffixTokens = 0;
-  while (boundary > 0 && suffixTokens < minProtected) {
-    boundary -= 1;
-    suffixTokens += effectiveEstimates[boundary];
+  while (maxCutIndex > 0 && suffixTokens < minProtected) {
+    maxCutIndex -= 1;
+    suffixTokens += effectiveEstimates[maxCutIndex];
   }
   // 保護ウィンドウが全体を覆う場合（設定異常など）は退避しない
-  if (boundary === 0) {
+  if (maxCutIndex === 0) {
     return noEviction();
   }
 
-  // ── 「会話の間（ま）」による自然分割（§7.1）──
-  // 境界の手前（g + 1 <= boundary。つまり切っても保護 250K を下回らない）にある
-  // 最後の pause を優先する。無ければメッセージ境界（boundary）でフォールバック。
+  // 先頭からの累積退避トークン（実測スケール済み推定の prefix sum）。
+  const prefixTokens = new Array<number>(messages.length + 1);
+  prefixTokens[0] = 0;
+  for (let i = 0; i < messages.length; i++) {
+    prefixTokens[i + 1] = prefixTokens[i] + effectiveEstimates[i];
+  }
+
+  // ── 章（ブロック）境界の候補を古い順に収集（§7.1 / §7.2）──
+  // 「間」の直後 (p + 1) と partitionHistoryBlocks の各ブロック終端 (endIndex + 1)
+  // の和集合。0 < cand <= maxCutIndex のみ有効（直近保護フロアを侵さない）。
+  const candidates = new Set<number>();
   const pauses = detectTemporalPauses(messages, {
     minPauseThresholdMs: opts.minPauseThresholdMs,
     pauseMultiplier: opts.pauseMultiplier,
   });
-  let cut = boundary;
-  for (let i = pauses.length - 1; i >= 0; i--) {
-    if (pauses[i] + 1 <= boundary) {
-      cut = pauses[i] + 1;
+  for (const pause of pauses) {
+    const cand = pause + 1;
+    if (cand > 0 && cand <= maxCutIndex) {
+      candidates.add(cand);
+    }
+  }
+  for (const block of partitionHistoryBlocks(messages, {
+    minPauseThresholdMs: opts.minPauseThresholdMs,
+    pauseMultiplier: opts.pauseMultiplier,
+  })) {
+    const cand = block.endIndex + 1;
+    if (cand > 0 && cand <= maxCutIndex) {
+      candidates.add(cand);
+    }
+  }
+  const orderedCandidates = [...candidates].sort((a, b) => a - b);
+
+  // ── 最古の章から順にスライド判定 ──
+  // 先頭からの累積 prefixTokens[cand] が超過分に届く【最初の（最も手前の）境界】
+  // を採用。第1章だけで収まれば第1章のみ退避し、第2章以降は生のまま残る。
+  let cut = -1;
+  for (const cand of orderedCandidates) {
+    if (prefixTokens[cand] >= neededEvictionTokens) {
+      cut = cand;
       break;
+    }
+  }
+  if (cut === -1) {
+    // 候補が無い、またはどの候補でも超過分に届かない場合: 超過分に達する
+    // 最小メッセージ境界まで進める（上限は maxCutIndex にクランプ）。
+    cut = maxCutIndex;
+    for (let i = 1; i <= maxCutIndex; i++) {
+      if (prefixTokens[i] >= neededEvictionTokens) {
+        cut = i;
+        break;
+      }
     }
   }
 

@@ -3,7 +3,8 @@
  *
  * 対象（COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5 / 裏方圧縮 ステップ 2）:
  * - 閾値（既定 950K）以下では退避が発火せず全メッセージが保持される
- * - 閾値超過時に「直近 250K」が1文字も削られず完全保持され、過去ブロックのみ一時退避
+ * - 閾値超過時に超過分だけを最古の章から1章ずつ段階的に退避（漸進的スライディング）し、
+ *   「直近 250K」が1文字も削られず完全保持される
  * - 退避時にシステム注記（role: "user" の notice message）が先頭に挿入される
  * - セッションファイルへの I/O を行わない純粋なインメモリ変換（入力配列・要素の不変）
  * - DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 キルスイッチの判定
@@ -148,9 +149,11 @@ describe("applyPromptEvictionSafetyValve", () => {
     expect(DEFAULT_EVICTION_THRESHOLD_TOKENS).toBe(950_000);
   });
 
-  it("evicts only tokens older than the protected recent window (recent 250K kept byte-for-byte)", () => {
+  it("evicts only the excess tokens, keeping the rest raw (no 250K cliff drop)", () => {
     // 過去 100件 × 10トークン = 1000 + 直近 50件 × 5トークン = 250 → 合計 1250 > 1000
-    // 末尾から 250 トークンに達する最小境界 = index 100（直近ブロック先頭と一致）
+    // 超過分は 250 のみ。「間」も章境界も無いため最小メッセージ境界まで進め、
+    // 先頭 25件（250トークン）だけを退避し残り 1000 トークンは生のまま保持する。
+    // 一括崖落ち（100件退避で 250 まで急降下）はしない。
     const past = makeEvenUserMessages(100, 10);
     const recent = makeEvenUserMessages(50, 5, MINUTE_MS, 100);
     const input = castMessages([...past, ...recent]);
@@ -161,27 +164,31 @@ describe("applyPromptEvictionSafetyValve", () => {
 
     expect(result.evicted).toBe(true);
     expect(result.totalTokens).toBe(1_250);
-    expect(result.evictedMessageCount).toBe(100);
-    expect(result.evictedTokens).toBe(1_000);
-    expect(result.protectedTokens).toBe(250);
+    expect(result.evictedMessageCount).toBe(25);
+    expect(result.evictedTokens).toBe(250);
+    expect(result.protectedTokens).toBe(1_000);
     expect(result.evictedTokens + result.protectedTokens).toBe(result.totalTokens);
 
     // 保持テール（result.messages[1..]）は元メッセージの「同一オブジェクト参照」。
-    // コピー・再シリアライズが一切無い = 直近 250K は1文字も削られていない。
-    expect(result.messages).toHaveLength(1 + recent.length);
-    for (let i = 0; i < recent.length; i++) {
-      expect(result.messages[i + 1]).toBe(recent[i]);
+    // コピー・再シリアライズが一切無い = 直近は1文字も削られていない。
+    expect(result.messages).toHaveLength(1 + 125);
+    expect(result.messages[1]).toBe(input[25]);
+    for (let i = 0; i < 125; i++) {
+      expect(result.messages[i + 1]).toBe(input[25 + i]);
     }
-    // 過去ブロックは結果に現れない
-    for (let i = 0; i < past.length; i++) {
+    // 退避された先頭 25件だけが結果に現れない（past の残りは生保持）
+    for (let i = 0; i < 25; i++) {
       expect(result.messages.includes(past[i] as unknown as AgentMessage)).toBe(false);
+    }
+    for (let i = 25; i < past.length; i++) {
+      expect(result.messages.includes(past[i] as unknown as AgentMessage)).toBe(true);
     }
   });
 
   it("keeps at least the protected window when it does not align to a block boundary", () => {
     // 過去 100件 × 8トークン = 800 + 直近 100件 × 3トークン = 300 → 合計 1100 > 1000
-    // 末尾から 250 トークンに達する最小境界 = index 116（直近ブロックの途中）。
-    // 保持テール = 84件 (252トークン) ≥ 250 を下回らない。
+    // 超過分は 100 のみ。最小メッセージ境界は index 13（104トークン退避）。
+    // 保持テール = 187件 (996トークン) ≥ 250 を下回らない。
     const past = makeEvenUserMessages(100, 8);
     const recent = makeEvenUserMessages(100, 3, MINUTE_MS, 100);
     const input = castMessages([...past, ...recent]);
@@ -191,12 +198,13 @@ describe("applyPromptEvictionSafetyValve", () => {
     });
 
     expect(result.evicted).toBe(true);
-    expect(result.evictedMessageCount).toBe(116);
-    expect(result.protectedTokens).toBe(252);
+    expect(result.evictedMessageCount).toBe(13);
+    expect(result.evictedTokens).toBe(104);
+    expect(result.protectedTokens).toBe(996);
     expect(result.protectedTokens).toBeGreaterThanOrEqual(250);
-    expect(result.messages[1]).toBe(input[116]);
-    for (let i = 0; i < 84; i++) {
-      expect(result.messages[i + 1]).toBe(input[116 + i]);
+    expect(result.messages[1]).toBe(input[13]);
+    for (let i = 0; i < 187; i++) {
+      expect(result.messages[i + 1]).toBe(input[13 + i]);
     }
   });
 
@@ -215,7 +223,7 @@ describe("applyPromptEvictionSafetyValve", () => {
     expect(Object.is(notice, input[0])).toBe(false); // 注記は新規メッセージ
     expect((notice as { role?: unknown }).role).toBe("user");
     expect((notice as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
-    expect(kept).toHaveLength(50); // 直近 250トークン分（50件 × 5トークン）を保持
+    expect(kept).toHaveLength(125); // 超過分 250 のみ退避し残り 1000 トークンを生保持
   });
 
   it("honors a custom noticeText", () => {
@@ -247,7 +255,9 @@ describe("applyPromptEvictionSafetyValve", () => {
     });
     expect(result.evicted).toBe(true);
     expect(result.totalTokens).toBe(101);
-    expect(result.protectedTokens).toBe(51);
+    // 超過分 11 のみ退避（先頭 2件 = 20トークン）し、残り 81 を生保持
+    expect(result.evictedMessageCount).toBe(2);
+    expect(result.protectedTokens).toBe(81);
     expect(result.evictedTokens + result.protectedTokens).toBe(101);
   });
 
@@ -284,9 +294,135 @@ describe("applyPromptEvictionSafetyValve", () => {
     });
 
     expect(result.evicted).toBe(true);
+    expect(result.totalTokens).toBe(350);
+    // 超過分 250 に届く最小境界は index 100（CJK 1件 = 1トークン）。
+    // 保護フロア（index 100）と同点で切り、第2章以降（日本語 250件）は生保持。
     expect(result.evictedMessageCount).toBe(100);
     expect(result.protectedTokens).toBe(250);
     expect(result.messages[1]).toBe(recent[0]);
+  });
+});
+
+// ── 人間らしい漸進的忘却（章単位スライディング退避）────────────────
+
+describe("progressive chapter-by-chapter eviction", () => {
+  it("evicts only the first chapter when it alone covers the excess", () => {
+    // 第1章 100件 × 6トークン = 600 | 沈黙 | 第2章 50件 × 3トークン = 150 | 直近 100件 × 3トークン = 300
+    // 合計 1050 > 1000。超過分 50 は第1章（600）だけで解消するため、
+    // 第1章のみ退避し第2章以降は生メッセージのまま保持される。
+    const chapter1 = makeEvenUserMessages(100, 6);
+    const chapter2 = makeEvenUserMessages(50, 3, MINUTE_MS, 100);
+    const recent = makeEvenUserMessages(100, 3, MINUTE_MS, 150);
+    const input = castMessages(
+      withSilenceAfter([...chapter1, ...chapter2, ...recent], 99, 3 * HOUR_MS),
+    );
+
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 1_000,
+      protectedRecentTokens: 250,
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(100);
+    expect(result.messages[1]).toBe(input[100]);
+    expect(result.protectedTokens).toBe(450);
+    // 第2章以降は生参照のまま残る（目次化されず退避もされない）
+    for (let i = 100; i < input.length; i++) {
+      expect(result.messages.includes(input[i])).toBe(true);
+    }
+    expectNoOrphanToolResults(result.messages);
+  });
+
+  it("slides to the second chapter only when the first chapter is not enough", () => {
+    // 第1章 100件 × 1トークン = 100 | 沈黙 | 第2章 100件 × 3トークン = 300 | 沈黙 | 直近 100件 × 3トークン = 300
+    // 合計 700 > 閾値 500。超過分 200 は第1章（100）だけでは届かず、
+    // 第1章＋第2章（400）で初めて解消するため、cut は第2章終端（index 200）へ進む。
+    const chapter1 = makeEvenUserMessages(100, 1);
+    const chapter2 = makeEvenUserMessages(100, 3, MINUTE_MS, 100);
+    const recent = makeEvenUserMessages(100, 3, MINUTE_MS, 200);
+    const afterFirst = withSilenceAfter([...chapter1, ...chapter2, ...recent], 99, 3 * HOUR_MS);
+    const input = castMessages(withSilenceAfter(afterFirst, 199, 3 * HOUR_MS));
+
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 500,
+      protectedRecentTokens: 250,
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(200);
+    expect(result.messages[1]).toBe(input[200]);
+    expect(result.protectedTokens).toBe(300);
+    expect(result.protectedTokens).toBeGreaterThanOrEqual(250);
+    expectNoOrphanToolResults(result.messages);
+  });
+
+  it("clamps a huge excess at the protected recent window instead of dropping below it", () => {
+    // 合計 1250 に対し閾値 100（超過分 1150 > 退避可能最大 1000）。
+    // 保護 250 のフロアは index 100。どんなに超過が大きくても cut は 100 を超えず、
+    // 保持テールは 250 を下回らない。
+    const past = makeEvenUserMessages(100, 10);
+    const recent = makeEvenUserMessages(50, 5, MINUTE_MS, 100);
+    const input = castMessages([...past, ...recent]);
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 100,
+      protectedRecentTokens: 250,
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(100);
+    expect(result.evictedTokens).toBe(1_000);
+    expect(result.protectedTokens).toBe(250);
+    expect(result.messages[1]).toBe(input[100]);
+    expectNoOrphanToolResults(result.messages);
+  });
+
+  it("includes only evicted chapters in the TOC and keeps later chapters raw", () => {
+    // 第1章（60件 × 10トークン = 600）は退避、第2章（40件 × 10トークン = 400）は生保持。
+    // 目次には第1章の要約だけが含まれ、第2章の要約は含まれない。
+    const chapter1 = makeEvenUserMessages(60, 10);
+    const chapter2 = makeEvenUserMessages(40, 10, MINUTE_MS, 60);
+    const input = castMessages(withSilenceAfter([...chapter1, ...chapter2], 59, 3 * HOUR_MS));
+    const totalTokens = 1_000;
+    const chapter1Summary = {
+      blockId: "block-1",
+      title: "第1章の設計",
+      summary: "第1章の要約本文",
+      startTime: BASE_TIME,
+      endTime: BASE_TIME + 59 * MINUTE_MS,
+      tokenCount: 600,
+      summarizedAt: BASE_TIME + 61 * MINUTE_MS,
+    };
+    // 第2章の実タイムスタンプは沈黙（+3H）シフト後: 60分+3H 〜 99分+3H。
+    // 保持テール先頭（index 60）より後に終わるため目次適用外 = 生保持される。
+    const chapter2Summary = {
+      blockId: "block-2",
+      title: "第2章の実装",
+      summary: "第2章の要約本文",
+      startTime: BASE_TIME + 60 * MINUTE_MS + 3 * HOUR_MS,
+      endTime: BASE_TIME + 99 * MINUTE_MS + 3 * HOUR_MS,
+      tokenCount: 400,
+      summarizedAt: BASE_TIME + 100 * MINUTE_MS + 3 * HOUR_MS,
+    };
+
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: totalTokens - 600,
+      protectedRecentTokens: 250,
+      summaries: [chapter1Summary, chapter2Summary],
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(60);
+    expect(result.appliedSummaryCount).toBe(1);
+    // 先頭は目次（第1章のみ）。第2章の要約タイトルは目次に含まれない。
+    const toc = result.messages[0] as { content?: unknown };
+    expect(typeof toc.content).toBe("string");
+    expect(String(toc.content)).toContain("第1章の設計");
+    expect(String(toc.content)).not.toContain("第2章の実装");
+    // 第2章は生メッセージのまま残る（退避側へ落ちない）
+    expect(result.messages[1]).toBe(input[60]);
+    for (let i = 60; i < input.length; i++) {
+      expect(result.messages.includes(input[i])).toBe(true);
+    }
   });
 });
 
@@ -390,22 +526,22 @@ describe("resolveEvictionOptionsFromCompaction", () => {
 
 describe("toolCall/toolResult pairing integrity", () => {
   it("extends the kept tail back to the assistant message when the boundary lands on a toolResult", () => {
-    // 過去 100件 × 8トークン + assistant(toolCall) 1 + toolResult 60 + 直近 100件 × 2トークン
-    // 合計 1061 > 1000。protected 250 の境界は toolResult の直前に落ちるが、
+    // 過去 5件 × 10トークン = 50 + assistant(toolCall) 1 + toolResult 60 + 直近 5件 × 10トークン = 50
+    // 合計 161 > 閾値 110。超過分 51 に届く最小境界は toolResult（index 6）に落ちるため、
     // ペアリング調整で assistant メッセージまで保持テールが後退する。
-    const past = makeEvenUserMessages(100, 8);
-    const assistant = makeAssistantWithToolCall("tc-boundary", 1, BASE_TIME + 100 * MINUTE_MS);
-    const toolResult = makeToolResult("tc-boundary", 60, BASE_TIME + 101 * MINUTE_MS);
-    const recent = makeEvenUserMessages(100, 2, MINUTE_MS, 102);
+    const past = makeEvenUserMessages(5, 10);
+    const assistant = makeAssistantWithToolCall("tc-boundary", 1, BASE_TIME + 5 * MINUTE_MS);
+    const toolResult = makeToolResult("tc-boundary", 60, BASE_TIME + 6 * MINUTE_MS);
+    const recent = makeEvenUserMessages(5, 10, MINUTE_MS, 7);
     const input = castMessages([...past, assistant, toolResult, ...recent]);
 
     const result = applyPromptEvictionSafetyValve(input, {
-      evictionThresholdTokens: 1_000,
-      protectedRecentTokens: 250,
+      evictionThresholdTokens: 110,
+      protectedRecentTokens: 50,
     });
 
     expect(result.evicted).toBe(true);
-    expect(result.protectedTokens).toBe(1 + 60 + 200);
+    expect(result.protectedTokens).toBe(1 + 60 + 50);
     // 保持テール先頭は toolResult ではなく、その toolCall を持つ assistant になる
     expect(result.messages[1]).toBe(assistant);
     expect(result.messages[2]).toBe(toolResult);
@@ -416,14 +552,15 @@ describe("toolCall/toolResult pairing integrity", () => {
 
   it("drops a parentless orphan toolResult at the boundary instead of keeping it", () => {
     // 過去 110件 × 5トークン = 550 + 親の無い toolResult 250 + 直近 80件 × 3トークン = 240
-    // 合計 1040 > 1000。境界は孤児 toolResult に落ちるため、孤児ごと退避側へ切り落とす。
+    // 合計 1040 > 閾値 490。超過分 550 に届く最小境界は孤児 toolResult（index 110）に
+    // 落ちるため、孤児ごと退避側へ切り落とす。
     const past = makeEvenUserMessages(110, 5);
     const orphan = makeToolResult("tc-orphan", 250, BASE_TIME + 110 * MINUTE_MS);
     const recent = makeEvenUserMessages(80, 3, MINUTE_MS, 111);
     const input = castMessages([...past, orphan, ...recent]);
 
     const result = applyPromptEvictionSafetyValve(input, {
-      evictionThresholdTokens: 1_000,
+      evictionThresholdTokens: 490,
       protectedRecentTokens: 250,
     });
 
@@ -438,9 +575,10 @@ describe("toolCall/toolResult pairing integrity", () => {
 // ── 時間認識による自然な境界（§7.1）───────────────────────
 
 describe("temporal-pause-aware boundary selection", () => {
-  it("prefers the latest natural conversation pause before the protected window", () => {
+  it("prefers the earliest chapter boundary that covers the excess", () => {
     // 過去 100件 × 6トークン = 600 | 3時間の沈黙 | 中盤 50件 × 3トークン = 150 | 直近 100件 × 3トークン = 300
-    // 合計 1050 > 1000。250K 境界（index 150）より手前の沈黙（index 99）で自然分割される。
+    // 合計 1050 > 1000。超過分 50 に届く最初の章境界は沈黙直後（index 100）。
+    // 最も新しい「間」ではなく、超過分を解消する最古の章境界を採用する。
     const old = makeEvenUserMessages(100, 6);
     const middle = makeEvenUserMessages(50, 3, MINUTE_MS, 100);
     const recent = makeEvenUserMessages(100, 3, MINUTE_MS, 150);
@@ -459,7 +597,7 @@ describe("temporal-pause-aware boundary selection", () => {
     expectNoOrphanToolResults(result.messages);
   });
 
-  it("falls back to the exact protected-window boundary when no pause exists", () => {
+  it("falls back to the minimal message boundary covering the excess when no pause exists", () => {
     const old = makeEvenUserMessages(100, 6);
     const middle = makeEvenUserMessages(50, 3, MINUTE_MS, 100);
     const recent = makeEvenUserMessages(100, 3, MINUTE_MS, 150);
@@ -471,11 +609,13 @@ describe("temporal-pause-aware boundary selection", () => {
       protectedRecentTokens: 250,
     });
 
-    // 末尾から 250 トークンに達する最小境界 = index 166（84件 × 3トークン = 252）
+    // 超過分 50 に届く最小メッセージ境界 = index 9（9件 × 6トークン = 54）。
+    // 保護フロア（index 166）より手前で止まり、残り 996 トークンを生保持する。
     expect(result.evicted).toBe(true);
-    expect(result.evictedMessageCount).toBe(166);
-    expect(result.messages[1]).toBe(input[166]);
-    expect(result.protectedTokens).toBe(252);
+    expect(result.evictedMessageCount).toBe(9);
+    expect(result.messages[1]).toBe(input[9]);
+    expect(result.evictedTokens).toBe(54);
+    expect(result.protectedTokens).toBe(996);
     expect(result.protectedTokens).toBeGreaterThanOrEqual(250);
   });
 
@@ -491,6 +631,7 @@ describe("temporal-pause-aware boundary selection", () => {
     const resultType: EvictionResult = result; // 型が EvictionResult であることを明示
     expect(typeof resultType.messages[0]?.timestamp).toBe("number");
     expect(resultType.evicted).toBe(true);
+    // 超過分 100 に届く最小境界は index 13 のため、注記 + 187件保持
     expect(resultType.evictedMessageCount + resultType.messages.length - 1).toBe(200);
   });
 });
