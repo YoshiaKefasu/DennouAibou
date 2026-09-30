@@ -31,12 +31,7 @@ export type BuildPluginApiParams = {
       | "registerConfigMigration"
       | "registerAutoEnableProbe"
       | "registerProvider"
-      | "registerRealtimeTranscriptionProvider"
-      | "registerRealtimeVoiceProvider"
       | "registerMediaUnderstandingProvider"
-      | "registerImageGenerationProvider"
-      | "registerVideoGenerationProvider"
-      | "registerMusicGenerationProvider"
       | "registerWebFetchProvider"
       | "registerWebSearchProvider"
       | "registerInteractiveHandler"
@@ -66,17 +61,7 @@ const noopRegisterService: OpenClawPluginApi["registerService"] = () => {};
 const noopRegisterConfigMigration: OpenClawPluginApi["registerConfigMigration"] = () => {};
 const noopRegisterAutoEnableProbe: OpenClawPluginApi["registerAutoEnableProbe"] = () => {};
 const noopRegisterProvider: OpenClawPluginApi["registerProvider"] = () => {};
-const noopRegisterRealtimeTranscriptionProvider: OpenClawPluginApi["registerRealtimeTranscriptionProvider"] =
-  () => {};
-const noopRegisterRealtimeVoiceProvider: OpenClawPluginApi["registerRealtimeVoiceProvider"] =
-  () => {};
 const noopRegisterMediaUnderstandingProvider: OpenClawPluginApi["registerMediaUnderstandingProvider"] =
-  () => {};
-const noopRegisterImageGenerationProvider: OpenClawPluginApi["registerImageGenerationProvider"] =
-  () => {};
-const noopRegisterVideoGenerationProvider: OpenClawPluginApi["registerVideoGenerationProvider"] =
-  () => {};
-const noopRegisterMusicGenerationProvider: OpenClawPluginApi["registerMusicGenerationProvider"] =
   () => {};
 const noopRegisterWebFetchProvider: OpenClawPluginApi["registerWebFetchProvider"] = () => {};
 const noopRegisterWebSearchProvider: OpenClawPluginApi["registerWebSearchProvider"] = () => {};
@@ -120,18 +105,8 @@ export function buildPluginApi(params: BuildPluginApiParams): OpenClawPluginApi 
     registerConfigMigration: handlers.registerConfigMigration ?? noopRegisterConfigMigration,
     registerAutoEnableProbe: handlers.registerAutoEnableProbe ?? noopRegisterAutoEnableProbe,
     registerProvider: handlers.registerProvider ?? noopRegisterProvider,
-    registerRealtimeTranscriptionProvider:
-      handlers.registerRealtimeTranscriptionProvider ?? noopRegisterRealtimeTranscriptionProvider,
-    registerRealtimeVoiceProvider:
-      handlers.registerRealtimeVoiceProvider ?? noopRegisterRealtimeVoiceProvider,
     registerMediaUnderstandingProvider:
       handlers.registerMediaUnderstandingProvider ?? noopRegisterMediaUnderstandingProvider,
-    registerImageGenerationProvider:
-      handlers.registerImageGenerationProvider ?? noopRegisterImageGenerationProvider,
-    registerVideoGenerationProvider:
-      handlers.registerVideoGenerationProvider ?? noopRegisterVideoGenerationProvider,
-    registerMusicGenerationProvider:
-      handlers.registerMusicGenerationProvider ?? noopRegisterMusicGenerationProvider,
     registerWebFetchProvider: handlers.registerWebFetchProvider ?? noopRegisterWebFetchProvider,
     registerWebSearchProvider: handlers.registerWebSearchProvider ?? noopRegisterWebSearchProvider,
     registerInteractiveHandler:

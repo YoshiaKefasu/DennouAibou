@@ -32,11 +32,6 @@ import type {
 type PluginManifestContractListKey =
   | "speechProviders"
   | "mediaUnderstandingProviders"
-  | "realtimeVoiceProviders"
-  | "realtimeTranscriptionProviders"
-  | "imageGenerationProviders"
-  | "videoGenerationProviders"
-  | "musicGenerationProviders"
   | "memoryEmbeddingProviders"
   | "webFetchProviders"
   | "webSearchProviders";

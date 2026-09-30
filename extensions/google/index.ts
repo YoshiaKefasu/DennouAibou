@@ -1,4 +1,3 @@
-import type { ImageGenerationProvider } from "openclaw/plugin-sdk/image-generation";
 import type { MediaUnderstandingProvider } from "openclaw/plugin-sdk/media-understanding";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-auth-api-key";
@@ -12,12 +11,9 @@ import {
   resolveGoogleGenerativeAiTransport,
 } from "./api.js";
 import { registerGoogleGeminiCliProvider } from "./gemini-cli-provider.js";
-import { buildGoogleMusicGenerationProvider } from "./music-generation-provider.js";
 import { isModernGoogleModel, resolveGoogleGeminiForwardCompatModel } from "./provider-models.js";
 import { createGeminiWebSearchProvider } from "./src/gemini-web-search-provider.js";
-import { buildGoogleVideoGenerationProvider } from "./video-generation-provider.js";
 
-let googleImageGenerationProviderPromise: Promise<ImageGenerationProvider> | null = null;
 let googleMediaUnderstandingProviderPromise: Promise<MediaUnderstandingProvider> | null = null;
 
 type GoogleMediaUnderstandingProvider = MediaUnderstandingProvider & {
@@ -32,15 +28,6 @@ const GOOGLE_GEMINI_PROVIDER_HOOKS = {
     family: "google-gemini",
   }),
 };
-
-async function loadGoogleImageGenerationProvider(): Promise<ImageGenerationProvider> {
-  if (!googleImageGenerationProviderPromise) {
-    googleImageGenerationProviderPromise = import("./image-generation-provider.js").then((mod) =>
-      mod.buildGoogleImageGenerationProvider(),
-    );
-  }
-  return await googleImageGenerationProviderPromise;
-}
 
 async function loadGoogleMediaUnderstandingProvider(): Promise<MediaUnderstandingProvider> {
   if (!googleMediaUnderstandingProviderPromise) {
@@ -62,37 +49,6 @@ async function loadGoogleRequiredMediaUnderstandingProvider(): Promise<GoogleMed
     throw new Error("google media understanding provider missing required handlers");
   }
   return provider as GoogleMediaUnderstandingProvider;
-}
-
-function createLazyGoogleImageGenerationProvider(): ImageGenerationProvider {
-  return {
-    id: "google",
-    label: "Google",
-    defaultModel: "gemini-3.1-flash-image-preview",
-    models: ["gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview"],
-    capabilities: {
-      generate: {
-        maxCount: 4,
-        supportsSize: true,
-        supportsAspectRatio: true,
-        supportsResolution: true,
-      },
-      edit: {
-        enabled: true,
-        maxCount: 4,
-        maxInputImages: 5,
-        supportsSize: true,
-        supportsAspectRatio: true,
-        supportsResolution: true,
-      },
-      geometry: {
-        sizes: ["1024x1024", "1024x1536", "1536x1024", "1024x1792", "1792x1024"],
-        aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
-        resolutions: ["1K", "2K", "4K"],
-      },
-    },
-    generateImage: async (req) => (await loadGoogleImageGenerationProvider()).generateImage(req),
-  };
 }
 
 function createLazyGoogleMediaUnderstandingProvider(): MediaUnderstandingProvider {
@@ -164,10 +120,7 @@ export default definePluginEntry({
       ...GOOGLE_GEMINI_PROVIDER_HOOKS,
       isModernModelRef: ({ modelId }) => isModernGoogleModel(modelId),
     });
-    api.registerImageGenerationProvider(createLazyGoogleImageGenerationProvider());
     api.registerMediaUnderstandingProvider(createLazyGoogleMediaUnderstandingProvider());
-    api.registerMusicGenerationProvider(buildGoogleMusicGenerationProvider());
-    api.registerVideoGenerationProvider(buildGoogleVideoGenerationProvider());
     api.registerWebSearchProvider(createGeminiWebSearchProvider());
   },
 });

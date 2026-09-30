@@ -171,15 +171,6 @@ describe("plugin runtime command execution", () => {
       },
     },
     {
-      name: "exposes runtime.imageGeneration helpers",
-      assert: (runtime: ReturnType<typeof createPluginRuntime>) => {
-        expectFunctionKeys(runtime.imageGeneration as Record<string, unknown>, [
-          "generate",
-          "listProviders",
-        ]);
-      },
-    },
-    {
       name: "exposes runtime.webSearch helpers",
       assert: (runtime: ReturnType<typeof createPluginRuntime>) => {
         expectFunctionKeys(runtime.webSearch as Record<string, unknown>, [

@@ -11,7 +11,6 @@ export function createToolingVitestConfig(env?: Record<string, string | undefine
   return createScopedVitestConfig(
     loadIncludePatternsFromEnv(env) ?? [
       "test/**/*.test.ts",
-      "src/scripts/**/*.test.ts",
       "src/config/doc-baseline.integration.test.ts",
       "src/config/schema.base.generated.test.ts",
       "src/config/schema.help.quality.test.ts",

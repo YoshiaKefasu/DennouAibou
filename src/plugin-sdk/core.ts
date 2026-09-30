@@ -70,7 +70,6 @@ export type {
   ProviderResolveDynamicModelContext,
   ProviderResolveTransportTurnStateContext,
   ProviderResolveWebSocketSessionPolicyContext,
-  RealtimeTranscriptionProviderPlugin,
   ProviderSanitizeReplayHistoryContext,
   ProviderTransportTurnState,
   ProviderToolSchemaDiagnostic,

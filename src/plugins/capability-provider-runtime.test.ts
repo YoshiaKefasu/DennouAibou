@@ -102,12 +102,7 @@ function setBundledCapabilityFixture(contractKey: string) {
 }
 
 function expectCompatChainApplied(params: {
-  key:
-    | "memoryEmbeddingProviders"
-    | "realtimeTranscriptionProviders"
-    | "realtimeVoiceProviders"
-    | "mediaUnderstandingProviders"
-    | "imageGenerationProviders";
+  key: "memoryEmbeddingProviders" | "mediaUnderstandingProviders";
   contractKey: string;
   cfg: OpenClawConfig;
   enablementCompat: {
@@ -144,10 +139,7 @@ describe("resolvePluginCapabilityProviders", () => {
 
   it.each([
     ["memoryEmbeddingProviders", "memoryEmbeddingProviders"],
-    ["realtimeTranscriptionProviders", "realtimeTranscriptionProviders"],
-    ["realtimeVoiceProviders", "realtimeVoiceProviders"],
     ["mediaUnderstandingProviders", "mediaUnderstandingProviders"],
-    ["imageGenerationProviders", "imageGenerationProviders"],
   ] as const)("applies bundled compat before fallback loading for %s", (key, contractKey) => {
     const { cfg, enablementCompat } = createCompatChainConfig();
     expectCompatChainApplied({

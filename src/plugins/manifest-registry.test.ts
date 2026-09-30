@@ -507,7 +507,6 @@ describe("loadPluginManifestRegistry", () => {
       providers: ["openai", "openai-codex"],
       speechProviders: ["openai"],
       mediaUnderstandingProviders: ["openai", "openai-codex"],
-      imageGenerationProviders: ["openai"],
       configSchema: { type: "object" },
     });
 

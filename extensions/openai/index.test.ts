@@ -1,14 +1,10 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
-import * as providerAuth from "openclaw/plugin-sdk/provider-auth-runtime";
 import type { ProviderPlugin } from "openclaw/plugin-sdk/provider-model-shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setTestGlobal } from "../../src/test-utils/bun-test-mocks.js";
 import { createTestPluginApi } from "../../test/helpers/plugins/plugin-api.js";
 import {
   registerProviderPlugin,
   requireRegisteredProvider,
 } from "../../test/helpers/plugins/provider-registration.js";
-import { buildOpenAIImageGenerationProvider } from "./image-generation-provider.js";
 import plugin from "./index.js";
 import {
   OPENAI_FRIENDLY_PROMPT_OVERLAY,
@@ -50,160 +46,6 @@ describe("openai plugin", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("generates PNG buffers from the OpenAI Images API", async () => {
-    const resolveApiKeySpy = vi.spyOn(providerAuth, "resolveApiKeyForProvider").mockResolvedValue({
-      apiKey: "sk-test",
-      source: "env",
-      mode: "api-key",
-    });
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [
-          {
-            b64_json: Buffer.from("png-data").toString("base64"),
-            revised_prompt: "revised",
-          },
-        ],
-      }),
-    });
-    setTestGlobal("fetch", fetchMock);
-
-    const provider = buildOpenAIImageGenerationProvider();
-    const result = await provider.generateImage({
-      provider: "openai",
-      model: "gpt-image-1",
-      prompt: "draw a cat",
-      cfg: {},
-    });
-
-    expect(resolveApiKeySpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: "openai",
-      }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/images/generations",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: "draw a cat",
-          n: 1,
-          size: "1024x1024",
-        }),
-      }),
-    );
-    expect(result).toEqual({
-      images: [
-        {
-          buffer: Buffer.from("png-data"),
-          mimeType: "image/png",
-          fileName: "image-1.png",
-          revisedPrompt: "revised",
-        },
-      ],
-      model: "gpt-image-1",
-    });
-  });
-
-  it("submits reference-image edits to the OpenAI Images edits endpoint", async () => {
-    const resolveApiKeySpy = vi.spyOn(providerAuth, "resolveApiKeyForProvider").mockResolvedValue({
-      apiKey: "sk-test",
-      source: "env",
-      mode: "api-key",
-    });
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [
-          {
-            b64_json: Buffer.from("edited-image").toString("base64"),
-          },
-        ],
-      }),
-    });
-    setTestGlobal("fetch", fetchMock);
-
-    const provider = buildOpenAIImageGenerationProvider();
-
-    const result = await provider.generateImage({
-      provider: "openai",
-      model: "gpt-image-1",
-      prompt: "Edit this image",
-      cfg: {},
-      inputImages: [
-        { buffer: Buffer.from("x"), mimeType: "image/png" },
-        { buffer: Buffer.from("y"), mimeType: "image/jpeg", fileName: "ref.jpg" },
-      ],
-    });
-
-    expect(resolveApiKeySpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: "openai",
-      }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/images/edits",
-      expect.objectContaining({
-        method: "POST",
-        body: expect.any(FormData),
-      }),
-    );
-    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
-    const requestBody = requestInit?.body;
-    if (!(requestBody instanceof FormData)) {
-      throw new Error("expected multipart form body");
-    }
-    expect(requestBody.get("model")).toBe("gpt-image-1");
-    expect(requestBody.get("prompt")).toBe("Edit this image");
-    expect(requestBody.get("n")).toBe("1");
-    expect(requestBody.get("size")).toBe("1024x1024");
-    const images = requestBody.getAll("image");
-    expect(images).toHaveLength(2);
-    expect(result).toEqual({
-      images: [
-        {
-          buffer: Buffer.from("edited-image"),
-          mimeType: "image/png",
-          fileName: "image-1.png",
-        },
-      ],
-      model: "gpt-image-1",
-    });
-  });
-
-  it("does not allow private-network routing just because a custom base URL is configured", async () => {
-    vi.spyOn(providerAuth, "resolveApiKeyForProvider").mockResolvedValue({
-      apiKey: "sk-test",
-      source: "env",
-      mode: "api-key",
-    });
-    const fetchMock = vi.fn();
-    setTestGlobal("fetch", fetchMock);
-
-    const provider = buildOpenAIImageGenerationProvider();
-    await expect(
-      provider.generateImage({
-        provider: "openai",
-        model: "gpt-image-1",
-        prompt: "draw a cat",
-        cfg: {
-          models: {
-            providers: {
-              openai: {
-                baseUrl: "http://127.0.0.1:8080/v1",
-                models: [],
-              },
-            },
-          },
-        } satisfies OpenClawConfig,
-      }),
-    ).rejects.toThrow("Blocked hostname or private/internal/special-use IP address");
-
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("registers GPT-5 system prompt contributions when the friendly overlay is enabled", async () => {

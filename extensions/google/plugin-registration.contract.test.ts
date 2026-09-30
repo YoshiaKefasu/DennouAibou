@@ -3,9 +3,6 @@ import { describePluginRegistrationContract } from "../../test/helpers/plugins/p
 
 describePluginRegistrationContract({
   ...pluginRegistrationContractCases.google,
-  videoGenerationProviderIds: ["google"],
   webSearchProviderIds: ["gemini"],
   requireDescribeImages: true,
-  requireGenerateImage: true,
-  requireGenerateVideo: true,
 });

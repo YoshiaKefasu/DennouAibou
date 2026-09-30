@@ -57,7 +57,6 @@ export const unitTestAdditionalExcludePatterns = [
   "src/utils/**",
   "src/wizard/**",
   "src/plugins/contracts/**",
-  "src/scripts/**",
   "src/infra/boundary-path.test.ts",
   "src/infra/git-root.test.ts",
   "src/infra/home-dir.test.ts",

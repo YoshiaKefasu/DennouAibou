@@ -1,18 +1,12 @@
 import type {
-  ImageGenerationProviderPlugin,
   MediaUnderstandingProviderPlugin,
-  MusicGenerationProviderPlugin,
   ProviderPlugin,
-  VideoGenerationProviderPlugin,
 } from "../../../src/plugins/types.js";
 import { createTestPluginApi } from "./plugin-api.js";
 
 type RegisteredProviderCollections = {
   providers: ProviderPlugin[];
   mediaProviders: MediaUnderstandingProviderPlugin[];
-  imageProviders: ImageGenerationProviderPlugin[];
-  musicProviders: MusicGenerationProviderPlugin[];
-  videoProviders: VideoGenerationProviderPlugin[];
 };
 
 type ProviderPluginModule = {
@@ -26,9 +20,6 @@ export async function registerProviderPlugin(params: {
 }): Promise<RegisteredProviderCollections> {
   const providers: ProviderPlugin[] = [];
   const mediaProviders: MediaUnderstandingProviderPlugin[] = [];
-  const imageProviders: ImageGenerationProviderPlugin[] = [];
-  const musicProviders: MusicGenerationProviderPlugin[] = [];
-  const videoProviders: VideoGenerationProviderPlugin[] = [];
 
   await params.plugin.register(
     createTestPluginApi({
@@ -43,24 +34,12 @@ export async function registerProviderPlugin(params: {
       registerMediaUnderstandingProvider: (provider) => {
         mediaProviders.push(provider);
       },
-      registerImageGenerationProvider: (provider) => {
-        imageProviders.push(provider);
-      },
-      registerMusicGenerationProvider: (provider) => {
-        musicProviders.push(provider);
-      },
-      registerVideoGenerationProvider: (provider) => {
-        videoProviders.push(provider);
-      },
     }),
   );
 
   return {
     providers,
     mediaProviders,
-    imageProviders,
-    musicProviders,
-    videoProviders,
   };
 }
 

@@ -1,14 +1,10 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { buildOpenAIImageGenerationProvider } from "./image-generation-provider.js";
 import { openaiMediaUnderstandingProvider } from "./media-understanding-provider.js";
 import { buildOpenAIProvider } from "./openai-provider.js";
 import {
   resolveOpenAIPromptOverlayMode,
   resolveOpenAISystemPromptContribution,
 } from "./prompt-overlay.js";
-import { buildOpenAIRealtimeTranscriptionProvider } from "./realtime-transcription-provider.js";
-import { buildOpenAIRealtimeVoiceProvider } from "./realtime-voice-provider.js";
-import { buildOpenAIVideoGenerationProvider } from "./video-generation-provider.js";
 
 export default definePluginEntry({
   id: "openai",
@@ -28,10 +24,6 @@ export default definePluginEntry({
         }),
     });
     api.registerProvider(buildProviderWithPromptContribution(buildOpenAIProvider()));
-    api.registerImageGenerationProvider(buildOpenAIImageGenerationProvider());
-    api.registerRealtimeTranscriptionProvider(buildOpenAIRealtimeTranscriptionProvider());
-    api.registerRealtimeVoiceProvider(buildOpenAIRealtimeVoiceProvider());
     api.registerMediaUnderstandingProvider(openaiMediaUnderstandingProvider);
-    api.registerVideoGenerationProvider(buildOpenAIVideoGenerationProvider());
   },
 });

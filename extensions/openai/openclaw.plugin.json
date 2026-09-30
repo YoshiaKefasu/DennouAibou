@@ -25,11 +25,7 @@
   ],
   "contracts": {
     "speechProviders": ["openai"],
-    "realtimeTranscriptionProviders": ["openai"],
-    "realtimeVoiceProviders": ["openai"],
-    "mediaUnderstandingProviders": ["openai"],
-    "imageGenerationProviders": ["openai"],
-    "videoGenerationProviders": ["openai"]
+    "mediaUnderstandingProviders": ["openai"]
   },
   "configSchema": {
     "type": "object",

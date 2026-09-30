@@ -8,5 +8,3 @@ export {
   OPENAI_DEFAULT_MODEL,
 } from "./default-models.js";
 export { buildOpenAIProvider } from "./openai-provider.js";
-export { buildOpenAIRealtimeTranscriptionProvider } from "./realtime-transcription-provider.js";
-export { buildOpenAIRealtimeVoiceProvider } from "./realtime-voice-provider.js";

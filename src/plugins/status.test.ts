@@ -613,7 +613,6 @@ describe("plugin status reports", () => {
           origin: "bundled",
           providerIds: ["google"],
           mediaUnderstandingProviderIds: ["google"],
-          imageGenerationProviderIds: ["google"],
           webSearchProviderIds: ["google"],
         }),
       ],
@@ -627,7 +626,7 @@ describe("plugin status reports", () => {
     expectInspectShape(inspect!, {
       shape: "hybrid-capability",
       capabilityMode: "hybrid",
-      capabilityKinds: ["text-inference", "media-understanding", "image-generation", "web-search"],
+      capabilityKinds: ["text-inference", "media-understanding", "web-search"],
     });
     expect(inspect?.usesLegacyBeforeAgentStart).toBe(true);
     expect(inspect?.compatibility).toEqual([

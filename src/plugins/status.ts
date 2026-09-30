@@ -28,10 +28,7 @@ export type PluginStatusReport = PluginRegistry & {
 export type PluginCapabilityKind =
   | "text-inference"
   | "speech"
-  | "realtime-transcription"
-  | "realtime-voice"
   | "media-understanding"
-  | "image-generation"
   | "web-search"
   | "channel";
 
@@ -241,10 +238,7 @@ export function buildPluginDiagnosticsReport(params?: PluginReportParams): Plugi
 function buildCapabilityEntries(plugin: PluginRegistry["plugins"][number]) {
   return [
     { kind: "text-inference" as const, ids: plugin.providerIds },
-    { kind: "realtime-transcription" as const, ids: plugin.realtimeTranscriptionProviderIds },
-    { kind: "realtime-voice" as const, ids: plugin.realtimeVoiceProviderIds },
     { kind: "media-understanding" as const, ids: plugin.mediaUnderstandingProviderIds },
-    { kind: "image-generation" as const, ids: plugin.imageGenerationProviderIds },
     { kind: "web-search" as const, ids: plugin.webSearchProviderIds },
     { kind: "channel" as const, ids: plugin.channelIds },
   ].filter((entry) => entry.ids.length > 0);

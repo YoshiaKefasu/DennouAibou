@@ -6,12 +6,7 @@ import { listBundledPluginMetadata } from "../../bundled-plugin-metadata.js";
 export type BundledPluginContractSnapshot = {
   pluginId: string;
   providerIds: string[];
-  realtimeTranscriptionProviderIds: string[];
-  realtimeVoiceProviderIds: string[];
   mediaUnderstandingProviderIds: string[];
-  imageGenerationProviderIds: string[];
-  videoGenerationProviderIds: string[];
-  musicGenerationProviderIds: string[];
   webFetchProviderIds: string[];
   webSearchProviderIds: string[];
   toolNames: string[];
@@ -40,14 +35,7 @@ export const BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS: readonly BundledPluginContractSn
   BUNDLED_PLUGIN_METADATA_FOR_CAPABILITIES.map(({ manifest }) => ({
     pluginId: manifest.id,
     providerIds: uniqueStrings(manifest.providers),
-    realtimeTranscriptionProviderIds: uniqueStrings(
-      manifest.contracts?.realtimeTranscriptionProviders,
-    ),
-    realtimeVoiceProviderIds: uniqueStrings(manifest.contracts?.realtimeVoiceProviders),
     mediaUnderstandingProviderIds: uniqueStrings(manifest.contracts?.mediaUnderstandingProviders),
-    imageGenerationProviderIds: uniqueStrings(manifest.contracts?.imageGenerationProviders),
-    videoGenerationProviderIds: uniqueStrings(manifest.contracts?.videoGenerationProviders),
-    musicGenerationProviderIds: uniqueStrings(manifest.contracts?.musicGenerationProviders),
     webFetchProviderIds: uniqueStrings(manifest.contracts?.webFetchProviders),
     webSearchProviderIds: uniqueStrings(manifest.contracts?.webSearchProviders),
     toolNames: uniqueStrings(manifest.contracts?.tools),
@@ -55,12 +43,7 @@ export const BUNDLED_PLUGIN_CONTRACT_SNAPSHOTS: readonly BundledPluginContractSn
     .filter(
       (entry) =>
         entry.providerIds.length > 0 ||
-        entry.realtimeTranscriptionProviderIds.length > 0 ||
-        entry.realtimeVoiceProviderIds.length > 0 ||
         entry.mediaUnderstandingProviderIds.length > 0 ||
-        entry.imageGenerationProviderIds.length > 0 ||
-        entry.videoGenerationProviderIds.length > 0 ||
-        entry.musicGenerationProviderIds.length > 0 ||
         entry.webFetchProviderIds.length > 0 ||
         entry.webSearchProviderIds.length > 0 ||
         entry.toolNames.length > 0,

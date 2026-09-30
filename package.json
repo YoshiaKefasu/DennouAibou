@@ -209,10 +209,6 @@
       "types": "./dist/plugin-sdk/media-runtime.d.ts",
       "default": "./dist/plugin-sdk/media-runtime.js"
     },
-    "./plugin-sdk/media-generation-runtime": {
-      "types": "./dist/plugin-sdk/media-generation-runtime.d.ts",
-      "default": "./dist/plugin-sdk/media-generation-runtime.js"
-    },
     "./plugin-sdk/conversation-binding-runtime": {
       "types": "./dist/plugin-sdk/conversation-binding-runtime.d.ts",
       "default": "./dist/plugin-sdk/conversation-binding-runtime.js"
@@ -557,42 +553,6 @@
       "types": "./dist/plugin-sdk/googlechat-runtime-shared.d.ts",
       "default": "./dist/plugin-sdk/googlechat-runtime-shared.js"
     },
-    "./plugin-sdk/media-generation-runtime-shared": {
-      "types": "./dist/plugin-sdk/media-generation-runtime-shared.d.ts",
-      "default": "./dist/plugin-sdk/media-generation-runtime-shared.js"
-    },
-    "./plugin-sdk/image-generation": {
-      "types": "./dist/plugin-sdk/image-generation.d.ts",
-      "default": "./dist/plugin-sdk/image-generation.js"
-    },
-    "./plugin-sdk/image-generation-runtime": {
-      "types": "./dist/plugin-sdk/image-generation-runtime.d.ts",
-      "default": "./dist/plugin-sdk/image-generation-runtime.js"
-    },
-    "./plugin-sdk/image-generation-core": {
-      "types": "./dist/plugin-sdk/image-generation-core.d.ts",
-      "default": "./dist/plugin-sdk/image-generation-core.js"
-    },
-    "./plugin-sdk/music-generation": {
-      "types": "./dist/plugin-sdk/music-generation.d.ts",
-      "default": "./dist/plugin-sdk/music-generation.js"
-    },
-    "./plugin-sdk/music-generation-core": {
-      "types": "./dist/plugin-sdk/music-generation-core.d.ts",
-      "default": "./dist/plugin-sdk/music-generation-core.js"
-    },
-    "./plugin-sdk/video-generation": {
-      "types": "./dist/plugin-sdk/video-generation.d.ts",
-      "default": "./dist/plugin-sdk/video-generation.js"
-    },
-    "./plugin-sdk/video-generation-runtime": {
-      "types": "./dist/plugin-sdk/video-generation-runtime.d.ts",
-      "default": "./dist/plugin-sdk/video-generation-runtime.js"
-    },
-    "./plugin-sdk/video-generation-core": {
-      "types": "./dist/plugin-sdk/video-generation-core.d.ts",
-      "default": "./dist/plugin-sdk/video-generation-core.js"
-    },
     "./plugin-sdk/irc": {
       "types": "./dist/plugin-sdk/irc.d.ts",
       "default": "./dist/plugin-sdk/irc.js"
@@ -604,14 +564,6 @@
     "./plugin-sdk/reply-history": {
       "types": "./dist/plugin-sdk/reply-history.d.ts",
       "default": "./dist/plugin-sdk/reply-history.js"
-    },
-    "./plugin-sdk/realtime-transcription": {
-      "types": "./dist/plugin-sdk/realtime-transcription.d.ts",
-      "default": "./dist/plugin-sdk/realtime-transcription.js"
-    },
-    "./plugin-sdk/realtime-voice": {
-      "types": "./dist/plugin-sdk/realtime-voice.d.ts",
-      "default": "./dist/plugin-sdk/realtime-voice.js"
     },
     "./plugin-sdk/media-understanding": {
       "types": "./dist/plugin-sdk/media-understanding.d.ts",
@@ -1033,7 +985,6 @@
     "protocol:check": "pnpm protocol:gen && pnpm protocol:gen:swift && git diff --exit-code -- dist/protocol.schema.json apps/macos/Sources/OpenClawProtocol/GatewayModels.swift apps/shared/OpenClawKit/Sources/OpenClawProtocol/GatewayModels.swift",
     "protocol:gen": "node --import tsx scripts/protocol-gen.ts",
     "protocol:gen:swift": "node --import tsx scripts/protocol-gen-swift.ts",
-    "qa:e2e": "node --import tsx scripts/qa-e2e.ts",
     "qa:lab:build": "vite build --config extensions/qa-lab/web/vite.config.ts",
     "qa:lab:ui": "pnpm dennou-aibou qa ui",
     "qa:lab:up": "node --import tsx scripts/qa-lab-up.ts",
@@ -1065,9 +1016,6 @@
     "test:docker:cleanup": "bash scripts/test-cleanup-docker.sh",
     "test:docker:doctor-switch": "bash scripts/e2e/doctor-install-switch-docker.sh",
     "test:docker:gateway-network": "bash scripts/e2e/gateway-network-docker.sh",
-    "test:docker:live-acp-bind": "bash scripts/test-live-acp-bind-docker.sh",
-    "test:docker:live-acp-bind:claude": "DENNOU_LIVE_ACP_BIND_AGENT=claude bash scripts/test-live-acp-bind-docker.sh",
-    "test:docker:live-acp-bind:codex": "DENNOU_LIVE_ACP_BIND_AGENT=codex bash scripts/test-live-acp-bind-docker.sh",
     "test:docker:live-build": "bash scripts/test-live-build-docker.sh",
     "test:docker:live-cli-backend": "bash scripts/test-live-cli-backend-docker.sh",
     "test:docker:live-gateway": "bash scripts/test-live-gateway-models-docker.sh",
@@ -1093,10 +1041,6 @@
     "test:live": "node scripts/test-live.mjs",
     "test:live:cache": "bun scripts/check-live-cache.ts",
     "test:live:gateway-profiles": "node scripts/test-live.mjs -- src/gateway/gateway-models.profiles.live.test.ts",
-    "test:live:media": "node --import tsx scripts/test-live-media.ts",
-    "test:live:media:image": "node --import tsx scripts/test-live-media.ts image",
-    "test:live:media:music": "node --import tsx scripts/test-live-media.ts music",
-    "test:live:media:video": "node --import tsx scripts/test-live-media.ts video",
     "test:live:models-profiles": "node scripts/test-live.mjs -- src/agents/models.profiles.live.test.ts",
     "test:max": "DENNOU_VITEST_MAX_WORKERS=8 node scripts/test-projects.mjs",
     "test:parallels:linux": "bash scripts/e2e/parallels-linux-smoke.sh",
@@ -1118,7 +1062,6 @@
     "test:startup:bench:smoke": "node --import tsx scripts/bench-cli-startup.ts --preset real --case gatewayStatusJson --runs 1 --warmup 0 --output .artifacts/cli-startup-bench-smoke.json",
     "test:startup:memory": "node scripts/check-cli-startup-memory.mjs",
     "test:ui": "pnpm ui:i18n:check && pnpm lint:ui:no-raw-window-open && pnpm --dir ui test",
-    "test:voicecall:closedloop": "node scripts/test-voicecall-closedloop.mjs",
     "test:watch": "node scripts/test-projects.mjs --watch",
     "tool-display:check": "node --import tsx scripts/tool-display.ts --check",
     "tool-display:write": "node --import tsx scripts/tool-display.ts --write",

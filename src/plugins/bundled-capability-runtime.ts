@@ -118,12 +118,7 @@ function createCapabilityPluginRecord(params: {
     hookNames: [],
     channelIds: [],
     providerIds: [],
-    realtimeTranscriptionProviderIds: [],
-    realtimeVoiceProviderIds: [],
     mediaUnderstandingProviderIds: [],
-    imageGenerationProviderIds: [],
-    videoGenerationProviderIds: [],
-    musicGenerationProviderIds: [],
     webFetchProviderIds: [],
     webSearchProviderIds: [],
     memoryEmbeddingProviderIds: [],
@@ -279,23 +274,8 @@ export function loadBundledCapabilityRuntimeRegistry(params: {
       const captured = createCapturedPluginRegistration();
       void register(captured.api);
       record.providerIds.push(...captured.providers.map((entry) => entry.id));
-      record.realtimeTranscriptionProviderIds.push(
-        ...captured.realtimeTranscriptionProviders.map((entry) => entry.id),
-      );
-      record.realtimeVoiceProviderIds.push(
-        ...captured.realtimeVoiceProviders.map((entry) => entry.id),
-      );
       record.mediaUnderstandingProviderIds.push(
         ...captured.mediaUnderstandingProviders.map((entry) => entry.id),
-      );
-      record.imageGenerationProviderIds.push(
-        ...captured.imageGenerationProviders.map((entry) => entry.id),
-      );
-      record.videoGenerationProviderIds.push(
-        ...captured.videoGenerationProviders.map((entry) => entry.id),
-      );
-      record.musicGenerationProviderIds.push(
-        ...captured.musicGenerationProviders.map((entry) => entry.id),
       );
       record.webFetchProviderIds.push(...captured.webFetchProviders.map((entry) => entry.id));
       record.webSearchProviderIds.push(...captured.webSearchProviders.map((entry) => entry.id));
@@ -313,53 +293,8 @@ export function loadBundledCapabilityRuntimeRegistry(params: {
           rootDir: record.rootDir,
         })),
       );
-      registry.realtimeTranscriptionProviders.push(
-        ...captured.realtimeTranscriptionProviders.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
-      registry.realtimeVoiceProviders.push(
-        ...captured.realtimeVoiceProviders.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
       registry.mediaUnderstandingProviders.push(
         ...captured.mediaUnderstandingProviders.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
-      registry.imageGenerationProviders.push(
-        ...captured.imageGenerationProviders.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
-      registry.videoGenerationProviders.push(
-        ...captured.videoGenerationProviders.map((provider) => ({
-          pluginId: record.id,
-          pluginName: record.name,
-          provider,
-          source: record.source,
-          rootDir: record.rootDir,
-        })),
-      );
-      registry.musicGenerationProviders.push(
-        ...captured.musicGenerationProviders.map((provider) => ({
           pluginId: record.id,
           pluginName: record.name,
           provider,

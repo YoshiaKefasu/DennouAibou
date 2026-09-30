@@ -23,25 +23,7 @@ import type { OperatorScope } from "../gateway/method-scopes.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import type { InternalHookHandler } from "../hooks/internal-hooks.js";
 import type { HookEntry } from "../hooks/types.js";
-import type { ImageGenerationProvider } from "../image-generation/types.js";
 import type { MediaUnderstandingProvider } from "../media-understanding/types.js";
-import type { MusicGenerationProvider } from "../music-generation/types.js";
-import type {
-  RealtimeTranscriptionProviderConfig,
-  RealtimeTranscriptionProviderConfiguredContext,
-  RealtimeTranscriptionProviderId,
-  RealtimeTranscriptionProviderResolveConfigContext,
-  RealtimeTranscriptionSession,
-  RealtimeTranscriptionSessionCreateRequest,
-} from "../realtime-transcription/provider-types.js";
-import type {
-  RealtimeVoiceBridge,
-  RealtimeVoiceBridgeCreateRequest,
-  RealtimeVoiceProviderConfig,
-  RealtimeVoiceProviderConfiguredContext,
-  RealtimeVoiceProviderId,
-  RealtimeVoiceProviderResolveConfigContext,
-} from "../realtime-voice/provider-types.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type {
   RuntimeWebFetchMetadata,
@@ -49,7 +31,6 @@ import type {
 } from "../secrets/runtime-web-tools.types.js";
 import type { SecurityAuditFinding } from "../security/audit.js";
 import type { DeliveryContext } from "../utils/delivery-context.js";
-import type { VideoGenerationProvider } from "../video-generation/types.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import type { SecretInputMode } from "./provider-auth-types.js";
 import type { createVpsAwareOAuthHandlers } from "./provider-oauth-flow.js";
@@ -1619,42 +1600,7 @@ export type PluginWebFetchProviderEntry = WebFetchProviderPlugin & {
   pluginId: string;
 };
 
-/** Realtime transcription capability registered by a plugin. */
-export type RealtimeTranscriptionProviderPlugin = {
-  id: RealtimeTranscriptionProviderId;
-  label: string;
-  aliases?: string[];
-  autoSelectOrder?: number;
-  resolveConfig?: (
-    ctx: RealtimeTranscriptionProviderResolveConfigContext,
-  ) => RealtimeTranscriptionProviderConfig;
-  isConfigured: (ctx: RealtimeTranscriptionProviderConfiguredContext) => boolean;
-  createSession: (req: RealtimeTranscriptionSessionCreateRequest) => RealtimeTranscriptionSession;
-};
-
-export type PluginRealtimeTranscriptionProviderEntry = RealtimeTranscriptionProviderPlugin & {
-  pluginId: string;
-};
-
-/** Realtime voice capability registered by a plugin. */
-export type RealtimeVoiceProviderPlugin = {
-  id: RealtimeVoiceProviderId;
-  label: string;
-  aliases?: string[];
-  autoSelectOrder?: number;
-  resolveConfig?: (ctx: RealtimeVoiceProviderResolveConfigContext) => RealtimeVoiceProviderConfig;
-  isConfigured: (ctx: RealtimeVoiceProviderConfiguredContext) => boolean;
-  createBridge: (req: RealtimeVoiceBridgeCreateRequest) => RealtimeVoiceBridge;
-};
-
-export type PluginRealtimeVoiceProviderEntry = RealtimeVoiceProviderPlugin & {
-  pluginId: string;
-};
-
 export type MediaUnderstandingProviderPlugin = MediaUnderstandingProvider;
-export type ImageGenerationProviderPlugin = ImageGenerationProvider;
-export type VideoGenerationProviderPlugin = VideoGenerationProvider;
-export type MusicGenerationProviderPlugin = MusicGenerationProvider;
 
 export type OpenClawPluginGatewayMethod = {
   method: string;
@@ -2009,18 +1955,8 @@ export type OpenClawPluginApi = {
   registerAutoEnableProbe: (probe: PluginSetupAutoEnableProbe) => void;
   /** Register a native model/provider plugin (text inference capability). */
   registerProvider: (provider: ProviderPlugin) => void;
-  /** Register a realtime transcription provider (streaming STT capability). */
-  registerRealtimeTranscriptionProvider: (provider: RealtimeTranscriptionProviderPlugin) => void;
-  /** Register a realtime voice provider (duplex voice capability). */
-  registerRealtimeVoiceProvider: (provider: RealtimeVoiceProviderPlugin) => void;
   /** Register a media understanding provider (media understanding capability). */
   registerMediaUnderstandingProvider: (provider: MediaUnderstandingProviderPlugin) => void;
-  /** Register an image generation provider (image generation capability). */
-  registerImageGenerationProvider: (provider: ImageGenerationProviderPlugin) => void;
-  /** Register a video generation provider (video generation capability). */
-  registerVideoGenerationProvider: (provider: VideoGenerationProviderPlugin) => void;
-  /** Register a music generation provider (music generation capability). */
-  registerMusicGenerationProvider: (provider: MusicGenerationProviderPlugin) => void;
   /** Register a web fetch provider (web fetch capability). */
   registerWebFetchProvider: (provider: WebFetchProviderPlugin) => void;
   /** Register a web search provider (web search capability). */

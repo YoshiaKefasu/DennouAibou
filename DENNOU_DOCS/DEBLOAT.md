@@ -2038,3 +2038,48 @@ DEBLOAT 台帳の「browser テスト10本は温存要判断」は本波で判�
 | 残存参照                                                                                       | 削除ファイルへの参照0件（`vitest.shared.config.ts`・`package.json`・非テストソース・workflows・docs を実測）                                                                                                                                                                                     |
 
 残務：ui 側 `playwright`・`@vitest/browser-playwright` devDependencies は browser プロジェクト撤去により未使用化（lockfile 再生成を伴うため本波では温存）。`src/scripts/test-projects.test.ts` の ui routing 例示（`views/channels.test.ts`）は削除済みパスだが routing ロジック自体は有効のため温存。
+
+## 31. 生成系・realtime・スタブ・死スクリプト・skills 残骸撤去（§23.2 候補 5・6・9・10・11・12・13・14・波1/波2・2026-09-30 時点作業）
+
+### 31.1 目的・背景
+
+§23.2 候補5（生成系残骸 `src/{image,music,video,media}-generation/`）・候補6（`extensions/google`・`extensions/openai` のメディア生成プロバイダー登録）・候補9（realtime 系）・候補10（`src/qa-e2e/`）・候補11（テスト専用 `src/docs/`・`src/i18n/`・`src/scripts/`）・候補12（package.json 死参照）・候補13（死にスクリプト群）・候補14（`skills/` 内削除済み機能）の実施波。生成系ツール（`image_generate` / `music_generate` / `video_generate`）は §22 で完全削除済みであり、本波では registry・runtime・plugin-sdk・contracts・manifest を含む残存面を完全撤去した（sandbox 波と同様、API 面も残さない方針）。
+
+### 31.2 削除内容（87ファイル・`git status` 実測）
+
+| 区分                        | 内容                                                                                                                                                                                                                                                                                                 | 数         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 生成系 src                  | `src/image-generation/`（9）・`src/music-generation/`（9）・`src/video-generation/`（11）・`src/media-generation/`（1）                                                                                                                                                                              | 30ファイル |
+| realtime src                | `src/realtime-transcription/`（2）・`src/realtime-voice/`（2）                                                                                                                                                                                                                                       | 4ファイル  |
+| スタブ・テスト専用          | `src/qa-e2e/`（9）・`src/docs/`（1）・`src/i18n/`（1）・`src/scripts/`（5）                                                                                                                                                                                                                          | 16ファイル |
+| plugin-sdk 生成系・realtime | `image-generation[.ts,-core.ts,-core.auth.runtime.ts]`・`music-generation[.ts,-core.ts]`・`video-generation[.ts,-core.ts]`・`media-generation-runtime-shared.ts`・`realtime-transcription.ts`・`realtime-voice.ts`                                                                                   | 10ファイル |
+| 拡張プロバイダー            | google: image/music/video-generation-provider＋各 test（6）。openai: image/video/realtime-transcription/realtime-voice-provider＋各 test（7、内訳は本文参照）                                                                                                                                        | 13ファイル |
+| scripts 死スクリプト        | `firecrawl-compare.ts`・`readability-basic-compare.ts`・`zai-fallback-repro.ts`・`phase3-delete.ps1`・`reindex.ps1`・`cron_usage_report.ts`・`sqlite-vec-smoke.mjs`・`test-voicecall-closedloop.mjs`（voice-call 特化のため本体も削除）・`qa-e2e.ts`（`src/qa-e2e` のランナー・`qa:e2e` と共に削除） | 9ファイル  |
+| skills                      | `skills/clawhub/`・`skills/voice-call/`・`skills/sherpa-onnx-tts/`（bin 含む）                                                                                                                                                                                                                       | 4ファイル  |
+| CLI                         | `src/cli/qa-cli.ts`（`register.subclis.ts` の `qa` 登録と共に撤去）                                                                                                                                                                                                                                  | 1ファイル  |
+
+注：`scripts/debug-claude-usage.ts` は指定時点で既に不在（削除不要）。`test:voicecall:closedloop` の参照先は存在していたが voice-call 特化スクリプトのため本体ごと削除。`scripts/reindex.ps1` は他参照0件実測（`reindex` 文字列一致は memory 系 config 文言のみ）。config schema の `imageGenerationModel` 等の文字列キー・`PluginManifestOnboardingScope` の `"image-generation"` スコープ・`sherpa-onnx-offline` バイナリ参照（STT runtime）は削除対象の import を持たないため温存。
+
+### 31.3 参照後始末（修正約40ファイル）
+
+- `src/plugins/types.ts`：5 import・5 provider 型（`RealtimeTranscription/Voice`・`Image/Video/MusicGenerationProviderPlugin`＋Entry 型）・5 Api メソッド（`register*Generation/Provider`・`registerRealtime*`）を除去。`registerMediaUnderstandingProvider` は温存。
+- `src/plugins/registry.ts`・`registry-empty.ts`・`manifest.ts`・`api-builder.ts`・`captured-registration.ts`・`loader.ts`・`status.ts`・`channel-plugin-ids.ts`・`manifest-registry.ts`：生成系・realtime の登録関数・レジストリ欄・manifest contracts 欄・capability kind を除去。
+- `src/plugins/runtime/index.ts`・`types-core.ts`：`imageGeneration`・`videoGeneration`・`musicGeneration` facade を除去。`mediaUnderstanding`・`stt`・`modelAuth` は温存。
+- `src/plugins/capability-provider-runtime.ts`・`bundled-capability-runtime.ts`：capability キー・取込分岐を memory/mediaUnderstanding のみに縮小。
+- `src/plugins/contracts/registry.ts`・`speech-vitest-registry.ts`・`inventory/bundled-capability-metadata.ts`：5 系統の contract registry・loader・snapshot 欄を除去（mediaUnderstanding 系のみ温存）。
+- `extensions/google/index.ts`・`test-api.ts`・`openclaw.plugin.json`：lazy image provider・music/video 登録・contracts 3件を除去（mediaUnderstanding・webSearch 温存）。`extensions/openai/index.ts`・`api.ts`・`register.runtime.ts`・`test-api.ts`・`openclaw.plugin.json`：image/video/realtime 登録・contracts 4件を除去。`extensions/openai/index.test.ts` の画像生成3テストも除去（provider 本体削除のため）。
+- テスト系：`test/helpers/plugins/` 4件・`runtime/index.test.ts`・`status.test.ts`・`status.test-helpers.ts`・`runtime.test.ts`・`registry.contract.test.ts`・`bundled-capability-metadata.test.ts`・`capability-provider-runtime.test.ts`・`manifest-registry.test.ts`・`gateway/server-plugins.test.ts`・`test-helpers.plugin-registry.ts`・`hooks.test-helpers.ts`・`test-utils/channel-plugins.ts`・`test/setup-openclaw-runtime.ts`・`bot-native-commands.registry.test.ts`・google/openai の contract test 2件から削除済み欄を除去。`attempt.spawn-workspace.test-support.ts` の `image-generation/runtime.js` mock を除去。
+- CLI：`register.subclis.ts` の `qa` エントリ＋対応 test mock・assertion を除去（`docs-cli` は `src/docs/` に依存しないため温存）。
+- doctor：`doctor-plugin-manifests.ts` の `LEGACY_MANIFEST_CONTRACT_KEYS` から `imageGenerationProviders` を除去。
+- 設定・基盤：`scripts/lib/plugin-sdk-entrypoints.json` から5エントリ除去。`package.json` から exports 12件（`image/music/video-generation[-core,-runtime]`・`media-generation-runtime[-shared]`・`realtime-*`）＋ scripts 9件（`test:live:media*` 4・`test:docker:live-acp-bind*` 3・`test:voicecall:closedloop`・`qa:e2e`）を除去。`vitest.tooling.config.ts`・`vitest.unit-paths.mjs`・`vitest-scoped-config.test.ts` の `src/scripts` パターンを除去。`docs/.generated/plugin-sdk-api-baseline.sha256` を再生成（`--check` pass 確認済み）。
+
+### 31.4 検証結果
+
+| ゲート                               | 結果                                                                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/run-tsgo.mjs --noEmit` | **exit 0**（エラー出力なし・本波内1回のみ実行）                                                                                 |
+| `oxfmt --check`（変更59ファイル）    | **pass**（5件 flag→write 整形後に全件 pass）                                                                                    |
+| `plugin-sdk:api:check`               | **pass**（baseline 再生成後）                                                                                                   |
+| 残存参照                             | 削除モジュールへの import・re-export・登録呼び出し0件（`grep` 実測。`tool-image-generation` はテスト fixture のパス文字列のみ） |
+
+残務：`plugin-sdk:check-exports`（`sync-plugin-sdk-exports.mjs --check`）は本波前から失敗しており本波でも失敗のまま（`entrypoints.json` に対して `channel-streaming`・`conversation-binding-runtime`・`simple-completion-runtime` 等の旧波由来とみられる stale exports が `package.json` に残存。本波の12件は除去済み。別波で sync を回すか判断要）。`test/bun-tier-*.txt` 台帳に削除済みテストパス（`src/image-generation/*`・`src/music-generation/*`・`src/video-generation/*`・`src/docs/*`・`src/i18n/*`・`src/scripts/*` 等）が残る（§27.6 系タスクで更新）。`docs/` 配下から削除済み provider・スクリプトへの言及が残る可能性あり（本波スコープ外）。 |

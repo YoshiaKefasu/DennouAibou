@@ -433,11 +433,7 @@ describe("scoped vitest configs", () => {
 
   it("keeps tooling tests in their own lane", () => {
     expect(defaultToolingConfig.test?.include).toEqual(
-      expect.arrayContaining([
-        "test/**/*.test.ts",
-        "src/scripts/**/*.test.ts",
-        "src/config/doc-baseline.integration.test.ts",
-      ]),
+      expect.arrayContaining(["test/**/*.test.ts", "src/config/doc-baseline.integration.test.ts"]),
     );
   });
 

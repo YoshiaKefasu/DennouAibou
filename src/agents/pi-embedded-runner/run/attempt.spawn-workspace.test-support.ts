@@ -324,11 +324,6 @@ vi.mock("../../pi-bundle-lsp-runtime.js", () => ({
   createBundleLspToolRuntime: async () => undefined,
 }));
 
-vi.mock("../../../image-generation/runtime.js", () => ({
-  generateImage: vi.fn(),
-  listRuntimeImageGenerationProviders: () => [],
-}));
-
 vi.mock("../../model-selection.js", () => ({
   normalizeProviderId: (providerId?: string) => providerId?.trim().toLowerCase() ?? "",
   resolveDefaultModelForAgent: () => ({ provider: "openai", model: "gpt-test" }),

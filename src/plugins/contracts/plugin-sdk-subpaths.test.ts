@@ -738,11 +738,6 @@ describe("plugin-sdk subpath exports", () => {
       "postJsonRequest",
       "postTranscriptionRequest",
     ]);
-    expectSourceOmits("image-generation", [
-      "buildFalImageGenerationProvider",
-      "buildGoogleImageGenerationProvider",
-      "buildOpenAIImageGenerationProvider",
-    ]);
     expectSourceOmits("config-runtime", [
       "hasConfiguredSecretInput",
       "normalizeResolvedSecretInputString",

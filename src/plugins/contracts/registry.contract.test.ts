@@ -4,13 +4,10 @@ import {
   resolveManifestContractPluginIds,
 } from "../manifest-registry.js";
 import {
-  imageGenerationProviderContractRegistry,
   mediaUnderstandingProviderContractRegistry,
   pluginRegistrationContractRegistry,
   providerContractLoadError,
   providerContractPluginIds,
-  realtimeTranscriptionProviderContractRegistry,
-  realtimeVoiceProviderContractRegistry,
   resolveWebFetchProviderContractEntriesForPluginId,
   resolveWebSearchProviderContractEntriesForPluginId,
   webFetchProviderContractRegistry,
@@ -31,8 +28,6 @@ describe("plugin contract registry", () => {
       providers: unknown[];
       contracts?: {
         speechProviders?: unknown[];
-        realtimeTranscriptionProviders?: unknown[];
-        realtimeVoiceProviders?: unknown[];
       };
     }) => boolean;
   }) {
@@ -47,8 +42,6 @@ describe("plugin contract registry", () => {
       providers: unknown[];
       contracts?: {
         speechProviders?: unknown[];
-        realtimeTranscriptionProviders?: unknown[];
-        realtimeVoiceProviders?: unknown[];
       };
     }) => boolean,
   ) {
@@ -80,18 +73,6 @@ describe("plugin contract registry", () => {
       name: "does not duplicate bundled media provider ids",
       ids: () => mediaUnderstandingProviderContractRegistry.map((entry) => entry.provider.id),
     },
-    {
-      name: "does not duplicate bundled realtime transcription provider ids",
-      ids: () => realtimeTranscriptionProviderContractRegistry.map((entry) => entry.provider.id),
-    },
-    {
-      name: "does not duplicate bundled realtime voice provider ids",
-      ids: () => realtimeVoiceProviderContractRegistry.map((entry) => entry.provider.id),
-    },
-    {
-      name: "does not duplicate bundled image-generation provider ids",
-      ids: () => imageGenerationProviderContractRegistry.map((entry) => entry.provider.id),
-    },
   ] as const)("$name", ({ ids }) => {
     expectUniqueIds(ids());
   });
@@ -100,23 +81,6 @@ describe("plugin contract registry", () => {
     expectRegistryPluginIds({
       actualPluginIds: providerContractPluginIds,
       predicate: (plugin) => plugin.origin === "bundled" && plugin.providers.length > 0,
-    });
-  });
-
-  it("covers every bundled realtime voice plugin discovered from manifests", () => {
-    expectRegistryPluginIds({
-      actualPluginIds: realtimeVoiceProviderContractRegistry.map((entry) => entry.pluginId),
-      predicate: (plugin) =>
-        plugin.origin === "bundled" && (plugin.contracts?.realtimeVoiceProviders?.length ?? 0) > 0,
-    });
-  });
-
-  it("covers every bundled realtime transcription plugin discovered from manifests", () => {
-    expectRegistryPluginIds({
-      actualPluginIds: realtimeTranscriptionProviderContractRegistry.map((entry) => entry.pluginId),
-      predicate: (plugin) =>
-        plugin.origin === "bundled" &&
-        (plugin.contracts?.realtimeTranscriptionProviders?.length ?? 0) > 0,
     });
   });
 
