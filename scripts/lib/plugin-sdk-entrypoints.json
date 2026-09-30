@@ -152,7 +152,6 @@
   "retry-runtime",
   "run-command",
   "param-readers",
-  "provider-zai-endpoint",
   "secret-input",
   "channel-status",
   "status-helpers",

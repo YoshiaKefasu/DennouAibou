@@ -1,4 +1,19 @@
-import type { OpenRouterModelCapabilities } from "./openrouter-model-capabilities.js";
+// Local copy of the removed openrouter-model-capabilities shape.
+// The provider capability fetcher is gone (DEBLOAT §23.2 candidate 15);
+// test doubles inject capabilities through ProviderRuntimeTestMockOptions instead.
+export interface OpenRouterModelCapabilities {
+  name: string;
+  input: Array<"text" | "image">;
+  reasoning: boolean;
+  contextWindow: number;
+  maxTokens: number;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
+}
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api";

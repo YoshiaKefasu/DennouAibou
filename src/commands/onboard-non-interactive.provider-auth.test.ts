@@ -16,7 +16,7 @@ import { createProviderApiKeyAuthMethod } from "../plugins/provider-api-key-auth
 import { providerApiKeyAuthRuntime } from "../plugins/provider-api-key-auth.runtime.js";
 import { configureOpenAICompatibleSelfHostedProviderNonInteractive } from "../plugins/provider-self-hosted-setup.js";
 import { makeTempWorkspace } from "../test-helpers/workspace.js";
-import { restoreTestGlobals, setTestGlobal } from "../test-utils/bun-test-mocks.js";
+import { restoreTestGlobals } from "../test-utils/bun-test-mocks.js";
 import { withEnvAsync } from "../test-utils/env.js";
 import { ensureWorkspaceAndSessions } from "./onboard-helpers.js";
 import { runNonInteractiveSetup, type NonInteractiveSetupDeps } from "./onboard-non-interactive.js";
@@ -32,20 +32,14 @@ import {
   type ApplyNonInteractiveAuthChoiceDeps,
 } from "./onboard-non-interactive/local/auth-choice.js";
 import type { AuthChoice, OnboardOptions } from "./onboard-types.js";
-import { detectZaiEndpoint } from "./zai-endpoint-detect.js";
 
 type OnboardEnv = {
   configPath: string;
   runtime: NonInteractiveRuntime;
 };
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
 const MINIMAX_API_BASE_URL = "https://api.minimax.chat/v1";
 const MINIMAX_CN_API_BASE_URL = "https://api.minimax.chat/v1";
 const OPENAI_DEFAULT_MODEL = "openai/gpt-5.4";
-const ZAI_CODING_GLOBAL_BASE_URL = "https://api.z.ai/api/coding/paas/v4";
-const ZAI_CODING_CN_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4";
-const ZAI_GLOBAL_BASE_URL = "https://api.z.ai/api/paas/v4";
 
 const ensureWorkspaceAndSessionsMock = vi.fn<typeof ensureWorkspaceAndSessions>(async () => {});
 
@@ -54,21 +48,6 @@ function createProviderAuthChoiceDeps() {
     ApplyNonInteractiveAuthChoiceDeps["applyNonInteractivePluginProviderChoice"]
   >;
   type PluginProviderChoiceParams = Parameters<PluginProviderChoiceFn>[0];
-
-  const ZAI_FALLBACKS = {
-    "zai-api-key": {
-      baseUrl: ZAI_GLOBAL_BASE_URL,
-      modelId: "glm-5",
-    },
-    "zai-coding-cn": {
-      baseUrl: ZAI_CODING_CN_BASE_URL,
-      modelId: "glm-4.7",
-    },
-    "zai-coding-global": {
-      baseUrl: ZAI_CODING_GLOBAL_BASE_URL,
-      modelId: "glm-5",
-    },
-  } as const;
 
   type HandlerContext = {
     authChoice: string;
@@ -216,53 +195,6 @@ function createProviderAuthChoiceDeps() {
     };
   }
 
-  function createZaiChoice(
-    choiceId: "zai-api-key" | "zai-coding-cn" | "zai-coding-global",
-  ): ChoiceHandler {
-    return {
-      providerId: "zai",
-      label: "Z.AI",
-      runNonInteractive: async (ctx) => {
-        const resolved = await ctx.resolveApiKey({
-          provider: "zai",
-          flagValue: normalizeText(ctx.opts.zaiApiKey),
-          flagName: "--zai-api-key",
-          envVar: "ZAI_API_KEY",
-        });
-        if (!resolved) {
-          return null;
-        }
-        const detected = await detectZaiEndpoint({
-          apiKey: resolved.key,
-          ...(choiceId === "zai-coding-global"
-            ? { endpoint: "coding-global" as const }
-            : choiceId === "zai-coding-cn"
-              ? { endpoint: "coding-cn" as const }
-              : {}),
-        });
-        const fallback = ZAI_FALLBACKS[choiceId];
-        let next = providerApiKeyAuthRuntime.applyAuthProfileConfig(ctx.config as never, {
-          profileId: "zai:default",
-          provider: "zai",
-          mode: "api_key",
-        }) as Record<string, unknown>;
-        next = withProviderConfig(next, "zai", {
-          baseUrl: detected?.baseUrl ?? fallback.baseUrl,
-          api: "openai-completions",
-          models: [
-            buildTestProviderModel(detected?.modelId ?? fallback.modelId, {
-              input: ["text"],
-            }),
-          ],
-        });
-        return providerApiKeyAuthRuntime.applyPrimaryModel(
-          next as never,
-          `zai/${detected?.modelId ?? fallback.modelId}`,
-        );
-      },
-    };
-  }
-
   const cloudflareAiGatewayChoice: ChoiceHandler = {
     providerId: "cloudflare-ai-gateway",
     label: "Cloudflare AI Gateway",
@@ -367,9 +299,6 @@ function createProviderAuthChoiceDeps() {
           }),
       }),
     ],
-    ["zai-api-key", createZaiChoice("zai-api-key")],
-    ["zai-coding-cn", createZaiChoice("zai-coding-cn")],
-    ["zai-coding-global", createZaiChoice("zai-coding-global")],
     [
       "xai-api-key",
       createApiKeyChoice({
@@ -669,72 +598,6 @@ type ProviderAuthConfigSnapshot = {
   };
 };
 
-function createZaiFetchMock(responses: Record<string, number>): FetchLike {
-  return vi.fn(async (input, init) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : "";
-    const parsedBody =
-      typeof init?.body === "string" ? (JSON.parse(init.body) as { model?: string }) : {};
-    const key = `${url}::${parsedBody.model ?? ""}`;
-    const status = responses[key] ?? 404;
-    return new Response(
-      JSON.stringify(
-        status === 200 ? { ok: true } : { error: { code: "unsupported", message: "unsupported" } },
-      ),
-      {
-        status,
-        headers: { "content-type": "application/json" },
-      },
-    );
-  });
-}
-
-async function withZaiProbeFetch<T>(
-  responses: Record<string, number>,
-  run: (fetchMock: FetchLike) => Promise<T>,
-): Promise<T> {
-  const originalVitest = process.env.VITEST;
-  delete process.env.VITEST;
-  const fetchMock = createZaiFetchMock(responses);
-  setTestGlobal("fetch", fetchMock);
-  try {
-    return await run(fetchMock);
-  } finally {
-    restoreTestGlobals();
-    if (originalVitest === undefined) {
-      delete process.env.VITEST;
-    } else {
-      process.env.VITEST = originalVitest;
-    }
-  }
-}
-
-function expectZaiProbeCalls(
-  fetchMock: FetchLike,
-  expected: Array<{ url: string; modelId: string }>,
-): void {
-  const calls = (
-    fetchMock as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }
-  ).mock.calls;
-
-  expect(calls).toHaveLength(expected.length);
-  for (const [index, probe] of expected.entries()) {
-    const [input, init] = calls[index] ?? [];
-    const requestUrl =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input && typeof input === "object" && "url" in input && typeof input.url === "string"
-            ? input.url
-            : undefined;
-    expect(requestUrl).toBe(probe.url);
-    expect(init?.method).toBe("POST");
-    const body =
-      typeof init?.body === "string" ? (JSON.parse(init.body) as { model?: string }) : {};
-    expect(body.model).toBe(probe.modelId);
-  }
-}
-
 async function removeDirWithRetry(dir: string): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
@@ -878,83 +741,6 @@ describe("onboard (non-interactive): provider auth", () => {
       expect(cfg.auth?.profiles?.["minimax:cn"]?.provider).toBe("minimax");
       expect(cfg.auth?.profiles?.["minimax:cn"]?.mode).toBe("api_key");
     });
-  });
-
-  it("stores Z.AI API key after probing the global endpoint", async () => {
-    await withZaiProbeFetch(
-      {
-        [`${ZAI_GLOBAL_BASE_URL}/chat/completions::glm-5`]: 200,
-      },
-      async (fetchMock) =>
-        await withOnboardEnv("openclaw-onboard-zai-", async (env) => {
-          const cfg = await runOnboardingAndReadConfig(env, {
-            authChoice: "zai-api-key",
-            zaiApiKey: "zai-test-key", // pragma: allowlist secret
-          });
-
-          expect(cfg.auth?.profiles?.["zai:default"]?.provider).toBe("zai");
-          expect(cfg.auth?.profiles?.["zai:default"]?.mode).toBe("api_key");
-          expectZaiProbeCalls(fetchMock, [
-            {
-              url: `${ZAI_GLOBAL_BASE_URL}/chat/completions`,
-              modelId: "glm-5",
-            },
-          ]);
-        }),
-    );
-  });
-
-  it("supports Z.AI CN coding endpoint auth choice", async () => {
-    await withZaiProbeFetch(
-      {
-        [`${ZAI_CODING_CN_BASE_URL}/chat/completions::glm-5`]: 404,
-        [`${ZAI_CODING_CN_BASE_URL}/chat/completions::glm-4.7`]: 200,
-      },
-      async (fetchMock) =>
-        await withOnboardEnv("openclaw-onboard-zai-cn-", async (env) => {
-          const cfg = await runOnboardingAndReadConfig(env, {
-            authChoice: "zai-coding-cn",
-            zaiApiKey: "zai-test-key", // pragma: allowlist secret
-          });
-
-          expect(cfg.auth?.profiles?.["zai:default"]?.provider).toBe("zai");
-          expect(cfg.auth?.profiles?.["zai:default"]?.mode).toBe("api_key");
-          expectZaiProbeCalls(fetchMock, [
-            {
-              url: `${ZAI_CODING_CN_BASE_URL}/chat/completions`,
-              modelId: "glm-5",
-            },
-            {
-              url: `${ZAI_CODING_CN_BASE_URL}/chat/completions`,
-              modelId: "glm-4.7",
-            },
-          ]);
-        }),
-    );
-  });
-
-  it("supports Z.AI Coding Plan global endpoint detection", async () => {
-    await withZaiProbeFetch(
-      {
-        [`${ZAI_CODING_GLOBAL_BASE_URL}/chat/completions::glm-5`]: 200,
-      },
-      async (fetchMock) =>
-        await withOnboardEnv("openclaw-onboard-zai-coding-global-", async (env) => {
-          const cfg = await runOnboardingAndReadConfig(env, {
-            authChoice: "zai-coding-global",
-            zaiApiKey: "zai-test-key", // pragma: allowlist secret
-          });
-
-          expect(cfg.auth?.profiles?.["zai:default"]?.provider).toBe("zai");
-          expect(cfg.auth?.profiles?.["zai:default"]?.mode).toBe("api_key");
-          expectZaiProbeCalls(fetchMock, [
-            {
-              url: `${ZAI_CODING_GLOBAL_BASE_URL}/chat/completions`,
-              modelId: "glm-5",
-            },
-          ]);
-        }),
-    );
   });
 
   it("stores xAI API key in the default auth profile", async () => {

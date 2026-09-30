@@ -16,10 +16,7 @@ import {
   createOpenRouterWrapper,
   isProxyReasoningUnsupported,
 } from "../agents/pi-embedded-runner/proxy-stream-wrappers.js";
-import {
-  createToolStreamWrapper,
-  createZaiToolStreamWrapper,
-} from "../agents/pi-embedded-runner/zai-stream-wrappers.js";
+import { createToolStreamWrapper } from "../agents/pi-embedded-runner/zai-stream-wrappers.js";
 import type { ProviderPlugin } from "../plugins/types.js";
 import type { ProviderWrapStreamFnContext } from "./plugin-entry.js";
 
@@ -129,8 +126,4 @@ export {
   resolveOpenAITextVerbosity,
 } from "../agents/pi-embedded-runner/openai-stream-wrappers.js";
 export { streamWithPayloadPatch } from "../agents/pi-embedded-runner/stream-payload-utils.js";
-export { createToolStreamWrapper, createZaiToolStreamWrapper };
-export {
-  getOpenRouterModelCapabilities,
-  loadOpenRouterModelCapabilities,
-} from "../agents/pi-embedded-runner/openrouter-model-capabilities.js";
+export { createToolStreamWrapper };

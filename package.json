@@ -765,10 +765,6 @@
       "types": "./dist/plugin-sdk/param-readers.d.ts",
       "default": "./dist/plugin-sdk/param-readers.js"
     },
-    "./plugin-sdk/provider-zai-endpoint": {
-      "types": "./dist/plugin-sdk/provider-zai-endpoint.d.ts",
-      "default": "./dist/plugin-sdk/provider-zai-endpoint.js"
-    },
     "./plugin-sdk/secret-input": {
       "types": "./dist/plugin-sdk/secret-input.d.ts",
       "default": "./dist/plugin-sdk/secret-input.js"

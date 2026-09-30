@@ -16,6 +16,11 @@ export type OpenAICompletionsCompatDefaults = {
   supportsReasoningEffort: boolean;
   supportsUsageInStreaming: boolean;
   maxTokensField: "max_completion_tokens" | "max_tokens";
+  // Note: "openrouter" / "zai" members are kept for persisted-config
+  // compat (config/io.ts warns on removed thinkingFormat values instead of
+  // crashing). Runtime detection below always resolves to "openai" —
+  // DEBLOAT §23.2 candidate 15 converged provider-specific branches to the
+  // default behavior.
   thinkingFormat: "openai" | "openrouter" | "zai";
   supportsStrictMode: boolean;
 };
@@ -46,9 +51,6 @@ export function resolveOpenAICompletionsCompatDefaults(
     knownProviderFamily === "modelstudio" ||
     endpointClass === "moonshot-native" ||
     endpointClass === "modelstudio-native";
-  const isZai =
-    endpointClass === "zai-native" ||
-    (isDefaultRoute && isDefaultRouteProvider(input.provider, "zai"));
   const isNonStandard =
     endpointClass === "cerebras-native" ||
     endpointClass === "chutes-native" ||
@@ -56,10 +58,8 @@ export function resolveOpenAICompletionsCompatDefaults(
     endpointClass === "mistral-public" ||
     endpointClass === "opencode-native" ||
     endpointClass === "xai-native" ||
-    isZai ||
     (isDefaultRoute &&
       isDefaultRouteProvider(input.provider, "cerebras", "chutes", "deepseek", "opencode", "xai"));
-  const isOpenRouterLike = input.provider === "openrouter" || endpointClass === "openrouter";
   const usesMaxTokens =
     endpointClass === "chutes-native" ||
     endpointClass === "mistral-public" ||
@@ -71,15 +71,14 @@ export function resolveOpenAICompletionsCompatDefaults(
       !isNonStandard && knownProviderFamily !== "mistral" && !usesExplicitProxyLikeEndpoint,
     supportsDeveloperRole: !isNonStandard && !isMoonshotLike && !usesConfiguredNonOpenAIEndpoint,
     supportsReasoningEffort:
-      !isZai &&
       knownProviderFamily !== "mistral" &&
       endpointClass !== "xai-native" &&
       !usesExplicitProxyLikeEndpoint,
     supportsUsageInStreaming:
       !isNonStandard && (!usesConfiguredNonOpenAIEndpoint || supportsNativeStreamingUsageCompat),
     maxTokensField: usesMaxTokens ? "max_tokens" : "max_completion_tokens",
-    thinkingFormat: isZai ? "zai" : isOpenRouterLike ? "openrouter" : "openai",
-    supportsStrictMode: !isZai && !usesConfiguredNonOpenAIEndpoint,
+    thinkingFormat: "openai",
+    supportsStrictMode: !usesConfiguredNonOpenAIEndpoint,
   };
 }
 

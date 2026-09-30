@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { discoverModels } from "../pi-model-discovery.js";
-import { createProviderRuntimeTestMock } from "./model.provider-runtime.test-support.js";
+import {
+  createProviderRuntimeTestMock,
+  type OpenRouterModelCapabilities,
+} from "./model.provider-runtime.test-support.js";
 
 vi.mock("../model-suppression.js", () => ({
   shouldSuppressBuiltInModel: ({ provider, id }: { provider?: string; id?: string }) =>
@@ -22,19 +25,12 @@ vi.mock("../pi-model-discovery.js", () => ({
   discoverModels: vi.fn(() => Promise.resolve({ find: vi.fn(() => null) })),
 }));
 
-import type { OpenRouterModelCapabilities } from "./openrouter-model-capabilities.js";
-
 const mockGetOpenRouterModelCapabilities = vi.fn<
   (modelId: string) => OpenRouterModelCapabilities | undefined
 >(() => undefined);
 const mockLoadOpenRouterModelCapabilities = vi.fn<(modelId: string) => Promise<void>>(
   async () => {},
 );
-vi.mock("./openrouter-model-capabilities.js", () => ({
-  getOpenRouterModelCapabilities: (modelId: string) => mockGetOpenRouterModelCapabilities(modelId),
-  loadOpenRouterModelCapabilities: (modelId: string) =>
-    mockLoadOpenRouterModelCapabilities(modelId),
-}));
 
 import type { OpenClawConfig } from "../../config/config.js";
 import { buildForwardCompatTemplate } from "./model.forward-compat.test-support.js";

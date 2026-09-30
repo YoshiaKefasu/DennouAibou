@@ -29,7 +29,4 @@ export {
   resolveMoonshotThinkingType,
 } from "../agents/pi-embedded-runner/moonshot-thinking-stream-wrappers.js";
 export { streamWithPayloadPatch } from "../agents/pi-embedded-runner/stream-payload-utils.js";
-export {
-  createToolStreamWrapper,
-  createZaiToolStreamWrapper,
-} from "../agents/pi-embedded-runner/zai-stream-wrappers.js";
+export { createToolStreamWrapper } from "../agents/pi-embedded-runner/zai-stream-wrappers.js";

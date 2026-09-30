@@ -21,7 +21,17 @@ import {
   setupAuthTestEnv,
 } from "./test-wizard-helpers.js";
 
-type DetectZaiEndpoint = typeof import("./zai-endpoint-detect.js").detectZaiEndpoint;
+// Local stub type for the removed zai endpoint detector
+// (DEBLOAT §23.2 candidate 15). Test doubles below inject results directly.
+type DetectZaiEndpoint = (params: {
+  apiKey: string;
+  endpoint?: "global" | "cn" | "coding-global" | "coding-cn";
+}) => Promise<{
+  endpoint: string;
+  baseUrl: string;
+  modelId: string;
+  note: string;
+} | null>;
 
 const GOOGLE_GEMINI_DEFAULT_MODEL = "google/gemini-3.1-pro-preview";
 const MINIMAX_CN_API_BASE_URL = "https://api.minimax.chat/v1";
@@ -45,9 +55,6 @@ vi.mock("../plugins/provider-auth-choice.runtime.js", async () => {
 });
 
 const detectZaiEndpoint = vi.hoisted(() => vi.fn<DetectZaiEndpoint>(async () => null));
-vi.mock("./zai-endpoint-detect.js", () => ({
-  detectZaiEndpoint,
-}));
 
 type StoredAuthProfile = {
   key?: string;

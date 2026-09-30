@@ -5,6 +5,10 @@ import { streamWithPayloadPatch } from "./stream-payload-utils.js";
 /**
  * Inject `tool_stream=true` so tool-call deltas stream in real time.
  * Providers can disable this by setting `params.tool_stream=false`.
+ *
+ * Note: the former `createZaiToolStreamWrapper` alias was removed
+ * (DEBLOAT §23.2 candidate 15 — zai compat layer is gone). Use
+ * `createToolStreamWrapper` directly.
  */
 export function createToolStreamWrapper(
   baseStreamFn: StreamFn | undefined,
@@ -21,5 +25,3 @@ export function createToolStreamWrapper(
     });
   };
 }
-
-export const createZaiToolStreamWrapper = createToolStreamWrapper;

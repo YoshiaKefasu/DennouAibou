@@ -2083,3 +2083,42 @@ DEBLOAT 台帳の「browser テスト10本は温存要判断」は本波で判�
 | 残存参照                             | 削除モジュールへの import・re-export・登録呼び出し0件（`grep` 実測。`tool-image-generation` はテスト fixture のパス文字列のみ） |
 
 残務：`plugin-sdk:check-exports`（`sync-plugin-sdk-exports.mjs --check`）は本波前から失敗しており本波でも失敗のまま（`entrypoints.json` に対して `channel-streaming`・`conversation-binding-runtime`・`simple-completion-runtime` 等の旧波由来とみられる stale exports が `package.json` に残存。本波の12件は除去済み。別波で sync を回すか判断要）。`test/bun-tier-*.txt` 台帳に削除済みテストパス（`src/image-generation/*`・`src/music-generation/*`・`src/video-generation/*`・`src/docs/*`・`src/i18n/*`・`src/scripts/*` 等）が残る（§27.6 系タスクで更新）。`docs/` 配下から削除済み provider・スクリプトへの言及が残る可能性あり（本波スコープ外）。 |
+
+## 32. zai / openrouter 等の互換レイヤー撤去（§23.2 候補15・波4・2026-09-30 時点作業）
+
+### 32.1 目的・背景
+
+KASOU 本番は `cli-router`（CPA）経由のみを使用しており、過去の zai / openrouter / minimax / deepseek 向け互換レイヤーは本番経路に存在しない。本波で死んだファサード・検出ヘルパー・特殊分岐を撤去し、デフォルト互換挙動に収束させた。
+
+### 32.2 削除内容（8ファイル）
+
+| 区分             | 内容                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| zai 検出         | `src/plugins/provider-zai-endpoint.ts`・`src/commands/zai-endpoint-detect.ts`（再輸出）・`src/plugin-sdk/provider-zai-endpoint.ts`（再輸出）         |
+| openrouter       | `src/agents/pi-embedded-runner/openrouter-model-capabilities.ts`・同 `.test.ts`・`src/plugin-sdk/openrouter.ts`（死んだファサード・import 0 件実測） |
+| minimax/deepseek | `src/plugin-sdk/minimax.ts`（死んだファサード・import 0 件実測）・`src/agents/deepseek-models.ts`（未使用の静的カタログ・import 0 件実測）           |
+
+注：`src/agents/pi-embedded-runner/zai-stream-wrappers.ts` は汎用ヘルパー `createToolStreamWrapper` の実体のため温存し、`createZaiToolStreamWrapper` エイリアスのみ撤去（`Note:` 付き）。`minimax-stream-wrappers.ts`・`proxy-stream-wrappers.ts`（openrouter thinking 等）は kept の openai/google 経路が利用するため温存（5.12 章）。
+
+### 32.3 参照後始末（修正10ファイル）
+
+- `src/agents/openai-completions-compat.ts`：`isZai` / `isOpenRouterLike` 特殊分岐を除去しデフォルト挙動に収束（`thinkingFormat` は常に `"openai"`）。型ユニオンの `"openrouter" | "zai"` は永続 config 互換のため維持（`config/io.ts` の `REMOVED_THINKING_FORMATS` 警告経路と対応・`Note:` 付き）。
+- `src/plugin-sdk/provider-stream.ts`・`provider-stream-family.ts`・`provider-stream-shared.ts`：`createZaiToolStreamWrapper` と openrouter capability 再輸出を除去（`createToolStreamWrapper` 本体は維持）。
+- `src/agents/pi-embedded-runner/model.provider-runtime.test-support.ts`：削除モジュール由来の型をローカル interface 化（テスト挙動は不変・double は options 注入のまま）。
+- `src/agents/pi-embedded-runner/model.test.ts`：同型 import 先を test-support に切替え、死んだ `vi.mock("./openrouter-model-capabilities.js")` を除去（当該モジュールを import する本番コードは存在せず mock は不活性だった）。
+- `src/commands/auth-choice.test.ts`：`typeof import("./zai-endpoint-detect.js")` をローカル stub 型に置換え、存在しないモジュールへの `vi.mock` を除去（zai 風 double による汎用 wiring カバレッジは維持）。
+- `src/commands/onboard-non-interactive.provider-auth.test.ts`：zai 選択肢 double（`createZaiChoice`・`ZAI_FALLBACKS`・map 3件）・zai 検証 3 テスト・probe helper 3件（`createZaiFetchMock`・`withZaiProbeFetch`・`expectZaiProbeCalls`）・`FetchLike` 型・`setTestGlobal` import を除去。
+- `package.json`：`"./plugin-sdk/provider-zai-endpoint"` export を除去（openrouter / minimax の export は元々不在を確認）。
+- `scripts/lib/plugin-sdk-entrypoints.json`：`"provider-zai-endpoint"` を除去（openrouter / minimax のエントリは元々不在を確認）。
+- `docs/.generated/plugin-sdk-api-baseline.*`：後述ゲート参照。
+
+### 32.4 検証結果
+
+| ゲート                               | 結果                                                               |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `node scripts/run-tsgo.mjs --noEmit` | **exit 0**（本波内1回のみ実行）                                    |
+| `oxfmt --check`（変更ファイル）      | **pass**                                                           |
+| `plugin-sdk:api:check`               | **pass**（baseline 再生成不要・`--check` そのまま pass）            |
+| 残存参照                             | 削除モジュールへの import・re-export・`vi.mock` 0件（`grep` 実測） |
+
+残務：`docs/plugins/sdk-overview.md` の `plugin-sdk/provider-zai-endpoint` 行・`docs/plugins/sdk-provider-plugins.md` の `createZaiToolStreamWrapper` 言及は本波スコープ外（docs 整理波で対応）。`src/commands/onboard-types.ts` の `AuthChoice` union 内 zai 選択肢文字列（`"zai-api-key"` 等）は型文字列のみで削除モジュールを import しないため温存（onboard 選択肢体系の整理は別波で判断要）。温存プラグイン（line, raw-chat-search, session-integrity-guard, deepgram）は無変更。
