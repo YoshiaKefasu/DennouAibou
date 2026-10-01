@@ -126,7 +126,7 @@ export type { RecallOptions, RecallResult } from "./src/recall.js";
 
 export default definePluginEntry({
   id: "raw-chat-search",
-  name: "Raw Chat Search",
+  name: "電脳神経 (Raw Chat Search)",
   description: "Permanent raw chat SQLite index and FTS5 search",
   register(api) {
     // Register chat_search agent tool
@@ -163,7 +163,7 @@ export default definePluginEntry({
           agentId: ctx.agentId,
           sessionId: ctx.sessionId,
         });
-        return result.injectedContext ? { prependContext: result.injectedContext } : undefined;
+        return result.injectedContext ? { appendSystemContext: result.injectedContext } : undefined;
       } catch (error) {
         // Recall is an optional accelerator: never make prompt construction fail.
         api.logger.warn(

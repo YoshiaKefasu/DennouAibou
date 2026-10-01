@@ -1,6 +1,6 @@
 {
   "id": "raw-chat-search",
-  "name": "Raw Chat Search",
+  "name": "電脳神経 (Raw Chat Search)",
   "description": "Permanent raw chat SQLite index and FTS5 search",
   "configSchema": {
     "type": "object",

@@ -307,9 +307,11 @@ describe("RAW_CHAT_SEARCH Phase 3 vector recall", () => {
     const result = (await handler(
       { prompt: "Please recall the gateway port", messages: [] },
       { agentId: "main", sessionId: SESSION_ID },
-    )) as { prependContext?: string } | undefined;
+    )) as { appendSystemContext?: string } | undefined;
 
-    expect(result?.prependContext).toContain('<recalled-memory type="verbatim"');
+    expect(result?.appendSystemContext).toContain('<recalled-memory type="verbatim"');
+    expect(result).not.toHaveProperty("prependContext");
+    expect(result).not.toHaveProperty("systemPrompt");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
