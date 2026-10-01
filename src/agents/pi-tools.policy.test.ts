@@ -145,12 +145,19 @@ describe("resolveSubagentToolPolicy depth awareness", () => {
     expect(isToolAllowedByPolicyName("sessions_history", policy)).toBe(true);
   });
 
-  it("depth-1 orchestrator still denies gateway and cron but allows memory tools", () => {
+  it("depth-1 orchestrator still denies gateway, cron, and alarm but allows memory tools", () => {
     const policy = resolveSubagentToolPolicy(baseCfg, 1);
     expect(isToolAllowedByPolicyName("gateway", policy)).toBe(false);
     expect(isToolAllowedByPolicyName("cron", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("alarm", policy)).toBe(false);
     expect(isToolAllowedByPolicyName("memory_search", policy)).toBe(true);
     expect(isToolAllowedByPolicyName("memory_get", policy)).toBe(true);
+  });
+
+  it("denies alarm for leaf sub-agents like cron", () => {
+    const policy = resolveSubagentToolPolicy(baseCfg, 2);
+    expect(isToolAllowedByPolicyName("alarm", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("cron", policy)).toBe(false);
   });
 
   it("depth-2 leaf denies sessions_spawn", () => {

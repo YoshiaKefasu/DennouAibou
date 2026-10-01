@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/dennou-alarm",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "DennouAibou autonomous body-clock timer and schedule management plugin",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.6"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

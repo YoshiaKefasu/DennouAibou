@@ -1,0 +1,14 @@
+{
+  "id": "dennou-alarm",
+  "name": "電脳アラーム (Dennou Alarm)",
+  "description": "自律的体内時計・タイマー ＆ スケジュール管理プラグイン",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      }
+    }
+  }
+}

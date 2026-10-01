@@ -104,6 +104,7 @@ describe("tool-policy", () => {
     });
 
     expect(Object.fromEntries(sharedBackstops)).toEqual({
+      alarm: "control_plane",
       cron: "control_plane",
       gateway: "control_plane",
       nodes: "exec_capable",

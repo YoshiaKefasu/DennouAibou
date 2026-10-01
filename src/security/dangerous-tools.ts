@@ -27,6 +27,8 @@ export const DEFAULT_GATEWAY_HTTP_TOOL_DENY = [
   "sessions_send",
   // Persistent automation control plane — can create/update/remove scheduled runs
   "cron",
+  // Replaces cron as the session-facing control plane
+  "alarm",
   // Gateway control plane — prevents gateway reconfiguration via HTTP
   "gateway",
   // Node command relay can reach system.run on paired hosts
