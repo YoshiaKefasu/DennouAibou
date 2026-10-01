@@ -15,6 +15,7 @@ import {
   formatAlarmLine,
   formatAlarmList,
 } from "./src/alarm-tool.js";
+import { createAlarmFireHandler, formatAlarmFireText } from "./src/fire.js";
 import { AlarmScheduler } from "./src/scheduler.js";
 import {
   AlarmStore,
@@ -38,6 +39,8 @@ export {
   ALARM_ACTIONS,
   AlarmToolSchema,
   createAlarmTool,
+  createAlarmFireHandler,
+  formatAlarmFireText,
   formatAlarmLine,
   formatAlarmList,
   AlarmScheduler,
@@ -80,10 +83,14 @@ export default definePluginEntry({
         const store = getSharedAlarmStore(resolveAlarmStorePath());
         // Restart catch-up (§4.2): recompute repeating alarms to future slots.
         applyCatchUpToStore(store, Date.now(), api.logger);
+        // Phase 2: inject a system event into the master session and run
+        // the event pump with `heartbeat: { target: "last" }` (§3).
+        const fireAlarm = createAlarmFireHandler();
         scheduler = new AlarmScheduler({
           store,
-          onFire: (event) => {
-            // Phase 2 replaces this log with event-pump injection.
+          onFire: async (event) => {
+            // Throwing here skips persistence (§4.3) so the alarm retries.
+            await fireAlarm(event, ctx.config);
             api.logger.info(
               `dennou-alarm: fired ${event.alarm.id} (${event.alarm.timeExpression}): ${event.alarm.task}${event.delayed ? " [delayed]" : ""}`,
             );

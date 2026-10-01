@@ -377,6 +377,15 @@ export type GatewayWebchatConfig = {
   chatHistoryMaxChars?: number;
 };
 
+export type GatewayChatConfig = {
+  /**
+   * When true, `chat.send` without `deliver: true` still resolves an external
+   * delivery route from the session's last active channel (Telegram/Discord).
+   * Lets WebUI instructions reach the active channel live (default: false).
+   */
+  deliverToActiveChannel?: boolean;
+};
+
 export type GatewayConfig = {
   /** Single multiplexed port for Gateway WS + HTTP (default: 18789). */
   port?: number;
@@ -421,6 +430,8 @@ export type GatewayConfig = {
   tools?: GatewayToolsConfig;
   /** WebChat display/history settings. */
   webchat?: GatewayWebchatConfig;
+  /** WebUI `chat.send` delivery behavior. */
+  chat?: GatewayChatConfig;
   /**
    * Channel health monitor interval in minutes.
    * Periodically checks channel health and restarts unhealthy channels.

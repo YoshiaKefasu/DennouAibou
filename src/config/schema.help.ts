@@ -465,6 +465,8 @@ export const FIELD_HELP: Record<string, string> = {
     "Node command names to block even if present in node claims or default allowlist (exact command-name matching only, e.g. `system.run`; does not inspect shell text inside that command).",
   "gateway.webchat.chatHistoryMaxChars":
     "Max characters per text field in chat.history responses before truncation (default: 12000).",
+  "gateway.chat.deliverToActiveChannel":
+    "When true, chat.send without deliver:true still resolves an external delivery route from the session's last active channel.",
   nodeHost:
     "Node host controls for features exposed from this gateway node to other nodes or clients. Keep defaults unless you intentionally proxy local capabilities across your node network.",
   "nodeHost.browserProxy":

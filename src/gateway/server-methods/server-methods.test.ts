@@ -203,11 +203,13 @@ describe("injectTimestamp", () => {
   });
 
   it("handles DST correctly (same UTC hour, different local time)", () => {
-    vi.advanceTimersByTime(Date.parse("2026-01-15T05:00:00.000Z") - Date.now());
+    // EST (winter): UTC-5 → 2026-01-15T05:00Z = midnight Jan 15
+    vi.setSystemTime(new Date("2026-01-15T05:00:00.000Z"));
     const winter = injectTimestamp("winter", { timezone: "America/New_York" });
     expect(winter).toMatch(/^\[Thu 2026-01-15 00:00 EST\]/);
 
-    vi.advanceTimersByTime(Date.parse("2026-07-15T04:00:00.000Z") - Date.now());
+    // EDT (summer): UTC-4 → 2026-07-15T04:00Z = midnight Jul 15
+    vi.setSystemTime(new Date("2026-07-15T04:00:00.000Z"));
     const summer = injectTimestamp("summer", { timezone: "America/New_York" });
     expect(summer).toMatch(/^\[Wed 2026-07-15 00:00 EDT\]/);
   });

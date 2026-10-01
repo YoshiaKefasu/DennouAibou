@@ -19237,6 +19237,18 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
             },
             additionalProperties: false,
           },
+          chat: {
+            type: "object",
+            properties: {
+              deliverToActiveChannel: {
+                type: "boolean",
+                title: "Chat Deliver To Active Channel",
+                description:
+                  "When true, chat.send without deliver:true still resolves an external delivery route from the session's last active channel.",
+              },
+            },
+            additionalProperties: false,
+          },
           channelHealthCheckMinutes: {
             type: "integer",
             minimum: 0,
@@ -22644,6 +22656,11 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       label: "WebChat History Max Chars",
       help: "Max characters per text field in chat.history responses before truncation (default: 12000).",
       tags: ["network", "performance"],
+    },
+    "gateway.chat.deliverToActiveChannel": {
+      label: "Chat Deliver To Active Channel",
+      help: "When true, chat.send without deliver:true still resolves an external delivery route from the session's last active channel.",
+      tags: ["network"],
     },
     "nodeHost.browserProxy": {
       label: "Node Browser Proxy",

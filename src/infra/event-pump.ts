@@ -2,7 +2,7 @@ import { resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { appendCronStyleCurrentTimeLine } from "../agents/current-time.js";
 import { resolveEmbeddedSessionLane } from "../agents/pi-embedded-runner/lanes.js";
 import { HEARTBEAT_TOKEN } from "../auto-reply/tokens.js";
-import type { ReplyPayload } from "../auto-reply/types.js";
+import type { GetReplyOptions, ReplyPayload } from "../auto-reply/types.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
 import { resolveAgentMainSessionKey } from "../config/sessions/main-session.js";
@@ -356,6 +356,22 @@ export type EventPumpDeps = OutboundSendDeps & {
   nowMs?: () => number;
 };
 
+/**
+ * Content key for an outbound payload (text + media URLs).
+ *
+ * Mirrors `createBlockReplyContentKey` in
+ * `src/auto-reply/reply/block-reply-pipeline.ts` (kept local to avoid
+ * pulling the reply pipeline into the infra layer). Used to skip final
+ * payloads that were already delivered block-by-block.
+ */
+function eventPumpPayloadContentKey(payload: ReplyPayload): string {
+  const text = typeof payload.text === "string" ? payload.text.trim() : "";
+  const mediaUrls = payload.mediaUrl
+    ? [payload.mediaUrl, ...(payload.mediaUrls ?? [])]
+    : [...(payload.mediaUrls ?? [])];
+  return JSON.stringify({ text, mediaList: mediaUrls });
+}
+
 let eventPumpRuntimePromise: Promise<typeof import("./event-pump.runtime.js")> | null = null;
 
 function loadEventPumpRuntime() {
@@ -465,7 +481,41 @@ export async function runEventPumpOnce(opts: {
   try {
     const getReplyFromConfig =
       opts.deps?.getReplyFromConfig ?? (await loadEventPumpRuntime()).getReplyFromConfig;
-    const replyResult = await getReplyFromConfig(ctx, {}, cfg);
+    const deliverChannel = delivery.channel !== "none" ? delivery.channel : undefined;
+    const deliverTo = delivery.to;
+    const deliverLive = async (payloads: ReplyPayload[]): Promise<void> => {
+      if (payloads.length === 0 || !deliverChannel || !deliverTo) {
+        return;
+      }
+      await deliverOutboundPayloads({
+        cfg,
+        channel: deliverChannel,
+        to: deliverTo,
+        accountId: delivery.accountId,
+        threadId: delivery.threadId,
+        payloads,
+        session: outboundSession,
+        deps: opts.deps,
+      });
+    };
+    // Sequential direct delivery: every block Kasou emits (message,
+    // intermediate remark, tool follow-up) reaches the active channel
+    // immediately instead of arriving as one bundled message at the end.
+    const streamedContentKeys = new Set<string>();
+    const onBlockReply: GetReplyOptions["onBlockReply"] = async (payload) => {
+      const key = eventPumpPayloadContentKey(payload);
+      if (streamedContentKeys.has(key)) {
+        return;
+      }
+      streamedContentKeys.add(key);
+      try {
+        await deliverLive([payload]);
+      } catch {
+        // Drop the key so the final sweep can still deliver it.
+        streamedContentKeys.delete(key);
+      }
+    };
+    const replyResult = await getReplyFromConfig(ctx, { onBlockReply }, cfg);
 
     const payloads: ReplyPayload[] = Array.isArray(replyResult)
       ? replyResult
@@ -473,18 +523,11 @@ export async function runEventPumpOnce(opts: {
         ? [replyResult]
         : [];
 
-    if (payloads.length > 0 && delivery.channel !== "none" && delivery.to) {
-      await deliverOutboundPayloads({
-        cfg,
-        channel: delivery.channel,
-        to: delivery.to,
-        accountId: delivery.accountId,
-        threadId: delivery.threadId,
-        payloads,
-        session: outboundSession,
-        deps: opts.deps,
-      });
-    }
+    // Final sweep: only payloads that were not streamed live yet.
+    const remaining = payloads.filter(
+      (payload) => !streamedContentKeys.has(eventPumpPayloadContentKey(payload)),
+    );
+    await deliverLive(remaining);
 
     return { status: "ran", durationMs: Date.now() - startedAt };
   } catch (err) {

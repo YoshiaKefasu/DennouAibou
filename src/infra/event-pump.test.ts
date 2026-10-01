@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { createEmptyPluginRegistry } from "../plugins/registry.js";
+import { releasePinnedPluginChannelRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
+import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import {
   hasPendingWake,
   hasWakeHandler,
@@ -9,6 +12,7 @@ import {
   runEventPumpOnce,
   setWakeHandler,
 } from "./event-pump.js";
+import { setDeliverDepsForTest } from "./outbound/deliver.js";
 import { enqueueSystemEvent, resetSystemEventsForTest } from "./system-events.js";
 
 const testConfig = {} as OpenClawConfig;
@@ -245,6 +249,111 @@ describe("event-pump", () => {
       expect(getReplyFromConfig).toHaveBeenCalled();
       const callCtx = getReplyFromConfig.mock.calls[0]?.[0];
       expect(callCtx.SessionKey).toBe("agent:main:main");
+    });
+  });
+
+  describe("sequential block delivery", () => {
+    const emptyRegistry = createEmptyPluginRegistry();
+    const sendText = vi.fn(async ({ text }: { text: string }) => ({
+      channel: "telegram" as const,
+      messageId: `tg:${text}`,
+    }));
+
+    beforeEach(() => {
+      sendText.mockClear();
+      sendText.mockImplementation(async ({ text }: { text: string }) => ({
+        channel: "telegram" as const,
+        messageId: `tg:${text}`,
+      }));
+      setActivePluginRegistry(
+        createTestRegistry([
+          {
+            pluginId: "telegram",
+            source: "test",
+            plugin: createOutboundTestPlugin({
+              id: "telegram",
+              outbound: {
+                deliveryMode: "direct",
+                sendText,
+              },
+            }),
+          },
+        ]),
+      );
+      setDeliverDepsForTest({
+        getGlobalHookRunner: () => null,
+        enqueueDelivery: async () => "mock-queue-id",
+        ackDelivery: async () => {},
+        failDelivery: async () => {},
+      });
+    });
+
+    afterEach(() => {
+      setDeliverDepsForTest();
+      releasePinnedPluginChannelRegistry();
+      setActivePluginRegistry(emptyRegistry);
+    });
+
+    function enqueueAlarmEvent() {
+      enqueueSystemEvent("【電脳アラーム発火 (ID: alarm_1)】タスク: 声かけて", {
+        sessionKey: "agent:main:main",
+        contextKey: "alarm:alarm_1",
+        deliveryContext: { channel: "telegram", to: "chat-123" },
+      });
+    }
+
+    it("streams each block reply live and skips duplicates in the final sweep", async () => {
+      enqueueAlarmEvent();
+      const order: string[] = [];
+      const getReplyFromConfig = vi.fn(
+        async (
+          _ctx: unknown,
+          opts?: { onBlockReply?: (p: { text?: string }) => Promise<void> | void },
+        ) => {
+          await opts?.onBlockReply?.({ text: "今からやるね" });
+          order.push("block1-sent");
+          await opts?.onBlockReply?.({ text: "完了したよ" });
+          order.push("block2-sent");
+          order.push("final-returned");
+          return [{ text: "今からやるね" }, { text: "完了したよ" }];
+        },
+      );
+
+      const res = await runEventPumpOnce({
+        cfg: testConfig,
+        sessionKey: "agent:main:main",
+        reason: "alarm:alarm_1",
+        heartbeat: { target: "last" },
+        deps: { getReplyFromConfig, nowMs: () => 1000 },
+      });
+
+      expect(res.status).toBe("ran");
+      // Each block arrives live, in order, before the final sweep runs.
+      expect(order).toEqual(["block1-sent", "block2-sent", "final-returned"]);
+      // Already-streamed payloads are not re-delivered in the final sweep.
+      expect(sendText).toHaveBeenCalledTimes(2);
+      expect(sendText).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ text: "今からやるね" }),
+      );
+      expect(sendText).toHaveBeenNthCalledWith(2, expect.objectContaining({ text: "完了したよ" }));
+    });
+
+    it("delivers the final payload when nothing was streamed live", async () => {
+      enqueueAlarmEvent();
+      const getReplyFromConfig = vi.fn(async () => [{ text: "まとめて報告" }]);
+
+      const res = await runEventPumpOnce({
+        cfg: testConfig,
+        sessionKey: "agent:main:main",
+        reason: "alarm:alarm_1",
+        heartbeat: { target: "last" },
+        deps: { getReplyFromConfig, nowMs: () => 1000 },
+      });
+
+      expect(res.status).toBe("ran");
+      expect(sendText).toHaveBeenCalledTimes(1);
+      expect(sendText).toHaveBeenCalledWith(expect.objectContaining({ text: "まとめて報告" }));
     });
   });
 });

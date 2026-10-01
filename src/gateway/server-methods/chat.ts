@@ -181,6 +181,8 @@ type SideResultPayload = {
 function resolveChatSendOriginatingRoute(params: {
   client?: { mode?: string | null; id?: string | null } | null;
   deliver?: boolean;
+  /** Config `gateway.chat.deliverToActiveChannel`: WebUI sends reach the active channel. */
+  deliverToActiveChannel?: boolean;
   entry?: ChatSendDeliveryEntry;
   explicitOrigin?: ChatSendExplicitOrigin;
   hasConnectedClient?: boolean;
@@ -198,7 +200,7 @@ function resolveChatSendOriginatingRoute(params: {
       explicitDeliverRoute: params.deliver === true,
     };
   }
-  const shouldDeliverExternally = params.deliver === true;
+  const shouldDeliverExternally = params.deliver === true || params.deliverToActiveChannel === true;
   if (!shouldDeliverExternally) {
     return {
       originatingChannel: INTERNAL_MESSAGE_CHANNEL,
@@ -259,13 +261,13 @@ function resolveChatSendOriginatingRoute(params: {
   const canInheritConfiguredMainRoute =
     isConfiguredMainSessionScope &&
     params.hasConnectedClient &&
-    (isFromGatewayCliClient || !hasClientMetadata);
+    (isFromGatewayCliClient || !hasClientMetadata || params.deliverToActiveChannel === true);
 
-  // Webchat clients never inherit external delivery routes. Configured-main
-  // sessions are stricter than channel-scoped sessions: only CLI callers, or
-  // legacy callers with no client metadata, may inherit the last external route.
+  // Webchat clients never inherit external delivery routes — unless the
+  // operator opted into active-channel delivery, which exists precisely to
+  // let WebUI instructions reach the last active channel live.
   const canInheritDeliverableRoute = Boolean(
-    !isFromWebchatClient &&
+    (params.deliverToActiveChannel === true || !isFromWebchatClient) &&
     sessionChannelHint &&
     sessionChannelHint !== INTERNAL_MESSAGE_CHANNEL &&
     ((!isChannelAgnosticSessionScope && (isChannelScopedSession || hasLegacyChannelPeerShape)) ||
@@ -1629,6 +1631,7 @@ export function createChatHandlers(overrides: ChatHandlersDeps = {}): GatewayReq
         } = resolveChatSendOriginatingRoute({
           client: clientInfo,
           deliver: p.deliver,
+          deliverToActiveChannel: cfg.gateway?.chat?.deliverToActiveChannel === true,
           entry,
           explicitOrigin: explicitOriginResult.value,
           hasConnectedClient: client?.connect !== undefined,

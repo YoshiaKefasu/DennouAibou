@@ -15,6 +15,8 @@ export type RunEventPumpOnceOptions = {
   reason?: string;
   agentId?: string;
   sessionKey?: string;
+  /** Optional heartbeat config override (e.g. target: "last" for alarm-triggered wakeups). */
+  heartbeat?: { target?: string; to?: string; accountId?: string };
 };
 
 /** Core runtime helpers exposed to trusted native plugins. */

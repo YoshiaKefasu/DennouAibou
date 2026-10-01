@@ -10,11 +10,12 @@ export function createRuntimeSystem(): PluginRuntime["system"] {
     enqueueSystemEvent,
     requestWakeNow,
     runEventPumpOnce: (opts?: RunEventPumpOnceOptions) => {
-      const { reason, agentId, sessionKey } = opts ?? {};
+      const { reason, agentId, sessionKey, heartbeat } = opts ?? {};
       return runEventPumpOnce({
         reason,
         agentId,
         sessionKey,
+        ...(heartbeat ? { heartbeat } : {}),
       });
     },
     runCommandWithTimeout,
