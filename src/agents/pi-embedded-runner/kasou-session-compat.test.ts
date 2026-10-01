@@ -221,11 +221,13 @@ describe("kasou-session-compat (D4 Phase Gate: Deep Session Compatibility)", () 
   describe("Pattern C: Corrupted and torn session lines", () => {
     it("gracefully skips malformed lines and handles orphaned nodes without throwing", async () => {
       const fixturePath = path.join(FIXTURES_DIR, "pattern-c-corrupted.jsonl");
+      const testFile = path.join(tmpDir, "pattern-c-corrupted-open.jsonl");
+      await fs.copyFile(fixturePath, testFile);
 
       // SessionManager.open should not crash on malformed lines
       let sm: SessionManager | null = null;
       expect(() => {
-        sm = SessionManager.open(fixturePath);
+        sm = SessionManager.open(testFile);
       }).not.toThrow();
 
       expect(sm).not.toBeNull();

@@ -1,6 +1,7 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Context, Model } from "@earendil-works/pi-ai";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import {
   createOpenRouterSystemCacheWrapper,
@@ -25,7 +26,7 @@ describe("proxy stream wrappers", () => {
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
 
-    void wrapped(model, context, { headers: { "X-Custom": "1" } });
+    void wrapped(model, normalizeContext(context), { headers: { "X-Custom": "1" } });
 
     expect(calls).toEqual([
       {
@@ -55,7 +56,7 @@ describe("proxy stream wrappers", () => {
         provider: "openrouter",
         id: "anthropic/claude-sonnet-4.6",
       } as Model<"openai-completions">,
-      { messages: [] },
+      normalizeContext({ messages: [] }),
       {},
     );
 
@@ -81,7 +82,7 @@ describe("proxy stream wrappers", () => {
         id: "anthropic/claude-sonnet-4.6",
         baseUrl: "https://proxy.example.com/v1",
       } as Model<"openai-completions">,
-      { messages: [] },
+      normalizeContext({ messages: [] }),
       {},
     );
 
@@ -105,7 +106,7 @@ describe("proxy stream wrappers", () => {
         id: "anthropic/claude-sonnet-4.6",
         baseUrl: "https://openrouter.ai/api/v1",
       } as Model<"openai-completions">,
-      { messages: [] },
+      normalizeContext({ messages: [] }),
       {},
     );
 

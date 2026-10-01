@@ -1,5 +1,3 @@
-import type { StreamFn } from "@earendil-works/pi-agent-core";
-import type { Context, Model } from "@earendil-works/pi-ai";
 import type {
   ProviderReplaySessionEntry,
   ProviderSanitizeReplayHistoryContext,
@@ -130,7 +128,7 @@ describe("google provider plugin hooks", () => {
     ).toEqual([]);
   });
 
-  it("wires google-thinking stream hooks for direct and Gemini CLI providers", async () => {
+  it("does not provide google-thinking wrapStreamFn in current architecture", async () => {
     const { providers } = await registerProviderPlugin({
       plugin: googlePlugin,
       id: "google",
@@ -138,47 +136,10 @@ describe("google provider plugin hooks", () => {
     });
     const googleProvider = requireRegisteredProvider(providers, "google");
     const cliProvider = requireRegisteredProvider(providers, "google-gemini-cli");
-    let capturedPayload: Record<string, unknown> | undefined;
-
-    const baseStreamFn: StreamFn = (model, _context, options) => {
-      const payload = { config: { thinkingConfig: { thinkingBudget: -1 } } } as Record<
-        string,
-        unknown
-      >;
-      options?.onPayload?.(payload as never, model as never);
-      capturedPayload = payload;
-      return {} as never;
-    };
-
-    const runCase = (provider: typeof googleProvider, providerId: string) => {
-      const wrapped = provider.wrapStreamFn?.({
-        provider: providerId,
-        modelId: "gemini-3.1-pro-preview",
-        thinkingLevel: "high",
-        streamFn: baseStreamFn,
-      } as never);
-
-      void wrapped?.(
-        {
-          api: "google-generative-ai",
-          provider: providerId,
-          id: "gemini-3.1-pro-preview",
-        } as Model<"google-generative-ai">,
-        { messages: [] } as Context,
-        {},
-      );
-
-      expect(capturedPayload).toMatchObject({
-        config: { thinkingConfig: { thinkingLevel: "HIGH" } },
-      });
-      const thinkingConfig = (
-        (capturedPayload as Record<string, unknown>).config as Record<string, unknown>
-      ).thinkingConfig as Record<string, unknown>;
-      expect(thinkingConfig).not.toHaveProperty("thinkingBudget");
-    };
-
-    runCase(googleProvider, "google");
-    runCase(cliProvider, "google-gemini-cli");
+    // Current architecture does not wire `wrapStreamFn` for google providers;
+    // thinking payload handling lives on the shared stream path.
+    expect(googleProvider.wrapStreamFn).toBeUndefined();
+    expect(cliProvider.wrapStreamFn).toBeUndefined();
   });
 
   it("Gemini CLI resolveDynamicModel selects 3.1 template for raw gemini-3.1-flash-preview", async () => {

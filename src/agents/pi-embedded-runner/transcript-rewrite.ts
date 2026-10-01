@@ -88,10 +88,25 @@ function appendBranchEntry(params: {
       entry.fromHook,
     );
   }
-  return sessionManager.appendLabelChange(
-    remapEntryId(entry.targetId, rewrittenEntryIds) ?? entry.targetId,
-    entry.label,
-  );
+  if (entry.type === "label") {
+    return sessionManager.appendLabelChange(
+      remapEntryId(entry.targetId, rewrittenEntryIds) ?? entry.targetId,
+      entry.label,
+    );
+  }
+  if (entry.type === "context_edit") {
+    return sessionManager.appendContextEdit(
+      remapEntryId(entry.targetId, rewrittenEntryIds) ?? entry.targetId,
+      entry.replacement,
+    );
+  }
+  return sessionManager.appendUsage(
+    entry.kind,
+    entry.provider,
+    entry.model,
+    entry.usage,
+    entry.note,
+  ).id;
 }
 
 /**

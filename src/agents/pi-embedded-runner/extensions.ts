@@ -1,4 +1,10 @@
-import type { ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+  createCodemodeExtension,
+  createMcpExtension,
+  createToolSearchExtension,
+  type ExtensionFactory,
+  type SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { ProviderRuntimeModel } from "../../plugins/types.js";
 import { resolveContextWindowInfo } from "../context-window-guard.js";
@@ -44,6 +50,11 @@ export function buildEmbeddedExtensionFactories(params: {
     });
     factories.push(compactionSafeguardExtension);
   }
+  factories.push(
+    createCodemodeExtension({ mode: "on" }),
+    createToolSearchExtension(),
+    createMcpExtension(),
+  );
   return factories;
 }
 

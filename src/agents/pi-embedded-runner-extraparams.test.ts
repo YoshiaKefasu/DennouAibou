@@ -1,5 +1,6 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAnthropicBetaHeadersWrapper,
@@ -526,7 +527,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(params.model, context, params.options ?? {});
+    void agent.streamFunction?.(params.model, normalizeContext(context), params.options ?? {});
     return payload;
   }
 
@@ -551,7 +552,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, normalizeContext(context), {});
     return resolvedModelId;
   }
 
@@ -581,7 +582,7 @@ describe("applyExtraParamsToAgent", () => {
       params.extraParamsOverride,
     );
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, normalizeContext(context), {});
     return payload;
   }
 
@@ -611,7 +612,7 @@ describe("applyExtraParamsToAgent", () => {
     const agent = { streamFunction: baseStreamFn };
     applyExtraParamsToAgent(agent, undefined, params.applyProvider, params.applyModelId);
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(params.model, context, {});
+    void agent.streamFunction?.(params.model, normalizeContext(context), {});
     return payload;
   }
 
@@ -629,7 +630,7 @@ describe("applyExtraParamsToAgent", () => {
       id: params.modelId,
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, params.options ?? {});
+    void agent.streamFunction?.(model, normalizeContext(context), params.options ?? {});
 
     expect(calls).toHaveLength(1);
     return calls[0]?.headers;
@@ -663,7 +664,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "deepseek/deepseek-r1",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning");
@@ -688,7 +689,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.reasoning).toEqual({ effort: "low" });
@@ -712,7 +713,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "MiniMax-M2.7",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -736,7 +737,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning_effort");
@@ -784,7 +785,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "openrouter/auto",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).toEqual({ reasoning: { max_tokens: 256 } });
@@ -815,7 +816,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "x-ai/grok-4.1-fast",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).not.toHaveProperty("reasoning");
@@ -1078,7 +1079,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "Pro/MiniMaxAI/MiniMax-M2.7",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toBeNull();
@@ -1109,7 +1110,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "deepseek-ai/DeepSeek-V3.2",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toBe("off");
@@ -1133,7 +1134,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1157,7 +1158,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "enabled" });
@@ -1184,7 +1185,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1222,7 +1223,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "kimi-k2.5",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.thinking).toEqual({ type: "disabled" });
@@ -1260,7 +1261,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://api.kimi.com/coding/",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.tools).toEqual([
@@ -1304,7 +1305,7 @@ describe("applyExtraParamsToAgent", () => {
       baseUrl: "https://api.anthropic.com",
     } as Model<"anthropic-messages">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(payloads).toHaveLength(1);
     expect(payloads[0]?.tools).toEqual([
@@ -1340,7 +1341,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
   });
@@ -1369,7 +1370,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("websocket");
@@ -1386,7 +1387,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("auto");
@@ -1459,7 +1460,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, { transport: "sse" });
+    void agent.streamFunction?.(model, normalizeContext(context), { transport: "sse" });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1489,7 +1490,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.openaiWsWarmup).toBe(false);
@@ -1519,7 +1520,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5",
     } as Model<"openai-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {
+    void agent.streamFunction?.(model, normalizeContext(context), {
       openaiWsWarmup: true,
     } as unknown as SimpleStreamOptions);
 
@@ -1551,7 +1552,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1581,7 +1582,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, { transport: "sse" });
+    void agent.streamFunction?.(model, normalizeContext(context), { transport: "sse" });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("sse");
@@ -1611,7 +1612,7 @@ describe("applyExtraParamsToAgent", () => {
       id: "gpt-5.4",
     } as Model<"openai-codex-responses">;
     const context: Context = { messages: [] };
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.transport).toBe("auto");
@@ -1695,7 +1696,7 @@ describe("applyExtraParamsToAgent", () => {
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
 
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.cacheRetention).toBeUndefined();
@@ -1726,7 +1727,7 @@ describe("applyExtraParamsToAgent", () => {
     } as Model<"openai-completions">;
     const context: Context = { messages: [] };
 
-    void agent.streamFunction?.(model, context, {});
+    void agent.streamFunction?.(model, normalizeContext(context), {});
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.cacheRetention).toBe("long");
@@ -1772,7 +1773,7 @@ describe("applyExtraParamsToAgent", () => {
         provider: "litellm",
         id: "claude-sonnet-4-6",
       } as Model<"anthropic-messages">,
-      context,
+      normalizeContext(context),
       {},
     );
 
@@ -1794,7 +1795,7 @@ describe("applyExtraParamsToAgent", () => {
     const context: Context = { messages: [] };
 
     // Simulate pi-agent-core passing apiKey in options (API key, not OAuth token)
-    void agent.streamFunction?.(model, context, {
+    void agent.streamFunction?.(model, normalizeContext(context), {
       apiKey: "sk-ant-api03-test", // pragma: allowlist secret
       headers: { "X-Custom": "1" },
     });
@@ -1852,7 +1853,7 @@ describe("applyExtraParamsToAgent", () => {
     const context: Context = { messages: [] };
 
     // Simulate pi-agent-core passing an OAuth token (sk-ant-oat-*) as apiKey
-    void agent.streamFunction?.(model, context, {
+    void agent.streamFunction?.(model, normalizeContext(context), {
       apiKey: "sk-ant-oat01-test-oauth-token", // pragma: allowlist secret
       headers: { "X-Custom": "1" },
     });

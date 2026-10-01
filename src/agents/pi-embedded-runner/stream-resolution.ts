@@ -1,7 +1,11 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { getCurrentSystemPrompt, normalizeContext } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
 import { createBoundaryAwareStreamFnForModel } from "../provider-transport-stream.js";
-import { stripSystemPromptCacheBoundary } from "../system-prompt-cache-boundary.js";
+import {
+  SYSTEM_PROMPT_CACHE_BOUNDARY,
+  stripSystemPromptCacheBoundary,
+} from "../system-prompt-cache-boundary.js";
 import type { EmbeddedRunAttemptParams } from "./run/types.js";
 
 let embeddedAgentBaseStreamFnCache = new WeakMap<object, StreamFn | undefined>();
@@ -61,13 +65,43 @@ export function resolveEmbeddedAgentStreamFn(params: {
 }): StreamFn {
   if (params.providerStreamFn) {
     const inner = params.providerStreamFn;
-    const normalizeContext = (context: Parameters<StreamFn>[1]) =>
-      context.systemPrompt
-        ? {
-            ...context,
-            systemPrompt: stripSystemPromptCacheBoundary(context.systemPrompt),
-          }
-        : context;
+    const stripBoundaryFromContext = (context: Parameters<StreamFn>[1]) => {
+      if (!context) return context;
+      const raw = context as unknown as { messages?: unknown; systemPrompt?: unknown };
+      if (!Array.isArray(raw.messages)) {
+        if (
+          typeof raw.systemPrompt === "string" &&
+          raw.systemPrompt.includes(SYSTEM_PROMPT_CACHE_BOUNDARY)
+        ) {
+          return {
+            ...(context as unknown as Record<string, unknown>),
+            systemPrompt: stripSystemPromptCacheBoundary(raw.systemPrompt),
+          } as unknown as Parameters<StreamFn>[1];
+        }
+        return context;
+      }
+      const transcript = normalizeContext(context);
+      if (!transcript || !Array.isArray(transcript.messages)) return transcript;
+      const [head, ...rest] = transcript.messages;
+      if (!head || head.role !== "system") {
+        return transcript;
+      }
+      const text = getCurrentSystemPrompt([head]);
+      if (!text.includes(SYSTEM_PROMPT_CACHE_BOUNDARY)) {
+        return transcript;
+      }
+      const stripped =
+        typeof head.content === "string"
+          ? stripSystemPromptCacheBoundary(head.content)
+          : Array.isArray(head.content)
+            ? head.content.map((part) =>
+                part.type === "text"
+                  ? { ...part, text: stripSystemPromptCacheBoundary(part.text) }
+                  : part,
+              )
+            : head.content;
+      return { ...transcript, messages: [{ ...head, content: stripped }, ...rest] };
+    };
     // Provider-owned transports bypass pi-coding-agent's default auth lookup,
     // so keep injecting the resolved runtime apiKey for streamSimple-compatible
     // transports that still read credentials from options.apiKey.
@@ -79,13 +113,13 @@ export function resolveEmbeddedAgentStreamFn(params: {
           resolvedApiKey,
           authStorage,
         });
-        return inner(m, normalizeContext(context), {
+        return inner(m, stripBoundaryFromContext(context), {
           ...options,
           apiKey: apiKey ?? options?.apiKey,
         });
       };
     }
-    return (m, context, options) => inner(m, normalizeContext(context), options);
+    return (m, context, options) => inner(m, stripBoundaryFromContext(context), options);
   }
 
   const currentStreamFn = params.currentStreamFn ?? streamSimple;

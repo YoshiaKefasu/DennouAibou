@@ -1,5 +1,6 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Context, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { mergeInboundPathRoots } from "../../../media/inbound-path-policy.js";
 import { getDefaultMediaLocalRoots } from "../../../media/local-roots.js";
 import {
@@ -173,7 +174,7 @@ export function createNativeAudioStreamFn(
       );
     }
     if (blocks.length === 0) {
-      return inner(model, context, options);
+      return inner(model, normalizeContext(context), options);
     }
     const previousOnPayload = options?.onPayload;
     const nextOptions = {
@@ -183,7 +184,7 @@ export function createNativeAudioStreamFn(
         return previousOnPayload ? await previousOnPayload(rewritten, payloadModel) : rewritten;
       },
     } satisfies SimpleStreamOptions;
-    return inner(model, nextContext, nextOptions);
+    return inner(model, normalizeContext(nextContext), nextOptions);
   };
 }
 

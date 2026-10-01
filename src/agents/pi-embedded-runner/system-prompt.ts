@@ -89,7 +89,16 @@ export function applySystemPromptOverrideToSession(
   override: string | ((defaultPrompt?: string) => string),
 ) {
   const prompt = typeof override === "function" ? override() : override.trim();
-  session.agent.state.systemPrompt = prompt;
+  // AgentState.systemPrompt is a read-only replay of the transcript's system
+  // messages in pi 1.0.0, so override by replacing the leading system message
+  // content (preserving tool declarations) or prepending one.
+  const state = session.agent.state;
+  const current = state.messages ?? [];
+  const [head, ...rest] = current;
+  state.messages =
+    head?.role === "system"
+      ? [{ ...head, content: prompt }, ...rest]
+      : [{ role: "system", content: prompt, timestamp: 0 }, ...current];
   const mutableSession = session as unknown as {
     _baseSystemPrompt?: string;
     _rebuildSystemPrompt?: (toolNames: string[]) => string;

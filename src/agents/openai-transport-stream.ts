@@ -2,6 +2,7 @@ import type { StreamFn } from "@earendil-works/pi-agent-core";
 import {
   calculateCost,
   createAssistantMessageEventStream,
+  normalizeContext,
   parseStreamingJson,
   type Api,
   type Context,
@@ -466,7 +467,11 @@ export function buildOpenAICompletionsParams(
     : context;
   const params: Record<string, unknown> = {
     model: model.id,
-    messages: convertMessages(model as never, completionsContext, compat as never),
+    messages: convertMessages(
+      model as never,
+      normalizeContext(completionsContext),
+      compat as never,
+    ),
     stream: true,
   };
   if (compat.supportsUsageInStreaming) {

@@ -1,5 +1,6 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { normalizeContext } from "@earendil-works/pi-ai";
 import type { ThinkLevel } from "../../auto-reply/thinking.shared.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { applyExtraParamsToAgent } from "./extra-params.js";
@@ -62,7 +63,7 @@ export function runExtraParamsCase<
   );
 
   const context: Context = { messages: [] };
-  void agent.streamFunction?.(params.model, context, {
+  void agent.streamFunction?.(params.model, normalizeContext(context), {
     ...params.options,
     headers: params.callerHeaders ?? params.options?.headers,
   });

@@ -14,7 +14,7 @@ type MutableSession = {
 type MockSession = MutableSession & {
   agent: {
     state: {
-      systemPrompt?: string;
+      messages: Array<{ role: string; content: unknown }>;
     };
   };
 };
@@ -23,9 +23,14 @@ function createMockSession(): {
   session: MockSession;
 } {
   const session = {
-    agent: { state: {} },
+    agent: { state: { messages: [] } },
   } as MockSession;
   return { session };
+}
+
+function leadingSystemContent(session: MockSession): unknown {
+  const [head] = session.agent.state.messages;
+  return head?.role === "system" ? head.content : undefined;
 }
 
 function applyAndGetMutableSession(
@@ -43,21 +48,21 @@ describe("applySystemPromptOverrideToSession", () => {
     const prompt = "You are a helpful assistant with custom context.";
     const { mutable } = applyAndGetMutableSession(prompt);
 
-    expect(mutable.agent.state.systemPrompt).toBe(prompt);
+    expect(leadingSystemContent(mutable)).toBe(prompt);
     expect(mutable._baseSystemPrompt).toBe(prompt);
   });
 
   it("trims whitespace from string overrides", () => {
     const { mutable } = applyAndGetMutableSession("  padded prompt  ");
 
-    expect(mutable.agent.state.systemPrompt).toBe("padded prompt");
+    expect(leadingSystemContent(mutable)).toBe("padded prompt");
   });
 
   it("applies a function override to the session system prompt", () => {
     const override = createSystemPromptOverride("function-based prompt");
     const { mutable } = applyAndGetMutableSession(override);
 
-    expect(mutable.agent.state.systemPrompt).toBe("function-based prompt");
+    expect(leadingSystemContent(mutable)).toBe("function-based prompt");
   });
 
   it("sets _rebuildSystemPrompt that returns the override", () => {

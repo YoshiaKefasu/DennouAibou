@@ -69,4 +69,34 @@ describe("buildEmbeddedExtensionFactories", () => {
       qualityGuardMaxRetries: 2,
     });
   });
+
+  it("returns safeguard plus codemode/tool-search/mcp factories (4+ total)", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          compaction: {
+            mode: "safeguard",
+          },
+        },
+      },
+    } as OpenClawConfig;
+    const { factories } = buildSafeguardFactories(cfg);
+    expect(factories).toContain(compactionSafeguardExtension);
+    expect(factories.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("returns the 3 native factories even in default mode", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          compaction: {
+            mode: "default",
+          },
+        },
+      },
+    } as OpenClawConfig;
+    const { factories } = buildSafeguardFactories(cfg);
+    expect(factories).not.toContain(compactionSafeguardExtension);
+    expect(factories.length).toBeGreaterThanOrEqual(3);
+  });
 });

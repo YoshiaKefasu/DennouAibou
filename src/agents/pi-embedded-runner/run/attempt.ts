@@ -932,11 +932,24 @@ export async function runEmbeddedAttempt(
         settingsManager,
         resourceLoader,
       }));
-      applySystemPromptOverrideToSession(session, systemPromptText);
       if (!session) {
         throw new Error("Embedded agent session missing");
       }
       const activeSession = session;
+      if (typeof activeSession.bindExtensions === "function") {
+        await activeSession.bindExtensions({});
+        if (
+          typeof activeSession.getAllTools === "function" &&
+          typeof activeSession.getActiveToolNames === "function"
+        ) {
+          const allTools = activeSession.getAllTools();
+          const activeNames = activeSession.getActiveToolNames();
+          if (allTools.some((t) => t.name === "codemode") && !activeNames.includes("codemode")) {
+            activeSession.setActiveToolsByName?.([...activeNames, "codemode"]);
+          }
+        }
+      }
+      applySystemPromptOverrideToSession(activeSession, systemPromptText);
       abortSessionForYield = () => {
         yieldAbortSettled = Promise.resolve(activeSession.abort());
       };

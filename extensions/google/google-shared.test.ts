@@ -1,4 +1,5 @@
 import type { Context, Tool } from "@earendil-works/pi-ai";
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { convertMessages, convertTools } from "@earendil-works/pi-ai/api/google-shared";
 import { describe, expect, it } from "vitest";
 import {
@@ -151,7 +152,7 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    const contents = convertMessages(model, normalizeContext(context));
     expect(contents).toHaveLength(2);
     expect(contents[0].role).toBe("user");
     expect(contents[1].role).toBe("user");
@@ -173,7 +174,7 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    const contents = convertMessages(model, normalizeContext(context));
     expect(contents).toHaveLength(1);
     expect(contents[0].role).toBe("model");
     expect(contents[0].parts?.[0]).toMatchObject({
@@ -196,7 +197,7 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    const contents = convertMessages(model, normalizeContext(context));
     const parts = contents?.[0]?.parts ?? [];
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({
@@ -238,7 +239,7 @@ describe("google-shared convertMessages", () => {
     // message shapes are structurally compatible for this assertion.
     const contents = convertMessages(
       model as unknown as Parameters<typeof convertMessages>[0],
-      context,
+      normalizeContext(context),
     );
     expectConvertedRoles(contents, ["user", "model", "model"]);
     expect(contents[1].parts).toHaveLength(1);
@@ -276,7 +277,7 @@ describe("google-shared convertMessages", () => {
       ],
     } as unknown as Context;
 
-    const contents = convertMessages(model, context);
+    const contents = convertMessages(model, normalizeContext(context));
     expect(contents).toHaveLength(4);
     expect(contents[0].role).toBe("user");
     expect(contents[1].role).toBe("model");
@@ -312,11 +313,13 @@ describe("google-shared convertMessages", () => {
 
     // pi-ai 0.73.1 narrowed convertMessages to GoogleApiType; the gemini-cli
     // message shapes are structurally compatible for this assertion.
+    // Pi SDK 1.0.0 synthesizes a `{ functionResponse: { error: "No result provided" } }`
+    // user turn for the unresolved trailing toolCall.
     const contents = convertMessages(
       model as unknown as Parameters<typeof convertMessages>[0],
-      context,
+      normalizeContext(context),
     );
-    expectConvertedRoles(contents, ["user", "model", "model"]);
+    expectConvertedRoles(contents, ["user", "model", "model", "user"]);
     const toolCallPart = contents[2].parts?.find(
       (part) => typeof part === "object" && part !== null && "functionCall" in part,
     );
@@ -325,7 +328,9 @@ describe("google-shared convertMessages", () => {
   });
 
   it("strips tool call and response ids for google-gemini-cli", () => {
-    const model = makeGeminiCliModel("gemini-3-flash");
+    // Pi SDK 1.0.0 keeps toolCallId for Gemini 3+ (requiresToolCallId); use a
+    // legacy model so ID stripping is exercised.
+    const model = makeGeminiCliModel("gemini-1.5-flash");
     const context = {
       messages: [
         {
@@ -354,7 +359,7 @@ describe("google-shared convertMessages", () => {
 
     const contents = convertMessages(
       model as unknown as Parameters<typeof convertMessages>[0],
-      context,
+      normalizeContext(context),
     );
     const parts = contents.flatMap((content) => content.parts ?? []);
     const toolCallPart = parts.find(

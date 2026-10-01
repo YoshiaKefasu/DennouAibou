@@ -1,3 +1,4 @@
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -102,7 +103,7 @@ describe("resolveEmbeddedAgentStreamFn", () => {
         provider: "ollama",
         id: "qwen",
       } as never,
-      { messages: [] },
+      normalizeContext({ messages: [] }),
       {},
     );
 
