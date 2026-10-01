@@ -1,9 +1,14 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+import { makeTempWorkspace, writeWorkspaceFile } from "../test-helpers/workspace.js";
 import { typedCases } from "../test-utils/typed-cases.js";
+import { buildBootstrapContextFiles } from "./pi-embedded-helpers.js";
 import { buildSubagentSystemPrompt } from "./subagent-announce.js";
 import { SYSTEM_PROMPT_CACHE_BOUNDARY } from "./system-prompt-cache-boundary.js";
 import { buildAgentSystemPrompt, buildRuntimeLine } from "./system-prompt.js";
+import { loadWorkspaceBootstrapFiles } from "./workspace.js";
 
 describe("buildAgentSystemPrompt", () => {
   it("formats owner section for plain, hash, and missing owner lists", () => {
@@ -622,6 +627,88 @@ describe("buildAgentSystemPrompt", () => {
     expect(boundaryIndex).toBeGreaterThan(memoryIndex);
   });
 
+  it("orders context files by explicit priority when provided", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      contextFiles: [
+        { path: "SOUL.md", content: "Later persona.", priority: 20 },
+        { path: "CUSTOM.md", content: "Top custom rules.", priority: 1 },
+        { path: "AGENTS.md", content: "Middle repo rules.", priority: 10 },
+      ],
+    });
+
+    const customIndex = prompt.indexOf("## CUSTOM.md");
+    const agentsIndex = prompt.indexOf("## AGENTS.md");
+    const soulIndex = prompt.indexOf("## SOUL.md");
+
+    expect(customIndex).toBeGreaterThan(-1);
+    expect(agentsIndex).toBeGreaterThan(customIndex);
+    expect(soulIndex).toBeGreaterThan(agentsIndex);
+  });
+
+  it("prefers explicit priority over the default CONTEXT_FILE_ORDER", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      contextFiles: [
+        { path: "AGENTS.md", content: "Demoted agents.", priority: 80 },
+        { path: "MEMORY.md", content: "Promoted memory.", priority: 1 },
+      ],
+    });
+
+    const agentsIndex = prompt.indexOf("## AGENTS.md");
+    const memoryIndex = prompt.indexOf("## MEMORY.md");
+
+    expect(agentsIndex).toBeGreaterThan(-1);
+    expect(memoryIndex).toBeGreaterThan(-1);
+    expect(memoryIndex).toBeLessThan(agentsIndex);
+  });
+
+  it("places unknown files without explicit priority at the end", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      contextFiles: [
+        { path: "CUSTOM_RULES.md", content: "No priority given." },
+        { path: "AGENTS.md", content: "Default priority." },
+        { path: "MEMORY.md", content: "Default priority." },
+      ],
+    });
+
+    const agentsIndex = prompt.indexOf("## AGENTS.md");
+    const memoryIndex = prompt.indexOf("## MEMORY.md");
+    const customIndex = prompt.indexOf("## CUSTOM_RULES.md");
+
+    expect(agentsIndex).toBeGreaterThan(-1);
+    expect(memoryIndex).toBeGreaterThan(-1);
+    expect(customIndex).toBeGreaterThan(agentsIndex);
+    expect(customIndex).toBeGreaterThan(memoryIndex);
+  });
+
+  it("injects a custom file declared in context-files.json at its configured position", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-context-files-prompt-");
+    await writeWorkspaceFile({
+      dir: tempDir,
+      name: "CUSTOM_RULES.md",
+      content: "Custom rules body",
+    });
+    await fs.writeFile(
+      path.join(tempDir, "context-files.json"),
+      JSON.stringify([{ file: "CUSTOM_RULES.md", priority: 1 }]),
+      "utf-8",
+    );
+
+    const bootstrapFiles = await loadWorkspaceBootstrapFiles(tempDir);
+    const contextFiles = buildBootstrapContextFiles(bootstrapFiles);
+    const prompt = buildAgentSystemPrompt({ workspaceDir: tempDir, contextFiles });
+
+    const customHeading = `## ${path.join(tempDir, "CUSTOM_RULES.md")}`;
+    const agentsHeading = `## ${path.join(tempDir, "AGENTS.md")}`;
+    const customIndex = prompt.indexOf(customHeading);
+    const agentsIndex = prompt.indexOf(agentsHeading);
+    expect(customIndex).toBeGreaterThan(-1);
+    expect(prompt).toContain("Custom rules body");
+    expect(agentsIndex).toBeGreaterThan(customIndex);
+  });
+
   it("replaces provider-owned prompt sections without disturbing core ordering", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
@@ -838,7 +925,9 @@ describe("buildSubagentSystemPrompt", () => {
       "You CAN spawn your own sub-agents for parallel or complex work using `sessions_spawn`.",
     );
     expect(prompt).toContain("sessions_spawn");
-    expect(prompt).toContain("Do not ask users to run slash commands or CLI");
+    expect(prompt).toContain(
+      "Only use the `message` tool when explicitly instructed to contact a specific external recipient; otherwise return plain text and let the main agent deliver it",
+    );
     expect(prompt).toContain(
       "After spawning children, do NOT call sessions_list, sessions_history, exec sleep, or any polling tool.",
     );
@@ -848,7 +937,9 @@ describe("buildSubagentSystemPrompt", () => {
     expect(prompt).toContain(
       "If a child completion event arrives AFTER you already sent your final answer, reply ONLY with NO_REPLY.",
     );
-    expect(prompt).toContain("Avoid polling loops");
+    expect(prompt).toContain(
+      "Do NOT repeatedly poll `subagents list` in a loop unless you are actively debugging or intervening.",
+    );
     expect(prompt).toContain("spawned by the main agent");
     expect(prompt).toContain("reported to the main agent");
     expect(prompt).toContain("[compacted: tool output removed to free context]");

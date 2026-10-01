@@ -61,14 +61,23 @@ function isDynamicContextFile(pathValue: string): boolean {
   return DYNAMIC_CONTEXT_FILE_BASENAMES.has(getContextFileBasename(pathValue));
 }
 
+function resolveContextFileOrder(file: EmbeddedContextFile, baseName: string): number {
+  // Explicit priority from `context-files.json` / `prompt-files.json` wins (smaller = earlier).
+  const explicitPriority = file.priority;
+  if (typeof explicitPriority === "number" && Number.isFinite(explicitPriority)) {
+    return explicitPriority;
+  }
+  return CONTEXT_FILE_ORDER.get(baseName) ?? Number.MAX_SAFE_INTEGER;
+}
+
 function sortContextFilesForPrompt(contextFiles: EmbeddedContextFile[]): EmbeddedContextFile[] {
   return contextFiles.toSorted((a, b) => {
     const aPath = normalizeContextFilePath(a.path);
     const bPath = normalizeContextFilePath(b.path);
     const aBase = getContextFileBasename(a.path);
     const bBase = getContextFileBasename(b.path);
-    const aOrder = CONTEXT_FILE_ORDER.get(aBase) ?? Number.MAX_SAFE_INTEGER;
-    const bOrder = CONTEXT_FILE_ORDER.get(bBase) ?? Number.MAX_SAFE_INTEGER;
+    const aOrder = resolveContextFileOrder(a, aBase);
+    const bOrder = resolveContextFileOrder(b, bBase);
     if (aOrder !== bOrder) {
       return aOrder - bOrder;
     }

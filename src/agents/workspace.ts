@@ -38,6 +38,10 @@ export const DEFAULT_USER_FILENAME = "USER.md";
 export const DEFAULT_BOOTSTRAP_FILENAME = "BOOTSTRAP.md";
 export const DEFAULT_MEMORY_FILENAME = "MEMORY.md";
 export const DEFAULT_MEMORY_ALT_FILENAME = "memory.md";
+// Optional JSON config that controls which workspace Markdown files are loaded into the
+// prompt and in what order. `context-files.json` wins over `prompt-files.json` when both exist.
+export const CONTEXT_FILES_CONFIG_FILENAME = "context-files.json";
+export const CONTEXT_FILES_CONFIG_ALT_FILENAME = "prompt-files.json";
 const WORKSPACE_STATE_DIRNAME = ".openclaw";
 const WORKSPACE_STATE_FILENAME = "workspace-state.json";
 const WORKSPACE_STATE_VERSION = 1;
@@ -148,10 +152,21 @@ export type WorkspaceBootstrapFileName =
   | typeof DEFAULT_MEMORY_ALT_FILENAME;
 
 export type WorkspaceBootstrapFile = {
-  name: WorkspaceBootstrapFileName;
+  /** Basename of the file, e.g. "AGENTS.md" or a custom file such as "CUSTOM.md". */
+  name: string;
   path: string;
   content?: string;
   missing: boolean;
+  /**
+   * Explicit prompt priority from `context-files.json` / `prompt-files.json`
+   * (smaller number = earlier in the prompt). Undefined means "use the default order".
+   */
+  priority?: number;
+};
+
+export type ContextFilesConfigEntry = {
+  file: string;
+  priority?: number;
 };
 
 export type ExtraBootstrapLoadDiagnosticCode =
@@ -480,6 +495,108 @@ export async function ensureAgentWorkspace(params?: {
   };
 }
 
+/**
+ * Lenient priority parsing: finite numbers pass through and numeric strings (e.g. `"5"`)
+ * are parsed with `Number.parseInt`. Anything else yields `undefined` (default order).
+ */
+function parseConfigPriorityValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function normalizeContextFilesConfigItem(item: unknown): ContextFilesConfigEntry | null {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+  const obj = item as Record<string, unknown>;
+  const fileValue =
+    typeof obj.file === "string" ? obj.file : typeof obj.name === "string" ? obj.name : undefined;
+  if (!fileValue) {
+    return null;
+  }
+  const file = fileValue.trim();
+  // Only plain relative filenames inside the workspace root are allowed (path-traversal guard).
+  if (!file || file === "." || file === ".." || file.includes("/") || file.includes("\\")) {
+    return null;
+  }
+  // Only Markdown files may be injected into the prompt (e.g. no `.env`).
+  if (!file.toLowerCase().endsWith(".md")) {
+    return null;
+  }
+  return { file, priority: parseConfigPriorityValue(obj.priority ?? obj.order) };
+}
+
+function extractContextFilesConfigArray(value: unknown): unknown[] | null {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (Array.isArray(obj.files)) {
+      return obj.files;
+    }
+    if (Array.isArray(obj.contextFiles)) {
+      return obj.contextFiles;
+    }
+    // Map form: { "RULES.md": 1, "SOUL.md": 5 }. Like the array form, invalid values
+    // and non-Markdown keys are skipped during normalization below; the map is
+    // rejected only when nothing valid remains.
+    const mapEntries = Object.entries(obj);
+    if (mapEntries.length > 0) {
+      return mapEntries.map(([file, priority]) => ({ file, priority }));
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse `context-files.json` / `prompt-files.json` content.
+ *
+ * Supported shapes:
+ * - Array form:  `[{ "file": "SOUL.md", "priority": 5 }, ...]` (`file`/`name`, `priority`/`order`)
+ * - Map form:    `{ "RULES.md": 1, "SOUL.md": 5 }`
+ * - Wrappers:    `{ "files": [...] }` or `{ "contextFiles": [...] }`
+ *
+ * Invalid JSON returns null (caller falls back to defaults). Malformed entries are skipped;
+ * duplicate basenames keep the first occurrence.
+ */
+export function parseContextFilesConfig(raw: string): ContextFilesConfigEntry[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const list = extractContextFilesConfigArray(parsed);
+  if (!list) {
+    return null;
+  }
+  const seen = new Set<string>();
+  const entries: ContextFilesConfigEntry[] = [];
+  for (const item of list) {
+    const entry = normalizeContextFilesConfigItem(item);
+    if (!entry) {
+      continue;
+    }
+    const key = entry.file.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    entries.push(entry);
+  }
+  // Adopt when at least one valid entry survives; otherwise fall back to defaults.
+  return entries.length > 0 ? entries : null;
+}
+
 async function resolveMemoryBootstrapEntry(
   resolvedDir: string,
 ): Promise<{ name: WorkspaceBootstrapFileName; filePath: string } | null> {
@@ -500,12 +617,53 @@ async function resolveMemoryBootstrapEntry(
   return null;
 }
 
+async function loadContextFilesConfig(
+  resolvedDir: string,
+): Promise<ContextFilesConfigEntry[] | null> {
+  for (const fileName of [CONTEXT_FILES_CONFIG_FILENAME, CONTEXT_FILES_CONFIG_ALT_FILENAME]) {
+    const loaded = await readWorkspaceFileWithGuards({
+      filePath: path.join(resolvedDir, fileName),
+      workspaceDir: resolvedDir,
+    });
+    if (!loaded.ok) {
+      // Missing or unreadable candidate — try the next filename.
+      continue;
+    }
+    // First readable candidate wins; unparseable content falls back to defaults.
+    return parseContextFilesConfig(loaded.content);
+  }
+  return null;
+}
+
 export async function loadWorkspaceBootstrapFiles(dir: string): Promise<WorkspaceBootstrapFile[]> {
   const resolvedDir = resolveUserPath(dir);
 
-  const entries: Array<{
+  const config = await loadContextFilesConfig(resolvedDir);
+  // Lowercased basename -> explicit priority from the JSON config.
+  const configPriorityByBase = new Map<string, number | undefined>();
+  // Custom files listed in the JSON that are not one of the default bootstrap files.
+  const customEntries: Array<{ name: string; filePath: string; priority?: number }> = [];
+  const defaultNameByBase = new Set([...VALID_BOOTSTRAP_NAMES].map((name) => name.toLowerCase()));
+  if (config) {
+    for (const entry of config) {
+      const baseKey = entry.file.toLowerCase();
+      configPriorityByBase.set(baseKey, entry.priority);
+      const hasDefault = defaultNameByBase.has(baseKey);
+      if (hasDefault) {
+        continue;
+      }
+      customEntries.push({
+        name: entry.file,
+        filePath: path.join(resolvedDir, entry.file),
+        priority: entry.priority,
+      });
+    }
+  }
+
+  const defaultEntries: Array<{
     name: WorkspaceBootstrapFileName;
     filePath: string;
+    priority?: number;
   }> = [
     {
       name: DEFAULT_HABITS_FILENAME,
@@ -536,14 +694,41 @@ export async function loadWorkspaceBootstrapFiles(dir: string): Promise<Workspac
       filePath: path.join(resolvedDir, DEFAULT_BOOTSTRAP_FILENAME),
     },
   ];
+  for (const entry of defaultEntries) {
+    entry.priority = configPriorityByBase.get(entry.name.toLowerCase());
+  }
+
+  const entries: Array<{ name: string; filePath: string; priority?: number }> = [
+    ...defaultEntries,
+    ...customEntries,
+  ];
 
   const memoryEntry = await resolveMemoryBootstrapEntry(resolvedDir);
   if (memoryEntry) {
-    entries.push(memoryEntry);
+    entries.push({
+      ...memoryEntry,
+      priority: configPriorityByBase.get(memoryEntry.name.toLowerCase()),
+    });
   }
 
+  // Budget order: explicit priorities first (ascending); unprioritized entries keep their
+  // default relative order afterwards. Ties keep their configured/default relative order
+  // (`toSorted` is stable). This way an important custom file (e.g. priority 1) consumes
+  // the bootstrap char budget before unprioritized defaults instead of being cut off last.
+  const orderedEntries = [...entries].toSorted((a, b) => {
+    const aOrder =
+      typeof a.priority === "number" && Number.isFinite(a.priority)
+        ? a.priority
+        : Number.MAX_SAFE_INTEGER;
+    const bOrder =
+      typeof b.priority === "number" && Number.isFinite(b.priority)
+        ? b.priority
+        : Number.MAX_SAFE_INTEGER;
+    return aOrder - bOrder;
+  });
+
   const result: WorkspaceBootstrapFile[] = [];
-  for (const entry of entries) {
+  for (const entry of orderedEntries) {
     const loaded = await readWorkspaceFileWithGuards({
       filePath: entry.filePath,
       workspaceDir: resolvedDir,
@@ -554,9 +739,15 @@ export async function loadWorkspaceBootstrapFiles(dir: string): Promise<Workspac
         path: entry.filePath,
         content: loaded.content,
         missing: false,
+        ...(entry.priority !== undefined ? { priority: entry.priority } : {}),
       });
     } else {
-      result.push({ name: entry.name, path: entry.filePath, missing: true });
+      result.push({
+        name: entry.name,
+        path: entry.filePath,
+        missing: true,
+        ...(entry.priority !== undefined ? { priority: entry.priority } : {}),
+      });
     }
   }
   return result;
@@ -571,6 +762,14 @@ const MINIMAL_BOOTSTRAP_ALLOWLIST = new Set([
   DEFAULT_USER_FILENAME,
 ]);
 
+/**
+ * Narrow bootstrap files for minimal-context sessions (subagent/cron).
+ *
+ * Besides the allowlisted default files, files carrying an explicit
+ * `context-files.json` / `prompt-files.json` priority are kept: an explicit
+ * priority is deliberate user intent to inject that file, and dropping it
+ * silently would contradict the configured order.
+ */
 export function filterBootstrapFilesForSession(
   files: WorkspaceBootstrapFile[],
   sessionKey?: string,
@@ -578,7 +777,11 @@ export function filterBootstrapFilesForSession(
   if (!sessionKey || (!isSubagentSessionKey(sessionKey) && !isCronSessionKey(sessionKey))) {
     return files;
   }
-  return files.filter((file) => MINIMAL_BOOTSTRAP_ALLOWLIST.has(file.name));
+  return files.filter(
+    (file) =>
+      MINIMAL_BOOTSTRAP_ALLOWLIST.has(file.name) ||
+      (typeof file.priority === "number" && Number.isFinite(file.priority)),
+  );
 }
 
 export async function loadExtraBootstrapFiles(
@@ -639,7 +842,7 @@ export async function loadExtraBootstrapFilesWithDiagnostics(
     });
     if (loaded.ok) {
       files.push({
-        name: baseName as WorkspaceBootstrapFileName,
+        name: baseName,
         path: filePath,
         content: loaded.content,
         missing: false,

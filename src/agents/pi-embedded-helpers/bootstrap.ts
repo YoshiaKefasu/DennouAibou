@@ -227,6 +227,7 @@ export function buildBootstrapContextFiles(
       result.push({
         path: pathValue,
         content: cappedMissingText,
+        ...(file.priority !== undefined ? { priority: file.priority } : {}),
       });
       continue;
     }
@@ -251,6 +252,7 @@ export function buildBootstrapContextFiles(
     result.push({
       path: pathValue,
       content: contentWithinBudget,
+      ...(file.priority !== undefined ? { priority: file.priority } : {}),
     });
   }
   return result;

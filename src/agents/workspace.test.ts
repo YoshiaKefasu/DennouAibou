@@ -4,11 +4,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTempWorkspace, writeWorkspaceFile } from "../test-helpers/workspace.js";
 import {
+  CONTEXT_FILES_CONFIG_FILENAME,
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_BOOTSTRAP_FILENAME,
   DEFAULT_IDENTITY_FILENAME,
   DEFAULT_MEMORY_ALT_FILENAME,
   DEFAULT_MEMORY_FILENAME,
+  DEFAULT_SOUL_FILENAME,
   DEFAULT_TOOLS_FILENAME,
   DEFAULT_USER_FILENAME,
   ensureAgentWorkspace,
@@ -274,5 +276,312 @@ describe("filterBootstrapFilesForSession", () => {
   it("filters to allowlist for cron sessions", () => {
     const result = filterBootstrapFilesForSession(mockFiles, "agent:default:cron:daily-check");
     expectSubagentAllowedBootstrapNames(result);
+  });
+
+  it("keeps custom files with an explicit priority in minimal-context sessions", () => {
+    const withCustom: WorkspaceBootstrapFile[] = [
+      ...mockFiles,
+      { name: "CUSTOM.md", path: "/w/CUSTOM.md", content: "", missing: false, priority: 1 },
+    ];
+    const subagent = filterBootstrapFilesForSession(withCustom, "agent:default:subagent:task-1");
+    expect(subagent.some((file) => file.name === "CUSTOM.md")).toBe(true);
+    const cron = filterBootstrapFilesForSession(withCustom, "agent:default:cron:daily-check");
+    expect(cron.some((file) => file.name === "CUSTOM.md")).toBe(true);
+  });
+
+  it("still drops custom files without an explicit priority in minimal-context sessions", () => {
+    const withCustom: WorkspaceBootstrapFile[] = [
+      ...mockFiles,
+      { name: "CUSTOM.md", path: "/w/CUSTOM.md", content: "", missing: false },
+    ];
+    const result = filterBootstrapFilesForSession(withCustom, "agent:default:subagent:task-1");
+    expectSubagentAllowedBootstrapNames(result);
+  });
+});
+
+describe("context-files.json / prompt-files.json", () => {
+  it("orders load entries by ascending priority so important files consume the budget first", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "CUSTOM.md", content: "custom rules" });
+    await writeWorkspaceFile({ dir: tempDir, name: "AGENTS.md", content: "agents" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "CUSTOM.md", priority: 1 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const customIndex = files.findIndex((file) => file.name === "CUSTOM.md");
+    const agentsIndex = files.findIndex((file) => file.name === DEFAULT_AGENTS_FILENAME);
+    expect(customIndex).toBeGreaterThan(-1);
+    expect(agentsIndex).toBeGreaterThan(-1);
+    expect(customIndex).toBeLessThan(agentsIndex);
+  });
+
+  it("loads custom files from context-files.json (array form) with priorities", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "CUSTOM.md", content: "custom rules" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([
+        { file: "CUSTOM.md", priority: 1 },
+        { file: "SOUL.md", priority: 25 },
+      ]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const custom = files.find((file) => file.name === "CUSTOM.md");
+    expect(custom).toBeDefined();
+    expect(custom?.missing).toBe(false);
+    expect(custom?.content).toBe("custom rules");
+    expect(custom?.priority).toBe(1);
+    expect(files.find((file) => file.name === DEFAULT_SOUL_FILENAME)?.priority).toBe(25);
+  });
+
+  it("accepts the map form with numeric priorities", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ "RULES.md": 1, "AGENTS.md": 15 }),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const rules = files.find((file) => file.name === "RULES.md");
+    expect(rules?.missing).toBe(false);
+    expect(rules?.content).toBe("rules");
+    expect(rules?.priority).toBe(1);
+    expect(files.find((file) => file.name === DEFAULT_AGENTS_FILENAME)?.priority).toBe(15);
+  });
+
+  it("accepts wrapper forms ({ files: [...] } and { contextFiles: [...] })", async () => {
+    const tempDir1 = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir1, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir1, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ files: [{ file: "RULES.md", priority: 2 }] }),
+      "utf-8",
+    );
+    expect(
+      (await loadWorkspaceBootstrapFiles(tempDir1)).find((file) => file.name === "RULES.md")
+        ?.priority,
+    ).toBe(2);
+
+    const tempDir2 = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir2, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir2, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ contextFiles: [{ file: "RULES.md", priority: 3 }] }),
+      "utf-8",
+    );
+    expect(
+      (await loadWorkspaceBootstrapFiles(tempDir2)).find((file) => file.name === "RULES.md")
+        ?.priority,
+    ).toBe(3);
+  });
+
+  it("accepts name/order key aliases", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "CUSTOM.md", content: "custom" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ name: "CUSTOM.md", order: 7 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const custom = files.find((file) => file.name === "CUSTOM.md");
+    expect(custom?.missing).toBe(false);
+    expect(custom?.priority).toBe(7);
+  });
+
+  it('accepts numeric-string priorities (e.g. "5")', async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "CUSTOM.md", content: "custom" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "CUSTOM.md", priority: "5" }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.find((file) => file.name === "CUSTOM.md")?.priority).toBe(5);
+  });
+
+  it("accepts numeric-string priorities in the map form", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ "RULES.md": "2", "AGENTS.md": 15 }),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.find((file) => file.name === "RULES.md")?.priority).toBe(2);
+  });
+
+  it("skips non-Markdown files (e.g. .env)", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: ".env", priority: 1 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name === ".env")).toBe(false);
+  });
+
+  it("skips non-Markdown keys in the map form", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ secrets: 1 }),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name.toLowerCase() === "secrets")).toBe(false);
+  });
+
+  it("keeps valid map entries when other values are invalid", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "RULES.md", content: "rules" });
+    await writeWorkspaceFile({ dir: tempDir, name: "AGENTS.md", content: "agents" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({
+        "RULES.md": 1,
+        "notes.txt": 2,
+        "AGENTS.md": "not-a-number",
+        "../evil.md": 3,
+      }),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const rules = files.find((file) => file.name === "RULES.md");
+    expect(rules?.missing).toBe(false);
+    expect(rules?.priority).toBe(1);
+    // Unusable values still declare the file (default order); invalid keys are skipped.
+    expect(files.find((file) => file.name === DEFAULT_AGENTS_FILENAME)?.priority).toBeUndefined();
+    expect(files.some((file) => file.name.toLowerCase() === "notes.txt")).toBe(false);
+    expect(files.some((file) => file.name.toLowerCase() === "evil.md")).toBe(false);
+  });
+
+  it("falls back to defaults when every map value is invalid", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify({ secrets: "nope", other: [1, 2] }),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name.toLowerCase() === "secrets")).toBe(false);
+    expect(files.some((file) => file.name.toLowerCase() === "other")).toBe(false);
+    expect(files.find((file) => file.name === DEFAULT_AGENTS_FILENAME)?.priority).toBeUndefined();
+  });
+
+  it("falls back to defaults when the JSON is invalid", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "CUSTOM.md", content: "custom" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      "{ not valid json",
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name === "CUSTOM.md")).toBe(false);
+    expect(files.find((file) => file.name === DEFAULT_AGENTS_FILENAME)?.priority).toBeUndefined();
+  });
+
+  it("falls back to default behavior for an empty array", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME), "[]", "utf-8");
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name === "CUSTOM.md")).toBe(false);
+    expect(files.find((file) => file.name === DEFAULT_AGENTS_FILENAME)?.priority).toBeUndefined();
+  });
+
+  it("prefers context-files.json over prompt-files.json", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "RULES.md", priority: 2 }]),
+      "utf-8",
+    );
+    await fs.writeFile(
+      path.join(tempDir, "prompt-files.json"),
+      JSON.stringify([{ file: "RULES.md", priority: 8 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.find((file) => file.name === "RULES.md")?.priority).toBe(2);
+  });
+
+  it("uses prompt-files.json when context-files.json is absent", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "RULES.md", content: "rules" });
+    await fs.writeFile(
+      path.join(tempDir, "prompt-files.json"),
+      JSON.stringify([{ file: "RULES.md", priority: 8 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.find((file) => file.name === "RULES.md")?.priority).toBe(8);
+  });
+
+  it("marks missing custom files as missing without crashing", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "GHOST.md", priority: 4 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const ghost = files.find((file) => file.name === "GHOST.md");
+    expect(ghost?.missing).toBe(true);
+    expect(ghost?.content).toBeUndefined();
+    expect(ghost?.priority).toBe(4);
+  });
+
+  it("skips unsafe path entries", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "../outside.md", priority: 1 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    expect(files.some((file) => file.name === "outside.md")).toBe(false);
+  });
+
+  it("treats case-variant default names as the default file (no duplicate load)", async () => {
+    const tempDir = await makeTempWorkspace("openclaw-workspace-");
+    await writeWorkspaceFile({ dir: tempDir, name: "AGENTS.md", content: "agents" });
+    await fs.writeFile(
+      path.join(tempDir, CONTEXT_FILES_CONFIG_FILENAME),
+      JSON.stringify([{ file: "agents.md", priority: 3 }]),
+      "utf-8",
+    );
+
+    const files = await loadWorkspaceBootstrapFiles(tempDir);
+    const agentsEntries = files.filter(
+      (file) => file.name.toLowerCase() === DEFAULT_AGENTS_FILENAME.toLowerCase(),
+    );
+    expect(agentsEntries).toHaveLength(1);
+    expect(agentsEntries[0]?.name).toBe(DEFAULT_AGENTS_FILENAME);
+    expect(agentsEntries[0]?.priority).toBe(3);
   });
 });
