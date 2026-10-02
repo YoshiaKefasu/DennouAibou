@@ -184,9 +184,15 @@ export const MemoToolSchema = Type.Object({
 
 - **配置順序**: Standing Rules である `<active-memos>` を先頭に配置し、エピソード想起の `<recalled-memory>` をその後に連結する。
 
-### 5.3 トークン予算ガード (固定バジェット方式)
+### 5.3 トークン予算ガード (動的スケーリング方式)
 
-- `before_prompt_build` でプラグインが安全に扱える固定予算上限 `maxTokens`（デフォルト: **4,000 トークン**、設定で上書き可能）を適用。
+- `before_prompt_build` でプラグインが安全に扱える予算上限 `maxTokens` を適用。デフォルトは固定値ではなく、メインセッションが使っているモデルの `contextWindow` の **5%**（`max(4,000, floor(contextWindow * 0.05))`）とする。
+  - 1M モデル (1,048,576): 約 52,428 トークン (~50K)
+  - 500K モデル (524,288): 約 26,214 トークン (~25K)
+  - 200K モデル (200,000): 10,000 トークン (10K)
+  - 不明・小さい場合: 下限 4,000 トークン
+- 明示的に `config.memo.maxTokens` が設定された場合はそちらを優先する（`resolveMemoMaxTokens(pluginConfig, modelContextWindow)`）。
+- モデルのコンテキストサイズは `PluginHookAgentContext.modelContextWindow`（`model.contextWindow ?? model.maxTokens`）経由でフックに渡される。
 - トークン推定には `src/plugin-sdk/cjk-chars.ts` の `estimateStringChars` および `estimateTokensFromChars`（CJK 1文字 ≈ 1トークン規約）を使用し、文字数とトークン数の換算ズレを防ぐ。
 - 予算超過時は `forever = 1`（重要ルール）を最優先で残し、期限付きメモは新しいものから順に枠内に収める。
 

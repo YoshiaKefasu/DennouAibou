@@ -359,6 +359,13 @@ function summarizeSessionContext(messages: AgentMessage[]): {
   };
 }
 
+/** モデルコンテキストサイズの解決（`contextWindow ?? maxTokens ?? DEFAULT_CONTEXT_TOKENS` の DRY 化）。 */
+function resolveAttemptModelContextTokens(
+  model: Pick<EmbeddedRunAttemptParams["model"], "contextWindow" | "maxTokens">,
+): number {
+  return model.contextWindow ?? model.maxTokens ?? DEFAULT_CONTEXT_TOKENS;
+}
+
 export async function runEmbeddedAttempt(
   params: EmbeddedRunAttemptParams,
 ): Promise<EmbeddedRunAttemptResult> {
@@ -959,9 +966,7 @@ export async function runEmbeddedAttempt(
         agent: activeSession.agent,
         contextWindowTokens: Math.max(
           1,
-          Math.floor(
-            params.model.contextWindow ?? params.model.maxTokens ?? DEFAULT_CONTEXT_TOKENS,
-          ),
+          Math.floor(resolveAttemptModelContextTokens(params.model)),
         ),
       });
       const cacheTrace = createCacheTrace({
@@ -1273,17 +1278,30 @@ export async function runEmbeddedAttempt(
         cacheTrace?.recordStage("session:limited", { messages: limited });
         if (limited.length > 0) {
           // 裏方圧縮 ステップ 2（COMPACTION_FEATURE.md §7.3-§7.5）: 一時退避安全弁
-          // （インメモリフィルター）。コンテキストが閾値（既定 950K）を超えている場合、
-          // 直近 250K より古い過去ログのみをプロンプトから一時退避する。
+          // （インメモリフィルター）。コンテキストが閾値（既定はモデルの 95%。
+          // 1M で 950K、500K で 475K、200K で 190K）を超えている場合、
+          // 直近保護テール（1M で 128K、500K で 64K、200K で 16K）より古い
+          // 過去ログのみをプロンプトから一時退避する。
           // セッションファイル（.jsonl）の実ログは一切変更せず、プロンプトへの
           // 注入だけをスキップする（可逆・SESSION_INTEGRITY_GUARD 非破壊）。
           // DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 または
           // agents.defaults.compaction.enabled=false でバイパス可能。
           const compactionCfg = params.config?.agents?.defaults?.compaction;
+          const modelContextTokens = resolveAttemptModelContextTokens(params.model);
+          const baseEvictionOptions = resolveEvictionOptionsFromCompaction(
+            compactionCfg,
+            modelContextTokens,
+          );
           const evictionSafetyValve =
             isEvictionSafetyValveEnabled() && !isCompactionDisabled(compactionCfg)
               ? applyPromptEvictionSafetyValve(limited, {
-                  ...resolveEvictionOptionsFromCompaction(compactionCfg),
+                  ...baseEvictionOptions,
+                  // 明示指定（reserveTokens 由来）があれば優先。未指定時はモデルの 95% で発火
+                  // （1M: 950K / 500K: 475K / 200K: 190K）。小規模モデルで 950K 固定のまま
+                  // 安全弁が発火しない問題を防ぐ。
+                  evictionThresholdTokens:
+                    baseEvictionOptions.evictionThresholdTokens ??
+                    Math.max(1, Math.floor(modelContextTokens * 0.95)),
                   measuredTotalTokens: resolveMeasuredPromptTokens(limited),
                 })
               : undefined;
@@ -1599,6 +1617,7 @@ export async function runEmbeddedAttempt(
           workspaceDir: params.workspaceDir,
           modelProviderId: params.model.provider,
           modelId: params.model.id,
+          modelContextWindow: params.model.contextWindow ?? params.model.maxTokens ?? undefined,
           messageProvider: params.messageProvider ?? undefined,
           trigger: params.trigger,
           channelId: params.messageChannel ?? params.messageProvider ?? undefined,

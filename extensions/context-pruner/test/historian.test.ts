@@ -17,7 +17,11 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it, vi } from "vitest";
 import { type HistoryBlock } from "../src/compartment.js";
-import { applyPromptEvictionSafetyValve, DEFAULT_EVICTION_NOTICE } from "../src/eviction.js";
+import {
+  applyPromptEvictionSafetyValve,
+  DEFAULT_EVICTION_NOTICE,
+  formatEvictionNotice,
+} from "../src/eviction.js";
 import {
   formatTableOfContents,
   reconcileBlockSummaries,
@@ -375,7 +379,8 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
     const tocText = (result.messages[0] as { content?: string }).content ?? "";
     expect(tocText).toContain("第1章: 午前の設計検討");
     expect(tocText).not.toContain("第2章");
-    expect((result.messages[1] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
+    // 保護 250 指定時は動的注記（formatEvictionNotice(250)）が付与される
+    expect((result.messages[1] as { content?: unknown }).content).toBe(formatEvictionNotice(250));
     for (let i = 0; i < recent.length; i++) {
       expect(result.messages[i + 2]).toBe(recent[i]);
     }
@@ -393,7 +398,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
     // 漸進退避で cut は index 50（第1章のみ退避）。block-recent の要約は保持テール内のため適用外。
     expect(result.evictedMessageCount).toBe(50);
     expect(result.messages).toHaveLength(1 + 60);
-    expect((result.messages[0] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
+    expect((result.messages[0] as { content?: unknown }).content).toBe(formatEvictionNotice(250));
     expect((result.messages[0] as { content?: string }).content ?? "").not.toContain(
       TABLE_OF_CONTENTS_HEADER,
     );
@@ -434,7 +439,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
     });
 
     expect(result.appliedSummaryCount).toBe(0);
-    expect((result.messages[0] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
+    expect((result.messages[0] as { content?: unknown }).content).toBe(formatEvictionNotice(250));
   });
 
   it("ignores summaries when the valve does not fire at all", () => {
@@ -461,7 +466,7 @@ describe("applyPromptEvictionSafetyValve with historian summaries", () => {
     // 漸進退避で cut は index 50（第1章のみ退避）。注記 + 60件の生保持。
     expect(result.evictedMessageCount).toBe(50);
     expect(result.messages).toHaveLength(1 + 60);
-    expect((result.messages[0] as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
+    expect((result.messages[0] as { content?: unknown }).content).toBe(formatEvictionNotice(250));
     expect(result.messages[1]).toBe(input[50]);
     for (let i = 0; i < 60; i++) {
       expect(result.messages[i + 1]).toBe(input[50 + i]);

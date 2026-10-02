@@ -4,19 +4,21 @@
  *
  * 仕様: DENNOU_DOCS/COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5
  *
- * コンテキストが evictionThresholdTokens（既定 950K = 1M - reserve 50K）を超え、
- * 裏方 Historian の要約が未完了のまま上限 1M に迫った場合、プロンプト構築時に
+ * コンテキストが evictionThresholdTokens（既定 1M 基準で 950K = baseContextTokens の 95%。
+ * 500K モデルなら 475K、200K モデルなら 190K）を超え、
+ * 裏方 Historian の要約が未完了のまま上限に迫った場合、プロンプト構築時に
  * 超過分が解消するまで最古の章から1章ずつ段階的に押し出す（漸進的スライディング
- * 退避）。直近 protectedRecentTokens（既定 250K）は不可侵の下限フロアであり、
- * 950K→250K の一括崖落ちドロップは行わない。
+ * 退避）。直近 protectedRecentTokens（モデル適応スケーリングフロア。既定 1M 基準で
+ * 128K、500K で 64K、200K で 16K）は不可侵の下限フロアであり、
+ * 一括崖落ちドロップは行わない。
  *
  * ステップ 3 の拡張（§7.5 の「要約完成時の復帰・差し替え」）:
  * 退避対象となった過去領域のうち、要約（BlockSummary）が完成しているブロック群は
  * 単なる「過去ログ退避中注記」の代わりに、historian.ts の formatTableOfContents で
  * 生成した「章立て要約目次メッセージ（role: "user"）」へ差し替えてプロンプト先頭に
  * 復帰注入する。まだ要約が完了していないブロックがある場合は、その分の一時退避注記も
- * 併記する。これによりプロンプトは「章立て要約目次（数千トークン）＋ 直近 250K 生データ」
- * という理想的な軽量状態に落ち着く。
+ * 併記する。これによりプロンプトは「章立て要約目次（数千トークン）＋ 直近保護テール
+ * （1M 基準で 128K）の生データ」という理想的な軽量状態に落ち着く。
  *
  * 設計メモ:
  * - ファイルI/O・セッション操作は一切行わない純粋関数。セッションファイル
@@ -35,7 +37,7 @@
  *   （上限は直近保護フロアにクランプ）。
  * - 要約の差し替え適否判定: 退避領域へ完全に含まれるブロック（要約の endTime が
  *   保持テール先頭メッセージのタイムスタンプより前）の要約のみを目次へ適用する
- *   （保持テール途中にまでかかるブロックの要約は適用しない = 直近 250K は決して
+ *   （保持テール途中にまでかかるブロックの要約は適用しない = 直近保護テールは決して
  *   差し替え・削除されない）。タイムスタンプが解釈できない場合は差し替えを見送る
  *   （要約の誤挿入を防ぐ安全側の挙動）。
  * - 退避発火時は先頭にシステム注記（role: "user" の notice message）を付与する。
@@ -43,7 +45,7 @@
  *   は role: "system" または role: "user" のどちらかを許容する）。
  * - toolCall/toolResult ペアリング整合性: 保持テールの先頭が孤児 toolResult に
  *   ならないよう、ペアとなる assistant メッセージまで境界を後退させる
- *   （境界後退は「保持を増やす」方向にしか動かないため、直近 250K 保護を下回らない）。
+ *   （境界後退は「保持を増やす」方向にしか動かないため、直近保護フロアを下回らない）。
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
@@ -57,27 +59,49 @@ import {
 } from "./compartment.js";
 import { formatTableOfContents, type BlockSummary } from "./historian.js";
 
-/** 退避発火閾値（既定 950K トークン = 1M コンテキスト - 50K reserve）。 */
+/** 退避発火閾値（既定 950K トークン = 1M 基準コンテキストの 95%。小規模モデルは 95% へスケーリング）。 */
 export const DEFAULT_EVICTION_THRESHOLD_TOKENS = 950_000;
-/** 不可侵の直近保護ウィンドウ（§7.4。この領域は1文字も削らない）。 */
+/** 不可侵の直近保護ウィンドウのレガシーフォールバック（§7.4。base 不正時のみ使用。通常はモデル適応スケーリングフロア 128K/64K/16K）。 */
 export const DEFAULT_PROTECTED_RECENT_TOKENS = 250_000;
-/** 退避時にプロンプト先頭へ付与するシステム注記。 */
-export const DEFAULT_EVICTION_NOTICE =
-  "[システム注記: コンテキスト上限接近のため、直近250K以前の過去ログは裏方要約完了まで一時退避中]";
 /** 退避閾値の基準コンテキストサイズ（KASOU 運用設定 contextTokens: 1,000,000）。 */
 export const DEFAULT_EVICTION_BASE_CONTEXT_TOKENS = 1_000_000;
 
+/** 保護トークン数の短表記（128_000 → "128K"、1_000_000 → "1M"、端数はそのまま）。 */
+export function formatProtectedTokensLabel(tokens: number): string {
+  const floored = Math.floor(tokens);
+  if (!Number.isFinite(floored) || floored <= 0) {
+    return String(tokens);
+  }
+  if (floored % 1_000_000 === 0) {
+    return `${floored / 1_000_000}M`;
+  }
+  if (floored % 1_000 === 0) {
+    return `${floored / 1_000}K`;
+  }
+  return String(floored);
+}
+
+/**
+ * 実際に保護される `protectedRecentTokens` の値に応じた動的注記。
+ * 1M で 128K、500K で 64K、200K で 16K 等の表記になる。
+ */
+export function formatEvictionNotice(tokens: number): string {
+  return `[システム注記: コンテキスト上限接近のため、直近${formatProtectedTokensLabel(tokens)}以前の過去ログは裏方要約完了まで一時退避中]`;
+}
+/** 退避時にプロンプト先頭へ付与するシステム注記（既定 1M 基準 = 128K 表記）。 */
+export const DEFAULT_EVICTION_NOTICE = formatEvictionNotice(128_000);
+
 /** 一時退避安全弁のオプション（すべて省略可）。 */
 export type EvictionOptions = {
-  /** 退避を発火する全体トークン閾値（実測優先、既定 950,000）。 */
+  /** 退避を発火する全体トークン閾値（実測優先。未指定時はモデル 95% 既定 = 1M で 950,000）。 */
   evictionThresholdTokens?: number;
-  /** 不可侵の直近保護トークン数（実測/CJK補正推定で逆算）。 */
+  /** 不可侵の直近保護トークン数（実測/CJK補正推定で逆算。未指定時はスケーリングフロア）。 */
   protectedRecentTokens?: number;
   /** 「会話の間（ま）」と判定する最小の絶対沈黙フロア ms（既定 30分）。 */
   minPauseThresholdMs?: number;
   /** 平均インターバルの何倍で「間」とみなすかの係数（既定 3.0）。 */
   pauseMultiplier?: number;
-  /** 退避時に先頭へ付与する注記テキスト（既定 DEFAULT_EVICTION_NOTICE）。 */
+  /** 退避時に先頭へ付与する注記テキスト（既定は protectedRecentTokens に応じた動的注記）。 */
   noticeText?: string;
   /**
    * 完了済みのブロック要約群（§7.5 の復帰差し替え用。opt-in）。
@@ -160,13 +184,14 @@ type ResolvedEvictionOptions = Required<
 };
 
 function resolveEvictionOptions(options?: EvictionOptions): ResolvedEvictionOptions {
+  const protectedRecentTokens = Math.floor(
+    positiveFinite(options?.protectedRecentTokens) ?? DEFAULT_PROTECTED_RECENT_TOKENS,
+  );
   return {
     evictionThresholdTokens: Math.floor(
       positiveFinite(options?.evictionThresholdTokens) ?? DEFAULT_EVICTION_THRESHOLD_TOKENS,
     ),
-    protectedRecentTokens: Math.floor(
-      positiveFinite(options?.protectedRecentTokens) ?? DEFAULT_PROTECTED_RECENT_TOKENS,
-    ),
+    protectedRecentTokens,
     minPauseThresholdMs: Math.floor(
       positiveFinite(options?.minPauseThresholdMs) ?? DEFAULT_MIN_PAUSE_THRESHOLD_MS,
     ),
@@ -174,7 +199,7 @@ function resolveEvictionOptions(options?: EvictionOptions): ResolvedEvictionOpti
     noticeText:
       typeof options?.noticeText === "string" && options.noticeText.trim() !== ""
         ? options.noticeText.trim()
-        : DEFAULT_EVICTION_NOTICE,
+        : formatEvictionNotice(protectedRecentTokens),
     summaries: collectSummaries(options),
     ...(options?.measuredTotalTokens !== undefined
       ? { measuredTotalTokens: options.measuredTotalTokens }
@@ -195,26 +220,32 @@ export function isEvictionSafetyValveEnabled(
 
 /**
  * kernel の compaction 設定（`agents.defaults.compaction` のスライス）を
- * EvictionOptions へ反映する。未指定の項目は既定値のまま（undefined で返す）。
+ * EvictionOptions へ反映する。
  *
  * - `reserveTokens` 指定時: `evictionThresholdTokens = baseContextTokens - reserveTokens`
  *   （既定 base = 1,000,000。reserve 50,000 で 950,000 = DEFAULT_EVICTION_THRESHOLD_TOKENS）。
+ *   明示指定があればこちらを優先する。
+ * - `reserveTokens` 未指定時: `evictionThresholdTokens = モデルの 95%`
+ *  （1M: 950K / 500K: 475K / 200K: 190K。小規模モデルでも安全弁が発火する）。
  * - `keepRecentTokens` 指定時: `protectedRecentTokens` を上書きする。
+ * - `keepRecentTokens` 未指定時: `baseContextTokens` に応じたモデル適応スケーリング
+ *   保護フロアを設定する（1M: 128K / 500K: 64K / 200K: 16K / それ未満: max(8K, base*0.08)）。
  */
 export function resolveEvictionOptionsFromCompaction(
   compaction: CompactionConfigLike | undefined,
   baseContextTokens: number = DEFAULT_EVICTION_BASE_CONTEXT_TOKENS,
 ): EvictionOptions {
   const options: EvictionOptions = {};
+  const base = Math.floor(baseContextTokens);
+  const validBase = Number.isFinite(base) && base > 0 ? base : DEFAULT_EVICTION_BASE_CONTEXT_TOKENS;
   if (
     typeof compaction?.reserveTokens === "number" &&
     Number.isFinite(compaction.reserveTokens) &&
     compaction.reserveTokens >= 0
   ) {
-    options.evictionThresholdTokens = Math.max(
-      1,
-      Math.floor(baseContextTokens) - Math.floor(compaction.reserveTokens),
-    );
+    options.evictionThresholdTokens = Math.max(1, validBase - Math.floor(compaction.reserveTokens));
+  } else {
+    options.evictionThresholdTokens = resolveScaledEvictionThresholdTokens(validBase);
   }
   if (
     typeof compaction?.keepRecentTokens === "number" &&
@@ -222,8 +253,50 @@ export function resolveEvictionOptionsFromCompaction(
     compaction.keepRecentTokens > 0
   ) {
     options.protectedRecentTokens = Math.floor(compaction.keepRecentTokens);
+  } else {
+    options.protectedRecentTokens = resolveScaledProtectedRecentTokens(baseContextTokens);
   }
   return options;
+}
+
+/**
+ * モデルコンテキストサイズに応じた退避発火閾値のスケーリング（コンテキストの 95%）。
+ * 明示的な `reserveTokens` が無い場合のデフォルトを返す。
+ *
+ * - 1M: 950,000 / 500K: 475,000 / 200K: 190,000
+ */
+export function resolveScaledEvictionThresholdTokens(baseContextTokens: number): number {
+  const base = Math.floor(baseContextTokens);
+  if (!Number.isFinite(base) || base <= 0) {
+    return DEFAULT_EVICTION_THRESHOLD_TOKENS;
+  }
+  return Math.max(1, Math.floor(base * 0.95));
+}
+
+/**
+ * モデルコンテキストサイズに応じた保護フロアのスケーリング。
+ * 明示的な `keepRecentTokens` が無い場合のデフォルトを返す。
+ *
+ * - base >= 1,000,000: 128,000 (128K)
+ * - base >= 500,000: 64,000 (64K)
+ * - base >= 200,000: 16,000 (16K)
+ * - それ未満: max(8,000, floor(base * 0.08))
+ */
+export function resolveScaledProtectedRecentTokens(baseContextTokens: number): number {
+  const base = Math.floor(baseContextTokens);
+  if (!Number.isFinite(base) || base <= 0) {
+    return DEFAULT_PROTECTED_RECENT_TOKENS;
+  }
+  if (base >= 1_000_000) {
+    return 128_000;
+  }
+  if (base >= 500_000) {
+    return 64_000;
+  }
+  if (base >= 200_000) {
+    return 16_000;
+  }
+  return Math.max(8_000, Math.floor(base * 0.08));
 }
 
 /**
@@ -293,7 +366,7 @@ export function applyPromptEvictionSafetyValve(
     (opts.measuredUsage ? resolveMeasuredPromptTokens(opts.measuredUsage) : undefined);
   // Provider/session usage is the source of truth for the firing decision. Scale
   // each message's CJK-aware estimate to the measured current context so the
-  // protected-tail reverse scan uses the same units as the 250K policy.
+  // protected-tail reverse scan uses the same units as the scaled-floor policy.
   const measurementScale =
     measuredTotalTokens !== undefined && estimatedTotalTokens > 0
       ? measuredTotalTokens / estimatedTotalTokens

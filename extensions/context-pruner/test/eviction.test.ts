@@ -2,10 +2,11 @@
  * context-pruner — 一時退避安全弁（eviction）の単体テスト
  *
  * 対象（COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5 / 裏方圧縮 ステップ 2）:
- * - 閾値（既定 950K）以下では退避が発火せず全メッセージが保持される
+ * - 閾値（既定 1M 基準で 950K = 95%）以下では退避が発火せず全メッセージが保持される
  * - 閾値超過時に超過分だけを最古の章から1章ずつ段階的に退避（漸進的スライディング）し、
- *   「直近 250K」が1文字も削られず完全保持される
+ *   直近保護テールが1文字も削られず完全保持される
  * - 退避時にシステム注記（role: "user" の notice message）が先頭に挿入される
+ *   （注記は保護トークン数に応じた動的表記。1M で 128K、500K で 64K、200K で 16K）
  * - セッションファイルへの I/O を行わない純粋なインメモリ変換（入力配列・要素の不変）
  * - DENNOU_SKIP_EVICTION_SAFETY_VALVE=1 キルスイッチの判定
  * - compaction 設定（reserveTokens / keepRecentTokens）の EvictionOptions 反映
@@ -14,15 +15,19 @@
  *
  * トークン推定の約束（compartment.ts と同じ）: 約4文字 = 1トークン。
  * テストは軽量にするため、オプションで小さな閾値・保護ウィンドウを指定する
- * （既定の 950K / 250K そのものをメモリ上に構築する必要はない）。
+ * （既定の 950K（1M 基準の 95%）/ スケーリングフロアそのものをメモリ上に構築する必要はない）。
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "vitest";
 import {
   applyPromptEvictionSafetyValve,
+  formatEvictionNotice,
+  formatProtectedTokensLabel,
   isCompactionDisabled,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
+  resolveScaledEvictionThresholdTokens,
+  resolveScaledProtectedRecentTokens,
   DEFAULT_EVICTION_NOTICE,
   DEFAULT_EVICTION_THRESHOLD_TOKENS,
   DEFAULT_PROTECTED_RECENT_TOKENS,
@@ -149,7 +154,7 @@ describe("applyPromptEvictionSafetyValve", () => {
     expect(DEFAULT_EVICTION_THRESHOLD_TOKENS).toBe(950_000);
   });
 
-  it("evicts only the excess tokens, keeping the rest raw (no 250K cliff drop)", () => {
+  it("evicts only the excess tokens, keeping the rest raw (no cliff drop)", () => {
     // 過去 100件 × 10トークン = 1000 + 直近 50件 × 5トークン = 250 → 合計 1250 > 1000
     // 超過分は 250 のみ。「間」も章境界も無いため最小メッセージ境界まで進め、
     // 先頭 25件（250トークン）だけを退避し残り 1000 トークンは生のまま保持する。
@@ -222,8 +227,40 @@ describe("applyPromptEvictionSafetyValve", () => {
     const [notice, ...kept] = result.messages;
     expect(Object.is(notice, input[0])).toBe(false); // 注記は新規メッセージ
     expect((notice as { role?: unknown }).role).toBe("user");
-    expect((notice as { content?: unknown }).content).toBe(DEFAULT_EVICTION_NOTICE);
+    // 保護 250 指定時は動的注記（formatEvictionNotice(250)）が付与される
+    expect((notice as { content?: unknown }).content).toBe(formatEvictionNotice(250));
     expect(kept).toHaveLength(125); // 超過分 250 のみ退避し残り 1000 トークンを生保持
+  });
+
+  it("uses a dynamic notice matching the protected window (128K/64K/16K)", () => {
+    expect(DEFAULT_EVICTION_NOTICE).toBe(formatEvictionNotice(128_000));
+    expect(DEFAULT_EVICTION_NOTICE).toContain("128K");
+    expect(formatEvictionNotice(64_000)).toContain("64K");
+    expect(formatEvictionNotice(16_000)).toContain("16K");
+    expect(formatProtectedTokensLabel(128_000)).toBe("128K");
+    expect(formatProtectedTokensLabel(64_000)).toBe("64K");
+    expect(formatProtectedTokensLabel(16_000)).toBe("16K");
+
+    const input = castMessages([
+      ...makeEvenUserMessages(100, 10),
+      ...makeEvenUserMessages(50, 5, MINUTE_MS, 100),
+    ]);
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 1_000,
+      protectedRecentTokens: 128_000,
+    });
+    // 超過分 250（1250 - 1000）では保護フロア 128K が全体を覆うため退避しない
+    expect(result.evicted).toBe(false);
+
+    const scaled = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 100,
+      protectedRecentTokens: 500,
+      // 実測 1250 相当でスケールし、保護 500 に対する動的注記を検証する
+      measuredTotalTokens: 1_250,
+    });
+    expect(scaled.evicted).toBe(true);
+    expect((scaled.messages[0] as { content?: unknown }).content).toBe(formatEvictionNotice(500));
+    expect(formatEvictionNotice(500)).toContain("500");
   });
 
   it("honors a custom noticeText", () => {
@@ -481,16 +518,71 @@ describe("isCompactionDisabled", () => {
 // ── compaction 設定の反映 ──────────────────────────────────
 
 describe("resolveEvictionOptionsFromCompaction", () => {
-  it("returns empty options when config is absent", () => {
-    expect(resolveEvictionOptionsFromCompaction(undefined)).toEqual({});
-    expect(resolveEvictionOptionsFromCompaction({})).toEqual({});
+  it("falls back to the scaled threshold (95%) and protected floor when config is absent", () => {
+    // Default base is 1M -> 950K threshold + 128K scaled floor.
+    expect(resolveEvictionOptionsFromCompaction(undefined)).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction({})).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
   });
 
-  it("maps reserveTokens to 1M - reserveTokens and keepRecentTokens to the protected window", () => {
-    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: 50_000 })).toEqual({
+  it("scales the eviction threshold to 95% of the model context (1M/500K/200K)", () => {
+    expect(resolveScaledEvictionThresholdTokens(1_000_000)).toBe(950_000);
+    expect(resolveScaledEvictionThresholdTokens(1_048_576)).toBe(996_147);
+    expect(resolveScaledEvictionThresholdTokens(500_000)).toBe(475_000);
+    expect(resolveScaledEvictionThresholdTokens(200_000)).toBe(190_000);
+  });
+
+  it("scales the protected floor by model context size (1M/500K/200K)", () => {
+    expect(resolveScaledProtectedRecentTokens(1_048_576)).toBe(128_000);
+    expect(resolveScaledProtectedRecentTokens(1_000_000)).toBe(128_000);
+    expect(resolveScaledProtectedRecentTokens(524_288)).toBe(64_000);
+    expect(resolveScaledProtectedRecentTokens(500_000)).toBe(64_000);
+    expect(resolveScaledProtectedRecentTokens(200_000)).toBe(16_000);
+    expect(resolveScaledProtectedRecentTokens(250_000)).toBe(16_000);
+    // Below 200K: max(8K, base * 0.08).
+    expect(resolveScaledProtectedRecentTokens(100_000)).toBe(8_000);
+    expect(resolveScaledProtectedRecentTokens(50_000)).toBe(8_000);
+    expect(resolveScaledProtectedRecentTokens(150_000)).toBe(12_000);
+  });
+
+  it("applies the scaled floor and 95% threshold for each base context size", () => {
+    expect(resolveEvictionOptionsFromCompaction(undefined, 1_000_000)).toEqual({
       evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction(undefined, 500_000)).toEqual({
+      evictionThresholdTokens: 475_000,
+      protectedRecentTokens: 64_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction(undefined, 200_000)).toEqual({
+      evictionThresholdTokens: 190_000,
+      protectedRecentTokens: 16_000,
+    });
+  });
+
+  it("prefers explicit keepRecentTokens over the scaled floor (threshold stays 95%)", () => {
+    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: 300_000 }, 1_000_000)).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 300_000,
     });
     expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: 300_000 })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 300_000,
+    });
+  });
+
+  it("maps reserveTokens to base - reserveTokens and keepRecentTokens to the protected window", () => {
+    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: 50_000 })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: 300_000 })).toEqual({
+      evictionThresholdTokens: 950_000,
       protectedRecentTokens: 300_000,
     });
 
@@ -505,19 +597,34 @@ describe("resolveEvictionOptionsFromCompaction", () => {
   });
 
   it("ignores invalid values and clamps degenerate reserves", () => {
-    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: -1 })).toEqual({});
-    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: Number.NaN })).toEqual({});
-    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: 0 })).toEqual({});
-    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: -5 })).toEqual({});
+    // Invalid reserve/keepRecent falls back to the 95% threshold + scaled floor (1M base).
+    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: -1 })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction({ reserveTokens: Number.NaN })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: 0 })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
+    expect(resolveEvictionOptionsFromCompaction({ keepRecentTokens: -5 })).toEqual({
+      evictionThresholdTokens: 950_000,
+      protectedRecentTokens: 128_000,
+    });
     // reserve が基準コンテキストを超えても下限 1 にクランプする
     expect(resolveEvictionOptionsFromCompaction({ reserveTokens: 1_200_000 })).toEqual({
       evictionThresholdTokens: 1,
+      protectedRecentTokens: 128_000,
     });
   });
 
   it("supports a custom base context size", () => {
     expect(resolveEvictionOptionsFromCompaction({ reserveTokens: 10_000 }, 200_000)).toEqual({
       evictionThresholdTokens: 190_000,
+      protectedRecentTokens: 16_000,
     });
   });
 });

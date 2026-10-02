@@ -67,14 +67,20 @@ export {
 export type { CompartmentMessage, HistoryBlock, PartitionOptions } from "./src/compartment.js";
 
 // 裏方圧縮 ステップ 2（COMPACTION_FEATURE.md §7.3 / §7.4 / §7.5）: 一時退避安全弁
-// （インメモリフィルター）。コンテキストが閾値（既定 950K）を超えた際、プロンプト
-// 構築時に直近 250K より古い過去ブロックを一時退避する。セッションファイル
+// （インメモリフィルター）。コンテキストが閾値（既定 1M 基準で 950K = 95%。
+// 小規模モデルは 95% へスケーリング）を超えた際、プロンプト
+// 構築時に直近保護テール（1M 基準で 128K、500K で 64K、200K で 16K）より古い
+// 過去ブロックを一時退避する。セッションファイル
 // （.jsonl）の実ログは 100% 保持され、プロンプトへの注入のみがスキップされる。
 export {
   applyPromptEvictionSafetyValve,
+  formatEvictionNotice,
+  formatProtectedTokensLabel,
   isCompactionDisabled,
   isEvictionSafetyValveEnabled,
   resolveEvictionOptionsFromCompaction,
+  resolveScaledEvictionThresholdTokens,
+  resolveScaledProtectedRecentTokens,
   DEFAULT_EVICTION_THRESHOLD_TOKENS,
   DEFAULT_PROTECTED_RECENT_TOKENS,
   DEFAULT_EVICTION_NOTICE,

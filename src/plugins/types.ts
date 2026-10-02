@@ -2111,6 +2111,8 @@ export type PluginHookAgentContext = {
   modelProviderId?: string;
   /** Resolved model id for this run (for example "gpt-5.4"). */
   modelId?: string;
+  /** Active model context window tokens (contextWindow ?? maxTokens). Used for dynamic budget scaling. */
+  modelContextWindow?: number;
   messageProvider?: string;
   /** What initiated this agent run: "user", "heartbeat", "cron", or "memory". */
   trigger?: string;

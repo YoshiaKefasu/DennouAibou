@@ -187,7 +187,7 @@ export default definePluginEntry({
       const injectedParts: string[] = [];
       try {
         const memoContext = getActiveMemosForPrompt(getRawChatDatabase(ctx.agentId), {
-          maxTokens: resolveMemoMaxTokens(api.pluginConfig),
+          maxTokens: resolveMemoMaxTokens(api.pluginConfig, ctx.modelContextWindow),
           timezone: resolveMemoTimezone(undefined, api.config),
         });
         if (memoContext) {

@@ -310,7 +310,10 @@ export function resolveMemoTimezone(
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
 }
 
-export function resolveMemoMaxTokens(pluginConfig?: Record<string, unknown>): number {
+export function resolveMemoMaxTokens(
+  pluginConfig?: Record<string, unknown>,
+  contextWindow?: number,
+): number {
   const memo = pluginConfig?.["memo"];
   const raw =
     memo && typeof memo === "object" && !Array.isArray(memo)
@@ -318,6 +321,10 @@ export function resolveMemoMaxTokens(pluginConfig?: Record<string, unknown>): nu
       : undefined;
   if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
     return Math.floor(raw);
+  }
+  // Dynamic scaling: 5% of the active model context window (floor 4,000).
+  if (typeof contextWindow === "number" && Number.isFinite(contextWindow) && contextWindow > 0) {
+    return Math.max(DEFAULT_MEMO_MAX_TOKENS, Math.floor(contextWindow * 0.05));
   }
   return DEFAULT_MEMO_MAX_TOKENS;
 }

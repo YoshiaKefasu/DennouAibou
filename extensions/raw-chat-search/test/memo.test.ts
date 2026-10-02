@@ -15,6 +15,7 @@ import {
   normalizeMemoCategory,
   readMemos,
   removeMemo,
+  resolveMemoMaxTokens,
   updateMemo,
   writeMemo,
 } from "../src/memo-db.js";
@@ -248,6 +249,31 @@ describe("memo subsystem (DENNOU_SHINKEI_MEMO Phase 1)", () => {
 
   it("default budget is 4,000 tokens", () => {
     expect(DEFAULT_MEMO_MAX_TOKENS).toBe(4_000);
+  });
+
+  it("resolveMemoMaxTokens scales to 5% of the model context window", () => {
+    // 1M model: ~52K (1_048_576 * 0.05 = 52_428).
+    expect(resolveMemoMaxTokens(undefined, 1_048_576)).toBe(52_428);
+    // 500K model: ~26K (524_288 * 0.05 = 26_214).
+    expect(resolveMemoMaxTokens(undefined, 524_288)).toBe(26_214);
+    // 200K model: 10K.
+    expect(resolveMemoMaxTokens(undefined, 200_000)).toBe(10_000);
+  });
+
+  it("resolveMemoMaxTokens falls back to 4,000 for unknown or small windows", () => {
+    expect(resolveMemoMaxTokens(undefined, undefined)).toBe(DEFAULT_MEMO_MAX_TOKENS);
+    expect(resolveMemoMaxTokens(undefined, 0)).toBe(DEFAULT_MEMO_MAX_TOKENS);
+    expect(resolveMemoMaxTokens(undefined, -10)).toBe(DEFAULT_MEMO_MAX_TOKENS);
+    // 5% below the floor clamps to 4,000.
+    expect(resolveMemoMaxTokens(undefined, 50_000)).toBe(DEFAULT_MEMO_MAX_TOKENS);
+    expect(resolveMemoMaxTokens({}, 50_000)).toBe(DEFAULT_MEMO_MAX_TOKENS);
+  });
+
+  it("resolveMemoMaxTokens prefers explicit memo.maxTokens", () => {
+    expect(resolveMemoMaxTokens({ memo: { maxTokens: 8_000 } }, 1_048_576)).toBe(8_000);
+    expect(resolveMemoMaxTokens({ memo: { maxTokens: 1_000 } }, 200_000)).toBe(1_000);
+    // Non-positive explicit values fall through to scaling.
+    expect(resolveMemoMaxTokens({ memo: { maxTokens: 0 } }, 200_000)).toBe(10_000);
   });
 
   it("memo tool validates correlations and limits", async () => {
