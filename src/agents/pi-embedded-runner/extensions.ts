@@ -12,6 +12,7 @@ import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";
 import { setCompactionSafeguardRuntime } from "../pi-hooks/compaction-safeguard-runtime.js";
 import compactionSafeguardExtension from "../pi-hooks/compaction-safeguard.js";
 import { ensurePiCompactionReserveTokens } from "../pi-settings.js";
+import { createDeferredMcpLoadConfig } from "./mcp-deferred-config.js";
 
 function resolveCompactionMode(cfg?: OpenClawConfig): "default" | "safeguard" {
   return cfg?.agents?.defaults?.compaction?.mode === "safeguard" ? "safeguard" : "default";
@@ -53,7 +54,9 @@ export function buildEmbeddedExtensionFactories(params: {
   factories.push(
     createCodemodeExtension({ mode: "on" }),
     createToolSearchExtension(),
-    createMcpExtension(),
+    // Box MCP tools by default (exposure deferred unless a server opts out),
+    // so only server labels reach the model until tool_search pulls tools out.
+    createMcpExtension({ loadConfig: createDeferredMcpLoadConfig(params.cfg) }),
   );
   return factories;
 }

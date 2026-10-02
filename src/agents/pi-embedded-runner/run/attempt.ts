@@ -110,6 +110,7 @@ import { buildEmbeddedExtensionFactories } from "../extensions.js";
 import { applyExtraParamsToAgent, resolveAgentTransportOverride } from "../extra-params.js";
 import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "../history.js";
 import { log } from "../logger.js";
+import { ensureDiscoveryToolsActive } from "../mcp-deferred-config.js";
 import { buildEmbeddedMessageActionDiscoveryInput } from "../message-action-discovery-input.js";
 import {
   collectPromptCacheToolNames,
@@ -938,15 +939,13 @@ export async function runEmbeddedAttempt(
       const activeSession = session;
       if (typeof activeSession.bindExtensions === "function") {
         await activeSession.bindExtensions({});
+        // Boxed MCP tools are pulled out with tool_search; make sure the
+        // discovery tools are active now that extensions are bound.
         if (
           typeof activeSession.getAllTools === "function" &&
           typeof activeSession.getActiveToolNames === "function"
         ) {
-          const allTools = activeSession.getAllTools();
-          const activeNames = activeSession.getActiveToolNames();
-          if (allTools.some((t) => t.name === "codemode") && !activeNames.includes("codemode")) {
-            activeSession.setActiveToolsByName?.([...activeNames, "codemode"]);
-          }
+          ensureDiscoveryToolsActive(activeSession);
         }
       }
       applySystemPromptOverrideToSession(activeSession, systemPromptText);
