@@ -68,7 +68,7 @@ CREATE INDEX IF NOT EXISTS idx_memos_category
 
 ## 4. ツール仕様 (`memo` ツール)
 
-単一の `memo` ツールを提供し、サブアクション（`write`, `read`, `update`, `remove`）で操作する。
+単一の `memo` ツールを提供し、サブアクション（`write`, `read`, `update`, `archive`, `remove`）で操作する。
 TypeBox 規約（`stringEnum` によるフラット文字列 enum、`typebox` パッケージからのインポート、ルール #1893/#1894）に準拠し、LLM の認知負荷を最小化する。
 
 ### 4.1 パラメータ定義
@@ -78,8 +78,9 @@ import { Type } from "typebox";
 import { stringEnum } from "../../../src/agents/schema/typebox.js";
 
 export const MemoToolSchema = Type.Object({
-  action: stringEnum(["write", "read", "update", "remove"], {
-    description: "操作: write=新規記録, read=一覧/検索, update=更新, remove=削除",
+  action: stringEnum(["write", "read", "update", "archive", "remove"], {
+    description:
+      "操作: write=新規記録, read=一覧/検索, update=更新, archive=アーカイブ, remove=削除",
   }),
   category: Type.Optional(
     stringEnum(["User", "Project", "AgentHabits", "etc"], {
@@ -94,7 +95,7 @@ export const MemoToolSchema = Type.Object({
   ),
   id: Type.Optional(
     Type.Number({
-      description: "操作対象のメモID。update/remove で必須。",
+      description: "操作対象のメモID。update/archive/remove で必須。",
     }),
   ),
   days: Type.Optional(
@@ -134,6 +135,7 @@ export const MemoToolSchema = Type.Object({
 - action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。
 - action="read": 有効なメモを一覧表示または検索する（query や category で絞り込み可能）。
 - action="update": 既存メモの内容・期限・カテゴリを更新する（id 必須）。days 指定時は更新日時を起点に再計算。
+- action="archive": メモをアーカイブする（id 必須。status='archived' へ。read の includeArchived=true で再表示できる）。
 - action="remove": メモを削除する（id 必須。status='dismissed' へ論理削除）。
 ```
 
@@ -246,7 +248,8 @@ export const MemoToolSchema = Type.Object({
           "enabled": true,
           "schedule": "0 3 * * *",
           "model": "cli-router/cline-muse-spark-1.3",
-          "timezone": "Asia/Jakarta"
+          "timezone": "Asia/Jakarta",
+          "language": "ja"
         }
       }
     }
@@ -285,7 +288,7 @@ export const MemoToolSchema = Type.Object({
 
 ### Phase 2: Dream 機能実装
 
-- [ ] Croner による定期スケジュールタスク登録
-- [ ] 単発構造化 LLM 補完による重複統合・精緻化ロジック
-- [ ] トランザクション更新 ＆ ログ記録
-- [ ] 統合テスト ＆ 実機検証
+- [x] Croner による定期スケジュールタスク登録
+- [x] 単発構造化 LLM 補完による重複統合・精緻化ロジック
+- [x] トランザクション更新 ＆ ログ記録
+- [x] 統合テスト ＆ 実機検証

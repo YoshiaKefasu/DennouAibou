@@ -6,6 +6,7 @@ import { readSnakeCaseParamRaw } from "../../../src/param-key.js";
 import { getRawChatDatabase, type RawChatDatabase } from "./database.js";
 import {
   DEFAULT_MEMO_TTL_DAYS,
+  archiveMemo,
   getActiveMemosForPrompt,
   normalizeMemoCategory,
   readMemos,
@@ -18,7 +19,7 @@ import {
 import type { AnyAgentTool } from "./runtime-core.local.js";
 import { readNumberParam, readStringParam, resolveSessionAgentId } from "./runtime-core.local.js";
 
-export const MEMO_ACTIONS = ["write", "read", "update", "remove"] as const;
+export const MEMO_ACTIONS = ["write", "read", "update", "archive", "remove"] as const;
 export type MemoAction = (typeof MEMO_ACTIONS)[number];
 
 export const MEMO_TOOL_DESCRIPTION = [
@@ -32,12 +33,14 @@ export const MEMO_TOOL_DESCRIPTION = [
   '- action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。',
   '- action="read": 有効なメモを一覧表示または検索する（query や category で絞り込み可能）。',
   '- action="update": 既存メモの内容・期限・カテゴリを更新する（id 必須）。days 指定時は更新日時を起点に再計算。',
-  "- action=\"remove\": メモを削除する（id 必須。status='dismissed' へ論理削除）。",
+  "- action=\"archive\": メモをアーカイブする（id 必須。status='archived' へ。read の includeArchived=true で再表示できる）。",
+  "- action=\"remove\": メモを削除する（id 必須。status='dismissed' へ論理削除。再表示されない）。",
 ].join("\n");
 
 export const MemoToolSchema = Type.Object({
-  action: stringEnum(["write", "read", "update", "remove"], {
-    description: "操作: write=新規記録, read=一覧/検索, update=更新, remove=削除",
+  action: stringEnum(["write", "read", "update", "archive", "remove"], {
+    description:
+      "操作: write=新規記録, read=一覧/検索, update=更新, archive=アーカイブ, remove=削除",
   }),
   category: Type.Optional(
     stringEnum(["User", "Project", "AgentHabits", "etc"], {
@@ -52,7 +55,7 @@ export const MemoToolSchema = Type.Object({
   ),
   id: Type.Optional(
     Type.Number({
-      description: "操作対象のメモID。update/remove で必須。",
+      description: "操作対象のメモID。update/archive/remove で必須。",
     }),
   ),
   days: Type.Optional(
@@ -104,7 +107,7 @@ function readBooleanParam(params: unknown, key: string): boolean | undefined {
 function readMemoId(params: unknown): number {
   const id = readNumberParam(params, "id", { integer: true });
   if (id === undefined || !Number.isInteger(id) || id <= 0) {
-    throw new ToolInputError("id required: update/remove needs a memo id");
+    throw new ToolInputError("id required: update/archive/remove needs a memo id");
   }
   return id;
 }
@@ -133,7 +136,7 @@ export function createMemoTool(options: {
       const action = readStringParam(params, "action", { required: true });
       if (!MEMO_ACTIONS.includes(action as MemoAction)) {
         throw new ToolInputError(
-          `invalid action "${action}": expected one of write, read, update, remove`,
+          `invalid action "${action}": expected one of write, read, update, archive, remove`,
         );
       }
 
@@ -214,6 +217,24 @@ export function createMemoTool(options: {
             throw new ToolInputError(error instanceof Error ? error.message : String(error));
           }
         }
+        case "archive": {
+          const id = readMemoId(params);
+          try {
+            const archived = archiveMemo(db, id);
+            if (!archived) {
+              const row = db.getRawDb().prepare("SELECT status FROM memos WHERE id = ?").get(id) as
+                | { status: string }
+                | undefined;
+              if (!row) {
+                throw new Error(`memo #${id} not found`);
+              }
+              throw new Error(`memo #${id} is already ${row.status}`);
+            }
+            return textResult(JSON.stringify({ archived: id }, null, 2), undefined);
+          } catch (error) {
+            throw new ToolInputError(error instanceof Error ? error.message : String(error));
+          }
+        }
         case "remove": {
           const id = readMemoId(params);
           try {
@@ -228,7 +249,7 @@ export function createMemoTool(options: {
         }
         default: {
           throw new ToolInputError(
-            `invalid action "${action}": expected one of write, read, update, remove`,
+            `invalid action "${action}": expected one of write, read, update, archive, remove`,
           );
         }
       }

@@ -1,4 +1,5 @@
 import { definePluginEntry } from "../../src/plugin-sdk/plugin-entry.js";
+import { DEFAULT_AGENT_ID } from "../../src/routing/session-key.js";
 import { backfillEmbeddings, embedPendingPairs } from "./src/backfill.js";
 import {
   closeAllRawChatDatabases,
@@ -6,6 +7,7 @@ import {
   RawChatDatabase,
   resolveRawChatDbPath,
 } from "./src/database.js";
+import { DreamScheduler, resolveDreamConfig, runDreamConsolidation } from "./src/dream.js";
 import {
   blobToEmbedding,
   embedTextWithGemini,
@@ -140,8 +142,29 @@ export type {
   ReadMemosParams,
   UpdateMemoParams,
   MemoPromptOptions,
+  DreamConsolidationInput,
+  DreamApplyResult,
 } from "./src/memo-db.js";
 export type { MemoAction } from "./src/memo-tool.js";
+export type {
+  DreamConfig,
+  DreamConsolidation,
+  DreamResult,
+  DreamRunParams,
+  DreamSchedulerOptions,
+  DreamDeps,
+} from "./src/dream.js";
+export {
+  DreamScheduler,
+  resolveDreamConfig,
+  runDreamConsolidation,
+  buildDreamPrompt,
+  parseDreamResponseText,
+  resolveDreamLanguageName,
+  withDreamLanguageDirective,
+  DEFAULT_DREAM_SCHEDULE,
+  DEFAULT_DREAM_LANGUAGE,
+} from "./src/dream.js";
 
 export default definePluginEntry({
   id: "raw-chat-search",
@@ -178,6 +201,44 @@ export default definePluginEntry({
       stop() {
         stopRawChatIndexer();
         closeAllRawChatDatabases();
+      },
+    });
+
+    // Dream: nightly autonomous memo consolidation (DENNOU_SHINKEI_MEMO §6).
+    // Single structured LLM completion per run — never a full agent session.
+    let dreamScheduler: DreamScheduler | undefined;
+    api.registerService({
+      id: "raw-chat-search-dream",
+      start(ctx) {
+        // Guard against double-start (e.g. hot reload).
+        dreamScheduler?.stop();
+        dreamScheduler = undefined;
+        const dreamConfig = resolveDreamConfig(api.pluginConfig, ctx.config);
+        if (!dreamConfig.enabled) {
+          api.logger.info("raw-chat-search: dream disabled by config.");
+          return;
+        }
+        const scheduler = new DreamScheduler({
+          schedule: dreamConfig.schedule,
+          timezone: dreamConfig.timezone,
+          ...(dreamConfig.model ? { modelOverride: dreamConfig.model } : {}),
+          language: dreamConfig.language,
+          agentId: DEFAULT_AGENT_ID,
+          db: () => getRawChatDatabase(DEFAULT_AGENT_ID),
+          cfg: ctx.config,
+          logger: api.logger,
+        });
+        if (!scheduler.start()) {
+          return;
+        }
+        dreamScheduler = scheduler;
+        api.logger.info(
+          `raw-chat-search: dream scheduled (${dreamConfig.schedule}, ${dreamConfig.timezone}).`,
+        );
+      },
+      stop() {
+        dreamScheduler?.stop();
+        dreamScheduler = undefined;
       },
     });
 

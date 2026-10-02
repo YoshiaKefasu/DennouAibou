@@ -58,6 +58,80 @@ export type MemoPromptOptions = {
   nowMs?: number;
 };
 
+/** Single Dream merge instruction (DENNOU_SHINKEI_MEMO §6.2). */
+export type DreamConsolidationInput = {
+  keepId: number;
+  updateContent?: string;
+  archiveIds: number[];
+};
+
+export type DreamApplyResult = {
+  updated: number;
+  archived: number;
+};
+
+/**
+ * Applies Dream merge instructions atomically (DENNOU_SHINKEI_MEMO §6.2).
+ *
+ * `BEGIN IMMEDIATE` so a concurrent writer (memo tool, prompt expiry) either
+ * waits or fails instead of interleaving half-applied merges. Unknown or
+ * non-active ids are skipped silently; `keepId` is never archived even when it
+ * appears in its own `archiveIds`. Only `content`/`updated_at` change on the
+ * kept row — expiry stays as-is because a merge is not a refresh.
+ */
+export function applyDreamConsolidation(
+  db: RawChatDatabase,
+  consolidations: readonly DreamConsolidationInput[],
+  nowMs = Date.now(),
+): DreamApplyResult {
+  const jobs = consolidations.filter(
+    (job): job is DreamConsolidationInput =>
+      Number.isInteger(job.keepId) && job.keepId > 0 && Array.isArray(job.archiveIds),
+  );
+  if (jobs.length === 0) {
+    return { updated: 0, archived: 0 };
+  }
+  const now = Math.floor(nowMs);
+  const raw = db.getRawDb();
+  let updated = 0;
+  let archived = 0;
+  raw.exec("BEGIN IMMEDIATE;");
+  try {
+    const updateStmt = raw.prepare(
+      "UPDATE memos SET content = ?, updated_at = ? WHERE id = ? AND status = 'active';",
+    );
+    const archiveStmt = raw.prepare(
+      "UPDATE memos SET status = 'archived', updated_at = ? WHERE id = ? AND status = 'active';",
+    );
+    for (const job of jobs) {
+      const content = job.updateContent?.trim();
+      if (content) {
+        updated += Number(updateStmt.run(content, now, job.keepId).changes);
+      }
+      const seen = new Set<number>();
+      for (const archiveId of job.archiveIds) {
+        if (!Number.isInteger(archiveId) || archiveId <= 0 || archiveId === job.keepId) {
+          continue;
+        }
+        if (seen.has(archiveId)) {
+          continue;
+        }
+        seen.add(archiveId);
+        archived += Number(archiveStmt.run(now, archiveId).changes);
+      }
+    }
+    raw.exec("COMMIT;");
+  } catch (error) {
+    try {
+      raw.exec("ROLLBACK;");
+    } catch {
+      // Rollback is best-effort; surface the original failure.
+    }
+    throw error;
+  }
+  return { updated, archived };
+}
+
 /** `user` -> `User`, `agenthabits` -> `AgentHabits`, ... Returns undefined when unknown. */
 export function normalizeMemoCategory(input: unknown): MemoCategory | undefined {
   if (typeof input !== "string") {
@@ -289,6 +363,24 @@ export function removeMemo(db: RawChatDatabase, id: number, nowMs = Date.now()):
     .getRawDb()
     .prepare(
       "UPDATE memos SET status = 'dismissed', updated_at = ? WHERE id = ? AND status != 'dismissed';",
+    )
+    .run(Math.floor(nowMs), id);
+  return Number(result.changes) > 0;
+}
+
+/**
+ * Archive (`status = 'archived'`). Unlike `removeMemo` (gone / dismissed), an
+ * archived memo stays visible via `readMemos({ includeArchived: true })`.
+ * Returns false when missing or already archived/dismissed.
+ */
+export function archiveMemo(db: RawChatDatabase, id: number, nowMs = Date.now()): boolean {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error("id required: archive needs a memo id");
+  }
+  const result = db
+    .getRawDb()
+    .prepare(
+      "UPDATE memos SET status = 'archived', updated_at = ? WHERE id = ? AND status = 'active';",
     )
     .run(Math.floor(nowMs), id);
   return Number(result.changes) > 0;

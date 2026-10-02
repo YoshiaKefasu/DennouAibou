@@ -9,6 +9,11 @@
       "enabled": {
         "type": "boolean"
       },
+      "language": {
+        "type": "string",
+        "default": "ja",
+        "description": "Output language for Dream-merged memo prose (2-letter ISO 639-1 code, e.g. ja, en). IDs, JSON keys, and technical terms stay in English."
+      },
       "memo": {
         "type": "object",
         "properties": {
@@ -35,6 +40,11 @@
           },
           "timezone": {
             "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "default": "ja",
+            "description": "Output language for Dream-merged memo prose (2-letter ISO 639-1 code). Wins over the plugin-level language."
           }
         }
       }
