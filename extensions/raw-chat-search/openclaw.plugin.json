@@ -8,6 +8,35 @@
     "properties": {
       "enabled": {
         "type": "boolean"
+      },
+      "memo": {
+        "type": "object",
+        "properties": {
+          "maxTokens": {
+            "type": "number",
+            "default": 4000,
+            "description": "System prompt memo token limit"
+          }
+        }
+      },
+      "dream": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "schedule": {
+            "type": "string",
+            "default": "0 3 * * *"
+          },
+          "model": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
       }
     }
   }

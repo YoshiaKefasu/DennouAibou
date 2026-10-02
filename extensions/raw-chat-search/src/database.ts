@@ -18,7 +18,7 @@ import type {
 import { blobToVector, normalizeL2, vectorToBlob } from "./vector-math.js";
 
 const DEFAULT_SNIPPET_MAX_LENGTH = 300;
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 
 /**
  * Cap for a single pending-base query.
@@ -230,6 +230,28 @@ export class RawChatDatabase {
         last_line INTEGER NOT NULL,
         last_indexed_at_ms INTEGER NOT NULL
       );
+    `);
+
+    // Active memos for the memo subsystem (DENNOU_SHINKEI_MEMO §3.1).
+    // Lives in the same raw-chat.sqlite so it reuses the single connection,
+    // WAL mode, and transactions (rule #2033).
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS memos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL CHECK(category IN ('User', 'Project', 'AgentHabits', 'etc')),
+        content TEXT NOT NULL,
+        days INTEGER DEFAULT 3,
+        forever INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived', 'dismissed')),
+        metadata_json TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_memos_status_expires
+        ON memos(status, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_memos_category
+        ON memos(category, status);
     `);
 
     // Schema version

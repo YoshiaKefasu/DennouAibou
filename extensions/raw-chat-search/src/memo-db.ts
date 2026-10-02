@@ -1,0 +1,435 @@
+import { estimateStringChars, estimateTokensFromChars } from "../../../src/plugin-sdk/cjk-chars.js";
+import type { RawChatDatabase } from "./database.js";
+
+/**
+ * Memo subsystem data layer (DENNOU_SHINKEI_MEMO Phase 1).
+ *
+ * Active short-term memory ("what Kasou promised / must keep in mind") backed
+ * by the `memos` table in raw-chat.sqlite. Short promises expire after a few
+ * days (lazy expiry); explicit `forever` rows are kept indefinitely.
+ */
+
+export const MEMO_CONTENT_MAX_LENGTH = 2_000;
+export const DEFAULT_MEMO_TTL_DAYS = 3;
+export const DEFAULT_MEMO_MAX_TOKENS = 4_000;
+export const MS_PER_DAY = 86_400_000;
+
+export const MEMO_CATEGORIES = ["User", "Project", "AgentHabits", "etc"] as const;
+export type MemoCategory = (typeof MEMO_CATEGORIES)[number];
+
+export const MEMO_STATUSES = ["active", "archived", "dismissed"] as const;
+export type MemoStatus = (typeof MEMO_STATUSES)[number];
+
+export type MemoRecord = {
+  id: number;
+  category: MemoCategory;
+  content: string;
+  days: number;
+  forever: boolean;
+  createdAt: number;
+  updatedAt: number;
+  expiresAt: number | null;
+  status: MemoStatus;
+};
+
+export type WriteMemoParams = {
+  category: string;
+  content: string;
+  days?: number;
+  forever?: boolean;
+};
+
+export type ReadMemosParams = {
+  query?: string;
+  category?: string;
+  includeArchived?: boolean;
+};
+
+export type UpdateMemoParams = {
+  category?: string;
+  content?: string;
+  days?: number;
+  forever?: boolean;
+};
+
+export type MemoPromptOptions = {
+  maxTokens?: number;
+  timezone?: string;
+  nowMs?: number;
+};
+
+/** `user` -> `User`, `agenthabits` -> `AgentHabits`, ... Returns undefined when unknown. */
+export function normalizeMemoCategory(input: unknown): MemoCategory | undefined {
+  if (typeof input !== "string") {
+    return undefined;
+  }
+  const key = input
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[\s_-]/gu, "");
+  switch (key) {
+    case "user":
+      return "User";
+    case "project":
+      return "Project";
+    case "agenthabits":
+      return "AgentHabits";
+    case "etc":
+      return "etc";
+    default:
+      return undefined;
+  }
+}
+
+export function validateMemoDays(days: unknown): number {
+  if (typeof days !== "number" || !Number.isFinite(days) || Math.floor(days) <= 0) {
+    throw new Error("days must be a positive integer (retention days)");
+  }
+  return Math.floor(days);
+}
+
+function validateMemoContent(content: unknown): string {
+  if (typeof content !== "string" || content.trim().length === 0) {
+    throw new Error("content required");
+  }
+  const trimmed = content.trim();
+  if (trimmed.length > MEMO_CONTENT_MAX_LENGTH) {
+    throw new Error(
+      `content exceeds maximum length of ${MEMO_CONTENT_MAX_LENGTH.toLocaleString("en-US")} characters`,
+    );
+  }
+  return trimmed;
+}
+
+type MemoRow = {
+  id: number | bigint;
+  category: string;
+  content: string;
+  days: number | bigint | null;
+  forever: number | bigint;
+  created_at: number | bigint;
+  updated_at: number | bigint;
+  expires_at: number | bigint | null;
+  status: string;
+};
+
+function toMemoRecord(row: MemoRow): MemoRecord {
+  return {
+    id: Number(row.id),
+    category: row.category as MemoCategory,
+    content: String(row.content),
+    days: row.days === null ? DEFAULT_MEMO_TTL_DAYS : Number(row.days),
+    forever: Number(row.forever) === 1,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    expiresAt: row.expires_at === null ? null : Number(row.expires_at),
+    status: row.status as MemoStatus,
+  };
+}
+
+/**
+ * Lazy expiry (DENNOU_SHINKEI_MEMO §5.1): archive every active memo whose
+ * deadline has passed. Runs before reads and prompt injection so an expired
+ * memo never leaks even when Dream is not running. Returns archived count.
+ */
+export function expireMemos(db: RawChatDatabase, nowMs = Date.now()): number {
+  const result = db
+    .getRawDb()
+    .prepare(
+      "UPDATE memos SET status = 'archived', updated_at = ? WHERE status = 'active' AND forever = 0 AND expires_at IS NOT NULL AND expires_at < ?;",
+    )
+    .run(Math.floor(nowMs), Math.floor(nowMs));
+  return Number(result.changes);
+}
+
+export function writeMemo(
+  db: RawChatDatabase,
+  params: WriteMemoParams,
+  nowMs = Date.now(),
+): MemoRecord {
+  const category = normalizeMemoCategory(params.category);
+  if (!category) {
+    throw new Error("category required: expected one of User, Project, AgentHabits, etc");
+  }
+  const content = validateMemoContent(params.content);
+  const forever = params.forever === true;
+  const days = params.days === undefined ? DEFAULT_MEMO_TTL_DAYS : validateMemoDays(params.days);
+  const now = Math.floor(nowMs);
+  const expiresAt = forever ? null : now + days * MS_PER_DAY;
+
+  const result = db
+    .getRawDb()
+    .prepare(
+      "INSERT INTO memos (category, content, days, forever, created_at, updated_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active');",
+    )
+    .run(category, content, days, forever ? 1 : 0, now, now, expiresAt);
+  const id = Number(result.lastInsertRowid);
+  const row = db.getRawDb().prepare("SELECT * FROM memos WHERE id = ?;").get(id) as MemoRow;
+  return toMemoRecord(row);
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+}
+
+export function readMemos(
+  db: RawChatDatabase,
+  params: ReadMemosParams = {},
+  nowMs = Date.now(),
+): MemoRecord[] {
+  expireMemos(db, nowMs);
+
+  const conditions: string[] = [];
+  const args: (string | number)[] = [];
+  if (params.includeArchived === true) {
+    conditions.push("status IN ('active', 'archived')");
+  } else {
+    conditions.push("status = 'active'");
+  }
+  if (params.category !== undefined) {
+    const category = normalizeMemoCategory(params.category);
+    if (!category) {
+      throw new Error("invalid category: expected one of User, Project, AgentHabits, etc");
+    }
+    conditions.push("category = ?");
+    args.push(category);
+  }
+  const query = params.query?.trim();
+  if (query) {
+    conditions.push("content LIKE ? ESCAPE '\\'");
+    args.push(`%${escapeLike(query)}%`);
+  }
+
+  // Deterministic order: prompt-cache stable (§5.2).
+  const rows = db
+    .getRawDb()
+    .prepare(
+      `SELECT * FROM memos WHERE ${conditions.join(" AND ")} ORDER BY forever DESC, category ASC, id ASC;`,
+    )
+    .all(...args) as MemoRow[];
+  return rows.map(toMemoRecord);
+}
+
+export function updateMemo(
+  db: RawChatDatabase,
+  id: number,
+  patch: UpdateMemoParams,
+  nowMs = Date.now(),
+): MemoRecord {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error("id required: update needs a memo id");
+  }
+  const current = db.getRawDb().prepare("SELECT * FROM memos WHERE id = ?;").get(id) as
+    | MemoRow
+    | undefined;
+  if (!current || current.status === "dismissed") {
+    throw new Error(`memo #${id} not found`);
+  }
+
+  let category = current.category;
+  if (patch.category !== undefined) {
+    const normalized = normalizeMemoCategory(patch.category);
+    if (!normalized) {
+      throw new Error("invalid category: expected one of User, Project, AgentHabits, etc");
+    }
+    category = normalized;
+  }
+  let content = String(current.content);
+  if (patch.content !== undefined) {
+    content = validateMemoContent(patch.content);
+  }
+
+  let forever = Number(current.forever) === 1;
+  let days = current.days === null ? DEFAULT_MEMO_TTL_DAYS : Number(current.days);
+  let expiresAt: number | null = current.expires_at === null ? null : Number(current.expires_at);
+
+  if (patch.forever === true) {
+    forever = true;
+    expiresAt = null;
+  } else if (patch.forever === false) {
+    forever = false;
+    if (patch.days !== undefined) {
+      days = validateMemoDays(patch.days);
+    }
+    expiresAt = Math.floor(nowMs) + days * MS_PER_DAY;
+  } else if (patch.days !== undefined) {
+    days = validateMemoDays(patch.days);
+    if (!forever) {
+      expiresAt = Math.floor(nowMs) + days * MS_PER_DAY;
+    }
+  }
+
+  if (
+    patch.category === undefined &&
+    patch.content === undefined &&
+    patch.days === undefined &&
+    patch.forever === undefined
+  ) {
+    throw new Error("nothing to update: specify category, content, days, or forever");
+  }
+
+  const now = Math.floor(nowMs);
+  // Self-healing: an explicit refresh that lands in the future revives the row.
+  const status = !forever && expiresAt !== null && expiresAt <= now ? "archived" : "active";
+  db.getRawDb()
+    .prepare(
+      "UPDATE memos SET category = ?, content = ?, days = ?, forever = ?, updated_at = ?, expires_at = ?, status = ? WHERE id = ?;",
+    )
+    .run(category, content, days, forever ? 1 : 0, now, expiresAt, status, id);
+  const row = db.getRawDb().prepare("SELECT * FROM memos WHERE id = ?;").get(id) as MemoRow;
+  return toMemoRecord(row);
+}
+
+/** Logical delete (`status = 'dismissed'`). Returns false when missing/already gone. */
+export function removeMemo(db: RawChatDatabase, id: number, nowMs = Date.now()): boolean {
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error("id required: remove needs a memo id");
+  }
+  const result = db
+    .getRawDb()
+    .prepare(
+      "UPDATE memos SET status = 'dismissed', updated_at = ? WHERE id = ? AND status != 'dismissed';",
+    )
+    .run(Math.floor(nowMs), id);
+  return Number(result.changes) > 0;
+}
+
+/** `dream.timezone` -> `agents.defaults.userTimezone` -> host TZ (DENNOU_SHINKEI_MEMO §6.1). */
+export function resolveMemoTimezone(
+  explicit?: string,
+  config?: { agents?: { defaults?: { userTimezone?: string } } },
+): string {
+  const trimmed = explicit?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+  const configured = config?.agents?.defaults?.userTimezone?.trim();
+  if (configured) {
+    return configured;
+  }
+  return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+}
+
+export function resolveMemoMaxTokens(pluginConfig?: Record<string, unknown>): number {
+  const memo = pluginConfig?.["memo"];
+  const raw =
+    memo && typeof memo === "object" && !Array.isArray(memo)
+      ? (memo as Record<string, unknown>)["maxTokens"]
+      : undefined;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+  return DEFAULT_MEMO_MAX_TOKENS;
+}
+
+function formatExpiryDate(expiresAtMs: number, timezone: string): string {
+  const format = (timeZone: string): string =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(expiresAtMs));
+  try {
+    return format(timezone);
+  } catch {
+    return format("UTC");
+  }
+}
+
+function escapeXmlText(text: string): string {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function estimateLineTokens(line: string): number {
+  return estimateTokensFromChars(estimateStringChars(line));
+}
+
+/**
+ * Builds the `<active-memos>` system context (§5.2). Forever memos win the
+ * token budget; dated memos fill newest-first. Selected rows render in the
+ * deterministic `forever DESC, category ASC, id ASC` order so prompt caching
+ * stays stable. Returns null when no memo fits.
+ */
+export function getActiveMemosForPrompt(
+  db: RawChatDatabase,
+  options: MemoPromptOptions = {},
+): string | null {
+  const maxTokens =
+    options.maxTokens !== undefined && Number.isFinite(options.maxTokens)
+      ? Math.floor(options.maxTokens)
+      : DEFAULT_MEMO_MAX_TOKENS;
+  if (maxTokens <= 0) {
+    return null;
+  }
+  const nowMs = options.nowMs ?? Date.now();
+  expireMemos(db, nowMs);
+  const timezone = resolveMemoTimezone(options.timezone);
+
+  const rows = db
+    .getRawDb()
+    .prepare(
+      "SELECT * FROM memos WHERE status = 'active' ORDER BY forever DESC, category ASC, id ASC;",
+    )
+    .all() as MemoRow[];
+  if (rows.length === 0) {
+    return null;
+  }
+  const memos = rows.map(toMemoRecord);
+
+  // Priority fill: forever rows (display order), then dated rows newest-first.
+  const foreverRows = memos.filter((memo) => memo.forever);
+  const datedRows = [...memos.filter((memo) => !memo.forever)].sort(
+    (left, right) => right.createdAt - left.createdAt || right.id - left.id,
+  );
+  const candidates = [...foreverRows, ...datedRows];
+
+  const headerTokens = new Map<MemoCategory, number>();
+  for (const category of MEMO_CATEGORIES) {
+    headerTokens.set(category, estimateLineTokens(`[${category}]`));
+  }
+  const selected = new Set<number>();
+  const liveCategories = new Set<MemoCategory>();
+  let used = estimateLineTokens("<active-memos>") + estimateLineTokens("</active-memos>");
+  for (const memo of candidates) {
+    const line = formatMemoLine(memo, timezone);
+    let cost = estimateLineTokens(line);
+    if (!liveCategories.has(memo.category)) {
+      cost += headerTokens.get(memo.category) ?? 0;
+    }
+    if (used + cost > maxTokens) {
+      continue;
+    }
+    used += cost;
+    selected.add(memo.id);
+    liveCategories.add(memo.category);
+  }
+  if (selected.size === 0) {
+    return null;
+  }
+
+  // Render in deterministic display order with category headers.
+  const lines: string[] = ["<active-memos>"];
+  let openCategory: MemoCategory | null = null;
+  for (const memo of memos) {
+    if (!selected.has(memo.id)) {
+      continue;
+    }
+    if (openCategory !== memo.category) {
+      if (openCategory !== null) {
+        lines.push("");
+      }
+      lines.push(`[${memo.category}]`);
+      openCategory = memo.category;
+    }
+    lines.push(formatMemoLine(memo, timezone));
+  }
+  lines.push("</active-memos>");
+  return lines.join("\n");
+}
+
+function formatMemoLine(memo: MemoRecord, timezone: string): string {
+  const deadline =
+    memo.forever || memo.expiresAt === null ? "無限" : formatExpiryDate(memo.expiresAt, timezone);
+  return `- #${memo.id} (期限: ${deadline}): ${escapeXmlText(memo.content)}`;
+}

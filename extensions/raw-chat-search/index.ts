@@ -24,6 +24,12 @@ import {
 } from "./src/hook.js";
 import { backfillSessionFiles, extractTextFromContent, indexSessionFile } from "./src/indexer.js";
 import {
+  getActiveMemosForPrompt,
+  resolveMemoMaxTokens,
+  resolveMemoTimezone,
+} from "./src/memo-db.js";
+import { createMemoTool, MemoToolSchema } from "./src/memo-tool.js";
+import {
   extractConversationPairs,
   formatPairSnippet,
   formatPairText,
@@ -60,6 +66,9 @@ export {
   resolveSessionAgentIdFromKey,
   createChatSearchTool,
   ChatSearchSchema,
+  // Memo subsystem (DENNOU_SHINKEI_MEMO Phase 1)
+  createMemoTool,
+  MemoToolSchema,
   // Vector computation engine (RAW_CHAT_SEARCH Phase 1)
   cosineSimilarity,
   cosineSimilarityBatch,
@@ -123,6 +132,16 @@ export type {
 
 export type { RawChatIndexerOptions } from "./src/hook.js";
 export type { RecallOptions, RecallResult } from "./src/recall.js";
+export type {
+  MemoCategory,
+  MemoStatus,
+  MemoRecord,
+  WriteMemoParams,
+  ReadMemosParams,
+  UpdateMemoParams,
+  MemoPromptOptions,
+} from "./src/memo-db.js";
+export type { MemoAction } from "./src/memo-tool.js";
 
 export default definePluginEntry({
   id: "raw-chat-search",
@@ -139,6 +158,16 @@ export default definePluginEntry({
       { names: ["chat_search"] },
     );
 
+    // Register memo agent tool (DENNOU_SHINKEI_MEMO Phase 1: independent of vector indexing)
+    api.registerTool(
+      (ctx) =>
+        createMemoTool({
+          config: ctx.config,
+          agentSessionKey: ctx.sessionKey,
+        }),
+      { names: ["memo"] },
+    );
+
     // Register background indexer service
     api.registerService({
       id: "raw-chat-indexer",
@@ -153,24 +182,45 @@ export default definePluginEntry({
     });
 
     api.on("before_prompt_build", async (event, ctx) => {
-      if (process.env.DENNOU_SKIP_VECTOR_RECALL === "1") {
-        return undefined;
+      // Memo injection runs independently of vector recall: it needs no API
+      // key and must survive DENNOU_SKIP_VECTOR_RECALL (DENNOU_SHINKEI_MEMO §5).
+      const injectedParts: string[] = [];
+      try {
+        const memoContext = getActiveMemosForPrompt(getRawChatDatabase(ctx.agentId), {
+          maxTokens: resolveMemoMaxTokens(api.pluginConfig),
+          timezone: resolveMemoTimezone(undefined, api.config),
+        });
+        if (memoContext) {
+          injectedParts.push(memoContext);
+        }
+      } catch (error) {
+        // Memo is an accelerator like recall: never fail prompt construction.
+        api.logger.warn(
+          `raw-chat-search: memo injection skipped: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
-      try {
-        const result = await performVectorRecall({
-          prompt: event.prompt,
-          agentId: ctx.agentId,
-          sessionId: ctx.sessionId,
-        });
-        return result.injectedContext ? { appendSystemContext: result.injectedContext } : undefined;
-      } catch (error) {
-        // Recall is an optional accelerator: never make prompt construction fail.
-        api.logger.warn(
-          `raw-chat-search: vector recall skipped: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return undefined;
+      if (process.env.DENNOU_SKIP_VECTOR_RECALL !== "1") {
+        try {
+          const result = await performVectorRecall({
+            prompt: event.prompt,
+            agentId: ctx.agentId,
+            sessionId: ctx.sessionId,
+          });
+          if (result.injectedContext) {
+            injectedParts.push(result.injectedContext);
+          }
+        } catch (error) {
+          // Recall is an optional accelerator: never make prompt construction fail.
+          api.logger.warn(
+            `raw-chat-search: vector recall skipped: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
+
+      // <active-memos> first, <recalled-memory> after (§5.2).
+      const combined = injectedParts.join("\n");
+      return combined ? { appendSystemContext: combined } : undefined;
     });
   },
 });
