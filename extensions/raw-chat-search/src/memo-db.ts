@@ -24,6 +24,7 @@ export type MemoRecord = {
   id: number;
   category: MemoCategory;
   content: string;
+  tags: string[];
   days: number;
   forever: boolean;
   createdAt: number;
@@ -35,6 +36,7 @@ export type MemoRecord = {
 export type WriteMemoParams = {
   category: string;
   content: string;
+  tags?: string[] | string;
   days?: number;
   forever?: boolean;
 };
@@ -42,12 +44,14 @@ export type WriteMemoParams = {
 export type ReadMemosParams = {
   query?: string;
   category?: string;
+  tag?: string;
   includeArchived?: boolean;
 };
 
 export type UpdateMemoParams = {
   category?: string;
   content?: string;
+  tags?: string[] | string;
   days?: number;
   forever?: boolean;
 };
@@ -78,6 +82,7 @@ export type DreamApplyResult = {
  * non-active ids are skipped silently; `keepId` is never archived even when it
  * appears in its own `archiveIds`. Only `content`/`updated_at` change on the
  * kept row — expiry stays as-is because a merge is not a refresh.
+ * Archived rows' tags are merged into the kept row (deduped).
  */
 export function applyDreamConsolidation(
   db: RawChatDatabase,
@@ -97,18 +102,25 @@ export function applyDreamConsolidation(
   let archived = 0;
   raw.exec("BEGIN IMMEDIATE;");
   try {
-    const updateStmt = raw.prepare(
+    const selectTagsStmt = raw.prepare(
+      "SELECT tags_json FROM memos WHERE id = ? AND status = 'active';",
+    );
+    const updateContentStmt = raw.prepare(
       "UPDATE memos SET content = ?, updated_at = ? WHERE id = ? AND status = 'active';",
+    );
+    const updateContentTagsStmt = raw.prepare(
+      "UPDATE memos SET content = ?, tags_json = ?, updated_at = ? WHERE id = ? AND status = 'active';",
+    );
+    const updateTagsStmt = raw.prepare(
+      "UPDATE memos SET tags_json = ?, updated_at = ? WHERE id = ? AND status = 'active';",
     );
     const archiveStmt = raw.prepare(
       "UPDATE memos SET status = 'archived', updated_at = ? WHERE id = ? AND status = 'active';",
     );
     for (const job of jobs) {
       const content = job.updateContent?.trim();
-      if (content) {
-        updated += Number(updateStmt.run(content, now, job.keepId).changes);
-      }
       const seen = new Set<number>();
+      const validArchiveIds: number[] = [];
       for (const archiveId of job.archiveIds) {
         if (!Number.isInteger(archiveId) || archiveId <= 0 || archiveId === job.keepId) {
           continue;
@@ -117,6 +129,44 @@ export function applyDreamConsolidation(
           continue;
         }
         seen.add(archiveId);
+        validArchiveIds.push(archiveId);
+      }
+      // Merge tags: keepId tags + tags of rows that will actually be archived.
+      const keepRow = selectTagsStmt.get(job.keepId) as { tags_json?: unknown } | undefined;
+      let mergedJson: string | null = null;
+      if (keepRow) {
+        const keepTags = parseTagsJson(keepRow.tags_json);
+        const seenTags = new Set<string>(keepTags);
+        const merged = [...keepTags];
+        for (const archiveId of validArchiveIds) {
+          const archiveRow = selectTagsStmt.get(archiveId) as { tags_json?: unknown } | undefined;
+          if (!archiveRow) {
+            continue;
+          }
+          for (const tag of parseTagsJson(archiveRow.tags_json)) {
+            if (seenTags.has(tag)) {
+              continue;
+            }
+            seenTags.add(tag);
+            merged.push(tag);
+          }
+        }
+        if (merged.length !== keepTags.length) {
+          mergedJson = JSON.stringify(merged);
+        }
+      }
+      if (content) {
+        if (mergedJson !== null) {
+          updated += Number(
+            updateContentTagsStmt.run(content, mergedJson, now, job.keepId).changes,
+          );
+        } else {
+          updated += Number(updateContentStmt.run(content, now, job.keepId).changes);
+        }
+      } else if (mergedJson !== null) {
+        updated += Number(updateTagsStmt.run(mergedJson, now, job.keepId).changes);
+      }
+      for (const archiveId of validArchiveIds) {
         archived += Number(archiveStmt.run(now, archiveId).changes);
       }
     }
@@ -162,6 +212,73 @@ export function validateMemoDays(days: unknown): number {
   return Math.floor(days);
 }
 
+/**
+ * Normalizes `tags` input (string[] or comma-separated string) into a clean list.
+ * Trims entries, drops empties, dedupes preserving first-seen order.
+ * Returns undefined when input is undefined/null (no change), [] when empty.
+ */
+export function normalizeMemoTags(input: unknown): string[] | undefined {
+  if (input === undefined || input === null) {
+    return undefined;
+  }
+  const parts: string[] = [];
+  if (typeof input === "string") {
+    parts.push(...input.split(","));
+  } else if (Array.isArray(input)) {
+    for (const entry of input) {
+      if (typeof entry !== "string") {
+        continue;
+      }
+      parts.push(...entry.split(","));
+    }
+  } else {
+    return undefined;
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of parts) {
+    const tag = part.trim();
+    if (!tag || seen.has(tag)) {
+      continue;
+    }
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out;
+}
+
+function parseTagsJson(raw: unknown): string[] {
+  if (typeof raw !== "string") {
+    return [];
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== "string") {
+        continue;
+      }
+      const tag = entry.trim();
+      if (!tag || seen.has(tag)) {
+        continue;
+      }
+      seen.add(tag);
+      out.push(tag);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function validateMemoContent(content: unknown): string {
   if (typeof content !== "string" || content.trim().length === 0) {
     throw new Error("content required");
@@ -179,6 +296,7 @@ type MemoRow = {
   id: number | bigint;
   category: string;
   content: string;
+  tags_json?: unknown;
   days: number | bigint | null;
   forever: number | bigint;
   created_at: number | bigint;
@@ -192,6 +310,7 @@ function toMemoRecord(row: MemoRow): MemoRecord {
     id: Number(row.id),
     category: row.category as MemoCategory,
     content: String(row.content),
+    tags: parseTagsJson(row.tags_json),
     days: row.days === null ? DEFAULT_MEMO_TTL_DAYS : Number(row.days),
     forever: Number(row.forever) === 1,
     createdAt: Number(row.created_at),
@@ -228,15 +347,16 @@ export function writeMemo(
   const content = validateMemoContent(params.content);
   const forever = params.forever === true;
   const days = params.days === undefined ? DEFAULT_MEMO_TTL_DAYS : validateMemoDays(params.days);
+  const tags = normalizeMemoTags(params.tags) ?? [];
   const now = Math.floor(nowMs);
   const expiresAt = forever ? null : now + days * MS_PER_DAY;
 
   const result = db
     .getRawDb()
     .prepare(
-      "INSERT INTO memos (category, content, days, forever, created_at, updated_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active');",
+      "INSERT INTO memos (category, content, tags_json, days, forever, created_at, updated_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active');",
     )
-    .run(category, content, days, forever ? 1 : 0, now, now, expiresAt);
+    .run(category, content, JSON.stringify(tags), days, forever ? 1 : 0, now, now, expiresAt);
   const id = Number(result.lastInsertRowid);
   const row = db.getRawDb().prepare("SELECT * FROM memos WHERE id = ?;").get(id) as MemoRow;
   return toMemoRecord(row);
@@ -281,7 +401,12 @@ export function readMemos(
       `SELECT * FROM memos WHERE ${conditions.join(" AND ")} ORDER BY forever DESC, category ASC, id ASC;`,
     )
     .all(...args) as MemoRow[];
-  return rows.map(toMemoRecord);
+  const memos = rows.map(toMemoRecord);
+  const tagFilter = params.tag?.trim().toLowerCase();
+  if (tagFilter) {
+    return memos.filter((memo) => memo.tags.some((tag) => tag.toLowerCase().includes(tagFilter)));
+  }
+  return memos;
 }
 
 export function updateMemo(
@@ -312,6 +437,10 @@ export function updateMemo(
   if (patch.content !== undefined) {
     content = validateMemoContent(patch.content);
   }
+  let tags = parseTagsJson((current as MemoRow).tags_json);
+  if (patch.tags !== undefined) {
+    tags = normalizeMemoTags(patch.tags) ?? [];
+  }
 
   let forever = Number(current.forever) === 1;
   let days = current.days === null ? DEFAULT_MEMO_TTL_DAYS : Number(current.days);
@@ -336,10 +465,11 @@ export function updateMemo(
   if (
     patch.category === undefined &&
     patch.content === undefined &&
+    patch.tags === undefined &&
     patch.days === undefined &&
     patch.forever === undefined
   ) {
-    throw new Error("nothing to update: specify category, content, days, or forever");
+    throw new Error("nothing to update: specify category, content, tags, days, or forever");
   }
 
   const now = Math.floor(nowMs);
@@ -347,9 +477,19 @@ export function updateMemo(
   const status = !forever && expiresAt !== null && expiresAt <= now ? "archived" : "active";
   db.getRawDb()
     .prepare(
-      "UPDATE memos SET category = ?, content = ?, days = ?, forever = ?, updated_at = ?, expires_at = ?, status = ? WHERE id = ?;",
+      "UPDATE memos SET category = ?, content = ?, tags_json = ?, days = ?, forever = ?, updated_at = ?, expires_at = ?, status = ? WHERE id = ?;",
     )
-    .run(category, content, days, forever ? 1 : 0, now, expiresAt, status, id);
+    .run(
+      category,
+      content,
+      JSON.stringify(tags),
+      days,
+      forever ? 1 : 0,
+      now,
+      expiresAt,
+      status,
+      id,
+    );
   const row = db.getRawDb().prepare("SELECT * FROM memos WHERE id = ?;").get(id) as MemoRow;
   return toMemoRecord(row);
 }
@@ -530,5 +670,7 @@ export function getActiveMemosForPrompt(
 function formatMemoLine(memo: MemoRecord, timezone: string): string {
   const deadline =
     memo.forever || memo.expiresAt === null ? "無限" : formatExpiryDate(memo.expiresAt, timezone);
-  return `- #${memo.id} (期限: ${deadline}): ${escapeXmlText(memo.content)}`;
+  const tagsPart =
+    memo.tags.length > 0 ? ` [${memo.tags.map((tag) => escapeXmlText(tag)).join(", ")}]` : "";
+  return `- #${memo.id}${tagsPart} (期限: ${deadline}): ${escapeXmlText(memo.content)}`;
 }

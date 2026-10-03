@@ -657,3 +657,48 @@ describe("plugin wiring (raw-chat-search-dream service)", () => {
     }
   });
 });
+
+describe("dream tags", () => {
+  let tmpDir = "";
+  let db: RawChatDatabase;
+
+  beforeEach(() => {
+    ({ db, tmpDir } = makeDb());
+  });
+
+  afterEach(() => {
+    db.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("buildDreamPrompt shows [tags: ...] when tags exist", () => {
+    const tagged = writeMemo(
+      db,
+      { category: "Project", content: "tagged rule", tags: ["DennouAibou", "アイデア"] },
+      NOW,
+    );
+    const plain = writeMemo(db, { category: "Project", content: "plain rule" }, NOW);
+    const prompt = buildDreamPrompt(readMemos(db, {}, NOW), "UTC");
+    expect(prompt).toContain(`#${tagged.id} [Project] [tags: DennouAibou, アイデア]`);
+    expect(prompt).toContain(`#${plain.id} [Project] (expires:`);
+    expect(prompt).not.toContain(`#${plain.id} [Project] [tags:`);
+  });
+
+  it("applyDreamConsolidation merges archived tags into keepId", () => {
+    const keep = writeMemo(db, { category: "User", content: "keep", tags: ["DennouAibou"] }, NOW);
+    const drop = writeMemo(
+      db,
+      { category: "User", content: "drop", tags: ["アイデア", "DennouAibou"] },
+      NOW,
+    );
+    const result = applyDreamConsolidation(
+      db,
+      [{ keepId: keep.id, updateContent: "merged", archiveIds: [drop.id] }],
+      NOW,
+    );
+    expect(result).toEqual({ updated: 1, archived: 1 });
+    const kept = readMemos(db, {}, NOW)[0];
+    expect(kept?.content).toBe("merged");
+    expect(kept?.tags).toEqual(["DennouAibou", "アイデア"]);
+  });
+});

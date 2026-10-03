@@ -9,6 +9,7 @@ import {
   archiveMemo,
   getActiveMemosForPrompt,
   normalizeMemoCategory,
+  normalizeMemoTags,
   readMemos,
   removeMemo,
   updateMemo,
@@ -30,9 +31,9 @@ export const MEMO_TOOL_DESCRIPTION = [
   "ユーザーとの重要な約束、プロジェクトの恒久的な掟、忘れてはならない個人情報を記録する場合は、",
   "必ず `forever: true`（無限保持）を指定するか、長めの日数（例: days: 30）を指定してください。",
   "",
-  '- action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。',
-  '- action="read": 有効なメモを一覧表示または検索する（query や category で絞り込み可能）。',
-  '- action="update": 既存メモの内容・期限・カテゴリを更新する（id 必須）。days 指定時は更新日時を起点に再計算。',
+  '- action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。tags でタグ付け可（例: tags: ["DennouAibou", "アイデア"]、カンマ区切り文字列も可）。',
+  '- action="read": 有効なメモを一覧表示または検索する（query や category や tag で絞り込み可能。tag は大文字小文字を区別しない部分一致）。',
+  '- action="update": 既存メモの内容・期限・カテゴリ・タグを更新する（id 必須。tags 指定で上書き）。days 指定時は更新日時を起点に再計算。',
   "- action=\"archive\": メモをアーカイブする（id 必須。status='archived' へ。read の includeArchived=true で再表示できる）。",
   "- action=\"remove\": メモを削除する（id 必須。status='dismissed' へ論理削除。再表示されない）。",
 ].join("\n");
@@ -74,6 +75,17 @@ export const MemoToolSchema = Type.Object({
       description: "read 時のキーワード検索・絞り込み文字列（部分一致）。",
     }),
   ),
+  tags: Type.Optional(
+    Type.Union([Type.Array(Type.String()), Type.String()], {
+      description:
+        'write/update 時のタグ一覧（例: ["DennouAibou", "アイデア"]）。カンマ区切り文字列も可。',
+    }),
+  ),
+  tag: Type.Optional(
+    Type.String({
+      description: "read 時のタグ絞り込み（大文字小文字を区別しない部分一致）。",
+    }),
+  ),
   includeArchived: Type.Optional(
     Type.Boolean({
       description: "read 時に期限切れ/アーカイブされたメモも含めるか（デフォルト false）。",
@@ -110,6 +122,17 @@ function readMemoId(params: unknown): number {
     throw new ToolInputError("id required: update/archive/remove needs a memo id");
   }
   return id;
+}
+
+function readTagsParam(params: unknown): string[] | string | undefined {
+  const raw = readSnakeCaseParamRaw(params, "tags");
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (typeof raw === "string" || Array.isArray(raw)) {
+    return raw as string[] | string;
+  }
+  throw new ToolInputError("tags must be a string array or comma-separated string");
 }
 
 export function createMemoTool(options: {
@@ -164,7 +187,15 @@ export function createMemoTool(options: {
             const rawDays = readNumberParam(params, "days");
             const days = rawDays === undefined ? DEFAULT_MEMO_TTL_DAYS : validateMemoDays(rawDays);
             const forever = readBooleanParam(params, "forever") ?? false;
-            const memo = writeMemo(db, { category, content, days, forever });
+            const tagsInput = readTagsParam(params);
+            const tags = tagsInput === undefined ? undefined : (normalizeMemoTags(tagsInput) ?? []);
+            const memo = writeMemo(db, {
+              category,
+              content,
+              days,
+              forever,
+              ...(tags !== undefined ? { tags } : {}),
+            });
             return textResult(JSON.stringify(memo, null, 2), undefined);
           } catch (error) {
             throw new ToolInputError(error instanceof Error ? error.message : String(error));
@@ -178,10 +209,12 @@ export function createMemoTool(options: {
               "invalid category: expected one of User, Project, AgentHabits, etc",
             );
           }
+          const tag = readStringParam(params, "tag") ?? undefined;
           const includeArchived = readBooleanParam(params, "includeArchived") ?? false;
           const memos = readMemos(db, {
             ...(query ? { query } : {}),
             ...(rawCategory ? { category: rawCategory } : {}),
+            ...(tag ? { tag } : {}),
             includeArchived,
           });
           return textResult(JSON.stringify({ memos, count: memos.length }, null, 2), undefined);
@@ -206,9 +239,12 @@ export function createMemoTool(options: {
               validateMemoDays(rawDays);
             }
             const forever = readBooleanParam(params, "forever");
+            const tagsInput = readTagsParam(params);
+            const tags = tagsInput === undefined ? undefined : (normalizeMemoTags(tagsInput) ?? []);
             const memo = updateMemo(db, id, {
               ...(rawCategory !== undefined ? { category: rawCategory } : {}),
               ...(content !== undefined ? { content } : {}),
+              ...(tags !== undefined ? { tags } : {}),
               ...(rawDays !== undefined ? { days: Math.floor(rawDays) } : {}),
               ...(forever !== undefined ? { forever } : {}),
             });

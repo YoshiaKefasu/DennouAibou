@@ -10,9 +10,11 @@ import {
   DEFAULT_MEMO_TTL_DAYS,
   MEMO_CONTENT_MAX_LENGTH,
   MS_PER_DAY,
+  applyDreamConsolidation,
   expireMemos,
   getActiveMemosForPrompt,
   normalizeMemoCategory,
+  normalizeMemoTags,
   readMemos,
   removeMemo,
   resolveMemoMaxTokens,
@@ -389,6 +391,164 @@ describe("memo subsystem (DENNOU_SHINKEI_MEMO Phase 1)", () => {
     } finally {
       closeAllRawChatDatabases();
       fs.rmSync(stateDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("memo tags (DENNOU_SHINKEI_MEMO tags)", () => {
+  let tmpDir: string;
+  let db: RawChatDatabase;
+
+  beforeEach(() => {
+    ({ db, tmpDir } = makeDb());
+  });
+
+  afterEach(() => {
+    db.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    restoreTestGlobals();
+    restoreTestEnvs();
+  });
+
+  it("write keeps tags as-is", () => {
+    const memo = writeMemo(
+      db,
+      { category: "Project", content: "tagged rule", tags: ["DennouAibou", "アイデア"] },
+      NOW,
+    );
+    expect(memo.tags).toEqual(["DennouAibou", "アイデア"]);
+    const row = db.getRawDb().prepare("SELECT tags_json FROM memos WHERE id = ?").get(memo.id) as {
+      tags_json: string;
+    };
+    expect(JSON.parse(row.tags_json)).toEqual(["DennouAibou", "アイデア"]);
+  });
+
+  it("normalizes comma strings, trims, drops empties, dedupes", () => {
+    expect(normalizeMemoTags([" a ", "", "a", "b", " b "])).toEqual(["a", "b"]);
+    expect(normalizeMemoTags("DennouAibou, アイデア, DennouAibou,, ")).toEqual([
+      "DennouAibou",
+      "アイデア",
+    ]);
+    expect(normalizeMemoTags(undefined)).toBeUndefined();
+    const memo = writeMemo(
+      db,
+      { category: "User", content: "comma", tags: "DennouAibou, アイデア, DennouAibou" },
+      NOW,
+    );
+    expect(memo.tags).toEqual(["DennouAibou", "アイデア"]);
+  });
+
+  it("update replaces tags", () => {
+    const memo = writeMemo(db, { category: "User", content: "x", tags: ["A"] }, NOW);
+    const updated = updateMemo(db, memo.id, { tags: ["B", "C"] }, NOW);
+    expect(updated.tags).toEqual(["B", "C"]);
+    const cleared = updateMemo(db, memo.id, { tags: [] }, NOW);
+    expect(cleared.tags).toEqual([]);
+  });
+
+  it("read filters by tag case-insensitively", () => {
+    const first = writeMemo(
+      db,
+      { category: "Project", content: "one", tags: ["DennouAibou"] },
+      NOW,
+    );
+    writeMemo(db, { category: "Project", content: "two", tags: ["GoRakuDo"] }, NOW);
+    writeMemo(db, { category: "Project", content: "three" }, NOW);
+    expect(readMemos(db, { tag: "dennouaibou" }, NOW).map((memo) => memo.id)).toEqual([first.id]);
+    expect(readMemos(db, { tag: "Dennou" }, NOW)).toHaveLength(1);
+    expect(readMemos(db, { tag: "nope" }, NOW)).toHaveLength(0);
+  });
+
+  it("prompt shows [tag1, tag2] only when tags exist", () => {
+    const tagged = writeMemo(
+      db,
+      {
+        category: "Project",
+        content: "tagged body",
+        tags: ["DennouAibou", "アイデア"],
+        forever: true,
+      },
+      NOW,
+    );
+    const plain = writeMemo(db, { category: "Project", content: "plain body", forever: true }, NOW);
+    const text = getActiveMemosForPrompt(db, { timezone: "UTC", nowMs: NOW })!;
+    expect(text).toContain(`#${tagged.id} [DennouAibou, アイデア] (期限: 無限)`);
+    expect(text).toContain(`#${plain.id} (期限: 無限)`);
+    expect(text).not.toContain(`#${plain.id} [`);
+  });
+
+  it("memo tool write/read/update round-trips tags", async () => {
+    const tool = createMemoTool({ config: minimalConfig(), db })!;
+    const written = readPayload(
+      await tool.execute!("w", {
+        action: "write",
+        category: "Project",
+        content: "tool tags",
+        tags: ["DennouAibou", "アイデア"],
+      }),
+    ) as { id: number; tags: string[] };
+    expect(written.tags).toEqual(["DennouAibou", "アイデア"]);
+    const filtered = readPayload(await tool.execute!("r", { action: "read", tag: "dennou" })) as {
+      count: number;
+    };
+    expect(filtered.count).toBe(1);
+    const updated = readPayload(
+      await tool.execute!("u", { action: "update", id: written.id, tags: "GoRakuDo, アイデア" }),
+    ) as { tags: string[] };
+    expect(updated.tags).toEqual(["GoRakuDo", "アイデア"]);
+  });
+
+  it("dream consolidation merges archived tags into keepId", () => {
+    const keep = writeMemo(db, { category: "User", content: "keep", tags: ["A"] }, NOW);
+    const drop = writeMemo(db, { category: "User", content: "drop", tags: ["B", "A"] }, NOW);
+    const result = applyDreamConsolidation(db, [{ keepId: keep.id, archiveIds: [drop.id] }], NOW);
+    expect(result).toEqual({ updated: 1, archived: 1 });
+    expect(readMemos(db, {}, NOW)[0]?.tags).toEqual(["A", "B"]);
+  });
+
+  it("migrates pre-tags database by adding tags_json column via ALTER TABLE", () => {
+    const preTagsDir = fs.mkdtempSync(path.join(os.tmpdir(), "raw-chat-pre-tags-"));
+    const dbPath = path.join(preTagsDir, "raw-chat.sqlite");
+
+    // Initialize raw database with pre-tags memos table (no tags_json)
+    const initDb = new RawChatDatabase(dbPath);
+    initDb.getRawDb().exec(`
+      DROP TABLE IF EXISTS memos;
+      CREATE TABLE memos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL CHECK(category IN ('User', 'Project', 'AgentHabits', 'etc')),
+        content TEXT NOT NULL,
+        days INTEGER DEFAULT 3,
+        forever INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived', 'dismissed')),
+        metadata_json TEXT
+      );
+      INSERT INTO memos (category, content, days, forever, created_at, updated_at, expires_at, status)
+      VALUES ('Project', 'pre-existing memo', 3, 1, 1000, 1000, NULL, 'active');
+    `);
+    initDb.close();
+
+    // Reopen using RawChatDatabase which triggers ALTER TABLE ADD COLUMN tags_json
+    const migratedDb = new RawChatDatabase(dbPath);
+    try {
+      const memos = readMemos(migratedDb, {}, NOW);
+      expect(memos).toHaveLength(1);
+      expect(memos[0].content).toBe("pre-existing memo");
+      expect(memos[0].tags).toEqual([]);
+
+      // Writing with tags works on migrated table
+      const newMemo = writeMemo(
+        migratedDb,
+        { category: "Project", content: "new tagged", tags: ["migrated"] },
+        NOW,
+      );
+      expect(newMemo.tags).toEqual(["migrated"]);
+    } finally {
+      migratedDb.close();
+      fs.rmSync(preTagsDir, { recursive: true, force: true });
     }
   });
 });

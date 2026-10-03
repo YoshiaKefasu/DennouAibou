@@ -246,6 +246,7 @@ export class RawChatDatabase {
         updated_at INTEGER NOT NULL,
         expires_at INTEGER,
         status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived', 'dismissed')),
+        tags_json TEXT DEFAULT '[]',
         metadata_json TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_memos_status_expires
@@ -253,6 +254,15 @@ export class RawChatDatabase {
       CREATE INDEX IF NOT EXISTS idx_memos_category
         ON memos(category, status);
     `);
+
+    // Tags migration for pre-tags DBs: safe ALTER (ignore duplicate column).
+    try {
+      this.db.exec("ALTER TABLE memos ADD COLUMN tags_json TEXT DEFAULT '[]';");
+    } catch (error) {
+      if (!/duplicate column name/i.test(String(error))) {
+        throw error;
+      }
+    }
 
     // Schema version
     const stmt = this.db.prepare(

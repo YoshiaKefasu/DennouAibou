@@ -147,10 +147,10 @@ export function buildDreamPrompt(
   timezone = "UTC",
   language: string = DEFAULT_DREAM_LANGUAGE,
 ): string {
-  const lines = memos.map(
-    (memo) =>
-      `#${memo.id} [${memo.category}] (expires: ${formatDreamExpiry(memo, timezone)}): ${memo.content}`,
-  );
+  const lines = memos.map((memo) => {
+    const tagsPart = memo.tags.length > 0 ? ` [tags: ${memo.tags.join(", ")}]` : "";
+    return `#${memo.id} [${memo.category}]${tagsPart} (expires: ${formatDreamExpiry(memo, timezone)}): ${memo.content}`;
+  });
   const body = [
     "Active memos to organize:",
     ...lines,

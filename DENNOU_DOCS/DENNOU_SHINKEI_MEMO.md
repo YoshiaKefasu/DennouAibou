@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS memos (
   updated_at INTEGER NOT NULL,          -- 更新日時 (epoch ms)
   expires_at INTEGER,                   -- 有効期限 (epoch ms, forever=1 の場合は NULL)
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived', 'dismissed')),
+  tags_json TEXT DEFAULT '[]',           -- タグ一覧 (JSON配列、例: '["DennouAibou","アイデア"]')
   metadata_json TEXT                    -- 将来の拡張用メタデータ (JSON文字列)
 );
 
@@ -61,6 +62,9 @@ CREATE INDEX IF NOT EXISTS idx_memos_status_expires
 CREATE INDEX IF NOT EXISTS idx_memos_category
   ON memos(category, status);
 ```
+
+- 既存 DB への移行: 初期化時に `ALTER TABLE memos ADD COLUMN tags_json TEXT DEFAULT '[]';` を try/catch で実行（既存カラムがある場合は無視）。
+- `MemoRecord.tags: string[]` としてシリアライズ/デシリアライズして保持する。
 
 - スキーマバージョン管理: `database.ts` の `SCHEMA_VERSION` を `"2"` へバンプし、テーブル自動生成・安全な移行を行う。
 
@@ -114,6 +118,17 @@ export const MemoToolSchema = Type.Object({
       description: "read 時のキーワード検索・絞り込み文字列（部分一致）。",
     }),
   ),
+  tags: Type.Optional(
+    Type.Union([Type.Array(Type.String()), Type.String()], {
+      description:
+        'write/update 時のタグ一覧（例: ["DennouAibou", "アイデア"]）。カンマ区切り文字列も可。',
+    }),
+  ),
+  tag: Type.Optional(
+    Type.String({
+      description: "read 時のタグ絞り込み（大文字小文字を区別しない部分一致）。",
+    }),
+  ),
   includeArchived: Type.Optional(
     Type.Boolean({
       description: "read 時に期限切れ/アーカイブされたメモも含めるか（デフォルト false）。",
@@ -132,11 +147,11 @@ export const MemoToolSchema = Type.Object({
 ユーザーとの重要な約束、プロジェクトの恒久的な掟、忘れてはならない個人情報を記録する場合は、
 必ず `forever: true`（無限保持）を指定するか、長めの日数（例: days: 30）を指定してください。
 
-- action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。
-- action="read": 有効なメモを一覧表示または検索する（query や category で絞り込み可能）。
-- action="update": 既存メモの内容・期限・カテゴリを更新する（id 必須）。days 指定時は更新日時を起点に再計算。
+- action="write": メモを記録する（category, content 必須。1件最大2,000文字。重要なら forever: true）。tags でタグ付け可（例: tags: ["DennouAibou", "アイデア"]、カンマ区切り文字列も可）。
+- action="read": 有効なメモを一覧表示または検索する（query や category や tag で絞り込み可能。tag は大文字小文字を区別しない部分一致）。
+- action="update": 既存メモの内容・期限・カテゴリ・タグを更新する（id 必須。tags 指定で上書き）。days 指定時は更新日時を起点に再計算。
 - action="archive": メモをアーカイブする（id 必須。status='archived' へ。read の includeArchived=true で再表示できる）。
-- action="remove": メモを削除する（id 必須。status='dismissed' へ論理削除）。
+- action="remove": メモを削除する（id 必須。status='dismissed' へ論理削除。再表示されない）。
 ```
 
 ### 4.3 入力検証 ＆ 相関バリデーション
@@ -150,6 +165,14 @@ export const MemoToolSchema = Type.Object({
   - `forever: true` に更新された場合は `expires_at = NULL, forever = 1` に設定。
   - `forever: false` に更新された場合は、同時に `days`（またはデフォルト3日）に基づき `expires_at = now + days * 86400000` を再計算。
 - `action="remove"`: `id` が必須。論理削除（`status='dismissed'`）としてマーク。
+
+### 4.4 タグ仕様 (`tags` / `tag`)
+
+- `write` / `update`: `tags?: string[]` を受け取る（例: `tags: ["DennouAibou", "アイデア"]`）。カンマ区切り文字列も許容し、正規化（トリム、空要素除外、重複排除）して `tags_json` に保存する。`update` では指定時に上書き（空配列でクリア可）。
+- `read`: `tag?: string` を受け取り、指定タグ付きメモのみに絞り込む（大文字小文字を区別しない部分一致）。`query` / `category` と併用可。
+- `normalizeMemoTags()`: `string[]` / カンマ区切り `string` を正規化する単一の真実源。配列要素内のカンマも分割する。
+- 表示: プロンプト常時表示 (`getActiveMemosForPrompt`) と Dream (`buildDreamPrompt`) でタグを表示する。
+- Dream 統合 (`applyDreamConsolidation`): `archiveIds` のタグを `keepId` にマージ（重複排除）して保持する。
 
 ---
 
@@ -173,16 +196,19 @@ export const MemoToolSchema = Type.Object({
   ```xml
   <active-memos>
   [User]
-  - #12 (期限: 無限): ユーザーは端的な会話調を好み、長文や定型文を嫌う。
+  - #12 [DennouAibou, アイデア] (期限: 無限): ユーザーは端的な会話調を好み、長文や定型文を嫌う。
   - #18 (期限: 2026-10-05): 来週月曜日にJLPT過去問の進捗を聞くこと。
 
   [Project]
-  - #3 (期限: 無限): KASOU デプロイ時は Git for Windows の tar パスを使うこと。
+  - #3 [DennouAibou] (期限: 無限): KASOU デプロイ時は Git for Windows の tar パスを使うこと。
 
   [AgentHabits]
   - #5 (期限: 無限): 親友のような温かいトーンで話し、敬語やロボット語を避ける。
   </active-memos>
   ```
+
+  - タグがある場合のみメモ行に `[タグ1, タグ2]` を表示（タグが無い場合は従来通り）。
+  - Dream プロンプト (`buildDreamPrompt`) では `#ID [Category] [tags: タグ1, タグ2] (expires: ...): 本文` 形式で表示する。
 
 - **配置順序**: Standing Rules である `<active-memos>` を先頭に配置し、エピソード想起の `<recalled-memory>` をその後に連結する。
 
