@@ -92,8 +92,8 @@ Text + native (when enabled):
 - `/focus <target>` (Discord: bind this thread, or a new thread, to a session/subagent target)
 - `/unfocus` (Discord: remove the current thread binding)
 - `/kill <id|#|all>` (immediately abort one or all running sub-agents for this session; no confirmation message)
-- `/steer <id|#> <message>` (steer a running sub-agent immediately: in-run when possible, otherwise abort current work and restart on the steer message)
-- `/tell <id|#> <message>` (alias for `/steer`)
+- `/followup <message>` (queue a message for the next turn; never steers the active run, even when the default queue mode is `steer`)
+- Top-level `/steer` and `/tell` were removed; to steer a running sub-agent use `/subagents steer <id|#> <message>`.
 - `/config show|get|set|unset` (persist config to disk, owner-only; requires `commands.config: true`)
 - `/mcp show|get|set|unset` (manage DennouAibou MCP server config, owner-only; requires `commands.mcp: true`)
 - `/plugins list|show|get|install|enable|disable` (inspect discovered plugins, install new ones, and toggle enablement; owner-only for writes; requires `commands.plugins: true`)

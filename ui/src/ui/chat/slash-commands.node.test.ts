@@ -82,15 +82,18 @@ describe("parseSlashCommand", () => {
     });
   });
 
-  it("keeps a single local /steer entry with the control-ui metadata", () => {
-    const steerEntries = SLASH_COMMANDS.filter((entry) => entry.name === "steer");
-    expect(steerEntries).toHaveLength(1);
-    expect(steerEntries[0]).toMatchObject({
-      key: "steer",
-      description: "Inject a message into the active run",
-      args: "[id] <message>",
-      aliases: expect.arrayContaining(["tell"]),
-      executeLocal: true,
+  it("keeps a single /followup entry for deferred queueing", () => {
+    expect(SLASH_COMMANDS.some((entry) => entry.name === "steer")).toBe(false);
+    const followupEntries = SLASH_COMMANDS.filter((entry) => entry.name === "followup");
+    expect(followupEntries).toHaveLength(1);
+    expect(followupEntries[0]).toMatchObject({
+      key: "followup",
+      description: "Queue a message to be processed after the current run finishes.",
+      executeLocal: false,
+    });
+    expect(parseSlashCommand("/followup do this after")).toMatchObject({
+      command: { key: "followup" },
+      args: "do this after",
     });
   });
 

@@ -32,6 +32,7 @@ import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { applySessionHints } from "./body.js";
 import type { buildCommandContext } from "./commands.js";
 import type { InlineDirectives } from "./directive-handling.js";
+import { extractFollowupMessage } from "./followup-command.js";
 import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
 import { buildInboundMetaSystemPrompt, buildInboundUserContextPrefix } from "./inbound-meta.js";
 import type { createModelSelectionState } from "./model-selection.js";
@@ -470,8 +471,19 @@ export async function runPreparedReply(
     };
   };
   let { activeSessionId, isActive, isStreaming } = resolveQueueBusyState();
-  const shouldSteer = resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog";
+  // Safety net: `/followup <message>` never steers, even on paths that bypass
+  // directive handling. The prefix is stripped upstream; here we only force
+  // the queue decision.
+  const followupOverride = extractFollowupMessage(command.commandBodyNormalized);
+  if (followupOverride !== null && !followupOverride) {
+    typing.cleanup();
+    return { text: "Usage: /followup <message>" };
+  }
+  const forceFollowup = followupOverride !== null;
+  const shouldSteer =
+    !forceFollowup && (resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog");
   const shouldFollowup =
+    forceFollowup ||
     resolvedQueue.mode === "followup" ||
     resolvedQueue.mode === "collect" ||
     resolvedQueue.mode === "steer-backlog";

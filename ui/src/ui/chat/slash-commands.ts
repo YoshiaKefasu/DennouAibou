@@ -1,5 +1,5 @@
-import { buildBuiltinChatCommands } from "../_shared/chat-commands.ts";
 import type { ChatCommandDefinition, CommandArgChoice } from "../_shared/chat-command-types.ts";
+import { buildBuiltinChatCommands } from "../_shared/chat-commands.ts";
 import type { IconName } from "../icons.ts";
 
 export type SlashCommandCategory = "session" | "model" | "agents" | "tools";
@@ -44,7 +44,6 @@ const COMMAND_ICON_OVERRIDES: Partial<Record<string, IconName>> = {
   agents: "monitor",
   subagents: "folder",
   kill: "x",
-  steer: "send",
 };
 
 const LOCAL_COMMANDS = new Set([
@@ -62,7 +61,6 @@ const LOCAL_COMMANDS = new Set([
   "usage",
   "agents",
   "kill",
-  "steer",
   "redirect",
 ]);
 
@@ -98,7 +96,6 @@ const CATEGORY_OVERRIDES: Partial<Record<string, SlashCommandCategory>> = {
   agents: "agents",
   subagents: "agents",
   kill: "agents",
-  steer: "agents",
   redirect: "agents",
   session: "session",
   stop: "session",
@@ -115,14 +112,6 @@ const CATEGORY_OVERRIDES: Partial<Record<string, SlashCommandCategory>> = {
   reasoning: "model",
   elevated: "model",
   queue: "model",
-};
-
-const COMMAND_DESCRIPTION_OVERRIDES: Partial<Record<string, string>> = {
-  steer: "Inject a message into the active run",
-};
-
-const COMMAND_ARGS_OVERRIDES: Partial<Record<string, string>> = {
-  steer: "[id] <message>",
 };
 
 function normalizeUiKey(command: ChatCommandDefinition): string {
@@ -186,8 +175,8 @@ function toSlashCommand(command: ChatCommandDefinition): SlashCommandDef | null 
     key: command.key,
     name,
     aliases: getSlashAliases(command).filter((alias) => alias !== name),
-    description: COMMAND_DESCRIPTION_OVERRIDES[command.key] ?? command.description,
-    args: COMMAND_ARGS_OVERRIDES[command.key] ?? formatArgs(command),
+    description: command.description,
+    args: formatArgs(command),
     icon: mapIcon(command),
     category: mapCategory(command),
     executeLocal: LOCAL_COMMANDS.has(command.key),

@@ -13,6 +13,7 @@ import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { resolveBlockStreamingChunking } from "./block-streaming.js";
 import { buildCommandContext } from "./commands-context.js";
 import { type InlineDirectives, parseInlineDirectives } from "./directive-handling.parse.js";
+import { extractFollowupMessage } from "./followup-command.js";
 import { applyInlineDirectiveOverrides } from "./get-reply-directives-apply.js";
 import { clearExecInlineDirectives, clearInlineDirectives } from "./get-reply-directives-utils.js";
 import { defaultGroupActivation, resolveGroupRequireMention } from "./groups.js";
@@ -184,7 +185,7 @@ export async function resolveReplyDirectives(params: {
     ctx.RawBody ??
     "";
   const promptSource = sessionCtx.BodyForAgent ?? sessionCtx.BodyStripped ?? sessionCtx.Body ?? "";
-  const commandText = commandSource || promptSource;
+  let commandText = commandSource || promptSource;
   const command = buildCommandContext({
     ctx,
     cfg,
@@ -199,6 +200,24 @@ export async function resolveReplyDirectives(params: {
     surface: command.surface,
     commandSource: ctx.CommandSource,
   });
+  // `/followup <message>` forces followup queueing (never steer): strip the
+  // prefix here so the remainder parses as a normal message, and remember
+  // to override perMessageQueueMode after directive application.
+  let followupRequested = false;
+  if (allowTextCommands && command.isAuthorizedSender) {
+    const followupMessage = extractFollowupMessage(command.commandBodyNormalized);
+    if (followupMessage !== null) {
+      if (!followupMessage) {
+        typing.cleanup();
+        return {
+          kind: "reply",
+          reply: { text: "Usage: /followup <message>" },
+        };
+      }
+      followupRequested = true;
+      commandText = followupMessage;
+    }
+  }
   const commandTextHasSlash = commandText.includes("/");
   const reservedCommands = new Set<string>();
   if (commandTextHasSlash) {
@@ -337,6 +356,27 @@ export async function resolveReplyDirectives(params: {
 
   if (allowStatusDirective) {
     cleanedBody = stripInlineStatus(cleanedBody).cleaned;
+  }
+
+  if (followupRequested) {
+    // The source bodies still carry the `/followup ` prefix (parsedDirectives
+    // was computed from the stripped remainder). Strip the prefix from the
+    // current-message portion only, preserving thread history and structural
+    // prefixes in `cleanedBody` instead of overwriting them with
+    // `parsedDirectives.cleaned`.
+    const markerIndex = cleanedBody.indexOf(CURRENT_MESSAGE_MARKER);
+    if (markerIndex < 0) {
+      const stripped = extractFollowupMessage(cleanedBody);
+      cleanedBody = stripped !== null ? stripped : parsedDirectives.cleaned;
+    } else {
+      const head = cleanedBody.slice(0, markerIndex + CURRENT_MESSAGE_MARKER.length);
+      const tail = cleanedBody.slice(markerIndex + CURRENT_MESSAGE_MARKER.length);
+      const strippedTail = extractFollowupMessage(tail);
+      cleanedBody = `${head}${strippedTail !== null ? strippedTail : parsedDirectives.cleaned}`;
+    }
+    if (allowStatusDirective) {
+      cleanedBody = stripInlineStatus(cleanedBody).cleaned;
+    }
   }
 
   sessionCtx.BodyForAgent = cleanedBody;
@@ -511,7 +551,11 @@ export async function resolveReplyDirectives(params: {
   provider = applyResult.provider;
   model = applyResult.model;
   contextTokens = applyResult.contextTokens;
-  const { directiveAck, perMessageQueueMode, perMessageQueueOptions } = applyResult;
+  const { directiveAck } = applyResult;
+  // `/followup` always defers to a followup turn, even when the session or
+  // global default queue mode is `steer`.
+  const perMessageQueueMode = followupRequested ? "followup" : applyResult.perMessageQueueMode;
+  const perMessageQueueOptions = followupRequested ? undefined : applyResult.perMessageQueueOptions;
   const execOverrides = resolveExecOverrides({ directives, sessionEntry, agentEntry });
 
   return {

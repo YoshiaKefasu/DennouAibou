@@ -3181,7 +3181,7 @@ describe("handleCommands subagents", () => {
     expect(callGatewayMock).not.toHaveBeenCalled();
   });
 
-  it("steers subagents via /steer alias", async () => {
+  it("steers subagents via /subagents steer", async () => {
     callGatewayMock.mockImplementation(async (opts: unknown) => {
       const request = opts as { method?: string };
       if (request.method === "agent") {
@@ -3211,7 +3211,7 @@ describe("handleCommands subagents", () => {
       channels: { whatsapp: { allowFrom: ["*"] } },
       session: { store: storePath },
     } as OpenClawConfig;
-    const params = buildParams("/steer 1 check timer.ts instead", cfg);
+    const params = buildParams("/subagents steer 1 check timer.ts instead", cfg);
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("steered");
@@ -3245,7 +3245,7 @@ describe("handleCommands subagents", () => {
     expect(trackedRuns[0].endedAt).toBeUndefined();
   });
 
-  it("restores announce behavior when /steer replacement dispatch fails", async () => {
+  it("restores announce behavior when /subagents steer replacement dispatch fails", async () => {
     callGatewayMock.mockImplementation(async (opts: unknown) => {
       const request = opts as { method?: string };
       if (request.method === "agent.wait") {
@@ -3270,7 +3270,7 @@ describe("handleCommands subagents", () => {
       commands: { text: true },
       channels: { whatsapp: { allowFrom: ["*"] } },
     } as OpenClawConfig;
-    const params = buildParams("/steer 1 check timer.ts instead", cfg);
+    const params = buildParams("/subagents steer 1 check timer.ts instead", cfg);
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("send failed: dispatch failed");

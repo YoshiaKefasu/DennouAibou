@@ -24,7 +24,6 @@ import type {
   SessionsListResult,
   SessionsPatchResult,
 } from "../types.ts";
-import { generateUUID } from "../uuid.ts";
 import { SLASH_COMMANDS } from "./slash-commands.ts";
 
 export type SlashCommandResult = {
@@ -111,8 +110,6 @@ export async function executeSlashCommand(
       return await executeAgents(client);
     case "kill":
       return await executeKill(client, sessionKey, args);
-    case "steer":
-      return await executeSteer(client, sessionKey, args, context);
     case "redirect":
       return await executeRedirect(client, sessionKey, args, context);
     default:
@@ -690,9 +687,8 @@ function resolveSteerSubagent(
  * Returns the resolved session key and the remaining message, or
  * falls back to the current session key with the full args as message.
  *
- * Ended subagents are still resolved here so explicit `/steer <id> ...`
- * can surface the correct "No active run matched" message and `/redirect <id> ...`
- * can restart that specific session instead of silently steering the current one.
+ * Ended subagents are still resolved here so explicit `/redirect <id> ...`
+ * can restart that specific session instead of silently targeting the current one.
  */
 async function resolveSteerTarget(
   client: GatewayBrowserClient,
@@ -711,8 +707,8 @@ async function resolveSteerTarget(
   if (spaceIdx > 0) {
     const maybeTarget = trimmed.slice(0, spaceIdx);
     const rest = trimmed.slice(spaceIdx + 1).trim();
-    // Skip "all" — resolveKillTargets treats it as a wildcard, but steer/redirect
-    // target a single session, so "all good now" should not match subagents.
+    // Skip "all" — resolveKillTargets treats it as a wildcard, but redirect
+    // targets a single session, so "all good now" should not match subagents.
     if (rest && maybeTarget.toLowerCase() !== "all") {
       const sessions =
         context.sessionsResult ?? (await client.request<SessionsListResult>("sessions.list", {}));
@@ -726,49 +722,6 @@ async function resolveSteerTarget(
     }
   }
   return { key: sessionKey, message: trimmed };
-}
-
-function isActiveSteerSession(session: GatewaySessionRow | undefined): boolean {
-  return session?.status === "running" && session.endedAt == null;
-}
-
-/** Soft inject — queues a message into the active run via chat.send (deliver: false). */
-async function executeSteer(
-  client: GatewayBrowserClient,
-  sessionKey: string,
-  args: string,
-  context: SlashCommandContext,
-): Promise<SlashCommandResult> {
-  try {
-    const resolved = await resolveSteerTarget(client, sessionKey, args, context);
-    if ("error" in resolved) {
-      return {
-        content: resolved.error === "empty" ? "Usage: `/steer [id] <message>`" : resolved.error,
-      };
-    }
-    const sessions =
-      resolved.sessions ?? (await client.request<SessionsListResult>("sessions.list", {}));
-    const targetSession = resolveCurrentSession(sessions, resolved.key);
-    if (!isActiveSteerSession(targetSession)) {
-      return {
-        content: resolved.label
-          ? `No active run matched \`${resolved.label}\`. Use \`/redirect\` instead.`
-          : "No active run. Use the chat input or `/redirect` instead.",
-      };
-    }
-    await client.request("chat.send", {
-      sessionKey: resolved.key,
-      message: resolved.message,
-      deliver: false,
-      idempotencyKey: generateUUID(),
-    });
-    return {
-      content: resolved.label ? `Steered \`${resolved.label}\`.` : "Steered.",
-      pendingCurrentRun: resolved.key === sessionKey,
-    };
-  } catch (err) {
-    return { content: `Failed to steer: ${String(err)}` };
-  }
 }
 
 /** Hard redirect — aborts the active run and restarts with a new message. */

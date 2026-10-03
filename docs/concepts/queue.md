@@ -26,7 +26,7 @@ We serialize inbound auto-reply runs (all channels) through a tiny in-process qu
 
 Inbound messages can steer the current run, wait for a followup turn, or do both:
 
-- `steer`: inject immediately into the current run (cancels pending tool calls after the next tool boundary). If not streaming, falls back to followup.
+- `steer`: inject immediately into the active run (works even while a tool is executing or the model is thinking; only compaction refuses injection).
 - `followup`: enqueue for the next agent turn after the current run ends.
 - `collect`: coalesce all queued messages into a **single** followup turn (default). If messages target different channels/threads, they drain individually to preserve routing.
 - `steer-backlog` (aka `steer+backlog`): steer now **and** preserve the message for a followup turn.
@@ -40,7 +40,9 @@ Send `/queue collect` as a standalone command (per-session) or set `messages.que
 
 Defaults (when unset in config):
 
-- All surfaces → `collect`
+- All surfaces → `steer`
+
+Use `/followup <message>` to force a message into the next turn without steering, even when the default mode is `steer`.
 
 Configure globally or per channel via `messages.queue`:
 

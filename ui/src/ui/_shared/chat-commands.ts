@@ -302,16 +302,15 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       args: [{ name: "target", description: "Label, run id, index, or all", type: "string" }],
     }),
     command({
-      key: "steer",
-      nativeName: "steer",
-      description: "Send guidance to a running subagent.",
-      textAlias: "/steer",
+      key: "followup",
+      nativeName: "followup",
+      description: "Queue a message to be processed after the current run finishes.",
+      textAlias: "/followup",
       category: "management",
       args: [
-        { name: "target", description: "Label, run id, or index", type: "string" },
         {
           name: "message",
-          description: "Steering message",
+          description: "Followup message",
           type: "string",
           captureRemaining: true,
         },
@@ -631,7 +630,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
   addAlias(commands, "verbose", "/v");
   addAlias(commands, "reasoning", "/reason");
   addAlias(commands, "elevated", "/elev");
-  addAlias(commands, "steer", "/tell");
 
   return commands;
 }
