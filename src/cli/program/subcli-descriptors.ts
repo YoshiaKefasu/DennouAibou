@@ -49,11 +49,6 @@ export const SUB_CLI_DESCRIPTORS = [
     hasSubcommands: false,
   },
   {
-    name: "cron",
-    description: "Manage cron jobs via the Gateway scheduler",
-    hasSubcommands: true,
-  },
-  {
     name: "dns",
     description: "DNS helpers for wide-area discovery (Tailscale + CoreDNS)",
     hasSubcommands: true,

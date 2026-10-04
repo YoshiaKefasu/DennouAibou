@@ -19,7 +19,7 @@ import {
   handleSendChat as handleSendChatInternal,
   removeQueuedMessage as removeQueuedMessageInternal,
 } from "./app-chat.ts";
-import { DEFAULT_CRON_FORM, DEFAULT_LOG_LEVEL_FILTERS } from "./app-defaults.ts";
+import { DEFAULT_LOG_LEVEL_FILTERS } from "./app-defaults.ts";
 import type { EventLogEntry } from "./app-events.ts";
 import { connectGateway as connectGatewayInternal } from "./app-gateway.ts";
 import {
@@ -38,7 +38,6 @@ import {
 } from "./app-scroll.ts";
 import {
   applySettings as applySettingsInternal,
-  loadCron as loadCronInternal,
   loadOverview as loadOverviewInternal,
   setTab as setTabInternal,
   setTheme as setThemeInternal,
@@ -75,9 +74,6 @@ import type {
   ConfigSnapshot,
   ConfigUiHints,
   ChatModelOverride,
-  CronJob,
-  CronRunLogEntry,
-  CronStatus,
   HealthSummary,
   LogEntry,
   LogLevel,
@@ -91,7 +87,7 @@ import type {
   ToolsCatalogResult,
   ToolsEffectiveResult,
 } from "./types.ts";
-import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
+import { type ChatAttachment, type ChatQueueItem } from "./ui-types.ts";
 import { generateUUID } from "./uuid.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
 
@@ -269,7 +265,7 @@ export class OpenClawApp extends LitElement {
   @state() toolsEffectiveResultKey: string | null = null;
   @state() toolsEffectiveError: string | null = null;
   @state() toolsEffectiveResult: ToolsEffectiveResult | null = null;
-  @state() agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" | "cron" = "files";
+  @state() agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" = "files";
   @state() agentFilesLoading = false;
   @state() agentFilesError: string | null = null;
   @state() agentFilesList: AgentsFilesListResult | null = null;
@@ -299,42 +295,6 @@ export class OpenClawApp extends LitElement {
   @state() sessionsPage = 0;
   @state() sessionsPageSize = 25;
   @state() sessionsSelectedKeys: Set<string> = new Set();
-
-  @state() cronLoading = false;
-  @state() cronJobsLoadingMore = false;
-  @state() cronJobs: CronJob[] = [];
-  @state() cronJobsTotal = 0;
-  @state() cronJobsHasMore = false;
-  @state() cronJobsNextOffset: number | null = null;
-  @state() cronJobsLimit = 50;
-  @state() cronJobsQuery = "";
-  @state() cronJobsEnabledFilter: import("./types.js").CronJobsEnabledFilter = "all";
-  @state() cronJobsScheduleKindFilter: import("./controllers/cron.js").CronJobsScheduleKindFilter =
-    "all";
-  @state() cronJobsLastStatusFilter: import("./controllers/cron.js").CronJobsLastStatusFilter =
-    "all";
-  @state() cronJobsSortBy: import("./types.js").CronJobsSortBy = "nextRunAtMs";
-  @state() cronJobsSortDir: import("./types.js").CronSortDir = "asc";
-  @state() cronStatus: CronStatus | null = null;
-  @state() cronError: string | null = null;
-  @state() cronForm: CronFormState = { ...DEFAULT_CRON_FORM };
-  @state() cronFieldErrors: import("./controllers/cron.js").CronFieldErrors = {};
-  @state() cronEditingJobId: string | null = null;
-  @state() cronRunsJobId: string | null = null;
-  @state() cronRunsLoadingMore = false;
-  @state() cronRuns: CronRunLogEntry[] = [];
-  @state() cronRunsTotal = 0;
-  @state() cronRunsHasMore = false;
-  @state() cronRunsNextOffset: number | null = null;
-  @state() cronRunsLimit = 50;
-  @state() cronRunsScope: import("./types.js").CronRunScope = "all";
-  @state() cronRunsStatuses: import("./types.js").CronRunsStatusValue[] = [];
-  @state() cronRunsDeliveryStatuses: import("./types.js").CronDeliveryStatus[] = [];
-  @state() cronRunsStatusFilter: import("./types.js").CronRunsStatusFilter = "all";
-  @state() cronRunsQuery = "";
-  @state() cronRunsSortDir: import("./types.js").CronSortDir = "desc";
-  @state() cronModelSuggestions: string[] = [];
-  @state() cronBusy = false;
 
   // Overview dashboard state
   @state() attentionItems: import("./types.js").AttentionItem[] = [];
@@ -551,10 +511,6 @@ export class OpenClawApp extends LitElement {
 
   async loadOverview() {
     await loadOverviewInternal(this as unknown as Parameters<typeof loadOverviewInternal>[0]);
-  }
-
-  async loadCron() {
-    await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
   }
 
   async handleAbortChat() {

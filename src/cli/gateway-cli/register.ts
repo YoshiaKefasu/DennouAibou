@@ -115,7 +115,7 @@ export function registerGatewayCli(program: Command) {
     gateway
       .command("call")
       .description("Call a Gateway method")
-      .argument("<method>", "Method name (health/status/system-presence/cron.*)")
+      .argument("<method>", "Method name (health/status/system-presence/sessions.*)")
       .option("--params <json>", "JSON object string for params", "{}")
       .action(async (method, opts, command) => {
         await runGatewayCommand(async () => {

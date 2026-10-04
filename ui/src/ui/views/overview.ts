@@ -6,13 +6,7 @@ import { formatRelativeTimestamp, formatDurationHuman } from "../format.ts";
 import type { GatewayHelloOk } from "../gateway.ts";
 import { icons } from "../icons.ts";
 import type { UiSettings } from "../storage.ts";
-import type {
-  AttentionItem,
-  CronJob,
-  CronStatus,
-  SessionsListResult,
-  SkillStatusReport,
-} from "../types.ts";
+import type { AttentionItem, SessionsListResult, SkillStatusReport } from "../types.ts";
 import { renderConnectCommand } from "./connect-command.ts";
 import { renderOverviewAttention } from "./overview-attention.ts";
 import { renderOverviewCards } from "./overview-cards.ts";
@@ -33,14 +27,10 @@ export type OverviewProps = {
   lastErrorCode: string | null;
   presenceCount: number;
   sessionsCount: number | null;
-  cronEnabled: boolean | null;
-  cronNext: number | null;
   lastChannelsRefresh: number | null;
   // New dashboard data
   sessionsResult: SessionsListResult | null;
   skillsReport: SkillStatusReport | null;
-  cronJobs: CronJob[];
-  cronStatus: CronStatus | null;
   attentionItems: AttentionItem[];
   eventLog: EventLogEntry[];
   overviewLogLines: string[];
@@ -389,8 +379,6 @@ export function renderOverview(props: OverviewProps) {
     ${renderOverviewCards({
       sessionsResult: props.sessionsResult,
       skillsReport: props.skillsReport,
-      cronJobs: props.cronJobs,
-      cronStatus: props.cronStatus,
       presenceCount: props.presenceCount,
       onNavigate: props.onNavigate,
     })}

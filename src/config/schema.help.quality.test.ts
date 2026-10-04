@@ -26,7 +26,6 @@ const ROOT_SECTIONS = [
   "commands",
   "approvals",
   "session",
-  "cron",
   "hooks",
   "web",
   "channels",
@@ -118,20 +117,6 @@ const TARGET_KEYS = [
   "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback",
   "gateway.controlUi.allowInsecureAuth",
   "gateway.controlUi.dangerouslyDisableDeviceAuth",
-  "cron",
-  "cron.enabled",
-  "cron.store",
-  "cron.maxConcurrentRuns",
-  "cron.retry",
-  "cron.retry.maxAttempts",
-  "cron.retry.backoffMs",
-  "cron.retry.retryOn",
-  "cron.webhook",
-  "cron.webhookToken",
-  "cron.sessionRetention",
-  "cron.runLog",
-  "cron.runLog.maxBytes",
-  "cron.runLog.keepLines",
   "session",
   "session.scope",
   "session.dmScope",
@@ -630,23 +615,6 @@ describe("config help copy quality", () => {
     );
   });
 
-  it("documents cron deprecation, migration, and retention formats", () => {
-    const legacy = FIELD_HELP["cron.webhook"];
-    expect(/deprecated|legacy/i.test(legacy)).toBe(true);
-    expect(legacy.includes('delivery.mode="webhook"')).toBe(true);
-    expect(legacy.includes("delivery.to")).toBe(true);
-
-    const retention = FIELD_HELP["cron.sessionRetention"];
-    expect(retention.includes("24h")).toBe(true);
-    expect(retention.includes("7d")).toBe(true);
-    expect(retention.includes("1h30m")).toBe(true);
-    expect(/false/i.test(retention)).toBe(true);
-
-    const token = FIELD_HELP["cron.webhookToken"];
-    expect(/token|bearer/i.test(token)).toBe(true);
-    expect(/secret|env|rotate/i.test(token)).toBe(true);
-  });
-
   it("documents session send-policy examples and prefix semantics", () => {
     const rules = FIELD_HELP["session.sendPolicy.rules"];
     expect(rules.includes("{ action:")).toBe(true);
@@ -682,17 +650,6 @@ describe("config help copy quality", () => {
 
     const highWater = FIELD_HELP["session.maintenance.highWaterBytes"];
     expect(highWater.includes("80%")).toBe(true);
-  });
-
-  it("documents cron run-log retention controls", () => {
-    const runLog = FIELD_HELP["cron.runLog"];
-    expect(runLog.includes("cron/runs")).toBe(true);
-
-    const maxBytes = FIELD_HELP["cron.runLog.maxBytes"];
-    expect(maxBytes.includes("2mb")).toBe(true);
-
-    const keepLines = FIELD_HELP["cron.runLog.keepLines"];
-    expect(keepLines.includes("2000")).toBe(true);
   });
 
   it("documents approvals filters and target semantics", () => {

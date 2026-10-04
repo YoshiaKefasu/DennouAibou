@@ -186,6 +186,32 @@ describe("handleToolExecutionEnd cron.add commitment tracking", () => {
     expect(ctx.state.itemCompletedCount).toBe(1);
     expect(ctx.state.itemActiveIds.size).toBe(0);
   });
+
+  it("increments successfulCronAdds when alarm set succeeds (DEBLOAT §34 successor)", async () => {
+    const { ctx } = createTestContext();
+    await handleToolExecutionStart(
+      ctx as never,
+      {
+        type: "tool_execution_start",
+        toolName: "alarm",
+        toolCallId: "tool-alarm-1",
+        args: { action: "set", time: "10m", task: "ping" },
+      } as never,
+    );
+
+    await handleToolExecutionEnd(
+      ctx as never,
+      {
+        type: "tool_execution_end",
+        toolName: "alarm",
+        toolCallId: "tool-alarm-1",
+        isError: false,
+        result: { details: { status: "ok" } },
+      } as never,
+    );
+
+    expect(ctx.state.successfulCronAdds).toBe(1);
+  });
 });
 
 describe("handleToolExecutionEnd mutating failure recovery", () => {

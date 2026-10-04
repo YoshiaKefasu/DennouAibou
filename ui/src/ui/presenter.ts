@@ -1,6 +1,6 @@
 import { t } from "../i18n/index.ts";
-import { formatRelativeTimestamp, formatDurationHuman, formatMs } from "./format.ts";
-import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types.ts";
+import { formatRelativeTimestamp, formatMs } from "./format.ts";
+import type { GatewaySessionRow, PresenceEntry } from "./types.ts";
 
 export function formatPresenceSummary(entry: PresenceEntry): string {
   const host = entry.host ?? "unknown";
@@ -42,45 +42,4 @@ export function formatEventPayload(payload: unknown): string {
     // oxlint-disable typescript/no-base-to-string
     return String(payload);
   }
-}
-
-export function formatCronState(job: CronJob) {
-  const state = job.state ?? {};
-  const next = state.nextRunAtMs ? formatMs(state.nextRunAtMs) : t("common.na");
-  const last = state.lastRunAtMs ? formatMs(state.lastRunAtMs) : t("common.na");
-  const status = state.lastStatus ?? t("common.na");
-  return `${status} · next ${next} · last ${last}`;
-}
-
-export function formatCronSchedule(job: CronJob) {
-  const s = job.schedule;
-  if (s.kind === "at") {
-    const atMs = Date.parse(s.at);
-    return Number.isFinite(atMs) ? `At ${formatMs(atMs)}` : `At ${s.at}`;
-  }
-  if (s.kind === "every") {
-    return `Every ${formatDurationHuman(s.everyMs)}`;
-  }
-  return `Cron ${s.expr}${s.tz ? ` (${s.tz})` : ""}`;
-}
-
-export function formatCronPayload(job: CronJob) {
-  const p = job.payload;
-  if (p.kind === "systemEvent") {
-    return `System: ${p.text}`;
-  }
-  const base = `Agent: ${p.message}`;
-  const delivery = job.delivery;
-  if (delivery && delivery.mode !== "none") {
-    const target =
-      delivery.mode === "webhook"
-        ? delivery.to
-          ? ` (${delivery.to})`
-          : ""
-        : delivery.channel || delivery.to
-          ? ` (${delivery.channel ?? "last"}${delivery.to ? ` -> ${delivery.to}` : ""})`
-          : "";
-    return `${base} · ${delivery.mode}${target}`;
-  }
-  return base;
 }

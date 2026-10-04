@@ -40,11 +40,6 @@ import {
 } from "./agent-runner-helpers.js";
 import { runMemoryFlushIfNeeded, runPreflightCompactionIfNeeded } from "./agent-runner-memory.js";
 import { buildReplyPayloads } from "./agent-runner-payloads.js";
-import {
-  appendUnscheduledReminderNote,
-  hasSessionRelatedCronJobs,
-  hasUnbackedReminderCommitment,
-} from "./agent-runner-reminder-guard.js";
 import { appendUsageLine, formatResponseUsageLine } from "./agent-runner-usage-line.js";
 import { createAudioAsVoiceBuffer, createBlockReplyPipeline } from "./block-reply-pipeline.js";
 import { resolveEffectiveBlockStreamingConfig } from "./block-streaming.js";
@@ -71,6 +66,46 @@ import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
+
+// DEBLOAT §34: moved from deleted `agent-runner-reminder-guard.ts`.
+// The cron-store lookup (`hasSessionRelatedCronJobs`) is gone with the cron
+// subsystem; only the pure commitment detection + note appending remain.
+export const UNSCHEDULED_REMINDER_NOTE =
+  "Note: I did not schedule a reminder in this turn, so this will not trigger automatically.";
+
+const REMINDER_COMMITMENT_PATTERNS: RegExp[] = [
+  /\b(?:i\s*['’]?ll|i will)\s+(?:make sure to\s+)?(?:remember|remind|ping|follow up|follow-up|check back|circle back)\b/i,
+  /\b(?:i\s*['’]?ll|i will)\s+(?:set|create|schedule)\s+(?:a\s+)?reminder\b/i,
+];
+
+export function hasUnbackedReminderCommitment(text: string): boolean {
+  const normalized = text.toLowerCase();
+  if (!normalized.trim()) {
+    return false;
+  }
+  if (normalized.includes(UNSCHEDULED_REMINDER_NOTE.toLowerCase())) {
+    return false;
+  }
+  return REMINDER_COMMITMENT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function appendUnscheduledReminderNote(payloads: ReplyPayload[]): ReplyPayload[] {
+  let appended = false;
+  return payloads.map((payload) => {
+    if (appended || payload.isError || typeof payload.text !== "string") {
+      return payload;
+    }
+    if (!hasUnbackedReminderCommitment(payload.text)) {
+      return payload;
+    }
+    appended = true;
+    const trimmed = payload.text.trimEnd();
+    return {
+      ...payload,
+      text: `${trimmed}\n\n${UNSCHEDULED_REMINDER_NOTE}`,
+    };
+  });
+}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -622,17 +657,11 @@ export async function runReplyAgent(params: {
         typeof payload.text === "string" &&
         hasUnbackedReminderCommitment(payload.text),
     );
-    // Suppress the guard note when an existing cron job (created in a prior
-    // turn) already covers the commitment — avoids false positives (#32228).
-    const coveredByExistingCron =
-      hasReminderCommitment && successfulCronAdds === 0
-        ? await hasSessionRelatedCronJobs({
-            cronStorePath: cfg.cron?.store,
-            sessionKey,
-          })
-        : false;
+    // DEBLOAT §34: old cron store check removed (cron subsystem deleted).
+    // Reminder commitments are now fulfilled via the `alarm` tool (tracked
+    // in successfulCronAdds); no prior-turn store lookup exists anymore.
     const guardedReplyPayloads =
-      hasReminderCommitment && successfulCronAdds === 0 && !coveredByExistingCron
+      hasReminderCommitment && successfulCronAdds === 0
         ? appendUnscheduledReminderNote(replyPayloads)
         : replyPayloads;
 

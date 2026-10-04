@@ -19,14 +19,12 @@ import type { ChannelHealthMonitor } from "./channel-health-monitor.js";
 import type { ChannelKind } from "./config-reload-plan.js";
 import type { GatewayReloadPlan } from "./config-reload.js";
 import { resolveHooksConfig } from "./hooks.js";
-import { buildGatewayCronService, type GatewayCronState } from "./server-cron.js";
 import type { HookClientIpConfig } from "./server-http.js";
 import { resolveHookClientIpConfig } from "./server/hooks.js";
 
 type GatewayHotReloadState = {
   hooksConfig: ReturnType<typeof resolveHooksConfig>;
   hookClientIpConfig: HookClientIpConfig;
-  cronState: GatewayCronState;
   channelHealthMonitor: ChannelHealthMonitor | null;
 };
 
@@ -43,7 +41,6 @@ export function createGatewayReloadHandlers(params: {
     error: (msg: string) => void;
   };
   logChannels: { info: (msg: string) => void; error: (msg: string) => void };
-  logCron: { error: (msg: string) => void };
   logReload: { info: (msg: string) => void; warn: (msg: string) => void };
   createHealthMonitor: (opts: {
     checkIntervalMs: number;
@@ -69,18 +66,6 @@ export function createGatewayReloadHandlers(params: {
     nextState.hookClientIpConfig = resolveHookClientIpConfig(nextConfig);
 
     resetDirectoryCache();
-
-    if (plan.restartCron) {
-      state.cronState.cron.stop();
-      nextState.cronState = buildGatewayCronService({
-        cfg: nextConfig,
-        deps: params.deps,
-        broadcast: params.broadcast,
-      });
-      void nextState.cronState.cron
-        .start()
-        .catch((err) => params.logCron.error(`failed to start: ${String(err)}`));
-    }
 
     if (plan.restartHealthMonitor) {
       state.channelHealthMonitor?.stop();
@@ -128,7 +113,6 @@ export function createGatewayReloadHandlers(params: {
       }
     }
 
-    setCommandLaneConcurrency(CommandLane.Cron, nextConfig.cron?.maxConcurrentRuns ?? 1);
     setCommandLaneConcurrency(CommandLane.Main, resolveAgentMaxConcurrent(nextConfig));
     setCommandLaneConcurrency(CommandLane.Subagent, resolveSubagentMaxConcurrent(nextConfig));
 

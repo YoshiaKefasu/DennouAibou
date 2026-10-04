@@ -219,7 +219,6 @@ export const sharedVitestConfig = {
       "vitest.cli.config.ts",
       "vitest.config.ts",
       "vitest.contracts.config.ts",
-      "vitest.cron.config.ts",
       "vitest.daemon.config.ts",
       "vitest.e2e.config.ts",
       "vitest.extension-channels.config.ts",

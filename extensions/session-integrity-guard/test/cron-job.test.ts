@@ -1,18 +1,12 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import { describe, expect, it, vi } from "vitest";
 import {
-  INTEGRITY_CRON_NAME,
-  INTEGRITY_CRON_TAG,
+  INTEGRITY_DEFAULT_FREQUENCY,
   INTEGRITY_EVENT_TEXT,
-  reconcileIntegrityCronJob,
-  resolveCronServiceFromStartupEvent,
+  IntegrityScheduler,
   resolveSessionIntegrityConfig,
   runIntegrityHealthCheck,
-  type CronServiceLike,
+  type HealthCheckOutcome,
 } from "../src/cron-job.js";
-
-type ManagedCronJobLike = NonNullable<Awaited<ReturnType<CronServiceLike["list"]>>>[number];
-type CronList = Awaited<ReturnType<CronServiceLike["list"]>>;
 
 function createLogger() {
   return {
@@ -20,67 +14,6 @@ function createLogger() {
     warn: vi.fn(),
     error: vi.fn(),
   };
-}
-
-function createCronHarness(initialJobs: ManagedCronJobLike[] = []) {
-  const jobs: ManagedCronJobLike[] = [...initialJobs];
-  const addCalls: Parameters<CronServiceLike["add"]>[0][] = [];
-  const updateCalls: Array<{ id: string; patch: Parameters<CronServiceLike["update"]>[1] }> = [];
-  const removeCalls: string[] = [];
-
-  const cron: CronServiceLike = {
-    async list() {
-      return jobs.map((job) => ({
-        ...job,
-        ...(job.schedule ? { schedule: { ...job.schedule } } : {}),
-        ...(job.payload ? { payload: { ...job.payload } } : {}),
-      }));
-    },
-    async add(input) {
-      addCalls.push(input);
-      jobs.push({
-        id: `job-${jobs.length + 1}`,
-        name: input.name,
-        description: input.description,
-        enabled: input.enabled,
-        schedule: { ...input.schedule },
-        sessionTarget: input.sessionTarget,
-        wakeMode: input.wakeMode,
-        payload: { ...input.payload },
-        createdAtMs: Date.now(),
-      });
-      return {};
-    },
-    async update(id, patch) {
-      updateCalls.push({ id, patch });
-      const index = jobs.findIndex((entry) => entry.id === id);
-      if (index < 0) {
-        return {};
-      }
-      const current = jobs[index]!;
-      jobs[index] = {
-        ...current,
-        ...(patch.name ? { name: patch.name } : {}),
-        ...(patch.description ? { description: patch.description } : {}),
-        ...(typeof patch.enabled === "boolean" ? { enabled: patch.enabled } : {}),
-        ...(patch.schedule ? { schedule: { ...patch.schedule } } : {}),
-        ...(patch.sessionTarget ? { sessionTarget: patch.sessionTarget } : {}),
-        ...(patch.wakeMode ? { wakeMode: patch.wakeMode } : {}),
-        ...(patch.payload ? { payload: { ...patch.payload } } : {}),
-      };
-      return {};
-    },
-    async remove(id) {
-      removeCalls.push(id);
-      const index = jobs.findIndex((entry) => entry.id === id);
-      if (index >= 0) {
-        jobs.splice(index, 1);
-      }
-      return { removed: true };
-    },
-  };
-
-  return { cron, jobs, addCalls, updateCalls, removeCalls };
 }
 
 describe("resolveSessionIntegrityConfig", () => {
@@ -119,103 +52,82 @@ describe("resolveSessionIntegrityConfig", () => {
   });
 });
 
-describe("resolveCronServiceFromStartupEvent", () => {
-  it("returns null when event is not a gateway startup", () => {
-    expect(resolveCronServiceFromStartupEvent({ type: "agent", action: "startup" })).toBeNull();
+describe("IntegrityScheduler", () => {
+  it("exposes the default frequency constant", () => {
+    expect(INTEGRITY_DEFAULT_FREQUENCY).toBe("0 3 * * *");
   });
 
-  it("extracts cron from context.cron", () => {
-    const cron = {
-      list: async () => [],
-      add: async () => ({}),
-      update: async () => ({}),
-      remove: async () => ({ removed: true }),
+  it("returns false on invalid schedule without throwing", () => {
+    const logger = createLogger();
+    const scheduler = new IntegrityScheduler({
+      schedule: "not-a-cron-expression",
+      logger,
+    });
+    expect(scheduler.start()).toBe(false);
+    expect(scheduler.isRunning).toBe(false);
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("starts with a stub factory and stops cleanly", () => {
+    const logger = createLogger();
+    const stop = vi.fn();
+    const scheduler = new IntegrityScheduler({
+      schedule: "0 3 * * *",
+      logger,
+      cronFactory: () => ({ stop }),
+    });
+    expect(scheduler.start()).toBe(true);
+    expect(scheduler.isRunning).toBe(true);
+    scheduler.stop();
+    expect(scheduler.isRunning).toBe(false);
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("runOnce scans and delivers notify when enabled", async () => {
+    const logger = createLogger();
+    const outcome: HealthCheckOutcome = {
+      scanned: 2,
+      failures: 1,
+      results: [],
+      repairs: [],
+      notifyMessage: "anomaly found",
     };
-    const event = {
-      type: "gateway",
-      action: "startup",
-      context: { cron },
+    const runCheck = vi.fn().mockResolvedValue(outcome);
+    const deliverNotify = vi.fn().mockResolvedValue(undefined);
+    const scheduler = new IntegrityScheduler({
+      schedule: "0 3 * * *",
+      logger,
+      runCheck,
+      deliverNotify,
+      notify: { enabled: true, channel: "telegram", to: "-1001" },
+    });
+    const result = await scheduler.runOnce();
+    expect(result).toBe(outcome);
+    expect(runCheck).toHaveBeenCalledTimes(1);
+    expect(deliverNotify).toHaveBeenCalledTimes(1);
+    expect(deliverNotify.mock.calls[0]?.[0]).toBe("anomaly found");
+  });
+
+  it("runOnce skips delivery when notify is disabled", async () => {
+    const logger = createLogger();
+    const outcome: HealthCheckOutcome = {
+      scanned: 1,
+      failures: 0,
+      results: [],
+      repairs: [],
+      notifyMessage: null,
     };
-    expect(resolveCronServiceFromStartupEvent(event)).toBe(cron);
-  });
-});
-
-describe("reconcileIntegrityCronJob", () => {
-  it("returns unavailable when cron is null", async () => {
-    const result = await reconcileIntegrityCronJob({
-      cron: null,
-      config: resolveSessionIntegrityConfig({}),
-      logger: createLogger(),
+    const runCheck = vi.fn().mockResolvedValue(outcome);
+    const deliverNotify = vi.fn().mockResolvedValue(undefined);
+    const scheduler = new IntegrityScheduler({
+      schedule: "0 3 * * *",
+      logger,
+      runCheck,
+      deliverNotify,
+      notify: { enabled: false, channel: "discord" },
     });
-    expect(result).toEqual({ status: "unavailable", removed: 0 });
-  });
-
-  it("creates the managed job when none exist", async () => {
-    const harness = createCronHarness();
-    const result = await reconcileIntegrityCronJob({
-      cron: harness.cron,
-      config: resolveSessionIntegrityConfig({}),
-      logger: createLogger(),
-    });
-    expect(result.status).toBe("added");
-    expect(harness.addCalls).toHaveLength(1);
-    const desired = harness.addCalls[0]!;
-    expect(desired.name).toBe(INTEGRITY_CRON_NAME);
-    expect(desired.description).toContain(INTEGRITY_CRON_TAG);
-    expect(desired.schedule).toEqual({ kind: "cron", expr: "0 3 * * *" });
-    expect(desired.payload).toEqual({ kind: "systemEvent", text: INTEGRITY_EVENT_TEXT });
-    expect(desired.sessionTarget).toBe("main");
-    expect(desired.wakeMode).toBe("next-heartbeat");
-  });
-
-  it("no-ops when the managed job already matches the desired config", async () => {
-    const config = resolveSessionIntegrityConfig({});
-    // description must match the formatter output exactly: `describeJob(config)`
-    // uses the same default cron expr / tag.
-    const harness = createCronHarness([
-      {
-        id: "job-1",
-        name: INTEGRITY_CRON_NAME,
-        description: `${INTEGRITY_CRON_TAG} Daily session integrity scan at "0 3 * * *".`,
-        enabled: true,
-        schedule: { kind: "cron", expr: "0 3 * * *" },
-        sessionTarget: "main",
-        wakeMode: "next-heartbeat",
-        payload: { kind: "systemEvent", text: INTEGRITY_EVENT_TEXT },
-        createdAtMs: 1,
-      },
-    ]);
-    const result = await reconcileIntegrityCronJob({
-      cron: harness.cron,
-      config,
-      logger: createLogger(),
-    });
-    expect(result.status).toBe("noop");
-    expect(harness.updateCalls).toHaveLength(0);
-    expect(harness.addCalls).toHaveLength(0);
-  });
-
-  it("removes the managed job when disabled", async () => {
-    const harness = createCronHarness([
-      {
-        id: "job-1",
-        name: INTEGRITY_CRON_NAME,
-        description: `${INTEGRITY_CRON_TAG} Daily session integrity scan at "0 3 * * *".`,
-        enabled: true,
-        schedule: { kind: "cron", expr: "0 3 * * *" },
-        sessionTarget: "main",
-        wakeMode: "next-heartbeat",
-        payload: { kind: "systemEvent", text: INTEGRITY_EVENT_TEXT },
-        createdAtMs: 1,
-      },
-    ]);
-    const result = await reconcileIntegrityCronJob({
-      cron: harness.cron,
-      config: resolveSessionIntegrityConfig({ pluginConfig: { enabled: false } }),
-      logger: createLogger(),
-    });
-    expect(result.status).toBe("disabled");
-    expect(harness.removeCalls).toEqual(["job-1"]);
+    await scheduler.runOnce();
+    expect(deliverNotify).not.toHaveBeenCalled();
   });
 });
 
@@ -231,18 +143,8 @@ describe("runIntegrityHealthCheck", () => {
       expect(logger.info).toHaveBeenCalled();
     }
   });
+
+  it("keeps the manual trigger event text stable", () => {
+    expect(INTEGRITY_EVENT_TEXT).toBe("__openclaw_session_integrity_health_check__");
+  });
 });
-
-// Type-only sanity: ensure the harness return types stay in lock-step with
-// the cron service type exported by the plugin (caught at compile time but
-// re-asserted here for documentation).
-const _typeCheck: CronList = [] as Awaited<ReturnType<CronServiceLike["list"]>>;
-void _typeCheck;
-
-// Compile-time sanity: OpenClawPluginApi surface used by register() exists.
-const _apiShape: Pick<OpenClawPluginApi, "registerHook" | "on" | "logger"> = {
-  registerHook: () => undefined,
-  on: () => undefined,
-  logger: createLogger(),
-};
-void _apiShape;

@@ -64,7 +64,6 @@ const PREFIX_RULES: Array<{ prefix: string; tags: ConfigTag[] }> = [
   { prefix: "models.", tags: ["models"] },
   { prefix: "diagnostics.", tags: ["observability"] },
   { prefix: "logging.", tags: ["observability"] },
-  { prefix: "cron.", tags: ["automation"] },
   { prefix: "talk.", tags: ["media"] },
   { prefix: "audio.", tags: ["media"] },
 ];
@@ -82,7 +81,7 @@ const KEYWORD_RULES: Array<{ pattern: RegExp; tags: ConfigTag[] }> = [
 
 const MODEL_PATH_PATTERN = /(^|\.)(model|models|modelid|imagemodel)(\.|$)/i;
 const MEDIA_PATH_PATTERN = /(tools\.media\.|^audio\.|^talk\.|image|video|stt|tts)/i;
-const AUTOMATION_PATH_PATTERN = /(cron|heartbeat|schedule|onstart|watchdebounce)/i;
+const AUTOMATION_PATH_PATTERN = /(heartbeat|schedule|onstart|watchdebounce)/i;
 const AUTH_KEYWORD_PATTERN = /(token|password|secret|api[_.-]?key|credential|oauth)/i;
 
 function normalizeTag(tag: string): ConfigTag | null {

@@ -2,14 +2,11 @@ import { html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../format.ts";
-import { formatNextRun } from "../presenter.ts";
-import type { SessionsListResult, SkillStatusReport, CronJob, CronStatus } from "../types.ts";
+import type { SessionsListResult, SkillStatusReport } from "../types.ts";
 
 export type OverviewCardsProps = {
   sessionsResult: SessionsListResult | null;
   skillsReport: SkillStatusReport | null;
-  cronJobs: CronJob[];
-  cronStatus: CronStatus | null;
   presenceCount: number;
   onNavigate: (tab: string) => void;
 };
@@ -69,25 +66,6 @@ export function renderOverviewCards(props: OverviewCardsProps) {
   const blockedSkills = skills.filter((s) => s.blockedByAllowlist).length;
   const totalSkills = skills.length;
 
-  const cronEnabled = props.cronStatus?.enabled ?? null;
-  const cronNext = props.cronStatus?.nextWakeAtMs ?? null;
-  const cronJobCount = props.cronJobs.length;
-  const failedCronCount = props.cronJobs.filter((j) => j.state?.lastStatus === "error").length;
-
-  const cronValue =
-    cronEnabled == null
-      ? t("common.na")
-      : cronEnabled
-        ? `${cronJobCount} jobs`
-        : t("common.disabled");
-
-  const cronHint =
-    failedCronCount > 0
-      ? html`<span class="danger">${failedCronCount} failed</span>`
-      : cronNext
-        ? t("overview.stats.cronNext", { time: formatNextRun(cronNext) })
-        : "";
-
   const cards: StatCard[] = [
     {
       kind: "sessions",
@@ -102,13 +80,6 @@ export function renderOverviewCards(props: OverviewCardsProps) {
       label: t("overview.cards.skills"),
       value: `${enabledSkills}/${totalSkills}`,
       hint: blockedSkills > 0 ? `${blockedSkills} blocked` : `${enabledSkills} active`,
-    },
-    {
-      kind: "cron",
-      tab: "cron",
-      label: t("overview.stats.cron"),
-      value: cronValue,
-      hint: cronHint,
     },
   ];
 

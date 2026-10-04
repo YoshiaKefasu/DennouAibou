@@ -5,7 +5,6 @@ import type { DiagnosticsConfig, LoggingConfig, SessionConfig, WebConfig } from 
 import type { BrowserConfig } from "./types.browser.js";
 import type { ChannelsConfig } from "./types.channels.js";
 import type { CliConfig } from "./types.cli.js";
-import type { CronConfig } from "./types.cron.js";
 import type {
   CanvasHostConfig,
   DiscoveryConfig,
@@ -121,7 +120,12 @@ export type OpenClawConfig = {
   session?: SessionConfig;
   web?: WebConfig;
   channels?: ChannelsConfig;
-  cron?: CronConfig;
+  /**
+   * @deprecated Old Gateway cron subsystem was removed in DEBLOAT §34
+   * (replaced by the `dennou-alarm` plugin). Accepted and ignored;
+   * nothing reads this key.
+   */
+  cron?: unknown;
   hooks?: HooksConfig;
   discovery?: DiscoveryConfig;
   canvasHost?: CanvasHostConfig;

@@ -487,27 +487,6 @@ function collectMediaRequestAssignments(params: {
   }
 }
 
-function collectCronAssignments(params: {
-  config: OpenClawConfig;
-  defaults: SecretDefaults | undefined;
-  context: ResolverContext;
-}): void {
-  const cron = params.config.cron as Record<string, unknown> | undefined;
-  if (!isRecord(cron)) {
-    return;
-  }
-  collectSecretInputAssignment({
-    value: cron.webhookToken,
-    path: "cron.webhookToken",
-    expected: "string",
-    defaults: params.defaults,
-    context: params.context,
-    apply: (value) => {
-      cron.webhookToken = value;
-    },
-  });
-}
-
 export function collectCoreConfigAssignments(params: {
   config: OpenClawConfig;
   defaults: SecretDefaults | undefined;
@@ -534,6 +513,5 @@ export function collectCoreConfigAssignments(params: {
   collectAgentMemorySearchAssignments(params);
   collectTalkAssignments(params);
   collectGatewayAssignments(params);
-  collectCronAssignments(params);
   collectMediaRequestAssignments(params);
 }

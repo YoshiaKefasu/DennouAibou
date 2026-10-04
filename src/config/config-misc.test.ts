@@ -289,55 +289,16 @@ describe("gateway.channelHealthCheckMinutes", () => {
   });
 });
 
-describe("cron webhook schema", () => {
-  it("accepts cron.webhookToken and legacy cron.webhook", () => {
-    const res = OpenClawSchema.safeParse({
-      cron: {
-        enabled: true,
-        webhook: "https://example.invalid/legacy-cron-webhook",
-        webhookToken: "secret-token",
-      },
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("accepts cron.webhookToken SecretRef values", () => {
-    const res = OpenClawSchema.safeParse({
-      cron: {
-        webhook: "https://example.invalid/legacy-cron-webhook",
-        webhookToken: {
-          source: "env",
-          provider: "default",
-          id: "CRON_WEBHOOK_TOKEN",
-        },
-      },
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("rejects non-http cron.webhook URLs", () => {
-    const res = OpenClawSchema.safeParse({
-      cron: {
-        webhook: "ftp://example.invalid/legacy-cron-webhook",
-      },
-    });
-
-    expect(res.success).toBe(false);
-  });
-
-  it("accepts cron.retry config", () => {
-    const res = OpenClawSchema.safeParse({
-      cron: {
-        retry: {
-          maxAttempts: 5,
-          backoffMs: [60000, 120000, 300000],
-          retryOn: ["rate_limit", "overloaded", "network"],
-        },
-      },
-    });
-    expect(res.success).toBe(true);
+describe("deprecated cron keys (DEBLOAT §34)", () => {
+  it("accepts leftover cron keys in any shape (OpenClawSchema.safeParse)", () => {
+    for (const cfg of [
+      { cron: { enabled: true, store: "/tmp/cron.json", maxConcurrentRuns: 2 } },
+      { cron: { webhook: "https://example.invalid/legacy-cron-webhook" } },
+      { cron: { sessionRetention: "24h" } },
+      {},
+    ]) {
+      expect(OpenClawSchema.safeParse(cfg).success).toBe(true);
+    }
   });
 });
 

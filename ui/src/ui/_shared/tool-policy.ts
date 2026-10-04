@@ -36,7 +36,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
   ],
   ui: [],
   messaging: [],
-  automation: ["cron"],
+  automation: [],
   nodes: ["nodes"],
   agents: ["subagents"],
   media: ["media_understand"],

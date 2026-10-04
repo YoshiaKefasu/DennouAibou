@@ -19,7 +19,7 @@
  *     (静的アーキテクチャ不変条件)
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -166,8 +166,8 @@ describe("B) isProtectedSessionKey truth table", () => {
 //
 //   - 自動リセット計算ロジックを提供する関数が `reset.ts` から消えている
 //   - 受信パス (`auto-reply/reply/session.ts`) から自動リセット判定が消えている
-//   - cron / webhook パス (`cron/isolated-agent/session.ts`) から自動リセット
-//     判定が消えている
+//   - cron subsystem (`src/cron/`) was removed entirely (DEBLOAT §34),
+//     so no auto-reset call can hide in `cron/isolated-agent/session.ts`
 //   - コマンド解決パス (`agents/command/session.ts`) から自動リセット判定が
 //     消えている
 //   - `DEFAULT_IDLE_MINUTES` 定数が `config/sessions/types.ts` から消えている
@@ -214,11 +214,11 @@ describe("C) automatic session reset machinery has been removed from the runtime
     expect(src).not.toMatch(/\bSessionFreshness\b/);
   });
 
-  it("cron / isolated-agent path no longer calls the auto-reset policy / freshness API", () => {
-    const src = readSrc("./../../cron/isolated-agent/session.ts");
-    expect(src).not.toMatch(/\bresolveSessionResetPolicy\s*\(/);
-    expect(src).not.toMatch(/\bevaluateSessionFreshness\s*\(/);
-    expect(src).not.toMatch(/\bresolveProtectedSessionResetPolicy\s*\(/);
+  it("cron / isolated-agent path was removed with the cron subsystem (DEBLOAT §34)", () => {
+    // The old `src/cron/isolated-agent/session.ts` no longer exists, so no
+    // auto-reset call can hide there. Assert absence instead of content.
+    expect(existsSync(path.join(__dirname, "./../../cron/isolated-agent/session.ts"))).toBe(false);
+    expect(existsSync(path.join(__dirname, "./../../cron"))).toBe(false);
   });
 
   it("agents/command session resolution no longer calls the auto-reset policy / freshness API", () => {

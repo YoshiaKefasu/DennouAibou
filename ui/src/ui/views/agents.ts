@@ -5,23 +5,17 @@ import type {
   AgentsFilesListResult,
   AgentsListResult,
   ChannelsStatusSnapshot,
-  CronJob,
-  CronStatus,
   ModelCatalogEntry,
   SkillStatusReport,
   ToolsCatalogResult,
   ToolsEffectiveResult,
 } from "../types.ts";
 import { renderAgentOverview } from "./agents-panels-overview.ts";
-import {
-  renderAgentFiles,
-  renderAgentChannels,
-  renderAgentCron,
-} from "./agents-panels-status-files.ts";
+import { renderAgentFiles, renderAgentChannels } from "./agents-panels-status-files.ts";
 import { renderAgentTools, renderAgentSkills } from "./agents-panels-tools-skills.ts";
 import { agentBadgeText, buildAgentContext, normalizeAgentLabel } from "./agents-utils.ts";
 
-export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels";
 
 export type ConfigState = {
   form: Record<string, unknown> | null;
@@ -35,13 +29,6 @@ export type ChannelsState = {
   loading: boolean;
   error: string | null;
   lastSuccess: number | null;
-};
-
-export type CronState = {
-  status: CronStatus | null;
-  jobs: CronJob[];
-  loading: boolean;
-  error: string | null;
 };
 
 export type AgentFilesState = {
@@ -83,7 +70,6 @@ export type AgentsProps = {
   activePanel: AgentsPanel;
   config: ConfigState;
   channels: ChannelsState;
-  cron: CronState;
   agentFiles: AgentFilesState;
   agentIdentityLoading: boolean;
   agentIdentityError: string | null;
@@ -109,8 +95,6 @@ export type AgentsProps = {
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
   onChannelsRefresh: () => void;
-  onCronRefresh: () => void;
-  onCronRunNow: (jobId: string) => void;
   onSkillsFilterChange: (next: string) => void;
   onSkillsRefresh: () => void;
   onAgentSkillToggle: (agentId: string, skillName: string, enabled: boolean) => void;
@@ -134,14 +118,10 @@ export function renderAgents(props: AgentsProps) {
   const channelEntryCount = props.channels.snapshot
     ? Object.keys(props.channels.snapshot.channelAccounts ?? {}).length
     : null;
-  const cronJobCount = selectedId
-    ? props.cron.jobs.filter((j) => j.agentId === selectedId).length
-    : null;
   const tabCounts: Record<string, number | null> = {
     files: props.agentFiles.list?.files?.length ?? null,
     skills: selectedSkillCount,
     channels: channelEntryCount,
-    cron: cronJobCount || null,
   };
 
   return html`
@@ -317,25 +297,6 @@ export function renderAgents(props: AgentsProps) {
                     onSelectPanel: props.onSelectPanel,
                   })
                 : nothing}
-              ${props.activePanel === "cron"
-                ? renderAgentCron({
-                    context: buildAgentContext(
-                      selectedAgent,
-                      props.config.form,
-                      props.agentFiles.list,
-                      defaultId,
-                      props.agentIdentityById[selectedAgent.id] ?? null,
-                    ),
-                    agentId: selectedAgent.id,
-                    jobs: props.cron.jobs,
-                    status: props.cron.status,
-                    loading: props.cron.loading,
-                    error: props.cron.error,
-                    onRefresh: props.onCronRefresh,
-                    onRunNow: props.onCronRunNow,
-                    onSelectPanel: props.onSelectPanel,
-                  })
-                : nothing}
             `}
       </section>
     </div>
@@ -353,7 +314,6 @@ function renderAgentTabs(
     { id: "tools", label: "Tools" },
     { id: "skills", label: "Skills" },
     { id: "channels", label: "Channels" },
-    { id: "cron", label: "Cron Jobs" },
   ];
   return html`
     <div class="agent-tabs">

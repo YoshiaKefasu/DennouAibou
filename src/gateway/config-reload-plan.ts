@@ -10,7 +10,6 @@ export type GatewayReloadPlan = {
   hotReasons: string[];
   reloadHooks: boolean;
   restartGmailWatcher: boolean;
-  restartCron: boolean;
   restartHealthMonitor: boolean;
   restartChannels: Set<ChannelKind>;
   noopPaths: string[];
@@ -25,7 +24,6 @@ type ReloadRule = {
 type ReloadAction =
   | "reload-hooks"
   | "restart-gmail-watcher"
-  | "restart-cron"
   | "restart-health-monitor"
   | `restart-channel:${ChannelId}`;
 
@@ -57,7 +55,9 @@ const BASE_RELOAD_RULES: ReloadRule[] = [
   { prefix: "models", kind: "none" },
   { prefix: "agents.list", kind: "none" },
   { prefix: "agent.heartbeat", kind: "none" },
-  { prefix: "cron", kind: "hot", actions: ["restart-cron"] },
+  // DEBLOAT §34: old cron subsystem removed. Leftover `cron` keys are
+  // accepted by the deprecated config schema and ignored (no restart).
+  { prefix: "cron", kind: "none" },
 ];
 
 const BASE_RELOAD_RULES_TAIL: ReloadRule[] = [
@@ -158,7 +158,6 @@ export function buildGatewayReloadPlan(changedPaths: string[]): GatewayReloadPla
     hotReasons: [],
     reloadHooks: false,
     restartGmailWatcher: false,
-    restartCron: false,
     restartHealthMonitor: false,
     restartChannels: new Set(),
     noopPaths: [],
@@ -176,9 +175,6 @@ export function buildGatewayReloadPlan(changedPaths: string[]): GatewayReloadPla
         break;
       case "restart-gmail-watcher":
         plan.restartGmailWatcher = true;
-        break;
-      case "restart-cron":
-        plan.restartCron = true;
         break;
       case "restart-health-monitor":
         plan.restartHealthMonitor = true;

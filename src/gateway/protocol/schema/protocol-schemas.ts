@@ -65,17 +65,6 @@ import {
   ConfigSetParamsSchema,
 } from "./config.js";
 import {
-  CronAddParamsSchema,
-  CronJobSchema,
-  CronListParamsSchema,
-  CronRemoveParamsSchema,
-  CronRunLogEntrySchema,
-  CronRunParamsSchema,
-  CronRunsParamsSchema,
-  CronStatusParamsSchema,
-  CronUpdateParamsSchema,
-} from "./cron.js";
-import {
   DevicePairApproveParamsSchema,
   DevicePairListParamsSchema,
   DevicePairRemoveParamsSchema,
@@ -282,15 +271,6 @@ export const ProtocolSchemas = {
   SkillsBinsResult: SkillsBinsResultSchema,
   SkillsInstallParams: SkillsInstallParamsSchema,
   SkillsUpdateParams: SkillsUpdateParamsSchema,
-  CronJob: CronJobSchema,
-  CronListParams: CronListParamsSchema,
-  CronStatusParams: CronStatusParamsSchema,
-  CronAddParams: CronAddParamsSchema,
-  CronUpdateParams: CronUpdateParamsSchema,
-  CronRemoveParams: CronRemoveParamsSchema,
-  CronRunParams: CronRunParamsSchema,
-  CronRunsParams: CronRunsParamsSchema,
-  CronRunLogEntry: CronRunLogEntrySchema,
   LogsTailParams: LogsTailParamsSchema,
   LogsTailResult: LogsTailResultSchema,
   ExecApprovalsGetParams: ExecApprovalsGetParamsSchema,

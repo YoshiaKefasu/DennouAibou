@@ -3,7 +3,6 @@ import path from "node:path";
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
-import "../cron/isolated-agent.mocks.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../agents/agent-scope.js";
 import { resolveSession } from "../agents/command/session.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
@@ -24,6 +23,18 @@ import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../plug
 import type { RuntimeEnv } from "../runtime.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { agentCommand, agentCommandFromIngress } from "./agent.js";
+
+// Mocks previously provided via deleted `src/cron/isolated-agent.mocks.js`
+// (DEBLOAT §34 removed the cron subsystem including that helper).
+vi.mock("../agents/pi-embedded.js", () => ({
+  abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
+  runEmbeddedPiAgent: vi.fn(),
+  resolveEmbeddedSessionLane: (key: string) => `session:${key.trim() || "main"}`,
+}));
+
+vi.mock("../agents/model-catalog.js", () => ({
+  loadModelCatalog: vi.fn(),
+}));
 
 vi.mock("../logging/subsystem.js", () => {
   const createMockLogger = () => ({

@@ -184,12 +184,6 @@ const sectionIcons = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
     </svg>
   `,
-  cron: html`
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="12" cy="12" r="10"></circle>
-      <polyline points="12 6 12 12 16 14"></polyline>
-    </svg>
-  `,
   web: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <circle cx="12" cy="12" r="10"></circle>
@@ -304,7 +298,6 @@ export const SECTION_META: Record<string, { label: string; description: string }
   broadcast: { label: "Broadcast", description: "Broadcast and notification settings" },
   audio: { label: "Audio", description: "Audio input/output settings" },
   session: { label: "Session", description: "Session management and persistence" },
-  cron: { label: "Cron", description: "Scheduled tasks and automation" },
   web: { label: "Web", description: "Web server and API settings" },
   discovery: { label: "Discovery", description: "Service discovery and networking" },
   canvasHost: { label: "Canvas Host", description: "Canvas rendering and display" },

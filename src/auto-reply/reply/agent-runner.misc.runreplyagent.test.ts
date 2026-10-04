@@ -91,14 +91,6 @@ vi.mock("./queue.js", () => {
   };
 });
 
-const loadCronStoreMock = vi.fn();
-vi.mock("../../cron/store.js", () => {
-  return {
-    loadCronStore: (...args: unknown[]) => loadCronStoreMock(...args),
-    resolveCronStorePath: (storePath?: string) => storePath ?? "/tmp/openclaw-cron-store.json",
-  };
-});
-
 vi.mock("../../agents/subagent-registry.js", () => ({
   getLatestSubagentRunByChildSessionKey: () => null,
   listSubagentRunsForController: () => [],
@@ -122,9 +114,6 @@ beforeEach(() => {
   clearSessionQueuesMock.mockReturnValue({ followupCleared: 0, laneCleared: 0, keys: [] });
   refreshQueuedFollowupSessionMock.mockReset();
   refreshQueuedFollowupSessionMock.mockResolvedValue(undefined);
-  loadCronStoreMock.mockClear();
-  // Default: no cron jobs in store.
-  loadCronStoreMock.mockResolvedValue({ version: 1, jobs: [] });
   resetSystemEventsForTest();
 
   // Default: no provider switch; execute the chosen provider+model.
@@ -1808,21 +1797,10 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
   });
 
-  it("suppresses guard note when session already has an active cron job", async () => {
-    loadCronStoreMock.mockResolvedValueOnce({
-      version: 1,
-      jobs: [
-        {
-          id: "existing-job",
-          name: "monitor-task",
-          enabled: true,
-          sessionKey: "main",
-          createdAtMs: Date.now() - 60_000,
-          updatedAtMs: Date.now() - 60_000,
-        },
-      ],
-    });
-
+  it("appends guard note when no reminder tool ran (no prior-turn store lookup)", async () => {
+    // DEBLOAT §34: the cron store is gone, so a reminder created in a prior
+    // turn can no longer suppress the note. Only a same-turn alarm tool
+    // success (successfulCronAdds > 0) suppresses it.
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "I'll ping you when it's done." }],
       meta: {},
@@ -1831,25 +1809,11 @@ describe("runReplyAgent reminder commitment guard", () => {
 
     const result = await createRun();
     expect(result).toMatchObject({
-      text: "I'll ping you when it's done.",
+      text: "I'll ping you when it's done.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
     });
   });
 
   it("still appends guard note when cron jobs exist but not for the current session", async () => {
-    loadCronStoreMock.mockResolvedValueOnce({
-      version: 1,
-      jobs: [
-        {
-          id: "unrelated-job",
-          name: "daily-news",
-          enabled: true,
-          sessionKey: "other-session",
-          createdAtMs: Date.now() - 60_000,
-          updatedAtMs: Date.now() - 60_000,
-        },
-      ],
-    });
-
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "I'll remind you tomorrow morning." }],
       meta: {},
@@ -1863,20 +1827,6 @@ describe("runReplyAgent reminder commitment guard", () => {
   });
 
   it("still appends guard note when cron jobs for session exist but are disabled", async () => {
-    loadCronStoreMock.mockResolvedValueOnce({
-      version: 1,
-      jobs: [
-        {
-          id: "disabled-job",
-          name: "old-monitor",
-          enabled: false,
-          sessionKey: "main",
-          createdAtMs: Date.now() - 60_000,
-          updatedAtMs: Date.now() - 60_000,
-        },
-      ],
-    });
-
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "I'll check back in an hour." }],
       meta: {},
@@ -1890,20 +1840,6 @@ describe("runReplyAgent reminder commitment guard", () => {
   });
 
   it("still appends guard note when sessionKey is missing", async () => {
-    loadCronStoreMock.mockResolvedValueOnce({
-      version: 1,
-      jobs: [
-        {
-          id: "existing-job",
-          name: "monitor-task",
-          enabled: true,
-          sessionKey: "main",
-          createdAtMs: Date.now() - 60_000,
-          updatedAtMs: Date.now() - 60_000,
-        },
-      ],
-    });
-
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "I'll ping you later." }],
       meta: {},
@@ -1916,9 +1852,7 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
   });
 
-  it("still appends guard note when cron store read fails", async () => {
-    loadCronStoreMock.mockRejectedValueOnce(new Error("store read failed"));
-
+  it("appends guard note when no reminder tool ran this turn", async () => {
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "I'll remind you after lunch." }],
       meta: {},

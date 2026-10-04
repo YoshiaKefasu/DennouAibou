@@ -78,23 +78,6 @@ import {
   ConfigSetParamsSchema,
   type ConnectParams,
   ConnectParamsSchema,
-  type CronAddParams,
-  CronAddParamsSchema,
-  type CronJob,
-  CronJobSchema,
-  type CronListParams,
-  CronListParamsSchema,
-  type CronRemoveParams,
-  CronRemoveParamsSchema,
-  type CronRunLogEntry,
-  type CronRunParams,
-  CronRunParamsSchema,
-  type CronRunsParams,
-  CronRunsParamsSchema,
-  type CronStatusParams,
-  CronStatusParamsSchema,
-  type CronUpdateParams,
-  CronUpdateParamsSchema,
   type DevicePairApproveParams,
   DevicePairApproveParamsSchema,
   type DevicePairListParams,
@@ -394,13 +377,6 @@ export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBins
 export const validateSkillsInstallParams =
   ajv.compile<SkillsInstallParams>(SkillsInstallParamsSchema);
 export const validateSkillsUpdateParams = ajv.compile<SkillsUpdateParams>(SkillsUpdateParamsSchema);
-export const validateCronListParams = ajv.compile<CronListParams>(CronListParamsSchema);
-export const validateCronStatusParams = ajv.compile<CronStatusParams>(CronStatusParamsSchema);
-export const validateCronAddParams = ajv.compile<CronAddParams>(CronAddParamsSchema);
-export const validateCronUpdateParams = ajv.compile<CronUpdateParams>(CronUpdateParamsSchema);
-export const validateCronRemoveParams = ajv.compile<CronRemoveParams>(CronRemoveParamsSchema);
-export const validateCronRunParams = ajv.compile<CronRunParams>(CronRunParamsSchema);
-export const validateCronRunsParams = ajv.compile<CronRunsParams>(CronRunsParamsSchema);
 export const validateDevicePairListParams = ajv.compile<DevicePairListParams>(
   DevicePairListParamsSchema,
 );
@@ -580,14 +556,6 @@ export {
   ToolsEffectiveParamsSchema,
   SkillsInstallParamsSchema,
   SkillsUpdateParamsSchema,
-  CronJobSchema,
-  CronListParamsSchema,
-  CronStatusParamsSchema,
-  CronAddParamsSchema,
-  CronUpdateParamsSchema,
-  CronRemoveParamsSchema,
-  CronRunParamsSchema,
-  CronRunsParamsSchema,
   LogsTailParamsSchema,
   LogsTailResultSchema,
   ExecApprovalsGetParamsSchema,
@@ -696,15 +664,6 @@ export type {
   SessionsResetParams,
   SessionsDeleteParams,
   SessionsCompactParams,
-  CronJob,
-  CronListParams,
-  CronStatusParams,
-  CronAddParams,
-  CronUpdateParams,
-  CronRemoveParams,
-  CronRunParams,
-  CronRunsParams,
-  CronRunLogEntry,
   ExecApprovalsGetParams,
   ExecApprovalsSetParams,
   ExecApprovalsSnapshot,

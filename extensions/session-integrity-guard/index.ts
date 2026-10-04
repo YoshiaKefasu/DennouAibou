@@ -1,28 +1,22 @@
 /**
- * Session Integrity Guard — Phase 2 plugin skeleton + Phase 3 repair / notify.
+ * Session Integrity Guard — autonomous plugin entry (DEBLOAT §34).
  *
- * Phase 2: registers a single daily cron job that wakes the main session with a
- * `systemEvent` payload; the `before_agent_reply` handler reads the payload and
- * runs the four-metric integrity scan over every session JSONL file in the
- * default session directory for `cwd`.
+ * The old Gateway cron coupling (`cron.add` via `gateway:startup`) was removed
+ * with the `src/cron/` subsystem. The guard now runs as a self-contained
+ * `registerService` backed by `IntegrityScheduler` (croner): on fire it scans
+ * session JSONL files directly and delivers anomaly notifications via
+ * `deliverOutboundPayloads` — no kernel cron service involved.
  *
- * Phase 3 additions (DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §4.4, §4.5, §7):
- *   - The same `before_agent_reply` handler also drives the auto-repair
- *     pipeline (`autoRepair: true` in plugin config) and produces a notify
- *     payload so a separate announce cron can publish Discord / Telegram
- *     notifications.
- *   - Startup reconciliation also registers an announce cron job with
- *     `delivery: { mode: "announce" | "none" }`.
- *
- * Design reference: DENNOU_DOCS/SESSION_INTEGRITY_GUARD.md §4.
+ * The `before_agent_reply` hook remains as a manual trigger path: when the
+ * agent session receives the integrity event text on heartbeat, the same
+ * health check runs inline.
  */
 
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import {
+  INTEGRITY_DEFAULT_FREQUENCY,
   INTEGRITY_EVENT_TEXT,
-  reconcileIntegrityCronJob,
-  reconcileIntegrityNotifyCronJob,
-  resolveCronServiceFromStartupEvent,
+  IntegrityScheduler,
   resolveSessionIntegrityConfig,
   runIntegrityHealthCheck,
 } from "./src/cron-job.js";
@@ -38,19 +32,19 @@ function resolvePluginConfig(
 }
 
 export {
-  reconcileIntegrityCronJob,
-  reconcileIntegrityNotifyCronJob,
-  resolveCronServiceFromStartupEvent,
+  INTEGRITY_DEFAULT_FREQUENCY,
+  INTEGRITY_EVENT_TEXT,
+  IntegrityScheduler,
   resolveSessionIntegrityConfig,
   runIntegrityHealthCheck,
-  INTEGRITY_EVENT_TEXT,
 } from "./src/cron-job.js";
 
 export type {
-  CronServiceLike,
   HealthCheckOutcome,
-  ReconcileNotifyResult,
-  ReconcileResult,
+  IntegrityCronFactory,
+  IntegrityCronJob,
+  IntegrityNotifyDeliver,
+  IntegritySchedulerOptions,
   SessionIntegrityConfig,
 } from "./src/cron-job.js";
 
@@ -81,39 +75,41 @@ export default definePluginEntry({
   id: "session-integrity-guard",
   name: "Session Integrity Guard",
   description:
-    "Periodic health check + auto-repair + Discord/Telegram notify for session JSONL integrity (Phase 3)",
+    "Periodic health check + auto-repair + Discord/Telegram notify for session JSONL integrity (autonomous scheduler)",
   kind: "memory",
   register(api) {
     const config = resolveSessionIntegrityConfig({ pluginConfig: resolvePluginConfig(api) });
 
-    api.registerHook(
-      "gateway:startup",
-      async (event: unknown) => {
-        try {
-          const cron = resolveCronServiceFromStartupEvent(event);
-          if (!cron && config.enabled) {
-            api.logger.warn(
-              "session-integrity-guard: cron service unavailable; managed job not reconciled.",
-            );
-          }
-          await reconcileIntegrityCronJob({
-            cron,
-            config,
-            logger: api.logger,
-          });
-          await reconcileIntegrityNotifyCronJob({
-            cron,
-            config,
-            logger: api.logger,
-          });
-        } catch (err) {
-          api.logger.error(
-            `session-integrity-guard: startup reconciliation failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
+    let scheduler: IntegrityScheduler | undefined;
+    api.registerService({
+      id: "session-integrity-guard-scheduler",
+      start(ctx) {
+        // Guard against double-start (e.g. hot reload).
+        scheduler?.stop();
+        scheduler = undefined;
+        if (!config.enabled) {
+          api.logger.info("session-integrity-guard: disabled by config.");
+          return;
         }
+        const next = new IntegrityScheduler({
+          schedule: config.cron,
+          ...(config.timezone ? { timezone: config.timezone } : {}),
+          autoRepair: config.autoRepair,
+          notify: config.notify,
+          cfg: ctx.config,
+          logger: api.logger,
+        });
+        if (!next.start()) {
+          return;
+        }
+        scheduler = next;
+        api.logger.info(`session-integrity-guard: scheduler started (${config.cron}).`);
       },
-      { name: "session-integrity-guard-cron" },
-    );
+      stop() {
+        scheduler?.stop();
+        scheduler = undefined;
+      },
+    });
 
     api.on("before_agent_reply", async (event, ctx) => {
       try {

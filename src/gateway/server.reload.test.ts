@@ -19,19 +19,6 @@ import {
 } from "./test-helpers.js";
 
 const hoisted = vi.hoisted(() => {
-  const cronInstances: Array<{
-    start: ReturnType<typeof vi.fn>;
-    stop: ReturnType<typeof vi.fn>;
-  }> = [];
-
-  class CronServiceMock {
-    start = vi.fn(async () => {});
-    stop = vi.fn();
-    constructor() {
-      cronInstances.push(this);
-    }
-  }
-
   const startGmailWatcher = vi.fn(async () => ({ started: true }));
   const stopGmailWatcher = vi.fn(async () => {});
 
@@ -123,8 +110,6 @@ const hoisted = vi.hoisted(() => {
   );
 
   return {
-    CronService: CronServiceMock,
-    cronInstances,
     startGmailWatcher,
     stopGmailWatcher,
     providerManager,
@@ -135,10 +120,6 @@ const hoisted = vi.hoisted(() => {
     getOnRestart: () => onRestart,
   };
 });
-
-vi.mock("../cron/service.js", () => ({
-  CronService: hoisted.CronService,
-}));
 
 vi.mock("../hooks/gmail-watcher.js", () => ({
   startGmailWatcher: hoisted.startGmailWatcher,
@@ -426,7 +407,6 @@ describe("gateway hot reload", () => {
           token: "secret",
           gmail: { account: "me@example.com" },
         },
-        cron: { enabled: true, store: "/tmp/cron.json" },
         agents: { defaults: { heartbeat: { every: "1m" }, maxConcurrent: 2 } },
         web: { enabled: true },
         channels: {
@@ -441,7 +421,6 @@ describe("gateway hot reload", () => {
         {
           changedPaths: [
             "hooks.gmail.account",
-            "cron.enabled",
             "web.enabled",
             "channels.telegram.botToken",
             "channels.discord.token",
@@ -453,7 +432,6 @@ describe("gateway hot reload", () => {
           hotReasons: ["web.enabled"],
           reloadHooks: true,
           restartGmailWatcher: true,
-          restartCron: true,
           restartHealthMonitor: false,
           restartChannels: new Set(["whatsapp", "telegram", "discord", "signal", "imessage"]),
           noopPaths: [],
@@ -463,10 +441,6 @@ describe("gateway hot reload", () => {
 
       expect(hoisted.stopGmailWatcher).toHaveBeenCalled();
       expect(hoisted.startGmailWatcher).toHaveBeenCalledWith(expect.objectContaining(nextConfig));
-
-      expect(hoisted.cronInstances.length).toBe(2);
-      expect(hoisted.cronInstances[0].stop).toHaveBeenCalledTimes(1);
-      expect(hoisted.cronInstances[1].start).toHaveBeenCalledTimes(1);
 
       expect(hoisted.providerManager.stopChannel).toHaveBeenCalledTimes(5);
       expect(hoisted.providerManager.startChannel).toHaveBeenCalledTimes(5);

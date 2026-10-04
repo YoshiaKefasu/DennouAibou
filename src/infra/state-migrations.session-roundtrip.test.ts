@@ -14,7 +14,6 @@ import type { OpenClawConfig } from "../config/config.js";
 import { canonicalizeMainSessionAlias } from "../config/sessions/main-session.js";
 import { resolveMainSessionKey } from "../config/sessions/main-session.js";
 import { resolveSessionKey } from "../config/sessions/session-key.js";
-import { resolveCronAgentSessionKey } from "../cron/isolated-agent/session-key.js";
 import { resolveSessionStoreKey } from "../gateway/session-utils.js";
 import { normalizeMainKey } from "../routing/session-key.js";
 
@@ -68,24 +67,6 @@ describe("session key write/read round-trip (#29683)", () => {
       // write path produces "agent:main:work". canonicalizeMainSessionAlias must
       // bridge this gap.
       expect(writeKey).toBe(gatewayCanonicalKey);
-    });
-  });
-
-  describe("cron write path round-trip", () => {
-    it("cron session key matches gateway canonical main session key", () => {
-      const cfg = makeNonDefaultAgentCfg();
-
-      const writeKey = resolveCronAgentSessionKey({
-        sessionKey: "main",
-        agentId: "ops",
-        mainKey: "work",
-        cfg,
-      });
-
-      const gatewayCanonicalKey = resolveMainSessionKey(cfg);
-
-      expect(writeKey).toBe(gatewayCanonicalKey);
-      expect(writeKey).toBe("agent:ops:work");
     });
   });
 

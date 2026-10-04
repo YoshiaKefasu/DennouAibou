@@ -137,15 +137,6 @@ const entries: SubCliEntry[] = [
     },
   },
   {
-    name: "cron",
-    description: "Manage cron jobs via the Gateway scheduler",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../cron-cli.js");
-      mod.registerCronCli(program);
-    },
-  },
-  {
     name: "dns",
     description: "DNS helpers for wide-area discovery (Tailscale + CoreDNS)",
     hasSubcommands: true,

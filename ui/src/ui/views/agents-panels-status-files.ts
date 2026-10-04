@@ -6,18 +6,10 @@ import { marked } from "marked";
 import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../format.ts";
 import { icons } from "../icons.ts";
-import {
-  formatCronPayload,
-  formatCronSchedule,
-  formatCronState,
-  formatNextRun,
-} from "../presenter.ts";
 import type {
   AgentsFilesListResult,
   ChannelAccountSnapshot,
   ChannelsStatusSnapshot,
-  CronJob,
-  CronStatus,
 } from "../types.ts";
 import { type AgentContext } from "./agents-utils.ts";
 import type { AgentsPanel } from "./agents.ts";
@@ -241,104 +233,6 @@ export function renderAgentChannels(params: {
               </div>
             `}
       </section>
-    </section>
-  `;
-}
-
-export function renderAgentCron(params: {
-  context: AgentContext;
-  agentId: string;
-  jobs: CronJob[];
-  status: CronStatus | null;
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
-  onRunNow: (jobId: string) => void;
-  onSelectPanel: (panel: AgentsPanel) => void;
-}) {
-  const jobs = params.jobs.filter((job) => job.agentId === params.agentId);
-  return html`
-    <section class="grid grid-cols-2">
-      ${renderAgentContextCard(
-        params.context,
-        "Workspace and scheduling targets.",
-        params.onSelectPanel,
-      )}
-      <section class="card">
-        <div class="row" style="justify-content: space-between;">
-          <div>
-            <div class="card-title">Scheduler</div>
-            <div class="card-sub">Gateway cron status.</div>
-          </div>
-          <button class="btn btn--sm" ?disabled=${params.loading} @click=${params.onRefresh}>
-            ${params.loading ? t("common.refreshing") : t("common.refresh")}
-          </button>
-        </div>
-        <div class="stat-grid" style="margin-top: 16px;">
-          <div class="stat">
-            <div class="stat-label">${t("common.enabled")}</div>
-            <div class="stat-value">
-              ${params.status
-                ? params.status.enabled
-                  ? t("common.yes")
-                  : t("common.no")
-                : t("common.na")}
-            </div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Jobs</div>
-            <div class="stat-value">${params.status?.jobs ?? t("common.na")}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Next wake</div>
-            <div class="stat-value">${formatNextRun(params.status?.nextWakeAtMs ?? null)}</div>
-          </div>
-        </div>
-        ${params.error
-          ? html`<div class="callout danger" style="margin-top: 12px;">${params.error}</div>`
-          : nothing}
-      </section>
-    </section>
-    <section class="card">
-      <div class="card-title">Agent Cron Jobs</div>
-      <div class="card-sub">Scheduled jobs targeting this agent.</div>
-      ${jobs.length === 0
-        ? html` <div class="muted" style="margin-top: 16px">No jobs assigned.</div> `
-        : html`
-            <div class="list" style="margin-top: 16px;">
-              ${jobs.map(
-                (job) => html`
-                  <div class="list-item">
-                    <div class="list-main">
-                      <div class="list-title">${job.name}</div>
-                      ${job.description
-                        ? html`<div class="list-sub">${job.description}</div>`
-                        : nothing}
-                      <div class="chip-row" style="margin-top: 6px;">
-                        <span class="chip">${formatCronSchedule(job)}</span>
-                        <span class="chip ${job.enabled ? "chip-ok" : "chip-warn"}">
-                          ${job.enabled ? "enabled" : "disabled"}
-                        </span>
-                        <span class="chip">${job.sessionTarget}</span>
-                      </div>
-                    </div>
-                    <div class="list-meta">
-                      <div class="mono">${formatCronState(job)}</div>
-                      <div class="muted">${formatCronPayload(job)}</div>
-                      <button
-                        class="btn btn--sm"
-                        style="margin-top: 6px;"
-                        ?disabled=${!job.enabled}
-                        @click=${() => params.onRunNow(job.id)}
-                      >
-                        Run Now
-                      </button>
-                    </div>
-                  </div>
-                `,
-              )}
-            </div>
-          `}
     </section>
   `;
 }

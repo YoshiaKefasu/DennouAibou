@@ -103,11 +103,6 @@ vi.mock("../agents/pi-model-discovery.js", async () => {
   };
 });
 
-vi.mock("../cron/isolated-agent.js", () => ({
-  runCronIsolatedAgentTurn: (...args: unknown[]) =>
-    (cronIsolatedRun as (...args: unknown[]) => unknown)(...args),
-}));
-
 vi.mock("../infra/tailnet.js", () => ({
   pickPrimaryTailnetIPv4: () => testTailnetIPv4.value,
   pickPrimaryTailnetIPv6: () => undefined,

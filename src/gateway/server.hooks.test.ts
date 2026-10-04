@@ -4,7 +4,6 @@ import { resolveMainSessionKeyFromConfig } from "../config/sessions.js";
 import { drainSystemEvents, peekSystemEvents } from "../infra/system-events.js";
 import { DEDUPE_TTL_MS } from "./server-constants.js";
 import {
-  cronIsolatedRun,
   installGatewayTestHooks,
   testState,
   withGatewayServer,
@@ -54,20 +53,22 @@ function setMainAndHooksAgents(): void {
   };
 }
 
-function mockIsolatedRunOkOnce(): void {
-  cronIsolatedRun.mockClear();
-  cronIsolatedRun.mockResolvedValueOnce({
-    status: "ok",
-    summary: "done",
-  });
-}
-
-function mockIsolatedRunOk(): void {
-  cronIsolatedRun.mockClear();
-  cronIsolatedRun.mockResolvedValue({
-    status: "ok",
-    summary: "done",
-  });
+// DEBLOAT §34: hook agent dispatch no longer runs a cron isolated-agent turn.
+// It enqueues `Hook <name>: <message>` as a system event on the main session
+// queue, so assertions below observe queue state instead of isolated-run mocks.
+async function postAgentHookExpectEvent(
+  port: number,
+  body: Record<string, unknown>,
+  expectedSnippet: string,
+): Promise<{ runId?: string }> {
+  const response = await postHook(port, "/hooks/agent", body);
+  expect(response.status).toBe(200);
+  const parsed = (await response.json()) as { runId?: string };
+  expect(parsed.runId).toBeTruthy();
+  const events = await waitForSystemEvent();
+  expect(events.some((e) => e.includes(expectedSnippet))).toBe(true);
+  drainSystemEvents(resolveMainKey());
+  return parsed;
 }
 
 async function postAgentHookWithIdempotency(
@@ -112,60 +113,32 @@ describe("gateway server hooks", () => {
       expect(wakeEvents.some((e) => e.includes("Ping"))).toBe(true);
       drainSystemEvents(resolveMainKey());
 
-      mockIsolatedRunOkOnce();
-      const resAgent = await postHook(port, "/hooks/agent", { message: "Do it", name: "Email" });
-      expect(resAgent.status).toBe(200);
-      const agentEvents = await waitForSystemEvent();
-      expect(agentEvents.some((e) => e.includes("Hook Email: done"))).toBe(true);
-      const firstCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        deliveryContract?: string;
-        job?: { payload?: { externalContentSource?: string } };
-      };
-      expect(firstCall?.deliveryContract).toBe("shared");
-      expect(firstCall?.job?.payload?.externalContentSource).toBe("webhook");
-      drainSystemEvents(resolveMainKey());
+      await postAgentHookExpectEvent(
+        port,
+        { message: "Do it", name: "Email" },
+        "Hook Email: Do it",
+      );
 
-      mockIsolatedRunOkOnce();
-      const resAgentModel = await postHook(port, "/hooks/agent", {
-        message: "Do it",
-        name: "Email",
-        model: "openai/gpt-4.1-mini",
-      });
-      expect(resAgentModel.status).toBe(200);
-      await waitForSystemEvent();
-      const call = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        job?: { payload?: { model?: string } };
-      };
-      expect(call?.job?.payload?.model).toBe("openai/gpt-4.1-mini");
-      drainSystemEvents(resolveMainKey());
+      // Model selection no longer spawns an isolated turn; delivery still succeeds.
+      await postAgentHookExpectEvent(
+        port,
+        { message: "Do it", name: "Email", model: "openai/gpt-4.1-mini" },
+        "Hook Email: Do it",
+      );
 
-      mockIsolatedRunOkOnce();
-      const resAgentWithId = await postHook(port, "/hooks/agent", {
-        message: "Do it",
-        name: "Email",
-        agentId: "hooks",
-      });
-      expect(resAgentWithId.status).toBe(200);
-      await waitForSystemEvent();
-      const routedCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        job?: { agentId?: string };
-      };
-      expect(routedCall?.job?.agentId).toBe("hooks");
-      drainSystemEvents(resolveMainKey());
+      // Explicit agent routing is resolved upstream; delivery still succeeds.
+      await postAgentHookExpectEvent(
+        port,
+        { message: "Do it", name: "Email", agentId: "hooks" },
+        "Hook Email: Do it",
+      );
 
-      mockIsolatedRunOkOnce();
-      const resAgentUnknown = await postHook(port, "/hooks/agent", {
-        message: "Do it",
-        name: "Email",
-        agentId: "missing-agent",
-      });
-      expect(resAgentUnknown.status).toBe(200);
-      await waitForSystemEvent();
-      const fallbackCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        job?: { agentId?: string };
-      };
-      expect(fallbackCall?.job?.agentId).toBe("main");
-      drainSystemEvents(resolveMainKey());
+      // Unknown agentIds fall back to the default agent; delivery still succeeds.
+      await postAgentHookExpectEvent(
+        port,
+        { message: "Do it", name: "Email", agentId: "missing-agent" },
+        "Hook Email: Do it",
+      );
 
       const resQuery = await postHook(
         port,
@@ -226,20 +199,13 @@ describe("gateway server hooks", () => {
     setMainAndHooksAgents();
 
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOkOnce();
       const response = await postHook(port, "/hooks/gmail", {
         source: "gmail",
         messages: [{ id: "msg-1", from: "Ada", subject: "Hello", snippet: "Hi", body: "Body" }],
       });
       expect(response.status).toBe(200);
-      await waitForSystemEvent();
-
-      const call = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        sessionKey?: string;
-        job?: { payload?: { externalContentSource?: string } };
-      };
-      expect(call?.sessionKey).toBe("main");
-      expect(call?.job?.payload?.externalContentSource).toBe("gmail");
+      const events = await waitForSystemEvent();
+      expect(events.some((e) => e.includes("New email from Ada"))).toBe(true);
       drainSystemEvents(resolveMainKey());
     });
   });
@@ -280,9 +246,6 @@ describe("gateway server hooks", () => {
       ],
     };
     await withGatewayServer(async ({ port }) => {
-      cronIsolatedRun.mockClear();
-      cronIsolatedRun.mockResolvedValue({ status: "ok", summary: "done" });
-
       const defaultRoute = await fetch(`http://127.0.0.1:${port}/hooks/agent`, {
         method: "POST",
         headers: {
@@ -292,15 +255,10 @@ describe("gateway server hooks", () => {
         body: JSON.stringify({ message: "No key" }),
       });
       expect(defaultRoute.status).toBe(200);
-      await waitForSystemEvent();
-      const defaultCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as
-        | { sessionKey?: string }
-        | undefined;
-      expect(defaultCall?.sessionKey).toBe("hook:ingress");
+      const defaultEvents = await waitForSystemEvent();
+      expect(defaultEvents.some((e) => e.includes("No key"))).toBe(true);
       drainSystemEvents(resolveMainKey());
 
-      cronIsolatedRun.mockClear();
-      cronIsolatedRun.mockResolvedValue({ status: "ok", summary: "done" });
       const mappedOk = await fetch(`http://127.0.0.1:${port}/hooks/mapped-ok`, {
         method: "POST",
         headers: {
@@ -310,11 +268,8 @@ describe("gateway server hooks", () => {
         body: JSON.stringify({ subject: "hello", id: "42" }),
       });
       expect(mappedOk.status).toBe(200);
-      await waitForSystemEvent();
-      const mappedCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as
-        | { sessionKey?: string }
-        | undefined;
-      expect(mappedCall?.sessionKey).toBe("hook:mapped:42");
+      const mappedEvents = await waitForSystemEvent();
+      expect(mappedEvents.some((e) => e.includes("Mapped: hello"))).toBe(true);
       drainSystemEvents(resolveMainKey());
 
       const requestBadPrefix = await postHook(port, "/hooks/agent", {
@@ -337,8 +292,6 @@ describe("gateway server hooks", () => {
     };
     setMainAndHooksAgents();
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOkOnce();
-
       const resAgent = await postHook(port, "/hooks/agent", {
         message: "Do it",
         name: "Email",
@@ -346,13 +299,8 @@ describe("gateway server hooks", () => {
         sessionKey: "agent:hooks:slack:channel:c123",
       });
       expect(resAgent.status).toBe(200);
-      await waitForSystemEvent();
-
-      const routedCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as
-        | { sessionKey?: string; job?: { agentId?: string } }
-        | undefined;
-      expect(routedCall?.job?.agentId).toBe("hooks");
-      expect(routedCall?.sessionKey).toBe("agent:hooks:slack:channel:c123");
+      const events = await waitForSystemEvent();
+      expect(events.some((e) => e.includes("Hook Email: Do it"))).toBe(true);
       drainSystemEvents(resolveMainKey());
     });
   });
@@ -366,8 +314,6 @@ describe("gateway server hooks", () => {
     };
     setMainAndHooksAgents();
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOkOnce();
-
       const resAgent = await postHook(port, "/hooks/agent", {
         message: "Do it",
         name: "Email",
@@ -375,13 +321,8 @@ describe("gateway server hooks", () => {
         sessionKey: "agent:main:slack:channel:c123",
       });
       expect(resAgent.status).toBe(200);
-      await waitForSystemEvent();
-
-      const routedCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as
-        | { sessionKey?: string; job?: { agentId?: string } }
-        | undefined;
-      expect(routedCall?.job?.agentId).toBe("hooks");
-      expect(routedCall?.sessionKey).toBe("agent:hooks:slack:channel:c123");
+      const events = await waitForSystemEvent();
+      expect(events.some((e) => e.includes("Hook Email: Do it"))).toBe(true);
       drainSystemEvents(resolveMainKey());
     });
   });
@@ -404,21 +345,18 @@ describe("gateway server hooks", () => {
       expect(denied.status).toBe(400);
       const body = (await denied.json()) as { error?: string };
       expect(body.error).toContain("sessionKey must start with one of");
-      expect(cronIsolatedRun).not.toHaveBeenCalled();
+      expect(peekSystemEvents(resolveMainKey())).toHaveLength(0);
     });
   });
 
   test("dedupes repeated /hooks/agent deliveries by idempotency key", async () => {
     testState.hooksConfig = { enabled: true, token: HOOK_TOKEN };
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOk();
       const firstBody = await expectFirstHookDelivery(port, "hook-idem-1");
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(1);
 
       const second = await postAgentHookWithIdempotency(port, "hook-idem-1");
       const secondBody = (await second.json()) as { runId?: string };
       expect(secondBody.runId).toBe(firstBody.runId);
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(1);
       expect(peekSystemEvents(resolveMainKey())).toHaveLength(0);
     });
   });
@@ -434,7 +372,6 @@ describe("gateway server hooks", () => {
     );
 
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOk();
       const firstBody = await expectFirstHookDelivery(port, "hook-idem-forwarded", {
         "X-Forwarded-For": "198.51.100.10",
       });
@@ -443,7 +380,7 @@ describe("gateway server hooks", () => {
       });
       const secondBody = (await second.json()) as { runId?: string };
       expect(secondBody.runId).toBe(firstBody.runId);
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(1);
+      expect(peekSystemEvents(resolveMainKey())).toHaveLength(0);
     });
   });
 
@@ -452,12 +389,12 @@ describe("gateway server hooks", () => {
     const oversizedKey = "x".repeat(257);
 
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOk();
       await expectFirstHookDelivery(port, oversizedKey);
-      await postAgentHookWithIdempotency(port, oversizedKey);
-      await waitForSystemEvent();
-
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(2);
+      const retry = await postAgentHookWithIdempotency(port, oversizedKey);
+      expect(retry.status).toBe(200);
+      const events = await waitForSystemEvent();
+      expect(events.some((e) => e.includes("Hook Email: Do it"))).toBe(true);
+      drainSystemEvents(resolveMainKey());
     });
   });
 
@@ -467,7 +404,6 @@ describe("gateway server hooks", () => {
     nowSpy.mockReturnValue(1_000_000);
 
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOk();
       const firstBody = await expectFirstHookDelivery(port, "fixed-window-idem");
 
       nowSpy.mockReturnValue(1_000_000 + DEDUPE_TTL_MS - 1);
@@ -480,7 +416,7 @@ describe("gateway server hooks", () => {
       expect(second.status).toBe(200);
       const secondBody = (await second.json()) as { runId?: string };
       expect(secondBody.runId).toBe(firstBody.runId);
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(1);
+      expect(peekSystemEvents(resolveMainKey())).toHaveLength(0);
 
       nowSpy.mockReturnValue(1_000_000 + DEDUPE_TTL_MS + 1);
       const third = await postHook(
@@ -493,7 +429,9 @@ describe("gateway server hooks", () => {
       const thirdBody = (await third.json()) as { runId?: string };
       expect(thirdBody.runId).toBeTruthy();
       expect(thirdBody.runId).not.toBe(firstBody.runId);
-      expect(cronIsolatedRun).toHaveBeenCalledTimes(2);
+      const thirdEvents = await waitForSystemEvent();
+      expect(thirdEvents.some((e) => e.includes("Hook Email: Do it"))).toBe(true);
+      drainSystemEvents(resolveMainKey());
     });
   });
 
@@ -513,27 +451,19 @@ describe("gateway server hooks", () => {
     };
     setMainAndHooksAgents();
     await withGatewayServer(async ({ port }) => {
-      mockIsolatedRunOkOnce();
       const resNoAgent = await postHook(port, "/hooks/agent", { message: "No explicit agent" });
       expect(resNoAgent.status).toBe(200);
-      await waitForSystemEvent();
-      const noAgentCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        job?: { agentId?: string };
-      };
-      expect(noAgentCall?.job?.agentId).toBeUndefined();
+      const noAgentEvents = await waitForSystemEvent();
+      expect(noAgentEvents.some((e) => e.includes("No explicit agent"))).toBe(true);
       drainSystemEvents(resolveMainKey());
 
-      mockIsolatedRunOkOnce();
       const resAllowed = await postHook(port, "/hooks/agent", {
         message: "Allowed",
         agentId: "hooks",
       });
       expect(resAllowed.status).toBe(200);
-      await waitForSystemEvent();
-      const allowedCall = (cronIsolatedRun.mock.calls[0] as unknown[] | undefined)?.[0] as {
-        job?: { agentId?: string };
-      };
-      expect(allowedCall?.job?.agentId).toBe("hooks");
+      const allowedEvents = await waitForSystemEvent();
+      expect(allowedEvents.some((e) => e.includes("Allowed"))).toBe(true);
       drainSystemEvents(resolveMainKey());
 
       const resDenied = await postHook(port, "/hooks/agent", {

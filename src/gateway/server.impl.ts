@@ -90,7 +90,6 @@ import {
   createSessionMessageSubscriberRegistry,
 } from "./server-chat.js";
 import { createGatewayCloseHandler } from "./server-close.js";
-import { buildGatewayCronService } from "./server-cron.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
@@ -187,7 +186,6 @@ function pruneSkippedStartupSecretSurfaces(config: OpenClawConfig): OpenClawConf
 }
 
 const logHealth = log.child("health");
-const logCron = log.child("cron");
 const logReload = log.child("reload");
 const logHooks = log.child("hooks");
 const logPlugins = log.child("plugins");
@@ -397,10 +395,6 @@ export type GatewayServerOptions = {
    * Optional startup timestamp used for concise readiness logging.
    */
   startupStartedAt?: number;
-  /**
-   * Test-only: override cron runtime dependencies (webhook fetch, announce).
-   */
-  cronRuntimeDeps?: import("./server-cron.js").GatewayCronDeps;
 };
 
 export async function startGatewayServer(
@@ -815,7 +809,6 @@ export async function startGatewayServer(
       releasePluginRouteRegistry,
       stopChannel,
       pluginServices,
-      cron,
       eventPumpDisposer,
       nodePresenceTimers,
       broadcast,
@@ -855,15 +848,6 @@ export async function startGatewayServer(
   };
   const hasMobileNodeConnected = () => hasConnectedMobileNode(nodeRegistry);
   applyGatewayLaneConcurrency(cfgAtStart);
-
-  let cronState = buildGatewayCronService({
-    cfg: cfgAtStart,
-    deps,
-    broadcast,
-    runtimeDeps: opts.cronRuntimeDeps,
-  });
-  let { cron, storePath: cronStorePath } = cronState;
-  deps.cron = cron;
 
   const { getRuntimeSnapshot, startChannels, startChannel, stopChannel, markChannelLoggedOut } =
     channelManager;
@@ -1185,10 +1169,6 @@ export async function startGatewayServer(
           ...(maxRestartsPerHour != null && { maxRestartsPerHour }),
         });
 
-    if (!minimalTestGateway) {
-      void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
-    }
-
     stopModelPricingRefresh =
       !minimalTestGateway && process.env.VITEST !== "1"
         ? startGatewayModelPricingRefresh({ config: cfgAtStart })
@@ -1250,8 +1230,6 @@ export async function startGatewayServer(
 
     const gatewayRequestContext: import("./server-methods/types.js").GatewayRequestContext = {
       deps,
-      cron,
-      cronStorePath,
       execApprovalManager,
       pluginApprovalManager,
       loadGatewayModelCatalog,
@@ -1439,23 +1417,17 @@ export async function startGatewayServer(
             getState: () => ({
               hooksConfig,
               hookClientIpConfig,
-              cronState,
               channelHealthMonitor,
             }),
             setState: (nextState) => {
               hooksConfig = nextState.hooksConfig;
               hookClientIpConfig = nextState.hookClientIpConfig;
-              cronState = nextState.cronState;
-              cron = cronState.cron;
-              cronStorePath = cronState.storePath;
-              deps.cron = cron;
               channelHealthMonitor = nextState.channelHealthMonitor;
             },
             startChannel,
             stopChannel,
             logHooks,
             logChannels,
-            logCron,
             logReload,
             createHealthMonitor: (opts: {
               checkIntervalMs: number;
@@ -1524,7 +1496,6 @@ export async function startGatewayServer(
     releasePluginRouteRegistry,
     stopChannel,
     pluginServices,
-    cron,
     eventPumpDisposer,
     nodePresenceTimers,
     broadcast,

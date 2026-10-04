@@ -544,78 +544,13 @@ export const OpenClawSchema = z
     commands: CommandsSchema,
     approvals: ApprovalsSchema,
     session: SessionSchema,
-    cron: z
-      .object({
-        enabled: z.boolean().optional(),
-        store: z.string().optional(),
-        maxConcurrentRuns: z.number().int().positive().optional(),
-        retry: z
-          .object({
-            maxAttempts: z.number().int().min(0).max(10).optional(),
-            backoffMs: z.array(z.number().int().nonnegative()).min(1).max(10).optional(),
-            retryOn: z
-              .array(z.enum(["rate_limit", "overloaded", "network", "timeout", "server_error"]))
-              .min(1)
-              .optional(),
-          })
-          .strict()
-          .optional(),
-        webhook: HttpUrlSchema.optional(),
-        webhookToken: SecretInputSchema.optional().register(sensitive),
-        sessionRetention: z.union([z.string(), z.literal(false)]).optional(),
-        runLog: z
-          .object({
-            maxBytes: z.union([z.string(), z.number()]).optional(),
-            keepLines: z.number().int().positive().optional(),
-          })
-          .strict()
-          .optional(),
-        failureAlert: z
-          .object({
-            enabled: z.boolean().optional(),
-            after: z.number().int().min(1).optional(),
-            cooldownMs: z.number().int().min(0).optional(),
-            mode: z.enum(["announce", "webhook"]).optional(),
-            accountId: z.string().optional(),
-          })
-          .strict()
-          .optional(),
-        failureDestination: z
-          .object({
-            channel: z.string().optional(),
-            to: z.string().optional(),
-            accountId: z.string().optional(),
-            mode: z.enum(["announce", "webhook"]).optional(),
-          })
-          .strict()
-          .optional(),
-      })
-      .strict()
-      .superRefine((val, ctx) => {
-        if (val.sessionRetention !== undefined && val.sessionRetention !== false) {
-          try {
-            parseDurationMs(String(val.sessionRetention).trim(), { defaultUnit: "h" });
-          } catch {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["sessionRetention"],
-              message: "invalid duration (use ms, s, m, h, d)",
-            });
-          }
-        }
-        if (val.runLog?.maxBytes !== undefined) {
-          try {
-            parseByteSize(String(val.runLog.maxBytes).trim(), { defaultUnit: "b" });
-          } catch {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["runLog", "maxBytes"],
-              message: "invalid size (use b, kb, mb, gb, tb)",
-            });
-          }
-        }
-      })
-      .optional(),
+    /**
+     * @deprecated Old Gateway cron subsystem was removed in DEBLOAT §34
+     * (replaced by the `dennou-alarm` plugin). Leftover `cron` keys in
+     * existing `dennou-aibou.json` files are accepted and ignored so
+     * production gateways keep starting.
+     */
+    cron: z.unknown().optional(),
     hooks: z
       .object({
         enabled: z.boolean().optional(),

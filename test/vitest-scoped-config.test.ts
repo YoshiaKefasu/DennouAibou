@@ -10,7 +10,6 @@ import { createChannelsVitestConfig } from "../vitest.channels.config.ts";
 import { createCliVitestConfig } from "../vitest.cli.config.ts";
 import { createCommandsVitestConfig } from "../vitest.commands.config.ts";
 import { createContractsVitestConfig } from "../vitest.contracts.config.ts";
-import { createCronVitestConfig } from "../vitest.cron.config.ts";
 import { createDaemonVitestConfig } from "../vitest.daemon.config.ts";
 import { createExtensionChannelsVitestConfig } from "../vitest.extension-channels.config.ts";
 import { createExtensionDiffsVitestConfig } from "../vitest.extension-diffs.config.ts";
@@ -135,7 +134,6 @@ describe("scoped vitest configs", () => {
   const defaultPluginSdkConfig = createPluginSdkVitestConfig({});
   const defaultSecretsConfig = createSecretsVitestConfig({});
   const defaultRuntimeConfig = createRuntimeConfigVitestConfig({});
-  const defaultCronConfig = createCronVitestConfig({});
   const defaultDaemonConfig = createDaemonVitestConfig({});
   const defaultMediaConfig = createMediaVitestConfig({});
   const defaultMediaUnderstandingConfig = createMediaUnderstandingVitestConfig({});
@@ -379,11 +377,6 @@ describe("scoped vitest configs", () => {
     expect(defaultRuntimeConfig.test?.include).toEqual(["config/**/*.test.ts"]);
   });
 
-  it("normalizes cron include patterns relative to the scoped dir", () => {
-    expect(defaultCronConfig.test?.dir).toBe("src");
-    expect(defaultCronConfig.test?.include).toEqual(["cron/**/*.test.ts"]);
-  });
-
   it("normalizes daemon include patterns relative to the scoped dir", () => {
     expect(defaultDaemonConfig.test?.dir).toBe("src");
     expect(defaultDaemonConfig.test?.include).toEqual(["daemon/**/*.test.ts"]);
@@ -504,7 +497,6 @@ describe("scoped vitest configs", () => {
       { lane: "plugin-sdk", config: defaultPluginSdkConfig },
       { lane: "secrets", config: defaultSecretsConfig },
       { lane: "runtime-config", config: defaultRuntimeConfig },
-      { lane: "cron", config: defaultCronConfig },
       { lane: "daemon", config: defaultDaemonConfig },
       { lane: "media", config: defaultMediaConfig },
       { lane: "media-understanding", config: defaultMediaUnderstandingConfig },

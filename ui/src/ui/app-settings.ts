@@ -14,7 +14,6 @@ import { loadAgentSkills } from "./controllers/agent-skills.ts";
 import { loadAgents } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
-import { loadCronJobs, loadCronRuns, loadCronStatus } from "./controllers/cron.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
@@ -54,7 +53,7 @@ type SettingsHost = {
   basePath: string;
   agentsList?: AgentsListResult | null;
   agentsSelectedId?: string | null;
-  agentsPanel?: "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+  agentsPanel?: "overview" | "files" | "tools" | "skills" | "channels";
   pendingGatewayUrl?: string | null;
   systemThemeCleanup?: (() => void) | null;
   pendingGatewayToken?: string | null;
@@ -226,9 +225,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "sessions") {
     await loadSessions(host as unknown as OpenClawApp);
   }
-  if (host.tab === "cron") {
-    await loadCron(host);
-  }
   if (host.tab === "skills") {
     await loadSkills(host as unknown as OpenClawApp);
   }
@@ -251,9 +247,6 @@ export async function refreshActiveTab(host: SettingsHost) {
       }
       if (host.agentsPanel === "channels") {
         void loadChannels(host as unknown as OpenClawApp, false);
-      }
-      if (host.agentsPanel === "cron") {
-        void loadCron(host);
       }
     }
   }
@@ -501,8 +494,6 @@ export async function loadOverview(host: SettingsHost) {
     loadChannels(app, false),
     loadPresence(app),
     loadSessions(app),
-    loadCronStatus(app),
-    loadCronJobs(app),
     loadDebug(app),
     loadSkills(app),
     loadOverviewLogs(app),
@@ -607,30 +598,6 @@ function buildAttentionItems(host: OpenClawApp) {
     });
   }
 
-  const cronJobs = host.cronJobs ?? [];
-  const failedCron = cronJobs.filter((j) => j.state?.lastStatus === "error");
-  if (failedCron.length > 0) {
-    items.push({
-      severity: "error",
-      icon: "clock",
-      title: `${failedCron.length} cron job${failedCron.length > 1 ? "s" : ""} failed`,
-      description: failedCron.map((j) => j.name).join(", "),
-    });
-  }
-
-  const now = Date.now();
-  const overdue = cronJobs.filter(
-    (j) => j.enabled && j.state?.nextRunAtMs != null && now - j.state.nextRunAtMs > 300_000,
-  );
-  if (overdue.length > 0) {
-    items.push({
-      severity: "warning",
-      icon: "clock",
-      title: `${overdue.length} overdue job${overdue.length > 1 ? "s" : ""}`,
-      description: overdue.map((j) => j.name).join(", "),
-    });
-  }
-
   host.attentionItems = items;
 }
 
@@ -639,16 +606,5 @@ export async function loadChannelsTab(host: SettingsHost) {
     loadChannels(host as unknown as OpenClawApp, true),
     loadConfigSchema(host as unknown as OpenClawApp),
     loadConfig(host as unknown as OpenClawApp),
-  ]);
-}
-
-export async function loadCron(host: SettingsHost) {
-  const app = host as unknown as OpenClawApp;
-  const activeCronJobId = app.cronRunsScope === "job" ? app.cronRunsJobId : null;
-  await Promise.all([
-    loadChannels(app, false),
-    loadCronStatus(app),
-    loadCronJobs(app),
-    loadCronRuns(app, activeCronJobId),
   ]);
 }

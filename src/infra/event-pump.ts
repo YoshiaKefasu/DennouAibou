@@ -71,6 +71,7 @@ function resolveReasonPriority(reason: string): number {
     return REASON_PRIORITY.RETRY;
   }
   if (
+    reason.startsWith("alarm:") ||
     reason.startsWith("cron:") ||
     reason.startsWith("exec-event") ||
     reason.startsWith("notifications-event") ||
@@ -420,12 +421,16 @@ export async function runEventPumpOnce(opts: {
   }
 
   const turnSourceDeliveryContext = resolveSystemEventDeliveryContext(pendingEventEntries);
-  const isCronEventReason = Boolean(opts.reason?.startsWith("cron:"));
+  const isCronEventReason = Boolean(
+    opts.reason?.startsWith("cron:") || opts.reason?.startsWith("alarm:"),
+  );
   const isExecEventReason = opts.reason === "exec-event";
   const cronEvents = pendingEventEntries
     .filter(
       (event) =>
-        (isCronEventReason || event.contextKey?.startsWith("cron:")) &&
+        (isCronEventReason ||
+          event.contextKey?.startsWith("cron:") ||
+          event.contextKey?.startsWith("alarm:")) &&
         isCronSystemEvent(event.text),
     )
     .map((event) => event.text);

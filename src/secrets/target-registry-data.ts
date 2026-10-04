@@ -36,17 +36,6 @@ const CORE_SECRET_TARGET_REGISTRY: SecretTargetRegistryEntry[] = [
     includeInAudit: true,
   },
   {
-    id: "cron.webhookToken",
-    targetType: "cron.webhookToken",
-    configFile: "dennou-aibou.json",
-    pathPattern: "cron.webhookToken",
-    secretShape: SECRET_INPUT_SHAPE,
-    expectedResolvedValue: "string",
-    includeInPlan: true,
-    includeInConfigure: true,
-    includeInAudit: true,
-  },
-  {
     id: "gateway.auth.token",
     targetType: "gateway.auth.token",
     configFile: "dennou-aibou.json",

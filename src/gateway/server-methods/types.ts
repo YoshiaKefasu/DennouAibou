@@ -1,7 +1,6 @@
 import type { ModelCatalogEntry } from "../../agents/model-catalog.js";
 import type { createDefaultDeps } from "../../cli/deps.js";
 import type { HealthSummary } from "../../commands/health.js";
-import type { CronService } from "../../cron/service.js";
 import type { PluginApprovalRequestPayload } from "../../infra/plugin-approvals.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { WizardSession } from "../../wizard/session.js";
@@ -37,8 +36,6 @@ export type RespondFn = (
 
 export type GatewayRequestContext = {
   deps: ReturnType<typeof createDefaultDeps>;
-  cron: CronService;
-  cronStorePath: string;
   execApprovalManager?: ExecApprovalManager;
   pluginApprovalManager?: ExecApprovalManager<PluginApprovalRequestPayload>;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;

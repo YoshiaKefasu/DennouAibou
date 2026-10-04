@@ -16,7 +16,6 @@ import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createAudioTool } from "./tools/audio-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
-import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
@@ -192,9 +191,6 @@ export function createOpenClawTools(
       config: options?.config,
       modelHasVision: options?.modelHasVision,
       allowMediaInvokeCommands: options?.allowMediaInvokeCommands,
-    }),
-    createCronTool({
-      agentSessionKey: options?.agentSessionKey,
     }),
     ...(messageTool ? [messageTool] : []),
     createGatewayTool({

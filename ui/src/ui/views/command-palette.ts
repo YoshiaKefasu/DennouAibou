@@ -38,13 +38,6 @@ const PALETTE_ITEMS: PaletteItem[] = [
     category: "navigation",
     action: "nav:sessions",
   },
-  {
-    id: "nav-cron",
-    label: "Scheduled",
-    icon: "scrollText",
-    category: "navigation",
-    action: "nav:cron",
-  },
   { id: "nav-skills", label: "Skills", icon: "zap", category: "navigation", action: "nav:skills" },
   {
     id: "nav-config",

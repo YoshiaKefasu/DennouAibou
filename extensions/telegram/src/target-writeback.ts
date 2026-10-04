@@ -3,11 +3,6 @@ import {
   readConfigFileSnapshotForWrite,
   writeConfigFile,
 } from "openclaw/plugin-sdk/config-runtime";
-import {
-  loadCronStore,
-  resolveCronStorePath,
-  saveCronStore,
-} from "openclaw/plugin-sdk/config-runtime";
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import {
   normalizeTelegramChatId,
@@ -183,37 +178,6 @@ export async function maybePersistResolvedTelegramTarget(params: {
   } catch (err) {
     if (params.verbose) {
       writebackLogger.warn(`failed to persist Telegram defaultTo target ${raw}: ${String(err)}`);
-    }
-  }
-
-  try {
-    const storePath = resolveCronStorePath(params.cfg.cron?.store);
-    const store = await loadCronStore(storePath);
-    let cronChanged = false;
-    for (const job of store.jobs) {
-      if (job.delivery?.channel !== "telegram") {
-        continue;
-      }
-      const nextTarget = rewriteTargetIfMatch({
-        rawValue: job.delivery.to,
-        matchKey,
-        resolvedTarget,
-      });
-      if (!nextTarget) {
-        continue;
-      }
-      job.delivery.to = nextTarget;
-      cronChanged = true;
-    }
-    if (cronChanged) {
-      await saveCronStore(storePath, store);
-      if (params.verbose) {
-        writebackLogger.warn(`resolved Telegram cron delivery target ${raw} -> ${resolvedTarget}`);
-      }
-    }
-  } catch (err) {
-    if (params.verbose) {
-      writebackLogger.warn(`failed to persist Telegram cron target ${raw}: ${String(err)}`);
     }
   }
 }

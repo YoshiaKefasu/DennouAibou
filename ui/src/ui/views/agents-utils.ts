@@ -93,10 +93,7 @@ export const FALLBACK_TOOL_SECTIONS: AgentToolSection[] = [
   {
     id: "automation",
     label: "Automation",
-    tools: [
-      { id: "cron", label: "cron", description: "Schedule tasks" },
-      { id: "gateway", label: "gateway", description: "Gateway control" },
-    ],
+    tools: [{ id: "gateway", label: "gateway", description: "Gateway control" }],
   },
   {
     id: "nodes",
@@ -506,7 +503,7 @@ export function sortLocaleStrings(values: Iterable<string>): string[] {
   return sorted;
 }
 
-export function resolveConfiguredCronModelSuggestions(
+export function resolveConfiguredModelSuggestions(
   configForm: Record<string, unknown> | null,
 ): string[] {
   if (!configForm || typeof configForm !== "object") {

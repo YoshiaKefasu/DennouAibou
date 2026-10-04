@@ -70,6 +70,14 @@ function isCronAddAction(args: unknown): boolean {
   return typeof action === "string" && action.trim().toLowerCase() === "add";
 }
 
+function isAlarmSetAction(args: unknown): boolean {
+  if (!args || typeof args !== "object") {
+    return false;
+  }
+  const action = (args as Record<string, unknown>).action;
+  return typeof action === "string" && action.trim().toLowerCase() === "set";
+}
+
 function buildToolCallSummary(toolName: string, args: unknown, meta?: string): ToolCallSummary {
   const mutation = buildToolMutationState(toolName, args, meta);
   return {
@@ -814,8 +822,14 @@ export async function handleToolExecutionEnd(
     }
   }
 
-  // Track committed reminders only when cron.add completed successfully.
-  if (!isToolError && toolName === "cron" && isCronAddAction(startData?.args)) {
+  // Track committed reminders when cron.add or alarm set completed successfully.
+  // DEBLOAT §34: cron tool removed; alarm tool (`alarm` action="set") is the successor.
+  // The `successfulCronAdds` counter is kept (name unchanged) to avoid touching run types.
+  if (
+    !isToolError &&
+    ((toolName === "cron" && isCronAddAction(startData?.args)) ||
+      (toolName === "alarm" && isAlarmSetAction(startData?.args)))
+  ) {
     ctx.state.successfulCronAdds += 1;
   }
 

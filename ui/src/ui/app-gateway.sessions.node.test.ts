@@ -8,7 +8,6 @@ vi.mock("./app-chat.ts", () => ({
 }));
 vi.mock("./app-settings.ts", () => ({
   applySettings: vi.fn(),
-  loadCron: vi.fn(),
   refreshActiveTab: vi.fn(),
   setLastActiveSessionKey: vi.fn(),
 }));
@@ -49,9 +48,9 @@ vi.mock("./gateway.ts", () => ({
 }));
 
 const { handleGatewayEvent } = await import("./app-gateway.ts");
-const { addExecApproval } = await vi.importActual<
-  typeof import("./controllers/exec-approval.ts")
->("./controllers/exec-approval.ts");
+const { addExecApproval } = await vi.importActual<typeof import("./controllers/exec-approval.ts")>(
+  "./controllers/exec-approval.ts",
+);
 
 function createHost() {
   return {

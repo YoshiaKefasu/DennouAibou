@@ -56,12 +56,14 @@ describe("config validation allowed-values metadata", () => {
 
   it("skips allowed-values hints for unions with open-ended branches", () => {
     const result = validateConfigObjectRaw({
-      cron: { sessionRetention: true },
+      gateway: { http: { securityHeaders: { strictTransportSecurity: true } } },
     });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      const issue = result.issues.find((entry) => entry.path === "cron.sessionRetention");
+      const issue = result.issues.find(
+        (entry) => entry.path === "gateway.http.securityHeaders.strictTransportSecurity",
+      );
       expect(issue).toBeDefined();
       expect(issue?.allowedValues).toBeUndefined();
       expect(issue?.allowedValuesHiddenCount).toBeUndefined();

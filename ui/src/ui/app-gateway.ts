@@ -4,12 +4,7 @@ import {
   flushChatQueueForEvent,
 } from "./app-chat.ts";
 import type { EventLogEntry } from "./app-events.ts";
-import {
-  applySettings,
-  loadCron,
-  refreshActiveTab,
-  setLastActiveSessionKey,
-} from "./app-settings.ts";
+import { applySettings, refreshActiveTab, setLastActiveSessionKey } from "./app-settings.ts";
 import { handleAgentEvent, resetToolStream, type AgentEventPayload } from "./app-tool-stream.ts";
 import type { OpenClawApp } from "./app.ts";
 import { shouldReloadHistoryForFinalEvent } from "./chat-event-reload.ts";
@@ -401,10 +396,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   if (evt.event === "sessions.changed") {
     void loadSessions(host as unknown as OpenClawApp);
     return;
-  }
-
-  if (evt.event === "cron" && host.tab === "cron") {
-    void loadCron(host as unknown as Parameters<typeof loadCron>[0]);
   }
 
   if (evt.event === "device.pair.requested" || evt.event === "device.pair.resolved") {
