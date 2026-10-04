@@ -790,14 +790,15 @@ describe("POST /tools/invoke", () => {
     expect(body.result).toEqual({ ok: true, result: [] });
   });
 
-  it("applies owner-only tool policy on the HTTP path", async () => {
+  it("does not hide owner-only tools on the HTTP path", async () => {
     setMainAllowedTools({ allow: ["owner_only_test"] });
 
-    const deniedRes = await invokeToolAuthed({
+    const nonOwnerRes = await invokeToolAuthed({
       tool: "owner_only_test",
       sessionKey: "main",
     });
-    expect(deniedRes.status).toBe(404);
+    const nonOwnerBody = await expectOkInvokeResponse(nonOwnerRes);
+    expect(nonOwnerBody.result).toEqual({ ok: true, result: "owner-only" });
 
     const allowedRes = await invokeTool({
       port: sharedPort,

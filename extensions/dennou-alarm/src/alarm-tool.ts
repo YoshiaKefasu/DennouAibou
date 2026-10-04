@@ -161,7 +161,6 @@ export function createAlarmTool(options: AlarmToolOptions = {}): AnyAgentTool {
   return {
     label: "Alarm",
     name: "alarm",
-    ownerOnly: true,
     description:
       "自律的体内時計・タイマー＆スケジュール管理。set=アラームをセット、list=一覧表示、cancel=キャンセル。",
     parameters: AlarmToolSchema,

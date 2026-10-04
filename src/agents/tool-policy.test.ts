@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
 import { DEFAULT_GATEWAY_HTTP_TOOL_DENY } from "../security/dangerous-tools.js";
 import { isToolAllowedByPolicyName, type ToolPolicy } from "./tool-policy-match.js";
 import { TOOL_POLICY_CONFORMANCE } from "./tool-policy.conformance.js";
@@ -86,6 +85,7 @@ describe("tool-policy", () => {
     expect(isOwnerOnlyToolName("cron")).toBe(true);
     expect(isOwnerOnlyToolName("gateway")).toBe(true);
     expect(isOwnerOnlyToolName("nodes")).toBe(true);
+    expect(isOwnerOnlyToolName("alarm")).toBe(false);
     expect(isOwnerOnlyToolName("read")).toBe(false);
   });
 
@@ -94,6 +94,7 @@ describe("tool-policy", () => {
     expect(resolveOwnerOnlyToolApprovalClass("cron")).toBe("control_plane");
     expect(resolveOwnerOnlyToolApprovalClass("gateway")).toBe("control_plane");
     expect(resolveOwnerOnlyToolApprovalClass("nodes")).toBe("exec_capable");
+    expect(resolveOwnerOnlyToolApprovalClass("alarm")).toBeUndefined();
     expect(resolveOwnerOnlyToolApprovalClass("read")).toBeUndefined();
   });
 
@@ -104,7 +105,6 @@ describe("tool-policy", () => {
     });
 
     expect(Object.fromEntries(sharedBackstops)).toEqual({
-      alarm: "control_plane",
       cron: "control_plane",
       gateway: "control_plane",
       nodes: "exec_capable",
@@ -112,10 +112,22 @@ describe("tool-policy", () => {
     });
   });
 
-  it("strips owner-only tools for non-owner senders", async () => {
+  it("keeps alarm available for non-owner senders", async () => {
+    const tools = [
+      {
+        name: "alarm",
+        // oxlint-disable-next-line typescript/no-explicit-any
+        execute: async () => ({ content: [], details: {} }) as any,
+      },
+    ] as unknown as AnyAgentTool[];
+    expect(applyOwnerOnlyToolPolicy(tools, false).map((t) => t.name)).toEqual(["alarm"]);
+    expect(applyOwnerOnlyToolPolicy(tools, true).map((t) => t.name)).toEqual(["alarm"]);
+  });
+
+  it("keeps all tools for non-owner senders (no owner hiding)", async () => {
     const tools = createOwnerPolicyTools();
     const filtered = applyOwnerOnlyToolPolicy(tools, false);
-    expect(filtered.map((t) => t.name)).toEqual(["read"]);
+    expect(filtered.map((t) => t.name)).toEqual(["read", "cron", "gateway", "whatsapp_login"]);
   });
 
   it("keeps owner-only tools for the owner sender", async () => {
@@ -124,7 +136,7 @@ describe("tool-policy", () => {
     expect(filtered.map((t) => t.name)).toEqual(["read", "cron", "gateway", "whatsapp_login"]);
   });
 
-  it("honors ownerOnly metadata for custom tool names", async () => {
+  it("keeps all tools regardless of ownerOnly metadata", async () => {
     const tools = [
       {
         name: "custom_admin_tool",
@@ -133,7 +145,7 @@ describe("tool-policy", () => {
         execute: async () => ({ content: [], details: {} }) as any,
       },
     ] as unknown as AnyAgentTool[];
-    expect(applyOwnerOnlyToolPolicy(tools, false)).toEqual([]);
+    expect(applyOwnerOnlyToolPolicy(tools, false)).toHaveLength(1);
     expect(applyOwnerOnlyToolPolicy(tools, true)).toHaveLength(1);
   });
 
@@ -147,7 +159,7 @@ describe("tool-policy", () => {
     ).toContain("optional-demo");
   });
 
-  it("strips nodes for non-owner senders via fallback policy", () => {
+  it("keeps nodes for non-owner senders (no fallback hiding)", () => {
     const tools = [
       {
         name: "read",
@@ -161,7 +173,10 @@ describe("tool-policy", () => {
       },
     ] as unknown as AnyAgentTool[];
 
-    expect(applyOwnerOnlyToolPolicy(tools, false).map((tool) => tool.name)).toEqual(["read"]);
+    expect(applyOwnerOnlyToolPolicy(tools, false).map((tool) => tool.name)).toEqual([
+      "read",
+      "nodes",
+    ]);
     expect(applyOwnerOnlyToolPolicy(tools, true).map((tool) => tool.name)).toEqual([
       "read",
       "nodes",
