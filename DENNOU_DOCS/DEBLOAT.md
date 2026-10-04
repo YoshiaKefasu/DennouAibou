@@ -2303,3 +2303,52 @@ Kasou 1人・単一マスターセッション永続化（ルール #2032）に�
 
 - **文字列参照の残留**：`ui/`（`agents-utils.ts`・`tool-policy.ts`）、`src/config/schema.*` の help 文、`system-prompt.ts`、tool-policy 既定値内のツール名文字列は tsgo に影響しないため本波スコープ外として温存。UI のエージェント系タブ整理・設定キー掃除は別波で。
 - **他テストの runtime 影響**：ツール名を文字列で参照する既存テスト（tool-policy 系・system-prompt 系・`attempt` 系等）は tsgo 上無傷だが、削除ツール存在前提の assertion がある場合は runtime で失敗し得る。ゲート対象外のため本波では未対応。次波で一括確認すること。
+
+## 37. 単一Kasou・マスターセッション永久不滅化（2026-10-05 作業）
+
+### 37.1 目的・背景
+
+ユーザー裁定（2026-10-05）：「マルチエージェントなし、Kasou一人だけで、そのセッションは1つ永続化でリストと削除できないようにします。」「WebUIを開いたときも最初からKasou（agent:main:main）のチャットに直行して、セッション一覧や削除ボタンは全部塞いじゃって大丈夫かな？ → はい、その通りで大丈夫です。」
+
+DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用の永続システム（ルール #2032）である。本波ではセッション削除・リセット・不要な切り替え口を完全に塞ぎ、WebUI を Kasou チャット直行にする。
+
+### 37.2 サーバー側：既設ガードの確認（本波では変更なし）
+
+調査の結果、破壊操作の chokepoint はすべて既に `isProtectedSessionKey` で封鎖済みであり、本波でのサーバー変更は不要だった（`master-session-immutability.test.ts` の F) が静的に固定化）：
+
+| Chokepoint                                                             | ガード                                                                 |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `sessions.delete` RPC（`src/gateway/server-methods/sessions.ts`）      | `isProtectedSessionKey(key, cfg)` で拒否（`INVALID_REQUEST`）          |
+| `sessions.reset` RPC（同上）                                           | `isProtectedSessionKey(key, loadConfig())` で拒否（`INVALID_REQUEST`） |
+| `performGatewaySessionReset`（`src/gateway/session-reset-service.ts`） | 先頭で `isProtectedSessionKey` 拒否                                    |
+| `/new`・`/reset` トリガー（`src/auto-reply/reply/session.ts`）         | 保護セッションでは通常メッセージ扱いに迂回（回転しない）               |
+| `runSessionResetFromAgent`（同 `session-reset-service.ts`）            | 先頭で `isProtectedSessionKey` 拒否                                    |
+| 自動リセット機構                                                       | 撤去済み（§34 の cron 撤去＋`reset.ts` の自動判定除去で確定）          |
+| WebUI 初期タブ（`ui/src/ui/navigation.ts` の `tabFromPath`）           | `/` は既定で `chat` に直行（変更不要）                                 |
+
+### 37.3 UI 側：本波の変更（6ファイル）
+
+| ファイル                             | 変更                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `ui/src/ui/navigation.ts`            | `TAB_GROUPS` の control タブから `sessions` を除去（サイドバー導線封鎖）                             |
+| `ui/src/ui/views/command-palette.ts` | `nav-sessions` 項目を除去（パレット導線封鎖）                                                        |
+| `ui/src/ui/views/overview-cards.ts`  | sessions 統計カードを除去（overview 導線封鎖。recent 一覧の読み取り表示は温存）                      |
+| `ui/src/ui/views/sessions.ts`        | 一括 Delete ボタンを恒久 `disabled` 化（直 URL 到達時の defense in depth。gateway も拒否する二重化） |
+| `ui/src/ui/views/chat.ts`            | 新規セッション（＋）ボタンを撤去し、`onNewSession`／`onClearHistory` props を除去                    |
+| `ui/src/ui/app-render.ts`            | 上記 props の配線（`/new` 送信・`sessions.reset` 呼び出し）を除去                                    |
+
+温存したもの（読み取り専用・破壊不能のため）：チャットヘッダーのセッション選択（参照切り替えのみ、破壊操作は gateway が拒否）、`/sessions` 直 URL の閲覧ビュー（削除ボタン無効化済み）、タブ型・ルート解決・`onClearHistory` 未使用残骸の整理範囲外（`app-chat.ts` の `/clear`・`/new`・`/reset` 打鍵パスは gateway ガードが無害化するため本波スコープ外）。
+
+### 37.4 検証ゲート
+
+| ゲート                                                             | 判定基準   |
+| ------------------------------------------------------------------ | ---------- |
+| `node scripts/run-tsgo.mjs --noEmit`                               | **exit 0** |
+| `bun run ui:build`                                                 | **pass**   |
+| `bun test src/config/sessions/master-session-immutability.test.ts` | **pass**   |
+| `pnpm exec oxfmt --check <changed_files>`                          | **pass**   |
+
+### 37.5 残務・注意（follow-up）
+
+- **`agents-utils.ts` の sessions ツール群ラベル**：§36 撤去ツールの文字列残留。表示専用のため本波スコープ外。
+- **i18n の sessions 文言**：タブ非表示後も辞書に残る。将来の単純再構築まで温存。

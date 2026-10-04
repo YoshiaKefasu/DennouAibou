@@ -59,21 +59,14 @@ export function renderOverviewCards(props: OverviewCardsProps) {
     return renderSkeletonCards();
   }
 
-  const sessionCount = props.sessionsResult?.count ?? null;
-
   const skills = props.skillsReport?.skills ?? [];
   const enabledSkills = skills.filter((s) => !s.disabled).length;
   const blockedSkills = skills.filter((s) => s.blockedByAllowlist).length;
   const totalSkills = skills.length;
 
+  // DennouAibou §37: sessions stat card sealed — single permanent Kasou master
+  // session only, no entry point to the sessions tab from overview.
   const cards: StatCard[] = [
-    {
-      kind: "sessions",
-      tab: "sessions",
-      label: t("overview.stats.sessions"),
-      value: String(sessionCount ?? t("common.na")),
-      hint: t("overview.stats.sessionsHint"),
-    },
     {
       kind: "skills",
       tab: "skills",

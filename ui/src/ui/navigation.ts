@@ -5,7 +5,9 @@ export const TAB_GROUPS = [
   { label: "chat", tabs: ["chat"] },
   {
     label: "control",
-    tabs: ["overview", "channels", "instances", "sessions"],
+    // DennouAibou §37: sessions tab sealed — single permanent Kasou master
+    // session only, no list/delete/reset entry points in the nav.
+    tabs: ["overview", "channels", "instances"],
   },
   { label: "agent", tabs: ["agents", "skills", "nodes"] },
   {

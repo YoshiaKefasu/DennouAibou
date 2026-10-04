@@ -31,13 +31,7 @@ const PALETTE_ITEMS: PaletteItem[] = [
     category: "navigation",
     action: "nav:overview",
   },
-  {
-    id: "nav-sessions",
-    label: "Sessions",
-    icon: "fileText",
-    category: "navigation",
-    action: "nav:sessions",
-  },
+  // DennouAibou §37: nav-sessions sealed — single permanent Kasou master session only.
   { id: "nav-skills", label: "Skills", icon: "zap", category: "navigation", action: "nav:skills" },
   {
     id: "nav-config",

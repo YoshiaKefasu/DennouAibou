@@ -310,10 +310,15 @@ export function renderSessions(props: SessionsProps) {
                 <button class="btn btn--sm" @click=${props.onDeselectAll}>
                   ${t("common.unselect")}
                 </button>
+                <!-- DennouAibou §37: session deletion sealed — single permanent
+                     Kasou master session. The gateway rejects sessions.delete for
+                     protected sessions; the button stays disabled so the UI never
+                     invites destruction. -->
                 <button
                   class="btn btn--sm danger"
-                  ?disabled=${props.loading}
-                  @click=${props.onDeleteSelected}
+                  disabled
+                  title="Session deletion is disabled: Kasou runs on a single permanent master session."
+                  aria-disabled="true"
                 >
                   ${icons.trash} Delete
                 </button>

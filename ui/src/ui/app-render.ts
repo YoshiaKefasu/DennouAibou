@@ -1136,21 +1136,7 @@ export function renderApp(state: AppViewState) {
               canAbort: Boolean(state.chatRunId),
               onAbort: () => void state.handleAbortChat(),
               onQueueRemove: (id) => state.removeQueuedMessage(id),
-              onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
-              onClearHistory: async () => {
-                if (!state.client || !state.connected) {
-                  return;
-                }
-                try {
-                  await state.client.request("sessions.reset", { key: state.sessionKey });
-                  state.chatMessages = [];
-                  state.chatStream = null;
-                  state.chatRunId = null;
-                  await loadChatHistory(state);
-                } catch (err) {
-                  state.lastError = String(err);
-                }
-              },
+              // DennouAibou §37: new-session / clear-history entry points sealed.
               agentsList: state.agentsList,
               currentAgentId: resolvedAgentId ?? "main",
               onAgentChange: (agentId: string) => {
