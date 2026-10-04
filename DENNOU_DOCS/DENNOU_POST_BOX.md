@@ -289,9 +289,10 @@ CREATE INDEX IF NOT EXISTS idx_letter_states_session ON letter_states(session, a
   - `src/server.ts`: `StreamableHTTPServerTransport` による `POST /mcp` 実装 ＆ Bearer トークン認証 (liveness `GET /` のみ認証免除)
   - 4 つのツール (`send_letter`, `check_inbox`, `read_letter`, `archive_letter`) の実装
   - ユニットテスト (`test/postbox.test.ts`): 23 テスト全 pass (往復投函・セッション別既読・認証ガード・プルーニング・カスケード削除検証)
-- [ ] **Phase 2: KASOU への常駐デプロイ**
-  - KASOU サーバー上に `openclaw-postbox.service` (systemd ユニット) を作成して自動起動
-  - ポート `8320` での待ち受けとローカルネットワーク疎通確認 (Windows 側から curl で確認)
-- [ ] **Phase 3: 各環境への設定配線 ＆ E2E 往復文通テスト**
+- [x] **Phase 2: KASOU への常駐デプロイ**
+  - KASOU サーバー上に `dennou-postbox.service` (systemd ユニット) を作成して自動起動 (ポート `8320`)
+  - 既存 Gateway サービスを `dennou-gateway.service` に完全リネーム・移行完了
+  - ポート `8320` での待ち受けとローカルネットワーク疎通確認 (HTTP 200 / Bearer 401/200)
+- [x] **Phase 3: 各環境への設定配線 ＆ E2E 往復文通テスト**
   - Windows 側 Pi Agent と KASOU 側 DennouAibou の双方で `postbox` を登録
-  - Kuraudo から投函 → Kasou が確認・返信 → Kuraudo が受信、の一連の往復サイクルを実証
+  - Kuraudo から投函 → Kasou が確認・開封・返信 → Kuraudo が受信・開封の一連の往復サイクルを実証完了！
