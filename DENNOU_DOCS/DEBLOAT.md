@@ -2158,4 +2158,49 @@ KASOU 本番は `cli-router`（CPA）経由のみを使用しており、過去�
 | `pnpm exec tsgo --noEmit`                                                                                         | **exit 0**（本波内1回のみ実行）                     |
 | 台帳残存欠落                                                                                                      | 4台帳とも missing 0件（`fs.existsSync` 再検証済み） |
 
-注：git 操作（add/commit/push 等）は未実施・Kuraudo 担当。`.pi/`・`__DENNOU_vitest__/` 不使用、KASOU 実機不接触。
+## 34. 旧 Gateway Cron サブシステム完全撤去（2026-10-05 作業）
+
+### 34.1 目的・背景
+
+OpenClaw 由来のマルチテナント向け・過剰エンジニアリングな旧 Cron 機構（`src/cron/` 130ファイル / 25,759行）を完全に撤去し、自律型体内時計プラグイン `extensions/dennou-alarm`（`alarm` ツール ＋ 独立ポーリングスケジューラ ＋ SQLite 永続化）へ一本化する（ユーザー裁定 2026-10-05、`DENNOU_POST_BOX.md` §1 思想準拠）。
+
+旧 Cron は「タスク台帳連携」「隔離エージェントターン（isolated-agent）」「webhook 配送」「run ログ集計」などの不要な複雑性を抱え、Gateway 起動や reload のたびに 2.5 万行のコードが関与していた。また、`session-integrity-guard` などのプラグインがカーネル内部の cron サービスに密結合する原因となっていた。
+本波により、スケジュール・タイマー機能はすべてプラグイン（`dennou-alarm`）の自己完結型サービスに移行し、カーネルはイベントポンプ（`runEventPumpOnce`）の受け口のみを提供するスリムなアーキテクチャ（Phase F 思想）を完成させる。
+
+### 34.2 削除対象一覧（実測約148ファイル / 約31,000行）
+
+| 区分                        | 対象パス・内容                                                                                                                                                                               | 規模                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| **`src/cron/` コア**        | `src/cron/**` 全ファイル（`service/` タイマー・スケジューラ、`isolated-agent/` 隔離エージェント、`store.ts`、`normalize.ts`、`types.ts` 等）                                                 | 130ファイル / 25,759行  |
+| **CLI コマンド**            | `src/cli/cron-cli.ts`、`src/cli/cron-cli/**` 全ファイル、`src/cli/cron-cli.test.ts`、`src/cli/program/register.subclis.ts` の登録除去                                                        | 約4ファイル / 約800行   |
+| **エージェントツール**      | `src/agents/tools/cron-tool.ts`、`src/agents/tools/cron-tool.*.test.ts`、`src/agents/openclaw-tools.ts` の `createCronTool` 登録点                                                           | 4ファイル / 約1,200行   |
+| **Gateway サービス ＆ RPC** | `src/gateway/server-cron.ts`、`src/gateway/server-methods/cron.ts`、`src/gateway/protocol/schema/cron.ts`、`src/gateway/server-cron.test.ts`、`src/gateway/server/hooks.ts` の cron 依存除去 | 約8ファイル / 約2,200行 |
+| **Doctor 診断**             | `src/commands/doctor-cron{,.legacy-delivery,.store-migration,.payload-migration}.ts`（4本）＋ テスト（3本）、`src/flows/doctor-health-contributions.ts` の cron 診断連携除去                 | 7ファイル / 約900行     |
+| **WebUI 画面**              | `ui/src/ui/controllers/cron.ts`、`ui/src/ui/views/cron.ts`、`ui/src/ui/_shared/cron-types.ts`（WebUI の Cron 管理タブ ＆ 周辺型定義）                                                        | 3ファイル / 約1,600行   |
+
+### 34.3 設定・スキーマ・プラグインの整合方針
+
+1. **KASOU 設定ファイルの後方互換性（ルール #2041 準拠）**:
+   - `dennou-aibou.json` 内に `cron: { ... }` セクションが残存していても起動時 zod バリデーションでクラッシュしないよう、他の DEBLOAT 波（sandbox/tasks 等）と同様に `@deprecated` 受容スキーマとして定義。
+   - `bun run config:schema:gen` を実行し、`schema.base.generated.ts` を正しく再生成する（ルール #1962 遵守）。次回設定クリーンアップで完全削除。
+2. **`session-integrity-guard` の自律タイマー化**:
+   - `extensions/session-integrity-guard/src/cron-job.ts` が呼んでいる `cron.add` を、プラグイン自身の自律サービス（`croner` 直接使用）による直接実行へ切り替え。通知は `deliverOutboundPayloads` を直接呼び出して配信。
+3. **残存 consumer のクリーンアップ**:
+   - `src/auto-reply/reply/agent-runner-reminder-guard.ts` の `hasSessionRelatedCronJobs` 呼び出しおよびファイルを削除し、`agent-runner.ts` のインポートを解消。
+   - `src/plugin-sdk/config-runtime.ts` から `loadCronStore`, `resolveCronStorePath`, `saveCronStore` の export を除去。
+   - `src/infra/event-pump.ts` の `cron:` wake reason や `isCronSystemEvent` を `alarm:` 優先へ整理。
+   - `src/gateway/server/hooks.ts` から cron 依存の `runCronIsolatedAgentTurn` 呼び出しを除去。
+4. **Gateway 起動・リロード・テスト基盤の整理**:
+   - `src/gateway/server.impl.ts`、`server-reload-handlers.ts`、`server-methods.ts`、`protocol-schemas.ts` から `buildGatewayCronService` および cron RPC ハンドラを除去。
+   - `vitest.cron.config.ts` および関連設定（`vitest.config.ts`, `vitest.shared.config.ts` 等）のプロジェクト定義を除去。
+
+### 34.4 検証ゲート
+
+| ゲート                      | 判定基準                            |
+| --------------------------- | ----------------------------------- |
+| `tsgo --noEmit`             | **0 errors (exit 0)**               |
+| `bun test` / `vitest`       | 削除対象以外の既存テスト全 pass     |
+| `oxfmt --check`             | 変更・追記ファイルすべて pass       |
+| `bun run ui:build`          | WebUI ビルド完走・Cron タブ除去確認 |
+| `config:schema:gen --check` | generated schema 整合確認           |
+| `config:schema:gen --check` | generated schema 整合確認           |
