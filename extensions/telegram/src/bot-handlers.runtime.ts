@@ -9,6 +9,7 @@ import {
   buildCommandsMessagePaginated,
   resolveStoredModelOverride,
 } from "openclaw/plugin-sdk/command-auth";
+import { isControlCommandMessage } from "openclaw/plugin-sdk/command-detection";
 import { writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
 import {
   loadSessionStore,
@@ -29,6 +30,7 @@ import {
 } from "openclaw/plugin-sdk/conversation-runtime";
 import { parseExecApprovalCommandText } from "openclaw/plugin-sdk/infra-runtime";
 import { formatModelsAvailableHeader } from "openclaw/plugin-sdk/models-provider-runtime";
+import { isAbortRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
 import { danger, logVerbose, warn } from "openclaw/plugin-sdk/runtime-env";
@@ -73,7 +75,11 @@ import {
   resolveTelegramGroupAllowFromContext,
   withResolvedTelegramForumFlag,
 } from "./bot/helpers.js";
-import type { TelegramContext, TelegramGetChat, TelegramSyntheticContextSource } from "./bot/types.js";
+import type {
+  TelegramContext,
+  TelegramGetChat,
+  TelegramSyntheticContextSource,
+} from "./bot/types.js";
 import { buildCommandsPaginationKeyboard } from "./command-ui.js";
 import {
   resolveTelegramConversationBaseSessionKey,
@@ -1093,16 +1099,28 @@ export const registerTelegramHandlers = ({
           debounceLane,
         })
       : null;
-    await inboundDebouncer.enqueue({
-      ctx,
-      msg,
-      allMedia,
-      storeAllowFrom,
-      receivedAtMs: Date.now(),
-      debounceKey,
-      debounceLane,
-      botUsername: ctx.me?.username,
-    });
+    const bypassText = msg.text ?? msg.caption ?? "";
+    const botUsername = ctx.me?.username;
+    const isBypassControlCommand =
+      isControlCommandMessage(bypassText, cfg, { botUsername }) ||
+      isAbortRequestText(bypassText, { botUsername });
+    // Steer: a message to a working session must overtake the serial chain
+    // instead of queueing behind the running agent.
+    const isSteerToWorkingSession = !!debounceKey && inboundDebouncer.isFlushing(debounceKey);
+    const shouldBypassDebounceChain = isBypassControlCommand || isSteerToWorkingSession;
+    await inboundDebouncer.enqueue(
+      {
+        ctx,
+        msg,
+        allMedia,
+        storeAllowFrom,
+        receivedAtMs: Date.now(),
+        debounceKey,
+        debounceLane,
+        botUsername: ctx.me?.username,
+      },
+      shouldBypassDebounceChain ? { bypassChain: true } : undefined,
+    );
   };
   bot.on("callback_query", async (ctx) => {
     const callback = ctx.callbackQuery;
@@ -1624,11 +1642,16 @@ export const registerTelegramHandlers = ({
         from: callback.from,
         text: nativeCallbackCommand ?? data,
       });
-      await processMessage(buildSyntheticContext(ctx as unknown as TelegramSyntheticContextSource, syntheticMessage), [], storeAllowFrom, {
-        ...(nativeCallbackCommand ? { commandSource: "native" as const } : {}),
-        forceWasMentioned: true,
-        messageIdOverride: callback.id,
-      });
+      await processMessage(
+        buildSyntheticContext(ctx as unknown as TelegramSyntheticContextSource, syntheticMessage),
+        [],
+        storeAllowFrom,
+        {
+          ...(nativeCallbackCommand ? { commandSource: "native" as const } : {}),
+          forceWasMentioned: true,
+          messageIdOverride: callback.id,
+        },
+      );
     } catch (err) {
       runtime.error?.(danger(`callback handler failed: ${String(err)}`));
     }

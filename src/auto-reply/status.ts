@@ -19,6 +19,7 @@ import { getChannelPlugin } from "../channels/plugins/index.js";
 import { isCommandFlagEnabled } from "../config/commands.js";
 import type { OpenClawConfig } from "../config/config.js";
 import {
+  resolveFreshSessionTotalTokens,
   resolveSessionFilePath,
   resolveSessionFilePathOptions,
   type SessionEntry,
@@ -232,19 +233,20 @@ const readUsageFromSessionLog = (
 
     // NOTE: every assistant usage entry is a snapshot of the *whole prompt* for that model
     // call, not a delta. Summing them counts the same context over and over (the `251.1m`
-    // `/status` regression). Dedupe by transcript entry id and keep the high-water mark as
-    // the session prompt size; the last call's counters still drive the input/output/cache
-    // fallbacks because those describe a single response.
-    const seenEntryIds = new Set<string>();
-    let input = 0;
-    let output = 0;
-    let cacheRead = 0;
-    let cacheWrite = 0;
-    let promptTokens = 0;
-    let total = 0;
-    let sawUsage = false;
-    let model: string | undefined;
-
+    // `/status` regression). Same-id lines are rewrites (retry / compaction rewrite),
+    // so only the tail copy is live: earlier copies are superseded and skipped
+    // (latest-wins). The surviving tail reflects the current post-compaction
+    // context size, while older lines still carry the pre-compaction peak
+    // (e.g. 807k vs the current 415k). A high-water mark would resurrect that
+    // past peak over the current value, so the maximum must never win here.
+    // The last call's counters still drive the input/output/cache fallbacks
+    // because those describe a single response.
+    type TranscriptUsageLine = {
+      id?: string;
+      usage?: UsageLike;
+      model?: string;
+    };
+    const parsedLines: TranscriptUsageLine[] = [];
     for (const line of lines) {
       if (!line.trim()) {
         continue;
@@ -259,21 +261,46 @@ const readUsageFromSessionLog = (
           usage?: UsageLike;
           model?: string;
         };
-        const entryId = typeof parsed.id === "string" ? parsed.id : undefined;
-        if (entryId !== undefined) {
-          if (seenEntryIds.has(entryId)) {
-            continue;
-          }
-          seenEntryIds.add(entryId);
-        }
-        const usage = normalizeUsage(parsed.message?.usage ?? parsed.usage);
+        parsedLines.push({
+          ...(typeof parsed.id === "string" ? { id: parsed.id } : {}),
+          usage: parsed.message?.usage ?? parsed.usage,
+          model: parsed.message?.model ?? parsed.model,
+        });
+      } catch {
+        // ignore malformed lines
+      }
+    }
+    const lastIndexById = new Map<string, number>();
+    parsedLines.forEach((entry, index) => {
+      if (entry.id !== undefined) {
+        lastIndexById.set(entry.id, index);
+      }
+    });
+    let input = 0;
+    let output = 0;
+    let cacheRead = 0;
+    let cacheWrite = 0;
+    let promptTokens = 0;
+    let total = 0;
+    let sawUsage = false;
+    let model: string | undefined;
+
+    for (const [index, entry] of parsedLines.entries()) {
+      if (entry.id !== undefined && lastIndexById.get(entry.id) !== index) {
+        // Superseded by a later rewrite of the same entry (latest-wins).
+        continue;
+      }
+      try {
+        const usage = normalizeUsage(entry.usage);
         if (!usage) {
-          model = parsed.message?.model ?? parsed.model ?? model;
+          model = entry.model ?? model;
           continue;
         }
         sawUsage = true;
         const prompt = derivePromptTokens(usage) ?? 0;
-        if (prompt > promptTokens) {
+        // Latest valid snapshot wins (never the max): transcript lines are ordered, so
+        // the tail reflects the current post-compaction context size.
+        if (prompt > 0) {
           promptTokens = prompt;
         }
         const callTotal =
@@ -282,14 +309,14 @@ const readUsageFromSessionLog = (
             (usage.output ?? 0) +
             (usage.cacheRead ?? 0) +
             (usage.cacheWrite ?? 0);
-        if (callTotal > total) {
+        if (callTotal > 0) {
           total = callTotal;
         }
         input = usage.input ?? input;
         output = usage.output ?? output;
         cacheRead = usage.cacheRead ?? cacheRead;
         cacheWrite = usage.cacheWrite ?? cacheWrite;
-        model = parsed.message?.model ?? parsed.model ?? model;
+        model = entry.model ?? model;
       } catch {
         // ignore malformed lines
       }
@@ -483,7 +510,13 @@ export function buildStatusMessage(args: StatusArgs): string {
   let outputTokens = entry?.outputTokens;
   let cacheRead = entry?.cacheRead;
   let cacheWrite = entry?.cacheWrite;
-  let totalTokens = entry?.totalTokens ?? (entry?.inputTokens ?? 0) + (entry?.outputTokens ?? 0);
+  // sessions.json holds the live (post-compaction) size via totalTokensFresh; a stale
+  // transcript peak must not resurrect over an explicit fresh value. The transcript
+  // candidate below only fills in when the session value is missing/zero or not
+  // explicitly marked fresh.
+  const freshSessionTotalTokens = resolveFreshSessionTotalTokens(entry);
+  let totalTokens =
+    freshSessionTotalTokens ?? (entry?.inputTokens ?? 0) + (entry?.outputTokens ?? 0);
 
   // Prefer prompt-size tokens from the session transcript when it looks larger
   // (cached prompt tokens are often missing from agent meta/store).
@@ -497,8 +530,15 @@ export function buildStatusMessage(args: StatusArgs): string {
     );
     if (logUsage) {
       const candidate = logUsage.promptTokens || logUsage.total;
-      if (!totalTokens || totalTokens === 0 || candidate > totalTokens) {
-        totalTokens = candidate;
+      // An explicit sessions.json fresh value (totalTokensFresh === true, the live
+      // post-compaction size) always wins when present: the transcript tail can
+      // still hold a stale pre-compaction peak (e.g. 807k vs the current 415k)
+      // that must not resurrect over it. The transcript candidate only fills in
+      // when no explicit fresh session value exists.
+      if (entry?.totalTokensFresh !== true) {
+        if (!totalTokens || totalTokens === 0 || candidate > totalTokens) {
+          totalTokens = candidate;
+        }
       }
       if (!entry?.model && logUsage.model) {
         const slashIndex = logUsage.model.indexOf("/");

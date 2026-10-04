@@ -3,8 +3,10 @@ import {
   createChannelInboundDebouncer,
   shouldDebounceTextInbound,
 } from "openclaw/plugin-sdk/channel-inbound";
+import { isControlCommandMessage } from "openclaw/plugin-sdk/command-detection";
 import { resolveOpenProviderRuntimeGroupPolicy } from "openclaw/plugin-sdk/config-runtime";
 import { createDedupeCache } from "openclaw/plugin-sdk/core";
+import { isAbortRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import { danger } from "openclaw/plugin-sdk/runtime-env";
 import { buildDiscordInboundJob } from "./inbound-job.js";
 import {
@@ -87,6 +89,26 @@ export function createDiscordMessageHandler(
     maxSize: RECENT_DISCORD_MESSAGE_MAX,
   });
 
+  const buildDebounceKey = (entry: {
+    data: DiscordMessageEvent;
+    client: Client;
+    abortSignal?: AbortSignal;
+  }): string | null => {
+    const message = entry.data.message;
+    const authorId = entry.data.author?.id;
+    if (!message || !authorId) {
+      return null;
+    }
+    const channelId = resolveDiscordMessageChannelId({
+      message,
+      eventChannelId: entry.data.channel_id,
+    });
+    if (!channelId) {
+      return null;
+    }
+    return `discord:${params.accountId}:${channelId}:${authorId}`;
+  };
+
   const { debouncer } = createChannelInboundDebouncer<{
     data: DiscordMessageEvent;
     client: Client;
@@ -94,21 +116,7 @@ export function createDiscordMessageHandler(
   }>({
     cfg: params.cfg,
     channel: "discord",
-    buildKey: (entry) => {
-      const message = entry.data.message;
-      const authorId = entry.data.author?.id;
-      if (!message || !authorId) {
-        return null;
-      }
-      const channelId = resolveDiscordMessageChannelId({
-        message,
-        eventChannelId: entry.data.channel_id,
-      });
-      if (!channelId) {
-        return null;
-      }
-      return `discord:${params.accountId}:${channelId}:${authorId}`;
-    },
+    buildKey: buildDebounceKey,
     shouldDebounce: (entry) => {
       const message = entry.data.message;
       if (!message) {
@@ -221,7 +229,19 @@ export function createDiscordMessageHandler(
         return;
       }
 
-      await debouncer.enqueue({ data, client, abortSignal: options?.abortSignal });
+      const entry = { data, client, abortSignal: options?.abortSignal };
+      const bypassText = data.message
+        ? resolveDiscordMessageText(data.message, { includeForwarded: false })
+        : "";
+      const isBypassControlCommand =
+        isControlCommandMessage(bypassText, params.cfg) || isAbortRequestText(bypassText);
+      // Steer: a message to a working session must overtake the serial chain
+      // instead of queueing behind the running agent.
+      const probeKey = buildDebounceKey(entry);
+      const isSteerToWorkingSession = !!probeKey && debouncer.isFlushing(probeKey);
+      const shouldBypassDebounceChain = isBypassControlCommand || isSteerToWorkingSession;
+
+      await debouncer.enqueue(entry, shouldBypassDebounceChain ? { bypassChain: true } : undefined);
     } catch (err) {
       params.runtime.error?.(danger(`handler failed: ${String(err)}`));
     }

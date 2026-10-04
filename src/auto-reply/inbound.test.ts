@@ -681,6 +681,95 @@ describe("createInboundDebouncer", () => {
       setTimeoutSpy.mockRestore();
     }
   });
+
+  it("dispatches bypassChain work immediately without waiting for a running same-key task", async () => {
+    const started: string[] = [];
+    const finished: string[] = [];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const debouncer = createInboundDebouncer<{ key: string; id: string; debounce: boolean }>({
+      debounceMs: 30,
+      buildKey: (item) => item.key,
+      shouldDebounce: (item) => item.debounce,
+      onFlush: async (items) => {
+        const ids = items.map((entry) => entry.id).join(",");
+        started.push(ids);
+        if (ids === "1") {
+          await firstGate;
+        }
+        finished.push(ids);
+      },
+    });
+
+    await debouncer.enqueue({ key: "a", id: "1", debounce: true });
+
+    // Wait for the debounce timer to fire so the first flush (agent run) is active.
+    await pollUntilAssert(
+      () => {
+        expect(started).toEqual(["1"]);
+      },
+      { timeoutMs: 3_000 },
+    );
+    expect(debouncer.isFlushing("a")).toBe(true);
+
+    // A normal chained follow-up must stay queued behind the running task.
+    const chained = debouncer.enqueue({ key: "a", id: "2", debounce: false });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(started).toEqual(["1"]);
+
+    // A bypass (/stop / Steer) task must dispatch immediately.
+    await debouncer.enqueue({ key: "a", id: "stop", debounce: false }, { bypassChain: true });
+    expect(started).toEqual(["1", "stop"]);
+    expect(finished).toEqual(["stop"]);
+
+    releaseFirst();
+    await chained;
+    expect(started).toEqual(["1", "stop", "2"]);
+    expect(finished).toEqual(["stop", "1", "2"]);
+  });
+
+  it("treats priority immediate as a chain bypass", async () => {
+    const finished: string[] = [];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const debouncer = createInboundDebouncer<{ key: string; id: string; debounce: boolean }>({
+      debounceMs: 30,
+      buildKey: (item) => item.key,
+      shouldDebounce: (item) => item.debounce,
+      onFlush: async (items) => {
+        const ids = items.map((entry) => entry.id).join(",");
+        if (ids === "1") {
+          await firstGate;
+        }
+        finished.push(ids);
+      },
+    });
+
+    await debouncer.enqueue({ key: "a", id: "1", debounce: true });
+    await pollUntilAssert(
+      () => {
+        expect(debouncer.isFlushing("a")).toBe(true);
+      },
+      { timeoutMs: 3_000 },
+    );
+
+    await debouncer.enqueue({ key: "a", id: "2", debounce: false }, { priority: "immediate" });
+    expect(finished).toEqual(["2"]);
+
+    releaseFirst();
+    await pollUntilAssert(
+      () => {
+        expect(finished).toEqual(["2", "1"]);
+      },
+      { timeoutMs: 3_000 },
+    );
+  });
 });
 
 describe("initSessionState BodyStripped", () => {

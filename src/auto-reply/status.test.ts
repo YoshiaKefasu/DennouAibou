@@ -1032,6 +1032,98 @@ describe("buildStatusMessage", () => {
     );
   });
 
+  it("prefers an explicit fresh session total over a stale transcript peak", async () => {
+    await withTempHome(
+      async (dir) => {
+        const sessionId = "sess-fresh-wins-over-peak";
+        writeTranscriptUsageLog({
+          dir,
+          agentId: "main",
+          sessionId,
+          usage: {
+            input: 7000,
+            output: 100,
+            cacheRead: 800_000,
+            cacheWrite: 0,
+            totalTokens: 807_100,
+          },
+        });
+
+        const text = buildStatusMessage({
+          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 1_048_576 },
+          sessionEntry: {
+            sessionId,
+            updatedAt: 0,
+            totalTokens: 415_000,
+            totalTokensFresh: true,
+            contextTokens: 1_048_576,
+          },
+          sessionKey: "agent:main:main",
+          sessionScope: "per-sender",
+          queue: { mode: "collect", depth: 0 },
+          includeTranscriptUsage: true,
+          modelAuth: "api-key",
+        });
+
+        // The transcript still carries the pre-compaction 807k peak while
+        // sessions.json already holds the live post-compaction 415k value.
+        const normalized = normalizeTestText(text);
+        expect(normalized).toContain("Context: 415k/1.0m");
+        expect(normalized).not.toContain("807k");
+      },
+      { prefix: "openclaw-status-" },
+    );
+  });
+
+  it("prefers the latest rewrite of a duplicated transcript entry", async () => {
+    await withTempHome(
+      async (dir) => {
+        const sessionId = "sess-usage-latest-wins";
+        const logPath = path.join(
+          dir,
+          ".openclaw",
+          "agents",
+          "main",
+          "sessions",
+          `${sessionId}.jsonl`,
+        );
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        const older = JSON.stringify({
+          id: "msg-rewrite",
+          type: "message",
+          message: {
+            role: "assistant",
+            model: "anthropic/claude-opus-4-6",
+            usage: { input: 900, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 905 },
+          },
+        });
+        const newer = JSON.stringify({
+          id: "msg-rewrite",
+          type: "message",
+          message: {
+            role: "assistant",
+            model: "anthropic/claude-opus-4-6",
+            usage: { input: 400, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 405 },
+          },
+        });
+        fs.writeFileSync(logPath, `${older}\n${newer}`, "utf-8");
+
+        const text = buildStatusMessage({
+          agent: { model: "anthropic/claude-opus-4-6", contextTokens: 1_000 },
+          sessionEntry: { sessionId, updatedAt: 0, contextTokens: 1_000 },
+          sessionKey: "agent:main:main",
+          sessionScope: "per-sender",
+          queue: { mode: "collect", depth: 0 },
+          includeTranscriptUsage: true,
+          modelAuth: "api-key",
+        });
+
+        expect(normalizeTestText(text)).toContain("Context: 400/1.0k (40%)");
+      },
+      { prefix: "openclaw-status-" },
+    );
+  });
+
   it("prefers cached prompt tokens from the session log", async () => {
     await withTempHome(
       async (dir) => {

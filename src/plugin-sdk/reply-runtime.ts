@@ -30,6 +30,10 @@ export {
   createInboundDebouncer,
   resolveInboundDebounceMs,
 } from "../auto-reply/inbound-debounce.js";
+export type {
+  InboundDebounceEnqueueOptions,
+  InboundDebouncePriority,
+} from "../auto-reply/inbound-debounce.js";
 export {
   dispatchReplyWithBufferedBlockDispatcher,
   dispatchReplyWithDispatcher,

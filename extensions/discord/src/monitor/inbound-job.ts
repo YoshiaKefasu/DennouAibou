@@ -1,3 +1,5 @@
+import { isControlCommandMessage } from "openclaw/plugin-sdk/command-detection";
+import { isAbortRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import type { DiscordMessagePreflightContext } from "./message-handler.preflight.types.js";
 
 type DiscordInboundJobRuntimeField =
@@ -26,14 +28,28 @@ export type DiscordInboundJob = {
 
 export function resolveDiscordInboundJobQueueKey(ctx: DiscordMessagePreflightContext): string {
   const sessionKey = ctx.route.sessionKey?.trim();
-  if (sessionKey) {
-    return sessionKey;
+  const base = sessionKey || ctx.baseSessionKey?.trim() || ctx.messageChannelId;
+  // Control commands (/stop etc.) run on a dedicated `:control` lane so they
+  // dispatch concurrently instead of queueing behind a running agent run.
+  // Same pattern as Telegram's sequential-key.ts abort → `:control` split:
+  // KeyedAsyncQueue serializes per key, so a suffixed key never blocks on
+  // the normal lane's tail. Without this, /stop deadlocks — it only runs
+  // after the run it is supposed to interrupt.
+  const text = ctx.baseText?.trim() || ctx.messageText?.trim() || "";
+  if (text && isDiscordInboundControlText(text, ctx.cfg)) {
+    return `${base}:control`;
   }
-  const baseSessionKey = ctx.baseSessionKey?.trim();
-  if (baseSessionKey) {
-    return baseSessionKey;
+  return base;
+}
+
+export function isDiscordInboundControlText(
+  text: string | undefined,
+  cfg: DiscordMessagePreflightContext["cfg"],
+): boolean {
+  if (!text?.trim()) {
+    return false;
   }
-  return ctx.messageChannelId;
+  return isControlCommandMessage(text, cfg) || isAbortRequestText(text);
 }
 
 export function buildDiscordInboundJob(ctx: DiscordMessagePreflightContext): DiscordInboundJob {
