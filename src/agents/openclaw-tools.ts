@@ -12,7 +12,6 @@ import { resolveOpenClawPluginToolInputs } from "./openclaw-tools.plugin-context
 import { applyPluginToolDeliveryDefaults } from "./plugin-tool-delivery-defaults.js";
 import type { SpawnedToolContext } from "./spawned-context.js";
 import type { ToolFsPolicy } from "./tool-fs-policy.js";
-import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createAudioTool } from "./tools/audio-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
@@ -21,13 +20,6 @@ import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createPdfTool } from "./tools/pdf-tool.js";
-import { createSessionStatusTool } from "./tools/session-status-tool.js";
-import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
-import { createSessionsListTool } from "./tools/sessions-list-tool.js";
-import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
-import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
-import { createSessionsYieldTool } from "./tools/sessions-yield-tool.js";
-import { createSubagentsTool } from "./tools/subagents-tool.js";
 import { createUpdatePlanTool } from "./tools/update-plan-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
@@ -120,9 +112,6 @@ export function createOpenClawTools(
       ? undefined
       : resolveAgentWorkspaceDir(resolvedConfig, sessionAgentId);
   const workspaceDir = resolveWorkspaceRoot(options?.workspaceDir ?? inferredWorkspaceDir);
-  const spawnWorkspaceDir = resolveWorkspaceRoot(
-    options?.spawnWorkspaceDir ?? options?.workspaceDir ?? inferredWorkspaceDir,
-  );
   const deliveryContext = normalizeDeliveryContext({
     channel: options?.agentChannel,
     to: options?.agentTo,
@@ -197,52 +186,9 @@ export function createOpenClawTools(
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
     }),
-    createAgentsListTool({
-      agentSessionKey: options?.agentSessionKey,
-      requesterAgentIdOverride: options?.requesterAgentIdOverride,
-    }),
     ...(isExperimentalPlanToolEnabled(resolvedConfig) || isOpenAIProvider(options?.modelProvider)
       ? [createUpdatePlanTool()]
       : []),
-    createSessionsListTool({
-      agentSessionKey: options?.agentSessionKey,
-      config: resolvedConfig,
-      callGateway: openClawToolsDeps.callGateway,
-    }),
-    createSessionsHistoryTool({
-      agentSessionKey: options?.agentSessionKey,
-      config: resolvedConfig,
-      callGateway: openClawToolsDeps.callGateway,
-    }),
-    createSessionsSendTool({
-      agentSessionKey: options?.agentSessionKey,
-      agentChannel: options?.agentChannel,
-      config: resolvedConfig,
-      callGateway: openClawToolsDeps.callGateway,
-    }),
-    createSessionsYieldTool({
-      sessionId: options?.sessionId,
-      onYield: options?.onYield,
-    }),
-    createSessionsSpawnTool({
-      agentSessionKey: options?.agentSessionKey,
-      agentChannel: options?.agentChannel,
-      agentAccountId: options?.agentAccountId,
-      agentTo: options?.agentTo,
-      agentThreadId: options?.agentThreadId,
-      agentGroupId: options?.agentGroupId,
-      agentGroupChannel: options?.agentGroupChannel,
-      agentGroupSpace: options?.agentGroupSpace,
-      requesterAgentIdOverride: options?.requesterAgentIdOverride,
-      workspaceDir: spawnWorkspaceDir,
-    }),
-    createSubagentsTool({
-      agentSessionKey: options?.agentSessionKey,
-    }),
-    createSessionStatusTool({
-      agentSessionKey: options?.agentSessionKey,
-      config: resolvedConfig,
-    }),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),

@@ -2267,3 +2267,39 @@ OpenClaw 由来のマルチテナント向け・過剰エンジニアリング�
 - **`from "vitest"` 約2394ファイル残留**: Bun shim により runtime は動作するが、クリーン install 後（`node_modules/vitest` 消失後）の `tsgo` は TS2307 リスクあり。`bun:test` への import 移行は別波で（vitest-only API 使用ファイルあり、一括置換禁止）。
 - **`docs/help/testing.md`・`DENNOU_RULES.md` の vitest 記述**は本波スコープ外として温存。ドキュメント更新は別途。
 - **`test:perf:budget` / `test:perf:hotspots`** は vitest レポートのパーサとして残置（既定 config 文字列は dangling のため将来整理）。
+
+## 36. エージェント・セッション管理ツールの全撤去（2026-10-05 作業）
+
+### 36.1 目的・背景
+
+ユーザー裁定（2026-10-05）：「サブエージェント仕組みをもDebloatします。後でシンプルに作り変えます。マルチエージェントなし、Kasou一人だけで、そのセッションは1つ永続化でリストと削除できないようにします。」「message は残します。エージェントセッションツールはいらない。」
+
+Kasou 1人・単一マスターセッション永続化（ルール #2032）に伴い、他のエージェントを作ったりセッションを一覧・切り替えたりするツール群は完全に不要になった。`message` ツールは能動発信に有用なため温存する。
+
+### 36.2 削除内容（ツール9ファイル＋対応テスト22ファイル）
+
+| 区分                          | 対象                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ツール実装（8ツール）**     | `src/agents/tools/agents-list-tool.ts`（`agents_list`）、`session-status-tool.ts`（`session_status`）、`sessions-history-tool.ts`（`sessions_history`）、`sessions-list-tool.ts`（`sessions_list`）、`sessions-send-tool.ts`＋`sessions-send-tool.a2a.ts`（`sessions_send`）、`sessions-spawn-tool.ts`（`sessions_spawn`）、`sessions-yield-tool.ts`（`sessions_yield`）、`subagents-tool.ts`（`subagents`）                                                                                                                |
+| **ツール登録解除**            | `src/agents/openclaw-tools.ts` の上記8ツール import＋生成ブロック除去。`spawnWorkspaceDir` ローカル解決（spawn 専用だった）を除去。options 型の `spawnWorkspaceDir`／`onYield`／`requesterAgentIdOverride` は `pi-tools.ts`・`attempt.ts` の呼び出し互換のため保持（デッドフィールド、将来の単純再構築まで）。`message` ツールは無変更・温存。                                                                                                                                                                              |
+| **ツール単体テスト**          | `tools/sessions-list-tool.test.ts`・`sessions-spawn-tool.test.ts`・`sessions-yield-tool.test.ts`（削除ツール専用のため連動削除）                                                                                                                                                                                                                                                                                                                                                                                            |
+| **openclaw-tools 結合テスト** | `openclaw-tools.sessions.test.ts`・`sessions-visibility.test.ts`・`session-status.test.ts`・`agents.test.ts`・`subagents.scope.test.ts`・`subagents.steer-failure-clears-suppression.test.ts`、`subagents.sessions-spawn.*` 7件（thinking-default／timeout×2／allowlist／cron-note／lifecycle／model／depth-limits）＋ `sessions-spawn.test-harness.ts`・`subagents.test-harness.ts`（利用者が全滅したため連動削除）、`sessions-spawn-hooks.test.ts`・`sessions-spawn-threadid.test.ts`（spawn ハーネス経由のため連動削除） |
+| **テストスタブ**              | `src/agents/test-helpers/fast-openclaw-tools-sessions.ts`（唯一の利用者 `openclaw-tools.sessions.test.ts` の削除により孤立したため削除。中身は削除ツール2件の `vi.mock` を含んでいた）                                                                                                                                                                                                                                                                                                                                      |
+| **混合テストの縮小**          | `src/agents/tools/sessions.test.ts` は削除ツール依存部（`sessions_list`／`sessions_send` gating・transcriptPath・channel 4 describes＋関連ヘルパー）のみ除去し、存続基盤の `sanitizeTextContent`／`extractAssistantText`／`resolveAnnounceTarget` 3 describes は維持                                                                                                                                                                                                                                                        |
+
+### 36.3 温存した共有基盤（将来のシンプル再構築用）
+
+ツール本体の下にある解決・整形層は、存続コードが使用中のため残す：`sessions-helpers.ts`・`sessions-access.ts`・`sessions-resolution.ts`・`sessions-send-helpers.ts`（`gateway/server-restart-sentinel.ts` が使用）・`sessions-send-tokens.ts`（`subagent-announce*.ts` が使用）・`sessions-announce-target.ts`・`session-message-text.ts`・`chat-history-text.ts`（`run-wait.ts` が使用）とそのテスト（`sessions-access`・`sessions-resolution`・`sessions-send-helpers`・縮小後 `sessions.test.ts`）。将来「シンプルに作り変える」際の土台になる。
+
+### 36.4 検証ゲート
+
+| ゲート                                    | 判定基準   |
+| ----------------------------------------- | ---------- |
+| `node scripts/run-tsgo.mjs --noEmit`      | **exit 0** |
+| `bun test src/auto-reply/status.test.ts`  | **pass**   |
+| `pnpm exec oxfmt --check <changed_files>` | **pass**   |
+
+### 36.5 残務・注意（follow-up）
+
+- **文字列参照の残留**：`ui/`（`agents-utils.ts`・`tool-policy.ts`）、`src/config/schema.*` の help 文、`system-prompt.ts`、tool-policy 既定値内のツール名文字列は tsgo に影響しないため本波スコープ外として温存。UI のエージェント系タブ整理・設定キー掃除は別波で。
+- **他テストの runtime 影響**：ツール名を文字列で参照する既存テスト（tool-policy 系・system-prompt 系・`attempt` 系等）は tsgo 上無傷だが、削除ツール存在前提の assertion がある場合は runtime で失敗し得る。ゲート対象外のため本波では未対応。次波で一括確認すること。
