@@ -1,8 +1,35 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installSessionToolResultGuard } from "./session-tool-result-guard.js";
 import { castAgentMessage } from "./test-helpers/agent-message-fixtures.js";
+
+const warnLog = vi.hoisted(() => vi.fn());
+
+vi.mock("../logging/subsystem.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../logging/subsystem.js")>("../logging/subsystem.js");
+  const mockLogger: import("../logging/subsystem.js").SubsystemLogger = {
+    subsystem: "test",
+    isEnabled: () => true,
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: warnLog,
+    error: () => {},
+    fatal: () => {},
+    raw: () => {},
+    child: () => mockLogger,
+  };
+  return {
+    ...actual,
+    createSubsystemLogger: () => mockLogger,
+  };
+});
+
+beforeEach(() => {
+  warnLog.mockClear();
+});
 
 type AppendMessage = Parameters<SessionManager["appendMessage"]>[0];
 
@@ -896,5 +923,43 @@ describe("installSessionToolResultGuard", () => {
       (m) => (m as { toolCallId?: string }).toolCallId === "call_error",
     );
     expect(syntheticForError).toHaveLength(0);
+  });
+
+  it("persists mcp__ tool calls even when not in allowedToolNames", () => {
+    const sm = SessionManager.inMemory();
+    installSessionToolResultGuard(sm, {
+      allowedToolNames: ["read"],
+    });
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [{ type: "toolCall", id: "call_mcp", name: "mcp__server__tool", arguments: {} }],
+      }),
+    );
+
+    const messages = getPersistedMessages(sm);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.role).toBe("assistant");
+    expect(warnLog).not.toHaveBeenCalled();
+  });
+
+  it("emits a guard warn log when dropping a tool call not in allowedToolNames", () => {
+    const sm = SessionManager.inMemory();
+    installSessionToolResultGuard(sm, {
+      allowedToolNames: ["read"],
+    });
+
+    sm.appendMessage(
+      asAppendMessage({
+        role: "assistant",
+        content: [{ type: "toolCall", id: "call_drop", name: "write", arguments: {} }],
+      }),
+    );
+
+    expect(getPersistedMessages(sm)).toHaveLength(0);
+    expect(warnLog).toHaveBeenCalled();
+    const firstCall = warnLog.mock.calls[0]?.[0];
+    expect(String(firstCall)).toContain("[guard:drop]");
   });
 });

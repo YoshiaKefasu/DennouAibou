@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  AUDIO_OMISSION_PREFIX,
   findAudioAttachments,
   findEligibleAudioAttachments,
+  formatAudioPlaceholder,
   formatAudioTranscript,
   resolveGroqApiKey,
   scanSessionFile,
@@ -289,6 +291,279 @@ describe("Groq transcription and session replacement", () => {
     expect(await fs.readFile(sessionFile, "utf8")).toBe(
       `${JSON.stringify(originalEntry)}\n${JSON.stringify(liveAppend)}\n`,
     );
+  });
+});
+
+function makeInlineAudioEntry(params: {
+  base64Data: string;
+  timestamp: number;
+  mimeType?: string;
+}) {
+  return {
+    type: "message",
+    id: "msg-inline-audio-1",
+    parentId: "msg-parent-1",
+    timestamp: new Date(params.timestamp).toISOString(),
+    message: {
+      role: "user",
+      content: [
+        {
+          type: "audio",
+          data: params.base64Data,
+          mimeType: params.mimeType ?? "audio/ogg",
+          durationSeconds: 8,
+        },
+      ],
+      timestamp: params.timestamp,
+    },
+  };
+}
+
+describe("inline base64 audio (30-minute fail-open)", () => {
+  const inlineData = Buffer.from("fake inline audio bytes ".repeat(4000)).toString("base64");
+
+  it("detects inline audio only after 30 minutes and fails closed without a timestamp", async () => {
+    const young = makeInlineAudioEntry({
+      base64Data: inlineData,
+      timestamp: NOW - THIRTY_MINUTES + 1,
+    });
+    const old = makeInlineAudioEntry({ base64Data: inlineData, timestamp: NOW - THIRTY_MINUTES });
+
+    expect(findAudioAttachments(young)).toHaveLength(1);
+    expect(findAudioAttachments(young)[0]).toMatchObject({ isInline: true });
+    expect(findEligibleAudioAttachments({ entry: young, now: NOW, delayMinutes: 30 })).toEqual([]);
+    const eligible = findEligibleAudioAttachments({ entry: old, now: NOW, delayMinutes: 30 });
+    expect(eligible).toHaveLength(1);
+    expect(eligible[0]).toMatchObject({ isInline: true, contentIndex: 0 });
+
+    const noTimestamp = makeInlineAudioEntry({
+      base64Data: inlineData,
+      timestamp: NOW - THIRTY_MINUTES,
+    });
+    delete (noTimestamp.message as { timestamp?: number }).timestamp;
+    delete (noTimestamp as { timestamp?: string }).timestamp;
+    expect(
+      findEligibleAudioAttachments({ entry: noTimestamp, now: NOW, delayMinutes: 30 }),
+    ).toEqual([]);
+  });
+
+  it("replaces stale inline audio with a transcript via the transcribe seam", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "context-pruner-inline-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    const originalEntry = makeInlineAudioEntry({
+      base64Data: inlineData,
+      timestamp: NOW - THIRTY_MINUTES - 1,
+    });
+    await fs.writeFile(sessionFile, `${JSON.stringify(originalEntry)}\n`, "utf8");
+    await makeSessionScannable(sessionFile);
+    const beforeSize = (await fs.stat(sessionFile)).size;
+    expect(beforeSize).toBeGreaterThan(60_000);
+
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      now: NOW,
+      transcribeAudio: async (target) => {
+        expect(target.isInline).toBe(true);
+        expect(typeof target.inlineData).toBe("string");
+        return "インライン音声の内容です。";
+      },
+    });
+
+    expect(result).toMatchObject({ candidates: 1, transcribed: 1, changed: true });
+    const rewritten = JSON.parse((await fs.readFile(sessionFile, "utf8")).trim()) as {
+      id: string;
+      parentId: string;
+      timestamp: string;
+      message: {
+        role: string;
+        timestamp: number;
+        content: Array<{ type: string; text?: string; data?: string }>;
+      };
+    };
+    expect(rewritten.id).toBe(originalEntry.id);
+    expect(rewritten.parentId).toBe(originalEntry.parentId);
+    expect(rewritten.timestamp).toBe(originalEntry.timestamp);
+    expect(rewritten.message.content).toHaveLength(1);
+    expect(rewritten.message.content[0].type).toBe("text");
+    expect(rewritten.message.content[0].text).toContain("🎙️ [音声文字起こし:");
+    expect(rewritten.message.content[0].text).toContain("インライン音声の内容です。");
+    expect(JSON.stringify(rewritten)).not.toContain(inlineData.slice(0, 64));
+    expect((await fs.stat(sessionFile)).size).toBeLessThan(beforeSize / 10);
+  });
+
+  it("fail-open placeholderizes stale inline audio without GROQ_API_KEY", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "context-pruner-inline-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    const originalEntry = makeInlineAudioEntry({
+      base64Data: inlineData,
+      timestamp: NOW - THIRTY_MINUTES - 1,
+    });
+    await fs.writeFile(sessionFile, `${JSON.stringify(originalEntry)}\n`, "utf8");
+    await makeSessionScannable(sessionFile);
+    const beforeSize = (await fs.stat(sessionFile)).size;
+
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      env: {},
+      now: NOW,
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.omitted).toBe(1);
+    expect(result.skipped).toBeUndefined();
+    const rewritten = JSON.parse((await fs.readFile(sessionFile, "utf8")).trim()) as {
+      message: { content: Array<{ type: string; text?: string }> };
+    };
+    expect(rewritten.message.content).toHaveLength(1);
+    expect(rewritten.message.content[0].type).toBe("text");
+    expect(rewritten.message.content[0].text).toContain(AUDIO_OMISSION_PREFIX);
+    expect(JSON.stringify(rewritten)).not.toContain(inlineData.slice(0, 64));
+    expect((await fs.stat(sessionFile)).size).toBeLessThan(beforeSize / 10);
+  });
+
+  it("fail-open placeholderizes stale inline audio when Whisper fails", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "context-pruner-inline-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(
+      sessionFile,
+      `${JSON.stringify(makeInlineAudioEntry({ base64Data: inlineData, timestamp: NOW - THIRTY_MINUTES - 1 }))}\n`,
+      "utf8",
+    );
+    await makeSessionScannable(sessionFile);
+
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 }));
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      env: { GROQ_API_KEY: "test-groq-key" },
+      now: NOW,
+      fetchImpl,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ candidates: 1, transcribed: 0, changed: true });
+    expect(result.omitted).toBe(1);
+    const text = (await fs.readFile(sessionFile, "utf8")).trim();
+    expect(text).toContain(AUDIO_OMISSION_PREFIX);
+    expect(text).not.toContain(inlineData.slice(0, 64));
+  });
+
+  it("sends decoded inline audio to Groq via a temp file", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "context-pruner-inline-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(
+      sessionFile,
+      `${JSON.stringify(makeInlineAudioEntry({ base64Data: inlineData, timestamp: NOW - THIRTY_MINUTES - 1 }))}\n`,
+      "utf8",
+    );
+    await makeSessionScannable(sessionFile);
+
+    const fetchImpl = vi.fn<typeof fetch>(async (_input, init) => {
+      const form = init?.body as FormData;
+      const file = form.get("file") as File;
+      expect(file).toBeInstanceOf(File);
+      expect(file.size).toBeGreaterThan(60_000);
+      return new Response(JSON.stringify({ text: "temp経由の文字起こし" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      env: { GROQ_API_KEY: "test-groq-key" },
+      now: NOW,
+      fetchImpl,
+    });
+
+    expect(result).toMatchObject({ candidates: 1, transcribed: 1, changed: true });
+    expect(await fs.readFile(sessionFile, "utf8")).toContain("temp経由の文字起こし");
+  });
+
+  it("formats a compact omission placeholder", () => {
+    const placeholder = formatAudioPlaceholder({
+      label: "inline音声(content[0], 61KB)",
+      durationSeconds: 8,
+    });
+    expect(placeholder.startsWith(AUDIO_OMISSION_PREFIX)).toBe(true);
+    expect(placeholder.length).toBeLessThan(200);
+  });
+});
+
+describe("toolResult inline audio", () => {
+  const inlineData = Buffer.from("fake toolresult audio bytes ".repeat(4000)).toString("base64");
+
+  function makeToolResultInlineEntry(timestamp: number) {
+    return {
+      type: "message",
+      id: "msg-toolresult-audio-1",
+      parentId: "msg-parent-1",
+      timestamp: new Date(timestamp).toISOString(),
+      message: {
+        role: "toolResult",
+        toolCallId: "call-audio-1",
+        toolName: "audio",
+        content: [
+          {
+            type: "audio",
+            data: inlineData,
+            mimeType: "audio/ogg",
+            durationSeconds: 5,
+          },
+        ],
+        timestamp,
+      },
+    };
+  }
+
+  it("detects inline base64 audio inside toolResult messages", async () => {
+    const young = makeToolResultInlineEntry(NOW - THIRTY_MINUTES + 1);
+    const old = makeToolResultInlineEntry(NOW - THIRTY_MINUTES);
+
+    expect(findAudioAttachments(young)).toHaveLength(1);
+    expect(findAudioAttachments(young)[0]).toMatchObject({ isInline: true });
+    expect(findEligibleAudioAttachments({ entry: young, now: NOW, delayMinutes: 30 })).toEqual([]);
+    const eligible = findEligibleAudioAttachments({ entry: old, now: NOW, delayMinutes: 30 });
+    expect(eligible).toHaveLength(1);
+    expect(eligible[0]).toMatchObject({ isInline: true, contentIndex: 0 });
+  });
+
+  it("fail-open placeholderizes stale toolResult inline audio without GROQ_API_KEY", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "context-pruner-toolresult-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(
+      sessionFile,
+      `${JSON.stringify(makeToolResultInlineEntry(NOW - THIRTY_MINUTES - 1))}\n`,
+      "utf8",
+    );
+    await makeSessionScannable(sessionFile);
+    const beforeSize = (await fs.stat(sessionFile)).size;
+
+    const result = await scanSessionFile({
+      sessionFile,
+      stt: { provider: "groq", model: "whisper-large-v3-turbo", delayMinutes: 30 },
+      env: {},
+      now: NOW,
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.omitted).toBe(1);
+    const rewritten = JSON.parse((await fs.readFile(sessionFile, "utf8")).trim()) as {
+      message: { role: string; content: Array<{ type: string; text?: string }> };
+    };
+    expect(rewritten.message.role).toBe("toolResult");
+    expect(rewritten.message.content).toHaveLength(1);
+    expect(rewritten.message.content[0].type).toBe("text");
+    expect(rewritten.message.content[0].text).toContain(AUDIO_OMISSION_PREFIX);
+    expect(JSON.stringify(rewritten)).not.toContain(inlineData.slice(0, 64));
+    expect((await fs.stat(sessionFile)).size).toBeLessThan(beforeSize / 10);
   });
 });
 

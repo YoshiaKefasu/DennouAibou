@@ -1,5 +1,8 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-id.js";
+
+const log = createSubsystemLogger("agents/session-transcript-repair");
 
 const TOOL_CALL_NAME_MAX_CHARS = 64;
 const TOOL_CALL_NAME_RE = /^[A-Za-z0-9_:.-]+$/;
@@ -55,6 +58,10 @@ function normalizeAllowedToolNames(allowedToolNames?: Iterable<string>): Set<str
   return normalized.size > 0 ? normalized : null;
 }
 
+function isMcpToolName(name: string): boolean {
+  return name.trim().toLowerCase().startsWith("mcp__");
+}
+
 function hasToolCallName(block: RawToolCallBlock, allowedToolNames: Set<string> | null): boolean {
   if (typeof block.name !== "string") {
     return false;
@@ -62,6 +69,11 @@ function hasToolCallName(block: RawToolCallBlock, allowedToolNames: Set<string> 
   const trimmed = block.name.trim();
   if (!trimmed) {
     return false;
+  }
+  // MCP tools are always allowed so boxed/deferred MCP tools pulled out via
+  // tool_search are never silently dropped from transcripts.
+  if (isMcpToolName(trimmed)) {
+    return true;
   }
   if (trimmed.length > TOOL_CALL_NAME_MAX_CHARS || !TOOL_CALL_NAME_RE.test(trimmed)) {
     return false;
@@ -221,6 +233,33 @@ export function stripToolResultDetails(messages: AgentMessage[]): AgentMessage[]
   return touched ? out : messages;
 }
 
+function describeToolCallDropReason(
+  block: RawToolCallBlock,
+  allowedToolNames: Set<string> | null,
+): string {
+  if (!hasToolCallInput(block)) {
+    return "missing_input";
+  }
+  if (!hasToolCallId(block)) {
+    return "missing_id";
+  }
+  const rawName = typeof block.name === "string" ? block.name : undefined;
+  const trimmed = rawName?.trim() ?? "";
+  if (!trimmed) {
+    return "invalid_name";
+  }
+  if (isMcpToolName(trimmed)) {
+    return "name_rejected";
+  }
+  if (trimmed.length > TOOL_CALL_NAME_MAX_CHARS || !TOOL_CALL_NAME_RE.test(trimmed)) {
+    return "invalid_name";
+  }
+  if (allowedToolNames && !allowedToolNames.has(trimmed.toLowerCase())) {
+    return "unknown_tool";
+  }
+  return "name_rejected";
+}
+
 export function repairToolCallInputs(
   messages: AgentMessage[],
   options?: ToolCallInputRepairOptions,
@@ -253,10 +292,16 @@ export function repairToolCallInputs(
           !hasToolCallId(block) ||
           !hasToolCallName(block, allowedToolNames))
       ) {
+        const reason = describeToolCallDropReason(block, allowedToolNames);
+        const dropName = (block as { name?: unknown }).name;
+        const dropId = (block as { id?: unknown }).id;
         droppedToolCalls += 1;
         droppedInMessage += 1;
         changed = true;
         messageChanged = true;
+        log.warn(
+          `[guard:drop] dropped tool call: name=${String(dropName ?? "(missing)")} id=${String(dropId ?? "(missing)")} reason=${reason}`,
+        );
         continue;
       }
       if (isRawToolCallBlock(block)) {
@@ -305,6 +350,9 @@ export function repairToolCallInputs(
       if (nextContent.length === 0) {
         droppedAssistantMessages += 1;
         changed = true;
+        log.warn(
+          `[guard:drop] dropped assistant message: droppedToolCallsInMessage=${droppedInMessage} reason=all_tool_calls_dropped`,
+        );
         continue;
       }
       out.push({ ...msg, content: nextContent });

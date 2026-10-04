@@ -954,6 +954,29 @@ export async function runEmbeddedAttempt(
         ) {
           ensureDiscoveryToolsActive(activeSession);
         }
+        // Merge post-bind tools (formal SDK/plugin/extension tools, notably
+        // boxed/deferred `mcp__*` tools) into the allowlist so transcript guards
+        // and stream sanitizers treat formally registered tools as allowed and
+        // never drop them for "not in static list". allowedToolNames is shared
+        // by reference with downstream consumers.
+        if (typeof activeSession.getAllTools === "function") {
+          try {
+            const boundTools = activeSession.getAllTools();
+            if (Array.isArray(boundTools)) {
+              for (const tool of boundTools) {
+                const name = (tool as { name?: unknown })?.name;
+                if (typeof name === "string" && name.trim()) {
+                  allowedToolNames.add(name.trim());
+                }
+              }
+            }
+            log.info(
+              `[guard:allowed-tools] registered tools for session: ${[...allowedToolNames].toSorted().join(", ")} (count=${allowedToolNames.size})`,
+            );
+          } catch (error) {
+            log.debug(`merge bound tools into allowlist failed: ${String(error)}`);
+          }
+        }
       }
       applySystemPromptOverrideToSession(activeSession, systemPromptText);
       abortSessionForYield = () => {

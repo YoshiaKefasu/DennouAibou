@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   sanitizeToolCallInputs,
   sanitizeToolUseResultPairing,
@@ -7,6 +7,33 @@ import {
   stripToolResultDetails,
 } from "./session-transcript-repair.js";
 import { castAgentMessage, castAgentMessages } from "./test-helpers/agent-message-fixtures.js";
+
+const warnLog = vi.hoisted(() => vi.fn());
+
+vi.mock("../logging/subsystem.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../logging/subsystem.js")>("../logging/subsystem.js");
+  const mockLogger: import("../logging/subsystem.js").SubsystemLogger = {
+    subsystem: "test",
+    isEnabled: () => true,
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: warnLog,
+    error: () => {},
+    fatal: () => {},
+    raw: () => {},
+    child: () => mockLogger,
+  };
+  return {
+    ...actual,
+    createSubsystemLogger: () => mockLogger,
+  };
+});
+
+beforeEach(() => {
+  warnLog.mockClear();
+});
 
 const TOOL_CALL_BLOCK_TYPES = new Set(["toolCall", "toolUse", "functionCall"]);
 
@@ -479,6 +506,55 @@ describe("sanitizeToolCallInputs", () => {
     expect((toolCalls[0] as { name?: unknown }).name).toBe("read");
     expect((toolCalls[0] as { id?: unknown }).id).toBe("call_1");
     expect((toolCalls[0] as { arguments?: unknown }).arguments).toEqual({ path: "/tmp/test" });
+  });
+});
+
+describe("mcp__ auto-allow", () => {
+  it("preserves mcp__ tool calls even when not in allowedToolNames", () => {
+    const input = castAgentMessages([
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "call_mcp", name: "mcp__server__tool", arguments: {} }],
+      },
+    ]);
+
+    const out = sanitizeToolCallInputs(input, { allowedToolNames: ["read"] });
+    const assistant = out[0] as Extract<AgentMessage, { role: "assistant" }>;
+    expect(Array.isArray(assistant.content)).toBe(true);
+    expect(assistant.content).toHaveLength(1);
+    expect((assistant.content[0] as { name?: unknown }).name).toBe("mcp__server__tool");
+    expect(warnLog).not.toHaveBeenCalled();
+  });
+
+  it("preserves case-insensitive MCP__ prefix without allowlist registration", () => {
+    const input = castAgentMessages([
+      {
+        role: "assistant",
+        content: [{ type: "toolUse", id: "call_mcp2", name: "MCP__MyServer__do_thing", input: {} }],
+      },
+    ]);
+
+    const out = sanitizeToolCallInputs(input, { allowedToolNames: ["read"] });
+    expect(out).toHaveLength(1);
+    const blocks = getAssistantToolCallBlocks(out);
+    expect(blocks).toHaveLength(1);
+    expect(warnLog).not.toHaveBeenCalled();
+  });
+
+  it("emits a guard warn log when dropping a non-mcp tool call", () => {
+    const input = castAgentMessages([
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "call_unknown", name: "write", arguments: {} }],
+      },
+    ]);
+
+    const out = sanitizeToolCallInputs(input, { allowedToolNames: ["read"] });
+    expect(out.map((m) => m.role)).toEqual([]);
+    expect(warnLog).toHaveBeenCalled();
+    const firstCall = warnLog.mock.calls[0]?.[0];
+    expect(String(firstCall)).toContain("[guard:drop]");
+    expect(String(firstCall)).toContain("write");
   });
 });
 

@@ -1,9 +1,30 @@
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
+import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import { validateAnthropicTurns, validateGeminiTurns } from "../../pi-embedded-helpers.js";
 import { sanitizeToolUseResultPairing } from "../../session-transcript-repair.js";
 import { normalizeToolName } from "../../tool-policy.js";
 import type { TranscriptPolicy } from "../../transcript-policy.js";
+
+const log = createSubsystemLogger("agents/pi-embedded-runner/tool-call-normalization");
+
+// Keep charset validation aligned with session-transcript-repair.ts
+// (TOOL_CALL_NAME_RE = /^[A-Za-z0-9_:.-]+$/): MCP names bypass the 64-char
+// replay cap so long `mcp__server__tool` names survive, but they must still
+// reject whitespace/control chars and stay within a generous bound.
+const MCP_TOOL_CALL_NAME_MAX_CHARS = 128;
+const TOOL_CALL_NAME_CHARSET_RE = /^[A-Za-z0-9_:.-]+$/;
+
+function isMcpToolName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > MCP_TOOL_CALL_NAME_MAX_CHARS) {
+    return false;
+  }
+  if (!trimmed.toLowerCase().startsWith("mcp__")) {
+    return false;
+  }
+  return TOOL_CALL_NAME_CHARSET_RE.test(trimmed);
+}
 
 function resolveCaseInsensitiveAllowedToolName(
   rawName: string,
@@ -30,6 +51,12 @@ function resolveExactAllowedToolName(
   rawName: string,
   allowedToolNames?: Set<string>,
 ): string | null {
+  // MCP tools are always allowed so boxed/deferred MCP tools pulled out via
+  // tool_search are never silently dropped during normalization.
+  if (isMcpToolName(rawName)) {
+    const trimmed = rawName.trim();
+    return trimmed || rawName;
+  }
   if (!allowedToolNames || allowedToolNames.size === 0) {
     return null;
   }
@@ -89,6 +116,12 @@ function resolveStructuredAllowedToolName(
   rawName: string,
   allowedToolNames?: Set<string>,
 ): string | null {
+  // MCP tools are always allowed so boxed/deferred MCP tools pulled out via
+  // tool_search are never silently dropped during normalization.
+  if (isMcpToolName(rawName)) {
+    const trimmed = rawName.trim();
+    return trimmed || rawName;
+  }
   if (!allowedToolNames || allowedToolNames.size === 0) {
     return null;
   }
@@ -184,6 +217,10 @@ function normalizeToolCallNameForDispatch(
   if (!trimmed) {
     return inferToolNameFromToolCallId(rawToolCallId, allowedToolNames) ?? rawName;
   }
+  // MCP tools are always allowed; preserve the name verbatim.
+  if (isMcpToolName(trimmed)) {
+    return trimmed;
+  }
   if (!allowedToolNames || allowedToolNames.size === 0) {
     return trimmed;
   }
@@ -251,11 +288,19 @@ function resolveReplayToolCallName(
   rawId: string,
   allowedToolNames?: Set<string>,
 ): string | null {
-  if (rawName.length > REPLAY_TOOL_CALL_NAME_MAX_CHARS * 2) {
+  if (rawName.length > REPLAY_TOOL_CALL_NAME_MAX_CHARS * 2 && !isMcpToolName(rawName)) {
     return null;
   }
   const normalized = normalizeToolCallNameForDispatch(rawName, allowedToolNames, rawId);
   const trimmed = normalized.trim();
+  // MCP tools are always allowed; bypass the length cap so long
+  // `mcp__server__tool` names are never silently dropped from replays.
+  if (isMcpToolName(trimmed)) {
+    if (!trimmed || /\s/.test(trimmed)) {
+      return null;
+    }
+    return trimmed;
+  }
   if (!trimmed || trimmed.length > REPLAY_TOOL_CALL_NAME_MAX_CHARS || /\s/.test(trimmed)) {
     return null;
   }
@@ -292,10 +337,15 @@ function sanitizeReplayToolCallInputs(
         continue;
       }
       const replayBlock = block as ReplayToolCallBlock;
+      const dropName = typeof replayBlock.name === "string" ? replayBlock.name : undefined;
+      const dropId = typeof replayBlock.id === "string" ? replayBlock.id : undefined;
 
       if (!replayToolCallHasInput(replayBlock) || !replayToolCallNonEmptyString(replayBlock.id)) {
         changed = true;
         messageChanged = true;
+        log.warn(
+          `[guard:drop] role=assistant reason=missing_input_or_id name=${String(dropName ?? "(missing)")} id=${String(dropId ?? "(missing)")}`,
+        );
         continue;
       }
 
@@ -304,6 +354,9 @@ function sanitizeReplayToolCallInputs(
       if (!resolvedName) {
         changed = true;
         messageChanged = true;
+        log.warn(
+          `[guard:drop] role=assistant reason=name_rejected name=${String(dropName ?? "(missing)")} id=${String(dropId ?? "(missing)")}`,
+        );
         continue;
       }
 
@@ -322,6 +375,9 @@ function sanitizeReplayToolCallInputs(
         out.push({ ...message, content: nextContent });
       } else {
         droppedAssistantMessages += 1;
+        log.warn(
+          `[guard:drop] role=assistant reason=all_tool_calls_dropped name=(message) id=(message)`,
+        );
       }
       continue;
     }
@@ -379,7 +435,13 @@ function sanitizeAnthropicReplayToolResults(messages: AgentMessage[]): AgentMess
       if (typedBlock.type !== "toolResult" || typeof typedBlock.toolUseId !== "string") {
         return true;
       }
-      return validToolUseIds.size > 0 && validToolUseIds.has(typedBlock.toolUseId);
+      const keep = validToolUseIds.size > 0 && validToolUseIds.has(typedBlock.toolUseId);
+      if (!keep) {
+        log.warn(
+          `[guard:drop] role=user reason=orphan_tool_result name=toolResult id=${String(typedBlock.toolUseId ?? "(missing)")}`,
+        );
+      }
+      return keep;
     });
 
     if (nextContent.length === message.content.length) {

@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { TOOL_RESULT_SAFETY_CAP_CHARS } from "../dennou-soul/prune-engine.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import type {
   PluginHookBeforeMessageWriteEvent,
   PluginHookBeforeMessageWriteResult,
@@ -13,6 +14,36 @@ import {
 import { createPendingToolCallState } from "./session-tool-result-state.js";
 import { makeMissingToolResult, sanitizeToolCallInputs } from "./session-transcript-repair.js";
 import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-id.js";
+
+const log = createSubsystemLogger("agents/session-tool-result-guard");
+
+function describeGuardedMessage(message: AgentMessage): string {
+  const role = String((message as { role?: unknown }).role ?? "(missing)");
+  if (role === "assistant") {
+    try {
+      const calls = extractToolCallsFromAssistant(
+        message as Extract<AgentMessage, { role: "assistant" }>,
+      );
+      if (calls.length > 0) {
+        const summary = calls
+          .map(
+            (call) =>
+              `name=${String(call.name ?? "(missing)")} id=${String(call.id ?? "(missing)")}`,
+          )
+          .join(",");
+        return `role=assistant toolCalls=[${summary}]`;
+      }
+    } catch {
+      // Fall through to role-only description.
+    }
+    return "role=assistant";
+  }
+  if (role === "toolResult") {
+    const id = extractToolResultId(message as Extract<AgentMessage, { role: "toolResult" }>);
+    return `role=toolResult id=${String(id ?? "(missing)")}`;
+  }
+  return `role=${role}`;
+}
 
 const GUARD_TRUNCATION_SUFFIX =
   "\n\n⚠️ [Content truncated during persistence — original exceeded size limit. " +
@@ -227,6 +258,9 @@ export function installSessionToolResultGuard(
         if (pendingState.shouldFlushForSanitizedDrop()) {
           flushPendingToolResults();
         }
+        log.warn(
+          `[guard:drop] dropped assistant message during sanitize: reason=sanitized_empty sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(message)}`,
+        );
         return undefined;
       }
       nextMessage = sanitized[0];
@@ -253,6 +287,9 @@ export function installSessionToolResultGuard(
         }),
       );
       if (!persisted) {
+        log.warn(
+          `[guard:drop] dropped toolResult: reason=before_write_blocked sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(nextMessage)}`,
+        );
         return undefined;
       }
       return originalAppend(persisted as never);
@@ -286,6 +323,9 @@ export function installSessionToolResultGuard(
 
     const finalMessage = applyBeforeWriteHook(persistMessage(nextMessage));
     if (!finalMessage) {
+      log.warn(
+        `[guard:drop] dropped message: reason=before_write_blocked sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(nextMessage)}`,
+      );
       return undefined;
     }
     if (
@@ -293,6 +333,9 @@ export function installSessionToolResultGuard(
       toolCalls.length === 0 &&
       opts?.suppressTranscriptOnlyAssistantPersistence === true
     ) {
+      log.warn(
+        `[guard:drop] dropped assistant message: reason=suppress_transcript_only sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(finalMessage)}`,
+      );
       return undefined;
     }
     if (
@@ -300,11 +343,17 @@ export function installSessionToolResultGuard(
       opts?.suppressAssistantErrorPersistence === true &&
       (finalMessage as { stopReason?: string }).stopReason === "error"
     ) {
+      log.warn(
+        `[guard:drop] dropped assistant message: reason=suppress_assistant_error sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(finalMessage)}`,
+      );
       return undefined;
     }
     const finalRole = (finalMessage as { role?: unknown }).role;
     if (finalRole === "user" && suppressNextUserMessagePersistence) {
       suppressNextUserMessagePersistence = false;
+      log.warn(
+        `[guard:drop] dropped user message: reason=suppress_next_user sessionKey=${String(opts?.sessionKey ?? "(missing)")} ${describeGuardedMessage(finalMessage)}`,
+      );
       return undefined;
     }
     const result = originalAppend(finalMessage as never);

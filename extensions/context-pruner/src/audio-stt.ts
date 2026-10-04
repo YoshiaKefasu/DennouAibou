@@ -8,6 +8,7 @@
  * safe no-op; the next scan can retry it.
  */
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logSessionCheckin, requestSessionWrite } from "openclaw/plugin-sdk/session-gatekeeper";
@@ -36,6 +37,7 @@ const AUDIO_EXTENSIONS = new Set([
 
 const AUDIO_MIME_PREFIX = "audio/";
 const TRANSCRIPT_PREFIX = "🎙️ [音声文字起こし:";
+export const AUDIO_OMISSION_PREFIX = "[音声データ省略:";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -47,7 +49,7 @@ export type AudioSttLogger = {
 };
 
 export type AudioAttachmentTarget = {
-  /** Local filesystem path used for the Groq upload and shown in the replacement. */
+  /** Local filesystem path or inline label used for the Groq upload and shown in the replacement. */
   path: string;
   mimeType?: string;
   durationSeconds?: number;
@@ -57,12 +59,20 @@ export type AudioAttachmentTarget = {
   contentIndex?: number;
   /** Message timestamp used for the age gate. */
   timestampMs: number | null;
+  /** Inline base64 payload when the session holds audio data directly (no local file). */
+  inlineData?: string;
+  /** Decoded byte size of inlineData (for labels and placeholders). */
+  inlineBytes?: number;
+  /** True for inline/base64 targets that must be fail-open placeholderized. */
+  isInline?: boolean;
 };
 
 export type AudioSttScanResult = {
   sessionFile: string;
   candidates: number;
   transcribed: number;
+  /** Inline audio blocks replaced with omission placeholders (fail-open, no STT). */
+  omitted?: number;
   changed: boolean;
   skipped?:
     | "missing-api-key"
@@ -251,6 +261,11 @@ function hasTranscriptForPath(message: JsonRecord, filePath: string): boolean {
   return text.includes(TRANSCRIPT_PREFIX) && text.includes(`(添付: ${filePath},`);
 }
 
+function hasOmissionForPath(message: JsonRecord, filePath: string): boolean {
+  const text = getTextFromContent(message.content);
+  return text.includes(AUDIO_OMISSION_PREFIX) && text.includes(filePath);
+}
+
 function isTranscribedAttachment(
   message: JsonRecord,
   attachmentIndex: number | undefined,
@@ -287,6 +302,82 @@ function contentIndexForPath(content: unknown, filePath: string): number | undef
     }
   }
   return undefined;
+}
+
+function readInlineBase64(record: JsonRecord): string | undefined {
+  const direct = record.data;
+  if (typeof direct === "string" && direct.trim().length > 0) {
+    return direct.trim();
+  }
+  const nested = asRecord(record.input_audio);
+  if (nested && typeof nested.data === "string" && nested.data.trim().length > 0) {
+    return nested.data.trim();
+  }
+  return undefined;
+}
+
+function stripDataUrlPrefix(data: string): { base64: string; mimeFromUrl?: string } {
+  const match = /^data:([^;,]+)?;base64,(.*)$/isu.exec(data.trim());
+  if (match) {
+    return { base64: match[2] ?? "", mimeFromUrl: match[1]?.trim() || undefined };
+  }
+  return { base64: data.trim() };
+}
+
+function estimateInlineBytes(data: string): number {
+  const raw = stripDataUrlPrefix(data).base64.replace(/\s/gu, "");
+  if (raw.length === 0) {
+    return 0;
+  }
+  const padding = raw.endsWith("==") ? 2 : raw.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((raw.length * 3) / 4) - padding);
+}
+
+function extensionForAudioMime(mimeType: string | undefined): string {
+  switch ((mimeType ?? "").toLowerCase().split(";", 1)[0]?.trim()) {
+    case "audio/mpeg":
+    case "audio/mp3":
+      return ".mp3";
+    case "audio/mp4":
+    case "audio/x-m4a":
+      return ".m4a";
+    case "audio/wav":
+    case "audio/x-wav":
+      return ".wav";
+    case "audio/flac":
+      return ".flac";
+    case "audio/webm":
+      return ".webm";
+    case "audio/aac":
+      return ".aac";
+    case "audio/ogg":
+    case "audio/opus":
+    default:
+      return ".ogg";
+  }
+}
+
+function formatInlineLabel(contentIndex: number, bytes: number): string {
+  const approxKb = Math.max(1, Math.round(bytes / 1024));
+  return `inline音声(content[${contentIndex}], ${approxKb}KB)`;
+}
+
+function addInlineTarget(
+  targets: Map<string, AudioAttachmentTarget>,
+  params: Omit<AudioAttachmentTarget, "timestampMs"> & { timestampMs: number | null },
+): void {
+  if (params.contentIndex === undefined || !params.inlineData) {
+    return;
+  }
+  const key = `inline:content:${params.contentIndex}`;
+  if (targets.has(key)) {
+    return;
+  }
+  targets.set(key, {
+    ...params,
+    mimeType: normalizeMimeType(params.mimeType),
+    isInline: true,
+  });
 }
 
 function addTarget(
@@ -386,16 +477,36 @@ function collectContentTargets(
       if (!record || !isAudioContentBlock(record)) {
         continue;
       }
-      const filePath = readPathFromRecord(record);
       const mimeType = normalizeMimeType(record.mimeType ?? record.mime ?? record.mediaType);
+      const durationSeconds = readDurationSeconds(record) ?? readDurationSeconds(message);
+      const inlineData = readInlineBase64(record);
+      if (inlineData) {
+        // Inline/base64 audio lives directly in the session JSONL. Decode it to a
+        // temp file for the deferred Whisper upload, then replace the block.
+        const bytes = estimateInlineBytes(inlineData);
+        if (bytes === 0) {
+          continue;
+        }
+        const { mimeFromUrl } = stripDataUrlPrefix(inlineData);
+        addInlineTarget(targets, {
+          path: formatInlineLabel(index, bytes),
+          mimeType: mimeType ?? normalizeMimeType(mimeFromUrl),
+          durationSeconds,
+          contentIndex: index,
+          timestampMs,
+          inlineData,
+          inlineBytes: bytes,
+        });
+        continue;
+      }
+      const filePath = readPathFromRecord(record);
       if (!filePath) {
-        // Inline/base64 audio has no local file that can be sent to the deferred worker.
         continue;
       }
       addTarget(targets, {
         path: filePath,
         mimeType,
-        durationSeconds: readDurationSeconds(record) ?? readDurationSeconds(message),
+        durationSeconds,
         contentIndex: index,
         timestampMs,
       });
@@ -427,7 +538,7 @@ function collectContentTargets(
 export function findAudioAttachments(entry: unknown): AudioAttachmentTarget[] {
   const entryRecord = asRecord(entry);
   const message = asRecord(entryRecord?.message);
-  if (!entryRecord || !message || message.role !== "user") {
+  if (!entryRecord || !message || (message.role !== "user" && message.role !== "toolResult")) {
     return [];
   }
   if (readString(message.Transcript)) {
@@ -448,6 +559,7 @@ export function findAudioAttachments(entry: unknown): AudioAttachmentTarget[] {
     .filter(
       (target) =>
         !hasTranscriptForPath(message, target.path) &&
+        !hasOmissionForPath(message, target.path) &&
         !isTranscribedAttachment(message, target.attachmentIndex),
     );
 }
@@ -497,24 +609,27 @@ export function formatAudioTranscript(params: {
   return `🎙️ [音声文字起こし: "${params.text.trim()}"] (添付: ${params.filePath}, ${formatDuration(params.durationSeconds)})`;
 }
 
-/** Replace only the message content; entry id/parentId/timestamp and all other fields stay intact. */
-export function replaceAudioTranscriptInEntry(
-  entry: unknown,
-  target: AudioAttachmentTarget,
-  transcript: string,
-): unknown {
-  const entryRecord = asRecord(entry);
-  const message = asRecord(entryRecord?.message);
-  const text = transcript.trim();
-  if (!entryRecord || !message || !text) {
-    return entry;
-  }
+/**
+ * Fail-open placeholder for stale inline audio that cannot be transcribed
+ * (missing GROQ_API_KEY or Whisper failure). Keeps only a short label so a
+ * 61KB+ base64 block no longer rides every model request.
+ */
+export function formatAudioPlaceholder(params: {
+  label: string;
+  durationSeconds?: number;
+  reason?: string;
+}): string {
+  const reason = params.reason ? `, ${params.reason}` : "";
+  return `${AUDIO_OMISSION_PREFIX} ${params.label}, ${formatDuration(params.durationSeconds)}${reason}]`;
+}
 
-  const replacement = formatAudioTranscript({
-    text,
-    filePath: target.path,
-    durationSeconds: target.durationSeconds,
-  });
+/** Shared block replacer: swap one audio content block for a text block. */
+function setAudioBlockText(
+  entryRecord: JsonRecord,
+  message: JsonRecord,
+  target: AudioAttachmentTarget,
+  replacement: string,
+): JsonRecord {
   const nextMessage: JsonRecord = { ...message };
   const content = message.content;
 
@@ -542,7 +657,53 @@ export function replaceAudioTranscriptInEntry(
     nextMessage.content = replacement;
   }
 
-  const nextEntry = { ...entryRecord, message: nextMessage };
+  return { ...entryRecord, message: nextMessage };
+}
+
+/** Replace an inline audio block with a fail-open omission placeholder. */
+export function replaceAudioOmissionInEntry(
+  entry: unknown,
+  target: AudioAttachmentTarget,
+  placeholder?: string,
+): unknown {
+  const entryRecord = asRecord(entry);
+  const message = asRecord(entryRecord?.message);
+  if (!entryRecord || !message) {
+    return entry;
+  }
+  const replacement =
+    placeholder ??
+    formatAudioPlaceholder({
+      label: target.path,
+      durationSeconds: target.durationSeconds,
+    });
+  if (!replacement.trim()) {
+    return entry;
+  }
+  const nextEntry = setAudioBlockText(entryRecord, message, target, replacement);
+  assertSessionTreeFieldsUnchanged(entryRecord, nextEntry);
+  return nextEntry;
+}
+
+/** Replace only the message content; entry id/parentId/timestamp and all other fields stay intact. */
+export function replaceAudioTranscriptInEntry(
+  entry: unknown,
+  target: AudioAttachmentTarget,
+  transcript: string,
+): unknown {
+  const entryRecord = asRecord(entry);
+  const message = asRecord(entryRecord?.message);
+  const text = transcript.trim();
+  if (!entryRecord || !message || !text) {
+    return entry;
+  }
+
+  const replacement = formatAudioTranscript({
+    text,
+    filePath: target.path,
+    durationSeconds: target.durationSeconds,
+  });
+  const nextEntry = setAudioBlockText(entryRecord, message, target, replacement);
   assertSessionTreeFieldsUnchanged(entryRecord, nextEntry);
   return nextEntry;
 }
@@ -648,6 +809,41 @@ export async function transcribeWithGroq(params: {
     return text;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+/** Decode inline base64 audio to a temp file and send it to Groq Whisper. */
+async function transcribeInlineWithGroq(params: {
+  target: AudioAttachmentTarget;
+  apiKey: string;
+  model: string;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  const rawData = params.target.inlineData;
+  if (!rawData) {
+    throw new Error("missing inline audio data");
+  }
+  const { base64, mimeFromUrl } = stripDataUrlPrefix(rawData);
+  const buffer = Buffer.from(base64.replace(/\s/gu, ""), "base64");
+  if (buffer.length === 0) {
+    throw new Error("empty inline audio data");
+  }
+  const mimeType = params.target.mimeType ?? normalizeMimeType(mimeFromUrl);
+  const temporary = path.join(
+    os.tmpdir(),
+    `context-pruner-audio-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}${extensionForAudioMime(mimeType)}`,
+  );
+  try {
+    await fs.writeFile(temporary, buffer, { mode: 0o600 });
+    return await transcribeWithGroq({
+      filePath: temporary,
+      apiKey: params.apiKey,
+      model: params.model,
+      mimeType,
+      fetchImpl: params.fetchImpl,
+    });
+  } finally {
+    await fs.rm(temporary, { force: true }).catch(() => undefined);
   }
 }
 
@@ -801,7 +997,7 @@ async function transcribeEntry(params: {
   entry: unknown;
   options: SessionFileScanOptions;
   apiKey?: string;
-}): Promise<{ entry: unknown; candidates: number; transcribed: number }> {
+}): Promise<{ entry: unknown; candidates: number; transcribed: number; omitted: number }> {
   const now = params.options.now ?? Date.now();
   const candidates = findEligibleAudioAttachments({
     entry: params.entry,
@@ -810,20 +1006,50 @@ async function transcribeEntry(params: {
   });
   let current = params.entry;
   let transcribed = 0;
+  let omitted = 0;
+  const placeholderizeInline = (target: AudioAttachmentTarget, reason: string): void => {
+    const placeholder = formatAudioPlaceholder({
+      label: target.path,
+      durationSeconds: target.durationSeconds,
+      reason,
+    });
+    current = replaceAudioOmissionInEntry(current, target, placeholder);
+    omitted += 1;
+  };
   for (const target of candidates) {
+    const isInline = target.isInline === true;
     try {
-      const transcript = params.options.transcribeAudio
-        ? await params.options.transcribeAudio(target)
-        : params.apiKey
-          ? await transcribeWithGroq({
+      let transcript: string | undefined;
+      if (params.options.transcribeAudio) {
+        transcript = await params.options.transcribeAudio(target);
+      } else if (params.apiKey) {
+        transcript = isInline
+          ? await transcribeInlineWithGroq({
+              target,
+              apiKey: params.apiKey,
+              model: params.options.stt.model,
+              fetchImpl: params.options.fetchImpl,
+            })
+          : await transcribeWithGroq({
               filePath: target.path,
               apiKey: params.apiKey,
               model: params.options.stt.model,
               mimeType: target.mimeType,
               fetchImpl: params.options.fetchImpl,
-            })
-          : undefined;
+            });
+      } else if (isInline) {
+        // Fail-open: without an API key a 61KB+ inline block would otherwise
+        // ride every model request forever. File attachments stay retryable.
+        placeholderizeInline(target, "GROQ_API_KEY未設定のため省略");
+        continue;
+      } else {
+        continue;
+      }
       if (!transcript?.trim()) {
+        // Empty transcript: retry file attachments later, but shrink inline now.
+        if (isInline) {
+          placeholderizeInline(target, "文字起こし失敗のため省略");
+        }
         continue;
       }
       current = replaceAudioTranscriptInEntry(current, target, transcript);
@@ -832,9 +1058,17 @@ async function transcribeEntry(params: {
       params.options.logger?.warn?.(
         `context-pruner: audio transcription skipped for ${target.path}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      // Failed Whisper call: retry file attachments later, shrink inline now.
+      if (isInline) {
+        try {
+          placeholderizeInline(target, "文字起こし失敗のため省略");
+        } catch {
+          // Placeholder replacement must never throw the scan off track.
+        }
+      }
     }
   }
-  return { entry: current, candidates: candidates.length, transcribed };
+  return { entry: current, candidates: candidates.length, transcribed, omitted };
 }
 
 /** Scan and, when necessary, atomically rewrite one session JSONL file. */
@@ -845,18 +1079,19 @@ export async function scanSessionFile(
     sessionFile: options.sessionFile,
     candidates: 0,
     transcribed: 0,
+    omitted: 0,
     changed: false,
   };
   if (options.stt.provider !== "groq") {
     return { ...baseResult, skipped: "unsupported-provider" };
   }
 
+  // Note: no early missing-api-key return here. Stale inline/base64 audio must
+  // still be fail-open placeholderized without a key; file-only sessions with
+  // no key report missing-api-key after the scan when nothing changed.
   const apiKey = options.transcribeAudio
     ? undefined
     : resolveGroqApiKey({ gatewayConfig: options.gatewayConfig, env: options.env });
-  if (!options.transcribeAudio && !apiKey) {
-    return { ...baseResult, skipped: "missing-api-key" };
-  }
 
   const now = options.now ?? Date.now();
   let initialSnapshot: SessionFileSnapshot;
@@ -900,6 +1135,7 @@ export async function scanSessionFile(
     let changed = false;
     let candidates = 0;
     let transcribed = 0;
+    let omitted = 0;
     let sessionId = path.basename(options.sessionFile, path.extname(options.sessionFile));
     const rewritten = [] as string[];
 
@@ -927,7 +1163,8 @@ export async function scanSessionFile(
       const result = await transcribeEntry({ entry, options, apiKey });
       candidates += result.candidates;
       transcribed += result.transcribed;
-      if (result.transcribed === 0) {
+      omitted += result.omitted;
+      if (result.transcribed + result.omitted === 0) {
         rewritten.push(line);
         continue;
       }
@@ -937,7 +1174,7 @@ export async function scanSessionFile(
 
     let writeOp: string | undefined;
     if (changed) {
-      writeOp = `audio-stt-${Date.now()}-${transcribed}`;
+      writeOp = `audio-stt-${Date.now()}-${transcribed + omitted}`;
       const authorization = requestSessionWrite({
         actor: "audio-stt",
         action: "rewrite",
@@ -955,6 +1192,7 @@ export async function scanSessionFile(
           ...baseResult,
           candidates,
           transcribed: 0,
+          omitted: 0,
           changed: false,
           skipped: "preauth-denied",
         };
@@ -969,6 +1207,7 @@ export async function scanSessionFile(
           ...baseResult,
           candidates,
           transcribed: 0,
+          omitted: 0,
           changed: false,
           skipped: "concurrent-update",
         };
@@ -978,14 +1217,24 @@ export async function scanSessionFile(
           actor: "audio-stt",
           action: "rewrite",
           op: writeOp,
-          lines: transcribed,
+          lines: transcribed + omitted,
           sessionId,
         });
       } catch {
         // Phase A logging is best-effort and must not affect transcription.
       }
     }
-    return { ...baseResult, candidates, transcribed, changed };
+    if (!changed && !options.transcribeAudio && !apiKey) {
+      return {
+        ...baseResult,
+        candidates,
+        transcribed,
+        omitted,
+        changed,
+        skipped: "missing-api-key",
+      };
+    }
+    return { ...baseResult, candidates, transcribed, omitted, changed };
   } finally {
     await release();
   }
