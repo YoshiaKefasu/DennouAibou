@@ -284,11 +284,11 @@ CREATE INDEX IF NOT EXISTS idx_letter_states_session ON letter_states(session, a
 
 ## 8. 実装ロードマップ
 
-- [ ] **Phase 1: PostBox MCP サーバーの実装**
-  - ディレクトリ: `packages/postbox-mcp/` (Bun + `@modelcontextprotocol/sdk` + SQLite)
-  - `server.ts`: `StreamableHTTPServerTransport` による `POST /mcp` 実装 ＆ Bearer トークン認証
+- [x] **Phase 1: PostBox MCP サーバーの実装**
+  - ディレクトリ: `Dennou-Postbox-mcp/` (独立リポジトリ, Bun + `@modelcontextprotocol/sdk` + SQLite)
+  - `src/server.ts`: `StreamableHTTPServerTransport` による `POST /mcp` 実装 ＆ Bearer トークン認証 (liveness `GET /` のみ認証免除)
   - 4 つのツール (`send_letter`, `check_inbox`, `read_letter`, `archive_letter`) の実装
-  - ユニットテスト (`packages/postbox-mcp/test/postbox.test.ts`): 往復投函・セッション別既読・認証ガード・プルーニング検証
+  - ユニットテスト (`test/postbox.test.ts`): 23 テスト全 pass (往復投函・セッション別既読・認証ガード・プルーニング・カスケード削除検証)
 - [ ] **Phase 2: KASOU への常駐デプロイ**
   - KASOU サーバー上に `openclaw-postbox.service` (systemd ユニット) を作成して自動起動
   - ポート `8320` での待ち受けとローカルネットワーク疎通確認 (Windows 側から curl で確認)
