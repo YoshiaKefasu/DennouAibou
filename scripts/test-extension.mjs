@@ -8,14 +8,11 @@ import { resolveExtensionTestPlan } from "./lib/extension-test-plan.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const pnpm = "pnpm";
+const bun = "bun";
 
-async function runVitestBatch(params) {
+async function runBunBatch(params) {
   return await new Promise((resolve, reject) => {
-    const child = spawn(
-      pnpm,
-      ["exec", "vitest", "run", "--config", params.config, ...params.targets, ...params.args],
-      {
+    const child = spawn(bun, ["test", ...params.targets, ...params.args], {
         cwd: repoRoot,
         stdio: "inherit",
         shell: process.platform === "win32",
@@ -35,8 +32,8 @@ async function runVitestBatch(params) {
 }
 
 function printUsage() {
-  console.error("Usage: pnpm test:extension <extension-name|path> [vitest args...]");
-  console.error("       node scripts/test-extension.mjs [extension-name|path] [vitest args...]");
+  console.error("Usage: pnpm test:extension <extension-name|path> [bun test args...]");
+  console.error("       node scripts/test-extension.mjs [extension-name|path] [bun test args...]");
 }
 
 function printNoTestsMessage(plan) {
@@ -72,9 +69,8 @@ async function run() {
   }
 
   console.log(`[test-extension] Running ${plan.testFileCount} test files for ${plan.extensionId}`);
-  const exitCode = await runVitestBatch({
+  const exitCode = await runBunBatch({
     args: passthroughArgs,
-    config: plan.config,
     env: process.env,
     targets: plan.roots,
   });

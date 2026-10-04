@@ -1,9 +1,10 @@
 import { defineConfig, defineProject } from "vitest/config";
-import { jsdomOptimizedDeps, resolveDefaultVitestPool } from "../vitest.shared.config.ts";
 
+// Note: root Vitest configs were removed (DEBLOAT §35, bun test一本化).
+// `pool` was `resolveDefaultVitestPool()` which always returned "threads".
 const sharedUiTestConfig = {
   isolate: true,
-  pool: resolveDefaultVitestPool(),
+  pool: "threads",
 } as const;
 
 export default defineConfig({
@@ -13,7 +14,14 @@ export default defineConfig({
       defineProject({
         test: {
           ...sharedUiTestConfig,
-          deps: jsdomOptimizedDeps,
+          deps: {
+            optimizer: {
+              web: {
+                enabled: true,
+                include: ["lit", "lit-html", "@lit/reactive-element", "marked"] as string[],
+              },
+            },
+          },
           name: "unit-node",
           include: ["src/**/*.node.test.ts"],
           environment: "jsdom",

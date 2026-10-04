@@ -8,14 +8,11 @@ import { resolveExtensionBatchPlan } from "./lib/extension-test-plan.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const pnpm = "pnpm";
+const bun = "bun";
 
-async function runVitestBatch(params) {
+async function runBunBatch(params) {
   return await new Promise((resolve, reject) => {
-    const child = spawn(
-      pnpm,
-      ["exec", "vitest", "run", "--config", params.config, ...params.targets, ...params.args],
-      {
+    const child = spawn(bun, ["test", ...params.targets, ...params.args], {
         cwd: repoRoot,
         stdio: "inherit",
         shell: process.platform === "win32",
@@ -35,9 +32,9 @@ async function runVitestBatch(params) {
 }
 
 function printUsage() {
-  console.error("Usage: pnpm test:extensions:batch <extension[,extension...]> [vitest args...]");
+  console.error("Usage: pnpm test:extensions:batch <extension[,extension...]> [bun test args...]");
   console.error(
-    "       node scripts/test-extension-batch.mjs <extension[,extension...]> [vitest args...]",
+    "       node scripts/test-extension-batch.mjs <extension[,extension...]> [bun test args...]",
   );
 }
 
@@ -66,7 +63,7 @@ async function run() {
   }
 
   const passthroughArgs = rawArgs.filter((arg) => arg !== "--");
-  const { extensionIds, passthroughArgs: vitestArgs } = parseExtensionIds(passthroughArgs);
+  const { extensionIds, passthroughArgs: bunArgs } = parseExtensionIds(passthroughArgs);
   if (extensionIds.length === 0) {
     printUsage();
     process.exit(1);
@@ -84,11 +81,10 @@ async function run() {
 
   for (const group of batchPlan.planGroups) {
     console.log(
-      `[test-extension-batch] ${group.config}: ${group.extensionIds.join(", ")} (${group.testFileCount} files)`,
+      `[test-extension-batch] ${group.extensionIds.join(", ")} (${group.testFileCount} files)`,
     );
-    const exitCode = await runVitestBatch({
-      args: vitestArgs,
-      config: group.config,
+    const exitCode = await runBunBatch({
+      args: bunArgs,
       env: process.env,
       targets: group.roots,
     });

@@ -1,4 +1,5 @@
-import { spawnPnpmRunner } from "./pnpm-runner.mjs";
+import { spawn } from "node:child_process";
+import path from "node:path";
 
 const forwardedArgs = [];
 let quietOverride;
@@ -36,11 +37,19 @@ const heartbeatMs = parsePositiveInt(process.env.OPENCLAW_LIVE_WRAPPER_HEARTBEAT
 const startedAt = Date.now();
 let lastOutputAt = startedAt;
 
-const child = spawnPnpmRunner({
-  stdio: ["inherit", "pipe", "pipe"],
-  pnpmArgs: ["exec", "vitest", "run", "--config", "vitest.live.config.ts", ...forwardedArgs],
-  env,
-});
+// Bun test selects files by path filter. Default to live tests when the caller
+// passes no path filter (flags only or nothing); explicit file/dir args win.
+const hasPathFilter = forwardedArgs.some((arg) => !arg.startsWith("-"));
+const child = spawn(
+  "bun",
+  ["test", ...(hasPathFilter ? [] : [".live.test.ts"]), ...forwardedArgs],
+  {
+    cwd: path.resolve(import.meta.dirname, ".."),
+    stdio: ["inherit", "pipe", "pipe"],
+    env,
+    shell: process.platform === "win32",
+  },
+);
 
 const noteOutput = () => {
   lastOutputAt = Date.now();

@@ -1,14 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { channelTestRoots } from "../../vitest.channel-paths.mjs";
-import { isDiffsExtensionRoot } from "../../vitest.extension-diffs-paths.mjs";
-import { isMattermostExtensionRoot } from "../../vitest.extension-mattermost-paths.mjs";
-import { isMemoryExtensionRoot } from "../../vitest.extension-memory-paths.mjs";
-import { isMessagingExtensionRoot } from "../../vitest.extension-messaging-paths.mjs";
-import { isMsTeamsExtensionRoot } from "../../vitest.extension-msteams-paths.mjs";
-import { isProviderExtensionRoot } from "../../vitest.extension-provider-paths.mjs";
-import { isTelegramExtensionRoot } from "../../vitest.extension-telegram-paths.mjs";
-import { isVoiceCallExtensionRoot } from "../../vitest.extension-voice-call-paths.mjs";
 import { BUNDLED_PLUGIN_PATH_PREFIX, BUNDLED_PLUGIN_ROOT_DIR } from "./bundled-plugin-paths.mjs";
 import { listAvailableExtensionIds } from "./changed-extensions.mjs";
 
@@ -96,41 +87,12 @@ export function resolveExtensionTestPlan(params = {}) {
     roots.push(normalizeRelative(path.relative(repoRoot, pairedCoreRoot)));
   }
 
-  const usesChannelConfig = roots.some((root) => channelTestRoots.includes(root));
-  const usesDiffsConfig = roots.some((root) => isDiffsExtensionRoot(root));
-  const usesMattermostConfig = roots.some((root) => isMattermostExtensionRoot(root));
-  const usesTelegramConfig = roots.some((root) => isTelegramExtensionRoot(root));
-  const usesVoiceCallConfig = roots.some((root) => isVoiceCallExtensionRoot(root));
-  const usesMemoryConfig = roots.some((root) => isMemoryExtensionRoot(root));
-  const usesMsTeamsConfig = roots.some((root) => isMsTeamsExtensionRoot(root));
-  const usesMessagingConfig = roots.some((root) => isMessagingExtensionRoot(root));
-  const usesProviderConfig = roots.some((root) => isProviderExtensionRoot(root));
-  const config = usesChannelConfig
-    ? "vitest.extension-channels.config.ts"
-    : usesDiffsConfig
-      ? "vitest.extension-diffs.config.ts"
-      : usesMattermostConfig
-        ? "vitest.extension-mattermost.config.ts"
-        : usesTelegramConfig
-          ? "vitest.extension-telegram.config.ts"
-          : usesVoiceCallConfig
-            ? "vitest.extension-voice-call.config.ts"
-            : usesMemoryConfig
-              ? "vitest.extension-memory.config.ts"
-              : usesMsTeamsConfig
-                ? "vitest.extension-msteams.config.ts"
-                : usesMessagingConfig
-                  ? "vitest.extension-messaging.config.ts"
-                  : usesProviderConfig
-                    ? "vitest.extension-providers.config.ts"
-                    : "vitest.extensions.config.ts";
   const testFileCount = roots.reduce(
     (sum, root) => sum + countTestFiles(path.join(repoRoot, root)),
     0,
   );
 
   return {
-    config,
     extensionDir: relativeExtensionDir,
     extensionId,
     hasTests: testFileCount > 0,
@@ -140,38 +102,18 @@ export function resolveExtensionTestPlan(params = {}) {
 }
 
 function mergeTestPlans(plans) {
-  const groupsByConfig = new Map();
-
-  for (const plan of plans) {
-    const current = groupsByConfig.get(plan.config) ?? {
-      config: plan.config,
-      extensionIds: [],
-      roots: [],
-      testFileCount: 0,
-    };
-
-    current.extensionIds.push(plan.extensionId);
-    current.roots.push(...plan.roots);
-    current.testFileCount += plan.testFileCount;
-    groupsByConfig.set(plan.config, current);
-  }
-
-  const planGroups = [...groupsByConfig.values()]
-    .map((group) => ({
-      ...group,
-      extensionIds: group.extensionIds.toSorted((left, right) => left.localeCompare(right)),
-      roots: [...new Set(group.roots)],
-    }))
-    .toSorted((left, right) => left.config.localeCompare(right.config));
+  const extensionIds = plans
+    .map((plan) => plan.extensionId)
+    .toSorted((left, right) => left.localeCompare(right));
+  const roots = [...new Set(plans.flatMap((plan) => plan.roots))];
+  const testFileCount = plans.reduce((sum, plan) => sum + plan.testFileCount, 0);
 
   return {
     extensionCount: plans.length,
-    extensionIds: plans
-      .map((plan) => plan.extensionId)
-      .toSorted((left, right) => left.localeCompare(right)),
+    extensionIds,
     hasTests: plans.length > 0,
-    planGroups,
-    testFileCount: plans.reduce((sum, plan) => sum + plan.testFileCount, 0),
+    planGroups: [{ extensionIds, roots, testFileCount }],
+    testFileCount,
   };
 }
 

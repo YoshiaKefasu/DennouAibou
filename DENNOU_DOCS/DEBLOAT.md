@@ -2204,3 +2204,66 @@ OpenClaw 由来のマルチテナント向け・過剰エンジニアリング�
 | `bun run ui:build`          | WebUI ビルド完走・Cron タブ除去確認 |
 | `config:schema:gen --check` | generated schema 整合確認           |
 | `config:schema:gen --check` | generated schema 整合確認           |
+
+## 35. Vitest 完全撤去 ＆ bun test 一本化（2026-10-05 作業）
+
+### 35.1 目的・背景
+
+プロジェクトは DI 化および Bun ランタイム移行を完了しており、`bun test` が動作する環境になっている。Bun 1.4 は `from "vitest"` をネイティブに shim する（node_modules のない空ディレクトリで `describe` / `it` / `expect` / `vi.fn` が pass することを実証済み）ため、vitest パッケージがなくても `bun test` は動作する。
+
+デュアルランナーとして残存していた Vitest（56個の設定ファイル・駆動スクリプト・package.json lanes/deps）を完全に DEBLOAT 撤去し、タスクマネージャーに `vitest` プロセスが残る問題を根治する。`ui/` パッケージの Vitest（`ui/vitest.config.ts`・`ui/vitest.node.config.ts`・`pnpm --dir ui test`）は独立ワークスペースのため対象外・維持する。
+
+### 35.2 削除内容（73ファイル・`git status` 実測）
+
+| 区分               | 対象                                                                                                                                                         | 数  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
+| **ルート設定群**   | `vitest*.config.ts`・`vitest*.mjs`・`vitest*.ts`（`*.config`・`*-paths`・`pattern-file`・`system-load`・`performance-config`・`scoped-config` 等、残存全件） | 56  |
+| **駆動スクリプト** | `scripts/run-vitest.mjs`・`scripts/run-vitest-profile.mjs`・`scripts/test-projects.mjs`・`scripts/test-projects.test-support.mjs`（＋`.d.mts`）              | 5   |
+| **設定依存テスト** | `test/vitest-*.test.ts` 7件・`test/scripts/run-vitest*.test.ts` 2件・`src/infra/vitest-*-config.test.ts` 3件（削除設定を import するため連動削除）           | 12  |
+| **package.json**   | `devDependencies` の `vitest`・`@vitest/coverage-v8` を削除                                                                                                  | —   |
+
+`test/vitest-ui-package-config.test.ts` は `ui/` 側の設定（存続）を検証するため維持した。`__DENNOU_vitest__/cron` は cron 実行フィクスチャであり Vitest 設定ではないため維持した。
+
+### 35.3 package.json lanes 整理
+
+| lane                                 | 変更後                                                                                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test`                               | `bun test`                                                                                                                                                      |
+| `test:gateway`                       | `bun test src/gateway`                                                                                                                                          |
+| `test:channels`                      | `bun test src/channels extensions/discord extensions/line`（`extensions/slack` 等は未存在のため既存 dir のみ。旧 lane の contracts 除外は再現せず内包実行する） |
+| `test:bundled`                       | `bun test src/plugin-sdk/facade-runtime.test.ts src/plugins/loader.test.ts`（旧 include の `matrix-plugin-helper.test.ts` は既に存在しない）                    |
+| `test:contracts[:channels,:plugins]` | `bun test <contracts dir>`（`--maxWorkers=1` は廃止）                                                                                                           |
+| `test:coverage`                      | `bun test --coverage`                                                                                                                                           |
+| `test:e2e`                           | `bun test .e2e.test.ts`（path filter で e2e のみ実行）                                                                                                          |
+| `test:extensions`                    | `bun test extensions`                                                                                                                                           |
+| `test:auth:compat`                   | `bun test <対象4ファイル>`（`--config` 廃止）                                                                                                                   |
+| `android:test:integration`           | `bun test <live test 1件>`（`run-vitest` 経由を廃止）                                                                                                           |
+| `test:watch`                         | `bun test --watch`                                                                                                                                              |
+
+削除 lanes：`test:fast`・`test:changed`（`:max`）・`test:max`・`test:coverage:changed`・`test:perf:imports`（`:changed`）・`test:perf:profile:*`・`test:sectriage`・`test:serial`（いずれも vitest 専用機構に依存）。`test:live`・`test:extension`（`:batch`）・`test:force`・`test:perf:budget`・`test:perf:hotspots`・docker/install/parallels/startup 系は維持。
+
+### 35.4 bun 移行の consequential fix
+
+1. **`scripts/lib/extension-test-plan.mjs`**: 削除した 9 個の `vitest.*-paths` import と config 選別ブロックを撤去。`plan.config` を廃止し、`mergeTestPlans` は config グルーピングをやめて単一グループ返却へ単純化（`createExtensionTestShards` 互換維持）。
+2. **`scripts/test-extension.mjs` / `test-extension-batch.mjs`**: `pnpm exec vitest --config` 起動を `bun test <targets>` 起動へ変更（`--config` 廃止、targets は plan の roots をそのまま渡す）。
+3. **`scripts/test-live.mjs`**: `spawnPnpmRunner` を `bun test` 直接起動へ変更。path フィルタがない場合は既定で `.live.test.ts` フィルタを付与する。
+4. **`scripts/test-force.ts`**: `pnpm exec vitest` 起動を `bun test` 起動へ変更（port 解放ラッパー機能は維持）。
+5. **`ui/vitest.config.ts`・`ui/vitest.node.config.ts`**: 削除した root `vitest.shared.config.ts` への import を、ui ローカル値へ inline（`pool: "threads"`・`jsdomOptimizedDeps` 実体。`resolveDefaultVitestPool()` は常時 `"threads"` 返却だったため等価）。
+6. **`scripts/e2e/Dockerfile`**: 存在しなくなった 6 個の vitest ファイルを `COPY` 行から除去。
+7. **`scripts/prepush-ci.sh`**: vitest 2 行を `bun test extensions` へ一本化（unit lane は後続の `pnpm test` が内包するため削除）。
+
+### 35.5 検証結果
+
+| ゲート                                                        | 結果                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `node scripts/run-tsgo.mjs --noEmit`                          | **exit 0**（削除直後は `ui/` 2 errors → 35.4-5 の inline で解消） |
+| `bun test src/auto-reply/status.test.ts`                      | **49 pass / 0 fail**                                              |
+| `bun test test/vitest-ui-package-config.test.ts`              | **2 pass / 0 fail**（ui 維持の根拠）                              |
+| `pnpm exec oxfmt --check package.json DENNOU_DOCS/DEBLOAT.md` | **pass**                                                          |
+
+### 35.6 残務・注意（follow-up）
+
+- **CI の Bun 未導入**: `.github/workflows/ci.yml` の test 実行 job はすべて `install-bun: "false"` のため、`pnpm test`（＝`bun test`）が CI で動作するか要確認（runner への bun preinstall 前提）。必要なら `install-bun: "true"` 化は別途 Kuraudo 裁定で。
+- **`from "vitest"` 約2394ファイル残留**: Bun shim により runtime は動作するが、クリーン install 後（`node_modules/vitest` 消失後）の `tsgo` は TS2307 リスクあり。`bun:test` への import 移行は別波で（vitest-only API 使用ファイルあり、一括置換禁止）。
+- **`docs/help/testing.md`・`DENNOU_RULES.md` の vitest 記述**は本波スコープ外として温存。ドキュメント更新は別途。
+- **`test:perf:budget` / `test:perf:hotspots`** は vitest レポートのパーサとして残置（既定 config 文字列は dangling のため将来整理）。
