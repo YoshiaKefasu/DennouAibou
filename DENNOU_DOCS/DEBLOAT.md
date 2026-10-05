@@ -2353,49 +2353,64 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 - **`agents-utils.ts` の sessions ツール群ラベル**：§36 撤去ツールの文字列残留。表示専用のため本波スコープ外。
 - **i18n の sessions 文言**：タブ非表示後も辞書に残る。将来の単純再構築まで温存。
 
-## 38. インバウンドメディアのワークスペース自動仕分け ＆ read ツールへの一本化（image/pdf/audio 完全撤去）
+## 38. インバウンドメディアのワークスペース自動仕分け ＆ read ツールへの一本化（image/pdf/audio 完全撤去）（2026-10-05 改訂）
 
 ### 38.1 目的・背景
 
 ユーザー裁定（2026-10-05）：
 「僕がTelegramかDiscordから画像とか音声、動画、PDFなど送ったら \media\inbound に入っちゃうんじゃない？これからKasouのWorkspaceで \workspace\inbound_media\{ファイル形式}\{ファイル内容} にできます？でPlaceholderプラグインを画像はそのファイルの居場所へ書けばいいですね。それとimage, pdf, audioメディア読込みツールはreadツールに一本化統合できます？」
+「しかしですね… モデル "audio" サポートしてないなら、そのWhisperへ直行して貰うね。GeminiサポートするからBase64ですね…」
 
 #### 2つの改善の柱
 
 1. **インバウンドメディアの整理 ＆ 賢いプレースホルダー化**:
-   - 受信メディアの保存先を従来の雑多な `~/.openclaw/media/inbound` から、Kasou のワークスペース内 `workspace/inbound_media/{形式}/...` に自動仕分けして保存する。
+   - 受信メディアの保存先を従来の単一 `~/.openclaw/media/inbound` から、Kasou のワークスペース内 `workspace/inbound_media/{形式}/...` に自動仕分けして永続保存する。
      - `workspace/inbound_media/image/...`（画像: png, jpg, webp, gif等）
      - `workspace/inbound_media/audio/...`（音声: ogg, mp3, wav等）
      - `workspace/inbound_media/video/...`（動画: mp4, webm等）
      - `workspace/inbound_media/pdf/...`（PDF: pdf）
      - `workspace/inbound_media/document/...`（ドキュメント: txt, md, json, doc等）
      - `workspace/inbound_media/other/...`（その他）
-   - `context-pruner`（カンナくず圧縮）のプレースホルダーを強化し、`[画像省略]` のような単なる省略から `[画像省略: inbound_media/image/photo---xxxx.jpg]` のようにファイルの居場所（相対パス）を明記する。これにより Kasou は後からでも必要に応じて `read` ツールでファイルを読みに行ける。
+   - **保存と配信の二層設計**:
+     - 内部の claim-check ID 解決（`resolveMediaBufferPath`）は、ワークスペース配下の `inbound_media` の新パスおよび従来の `media/inbound` 両方を後方互換で解決可能とする。
+     - `/media/:id` HTTP 配信エンドポイントも、サブフォルダを含む safe ID を解決して配信可能とする。
+     - 一時キャッシュではなく Kasou のワークスペース資産（永続）として保持し、シングルユース即時削除は行わない。
+   - **賢いプレースホルダー化（`context-pruner`）**:
+     - 既存の正準プレフィックス（`[出力省略:`）を維持し、`[出力省略: 画像データ (NKB) / inbound_media/image/photo---xxxx.jpg]` のようにファイルの居場所（相対パス）を明記する。
+     - 添付メタデータ（`MediaPath` / `inbound_media` パス）からファイル位置を特定し、二重置換ガード（`PLACEHOLDER_MARKERS`）を破壊しない形式で記録する。
+     - これにより Kasou は後からでも必要に応じて `read` ツールでファイルを直接読みに行ける。
+
 2. **`image`, `pdf`, `audio` ツールを `read` ツールに完全統合（3ツール DEBLOAT 撤去）**:
-   - 既存の `read` ツール（`src/agents/pi-tools.read.ts`）を拡張し、ファイル拡張子・MIME に応じて画像、PDF、音声を自動判別して処理・返却する。
-     - テキスト/コード: 従来通りテキスト内容を表示。
-     - 画像: 画像ブロック（`type: "image"`）または画像記述として読み込み。
-     - PDF: PDF テキスト・構造化コンテンツを抽出して返却。
-     - 音声: 音声ブロックまたは文字起こし・メタデータを返却。
+   - 既存の `read` ツール（`src/agents/pi-tools.read.ts`）を拡張し、ファイル拡張子・MIME に応じて画像、PDF、音声を自動判別してローカル完結（KISS）で処理・返却する。
+     - **テキスト/コード**: 従来通りテキスト内容を表示。
+     - **画像**: 既存の `normalizeReadImageResult` / `sanitizeToolResultImages` を活かし、画像ブロック（`type: "image"`）として返却。
+     - **PDF**: 外部プロバイダ依存（Anthropic PDF 等）やリモート URL を廃止し、ローカルの `extractPdfContent`（`media/pdf-extract.js`）による直接テキスト抽出に一本化。
+     - **音声（Audio）**: ユーザー裁定に準拠したハイブリッド処理：
+       - カレントモデルが音声モダリティ（`input: ["audio"]`）をサポートしている場合（Gemini 等）：生音声データ（Base64 / `type: "audio"`）としてモデルへ直通！
+       - カレントモデルが音声非対応の場合（Kimi, DeepSeek 等）：Groq Whisper（`whisper-large-v3-turbo`）へ直行して即座に文字起こしテキストとして返却！
    - 不要となった `image`、`pdf`、`audio` ツールの登録を `openclaw-tools.ts` から削除し、実装ファイルおよびテストを物理削除する。
+   - `agents.defaults.pdfModel` 等の不要設定スキーマを削除し、`bun run config:schema:gen` で生成スキーマを再同期する。
    - Kasou の手元のツール選択肢をさらに絞り込み、モデルの判断負荷とプロンプトトークンを大幅に削減する。
 
 ### 38.2 変更対象と責務
 
-| 対象領域         | ファイル                                                                                               | 変更内容                                                                                                                                                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| メディア保存     | `src/media/store.ts`                                                                                   | `saveMediaBuffer` の保存先ディレクトリをワークスペース配下の `inbound_media/<subfolder>/` に対応。MIME タイプからサブフォルダ名（`image`, `audio`, `video`, `pdf`, `document`, `other`）を自動解決。既存の ID 解決（`resolveMediaBufferPath`）との後方互換性を維持。 |
-| メディア保存     | `src/media/inbound-path-policy.ts`                                                                     | ワークスペース配下の `inbound_media` パスを許可ルートとして認識。                                                                                                                                                                                                    |
-| ツール統合       | `src/agents/pi-tools.read.ts`                                                                          | `createOpenClawReadTool` を拡張。画像ファイル読み込み（既存の `normalizeReadImageResult` / `sanitizeToolResultImages` を強化）、PDF 抽出処理の統合、音声ファイル読み込み処理の統合。                                                                                 |
-| ツール撤去       | `src/agents/openclaw-tools.ts`                                                                         | `createImageTool`, `createPdfTool`, `createAudioTool` の import と登録を完全に削除。                                                                                                                                                                                 |
-| ツール物理削除   | `src/agents/tools/image-tool.ts`<br>`src/agents/tools/pdf-tool.ts`<br>`src/agents/tools/audio-tool.ts` | 不要となったツール実装ファイルおよび対応テストファイルを削除。                                                                                                                                                                                                       |
-| プレースホルダー | `extensions/context-pruner/`                                                                           | プレースホルダー生成時に添付パス情報がある場合、`[画像省略: <path>]` / `[音声データ省略: <path>]` のように相対パスを明記。                                                                                                                                           |
+| 対象領域         | ファイル                                                                                               | 変更内容                                                                                                                                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| メディア保存     | `src/media/store.ts`                                                                                   | `saveMediaBuffer` の保存先ディレクトリをワークスペース配下の `inbound_media/<subfolder>/` に対応。MIME タイプからサブフォルダ名（`image`, `audio`, `video`, `pdf`, `document`, `other`）を自動解決。既存 ID 解決（`resolveMediaBufferPath`）および新パス解決の二層両立。 |
+| メディア配信     | `src/media/server.ts`                                                                                  | `/media/:id` エンドポイントがワークスペース配下の仕分け済みファイルも安全に配信できるよう解決関数を更新。                                                                                                                                                                |
+| メディアパス認可 | `src/auto-reply/reply/stage-inbound-media.ts`<br>`src/media-understanding/attachments.cache.ts`        | ワークスペース配下の `inbound_media` を許可ルートとして登録。                                                                                                                                                                                                            |
+| ツール統合       | `src/agents/pi-tools.read.ts`                                                                          | `createOpenClawReadTool` を拡張。画像、PDF（`extractPdfContent`）、音声（モデル音声サポート時は Base64、非対応時は Groq Whisper 文字起こし）の自動ディスパッチ。                                                                                                         |
+| ツール撤去       | `src/agents/openclaw-tools.ts`                                                                         | `createImageTool`, `createPdfTool`, `createAudioTool` の import と登録を完全に削除。                                                                                                                                                                                     |
+| ツール物理削除   | `src/agents/tools/image-tool.ts`<br>`src/agents/tools/pdf-tool.ts`<br>`src/agents/tools/audio-tool.ts` | 不要となったツール実装ファイルおよび対応テストファイルを削除。`fast-tool-stubs.ts` 等のスタブも整理。                                                                                                                                                                    |
+| スキーマ再生成   | `src/config/schema-base.ts`<br>`src/config/schema.base.generated.ts`                                   | `pdfModel` 等の削除済みツール専用設定キーを整理し、`bun run config:schema:gen` で再生成。                                                                                                                                                                                |
+| プレースホルダー | `extensions/context-pruner/src/pruner.ts`<br>`src/dennou-soul/prune-engine.ts`                         | プレースホルダー生成時に添付パス情報がある場合、`[出力省略: 画像データ (NKB) / <relative_path>]` のように正準プレフィックスを維持しつつファイル位置を明記。                                                                                                              |
 
 ### 38.3 検証ゲート
 
-| ゲート                                    | 判定基準   |
-| ----------------------------------------- | ---------- |
-| `node scripts/run-tsgo.mjs --noEmit`      | **exit 0** |
-| `bun run ui:build`                        | **pass**   |
-| `bun test` 関連テスト                     | **pass**   |
-| `pnpm exec oxfmt --check <changed_files>` | **pass**   |
+| ゲート                                    | 判定基準                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| `node scripts/run-tsgo.mjs --noEmit`      | **exit 0**                                                                     |
+| `bun run ui:build`                        | **pass**                                                                       |
+| `bun run config:schema:gen --check`       | **clean（生成スキーマ一致）**                                                  |
+| `bun test` 関連テスト                     | `src/media/`, `src/agents/pi-tools.read.test.ts`, `context-pruner` 等の全 pass |
+| `pnpm exec oxfmt --check <changed_files>` | **pass**                                                                       |
