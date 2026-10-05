@@ -472,6 +472,13 @@ export async function runEmbeddedAttempt(
     let yieldAbortSettled: Promise<void> | null = null;
     // Check if the model supports native image input
     const modelHasVision = params.model.input?.includes("image") ?? false;
+    // DEBLOAT §38: audio-capable models hear raw clips via the read tool;
+    // others get Whisper transcripts.
+    // Note: the SDK input-modality type only lists "image" | "text", but
+    // providers can advertise "audio" at runtime (same contract the native
+    // audio blocks rely on), so compare via a widened readonly view.
+    const modelInputModalities = params.model.input as readonly string[] | undefined;
+    const modelSupportsAudio = modelInputModalities?.includes("audio") ?? false;
     const toolsRaw = params.disableTools
       ? []
       : (() => {
@@ -518,6 +525,7 @@ export async function runEmbeddedAttempt(
             replyToMode: params.replyToMode,
             hasRepliedRef: params.hasRepliedRef,
             modelHasVision,
+            modelSupportsAudio,
             requireExplicitMessageTarget:
               params.requireExplicitMessageTarget ?? isSubagentSessionKey(params.sessionKey),
             disableMessageTool: params.disableMessageTool,

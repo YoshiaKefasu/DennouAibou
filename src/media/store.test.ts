@@ -631,4 +631,59 @@ describe("media store", () => {
       await expectSavedOriginalFilenameCase(testCase);
     });
   });
+
+  describe("DEBLOAT §38 workspace inbound_media", () => {
+    it.each([
+      { mime: "image/png", subfolder: "image" },
+      { mime: "audio/ogg", subfolder: "audio" },
+      { mime: "video/mp4", subfolder: "video" },
+      { mime: "application/pdf", subfolder: "pdf" },
+      { mime: "text/plain", subfolder: "document" },
+      { mime: "application/octet-stream", subfolder: "document" },
+      { mime: undefined, subfolder: "other" },
+    ] as const)("$mime sorts into $subfolder", ({ mime, subfolder }) => {
+      expect(store.resolveInboundMediaSubfolder(mime)).toBe(subfolder);
+    });
+
+    it("saves into workspace inbound_media sorted by mime and resolves two-layer", async () => {
+      await withTempStore(async (store, home) => {
+        const workspaceDir = path.join(home, "workspace-main");
+        const jpeg = await sharp({
+          create: { width: 2, height: 2, channels: 3, background: "#123456" },
+        })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        const saved = await store.saveMediaBuffer(
+          jpeg,
+          "image/jpeg",
+          "inbound",
+          5 * 1024 * 1024,
+          undefined,
+          {
+            workspaceDir,
+          },
+        );
+        expect(saved.path).toContain(`inbound_media${path.sep}image${path.sep}`);
+        expect(saved.id.endsWith(".jpg")).toBe(true);
+        // Workspace-first resolution finds it; legacy-only lookup does not.
+        await expect(store.resolveMediaBufferPath(saved.id, "inbound", workspaceDir)).resolves.toBe(
+          saved.path,
+        );
+        await expect(store.resolveMediaBufferPath(saved.id, "inbound")).rejects.toThrow();
+        // Workspace files survive the legacy TTL sweep.
+        await store.cleanOldMedia(1);
+        expect((await fs.stat(saved.path)).isFile()).toBe(true);
+      });
+    });
+
+    it("falls back to the legacy media cache when the id is not in the workspace", async () => {
+      await withTempStore(async (store, home) => {
+        const workspaceDir = path.join(home, "workspace-main");
+        const legacy = await store.saveMediaBuffer(Buffer.from("legacy"), "text/plain", "inbound");
+        await expect(
+          store.resolveMediaBufferPath(legacy.id, "inbound", workspaceDir),
+        ).resolves.toBe(legacy.path);
+      });
+    });
+  });
 });

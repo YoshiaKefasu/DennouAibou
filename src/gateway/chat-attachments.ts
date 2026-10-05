@@ -290,7 +290,17 @@ function validateAttachmentBase64OrThrow(
 export async function parseMessageWithAttachments(
   message: string,
   attachments: ChatAttachment[] | undefined,
-  opts?: { maxBytes?: number; log?: AttachmentLog; supportsImages?: boolean },
+  opts?: {
+    maxBytes?: number;
+    log?: AttachmentLog;
+    supportsImages?: boolean;
+    /**
+     * DEBLOAT §38: agent workspace dir. When set, offloaded files persist into
+     * `<workspace>/inbound_media/<subfolder>/`; otherwise the legacy media
+     * cache is used.
+     */
+    workspaceDir?: string;
+  },
 ): Promise<ParsedMessageWithImages> {
   const maxBytes = opts?.maxBytes ?? 5_000_000;
   const log = opts?.log;
@@ -401,6 +411,7 @@ export async function parseMessageWithAttachments(
             "inbound",
             maxBytes,
             labelWithExt,
+            opts?.workspaceDir ? { workspaceDir: opts.workspaceDir } : undefined,
           );
 
           const savedMedia = assertSavedMedia(rawResult, label);
@@ -446,7 +457,10 @@ export async function parseMessageWithAttachments(
   } catch (err) {
     // Best-effort cleanup before rethrowing.
     if (savedMediaIds.length > 0) {
-      await Promise.allSettled(savedMediaIds.map((id) => deleteMediaBuffer(id, "inbound")));
+      const workspaceDir = opts?.workspaceDir;
+      await Promise.allSettled(
+        savedMediaIds.map((id) => deleteMediaBuffer(id, "inbound", workspaceDir)),
+      );
     }
     throw err;
   }

@@ -15,6 +15,65 @@ const resolveMediaDir = () => path.join(resolveConfigDir(), "media");
 export const MEDIA_MAX_BYTES = 5 * 1024 * 1024; // 5MB default
 const MAX_BYTES = MEDIA_MAX_BYTES;
 const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+/**
+ * DEBLOAT §38: workspace-persistent inbound media root.
+ *
+ * Inbound attachments (Telegram/Discord/etc.) are sorted into
+ * `<workspaceDir>/inbound_media/<subfolder>/` instead of the legacy single
+ * `~/.openclaw/media/inbound` directory. Files here are workspace assets
+ * (persistent) — `cleanOldMedia` never touches them.
+ */
+export const INBOUND_MEDIA_ROOT_DIRNAME = "inbound_media";
+
+/** Subfolders under `inbound_media/`, resolved from the detected MIME type. */
+export const INBOUND_MEDIA_SUBFOLDERS = [
+  "image",
+  "audio",
+  "video",
+  "pdf",
+  "document",
+  "other",
+] as const;
+
+export type InboundMediaSubfolder = (typeof INBOUND_MEDIA_SUBFOLDERS)[number];
+
+/**
+ * Map a detected MIME type to its `inbound_media/` subfolder.
+ * Unknown/missing MIME types fall back to `"other"`.
+ */
+export function resolveInboundMediaSubfolder(mime?: string | null): InboundMediaSubfolder {
+  const normalized = mime?.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (!normalized) {
+    return "other";
+  }
+  if (normalized.startsWith("image/")) {
+    return "image";
+  }
+  if (normalized.startsWith("audio/")) {
+    return "audio";
+  }
+  if (normalized.startsWith("video/")) {
+    return "video";
+  }
+  if (normalized === "application/pdf") {
+    return "pdf";
+  }
+  if (
+    normalized.startsWith("text/") ||
+    normalized.startsWith("application/") ||
+    normalized.startsWith("font/") ||
+    normalized.startsWith("model/")
+  ) {
+    return "document";
+  }
+  return "other";
+}
+
+/** `<workspaceDir>/inbound_media/<subfolder>` (lexical join, no fs access). */
+export function resolveWorkspaceInboundMediaDir(workspaceDir: string, subfolder: string): string {
+  return path.join(path.resolve(workspaceDir), INBOUND_MEDIA_ROOT_DIRNAME, subfolder);
+}
 // Files are intentionally readable by non-owner UIDs so sibling local tooling can
 // consume inbound media. The containing state/media directories remain 0o700, which is the trust boundary.
 const MEDIA_FILE_MODE = 0o644;
@@ -111,6 +170,12 @@ async function retryAfterRecreatingDir<T>(dir: string, run: () => Promise<T>): P
   }
 }
 
+/**
+ * Remove expired files under the managed media cache (`~/.openclaw/media`).
+ *
+ * Note (DEBLOAT §38): workspace-persistent `inbound_media/` files live outside
+ * this tree and are never deleted here — only the legacy cache is swept.
+ */
 export async function cleanOldMedia(ttlMs = DEFAULT_TTL_MS, options: CleanOldMediaOptions = {}) {
   const mediaDir = await ensureMediaDir();
   const now = Date.now();
@@ -398,15 +463,23 @@ export async function saveMediaBuffer(
   subdir = "inbound",
   maxBytes = MAX_BYTES,
   originalFilename?: string,
+  options?: { workspaceDir?: string },
 ): Promise<SavedMedia> {
   if (buffer.byteLength > maxBytes) {
     throw new Error(`Media exceeds ${(maxBytes / (1024 * 1024)).toFixed(0)}MB limit`);
   }
-  const dir = path.join(resolveMediaDir(), subdir);
+  const mime = await detectMime({ buffer, headerMime: contentType });
+  // DEBLOAT §38: the default inbound flow persists into the agent workspace
+  // (`<workspace>/inbound_media/<subfolder>/`), sorted by detected MIME type.
+  // Explicit subdir callers (tests, remote-cache, etc.) keep legacy behaviour.
+  const workspaceDir = options?.workspaceDir?.trim();
+  const dir =
+    workspaceDir && subdir === "inbound"
+      ? resolveWorkspaceInboundMediaDir(workspaceDir, resolveInboundMediaSubfolder(mime))
+      : path.join(resolveMediaDir(), subdir);
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   const uuid = crypto.randomUUID();
   const headerExt = extensionForMime(contentType?.split(";")[0]?.trim() ?? undefined);
-  const mime = await detectMime({ buffer, headerMime: contentType });
   const ext = headerExt ?? extensionForMime(mime) ?? "";
   const id = buildSavedMediaId({ baseId: uuid, ext, originalFilename });
   await writeSavedMediaBuffer({ dir, id, buffer });
@@ -437,6 +510,7 @@ export async function saveMediaBuffer(
 export async function resolveMediaBufferPath(
   id: string,
   subdir: "inbound" = "inbound",
+  workspaceDir?: string,
 ): Promise<string> {
   // Guard against path traversal and null-byte injection.
   //
@@ -454,6 +528,25 @@ export async function resolveMediaBufferPath(
   // (including \0) are rendered visibly in logs rather than silently dropped.
   if (!id || id.includes("/") || id.includes("\\") || id.includes("\0") || id === "..") {
     throw new Error(`resolveMediaBufferPath: unsafe media ID: ${JSON.stringify(id)}`);
+  }
+
+  // DEBLOAT §38 two-layer resolution: workspace `inbound_media/<subfolder>/`
+  // first (new path), legacy `media/inbound` second (back-compat fallback).
+  // IDs carry no subfolder, so each known subfolder is probed in order.
+  const trimmedWorkspace = workspaceDir?.trim();
+  if (trimmedWorkspace && subdir === "inbound") {
+    for (const subfolder of INBOUND_MEDIA_SUBFOLDERS) {
+      const dir = resolveWorkspaceInboundMediaDir(trimmedWorkspace, subfolder);
+      const candidate = path.join(dir, id);
+      if (!candidate.startsWith(dir + path.sep) && candidate !== dir) {
+        continue;
+      }
+      const stat = await fs.lstat(candidate).catch(() => null);
+      if (!stat || stat.isSymbolicLink() || !stat.isFile()) {
+        continue;
+      }
+      return candidate;
+    }
   }
 
   const dir = path.join(resolveMediaDir(), subdir);
@@ -501,7 +594,11 @@ export async function resolveMediaBufferPath(
  * @param id     The media ID as returned by SavedMedia.id.
  * @param subdir The subdirectory the file was saved into (default "inbound").
  */
-export async function deleteMediaBuffer(id: string, subdir: "inbound" = "inbound"): Promise<void> {
-  const physicalPath = await resolveMediaBufferPath(id, subdir);
+export async function deleteMediaBuffer(
+  id: string,
+  subdir: "inbound" = "inbound",
+  workspaceDir?: string,
+): Promise<void> {
+  const physicalPath = await resolveMediaBufferPath(id, subdir, workspaceDir);
   await fs.unlink(physicalPath);
 }

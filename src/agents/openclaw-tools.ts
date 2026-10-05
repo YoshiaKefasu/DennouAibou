@@ -7,22 +7,17 @@ import {
 } from "../secrets/runtime.js";
 import { normalizeDeliveryContext } from "../utils/delivery-context.js";
 import type { GatewayMessageChannel } from "../utils/message-channel.js";
-import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "./agent-scope.js";
 import { resolveOpenClawPluginToolInputs } from "./openclaw-tools.plugin-context.js";
 import { applyPluginToolDeliveryDefaults } from "./plugin-tool-delivery-defaults.js";
 import type { SpawnedToolContext } from "./spawned-context.js";
 import type { ToolFsPolicy } from "./tool-fs-policy.js";
-import { createAudioTool } from "./tools/audio-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
-import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
-import { createPdfTool } from "./tools/pdf-tool.js";
 import { createUpdatePlanTool } from "./tools/update-plan-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
-import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 type OpenClawToolsDeps = {
   callGateway: typeof callGateway;
@@ -101,17 +96,6 @@ export function createOpenClawTools(
   } & SpawnedToolContext,
 ): AnyAgentTool[] {
   const resolvedConfig = options?.config ?? openClawToolsDeps.config;
-  const sessionAgentId = resolveSessionAgentId({
-    sessionKey: options?.agentSessionKey,
-    config: resolvedConfig,
-  });
-  // Fall back to the session agent workspace so plugin loading stays workspace-stable
-  // even when a caller forgets to thread workspaceDir explicitly.
-  const inferredWorkspaceDir =
-    options?.workspaceDir || !resolvedConfig
-      ? undefined
-      : resolveAgentWorkspaceDir(resolvedConfig, sessionAgentId);
-  const workspaceDir = resolveWorkspaceRoot(options?.workspaceDir ?? inferredWorkspaceDir);
   const deliveryContext = normalizeDeliveryContext({
     channel: options?.agentChannel,
     to: options?.agentTo,
@@ -120,31 +104,7 @@ export function createOpenClawTools(
   });
   const runtimeWebTools = getActiveRuntimeWebToolsMetadata();
   const runtimeSnapshot = getActiveSecretsRuntimeSnapshot();
-  const imageTool = options?.agentDir?.trim()
-    ? createImageTool({
-        config: options?.config,
-        agentDir: options.agentDir,
-        workspaceDir,
-        fsPolicy: options?.fsPolicy,
-        modelHasVision: options?.modelHasVision,
-      })
-    : null;
-  const pdfTool = options?.agentDir?.trim()
-    ? createPdfTool({
-        config: options?.config,
-        agentDir: options.agentDir,
-        workspaceDir,
-        fsPolicy: options?.fsPolicy,
-      })
-    : null;
-  const audioTool = options?.agentDir?.trim()
-    ? createAudioTool({
-        config: options?.config,
-        agentDir: options.agentDir,
-        workspaceDir,
-        fsPolicy: options?.fsPolicy,
-      })
-    : null;
+  // DEBLOAT §38: image/pdf/audio tools were unified into the read tool.
   const webSearchTool = createWebSearchTool({
     config: options?.config,
     runtimeWebSearch: runtimeWebTools?.search,
@@ -191,9 +151,6 @@ export function createOpenClawTools(
       : []),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
-    ...(imageTool ? [imageTool] : []),
-    ...(pdfTool ? [pdfTool] : []),
-    ...(audioTool ? [audioTool] : []),
   ];
 
   if (options?.disablePluginTools) {

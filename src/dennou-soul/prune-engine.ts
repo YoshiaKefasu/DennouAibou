@@ -84,6 +84,88 @@ export function buildCanonicalPlaceholder(params: {
   return `[出力省略: ${params.lineCount}行 / ${params.sizeLabel} ${params.status ?? "正常終了"}]`;
 }
 
+/**
+ * DEBLOAT §38: テキスト中から `inbound_media/<subfolder>/<file>` の相対パスを
+ * 抜き出す（絶対パス・`\\` 区切り・`"` 囲みも正規化して検出）。
+ * 見つからなければ undefined。プレースホルダーにファイルの居場所を明記するために使う。
+ */
+export function extractInboundMediaRelPath(text: string): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  const normalized = text.replace(/\\/g, "/");
+  const match = normalized.match(/inbound_media\/([A-Za-z0-9_.-]+\/[^\s"'\]<>|()。、]+)/);
+  if (!match) {
+    return undefined;
+  }
+  const rel = `inbound_media/${match[1]}`.replace(/[/.]+$/, "");
+  return rel.length > "inbound_media/".length ? rel : undefined;
+}
+
+/**
+ * DEBLOAT §38: 画像データ用プレースホルダー。
+ * 添付パス情報がある場合は `[出力省略: 画像データ (NKB) / <relpath> / 正常終了]`
+ * のようにファイル位置を明記する（正準プレフィックスとステータスは維持）。
+ */
+export function buildImagePlaceholder(params: {
+  imageDataChars: number;
+  relPath?: string;
+  status?: string;
+}): string {
+  const approxKb = Math.max(1, Math.round(params.imageDataChars / 1024));
+  const status = params.status ?? "正常終了";
+  if (params.relPath) {
+    return `[出力省略: 画像データ (${approxKb}KB) / ${params.relPath} / ${status}]`;
+  }
+  return `[出力省略: 画像データ (${approxKb}KB) ${status}]`;
+}
+
+/** エントリ内の画像ブロック（type: "image"）の Base64 data 文字数合計。 */
+export function getToolResultImageDataChars(entry: JsonlEntry): number {
+  const msg = entry.parsed.message as Record<string, unknown> | undefined;
+  if (!msg || typeof msg !== "object") {
+    return 0;
+  }
+  const content = msg.content;
+  if (!Array.isArray(content)) {
+    return 0;
+  }
+  let total = 0;
+  for (const item of content) {
+    if (
+      item &&
+      typeof item === "object" &&
+      (item as Record<string, unknown>).type === "image" &&
+      typeof (item as Record<string, unknown>).data === "string"
+    ) {
+      total += ((item as Record<string, unknown>).data as string).length;
+    }
+  }
+  return total;
+}
+
+/**
+ * DEBLOAT §38: エントリから添付パス情報（`inbound_media/...`）を探す。
+ * テキスト内容と構造化 details の両方を見る（read ツールは details.readPath に
+ * 読み取り元パスを残す）。
+ */
+export function extractEntryInboundMediaRelPath(entry: JsonlEntry): string | undefined {
+  const fromText = extractInboundMediaRelPath(getToolResultTextContent(entry));
+  if (fromText) {
+    return fromText;
+  }
+  const msg = entry.parsed.message as Record<string, unknown> | undefined;
+  const details = msg && typeof msg === "object" ? msg.details : undefined;
+  if (!details || typeof details !== "object") {
+    return undefined;
+  }
+  try {
+    return extractInboundMediaRelPath(JSON.stringify(details));
+  } catch {
+    return undefined;
+  }
+}
+
 /** JSONLの1行を表すパース済みエントリ */
 interface JsonlEntry {
   raw: string;
@@ -360,7 +442,37 @@ export function pruneToolOutputLines(
       resultLines.push(line); // dry-run時は実際には置き換えない
     } else {
       logger(`[DennouAibou] PRUNE: line ${i + 1} (${contentLength} chars)`);
-      resultLines.push(pruneToolResultEntry(entry, config.placeholder));
+      // pruner.ts parity: a custom placeholder wins when set; otherwise fall
+      // back to the path-citing image placeholder (or the canonical text
+      // placeholder when there is no image data). Both keep the `[出力省略:`
+      // prefix so the idempotency guard still holds.
+      const customPlaceholder =
+        typeof config.placeholder === "string" && config.placeholder.trim()
+          ? config.placeholder.trim()
+          : "";
+      if (customPlaceholder) {
+        resultLines.push(pruneToolResultEntry(entry, customPlaceholder));
+      } else {
+        const imageDataChars = getToolResultImageDataChars(entry);
+        if (imageDataChars > 0) {
+          const relPath = extractEntryInboundMediaRelPath(entry);
+          resultLines.push(
+            pruneToolResultEntry(entry, buildImagePlaceholder({ imageDataChars, relPath })),
+          );
+        } else {
+          const text = getToolResultTextContent(entry);
+          const lineCount = Math.max(1, text.split("\n").length);
+          resultLines.push(
+            pruneToolResultEntry(
+              entry,
+              buildCanonicalPlaceholder({
+                lineCount,
+                sizeLabel: formatPrunableSizeLabel(text.length),
+              }),
+            ),
+          );
+        }
+      }
     }
     prunedCount++;
   }

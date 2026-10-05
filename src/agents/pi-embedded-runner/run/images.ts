@@ -2,7 +2,11 @@ import path from "node:path";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { assertNoWindowsNetworkPath, safeFileURLToPath } from "../../../infra/local-file-access.js";
 import type { PromptImageOrderEntry } from "../../../media/prompt-image-order.js";
-import { resolveMediaBufferPath, getMediaDir } from "../../../media/store.js";
+import {
+  resolveMediaBufferPath,
+  getMediaDir,
+  resolveWorkspaceInboundMediaDir,
+} from "../../../media/store.js";
 import { loadWebMedia } from "../../../media/web-media.js";
 import { resolveUserPath } from "../../../utils.js";
 import type { ImageSanitizationLimits } from "../../image-sanitization.js";
@@ -344,8 +348,9 @@ export async function loadImageFromRef(
   // Handle Gateway claim-check URIs (media://inbound/<id>).
   // These are written by the Gateway's offload path and point to files that
   // the Gateway has already validated and persisted. They are intentionally
-  // exempt from workspaceOnly checks because they live in the media store
-  // managed by the Gateway, not in the agent workspace.
+  // exempt from workspaceOnly checks. DEBLOAT §38: new files live in the
+  // agent workspace (`inbound_media/<subfolder>/`), legacy files in the
+  // managed media store — resolve workspace-first, then fall back.
   if (ref.type === "media-uri") {
     const uriMatch = ref.resolved.match(MEDIA_URI_REGEX);
     if (!uriMatch) {
@@ -358,10 +363,10 @@ export async function loadImageFromRef(
       // and original-filename prefix) and returns the absolute path of the
       // persisted file. It applies its own guards against path traversal,
       // symlinks, and null bytes.
-      const physicalPath = await resolveMediaBufferPath(mediaId, "inbound");
+      const physicalPath = await resolveMediaBufferPath(mediaId, "inbound", workspaceDir);
       const media = await loadWebMedia(physicalPath, {
         maxBytes: options?.maxBytes,
-        localRoots: [getMediaDir()],
+        localRoots: [getMediaDir(), resolveWorkspaceInboundMediaDir(workspaceDir, "image")],
       });
       if (media.kind !== "image") {
         log.debug(`Native image: media store entry is not an image: ${mediaId}`);

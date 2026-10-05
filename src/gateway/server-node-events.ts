@@ -23,6 +23,7 @@ import {
   resolveGatewayModelSupportsImages,
   resolveOutboundTarget,
   resolveSessionAgentId,
+  resolveAgentWorkspaceDir,
   resolveSessionModelRef,
   sanitizeInboundSystemTags,
   scopedWakeOptions,
@@ -389,11 +390,19 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
           provider: modelRef.provider,
           model: modelRef.model,
         });
+        // DEBLOAT §38: persist inbound media into the session agent workspace.
+        let inboundWorkspaceDir: string | undefined;
+        try {
+          inboundWorkspaceDir = resolveAgentWorkspaceDir(cfg, sessionAgentId);
+        } catch {
+          inboundWorkspaceDir = undefined;
+        }
         try {
           const parsed = await parseMessageWithAttachments(message, normalizedAttachments, {
             maxBytes: 5_000_000,
             log: ctx.logGateway,
             supportsImages,
+            workspaceDir: inboundWorkspaceDir,
           });
           message = parsed.message.trim();
           images = parsed.images;
@@ -405,7 +414,7 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
             if (parsed.offloadedRefs && parsed.offloadedRefs.length > 0) {
               for (const ref of parsed.offloadedRefs) {
                 try {
-                  await deleteMediaBuffer(ref.id);
+                  await deleteMediaBuffer(ref.id, "inbound", inboundWorkspaceDir);
                 } catch (cleanupErr) {
                   ctx.logGateway.warn(
                     `Failed to cleanup orphaned media ${ref.id}: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`,

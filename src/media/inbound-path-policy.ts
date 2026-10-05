@@ -1,4 +1,5 @@
 import path from "node:path";
+import { INBOUND_MEDIA_ROOT_DIRNAME } from "./store.js";
 
 const WILDCARD_SEGMENT = "*";
 const WINDOWS_DRIVE_ABS_RE = /^[A-Za-z]:\//;
@@ -110,4 +111,18 @@ export function isInboundPathAllowed(params: {
     return false;
   }
   return effectiveRoots.some((rootPattern) => matchesRootPattern({ candidatePath, rootPattern }));
+}
+
+/**
+ * DEBLOAT §38: workspace-persistent inbound media roots.
+ *
+ * Returns the `<workspaceDir>/inbound_media` root (plus nothing else) so
+ * callers can merge it into their allowed-roots set. Empty input yields [].
+ */
+export function resolveWorkspaceInboundMediaRoots(workspaceDir?: string | null): string[] {
+  const trimmed = workspaceDir?.trim();
+  if (!trimmed) {
+    return [];
+  }
+  return mergeInboundPathRoots([`${trimmed}/${INBOUND_MEDIA_ROOT_DIRNAME}`]);
 }

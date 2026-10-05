@@ -57,12 +57,6 @@ export type AgentDefaultsConfig = {
   videoGenerationModel?: AgentModelConfig;
   /** Optional music-generation model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */
   musicGenerationModel?: AgentModelConfig;
-  /** Optional PDF-capable model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */
-  pdfModel?: AgentModelConfig;
-  /** Maximum PDF file size in megabytes (default: 10). */
-  pdfMaxBytesMb?: number;
-  /** Maximum number of PDF pages to process (default: 20). */
-  pdfMaxPages?: number;
   /** Model catalog with optional aliases (full provider/model keys). */
   models?: Record<string, AgentModelEntryConfig>;
   /** Agent working directory (preferred). Used as the default cwd for agent runs. */

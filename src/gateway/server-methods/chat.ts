@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION, SessionManager } from "@earendil-works/pi-coding-agent";
-import { resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { resolveSessionAgentId, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import { resolveThinkingDefault } from "../../agents/model-selection.js";
 import { rewriteTranscriptEntriesInSessionFile } from "../../agents/pi-embedded-runner/transcript-rewrite.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
@@ -367,6 +367,8 @@ async function persistChatSendImages(
     offloadedRefs: OffloadedRef[];
     client: GatewayRequestHandlerOptions["client"];
     logGateway: GatewayRequestContext["logGateway"];
+    /** DEBLOAT §38: agent workspace dir for inbound_media persistence. */
+    workspaceDir?: string;
   },
   saveMediaBufferImpl: typeof saveMediaBuffer,
 ): Promise<SavedMedia[]> {
@@ -398,7 +400,14 @@ async function persistChatSendImages(
     }
     try {
       saved.push(
-        await saveMediaBufferImpl(Buffer.from(img.data, "base64"), img.mimeType, "inbound"),
+        await saveMediaBufferImpl(
+          Buffer.from(img.data, "base64"),
+          img.mimeType,
+          "inbound",
+          undefined,
+          undefined,
+          params.workspaceDir ? { workspaceDir: params.workspaceDir } : undefined,
+        ),
       );
     } catch (err) {
       params.logGateway.warn(
@@ -1481,6 +1490,8 @@ export function createChatHandlers(overrides: ChatHandlersDeps = {}): GatewayReq
       let parsedImages: ChatImageContent[] = [];
       let parsedImageOrder: PromptImageOrderEntry[] = [];
       let parsedOffloadedRefs: OffloadedRef[] = [];
+      // DEBLOAT §38: workspace used for inbound_media persistence (set below).
+      let inboundWorkspaceDir: string | undefined;
 
       const timeoutMs = resolveAgentTimeoutMs({
         cfg,
@@ -1550,12 +1561,21 @@ export function createChatHandlers(overrides: ChatHandlersDeps = {}): GatewayReq
           provider: modelRef.provider,
           model: modelRef.model,
         });
+        // DEBLOAT §38: persist inbound media into the agent workspace.
+        // resolveAgentWorkspaceDir can throw for unknown agents; fall back to
+        // undefined so attachments still parse (stored under the default root).
+        try {
+          inboundWorkspaceDir = resolveAgentWorkspaceDir(cfg, sessionAgentId);
+        } catch {
+          inboundWorkspaceDir = undefined;
+        }
 
         try {
           const parsed = await parseMessageWithAttachments(inboundMessage, normalizedAttachments, {
             maxBytes: 5_000_000,
             log: context.logGateway,
             supportsImages,
+            workspaceDir: inboundWorkspaceDir,
           });
           parsedMessage = parsed.message;
           parsedImages = parsed.images;
@@ -1607,6 +1627,7 @@ export function createChatHandlers(overrides: ChatHandlersDeps = {}): GatewayReq
             offloadedRefs: parsedOffloadedRefs,
             client,
             logGateway: context.logGateway,
+            workspaceDir: inboundWorkspaceDir,
           },
           deps.saveMediaBuffer,
         );

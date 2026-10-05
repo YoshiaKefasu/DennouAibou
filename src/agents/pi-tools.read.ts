@@ -10,8 +10,11 @@ import {
   writeFileWithinRoot,
 } from "../infra/fs-safe.js";
 import { trySafeFileURLToPath } from "../infra/local-file-access.js";
-import { detectMime } from "../media/mime.js";
+import { detectMime, isAudioFileName } from "../media/mime.js";
+import { MAX_NATIVE_AUDIO_BYTES, resolveNativeAudioMimeType } from "../media/native-audio.js";
+import { extractPdfContent } from "../media/pdf-extract.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
+import { resolveUserPath } from "../utils.js";
 import type { ImageSanitizationLimits } from "./image-sanitization.js";
 import { assertPathWithinRoot, toRelativeWorkspacePath } from "./path-policy.js";
 import { wrapEditToolWithRecovery } from "./pi-tools.host-edit.js";
@@ -46,6 +49,28 @@ const MAX_ADAPTIVE_READ_PAGES = 8;
 type OpenClawReadToolOptions = {
   modelContextWindowTokens?: number;
   imageSanitization?: ImageSanitizationLimits;
+  /**
+   * Agent workspace dir. Used to resolve relative paths for the binary
+   * pre-dispatch (PDF/audio) and to render details.readPath workspace-relative.
+   * Should match the root the wrapped base read tool was created with.
+   */
+  workspaceDir?: string;
+  /**
+   * True when the current model natively accepts audio input (e.g. Gemini).
+   * Audio files are then passed through as base64 `type: "audio"` blocks;
+   * otherwise they are transcribed via `transcribeAudio` (Groq Whisper).
+   */
+  modelSupportsAudio?: boolean;
+  /**
+   * Transcriber for audio files when the model lacks audio support.
+   * Wired by pi-tools.ts to the media-understanding Whisper runner.
+   * When absent, audio reads degrade to an explanatory error text.
+   */
+  transcribeAudio?: (absolutePath: string) => Promise<{
+    transcript?: string;
+    provider?: string;
+    model?: string;
+  }>;
 };
 
 type ReadTruncationDetails = {
@@ -484,6 +509,307 @@ export function createHostWorkspaceEditTool(
   return wrapToolParamValidation(withRecovery, REQUIRED_PARAM_GROUPS.edit);
 }
 
+// ---------------------------------------------------------------------------
+// DEBLOAT §38: binary pre-dispatch (image/pdf/audio unification into read).
+//
+// The upstream read tool handles text and images. PDF and audio files are
+// intercepted here and served locally (KISS, no remote providers):
+// - PDF: direct text extraction via src/media/pdf-extract.ts.
+// - Audio: base64 passthrough when the current model supports audio input,
+//   otherwise immediate transcription via the Whisper runner.
+// Images keep flowing to the base tool (normalize + sanitize below).
+//
+// Note: former agents.defaults.pdfMaxBytesMb/pdfMaxPages config keys were
+// removed by §38; the old pdf-tool defaults (10MB, 20 pages) are now constants.
+// ---------------------------------------------------------------------------
+
+const READ_SNIFF_BYTES = 16_384;
+const READ_PDF_MAX_BYTES = 10 * 1024 * 1024;
+const READ_PDF_MAX_PAGES = 20;
+const READ_PDF_MAX_PIXELS = 4_000_000;
+const READ_PDF_MIN_TEXT_CHARS = 200;
+
+function resolveReadDispatchPath(rawPath: string, workspaceDir?: string): string | undefined {
+  const trimmed = rawPath.startsWith("@") ? rawPath.slice(1).trim() : rawPath.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return undefined;
+  }
+  if (/^data:/i.test(trimmed)) {
+    return undefined;
+  }
+  let candidate = trimmed;
+  if (candidate.startsWith("file://")) {
+    try {
+      candidate = trySafeFileURLToPath(candidate) ?? candidate;
+    } catch {
+      return undefined;
+    }
+  } else if (candidate.startsWith("~")) {
+    try {
+      candidate = resolveUserPath(candidate);
+    } catch {
+      return undefined;
+    }
+  }
+  try {
+    return path.isAbsolute(candidate)
+      ? path.resolve(candidate)
+      : workspaceDir
+        ? path.resolve(workspaceDir, candidate)
+        : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function toDisplayPath(absolutePath: string, workspaceDir?: string): string {
+  if (workspaceDir) {
+    try {
+      const root = path.resolve(workspaceDir);
+      const rel = path.relative(root, absolutePath);
+      if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+        return rel.split(path.sep).join("/");
+      }
+    } catch {
+      // fall through to absolute
+    }
+  }
+  return absolutePath;
+}
+
+function withReadPathDetails(
+  result: AgentToolResult<unknown>,
+  displayPath: string,
+): AgentToolResult<unknown> {
+  const details = (result as { details?: unknown }).details;
+  const nextDetails: Record<string, unknown> =
+    details && typeof details === "object" ? { ...(details as Record<string, unknown>) } : {};
+  // Note: readPath lets prune placeholders cite the file location
+  // (`inbound_media/...`) without polluting model-visible content.
+  if (!("readPath" in nextDetails)) {
+    nextDetails.readPath = displayPath;
+  }
+  return { ...result, details: nextDetails };
+}
+
+function textToolResult(text: string, details: Record<string, unknown>): AgentToolResult<unknown> {
+  return {
+    content: [{ type: "text", text }] as unknown as AgentToolResult<unknown>["content"],
+    details,
+  };
+}
+
+async function readPdfDispatchResult(params: {
+  absolutePath: string;
+  displayPath: string;
+  sizeBytes: number;
+}): Promise<AgentToolResult<unknown>> {
+  const fileName = path.basename(params.absolutePath) || params.displayPath;
+  if (params.sizeBytes > READ_PDF_MAX_BYTES) {
+    return textToolResult(
+      `Cannot read PDF ${fileName}: file exceeds ${(READ_PDF_MAX_BYTES / (1024 * 1024)).toFixed(0)}MB limit.`,
+      { path: params.displayPath, format: "pdf", error: "too-large" },
+    );
+  }
+  let buffer: Buffer;
+  try {
+    buffer = await fs.readFile(params.absolutePath);
+  } catch (err) {
+    return textToolResult(
+      `Cannot read PDF ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+      { path: params.displayPath, format: "pdf", error: "read-failed" },
+    );
+  }
+  let extracted: Awaited<ReturnType<typeof extractPdfContent>>;
+  try {
+    extracted = await extractPdfContent({
+      buffer,
+      maxPages: READ_PDF_MAX_PAGES,
+      maxPixels: READ_PDF_MAX_PIXELS,
+      minTextChars: READ_PDF_MIN_TEXT_CHARS,
+    });
+  } catch (err) {
+    return textToolResult(
+      `Cannot parse PDF ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+      { path: params.displayPath, format: "pdf", error: "parse-failed" },
+    );
+  }
+  const text = extracted.text.trim();
+  if (!text && extracted.images.length === 0) {
+    return textToolResult(`PDF ${fileName} contains no extractable text or images.`, {
+      path: params.displayPath,
+      format: "pdf",
+    });
+  }
+  const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];
+  if (text) {
+    content.push({ type: "text", text: `[PDF: ${fileName}]\n\n${text}` });
+  } else {
+    content.push({
+      type: "text",
+      text: `[PDF: ${fileName}] (scanned pages attached as images below)`,
+    });
+  }
+  for (const image of extracted.images) {
+    content.push({ type: "image", data: image.data, mimeType: image.mimeType });
+  }
+  const result: AgentToolResult<unknown> = {
+    content: content as unknown as AgentToolResult<unknown>["content"],
+    details: { path: params.displayPath, format: "pdf" },
+  };
+  return withReadPathDetails(result, params.displayPath);
+}
+
+async function readAudioDispatchResult(params: {
+  absolutePath: string;
+  displayPath: string;
+  sizeBytes: number;
+  mimeType?: string;
+  options?: OpenClawReadToolOptions;
+}): Promise<AgentToolResult<unknown>> {
+  const fileName = path.basename(params.absolutePath) || params.displayPath;
+  const mimeType = resolveNativeAudioMimeType({
+    path: params.absolutePath,
+    mimeType: params.mimeType,
+  });
+  const modelSupportsAudio = params.options?.modelSupportsAudio === true;
+
+  // User ruling (§38): audio-capable models (Gemini etc.) hear the raw clip.
+  if (modelSupportsAudio && mimeType && params.sizeBytes <= MAX_NATIVE_AUDIO_BYTES) {
+    try {
+      const buffer = await fs.readFile(params.absolutePath);
+      // Note: AgentToolResult.content is statically typed as text/image only,
+      // but the runtime persists tool content verbatim (same contract the old
+      // audio tool relied on), so audio-capable models hear the clip.
+      return withReadPathDetails(
+        {
+          content: [
+            {
+              type: "audio",
+              data: buffer.toString("base64"),
+              mimeType,
+            } as unknown as AgentToolResult<unknown>["content"][number],
+            {
+              type: "text",
+              text: `Read audio file [${mimeType}] (${fileName})`,
+            } as unknown as AgentToolResult<unknown>["content"][number],
+          ],
+          details: {
+            path: params.displayPath,
+            format: "audio",
+            mimeType,
+            size: params.sizeBytes,
+          },
+        },
+        params.displayPath,
+      );
+    } catch (err) {
+      return textToolResult(
+        `Cannot read audio ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+        { path: params.displayPath, format: "audio", error: "read-failed" },
+      );
+    }
+  }
+
+  // Otherwise transcribe immediately via Whisper (Kimi/DeepSeek etc.).
+  const transcribe = params.options?.transcribeAudio;
+  if (!transcribe) {
+    return textToolResult(
+      `Cannot read audio ${fileName}: the current model does not support audio input and no transcription engine is configured.`,
+      { path: params.displayPath, format: "audio", error: "no-transcriber" },
+    );
+  }
+  try {
+    const { transcript, provider, model } = await transcribe(params.absolutePath);
+    if (!transcript?.trim()) {
+      return textToolResult(
+        `No transcript was produced for audio ${fileName}. Check that the file is a supported audio format and that transcription is configured.`,
+        { path: params.displayPath, format: "audio", error: "no-transcript" },
+      );
+    }
+    return withReadPathDetails(
+      textToolResult(transcript.trim(), {
+        path: params.displayPath,
+        format: "audio",
+        transcribed: true,
+        ...(provider ? { provider } : {}),
+        ...(model ? { model } : {}),
+      }),
+      params.displayPath,
+    );
+  } catch (err) {
+    return textToolResult(
+      `Audio transcription failed for ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+      { path: params.displayPath, format: "audio", error: "transcribe-failed" },
+    );
+  }
+}
+
+/**
+ * Binary pre-dispatch for the read tool. Returns a result for PDF/audio files,
+ * or undefined to let the base (text/image) tool handle the path.
+ * Never throws for missing/unreadable files — the base tool owns those errors.
+ */
+async function tryDispatchBinaryRead(params: {
+  rawPath: string;
+  options?: OpenClawReadToolOptions;
+}): Promise<AgentToolResult<unknown> | undefined> {
+  const absolutePath = resolveReadDispatchPath(params.rawPath, params.options?.workspaceDir);
+  if (!absolutePath) {
+    return undefined;
+  }
+  let stat: { isFile(): boolean; size: number };
+  try {
+    const real = await fs.stat(absolutePath);
+    stat = real;
+    if (!real.isFile()) {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  let sniff: Buffer;
+  try {
+    const handle = await fs.open(absolutePath, "r");
+    try {
+      const length = Math.min(stat.size, READ_SNIFF_BYTES);
+      const buffer = Buffer.alloc(Math.max(0, length));
+      if (length > 0) {
+        await handle.read(buffer, 0, length, 0);
+      }
+      sniff = buffer;
+    } finally {
+      await handle.close().catch(() => {});
+    }
+  } catch {
+    return undefined;
+  }
+  let mime: string | undefined;
+  try {
+    mime = await detectMime({ buffer: sniff, filePath: absolutePath });
+  } catch {
+    mime = undefined;
+  }
+  const displayPath = toDisplayPath(absolutePath, params.options?.workspaceDir);
+  const lowerPath = absolutePath.toLowerCase();
+  if (mime === "application/pdf" || lowerPath.endsWith(".pdf")) {
+    return await readPdfDispatchResult({ absolutePath, displayPath, sizeBytes: stat.size });
+  }
+  if (mime?.startsWith("audio/") || isAudioFileName(absolutePath)) {
+    return await readAudioDispatchResult({
+      absolutePath,
+      displayPath,
+      sizeBytes: stat.size,
+      mimeType: mime,
+      options: params.options,
+    });
+  }
+  return undefined;
+}
+
 export function createOpenClawReadTool(
   base: AnyAgentTool,
   options?: OpenClawReadToolOptions,
@@ -493,6 +819,22 @@ export function createOpenClawReadTool(
     execute: async (toolCallId, params, signal) => {
       const record = getToolParamsRecord(params);
       assertRequiredParams(record, REQUIRED_PARAM_GROUPS.read, base.name);
+      const filePath = typeof record?.path === "string" ? String(record.path) : "<unknown>";
+      // DEBLOAT §38: PDF/audio pre-dispatch before the text/image base tool.
+      if (filePath.trim()) {
+        try {
+          const dispatched = await tryDispatchBinaryRead({ rawPath: filePath, options });
+          if (dispatched) {
+            return await sanitizeToolResultImages(
+              dispatched,
+              `read:${filePath}`,
+              options?.imageSanitization,
+            );
+          }
+        } catch {
+          // Pre-dispatch is best-effort; fall through to the base tool.
+        }
+      }
       const result = await executeReadWithAdaptivePaging({
         base,
         toolCallId,
@@ -500,14 +842,16 @@ export function createOpenClawReadTool(
         signal,
         maxBytes: resolveAdaptiveReadMaxBytes(options),
       });
-      const filePath = typeof record?.path === "string" ? String(record.path) : "<unknown>";
       const strippedDetailsResult = stripReadTruncationContentDetails(result);
       const normalizedResult = await normalizeReadImageResult(strippedDetailsResult, filePath);
-      return sanitizeToolResultImages(
+      const withPath = withReadPathDetails(
         normalizedResult,
-        `read:${filePath}`,
-        options?.imageSanitization,
+        toDisplayPath(
+          resolveReadDispatchPath(filePath, options?.workspaceDir) ?? filePath,
+          options?.workspaceDir,
+        ),
       );
+      return sanitizeToolResultImages(withPath, `read:${filePath}`, options?.imageSanitization);
     },
   };
 }

@@ -19,6 +19,10 @@ import {
   buildCanonicalPlaceholder,
   formatPrunableSizeLabel,
   getToolResultContentLength,
+  extractInboundMediaRelPath,
+  buildImagePlaceholder,
+  getToolResultImageDataChars,
+  extractEntryInboundMediaRelPath,
 } from "./prune-engine.js";
 import type { DennouSessionToolsPruneConfig, DennouPruneProtectionConfig } from "./types.js";
 
@@ -716,5 +720,81 @@ describe("canonical placeholder helpers", () => {
     expect(formatPrunableSizeLabel(3_481)).toBe("3.4KB");
     expect(formatPrunableSizeLabel(15_360)).toBe("15KB");
     expect(formatPrunableSizeLabel(3_400_000)).toBe("3.2MB");
+  });
+});
+
+// ── DEBLOAT §38: inbound_media パス付きプレースホルダー ──────────
+
+describe("inbound_media placeholder helpers", () => {
+  it("extractInboundMediaRelPath finds workspace-relative media paths", () => {
+    expect(
+      extractInboundMediaRelPath(
+        "Read image file [image/png] (C:\\work\\ws\\inbound_media\\image\\photo---abc.jpg)",
+      ),
+    ).toBe("inbound_media/image/photo---abc.jpg");
+    expect(extractInboundMediaRelPath("see inbound_media/audio/note---123.ogg for detail")).toBe(
+      "inbound_media/audio/note---123.ogg",
+    );
+    expect(extractInboundMediaRelPath("plain text without paths")).toBeUndefined();
+    expect(extractInboundMediaRelPath("")).toBeUndefined();
+  });
+
+  it("buildImagePlaceholder cites the file location with the canonical prefix", () => {
+    expect(buildImagePlaceholder({ imageDataChars: 2048 })).toBe(
+      "[出力省略: 画像データ (2KB) 正常終了]",
+    );
+    expect(
+      buildImagePlaceholder({
+        imageDataChars: 2048,
+        relPath: "inbound_media/image/photo---abc.jpg",
+      }),
+    ).toBe("[出力省略: 画像データ (2KB) / inbound_media/image/photo---abc.jpg / 正常終了]");
+  });
+
+  it("pruneToolOutputLines uses the path-citing image placeholder when attached", () => {
+    const imageEntry = JSON.stringify({
+      type: "message",
+      id: "tool-img",
+      parentId: "msg-2",
+      timestamp: "2026-01-01T00:00:03.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId: "call_img",
+        toolName: "read",
+        content: [{ type: "image", data: "A".repeat(2_000), mimeType: "image/png" }],
+        details: { readPath: "inbound_media/image/photo---abc.jpg" },
+        isError: false,
+      },
+    });
+    const parsed = parseLine(imageEntry)!;
+    expect(getToolResultImageDataChars(parsed)).toBe(2_000);
+    expect(extractEntryInboundMediaRelPath(parsed)).toBe("inbound_media/image/photo---abc.jpg");
+    const lines = [
+      makeSessionHeader(),
+      makeUserMessage("hello"),
+      imageEntry,
+      makeAssistantMessage("a1"),
+      makeAssistantMessage("a2"),
+    ];
+    const cfg: DennouSessionToolsPruneConfig = {
+      ...defaultConfig,
+      // pruner.ts parity: no custom placeholder so the path-citing image
+      // placeholder is exercised (a non-empty custom placeholder would win).
+      placeholder: "",
+      keepLastAssistants: 2,
+      minPrunableToolChars: 1200,
+    };
+    const { resultLines, prunedCount } = pruneToolOutputLines(lines, cfg, () => {});
+    expect(prunedCount).toBe(1);
+    const parsedBody: { message: { content: Array<{ type: string; text: string }> } } = JSON.parse(
+      resultLines[2]!,
+    );
+    const content = parsedBody.message.content;
+    expect(content).toEqual([
+      {
+        type: "text",
+        text: "[出力省略: 画像データ (2KB) / inbound_media/image/photo---abc.jpg / 正常終了]",
+      },
+    ]);
   });
 });

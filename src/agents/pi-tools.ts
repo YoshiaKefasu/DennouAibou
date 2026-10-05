@@ -6,6 +6,8 @@ import { createChatSearchTool } from "../dennou-soul/raw-chat/tool.js";
 import type { ExecTarget } from "../infra/exec-approvals.js";
 import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runtime-policy.js";
 import { logWarn } from "../logger.js";
+import { runAudioTranscription } from "../media-understanding/audio-transcription-runner.js";
+import { getDefaultMediaLocalRoots } from "../media/local-roots.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
@@ -62,8 +64,10 @@ function isOpenAIProvider(provider?: string) {
 }
 
 const TOOL_DENY_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {};
+// DEBLOAT §38: image/pdf/audio tools were unified into read; only non-media
+// tools remain gated here.
 const TOOL_ALLOW_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {
-  node: ["canvas", "image", "pdf", "web_fetch", "web_search"],
+  node: ["canvas", "web_fetch", "web_search"],
 };
 const MEMORY_FLUSH_ALLOWED_TOOL_NAMES = new Set(["read", "write"]);
 
@@ -295,6 +299,12 @@ export function createOpenClawCodingTools(options?: {
   allowGatewaySubagentBinding?: boolean;
   /** If true, the model has native vision capability */
   modelHasVision?: boolean;
+  /**
+   * If true, the model natively accepts audio input (e.g. Gemini).
+   * The read tool then passes audio files through as base64; otherwise it
+   * transcribes them via Whisper (DEBLOAT §38).
+   */
+  modelSupportsAudio?: boolean;
   /** Require explicit message targets (no implicit last-route sends). */
   requireExplicitMessageTarget?: boolean;
   /** If true, omit the message tool from the tool list. */
@@ -395,6 +405,20 @@ export function createOpenClawCodingTools(options?: {
       const wrapped = createOpenClawReadTool(freshReadTool, {
         modelContextWindowTokens: options?.modelContextWindowTokens,
         imageSanitization,
+        // DEBLOAT §38: image/pdf/audio unified into read.
+        workspaceDir: workspaceRoot,
+        modelSupportsAudio: options?.modelSupportsAudio ?? false,
+        transcribeAudio: async (absolutePath: string) => {
+          const { transcript, provider, model } = await runAudioTranscription({
+            ctx: { MediaPath: absolutePath },
+            cfg: options?.config ?? {},
+            agentDir: options?.agentDir,
+            localPathRoots: workspaceOnly
+              ? [workspaceRoot]
+              : Array.from(new Set([...getDefaultMediaLocalRoots(), workspaceRoot])),
+          });
+          return { transcript, provider, model };
+        },
       });
       return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
     }

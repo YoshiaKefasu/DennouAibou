@@ -31,8 +31,6 @@ const coreTools = [
   stubActionTool("subagents", ["list", "show"]),
   stubActionTool("session_status", ["get", "show"]),
   stubTool("web_fetch"),
-  stubTool("image"),
-  stubTool("pdf"),
 ];
 
 vi.mock("../openclaw-tools.js", () => ({

@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { resolveConfigDir } from "../utils.js";
+import { INBOUND_MEDIA_ROOT_DIRNAME } from "./store.js";
 
 type BuildMediaLocalRootsOptions = {
   preferredTmpDir?: string;
@@ -31,6 +32,10 @@ export function buildMediaLocalRoots(
       preferredTmpDir,
       path.join(resolvedStateDir, "media"),
       path.join(resolvedStateDir, "workspace"),
+      // DEBLOAT §38: workspace-persistent inbound media (explicit so the
+      // sorted `inbound_media/<subfolder>/` tree stays readable even if the
+      // parent workspace root handling ever narrows).
+      path.join(resolvedStateDir, "workspace", INBOUND_MEDIA_ROOT_DIRNAME),
       // Upgraded installs can still resolve the active state dir to the legacy
       // ~/.clawdbot tree while new media writes already go under ~/.dennou-aibou/media.
       // Keep inbound media readable across that split without widening roots beyond
@@ -59,6 +64,11 @@ export function getAgentScopedMediaLocalRoots(
   const normalizedWorkspaceDir = path.resolve(workspaceDir);
   if (!roots.includes(normalizedWorkspaceDir)) {
     roots.push(normalizedWorkspaceDir);
+  }
+  // DEBLOAT §38: keep the agent's sorted inbound_media tree explicitly readable.
+  const inboundMediaDir = path.join(normalizedWorkspaceDir, INBOUND_MEDIA_ROOT_DIRNAME);
+  if (!roots.includes(inboundMediaDir)) {
+    roots.push(inboundMediaDir);
   }
   return roots;
 }

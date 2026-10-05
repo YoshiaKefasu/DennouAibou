@@ -3128,47 +3128,6 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                   },
                 ],
               },
-              pdfModel: {
-                anyOf: [
-                  {
-                    type: "string",
-                  },
-                  {
-                    type: "object",
-                    properties: {
-                      primary: {
-                        type: "string",
-                        title: "PDF Model",
-                        description:
-                          "Optional PDF model (provider/model) for the PDF analysis tool. Defaults to imageModel, then session model.",
-                      },
-                      fallbacks: {
-                        type: "array",
-                        items: {
-                          type: "string",
-                        },
-                        title: "PDF Model Fallbacks",
-                        description: "Ordered fallback PDF models (provider/model).",
-                      },
-                    },
-                    additionalProperties: false,
-                  },
-                ],
-              },
-              pdfMaxBytesMb: {
-                type: "number",
-                exclusiveMinimum: 0,
-                title: "PDF Max Size (MB)",
-                description: "Maximum PDF file size in megabytes for the PDF tool (default: 10).",
-              },
-              pdfMaxPages: {
-                type: "integer",
-                exclusiveMinimum: 0,
-                maximum: 9007199254740991,
-                title: "PDF Max Pages",
-                description:
-                  "Maximum number of PDF pages to process for the PDF tool (default: 20).",
-              },
               models: {
                 type: "object",
                 propertyNames: {
@@ -23422,26 +23381,6 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       label: "Music Generation Model Fallbacks",
       help: "Ordered fallback music-generation models (provider/model).",
       tags: ["reliability"],
-    },
-    "agents.defaults.pdfModel.primary": {
-      label: "PDF Model",
-      help: "Optional PDF model (provider/model) for the PDF analysis tool. Defaults to imageModel, then session model.",
-      tags: ["advanced"],
-    },
-    "agents.defaults.pdfModel.fallbacks": {
-      label: "PDF Model Fallbacks",
-      help: "Ordered fallback PDF models (provider/model).",
-      tags: ["reliability"],
-    },
-    "agents.defaults.pdfMaxBytesMb": {
-      label: "PDF Max Size (MB)",
-      help: "Maximum PDF file size in megabytes for the PDF tool (default: 10).",
-      tags: ["performance"],
-    },
-    "agents.defaults.pdfMaxPages": {
-      label: "PDF Max Pages",
-      help: "Maximum number of PDF pages to process for the PDF tool (default: 20).",
-      tags: ["performance"],
     },
     "agents.defaults.imageMaxDimensionPx": {
       label: "Image Max Dimension (px)",

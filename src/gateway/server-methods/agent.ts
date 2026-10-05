@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { listAgentIds } from "../../agents/agent-scope.js";
+import {
+  listAgentIds,
+  resolveAgentWorkspaceDir,
+  resolveSessionAgentId,
+} from "../../agents/agent-scope.js";
 import type { AgentInternalEvent } from "../../agents/internal-events.js";
 import {
   normalizeSpawnedRunMetadata,
@@ -377,11 +381,24 @@ export function createAgentHandlers(overrides: AgentHandlersDeps = {}): GatewayR
 
         let baseProvider: string | undefined;
         let baseModel: string | undefined;
+        let inboundWorkspaceDir: string | undefined;
         if (requestedSessionKeyRaw) {
           const { cfg: sessCfg, entry: sessEntry } = deps.loadSessionEntry(requestedSessionKeyRaw);
           const modelRef = resolveSessionModelRef(sessCfg, sessEntry, undefined);
           baseProvider = modelRef.provider;
           baseModel = modelRef.model;
+          // DEBLOAT §38: persist inbound media into the session agent workspace.
+          try {
+            inboundWorkspaceDir = resolveAgentWorkspaceDir(
+              sessCfg,
+              resolveSessionAgentId({
+                sessionKey: requestedSessionKeyRaw,
+                config: sessCfg,
+              }),
+            );
+          } catch {
+            inboundWorkspaceDir = undefined;
+          }
         }
         const effectiveProvider = providerOverride || baseProvider;
         const effectiveModel = modelOverride || baseModel;
@@ -396,6 +413,7 @@ export function createAgentHandlers(overrides: AgentHandlersDeps = {}): GatewayR
             maxBytes: 5_000_000,
             log: context.logGateway,
             supportsImages,
+            workspaceDir: inboundWorkspaceDir,
           });
           message = parsed.message.trim();
           images = parsed.images;

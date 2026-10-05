@@ -25,12 +25,16 @@
  *   生データのまま保持し、フェンスを過ぎて古くなったツール結果だけを
  *   `[出力省略: 画像データ (NKB) 正常終了]`（テキスト併存時は
  *   `[出力省略: 画像データ (NKB) / テキスト {行数}行 / {サイズ} 正常終了]`）に置換する。
+ *   DEBLOAT §38: 添付パス情報（`inbound_media/...`）がある場合は
+ *   `[出力省略: 画像データ (NKB) / inbound_media/image/xxx.jpg / 正常終了]` のように
+ *   ファイル位置を明記する（Kasou が後から read ツールで読み直せる）。
  *   画像プレースホルダーも `[出力省略:` プレフィックスを持つため、冪等性ガード
  *   （hasPlaceholderMarker）で二重置換を防止できる。
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   buildCanonicalPlaceholder,
+  extractInboundMediaRelPath,
   formatPrunableSizeLabel,
   hasPlaceholderMarker,
   TOOL_RESULT_SAFETY_CAP_CHARS,
@@ -221,6 +225,27 @@ export function isProtectedByKeywordInMessage(
 }
 
 /**
+ * DEBLOAT §38: メッセージから添付パス情報（`inbound_media/...`）を探す。
+ * テキスト内容と構造化 details（read ツールは details.readPath に読み取り元を残す）の
+ * 両方を見る。見つからなければ undefined。
+ */
+export function extractMessageInboundMediaRelPath(message: ToolResultMessage): string | undefined {
+  const fromText = extractInboundMediaRelPath(getToolResultText(message));
+  if (fromText) {
+    return fromText;
+  }
+  const details = (message as { details?: unknown }).details;
+  if (!details || typeof details !== "object") {
+    return undefined;
+  }
+  try {
+    return extractInboundMediaRelPath(JSON.stringify(details));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * 正準プレースホルダーを組み立てる。
  * `[出力省略: {行数}行 / {サイズ} 正常終了]`（customPlaceholder 指定時はそれを優先）。
  * 行数・サイズは置換前の元テキストから算出する。
@@ -229,6 +254,9 @@ export function isProtectedByKeywordInMessage(
  * `[出力省略: 画像データ ({approxKb}KB) 正常終了]` を返す。テキストブロックも併存する場合は
  * `[出力省略: 画像データ ({approxKb}KB) / テキスト {行数}行 / {サイズ} 正常終了]` の
  * 併記形式を返す（画像データのサイズ認識と直近ターン保護後の遅延プレースホルダー化）。
+ *
+ * DEBLOAT §38: 添付パス情報（`inbound_media/...`）がある場合はファイル位置を
+ * ` / <relpath>` セグメントとして明記する（正準プレフィックスとステータスは維持）。
  */
 export function buildMessagePlaceholder(
   message: ToolResultMessage,
@@ -237,16 +265,18 @@ export function buildMessagePlaceholder(
   if (typeof customPlaceholder === "string" && customPlaceholder.trim()) {
     return customPlaceholder.trim();
   }
+  const relPath = extractMessageInboundMediaRelPath(message);
   const imageDataChars = getToolResultImageDataChars(message);
   if (imageDataChars > 0) {
     const approxKb = Math.max(1, Math.round(imageDataChars / 1024));
+    const location = relPath ? ` / ${relPath} /` : "";
     const text = getToolResultText(message);
     if (text.length > 0) {
       const lineCount = Math.max(1, text.split("\n").length);
       const sizeLabel = formatPrunableSizeLabel(text.length);
-      return `[出力省略: 画像データ (${approxKb}KB) / テキスト ${lineCount}行 / ${sizeLabel} 正常終了]`;
+      return `[出力省略: 画像データ (${approxKb}KB) / テキスト ${lineCount}行 / ${sizeLabel}${location} 正常終了]`;
     }
-    return `[出力省略: 画像データ (${approxKb}KB) 正常終了]`;
+    return `[出力省略: 画像データ (${approxKb}KB)${location} 正常終了]`;
   }
   const text = getToolResultText(message);
   const lineCount = Math.max(1, text.split("\n").length);

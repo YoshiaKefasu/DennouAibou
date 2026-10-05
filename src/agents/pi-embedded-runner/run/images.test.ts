@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   detectAndLoadPromptImages,
@@ -230,7 +231,40 @@ describe("modelSupportsImages", () => {
   });
 });
 
-describe("loadImageFromRef", () => {});
+describe("loadImageFromRef (media-uri claim-check)", () => {
+  it("resolves workspace inbound_media ids workspace-first", async () => {
+    const { loadImageFromRef } = await import("./images.js");
+    const { createTempHomeEnv } = await import("../../../test-utils/temp-home.js");
+    const home = await createTempHomeEnv("openclaw-imgref-home-");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-imgref-"));
+    try {
+      const png = await sharp({
+        create: { width: 4, height: 4, channels: 3, background: "#ff0000" },
+      })
+        .png()
+        .toBuffer();
+      const { saveMediaBuffer } = await import("../../../media/store.js");
+      const saved = await saveMediaBuffer(png, "image/png", "inbound", 5 * 1024 * 1024, undefined, {
+        workspaceDir: dir,
+      });
+      expect(saved.path).toContain("inbound_media");
+      const loaded = await loadImageFromRef(
+        {
+          raw: `media://inbound/${saved.id}`,
+          type: "media-uri",
+          resolved: `media://inbound/${saved.id}`,
+        },
+        dir,
+      );
+      expect(loaded?.type).toBe("image");
+      expect(loaded?.mimeType?.startsWith("image/")).toBe(true);
+      expect(typeof loaded?.data).toBe("string");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+      await home.restore().catch(() => {});
+    }
+  });
+});
 
 describe("detectAndLoadPromptImages", () => {
   it("returns no images for non-vision models even when existing images are provided", async () => {

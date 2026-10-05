@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import type { Server } from "node:http";
-import express, { type Express } from "express";
+import express, { type Express, type Response } from "express";
 import { danger } from "../globals.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { detectMime } from "./mime.js";
@@ -11,6 +11,7 @@ import {
   MEDIA_MAX_BYTES,
   readFileWithinRoot,
 } from "./server.runtime.js";
+import { INBOUND_MEDIA_SUBFOLDERS, resolveWorkspaceInboundMediaDir } from "./store.js";
 
 const DEFAULT_TTL_MS = 2 * 60 * 1000;
 const MAX_MEDIA_ID_CHARS = 200;
@@ -25,6 +26,11 @@ export type MediaServerRuntimeDeps = {
   readFileWithinRoot?: typeof readFileWithinRoot;
   getMediaDir?: typeof getMediaDir;
   cleanOldMedia?: typeof cleanOldMedia;
+  /**
+   * DEBLOAT §38: agent workspaces whose `inbound_media/<subfolder>/` files
+   * should also be served. Empty by default (legacy-only behaviour).
+   */
+  workspaceDirs?: readonly string[];
 };
 
 const isValidMediaId = (id: string) => {
@@ -50,6 +56,60 @@ export function attachMediaRoutes(
   const readWithinRoot = deps.readFileWithinRoot ?? readFileWithinRoot;
   const cleanMedia = deps.cleanOldMedia ?? cleanOldMedia;
   const mediaDir = resolveMediaDir();
+  const workspaceDirs = (deps.workspaceDirs ?? []).filter(
+    (dir): dir is string => typeof dir === "string" && dir.trim().length > 0,
+  );
+
+  const serveBuffer = async (
+    res: Response,
+    data: Buffer,
+    realPath: string,
+    persistent: boolean,
+  ) => {
+    const mime = await detectMime({ buffer: data, filePath: realPath });
+    if (mime) {
+      res.type(mime);
+    }
+    res.send(data);
+    if (persistent) {
+      // DEBLOAT §38: workspace inbound_media files are persistent assets —
+      // no TTL expiry, no single-use cleanup.
+      return;
+    }
+    // best-effort single-use cleanup after response ends
+    res.on("finish", () => {
+      const cleanup = () => {
+        void fs.rm(realPath).catch(() => {});
+      };
+      // Tests should not pay for time-based cleanup delays.
+      if (process.env.VITEST || process.env.NODE_ENV === "test") {
+        queueMicrotask(cleanup);
+        return;
+      }
+      setTimeout(cleanup, 50);
+    });
+  };
+
+  const serveWorkspaceFile = async (res: Response, id: string): Promise<boolean> => {
+    for (const workspaceDir of workspaceDirs) {
+      for (const subfolder of INBOUND_MEDIA_SUBFOLDERS) {
+        let data: Buffer;
+        let realPath: string;
+        try {
+          ({ buffer: data, realPath } = await readWithinRoot({
+            rootDir: resolveWorkspaceInboundMediaDir(workspaceDir, subfolder),
+            relativePath: id,
+            maxBytes: MAX_MEDIA_BYTES,
+          }));
+        } catch {
+          continue;
+        }
+        await serveBuffer(res, data, realPath, true);
+        return true;
+      }
+    }
+    return false;
+  };
 
   app.get("/media/:id", async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -73,24 +133,16 @@ export function attachMediaRoutes(
         res.status(410).send("expired");
         return;
       }
-      const mime = await detectMime({ buffer: data, filePath: realPath });
-      if (mime) {
-        res.type(mime);
-      }
-      res.send(data);
-      // best-effort single-use cleanup after response ends
-      res.on("finish", () => {
-        const cleanup = () => {
-          void fs.rm(realPath).catch(() => {});
-        };
-        // Tests should not pay for time-based cleanup delays.
-        if (process.env.VITEST || process.env.NODE_ENV === "test") {
-          queueMicrotask(cleanup);
+      await serveBuffer(res, data, realPath, false);
+    } catch (err) {
+      // DEBLOAT §38: fall back to workspace inbound_media before 404.
+      try {
+        if (await serveWorkspaceFile(res, id)) {
           return;
         }
-        setTimeout(cleanup, 50);
-      });
-    } catch (err) {
+      } catch {
+        // fall through to the legacy error mapping below
+      }
       if (isSafeOpenError(err)) {
         if (err.code === "outside-workspace") {
           res.status(400).send("file is outside workspace root");

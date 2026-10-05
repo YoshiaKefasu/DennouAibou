@@ -996,13 +996,7 @@ Time format in system prompt. Default: `auto` (OS preference).
         primary: "openai/sora-2",
         fallbacks: ["google/veo-3.1-fast-generate-preview"],
       },
-      pdfModel: {
-        primary: "openai/gpt-5.4-mini",
-        fallbacks: ["google/gemini-3-flash-preview"],
-      },
       params: { cacheRetention: "long" }, // global default provider params
-      pdfMaxBytesMb: 10,
-      pdfMaxPages: 20,
       thinkingDefault: "low",
       verboseDefault: "off",
       elevatedDefault: "on",
@@ -1036,11 +1030,6 @@ Time format in system prompt. Default: `auto` (OS preference).
   - Typical values: `openai/sora-2` or `google/veo-3.1-fast-generate-preview`.
   - If omitted, `video_generate` can still infer an auth-backed provider default. It tries the current default provider first, then the remaining registered video-generation providers in provider-id order.
   - If you select a provider/model directly, configure the matching provider auth/API key too.
-- `pdfModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
-  - Used by the `pdf` tool for model routing.
-  - If omitted, the PDF tool falls back to `imageModel`, then to the resolved session/default model.
-- `pdfMaxBytesMb`: default PDF size limit for the `pdf` tool when `maxBytesMb` is not passed at call time.
-- `pdfMaxPages`: default maximum pages considered by extraction fallback mode in the `pdf` tool.
 - `verboseDefault`: default verbose level for agents. Values: `"off"`, `"on"`, `"full"`. Default: `"off"`.
 - `elevatedDefault`: default elevated-output level for agents. Values: `"off"`, `"on"`, `"ask"`, `"full"`. Default: `"on"`.
 - `model.primary`: format `provider/model` (e.g. `openai/gpt-5.4`). If you omit the provider, DennouAibou tries an alias first, then a unique configured-provider match for that exact model id, and only then falls back to the configured default provider (deprecated compatibility behavior, so prefer explicit `provider/model`). If that provider no longer exposes the configured default model, DennouAibou falls back to the first configured provider/model instead of surfacing a stale removed-provider default.

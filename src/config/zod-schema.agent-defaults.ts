@@ -22,9 +22,6 @@ export const AgentDefaultsSchema = z
     imageGenerationModel: AgentModelSchema.optional(),
     videoGenerationModel: AgentModelSchema.optional(),
     musicGenerationModel: AgentModelSchema.optional(),
-    pdfModel: AgentModelSchema.optional(),
-    pdfMaxBytesMb: z.number().positive().optional(),
-    pdfMaxPages: z.number().int().positive().optional(),
     models: z
       .record(
         z.string(),

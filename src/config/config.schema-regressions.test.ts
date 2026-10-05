@@ -186,7 +186,7 @@ describe("config schema regressions", () => {
     expect(res.ok).toBe(true);
   });
 
-  it("accepts pdf default model and limits", () => {
+  it("rejects removed pdf keys (DEBLOAT §38: unified into read)", () => {
     const res = validateConfigObject({
       agents: {
         defaults: {
@@ -200,24 +200,7 @@ describe("config schema regressions", () => {
       },
     });
 
-    expect(res.ok).toBe(true);
-  });
-
-  it("rejects non-positive pdf limits", () => {
-    const res = validateConfigObject({
-      agents: {
-        defaults: {
-          pdfModel: { primary: "openai/gpt-5.4-mini" },
-          pdfMaxBytesMb: 0,
-          pdfMaxPages: 0,
-        },
-      },
-    });
-
     expect(res.ok).toBe(false);
-    if (!res.ok) {
-      expect(res.issues.some((issue) => issue.path.includes("agents.defaults.pdfMax"))).toBe(true);
-    }
   });
 
   it("rejects relative iMessage attachment roots", () => {

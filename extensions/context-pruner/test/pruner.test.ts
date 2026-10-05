@@ -589,6 +589,29 @@ describe("buildMessagePlaceholder", () => {
     expect(buildMessagePlaceholder(message as never, "[pruned]")).toBe("[pruned]");
   });
 
+  it("cites the inbound_media location when attachment path info exists (DEBLOAT §38)", () => {
+    const withDetails = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS, {
+      details: { readPath: "inbound_media/image/photo---abc.jpg" },
+    });
+    expect(buildMessagePlaceholder(withDetails as never)).toBe(
+      "[出力省略: 画像データ (2KB) / inbound_media/image/photo---abc.jpg / 正常終了]",
+    );
+
+    const withTextPath = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS, {
+      content: [
+        { type: "image", data: "A".repeat(IMAGE_2KB_DATA_CHARS), mimeType: "image/png" },
+        { type: "text", text: "saved to inbound_media/image/photo---abc.jpg" },
+      ],
+    });
+    expect(buildMessagePlaceholder(withTextPath as never)).toBe(
+      "[出力省略: 画像データ (2KB) / テキスト 1行 / 44B / inbound_media/image/photo---abc.jpg / 正常終了]",
+    );
+
+    // パス情報がなければ従来形式のまま
+    const plain = makeImageToolResultMessage(IMAGE_2KB_DATA_CHARS);
+    expect(buildMessagePlaceholder(plain as never)).toBe("[出力省略: 画像データ (2KB) 正常終了]");
+  });
+
   it("treats placeholder markers as idempotent signals", () => {
     const message = makeToolResultMessage({
       content: [{ type: "text", text: "[出力省略: 1行 / 1B]" }],

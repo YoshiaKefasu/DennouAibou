@@ -15,18 +15,13 @@ export const stubTool = (name: string): StubTool => ({
   execute: vi.fn() as unknown as (...args: unknown[]) => unknown,
 });
 
-vi.mock("../tools/image-tool.js", () => ({
-  createImageTool: () => stubTool("image"),
-}));
-
 vi.mock("../tools/web-tools.js", () => ({
   createWebSearchTool: () => null,
   createWebFetchTool: () => null,
 }));
 
 vi.mock("../../plugins/tools.js", async () => {
-  const mod =
-    await import("../../plugins/tools.js");
+  const mod = await import("../../plugins/tools.js");
   return {
     ...mod,
     resolvePluginTools: () => [],

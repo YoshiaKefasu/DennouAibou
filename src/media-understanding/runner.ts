@@ -2,6 +2,7 @@ import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { hasAvailableAuthForProvider } from "../agents/model-auth.js";
 import {
   findModelInCatalog,
@@ -22,7 +23,7 @@ import type {
 import { logVerbose, shouldLogVerbose } from "../globals.js";
 import { resolveChannelInboundAttachmentRoots } from "../media/channel-inbound-roots.js";
 import { mergeInboundPathRoots } from "../media/inbound-path-policy.js";
-import { getDefaultMediaLocalRoots } from "../media/local-roots.js";
+import { getAgentScopedMediaLocalRoots, getDefaultMediaLocalRoots } from "../media/local-roots.js";
 import { runExec } from "../process/exec.js";
 import { MediaAttachmentCache, selectAttachments } from "./attachments.js";
 import { resolveAutoMediaKeyProviders, resolveDefaultMediaModel } from "./defaults.js";
@@ -189,8 +190,21 @@ export function resolveMediaAttachmentLocalRoots(params: {
   cfg: OpenClawConfig;
   ctx: MsgContext;
 }): readonly string[] {
+  // DEBLOAT §38: agent-scoped roots so workspace-persistent `inbound_media/`
+  // files of non-default agents stay readable (defaults alone only cover the
+  // shared state workspace + legacy media cache).
+  let scopedRoots: readonly string[] | undefined;
+  try {
+    const agentId = resolveSessionAgentId({
+      sessionKey: params.ctx.SessionKey,
+      config: params.cfg,
+    });
+    scopedRoots = getAgentScopedMediaLocalRoots(params.cfg, agentId);
+  } catch {
+    scopedRoots = undefined;
+  }
   return mergeInboundPathRoots(
-    getDefaultMediaLocalRoots(),
+    scopedRoots ?? getDefaultMediaLocalRoots(),
     resolveChannelInboundAttachmentRoots(params),
   );
 }
