@@ -2352,3 +2352,50 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 
 - **`agents-utils.ts` の sessions ツール群ラベル**：§36 撤去ツールの文字列残留。表示専用のため本波スコープ外。
 - **i18n の sessions 文言**：タブ非表示後も辞書に残る。将来の単純再構築まで温存。
+
+## 38. インバウンドメディアのワークスペース自動仕分け ＆ read ツールへの一本化（image/pdf/audio 完全撤去）
+
+### 38.1 目的・背景
+
+ユーザー裁定（2026-10-05）：
+「僕がTelegramかDiscordから画像とか音声、動画、PDFなど送ったら \media\inbound に入っちゃうんじゃない？これからKasouのWorkspaceで \workspace\inbound_media\{ファイル形式}\{ファイル内容} にできます？でPlaceholderプラグインを画像はそのファイルの居場所へ書けばいいですね。それとimage, pdf, audioメディア読込みツールはreadツールに一本化統合できます？」
+
+#### 2つの改善の柱
+
+1. **インバウンドメディアの整理 ＆ 賢いプレースホルダー化**:
+   - 受信メディアの保存先を従来の雑多な `~/.openclaw/media/inbound` から、Kasou のワークスペース内 `workspace/inbound_media/{形式}/...` に自動仕分けして保存する。
+     - `workspace/inbound_media/image/...`（画像: png, jpg, webp, gif等）
+     - `workspace/inbound_media/audio/...`（音声: ogg, mp3, wav等）
+     - `workspace/inbound_media/video/...`（動画: mp4, webm等）
+     - `workspace/inbound_media/pdf/...`（PDF: pdf）
+     - `workspace/inbound_media/document/...`（ドキュメント: txt, md, json, doc等）
+     - `workspace/inbound_media/other/...`（その他）
+   - `context-pruner`（カンナくず圧縮）のプレースホルダーを強化し、`[画像省略]` のような単なる省略から `[画像省略: inbound_media/image/photo---xxxx.jpg]` のようにファイルの居場所（相対パス）を明記する。これにより Kasou は後からでも必要に応じて `read` ツールでファイルを読みに行ける。
+2. **`image`, `pdf`, `audio` ツールを `read` ツールに完全統合（3ツール DEBLOAT 撤去）**:
+   - 既存の `read` ツール（`src/agents/pi-tools.read.ts`）を拡張し、ファイル拡張子・MIME に応じて画像、PDF、音声を自動判別して処理・返却する。
+     - テキスト/コード: 従来通りテキスト内容を表示。
+     - 画像: 画像ブロック（`type: "image"`）または画像記述として読み込み。
+     - PDF: PDF テキスト・構造化コンテンツを抽出して返却。
+     - 音声: 音声ブロックまたは文字起こし・メタデータを返却。
+   - 不要となった `image`、`pdf`、`audio` ツールの登録を `openclaw-tools.ts` から削除し、実装ファイルおよびテストを物理削除する。
+   - Kasou の手元のツール選択肢をさらに絞り込み、モデルの判断負荷とプロンプトトークンを大幅に削減する。
+
+### 38.2 変更対象と責務
+
+| 対象領域         | ファイル                                                                                               | 変更内容                                                                                                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| メディア保存     | `src/media/store.ts`                                                                                   | `saveMediaBuffer` の保存先ディレクトリをワークスペース配下の `inbound_media/<subfolder>/` に対応。MIME タイプからサブフォルダ名（`image`, `audio`, `video`, `pdf`, `document`, `other`）を自動解決。既存の ID 解決（`resolveMediaBufferPath`）との後方互換性を維持。 |
+| メディア保存     | `src/media/inbound-path-policy.ts`                                                                     | ワークスペース配下の `inbound_media` パスを許可ルートとして認識。                                                                                                                                                                                                    |
+| ツール統合       | `src/agents/pi-tools.read.ts`                                                                          | `createOpenClawReadTool` を拡張。画像ファイル読み込み（既存の `normalizeReadImageResult` / `sanitizeToolResultImages` を強化）、PDF 抽出処理の統合、音声ファイル読み込み処理の統合。                                                                                 |
+| ツール撤去       | `src/agents/openclaw-tools.ts`                                                                         | `createImageTool`, `createPdfTool`, `createAudioTool` の import と登録を完全に削除。                                                                                                                                                                                 |
+| ツール物理削除   | `src/agents/tools/image-tool.ts`<br>`src/agents/tools/pdf-tool.ts`<br>`src/agents/tools/audio-tool.ts` | 不要となったツール実装ファイルおよび対応テストファイルを削除。                                                                                                                                                                                                       |
+| プレースホルダー | `extensions/context-pruner/`                                                                           | プレースホルダー生成時に添付パス情報がある場合、`[画像省略: <path>]` / `[音声データ省略: <path>]` のように相対パスを明記。                                                                                                                                           |
+
+### 38.3 検証ゲート
+
+| ゲート                                    | 判定基準   |
+| ----------------------------------------- | ---------- |
+| `node scripts/run-tsgo.mjs --noEmit`      | **exit 0** |
+| `bun run ui:build`                        | **pass**   |
+| `bun test` 関連テスト                     | **pass**   |
+| `pnpm exec oxfmt --check <changed_files>` | **pass**   |
