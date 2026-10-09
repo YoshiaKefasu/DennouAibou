@@ -2414,3 +2414,43 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 | `bun run config:schema:gen --check`       | **clean（生成スキーマ一致）**                                                                                                                             |
 | `bun test` 関連テスト                     | `src/media/store.test.ts`, `src/media/server.test.ts`, `src/agents/pi-tools.read.host-edit-access.test.ts`, `extensions/context-pruner/test/` 等の全 pass |
 | `pnpm exec oxfmt --check <changed_files>` | **pass**                                                                                                                                                  |
+
+---
+
+## 39. `web_search` ＆ `web_fetch` の本体分離と `extensions/dennou-websearch` プラグイン化（2026-10-06 改訂）
+
+### 39.1 目的と背景
+
+- **Phase F（スリムカーネル化・全部プラグイン化）の推進**:
+  Gateway 本体（カーネル）の `openclaw-tools.ts` にベタ書きされている `web_search` と `web_fetch` のツール生成・エージェント登録を、独立した `extensions/dennou-websearch` プラグインへ完全外出しする。
+- **KISS原則と依存境界の遵守**:
+  - `plugin-sdk`（`provider-web-search.ts`, `provider-web-fetch.ts`）が公開再エクスポートしているプロバイダ共通層（`web-guarded-fetch.ts`, `web-search-provider-*.ts`, `web-shared.ts`, `web-fetch-utils.ts` 等）およびカーネル runtime 層（`src/web-search/runtime.ts`, `src/web-fetch/runtime.ts`）は本体（カーネル／SDK基盤）に残す。
+  - プラグイン側はこれら基盤インフラを安全に利用し、純粋に**「エージェント向けツールファクトリ（`web_search`, `web_fetch`）の生成・登録」**に責務を限定する。
+  - 設定は `OpenClawPluginToolContext.config.tools.web` を直接参照し、既存の `tools.web.*` 設定スキーマを変更ゼロ（KISS）でそのまま引き継ぐ。
+
+### 39.2 変更対象と責務
+
+| 対象領域 | ファイル | 変更内容 |
+|---|---|---|
+| プラグイン新設 | `extensions/dennou-websearch/openclaw.plugin.json`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/src/*` | 新規プラグイン `dennou-websearch` を作成。<br>エントリポイント（`index.ts`）で `api.registerTool` を用いて `web_search` と `web_fetch` の2つのツールを登録。<br>`src/agents/tools/web-search.ts`, `web-fetch.ts`, `web-tools.ts` のツールファクトリロジックをプラグイン配下へ移設。<br>※プラグイン内からの import は `openclaw/plugin-sdk/*` 経由とし、相対 `../../../src/...` は禁止。<br>※`ctx.config` は optional であり、ファクトリ側で `config?` 受け・null許容とする。 |
+| カーネル側ツール登録解除 | `src/agents/openclaw-tools.ts`<br>`src/agents/test-helpers/fast-tool-stubs.ts` | `createWebSearchTool`, `createWebFetchTool` のインポートおよび `tools` 配列への直書き登録を削除。プラグインツールとして `resolvePluginTools` 経由で供給されるようにする。<br>`fast-tool-stubs.ts` の mock パスを整理。 |
+| カーネル基盤温存（移設除外） | `src/web-search/runtime.ts`<br>`src/web-fetch/runtime.ts`<br>`src/plugin-sdk/provider-web-*.ts`<br>`src/agents/tools/web-guarded-fetch.ts`<br>`src/agents/tools/web-search-provider-*.ts`<br>`src/agents/tools/web-shared.ts`<br>`src/agents/tools/web-fetch-utils.ts`<br>`src/agents/tools/web-fetch-visibility.ts`<br>`src/config/config.web-search-provider.test.ts` | 他の bundled 拡張（Brave, Google 等）やカーネル runtime（`src/plugins/runtime/index.ts`）が依存する共有基盤・公開SDKエクスポートは本体に温存し、依存逆転を完全に防止。<br>`config.web-search-provider.test.ts` の参照パスを整合。 |
+| ツールカタログ・HTTP呼出整合 | `src/agents/tool-catalog.ts`<br>`src/gateway/tools-invoke-http.ts` | `web_search`, `web_fetch` のカタログエントリは据え置き維持とし、`tools-invoke-http.ts` の汎用プラグインツール解決（`resolveGatewayScopedTools` 経由）で正常にディスパッチされることを確認。 |
+| 設定・許可配線 | `dennou-aibou.json`<br>`openclaw.json` (サンプル) | `plugins.entries.dennou-websearch`（`enabled: true`）および `plugins.allow`（`dennou-websearch`）を追記。設定は `ctx.config.tools.web` を直接消費。 |
+| 境界・テスト整合 | `scripts/check-*-provider-boundaries.mjs`<br>`test/fixtures/plugin-extension-import-boundary-inventory.json`<br>`test/bun-tier-*-known-failing.txt` | boundary lint 検査スクリプトおよび import boundary インベントリに対象パスの更新を反映。移設テストのパスを known-failing リストと同期。 |
+| テスト | `extensions/dennou-websearch/test/*` | ツールレベルのテスト（`web-search.test.ts`, `web-fetch.*.test.ts`, `web-tools.*.test.ts`）をプラグイン配下に配置・配線し、`bun test` で全緑化。 |
+
+### 39.3 検証ゲート
+
+| ゲート | 判定基準 |
+|---|---|
+| `bun check` | **0 errors（型検査全合格）** |
+| `bun run ui:build` | **pass** |
+| `npm run lint:web-search-provider-boundaries` | **pass** |
+| `npm run lint:web-fetch-provider-boundaries` | **pass** |
+| `npm run lint:extensions:no-src-outside-plugin-sdk` | **pass** |
+| `npm run lint:extensions:no-relative-outside-package` | **pass** |
+| `bun test test/plugin-extension-import-boundary.test.ts` | **pass** |
+| `bun test` 関連テスト | `extensions/dennou-websearch/` 配下および既存テスト全 pass |
+| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+
