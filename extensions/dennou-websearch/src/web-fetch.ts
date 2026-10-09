@@ -1,13 +1,7 @@
 import { Type } from "typebox";
-import type { OpenClawConfig } from "../../config/config.js";
-import { SsrFBlockedError, type LookupFn } from "../../infra/net/ssrf.js";
-import { logDebug } from "../../logger.js";
-import type { RuntimeWebFetchMetadata } from "../../secrets/runtime-web-tools.types.js";
-import { wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
-import { resolveWebFetchDefinition } from "../../web-fetch/runtime.js";
-import { stringEnum } from "../schema/typebox.js";
-import type { AnyAgentTool } from "./common.js";
-import { jsonResult, readNumberParam, readStringParam } from "./common.js";
+import { stringEnum } from "../../../src/agents/schema/typebox.js";
+import type { AnyAgentTool } from "../../../src/agents/tools/common.js";
+import { jsonResult, readNumberParam, readStringParam } from "../../../src/agents/tools/common.js";
 import {
   extractBasicHtmlContent,
   extractReadableContent,
@@ -15,8 +9,8 @@ import {
   markdownToText,
   truncateText,
   type ExtractMode,
-} from "./web-fetch-utils.js";
-import { fetchWithWebToolsNetworkGuard } from "./web-guarded-fetch.js";
+} from "../../../src/agents/tools/web-fetch-utils.js";
+import { fetchWithWebToolsNetworkGuard } from "../../../src/agents/tools/web-guarded-fetch.js";
 import {
   CacheEntry,
   DEFAULT_CACHE_TTL_MINUTES,
@@ -27,9 +21,15 @@ import {
   resolveCacheTtlMs,
   resolveTimeoutSeconds,
   writeCache,
-} from "./web-shared.js";
+} from "../../../src/agents/tools/web-shared.js";
+import type { OpenClawConfig } from "../../../src/config/config.js";
+import { SsrFBlockedError, type LookupFn } from "../../../src/infra/net/ssrf.js";
+import { logDebug } from "../../../src/logger.js";
+import type { RuntimeWebFetchMetadata } from "../../../src/secrets/runtime-web-tools.types.js";
+import { wrapExternalContent, wrapWebContent } from "../../../src/security/external-content.js";
+import { resolveWebFetchDefinition } from "../../../src/web-fetch/runtime.js";
 
-export { extractReadableContent } from "./web-fetch-utils.js";
+export { extractReadableContent } from "../../../src/agents/tools/web-fetch-utils.js";
 
 const EXTRACT_MODES = ["markdown", "text"] as const;
 

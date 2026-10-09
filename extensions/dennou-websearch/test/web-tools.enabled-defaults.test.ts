@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createEmptyPluginRegistry } from "../../plugins/registry.js";
-import { setActivePluginRegistry } from "../../plugins/runtime.js";
-import { clearActiveRuntimeWebToolsMetadata } from "../../secrets/runtime-web-tools-state.js";
-import { createWebFetchTool, createWebSearchTool } from "./web-tools.js";
+import { createEmptyPluginRegistry } from "../../../src/plugins/registry.js";
+import { setActivePluginRegistry } from "../../../src/plugins/runtime.js";
+import { clearActiveRuntimeWebToolsMetadata } from "../../../src/secrets/runtime-web-tools-state.js";
+import { createWebFetchTool, createWebSearchTool } from "../src/web-tools.js";
 
 beforeEach(() => {
   setActivePluginRegistry(createEmptyPluginRegistry());

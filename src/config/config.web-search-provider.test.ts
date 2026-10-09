@@ -220,14 +220,14 @@ vi.mock("../plugins/manifest-registry.js", () => {
 });
 
 let validateConfigObjectWithPlugins: typeof import("./config.js").validateConfigObjectWithPlugins;
-let resolveSearchProvider: typeof import("../agents/tools/web-search.js").__testing.resolveSearchProvider;
+let resolveSearchProvider: typeof import("../../extensions/dennou-websearch/src/web-search.js").__testing.resolveSearchProvider;
 
 beforeAll(async () => {
   vi.resetModules();
   ({ validateConfigObjectWithPlugins } = await import("./config.js"));
   ({
     __testing: { resolveSearchProvider },
-  } = await import("../agents/tools/web-search.js"));
+  } = await import("../../extensions/dennou-websearch/src/web-search.js"));
 });
 
 describe("web search provider config", () => {

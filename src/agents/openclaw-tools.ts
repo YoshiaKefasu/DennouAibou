@@ -1,10 +1,7 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { callGateway } from "../gateway/call.js";
 import { resolvePluginTools } from "../plugins/tools.js";
-import {
-  getActiveSecretsRuntimeSnapshot,
-  getActiveRuntimeWebToolsMetadata,
-} from "../secrets/runtime.js";
+import { getActiveSecretsRuntimeSnapshot } from "../secrets/runtime.js";
 import { normalizeDeliveryContext } from "../utils/delivery-context.js";
 import type { GatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveOpenClawPluginToolInputs } from "./openclaw-tools.plugin-context.js";
@@ -17,7 +14,6 @@ import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createUpdatePlanTool } from "./tools/update-plan-tool.js";
-import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 
 type OpenClawToolsDeps = {
   callGateway: typeof callGateway;
@@ -102,17 +98,10 @@ export function createOpenClawTools(
     accountId: options?.agentAccountId,
     threadId: options?.agentThreadId,
   });
-  const runtimeWebTools = getActiveRuntimeWebToolsMetadata();
   const runtimeSnapshot = getActiveSecretsRuntimeSnapshot();
   // DEBLOAT §38: image/pdf/audio tools were unified into the read tool.
-  const webSearchTool = createWebSearchTool({
-    config: options?.config,
-    runtimeWebSearch: runtimeWebTools?.search,
-  });
-  const webFetchTool = createWebFetchTool({
-    config: options?.config,
-    runtimeWebFetch: runtimeWebTools?.fetch,
-  });
+  // DEBLOAT §39: web_search/web_fetch are supplied by the dennou-websearch plugin
+  // via resolvePluginTools below.
   const messageTool = options?.disableMessageTool
     ? null
     : createMessageTool({
@@ -149,8 +138,6 @@ export function createOpenClawTools(
     ...(isExperimentalPlanToolEnabled(resolvedConfig) || isOpenAIProvider(options?.modelProvider)
       ? [createUpdatePlanTool()]
       : []),
-    ...(webSearchTool ? [webSearchTool] : []),
-    ...(webFetchTool ? [webFetchTool] : []),
   ];
 
   if (options?.disablePluginTools) {

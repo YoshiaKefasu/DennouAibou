@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/dennou-websearch",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "DennouAibou web search and fetch agent tools plugin",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.5"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

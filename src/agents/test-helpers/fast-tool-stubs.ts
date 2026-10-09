@@ -15,7 +15,7 @@ export const stubTool = (name: string): StubTool => ({
   execute: vi.fn() as unknown as (...args: unknown[]) => unknown,
 });
 
-vi.mock("../tools/web-tools.js", () => ({
+vi.mock("../../../extensions/dennou-websearch/src/web-tools.js", () => ({
   createWebSearchTool: () => null,
   createWebFetchTool: () => null,
 }));

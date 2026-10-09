@@ -1,4 +1,4 @@
-import type { LookupFn } from "../../infra/net/ssrf.js";
+import type { LookupFn } from "../../../src/infra/net/ssrf.js";
 
 export function makeFetchHeaders(map: Record<string, string>): {
   get: (key: string) => string | null;

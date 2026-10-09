@@ -1,26 +1,25 @@
 import { EnvHttpProxyAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LookupFn } from "../../infra/net/ssrf.js";
-import { resolveRequestUrl } from "../../plugin-sdk/request-url.js";
-import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
+import type { LookupFn } from "../../../src/infra/net/ssrf.js";
+import { resolveRequestUrl } from "../../../src/plugin-sdk/request-url.js";
+import { withFetchPreconnect } from "../../../src/test-utils/fetch-mock.js";
 import { makeFetchHeaders } from "./web-fetch.test-harness.js";
 const { extractReadableContentMock, resolveWebFetchDefinitionMock } = vi.hoisted(() => ({
   extractReadableContentMock: vi.fn(),
   resolveWebFetchDefinitionMock: vi.fn(),
 }));
 
-vi.mock("./web-fetch-utils.js", async () => {
-  const actual =
-    await import("./web-fetch-utils.js");
+vi.mock("../../../src/agents/tools/web-fetch-utils.js", async () => {
+  const actual = await import("../../../src/agents/tools/web-fetch-utils.js");
   return {
     ...actual,
     extractReadableContent: extractReadableContentMock,
   };
 });
-vi.mock("../../web-fetch/runtime.js", () => ({
+vi.mock("../../../src/web-fetch/runtime.js", () => ({
   resolveWebFetchDefinition: resolveWebFetchDefinitionMock,
 }));
-import { createWebFetchTool } from "./web-tools.js";
+import { createWebFetchTool } from "../src/web-tools.js";
 
 const lookupMock = vi.fn();
 

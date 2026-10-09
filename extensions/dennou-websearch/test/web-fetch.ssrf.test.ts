@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LookupFn } from "../../infra/net/ssrf.js";
-import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
+import type { LookupFn } from "../../../src/infra/net/ssrf.js";
+import { type FetchMock, withFetchPreconnect } from "../../../src/test-utils/fetch-mock.js";
 import { makeFetchHeaders } from "./web-fetch.test-harness.js";
 import "./web-fetch.test-mocks.js";
 
@@ -33,7 +33,7 @@ function setMockFetch(
 }
 
 async function createWebFetchToolForTest(params?: { firecrawlApiKey?: string }) {
-  const { createWebFetchTool } = await import("./web-tools.js");
+  const { createWebFetchTool } = await import("../src/web-tools.js");
   return createWebFetchTool({
     config: {
       plugins: params?.firecrawlApiKey

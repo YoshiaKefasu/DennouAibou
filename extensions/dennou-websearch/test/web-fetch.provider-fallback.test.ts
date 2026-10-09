@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../../config/config.js";
-import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
-import { createWebFetchTool } from "./web-tools.js";
+import type { OpenClawConfig } from "../../../src/config/config.js";
+import { withFetchPreconnect } from "../../../src/test-utils/fetch-mock.js";
+import { createWebFetchTool } from "../src/web-tools.js";
 
 const { resolveWebFetchDefinitionMock } = vi.hoisted(() => ({
   resolveWebFetchDefinitionMock: vi.fn(),
 }));
 
-vi.mock("../../web-fetch/runtime.js", () => ({
+vi.mock("../../../src/web-fetch/runtime.js", () => ({
   resolveWebFetchDefinition: resolveWebFetchDefinitionMock,
 }));
 

@@ -1,14 +1,14 @@
-import type { OpenClawConfig } from "../../config/config.js";
-import { asSchemaJson } from "../schema/typebox.js";
-import { resolveManifestContractOwnerPluginId } from "../../plugins/manifest-registry.js";
-import type { RuntimeWebSearchMetadata } from "../../secrets/runtime-web-tools.types.js";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
+import type { AnyAgentTool } from "../../../src/agents/tools/common.js";
+import { jsonResult } from "../../../src/agents/tools/common.js";
+import { SEARCH_CACHE } from "../../../src/agents/tools/web-search-provider-common.js";
+import type { OpenClawConfig } from "../../../src/config/config.js";
+import { resolveManifestContractOwnerPluginId } from "../../../src/plugins/manifest-registry.js";
+import type { RuntimeWebSearchMetadata } from "../../../src/secrets/runtime-web-tools.types.js";
 import {
   resolveWebSearchDefinition,
   resolveWebSearchProviderId,
-} from "../../web-search/runtime.js";
-import type { AnyAgentTool } from "./common.js";
-import { jsonResult } from "./common.js";
-import { SEARCH_CACHE } from "./web-search-provider-common.js";
+} from "../../../src/web-search/runtime.js";
 
 export function createWebSearchTool(options?: {
   config?: OpenClawConfig;
@@ -37,11 +37,7 @@ export function createWebSearchTool(options?: {
     description: resolved.definition.description,
     parameters: asSchemaJson(resolved.definition.parameters),
     execute: async (_toolCallId, rawArgs) =>
-      jsonResult(
-        await resolved.definition.execute(
-          rawArgs as Record<string, unknown>,
-        ),
-      ),
+      jsonResult(await resolved.definition.execute(rawArgs as Record<string, unknown>)),
   };
 }
 
