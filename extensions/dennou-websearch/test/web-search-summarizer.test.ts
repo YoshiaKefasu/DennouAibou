@@ -232,9 +232,31 @@ describe("web-search-summarizer", () => {
       ],
     };
     expect(normalizeSearchResults(payload)).toEqual([
-      { title: "Gemini A", url: "https://gemini.example/a", snippet: "これはGeminiの回答です。" },
+      { title: "Gemini A", url: "https://gemini.example/a", snippet: "" },
       { title: "Gemini B", url: "https://gemini.example/b", snippet: "" },
     ]);
+  });
+
+  it("Gemini形式（まとめ済み）は要約LLMを呼ばずcontent+Referenceを返す", async () => {
+    const spy: FetchSpy = { called: false };
+    const payload = {
+      content: "これはGeminiの回答です。",
+      citations: [
+        { url: "https://gemini.example/a", title: "Gemini A" },
+        { url: "https://gemini.example/b", title: "Gemini B" },
+      ],
+    };
+    const result = (await summarizeSearchResults(payload, "テスト", enabledConfig, {
+      fetchFn: chatCompletionsFetch("呼ばれないはず", spy),
+    })) as string;
+    // 二重要約の回避：要約LLMは一切呼ばれない。
+    expect(spy.called).toBe(false);
+    expect(typeof result).toBe("string");
+    expect(result).toContain("これはGeminiの回答です。");
+    expect(result).toContain("Reference:");
+    expect(result).toContain("[1] https://gemini.example/a | Gemini A");
+    expect(result).toContain("[2] https://gemini.example/b | Gemini B");
+    expect(result).toContain("EXTERNAL_UNTRUSTED_CONTENT");
   });
 
   it("複数wrapされたsnippetsを欠落なく結合する", () => {

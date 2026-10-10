@@ -93,11 +93,10 @@ function normalizeEntry(entry: unknown): NormalizedSearchResult | null {
  */
 export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchResult[] {
   const holder = rawPayload as
-    | { results?: unknown; data?: unknown; citations?: unknown; content?: unknown }
+    | { results?: unknown; data?: unknown; citations?: unknown }
     | null
     | undefined;
   let entries: unknown[];
-  let topContent: string | undefined;
   if (Array.isArray(rawPayload)) {
     entries = rawPayload;
   } else if (holder && Array.isArray(holder.results)) {
@@ -107,9 +106,6 @@ export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchRes
   } else if (holder && Array.isArray(holder.citations)) {
     // Note: Google/Gemini形式（content + citations）。各要素は { url, title, ... }。
     entries = holder.citations;
-    if (typeof holder.content === "string" && holder.content.trim()) {
-      topContent = holder.content;
-    }
   } else {
     return [];
   }
@@ -120,15 +116,38 @@ export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchRes
       normalized.push(item);
     }
   }
-  // Note: citations要素はurl/titleのみでsnippetが空のため、トップレベルのcontentを
-  // 先頭の空snippetに補完して要約モデルへ文脈を渡す（重複膨張を避け1件のみ）。
-  if (topContent !== undefined) {
-    const target = normalized.find((item) => !item.snippet);
-    if (target) {
-      target.snippet = stripWebContentWrap(topContent);
+  return normalized;
+}
+
+/**
+ * Gemini grounding形式（まとめ済みcontent + citations）の抽出。
+ * contentはGeminiが既にまとめた回答のため二重要約せずそのまま段落として使う。
+ */
+function extractPreSummarizedPayload(rawPayload: unknown): {
+  paragraph: string;
+  results: NormalizedSearchResult[];
+} | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const holder = rawPayload as Record<string, unknown>;
+  const content = holder.content;
+  const citations = holder.citations;
+  if (typeof content !== "string" || !content.trim() || !Array.isArray(citations)) {
+    return null;
+  }
+  const paragraph = stripWebContentWrap(content);
+  if (!paragraph) {
+    return null;
+  }
+  const results: NormalizedSearchResult[] = [];
+  for (const entry of citations) {
+    const item = normalizeEntry(entry);
+    if (item) {
+      results.push(item);
     }
   }
-  return normalized;
+  return { paragraph, results };
 }
 
 function isErrorPayload(rawPayload: unknown): boolean {
@@ -264,6 +283,7 @@ async function requestSummaryParagraph(params: {
 /**
  * 生検索結果を要約付き構造化テキストへ変換する。
  * - 無効時は生ペイロードをそのまま返す。
+ * - Gemini grounding形式（まとめ済みcontent + citations）は二重要約せずそのまま返す。
  * - 0件時はプレーンな固定文を返す。
  * - タイムアウト / 429・5xx / ネットワーク断 / パース失敗時は生ペイロードにフォールバックする。
  * - いかなる場合も例外を投げない（フェイルオープン）。
@@ -278,12 +298,25 @@ export async function summarizeSearchResults(
     if (config?.enabled !== true) {
       return rawPayload;
     }
+    if (isErrorPayload(rawPayload)) {
+      return rawPayload;
+    }
+    const limit =
+      config.referenceLimit && config.referenceLimit > 0 ? Math.floor(config.referenceLimit) : 5;
+    // Note: Gemini groundingは既にまとめ済みの回答のため要約LLMを呼ばず、
+    // contentを段落・citationsをReferenceとしてそのまま結合する（二重要約の回避）。
+    const preSummarized = extractPreSummarizedPayload(rawPayload);
+    if (preSummarized) {
+      const refResults = preSummarized.results.filter((item) => item.url).slice(0, limit);
+      const finalText =
+        refResults.length > 0
+          ? `${preSummarized.paragraph}\n\n${buildReferenceSection(refResults, limit)}`
+          : preSummarized.paragraph;
+      return wrapWebContent(finalText, "web_search");
+    }
     const model = config.model?.trim();
     const endpoint = config.endpoint?.trim();
     if (!model || !endpoint) {
-      return rawPayload;
-    }
-    if (isErrorPayload(rawPayload)) {
       return rawPayload;
     }
     const normalized = normalizeSearchResults(rawPayload);
@@ -292,8 +325,6 @@ export async function summarizeSearchResults(
       // 未知の構造・非配列ペイロードは「結果なし」と決めつけず生ペイロードにフェイルオープンする。
       return hasExplicitResultArray(rawPayload) ? NO_RESULTS_MESSAGE : rawPayload;
     }
-    const limit =
-      config.referenceLimit && config.referenceLimit > 0 ? Math.floor(config.referenceLimit) : 5;
     // Note: プロンプトの[N]とReference:[N]の番号対応を保つため、
     // URLを持たないエントリは番号付け前に除外する（ReferenceはURL必須のため）。
     const top = normalized.filter((item) => item.url).slice(0, limit);
