@@ -4,6 +4,7 @@ import { jsonResult } from "../../../src/agents/tools/common.js";
 import { SEARCH_CACHE } from "../../../src/agents/tools/web-search-provider-common.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
 import { resolveManifestContractOwnerPluginId } from "../../../src/plugins/manifest-registry.js";
+import { getActiveRuntimeWebToolsMetadata } from "../../../src/secrets/runtime-web-tools-state.js";
 import type { RuntimeWebSearchMetadata } from "../../../src/secrets/runtime-web-tools.types.js";
 import {
   resolveWebSearchDefinition,
@@ -14,10 +15,14 @@ export function createWebSearchTool(options?: {
   config?: OpenClawConfig;
   runtimeWebSearch?: RuntimeWebSearchMetadata;
 }): AnyAgentTool | null {
+  // Fall back to active global runtime metadata so preferRuntimeProviders
+  // reflects it even when the caller passes no runtimeWebSearch (e.g. plugin registration).
+  const runtimeWebSearch = options?.runtimeWebSearch ?? getActiveRuntimeWebToolsMetadata()?.search;
   const runtimeProviderId =
-    options?.runtimeWebSearch?.selectedProvider ?? options?.runtimeWebSearch?.providerConfigured;
+    runtimeWebSearch?.selectedProvider ?? runtimeWebSearch?.providerConfigured;
   const resolved = resolveWebSearchDefinition({
     ...options,
+    runtimeWebSearch,
     preferRuntimeProviders:
       Boolean(runtimeProviderId) &&
       !resolveManifestContractOwnerPluginId({

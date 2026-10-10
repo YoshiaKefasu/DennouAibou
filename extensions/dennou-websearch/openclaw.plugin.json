@@ -1,6 +1,11 @@
 {
   "id": "dennou-websearch",
+  "enabledByDefault": true,
   "name": "Dennou WebSearch",
   "description": "Web search and fetch tools for DennouAibou",
-  "version": "0.1.0"
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
 }

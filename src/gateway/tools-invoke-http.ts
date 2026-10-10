@@ -266,7 +266,10 @@ export async function handleToolsInvokeHttpRequest(
       agentThreadId,
       allowGatewaySubagentBinding: true,
       allowMediaInvokeCommands: true,
-      disablePluginTools: isKnownCoreToolId(toolName),
+      // DEBLOAT §39: web_search/web_fetch are plugin-supplied (dennou-websearch),
+      // so keep plugin tools enabled for them despite their core-tool catalog ids.
+      disablePluginTools:
+        isKnownCoreToolId(toolName) && !["web_search", "web_fetch"].includes(toolName),
     },
     { createOpenClawTools: deps.createOpenClawTools },
   );
