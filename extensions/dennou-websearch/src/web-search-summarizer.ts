@@ -93,10 +93,11 @@ function normalizeEntry(entry: unknown): NormalizedSearchResult | null {
  */
 export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchResult[] {
   const holder = rawPayload as
-    | { results?: unknown; data?: unknown; citations?: unknown }
+    | { results?: unknown; data?: unknown; citations?: unknown; content?: unknown }
     | null
     | undefined;
   let entries: unknown[];
+  let topContent: string | undefined;
   if (Array.isArray(rawPayload)) {
     entries = rawPayload;
   } else if (holder && Array.isArray(holder.results)) {
@@ -106,6 +107,9 @@ export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchRes
   } else if (holder && Array.isArray(holder.citations)) {
     // Note: Google/Gemini形式（content + citations）。各要素は { url, title, ... }。
     entries = holder.citations;
+    if (typeof holder.content === "string" && holder.content.trim()) {
+      topContent = holder.content;
+    }
   } else {
     return [];
   }
@@ -114,6 +118,14 @@ export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchRes
     const item = normalizeEntry(entry);
     if (item) {
       normalized.push(item);
+    }
+  }
+  // Note: citations要素はurl/titleのみでsnippetが空のため、トップレベルのcontentを
+  // 先頭の空snippetに補完して要約モデルへ文脈を渡す（重複膨張を避け1件のみ）。
+  if (topContent !== undefined) {
+    const target = normalized.find((item) => !item.snippet);
+    if (target) {
+      target.snippet = stripWebContentWrap(topContent);
     }
   }
   return normalized;
@@ -136,7 +148,7 @@ function hasExplicitResultArray(rawPayload: unknown): boolean {
   if (Array.isArray(rawPayload)) {
     return true;
   }
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+  if (!rawPayload || typeof rawPayload !== "object") {
     return false;
   }
   const holder = rawPayload as Record<string, unknown>;

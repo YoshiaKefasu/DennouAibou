@@ -16,7 +16,6 @@ const toolSources = [
   path.join(repoRoot, "src/agents/apply-patch.ts"),
   path.join(repoRoot, "src/agents/bash-tools.exec.ts"),
   path.join(repoRoot, "src/agents/bash-tools.process.ts"),
-  path.join(repoRoot, "src/auto-reply/reply/acp-projector.ts"),
 ];
 
 const args = new Set(process.argv.slice(2));

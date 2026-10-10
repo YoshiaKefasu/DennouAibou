@@ -232,7 +232,7 @@ describe("web-search-summarizer", () => {
       ],
     };
     expect(normalizeSearchResults(payload)).toEqual([
-      { title: "Gemini A", url: "https://gemini.example/a", snippet: "" },
+      { title: "Gemini A", url: "https://gemini.example/a", snippet: "これはGeminiの回答です。" },
       { title: "Gemini B", url: "https://gemini.example/b", snippet: "" },
     ]);
   });
