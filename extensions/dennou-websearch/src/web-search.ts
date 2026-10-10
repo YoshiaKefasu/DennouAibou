@@ -1,6 +1,6 @@
 import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import type { AnyAgentTool } from "../../../src/agents/tools/common.js";
-import { jsonResult } from "../../../src/agents/tools/common.js";
+import { jsonResult, textResult } from "../../../src/agents/tools/common.js";
 import { SEARCH_CACHE } from "../../../src/agents/tools/web-search-provider-common.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
 import { resolveManifestContractOwnerPluginId } from "../../../src/plugins/manifest-registry.js";
@@ -10,6 +10,7 @@ import {
   resolveWebSearchDefinition,
   resolveWebSearchProviderId,
 } from "../../../src/web-search/runtime.js";
+import { resolveSummarizerConfig, summarizeSearchResults } from "./web-search-summarizer.js";
 
 export function createWebSearchTool(options?: {
   config?: OpenClawConfig;
@@ -41,8 +42,27 @@ export function createWebSearchTool(options?: {
     name: "web_search",
     description: resolved.definition.description,
     parameters: asSchemaJson(resolved.definition.parameters),
-    execute: async (_toolCallId, rawArgs) =>
-      jsonResult(await resolved.definition.execute(rawArgs as Record<string, unknown>)),
+    execute: async (_toolCallId, rawArgs) => {
+      const raw = await resolved.definition.execute(rawArgs as Record<string, unknown>);
+      const args =
+        rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)
+          ? (rawArgs as Record<string, unknown>)
+          : {};
+      try {
+        const summarized = await summarizeSearchResults(
+          raw,
+          typeof args.query === "string" ? args.query : "",
+          resolveSummarizerConfig(options?.config),
+        );
+        if (typeof summarized === "string") {
+          // Note: contentは要約テキスト、detailsは従来どおり生ペイロードを保持する。
+          return textResult(summarized, raw);
+        }
+      } catch {
+        // フェイルオープン：要約経路の異常は生結果にフォールバックする。
+      }
+      return jsonResult(raw);
+    },
   };
 }
 

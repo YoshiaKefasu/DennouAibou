@@ -6,6 +6,19 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "properties": {}
+    "properties": {
+      "summarizer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "model": { "type": "string" },
+          "endpoint": { "type": "string" },
+          "apiKey": { "type": ["string", "object"] },
+          "referenceLimit": { "type": "integer", "minimum": 1 },
+          "timeoutMs": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
   }
 }
