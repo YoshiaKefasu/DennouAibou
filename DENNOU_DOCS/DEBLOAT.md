@@ -2456,37 +2456,39 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 
 ---
 
-## 41. Exa / Brave の `dennou-websearch` 内包と単一プラグイン一本化（DEBLOAT）
+## 41. Exa / Brave の `dennou-websearch` 内包と単一プラグイン一本化（DEBLOAT 2026-10-06 改訂）
 
 ### 41.1 目的と背景
 
 - **Web検索プラグインの散乱解消**:
-  現状、Web検索を行うために `dennou-websearch`, `exa`, `brave` と 3 つのプラグインが分散しており、`dennou-aibou.json` の `plugins.allow` や `plugins.entries` にもそれぞれ設定が散らばっている。
+  現状、Web検索を行うために `dennou-websearch`, `exa`, `brave` の複数プラグインに分散しており、KASOU の `dennou-aibou.json` の `plugins.allow` や `plugins.entries` にもそれぞれ設定が散らばっている。
 - **`dennou-websearch` への完全内包 (KISS)**:
-  - Exa (`api.exa.ai`) と Brave (`api.search.brave.com`) のプロバイダ実装を `extensions/dennou-websearch/src/providers/` 配下へ統合。
+  - Exa (`api.exa.ai`) と Brave (`api.search.brave.com`) のプロバイダ実装を `extensions/dennou-websearch/src/providers/` 配下へ移設・統合。
   - `dennou-websearch` の `index.ts` 内で `api.registerWebSearchProvider` を用いて Exa および Brave プロバイダを登録。
-  - `extensions/dennou-websearch/openclaw.plugin.json` に `contracts.webSearchProviders: ["exa", "brave"]` を宣言。
-  - 不要となった独立プラグイン `extensions/exa/` および `extensions/brave/` を完全削除（DEBLOAT）。
-- **設定と許可リストの 1 本化**:
-  - `plugins.allow` から `exa`, `brave` を撤去し、`dennou-websearch` 1 本に集約。
-  - `plugins.entries.dennou-websearch.config` 内で Exa / Brave の apiKey やモードを一括設定可能にする。
+  - `extensions/dennou-websearch/openclaw.plugin.json` に `contracts.webSearchProviders: ["exa", "brave"]` および `providerAuthEnvVars: { "exa": ["EXA_API_KEY"], "brave": ["BRAVE_API_KEY"] }` を宣言。
+  - 独立プラグイン `extensions/exa/` および `extensions/brave/` を完全削除（DEBLOAT）。
+- **設定スキーマと資格情報解決の統一 (`plugins.entries.dennou-websearch.config`)**:
+  - `plugins.entries.dennou-websearch.config.exa.apiKey` および `plugins.entries.dennou-websearch.config.brave.{apiKey, mode}`（＋後方互換として `config.webSearch.exa` / `config.webSearch.brave` や旧 `plugins.entries.{exa,brave}.config.webSearch` もフォールバック受容）で解決できるようにプロバイダ側の `credentialPath` / `getConfiguredCredentialValue` / `setConfiguredCredentialValue` / `applySelectionConfig` を `dennou-websearch` 向けに刷新する。
 
 ### 41.2 変更対象と責務
 
 | 対象領域 | ファイル | 変更内容 |
 |---|---|---|
-| プロバイダ移設・統合 | `extensions/dennou-websearch/src/providers/exa.ts`<br>`extensions/dennou-websearch/src/providers/brave.ts`<br>`extensions/dennou-websearch/index.ts` | `extensions/exa/src/exa-web-search-provider.ts` と `extensions/brave/src/brave-web-search-provider.ts` のロジックを移設。<br>`index.ts` で `api.registerWebSearchProvider` を呼んで登録。 |
-| プラグインスキーマ拡張 | `extensions/dennou-websearch/openclaw.plugin.json` | `contracts.webSearchProviders: ["exa", "brave"]` を追加。<br>`configSchema` に `exa.apiKey`, `brave.apiKey`, `brave.mode` の定義を追加。<br>`providerAuthEnvVars` に `EXA_API_KEY`, `BRAVE_API_KEY` を登録。 |
+| プロバイダ移設・統合 | `extensions/dennou-websearch/src/providers/exa.ts`<br>`extensions/dennou-websearch/src/providers/brave.ts`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/web-search-provider.ts` | `extensions/exa/src/exa-web-search-provider.ts` と `extensions/brave/src/brave-web-search-provider.ts` を移設（相対 import 階層を調整）。<br>`credentialPath` 等を `plugins.entries.dennou-websearch.config.{exa,brave}.apiKey` へ更新（旧パスも読み取りフォールバック維持）。<br>`index.ts` で `api.registerWebSearchProvider` を呼んで両プロバイダを登録。 |
+| プラグインスキーマ拡張 | `extensions/dennou-websearch/openclaw.plugin.json` | `contracts.webSearchProviders: ["exa", "brave"]`、`providerAuthEnvVars: { "exa": ["EXA_API_KEY"], "brave": ["BRAVE_API_KEY"] }` を追加。<br>`configSchema.properties` に `exa: { apiKey }`, `brave: { apiKey, mode }`, `webSearch`（互換用）を追加。 |
 | 旧プラグイン物理削除 | `extensions/exa/**`<br>`extensions/brave/**` | 独立プラグイン 2 つを完全削除。 |
-| 設定集約 | `dennou-aibou.json`<br>`openclaw.json` (サンプル) | `plugins.allow` から `exa`, `brave` を削除（`dennou-websearch` に一本化）。<br>`plugins.entries.dennou-websearch.config` に exa / brave の設定を集約。 |
-| テスト移設・整合 | `extensions/dennou-websearch/test/providers/` | 旧プロバイダの単体テストを移設し `bun test` で全緑化。 |
+| コア・契約テスト・境界整理 | `src/plugins/contracts/*.{brave,exa}.contract.test.ts`<br>`test/helpers/plugins/plugin-registration-contract-cases.ts`<br>`src/commands/doctor/shared/legacy-web-search-migrate.ts`<br>`src/secrets/target-registry-data.ts`<br>`scripts/check-*-boundaries.mjs`<br>`test/bun-tier-*-known-failing.txt` | 旧 `exa` / `brave` プラグインID前提の契約テスト・登録ケース・doctor移行先・secret target・境界lintスクリプト・known-failing リストを `dennou-websearch` に統合または整理。 |
+| テスト移設・整合 | `extensions/dennou-websearch/test/exa-web-search-provider.test.ts`<br>`extensions/dennou-websearch/test/brave-web-search-provider.test.ts` | 旧プロバイダの単体テストを `dennou-websearch/test/` 配下へ移設し `bun test` で全緑化。 |
+| KASOU運用設定（デプロイ時） | `Y:/.openclaw/dennou-aibou.json`（リポジトリ外） | `plugins.allow` から `exa`, `brave` を削除し `dennou-websearch` に一本化。<br>`plugins.entries` の `exa`, `brave` の apiKey を `plugins.entries.dennou-websearch.config` 内へ統合し、旧エントリを削除。 |
 
 ### 41.3 検証ゲート
 
 | ゲート | 判定基準 |
 |---|---|
-| `bun check` | **0 errors（型検査全合格）** |
+| `bun run tsgo` | **0 errors（型検査全合格）** |
 | `bun run ui:build` | **pass** |
+| `npm run lint:web-search-provider-boundaries` | **pass** |
+| `npm run lint:web-fetch-provider-boundaries` | **pass** |
 | `bun test extensions/dennou-websearch` | **全 pass（移設テスト含む）** |
 | `pnpm exec oxfmt --check <changed_files>` | **pass** |
 
