@@ -88,6 +88,16 @@ function pluginWebSearchApiKey(config: OpenClawConfig, pluginId: string): unknow
   return entry?.config?.webSearch?.apiKey;
 }
 
+// DEBLOAT §41: exa/brave credentials are namespaced under the dennou-websearch plugin.
+function bundledWebSearchApiKey(config: OpenClawConfig, providerId: string): unknown {
+  const entry = (
+    config.plugins?.entries as
+      | Record<string, { config?: Record<string, { apiKey?: unknown } | undefined> }>
+      | undefined
+  )?.["dennou-websearch"];
+  return entry?.config?.[providerId]?.apiKey;
+}
+
 function createDisabledFirecrawlConfig(apiKey?: string): OpenClawConfig {
   return {
     tools: {
@@ -201,8 +211,8 @@ describe("setupSearch", () => {
     const result = await setupSearch(cfg, runtime, prompter);
     expect(result.tools?.web?.search?.provider).toBe("brave");
     expect(result.tools?.web?.search?.enabled).toBe(true);
-    expect(pluginWebSearchApiKey(result, "brave")).toBe("BSA-test-key");
-    expect(result.plugins?.entries?.brave?.enabled).toBe(true);
+    expect(bundledWebSearchApiKey(result, "brave")).toBe("BSA-test-key");
+    expect(result.plugins?.entries?.["dennou-websearch"]?.enabled).toBe(true);
   });
 
   it("sets provider and key for gemini", async () => {
@@ -568,12 +578,12 @@ describe("setupSearch", () => {
       secretInputMode: "ref", // pragma: allowlist secret
     });
     expect(result.tools?.web?.search?.provider).toBe("brave");
-    expect(pluginWebSearchApiKey(result, "brave")).toEqual({
+    expect(bundledWebSearchApiKey(result, "brave")).toEqual({
       source: "env",
       provider: "default",
       id: "BRAVE_API_KEY",
     });
-    expect(result.plugins?.entries?.brave?.enabled).toBe(true);
+    expect(result.plugins?.entries?.["dennou-websearch"]?.enabled).toBe(true);
     expect(prompter.text).not.toHaveBeenCalled();
   });
 
@@ -610,7 +620,7 @@ describe("setupSearch", () => {
       textValue: "BSA-plain",
     });
     const result = await setupSearch(cfg, runtime, prompter);
-    expect(pluginWebSearchApiKey(result, "brave")).toBe("BSA-plain");
+    expect(bundledWebSearchApiKey(result, "brave")).toBe("BSA-plain");
   });
 
   it("exports all 7 providers in alphabetical order", () => {

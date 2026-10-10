@@ -42,7 +42,8 @@ Scope intent:
 - `messages.tts.providers.*.apiKey`
 - `tools.web.fetch.firecrawl.apiKey`
 - `plugins.entries.firecrawl.config.webFetch.apiKey`
-- `plugins.entries.brave.config.webSearch.apiKey`
+- `plugins.entries.dennou-websearch.config.brave.apiKey`
+- `plugins.entries.dennou-websearch.config.exa.apiKey`
 - `plugins.entries.google.config.webSearch.apiKey`
 - `plugins.entries.xai.config.webSearch.apiKey`
 - `plugins.entries.moonshot.config.webSearch.apiKey`

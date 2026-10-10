@@ -571,11 +571,13 @@ describe("normalizeCompatibilityConfigValues", () => {
       provider: "gemini",
       maxResults: 5,
     });
-    expect(res.config.plugins?.entries?.brave).toEqual({
+    expect(res.config.plugins?.entries?.["dennou-websearch"]).toEqual({
       enabled: true,
       config: {
         webSearch: {
-          apiKey: "brave-key",
+          brave: {
+            apiKey: "brave-key",
+          },
         },
       },
     });
@@ -598,7 +600,7 @@ describe("normalizeCompatibilityConfigValues", () => {
       },
     });
     expect(res.changes).toEqual([
-      "Moved tools.web.search.apiKey → plugins.entries.brave.config.webSearch.apiKey.",
+      "Moved tools.web.search.apiKey → plugins.entries.dennou-websearch.config.webSearch.brave.apiKey.",
       "Moved tools.web.search.firecrawl → plugins.entries.firecrawl.config.webSearch.",
       "Moved tools.web.search.gemini → plugins.entries.google.config.webSearch.",
     ]);

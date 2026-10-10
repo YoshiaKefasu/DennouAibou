@@ -3,9 +3,9 @@ import { describePluginRegistrationContract } from "./plugin-registration-contra
 type PluginRegistrationContractParams = Parameters<typeof describePluginRegistrationContract>[0];
 
 export const pluginRegistrationContractCases = {
-  brave: {
-    pluginId: "brave",
-    webSearchProviderIds: ["brave"],
+  "dennou-websearch": {
+    pluginId: "dennou-websearch",
+    webSearchProviderIds: ["exa", "brave"],
   },
   deepgram: {
     pluginId: "deepgram",
@@ -14,10 +14,6 @@ export const pluginRegistrationContractCases = {
   duckduckgo: {
     pluginId: "duckduckgo",
     webSearchProviderIds: ["duckduckgo"],
-  },
-  exa: {
-    pluginId: "exa",
-    webSearchProviderIds: ["exa"],
   },
   firecrawl: {
     pluginId: "firecrawl",

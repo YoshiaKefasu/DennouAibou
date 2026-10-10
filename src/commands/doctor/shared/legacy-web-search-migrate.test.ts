@@ -31,11 +31,13 @@ describe("legacy web search config", () => {
     expect(res.config.tools?.web?.search).toEqual({
       provider: "grok",
     });
-    expect(res.config.plugins?.entries?.brave).toEqual({
+    expect(res.config.plugins?.entries?.["dennou-websearch"]).toEqual({
       enabled: true,
       config: {
         webSearch: {
-          apiKey: "brave-key",
+          brave: {
+            apiKey: "brave-key",
+          },
         },
       },
     });
@@ -58,7 +60,7 @@ describe("legacy web search config", () => {
       },
     });
     expect(res.changes).toEqual([
-      "Moved tools.web.search.apiKey → plugins.entries.brave.config.webSearch.apiKey.",
+      "Moved tools.web.search.apiKey → plugins.entries.dennou-websearch.config.webSearch.brave.apiKey.",
       "Moved tools.web.search.grok → plugins.entries.xai.config.webSearch.",
       "Moved tools.web.search.kimi → plugins.entries.moonshot.config.webSearch.",
     ]);
@@ -117,16 +119,18 @@ describe("legacy web search config", () => {
     expect(migrated.config?.tools?.web?.search).toEqual({
       provider: "brave",
     });
-    expect(migrated.config?.plugins?.entries?.brave).toEqual({
+    expect(migrated.config?.plugins?.entries?.["dennou-websearch"]).toEqual({
       enabled: true,
       config: {
         webSearch: {
-          apiKey: "brave-key",
+          brave: {
+            apiKey: "brave-key",
+          },
         },
       },
     });
     expect(migrated.changes).toEqual([
-      "Moved tools.web.search.brave → plugins.entries.brave.config.webSearch.",
+      "Moved tools.web.search.brave → plugins.entries.dennou-websearch.config.webSearch.brave.",
     ]);
   });
 });

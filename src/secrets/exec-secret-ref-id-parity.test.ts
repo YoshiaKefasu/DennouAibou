@@ -119,6 +119,14 @@ describe("exec SecretRef id parity", () => {
     ) {
       return "tools.web.search";
     }
+    // DEBLOAT §41: dennou-websearch owns the exa/brave providers, so their
+    // credentials are namespaced as config.<providerId>.apiKey.
+    if (
+      canonicalId.startsWith("plugins.entries.dennou-websearch.config.") &&
+      canonicalId.endsWith(".apiKey")
+    ) {
+      return "tools.web.search";
+    }
     if (canonicalId.startsWith("tools.web.search.")) {
       return "tools.web.search";
     }

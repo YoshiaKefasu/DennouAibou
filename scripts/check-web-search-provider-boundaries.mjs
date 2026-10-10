@@ -31,8 +31,10 @@ const ignoredDirNames = new Set([
   "node_modules",
 ]);
 
+// Plugin ownership of bundled web search providers. DEBLOAT §41 folded the
+// standalone `brave` plugin (and `exa`) into `dennou-websearch`, which owns both
+// provider ids, so it cannot be expressed in this 1:1 map.
 const bundledProviderPluginToSearchProvider = new Map([
-  ["brave", "brave"],
   ["firecrawl", "firecrawl"],
   ["google", "gemini"],
   ["moonshot", "kimi"],

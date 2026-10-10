@@ -1,8 +1,7 @@
-import { Type } from "typebox";
-import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
+  enablePluginInConfig,
   MAX_SEARCH_COUNT,
   formatCliCommand,
   mergeScopedSearchConfig,
@@ -13,13 +12,11 @@ import {
   readNumberParam,
   readProviderEnvValue,
   readStringParam,
-  resolveProviderWebSearchPluginConfig,
   resolveSearchCacheTtlMs,
   resolveSearchCount,
   resolveSearchTimeoutSeconds,
   resolveSiteName,
   setTopLevelCredentialValue,
-  setProviderWebSearchPluginConfigValue,
   type SearchConfigRecord,
   type WebSearchProviderPlugin,
   type WebSearchProviderToolDefinition,
@@ -27,6 +24,13 @@ import {
   wrapWebContent,
   writeCachedSearchPayload,
 } from "openclaw/plugin-sdk/provider-web-search";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
+import {
+  DENNOU_WEBSEARCH_PLUGIN_ID,
+  resolveBundledWebSearchProviderConfig,
+  setBundledWebSearchProviderConfigValue,
+} from "./provider-plugin-config.js";
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 const BRAVE_LLM_CONTEXT_ENDPOINT = "https://api.search.brave.com/res/v1/llm/context";
@@ -133,6 +137,8 @@ const BRAVE_SEARCH_LANG_ALIASES: Record<string, string> = {
   "zh-tw": "zh-hant",
 };
 const BRAVE_UI_LANG_LOCALE = /^([a-z]{2})-([a-z]{2})$/i;
+
+const BRAVE_CREDENTIAL_PATH = `plugins.entries.${DENNOU_WEBSEARCH_PLUGIN_ID}.config.brave.apiKey`;
 
 type BraveConfig = {
   mode?: string;
@@ -641,21 +647,28 @@ export function createBraveWebSearchProvider(): WebSearchProviderPlugin {
     signupUrl: "https://brave.com/search/api/",
     docsUrl: "https://docs.openclaw.ai/brave-search",
     autoDetectOrder: 10,
-    credentialPath: "plugins.entries.brave.config.webSearch.apiKey",
-    inactiveSecretPaths: ["plugins.entries.brave.config.webSearch.apiKey"],
+    credentialPath: BRAVE_CREDENTIAL_PATH,
+    inactiveSecretPaths: [BRAVE_CREDENTIAL_PATH],
     getCredentialValue: (searchConfig) => searchConfig?.apiKey,
     setCredentialValue: setTopLevelCredentialValue,
     getConfiguredCredentialValue: (config) =>
-      resolveProviderWebSearchPluginConfig(config, "brave")?.apiKey,
+      resolveBundledWebSearchProviderConfig(config, "brave")?.apiKey,
     setConfiguredCredentialValue: (configTarget, value) => {
-      setProviderWebSearchPluginConfigValue(configTarget, "brave", "apiKey", value);
+      setBundledWebSearchProviderConfigValue({
+        configTarget,
+        providerId: "brave",
+        key: "apiKey",
+        value,
+      });
     },
+    applySelectionConfig: (config) =>
+      enablePluginInConfig(config, DENNOU_WEBSEARCH_PLUGIN_ID).config,
     createTool: (ctx) =>
       createBraveToolDefinition(
         mergeScopedSearchConfig(
           ctx.searchConfig as SearchConfigRecord | undefined,
           "brave",
-          resolveProviderWebSearchPluginConfig(ctx.config, "brave"),
+          resolveBundledWebSearchProviderConfig(ctx.config, "brave"),
           { mirrorApiKeyToTopLevel: true },
         ) as SearchConfigRecord | undefined,
       ),

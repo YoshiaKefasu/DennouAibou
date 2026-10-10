@@ -3,6 +3,13 @@
   "enabledByDefault": true,
   "name": "Dennou WebSearch",
   "description": "Web search and fetch tools for DennouAibou",
+  "contracts": {
+    "webSearchProviders": ["exa", "brave"]
+  },
+  "providerAuthEnvVars": {
+    "exa": ["EXA_API_KEY"],
+    "brave": ["BRAVE_API_KEY"]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -18,6 +25,24 @@
           "referenceLimit": { "type": "integer", "minimum": 1 },
           "timeoutMs": { "type": "integer", "minimum": 1 }
         }
+      },
+      "exa": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "apiKey": { "type": ["string", "object"] }
+        }
+      },
+      "brave": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "apiKey": { "type": ["string", "object"] },
+          "mode": { "type": "string", "enum": ["web", "llm-context"] }
+        }
+      },
+      "webSearch": {
+        "type": "object"
       }
     }
   }

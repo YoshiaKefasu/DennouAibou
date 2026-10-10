@@ -24,6 +24,27 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Config scope key used when a bundled plugin owns more than one web search
+ * provider (DEBLOAT §41: `dennou-websearch` owns both `exa` and `brave`).
+ * The migrated payload is then nested under the provider id inside
+ * `plugins.entries.<plugin>.config.webSearch` instead of being written flat.
+ */
+function resolveWebSearchConfigScopeKey(providerId: string): string | undefined {
+  const ownerPluginId = resolveManifestContractOwnerPluginId({
+    contract: "webSearchProviders",
+    value: providerId,
+    origin: "bundled",
+  });
+  if (!ownerPluginId) {
+    return undefined;
+  }
+  const owner = loadPluginManifestRegistry({ cache: true }).plugins.find(
+    (plugin) => plugin.origin === "bundled" && plugin.id === ownerPluginId,
+  );
+  return (owner?.contracts?.webSearchProviders?.length ?? 0) > 1 ? providerId : undefined;
+}
+
 function cloneRecord<T extends JsonRecord>(value: T | undefined): T {
   return { ...value } as T;
 }
@@ -72,6 +93,7 @@ function resolveLegacyGlobalWebSearchMigration(search: JsonRecord): {
   payload: JsonRecord;
   legacyPath: string;
   targetPath: string;
+  scopeKey?: string;
 } | null {
   const legacyProviderConfig = copyLegacyProviderConfig(
     search,
@@ -91,16 +113,19 @@ function resolveLegacyGlobalWebSearchMigration(search: JsonRecord): {
       value: LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID,
       origin: "bundled",
     }) ?? LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID;
+  const scopeKey = resolveWebSearchConfigScopeKey(LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID);
+  const webSearchPath = scopeKey
+    ? `plugins.entries.${pluginId}.config.webSearch.${scopeKey}`
+    : `plugins.entries.${pluginId}.config.webSearch`;
   return {
     pluginId,
     payload,
+    scopeKey,
     legacyPath: hasLegacyApiKey
       ? "tools.web.search.apiKey"
       : `tools.web.search.${LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID}`,
     targetPath:
-      hasLegacyApiKey && !legacyProviderConfig
-        ? `plugins.entries.${pluginId}.config.webSearch.apiKey`
-        : `plugins.entries.${pluginId}.config.webSearch`,
+      hasLegacyApiKey && !legacyProviderConfig ? `${webSearchPath}.apiKey` : webSearchPath,
   };
 }
 
@@ -111,20 +136,33 @@ function migratePluginWebSearchConfig(params: {
   pluginId: string;
   payload: JsonRecord;
   changes: string[];
+  scopeKey?: string;
 }) {
   const plugins = ensureRecord(params.root, "plugins");
   const entries = ensureRecord(plugins, "entries");
   const entry = ensureRecord(entries, params.pluginId);
   const config = ensureRecord(entry, "config");
   const hadEnabled = entry.enabled !== undefined;
-  const existing = isRecord(config.webSearch) ? cloneRecord(config.webSearch) : undefined;
+  const webSearch = isRecord(config.webSearch) ? config.webSearch : undefined;
+  const existing = params.scopeKey
+    ? isRecord(webSearch?.[params.scopeKey])
+      ? cloneRecord(webSearch[params.scopeKey] as JsonRecord)
+      : undefined
+    : webSearch
+      ? cloneRecord(webSearch)
+      : undefined;
 
   if (!hadEnabled) {
     entry.enabled = true;
   }
 
   if (!existing) {
-    config.webSearch = cloneRecord(params.payload);
+    if (params.scopeKey) {
+      const scoped = ensureRecord(config, "webSearch");
+      scoped[params.scopeKey] = cloneRecord(params.payload);
+    } else {
+      config.webSearch = cloneRecord(params.payload);
+    }
     params.changes.push(`Moved ${params.legacyPath} → ${params.targetPath}.`);
     return;
   }
@@ -132,7 +170,12 @@ function migratePluginWebSearchConfig(params: {
   const merged = cloneRecord(existing);
   mergeMissing(merged, params.payload);
   const changed = JSON.stringify(merged) !== JSON.stringify(existing) || !hadEnabled;
-  config.webSearch = merged;
+  if (params.scopeKey) {
+    const scoped = ensureRecord(config, "webSearch");
+    scoped[params.scopeKey] = merged;
+  } else {
+    config.webSearch = merged;
+  }
   if (changed) {
     params.changes.push(
       `Merged ${params.legacyPath} → ${params.targetPath} (filled missing fields from legacy; kept explicit plugin config values).`,
@@ -226,6 +269,7 @@ function normalizeLegacyWebSearchConfigRecord<T extends JsonRecord>(
       targetPath: globalSearchMigration.targetPath,
       pluginId: globalSearchMigration.pluginId,
       payload: globalSearchMigration.payload,
+      scopeKey: globalSearchMigration.scopeKey,
       changes,
     });
   }
@@ -246,12 +290,16 @@ function normalizeLegacyWebSearchConfigRecord<T extends JsonRecord>(
     if (!pluginId) {
       continue;
     }
+    const scopeKey = resolveWebSearchConfigScopeKey(providerId);
     migratePluginWebSearchConfig({
       root: nextRoot,
       legacyPath: `tools.web.search.${providerId}`,
-      targetPath: `plugins.entries.${pluginId}.config.webSearch`,
+      targetPath: scopeKey
+        ? `plugins.entries.${pluginId}.config.webSearch.${scopeKey}`
+        : `plugins.entries.${pluginId}.config.webSearch`,
       pluginId,
       payload: scoped,
+      scopeKey,
       changes,
     });
   }

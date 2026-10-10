@@ -78,12 +78,17 @@ function sortComparableEntries(entries: ComparableProvider[]): ComparableProvide
   });
 }
 
-export function describeBundledWebSearchFastPathContract(pluginId: string) {
+export function describeBundledWebSearchFastPathContract(pluginId: string, providerId?: string) {
+  const filterProvider = <T extends { id: string }>(entries: T[]): T[] =>
+    providerId ? entries.filter((entry) => entry.id === providerId) : entries;
+
   describe(`${pluginId} bundled web search fast-path contract`, () => {
     it("keeps provider-to-plugin ids aligned with bundled contracts", () => {
-      const providers = resolvePluginWebSearchProviders({
-        origin: "bundled",
-      }).filter((provider) => provider.pluginId === pluginId);
+      const providers = filterProvider(
+        resolvePluginWebSearchProviders({
+          origin: "bundled",
+        }).filter((provider) => provider.pluginId === pluginId),
+      );
       expect(providers.length).toBeGreaterThan(0);
       for (const provider of providers) {
         expect(
@@ -101,18 +106,22 @@ export function describeBundledWebSearchFastPathContract(pluginId: string) {
         contract: "webSearchProviders",
         origin: "bundled",
       });
-      const fastPathProviders = resolvePluginWebSearchProviders({
-        origin: "bundled",
-      }).filter((provider) => provider.pluginId === pluginId);
-      const bundledProviderEntries = loadBundledCapabilityRuntimeRegistry({
-        pluginIds: bundledWebSearchPluginIds,
-        pluginSdkResolution: "dist",
-      })
-        .webSearchProviders.filter((entry) => entry.pluginId === pluginId)
-        .map((entry) => ({
-          pluginId: entry.pluginId,
-          ...entry.provider,
-        }));
+      const fastPathProviders = filterProvider(
+        resolvePluginWebSearchProviders({
+          origin: "bundled",
+        }).filter((provider) => provider.pluginId === pluginId),
+      );
+      const bundledProviderEntries = filterProvider(
+        loadBundledCapabilityRuntimeRegistry({
+          pluginIds: bundledWebSearchPluginIds,
+          pluginSdkResolution: "dist",
+        })
+          .webSearchProviders.filter((entry) => entry.pluginId === pluginId)
+          .map((entry) => ({
+            pluginId: entry.pluginId,
+            ...entry.provider,
+          })),
+      );
 
       expect(
         sortComparableEntries(

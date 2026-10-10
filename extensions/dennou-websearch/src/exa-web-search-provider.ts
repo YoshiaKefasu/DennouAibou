@@ -1,5 +1,3 @@
-import { Type } from "typebox";
-import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
@@ -12,11 +10,9 @@ import {
   readNumberParam,
   readProviderEnvValue,
   readStringParam,
-  resolveProviderWebSearchPluginConfig,
   resolveSearchCacheTtlMs,
   resolveSearchTimeoutSeconds,
   resolveSiteName,
-  setProviderWebSearchPluginConfigValue,
   setScopedCredentialValue,
   type SearchConfigRecord,
   type WebSearchProviderPlugin,
@@ -25,11 +21,20 @@ import {
   wrapWebContent,
   writeCachedSearchPayload,
 } from "openclaw/plugin-sdk/provider-web-search";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
+import {
+  DENNOU_WEBSEARCH_PLUGIN_ID,
+  resolveBundledWebSearchProviderConfig,
+  setBundledWebSearchProviderConfigValue,
+} from "./provider-plugin-config.js";
 
 const EXA_SEARCH_ENDPOINT = "https://api.exa.ai/search";
 const EXA_SEARCH_TYPES = ["auto", "neural", "fast", "deep", "deep-reasoning", "instant"] as const;
 const EXA_FRESHNESS_VALUES = ["day", "week", "month", "year"] as const;
 const EXA_MAX_SEARCH_COUNT = 100;
+
+const EXA_CREDENTIAL_PATH = `plugins.entries.${DENNOU_WEBSEARCH_PLUGIN_ID}.config.exa.apiKey`;
 
 type ExaConfig = {
   apiKey?: string;
@@ -445,7 +450,7 @@ function missingExaKeyPayload() {
   return {
     error: "missing_exa_api_key",
     message:
-      "web_search (exa) needs an Exa API key. Set EXA_API_KEY in the Gateway environment, or configure tools.web.search.exa.apiKey.",
+      "web_search (exa) needs an Exa API key. Set EXA_API_KEY in the Gateway environment, or configure plugins.entries.dennou-websearch.config.exa.apiKey.",
     docs: "https://docs.openclaw.ai/tools/web",
   };
 }
@@ -599,23 +604,29 @@ export function createExaWebSearchProvider(): WebSearchProviderPlugin {
     signupUrl: "https://exa.ai/",
     docsUrl: "https://docs.openclaw.ai/tools/web",
     autoDetectOrder: 65,
-    credentialPath: "plugins.entries.exa.config.webSearch.apiKey",
-    inactiveSecretPaths: ["plugins.entries.exa.config.webSearch.apiKey"],
+    credentialPath: EXA_CREDENTIAL_PATH,
+    inactiveSecretPaths: [EXA_CREDENTIAL_PATH],
     getCredentialValue: (searchConfig) => getScopedCredentialValue(searchConfig, "exa"),
     setCredentialValue: (searchConfigTarget, value) =>
       setScopedCredentialValue(searchConfigTarget, "exa", value),
     getConfiguredCredentialValue: (config) =>
-      resolveProviderWebSearchPluginConfig(config, "exa")?.apiKey,
+      resolveBundledWebSearchProviderConfig(config, "exa")?.apiKey,
     setConfiguredCredentialValue: (configTarget, value) => {
-      setProviderWebSearchPluginConfigValue(configTarget, "exa", "apiKey", value);
+      setBundledWebSearchProviderConfigValue({
+        configTarget,
+        providerId: "exa",
+        key: "apiKey",
+        value,
+      });
     },
-    applySelectionConfig: (config) => enablePluginInConfig(config, "exa").config,
+    applySelectionConfig: (config) =>
+      enablePluginInConfig(config, DENNOU_WEBSEARCH_PLUGIN_ID).config,
     createTool: (ctx) =>
       createExaToolDefinition(
         mergeScopedSearchConfig(
           ctx.searchConfig as SearchConfigRecord | undefined,
           "exa",
-          resolveProviderWebSearchPluginConfig(ctx.config, "exa"),
+          resolveBundledWebSearchProviderConfig(ctx.config, "exa"),
         ) as SearchConfigRecord | undefined,
       ),
   };
