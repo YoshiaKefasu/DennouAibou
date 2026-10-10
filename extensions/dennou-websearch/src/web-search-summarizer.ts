@@ -56,9 +56,12 @@ function stripWebContentWrap(text: string): string {
 function readSnippet(entry: Record<string, unknown>): string {
   const snippets = entry.snippets;
   if (Array.isArray(snippets)) {
+    // Note: 各snippetを先にunwrapしてから結合する。結合後に一括で剥がすと
+    // 正規表現が最初のENDマーカーで止まり2件目以降が欠落するため。
     const joined = snippets
       .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-      .map((s) => s.trim())
+      .map((s) => stripWebContentWrap(s.trim()))
+      .filter((s) => s.length > 0)
       .join(" ");
     if (joined) {
       return joined;
@@ -82,12 +85,17 @@ function normalizeEntry(entry: unknown): NormalizedSearchResult | null {
 }
 
 /**
- * プロバイダ別ペイロード（Exa / Brave / Google等）から
+ * プロバイダ別ペイロード（Exa / Brave / Google / Gemini等）から
  * `{ title, url, snippet }` の配列を抽出・正規化する。
- * `results` / `data` 配列またはトップレベル配列を受け付ける。
+ * `results` / `data` / `citations` 配列またはトップレベル配列を受け付ける。
+ * 未知の構造・非配列ペイロードの場合は空配列を返す
+ * （呼び出し側で明示的な空結果と区別してフェイルオープンする）。
  */
 export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchResult[] {
-  const holder = rawPayload as { results?: unknown; data?: unknown } | null | undefined;
+  const holder = rawPayload as
+    | { results?: unknown; data?: unknown; citations?: unknown }
+    | null
+    | undefined;
   let entries: unknown[];
   if (Array.isArray(rawPayload)) {
     entries = rawPayload;
@@ -95,6 +103,9 @@ export function normalizeSearchResults(rawPayload: unknown): NormalizedSearchRes
     entries = holder.results;
   } else if (holder && Array.isArray(holder.data)) {
     entries = holder.data;
+  } else if (holder && Array.isArray(holder.citations)) {
+    // Note: Google/Gemini形式（content + citations）。各要素は { url, title, ... }。
+    entries = holder.citations;
   } else {
     return [];
   }
@@ -112,7 +123,26 @@ function isErrorPayload(rawPayload: unknown): boolean {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return false;
   }
-  return typeof (rawPayload as Record<string, unknown>).error === "string";
+  const error = (rawPayload as Record<string, unknown>).error;
+  // Note: 文字列だけでなくオブジェクト形式（{ error: { message: ... } }）もエラー扱いする。
+  return typeof error === "string" || (error !== null && typeof error === "object");
+}
+
+/**
+ * ペイロードが明示的な結果配列（空含む）を持つかどうか。
+ * `results: []` 等は「該当なし」の確定、配列を持たない未知の構造は未確定として区別する。
+ */
+function hasExplicitResultArray(rawPayload: unknown): boolean {
+  if (Array.isArray(rawPayload)) {
+    return true;
+  }
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+  const holder = rawPayload as Record<string, unknown>;
+  return (
+    Array.isArray(holder.results) || Array.isArray(holder.data) || Array.isArray(holder.citations)
+  );
 }
 
 /**
@@ -246,11 +276,15 @@ export async function summarizeSearchResults(
     }
     const normalized = normalizeSearchResults(rawPayload);
     if (normalized.length === 0) {
-      return NO_RESULTS_MESSAGE;
+      // Note: 明示的な空結果（results: []等）のみ固定文を返す。
+      // 未知の構造・非配列ペイロードは「結果なし」と決めつけず生ペイロードにフェイルオープンする。
+      return hasExplicitResultArray(rawPayload) ? NO_RESULTS_MESSAGE : rawPayload;
     }
     const limit =
       config.referenceLimit && config.referenceLimit > 0 ? Math.floor(config.referenceLimit) : 5;
-    const top = normalized.filter((item) => item.url || item.title || item.snippet).slice(0, limit);
+    // Note: プロンプトの[N]とReference:[N]の番号対応を保つため、
+    // URLを持たないエントリは番号付け前に除外する（ReferenceはURL必須のため）。
+    const top = normalized.filter((item) => item.url).slice(0, limit);
     if (top.length === 0) {
       return rawPayload;
     }

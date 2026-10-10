@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../../../src/config/config.js";
+import { wrapWebContent } from "../../../src/security/external-content.js";
 import {
   normalizeSearchResults,
   resolveSummarizerConfig,
@@ -220,6 +221,72 @@ describe("web-search-summarizer", () => {
         data: [{ title: "T", link: "https://g.example/", snippet: "S" }],
       }),
     ).toEqual([{ title: "T", url: "https://g.example/", snippet: "S" }]);
+  });
+
+  it("Gemini形式（content + citations）を正規化する", () => {
+    const payload = {
+      content: "これはGeminiの回答です。",
+      citations: [
+        { url: "https://gemini.example/a", title: "Gemini A" },
+        { url: "https://gemini.example/b", title: "Gemini B" },
+      ],
+    };
+    expect(normalizeSearchResults(payload)).toEqual([
+      { title: "Gemini A", url: "https://gemini.example/a", snippet: "" },
+      { title: "Gemini B", url: "https://gemini.example/b", snippet: "" },
+    ]);
+  });
+
+  it("複数wrapされたsnippetsを欠落なく結合する", () => {
+    const wrappedA = wrapWebContent("スニペットA", "web_search");
+    const wrappedB = wrapWebContent("スニペットB", "web_search");
+    expect(
+      normalizeSearchResults({
+        results: [{ title: "T", url: "https://w.example/", snippets: [wrappedA, wrappedB] }],
+      }),
+    ).toEqual([{ title: "T", url: "https://w.example/", snippet: "スニペットA スニペットB" }]);
+  });
+
+  it("オブジェクト型エラーペイロードは要約せず生のまま返す", async () => {
+    const spy: FetchSpy = { called: false };
+    const errorPayload = { error: { message: "something failed" } };
+    const result = await summarizeSearchResults(errorPayload, "テスト", enabledConfig, {
+      fetchFn: chatCompletionsFetch("呼ばれないはず", spy),
+    });
+    expect(result).toBe(errorPayload);
+    expect(spy.called).toBe(false);
+  });
+
+  it("未知の構造は該当なしと決めつけず生ペイロードにフェイルオープンする", async () => {
+    const spy: FetchSpy = { called: false };
+    const unknownPayload = { foo: "bar" };
+    const result = await summarizeSearchResults(unknownPayload, "テスト", enabledConfig, {
+      fetchFn: chatCompletionsFetch("呼ばれないはず", spy),
+    });
+    expect(result).toBe(unknownPayload);
+    expect(spy.called).toBe(false);
+  });
+
+  it("URLなしエントリを除外してプロンプトとReferenceの番号を一致させる", async () => {
+    const spy: FetchSpy = { called: false };
+    const payload = {
+      results: [
+        { title: "URLなし", description: "スニペットなし" },
+        { title: "タイトルA", url: "https://example.com/a", description: "説明A" },
+        { title: "タイトルB", url: "https://example.com/b", description: "説明B" },
+      ],
+    };
+    const result = (await summarizeSearchResults(payload, "テスト", enabledConfig, {
+      fetchFn: chatCompletionsFetch("これはテスト要約です。", spy),
+    })) as string;
+    expect(result).toContain("[1] https://example.com/a | タイトルA");
+    expect(result).toContain("[2] https://example.com/b | タイトルB");
+    expect(result).not.toContain("[3]");
+    const body = spy.body as { messages?: Array<{ content?: string }> };
+    const userContent = body.messages?.[1]?.content ?? "";
+    expect(userContent).toContain("[1] タイトルA");
+    expect(userContent).toContain("[2] タイトルB");
+    expect(userContent).not.toContain("URLなし");
   });
 
   it("プラグインconfigからsummarizer設定を解決する", () => {
