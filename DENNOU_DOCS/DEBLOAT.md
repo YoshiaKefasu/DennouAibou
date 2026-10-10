@@ -2454,3 +2454,75 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 | `bun test` 関連テスト | `extensions/dennou-websearch/` 配下および既存テスト全 pass |
 | `pnpm exec oxfmt --check <changed_files>` | **pass** |
 
+---
+
+## 40. `dennou-websearch` の要約付き構造化レスポンス（Reference リンク集付き）設計（2026-10-06）
+
+### 40.1 目的と背景
+
+- **生スニペット散乱問題の解消**:
+  従来の `web_search` は検索エンジンの生スニペット（断片文、広告、ノイズ）をそのままツール結果として返していたため、Kasou のコンテキストを無駄に圧迫し、思考の認知的負荷を高めていた。
+- **構造化要約 ＋ Reference リンク集の2段構成**:
+  検索直後に指定された軽量モデル（例: `cli-router/agy-gemini-3.1-flash-lite`）を呼び出し、複数ソースを横断して整理したクリーンな説明段落を生成。
+  下部に `[1] URL | タイトル` 形式で Reference リンク一覧を付与する。
+- **後続アクション（`read` ツール）とのシームレスな連携**:
+  Kasou は概要を即座に把握し、さらに詳細な情報が必要な場合は下部の `[N]` の URL を `read` ツール（web_fetch 統合済み）に渡して詳細ページを一本釣り（ピンポイント取得）できる。
+
+### 40.2 出力フォーマット仕様
+
+```text
+{まとめた検索の説明段落}
+
+{まとめた検索の説明段落}
+
+{まとめた検索の説明段落}
+
+Reference:
+[1] https://{link}.com | {ページタイトル}
+[2] https://{link}.net | {ページタイトル}
+[3] https://{link}.com | {ページタイトル}
+```
+
+- 各段落は、検索クエリに対する客観的で要点を押さえた説明。
+- `Reference:` セクションには、要約の根拠となった検索結果の URL とタイトルをナンバリングして列挙。
+- Kasou は `read("[1]のURL")` でそのまま詳細取得へ繋げられる。
+
+### 40.3 設定仕様 (`dennou-aibou.json` または `openclaw.plugin.json`)
+
+`tools.web.search` または `plugins.entries.dennou-websearch.config.search` 配下で設定：
+
+```json
+{
+  "summarizer": {
+    "enabled": true,
+    "model": "cli-router/agy-gemini-3.1-flash-lite",
+    "endpoint": "http://192.168.100.46:8317/v1",
+    "apiKey": "...",
+    "maxResults": 5,
+    "timeoutMs": 10000
+  }
+}
+```
+
+- **フェイルオープン原則 (KISS)**:
+  - `summarizer.enabled === false` やモデル未設定時は、従来の検索結果をそのまま返却。
+  - 要約モデルの呼び出しがタイムアウト（10s）やエラー（429/500/ネットワーク切断）となった場合は、**例外で落とさずに生の検索結果に自動フォールバック**し、会話を絶対に止めない。
+
+### 40.4 変更対象と責務
+
+| 対象領域 | ファイル | 変更内容 |
+|---|---|---|
+| 要約コア | `extensions/dennou-websearch/src/web-search-summarizer.ts` | 新規作成。<br>検索結果リスト（title, url, snippet）を受け取り、プロンプトを構築して指定エンドポイント/モデルへ要約を要求。<br>要約段落 ＋ `Reference:\n[N] URL \| Title` 形式へ整形。<br>タイムアウト・エラーハンドリング・生結果へのフェイルオープンを実装。 |
+| ツールファクトリ統合 | `extensions/dennou-websearch/src/web-search.ts` | `createWebSearchTool` の `execute` 内で、生検索結果取得後に `summarizer` を呼び出すパイプラインを配線。設定から `summarizer` オプションを取得。 |
+| プラグインスキーマ | `extensions/dennou-websearch/openclaw.plugin.json` | `configSchema` に `summarizer` 設定定義（enabled, model, endpoint, apiKey, maxResults, timeoutMs）を追加。 |
+| 単体テスト | `extensions/dennou-websearch/test/web-search-summarizer.test.ts` | 正常系（要約＋Reference形式生成）、エラー時フェイルオープン、空結果ハンドリング、Reference URLフォーマット検証。 |
+
+### 40.5 検証ゲート
+
+| ゲート | 判定基準 |
+|---|---|
+| `bun check` | **0 errors（型検査全合格）** |
+| `bun run ui:build` | **pass** |
+| `bun test extensions/dennou-websearch` | **全 pass（新規テスト含む）** |
+| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+
