@@ -2456,6 +2456,43 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 
 ---
 
+## 41. Exa / Brave の `dennou-websearch` 内包と単一プラグイン一本化（DEBLOAT）
+
+### 41.1 目的と背景
+
+- **Web検索プラグインの散乱解消**:
+  現状、Web検索を行うために `dennou-websearch`, `exa`, `brave` と 3 つのプラグインが分散しており、`dennou-aibou.json` の `plugins.allow` や `plugins.entries` にもそれぞれ設定が散らばっている。
+- **`dennou-websearch` への完全内包 (KISS)**:
+  - Exa (`api.exa.ai`) と Brave (`api.search.brave.com`) のプロバイダ実装を `extensions/dennou-websearch/src/providers/` 配下へ統合。
+  - `dennou-websearch` の `index.ts` 内で `api.registerWebSearchProvider` を用いて Exa および Brave プロバイダを登録。
+  - `extensions/dennou-websearch/openclaw.plugin.json` に `contracts.webSearchProviders: ["exa", "brave"]` を宣言。
+  - 不要となった独立プラグイン `extensions/exa/` および `extensions/brave/` を完全削除（DEBLOAT）。
+- **設定と許可リストの 1 本化**:
+  - `plugins.allow` から `exa`, `brave` を撤去し、`dennou-websearch` 1 本に集約。
+  - `plugins.entries.dennou-websearch.config` 内で Exa / Brave の apiKey やモードを一括設定可能にする。
+
+### 41.2 変更対象と責務
+
+| 対象領域 | ファイル | 変更内容 |
+|---|---|---|
+| プロバイダ移設・統合 | `extensions/dennou-websearch/src/providers/exa.ts`<br>`extensions/dennou-websearch/src/providers/brave.ts`<br>`extensions/dennou-websearch/index.ts` | `extensions/exa/src/exa-web-search-provider.ts` と `extensions/brave/src/brave-web-search-provider.ts` のロジックを移設。<br>`index.ts` で `api.registerWebSearchProvider` を呼んで登録。 |
+| プラグインスキーマ拡張 | `extensions/dennou-websearch/openclaw.plugin.json` | `contracts.webSearchProviders: ["exa", "brave"]` を追加。<br>`configSchema` に `exa.apiKey`, `brave.apiKey`, `brave.mode` の定義を追加。<br>`providerAuthEnvVars` に `EXA_API_KEY`, `BRAVE_API_KEY` を登録。 |
+| 旧プラグイン物理削除 | `extensions/exa/**`<br>`extensions/brave/**` | 独立プラグイン 2 つを完全削除。 |
+| 設定集約 | `dennou-aibou.json`<br>`openclaw.json` (サンプル) | `plugins.allow` から `exa`, `brave` を削除（`dennou-websearch` に一本化）。<br>`plugins.entries.dennou-websearch.config` に exa / brave の設定を集約。 |
+| テスト移設・整合 | `extensions/dennou-websearch/test/providers/` | 旧プロバイダの単体テストを移設し `bun test` で全緑化。 |
+
+### 41.3 検証ゲート
+
+| ゲート | 判定基準 |
+|---|---|
+| `bun check` | **0 errors（型検査全合格）** |
+| `bun run ui:build` | **pass** |
+| `bun test extensions/dennou-websearch` | **全 pass（移設テスト含む）** |
+| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+
+
+---
+
 ## 40. `dennou-websearch` の要約付き構造化レスポンス（Reference リンク集付き）設計（2026-10-06 改訂）
 
 ### 40.1 目的と背景
