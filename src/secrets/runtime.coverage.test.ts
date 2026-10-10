@@ -26,12 +26,27 @@ function createRuntimeWebToolsDeps(): Partial<RuntimeWebToolsDeps> {
   };
 }
 
+// DEBLOAT §41: brave and exa now live inside the dennou-websearch plugin, so their
+// configured credentials are namespaced under `plugins.entries.<plugin>.config.<providerId>`
+// instead of a single flat `config.webSearch`.
+const SCOPED_WEB_SEARCH_CONFIG_PROVIDER_IDS = new Set(["brave", "exa"]);
+
 function createTestProvider(params: {
-  id: "brave" | "gemini" | "grok" | "kimi" | "minimax" | "perplexity" | "firecrawl" | "tavily";
+  id:
+    | "brave"
+    | "exa"
+    | "gemini"
+    | "grok"
+    | "kimi"
+    | "minimax"
+    | "perplexity"
+    | "firecrawl"
+    | "tavily";
   pluginId: string;
   order: number;
 }): PluginWebSearchProviderEntry {
-  const credentialPath = `plugins.entries.${params.pluginId}.config.webSearch.apiKey`;
+  const configKey = SCOPED_WEB_SEARCH_CONFIG_PROVIDER_IDS.has(params.id) ? params.id : "webSearch";
+  const credentialPath = `plugins.entries.${params.pluginId}.config.${configKey}.apiKey`;
   const readSearchConfigKey = (searchConfig?: Record<string, unknown>): unknown => {
     const providerConfig =
       searchConfig?.[params.id] && typeof searchConfig[params.id] === "object"
@@ -58,16 +73,20 @@ function createTestProvider(params: {
           : ((searchConfigTarget[params.id] ??= {}) as { apiKey?: unknown });
       providerConfig.apiKey = value;
     },
-    getConfiguredCredentialValue: (config) =>
-      (config?.plugins?.entries?.[params.pluginId]?.config as { webSearch?: { apiKey?: unknown } })
-        ?.webSearch?.apiKey,
+    getConfiguredCredentialValue: (config) => {
+      const entryConfig = config?.plugins?.entries?.[params.pluginId]?.config;
+      if (!entryConfig || typeof entryConfig !== "object") {
+        return undefined;
+      }
+      return (entryConfig as Record<string, { apiKey?: unknown } | undefined>)[configKey]?.apiKey;
+    },
     setConfiguredCredentialValue: (configTarget, value) => {
       const plugins = (configTarget.plugins ??= {}) as { entries?: Record<string, unknown> };
       const entries = (plugins.entries ??= {});
       const entry = (entries[params.pluginId] ??= {}) as { config?: Record<string, unknown> };
       const config = (entry.config ??= {});
-      const webSearch = (config.webSearch ??= {}) as { apiKey?: unknown };
-      webSearch.apiKey = value;
+      const scoped = (config[configKey] ??= {}) as { apiKey?: unknown };
+      scoped.apiKey = value;
     },
     resolveRuntimeMetadata:
       params.id === "perplexity"
@@ -81,7 +100,8 @@ function createTestProvider(params: {
 
 function buildTestWebSearchProviders(): PluginWebSearchProviderEntry[] {
   return [
-    createTestProvider({ id: "brave", pluginId: "brave", order: 10 }),
+    createTestProvider({ id: "brave", pluginId: "dennou-websearch", order: 10 }),
+    createTestProvider({ id: "exa", pluginId: "dennou-websearch", order: 65 }),
     createTestProvider({ id: "gemini", pluginId: "google", order: 20 }),
     createTestProvider({ id: "grok", pluginId: "xai", order: 30 }),
     createTestProvider({ id: "kimi", pluginId: "moonshot", order: 40 }),
@@ -228,8 +248,11 @@ function buildConfigForOpenClawTarget(entry: SecretRegistryEntry, envId: string)
       "webhook",
     );
   }
-  if (entry.id === "plugins.entries.brave.config.webSearch.apiKey") {
+  if (entry.id === "plugins.entries.dennou-websearch.config.brave.apiKey") {
     setPathCreateStrict(config, ["tools", "web", "search", "provider"], "brave");
+  }
+  if (entry.id === "plugins.entries.dennou-websearch.config.exa.apiKey") {
+    setPathCreateStrict(config, ["tools", "web", "search", "provider"], "exa");
   }
   if (entry.id === "plugins.entries.google.config.webSearch.apiKey") {
     setPathCreateStrict(config, ["tools", "web", "search", "provider"], "gemini");

@@ -27,8 +27,8 @@ function isRecord(value: unknown): value is JsonRecord {
 /**
  * Config scope key used when a bundled plugin owns more than one web search
  * provider (DEBLOAT §41: `dennou-websearch` owns both `exa` and `brave`).
- * The migrated payload is then nested under the provider id inside
- * `plugins.entries.<plugin>.config.webSearch` instead of being written flat.
+ * The migrated payload is then written to `plugins.entries.<plugin>.config.<providerId>`
+ * instead of the flat `plugins.entries.<plugin>.config.webSearch`.
  */
 function resolveWebSearchConfigScopeKey(providerId: string): string | undefined {
   const ownerPluginId = resolveManifestContractOwnerPluginId({
@@ -114,8 +114,8 @@ function resolveLegacyGlobalWebSearchMigration(search: JsonRecord): {
       origin: "bundled",
     }) ?? LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID;
   const scopeKey = resolveWebSearchConfigScopeKey(LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID);
-  const webSearchPath = scopeKey
-    ? `plugins.entries.${pluginId}.config.webSearch.${scopeKey}`
+  const scopedPath = scopeKey
+    ? `plugins.entries.${pluginId}.config.${scopeKey}`
     : `plugins.entries.${pluginId}.config.webSearch`;
   return {
     pluginId,
@@ -124,8 +124,7 @@ function resolveLegacyGlobalWebSearchMigration(search: JsonRecord): {
     legacyPath: hasLegacyApiKey
       ? "tools.web.search.apiKey"
       : `tools.web.search.${LEGACY_GLOBAL_WEB_SEARCH_PROVIDER_ID}`,
-    targetPath:
-      hasLegacyApiKey && !legacyProviderConfig ? `${webSearchPath}.apiKey` : webSearchPath,
+    targetPath: hasLegacyApiKey && !legacyProviderConfig ? `${scopedPath}.apiKey` : scopedPath,
   };
 }
 
@@ -143,14 +142,14 @@ function migratePluginWebSearchConfig(params: {
   const entry = ensureRecord(entries, params.pluginId);
   const config = ensureRecord(entry, "config");
   const hadEnabled = entry.enabled !== undefined;
-  const webSearch = isRecord(config.webSearch) ? config.webSearch : undefined;
-  const existing = params.scopeKey
-    ? isRecord(webSearch?.[params.scopeKey])
-      ? cloneRecord(webSearch[params.scopeKey] as JsonRecord)
+  const container = params.scopeKey
+    ? isRecord(config[params.scopeKey])
+      ? (config[params.scopeKey] as JsonRecord)
       : undefined
-    : webSearch
-      ? cloneRecord(webSearch)
+    : isRecord(config.webSearch)
+      ? config.webSearch
       : undefined;
+  const existing = container ? cloneRecord(container) : undefined;
 
   if (!hadEnabled) {
     entry.enabled = true;
@@ -158,8 +157,7 @@ function migratePluginWebSearchConfig(params: {
 
   if (!existing) {
     if (params.scopeKey) {
-      const scoped = ensureRecord(config, "webSearch");
-      scoped[params.scopeKey] = cloneRecord(params.payload);
+      config[params.scopeKey] = cloneRecord(params.payload);
     } else {
       config.webSearch = cloneRecord(params.payload);
     }
@@ -171,8 +169,7 @@ function migratePluginWebSearchConfig(params: {
   mergeMissing(merged, params.payload);
   const changed = JSON.stringify(merged) !== JSON.stringify(existing) || !hadEnabled;
   if (params.scopeKey) {
-    const scoped = ensureRecord(config, "webSearch");
-    scoped[params.scopeKey] = merged;
+    config[params.scopeKey] = merged;
   } else {
     config.webSearch = merged;
   }
@@ -295,7 +292,7 @@ function normalizeLegacyWebSearchConfigRecord<T extends JsonRecord>(
       root: nextRoot,
       legacyPath: `tools.web.search.${providerId}`,
       targetPath: scopeKey
-        ? `plugins.entries.${pluginId}.config.webSearch.${scopeKey}`
+        ? `plugins.entries.${pluginId}.config.${scopeKey}`
         : `plugins.entries.${pluginId}.config.webSearch`,
       pluginId,
       payload: scoped,

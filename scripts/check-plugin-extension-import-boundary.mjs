@@ -40,7 +40,7 @@ const bundledWebSearchProviders = new Set([
   "perplexity",
 ]);
 const bundledWebSearchPluginIds = new Set([
-  "brave",
+  "dennou-websearch",
   "firecrawl",
   "google",
   "moonshot",
