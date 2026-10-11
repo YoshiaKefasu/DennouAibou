@@ -2577,3 +2577,34 @@ Reference:
 | `bun test extensions/dennou-websearch` | **全 pass（新規テスト含む）** |
 | `pnpm exec oxfmt --check <changed_files>` | **pass** |
 
+---
+
+## 42. `dennou-nap`（電脳仮眠）の `DennouAibou/extensions/dennou-nap` 内蔵化とプロンプト圧縮配線（2026-10-06）
+
+### 42.1 目的と背景
+
+- **外部スタンドアロンから本体内蔵プラグインへの昇格**:
+  `D:\GitHub\OpenClaw Related Repos\dennou-nap` として開発・実証済みのインテリジェント圧縮エンジン `dennou-nap`（時間認識章分割 ＋ System 1 直感仕分け ＋ Historian 選抜一括要約 ＋ `maxKeptRatio: 0.25` ＋ `protectRecentChapters: 250`）を、`DennouAibou/extensions/dennou-nap/` へ bundled 拡張として正式に内蔵化する。
+- **Kasou 本番プロンプト構築へのシームレスな配線 (KISS)**:
+  - `extensions/dennou-nap/openclaw.plugin.json` に `"enabledByDefault": true` を設定。
+  - `src/agents/pi-embedded-runner/run/attempt.ts` のプロンプト構築パイプライン（`applyPromptEvictionSafetyValve` 前段）において、`plugins.entries["dennou-nap"]` が有効な場合に `compressToTarget` を呼び出し、85% 閾値到達時に Laya（`http://192.168.100.32:8888/v1/systemone`）＋ Jev フォールバックを用いてインメモリでスマートに仮眠圧縮する。
+  - セッション JSONL は一切書き換えず（100% 可逆・SESSION_INTEGRITY_GUARD 非破壊）、万が一 `targetMissed` や障害が発生しても後段の既存 95% 安全弁（`applyPromptEvictionSafetyValve`）が二重の防壁としてそのまま守る。
+
+### 42.2 変更対象と責務
+
+| 対象領域 | ファイル | 変更内容 |
+|---|---|---|
+| プラグイン内蔵化 | `extensions/dennou-nap/openclaw.plugin.json`<br>`extensions/dennou-nap/package.json`<br>`extensions/dennou-nap/index.ts`<br>`extensions/dennou-nap/src/*`<br>`extensions/dennou-nap/test/*` | `dennou-nap` のコア実装（`types.ts`, `compartment.ts`, `system-one-client.ts`, `historian.ts`, `compactor.ts`, `auto-compact.ts`, `config-loader.ts`, `index.ts`）および単体テスト一式（53 tests）を `DennouAibou/extensions/dennou-nap/` 配下へ移設。<br>`openclaw.plugin.json` に `"enabledByDefault": true` を付与し、`definePluginEntry` で正式登録。 |
+| ランナー配線 | `src/agents/pi-embedded-runner/run/attempt.ts` | プロンプト履歴構築時（`limited` メッセージ列確定後、`applyPromptEvictionSafetyValve` の直前）に、`plugins.entries["dennou-nap"]` の設定を解決し、有効時は `compressToTarget` を実行してインメモリ圧縮を適用（失敗時は無傷で元の `limited` を維持するフェイルオープン）。 |
+| KASOU設定 | `Y:/.openclaw/dennou-aibou.json`（デプロイ時） | `plugins.allow` に `"dennou-nap"` を追加（`plugins.entries["dennou-nap"]` は既に設定済み）。 |
+
+### 42.3 検証ゲート
+
+| ゲート | 判定基準 |
+|---|---|
+| `bun run tsgo` | **0 errors（型検査全合格）** |
+| `bun run ui:build` | **pass** |
+| `bun test extensions/dennou-nap` | **53/53 全 pass** |
+| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+
+
