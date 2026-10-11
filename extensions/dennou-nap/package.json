@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/dennou-nap",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "DennouAibou intelligent nap (in-memory prompt compaction) plugin",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.5"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -14,6 +14,10 @@ import {
   resolveEvictionOptionsFromCompaction,
   resolveMeasuredPromptTokens,
 } from "../../../../extensions/context-pruner/index.js";
+import {
+  compressPromptForNap,
+  type CompactableMessage,
+} from "../../../../extensions/dennou-nap/index.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { ModelCompatConfig } from "../../../config/types.models.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
@@ -1319,13 +1323,53 @@ export async function runEmbeddedAttempt(
           // agents.defaults.compaction.enabled=false でバイパス可能。
           const compactionCfg = params.config?.agents?.defaults?.compaction;
           const modelContextTokens = resolveAttemptModelContextTokens(params.model);
+
+          // dennou-nap（電脳仮眠 / DEBLOAT §42）: 裏方圧縮 ステップ 1。
+          // コンテキスト使用率が 85% に達したら、直近250章保護 ＋ System 1
+          // （Laya＋Jev フォールバック）による直感仕分け ＋ 生維持25%上限で
+          // インメモリのスマート圧縮を行う。ログは落とさずに章目次＋要約だけを
+          // 先頭へ合成するため、会話の流れを保ったままコンテキストを target まで
+          // 落とせる。セッション JSONL は一切書き換えない（100% 可逆・
+          // SESSION_INTEGRITY_GUARD 非破壊）。
+          // 圧縮後もなお 95% を超える極限時のみ、後段の安全弁（ステップ 2）が
+          // 二重の防壁として作動する階層構造。
+          // 完全フェイルオープン: 例外が出ても limited をそのまま維持する。
+          let napLimited: AgentMessage[] = limited;
+          if (!isCompactionDisabled(compactionCfg)) {
+            const napEntry = params.config?.plugins?.entries?.["dennou-nap"];
+            if (napEntry?.enabled !== false) {
+              try {
+                const napOutcome = await compressPromptForNap({
+                  messages: limited as unknown as CompactableMessage[],
+                  contextWindow: modelContextTokens,
+                  measuredTokens: resolveMeasuredPromptTokens(limited),
+                  config: napEntry?.config,
+                });
+                if (napOutcome.applied) {
+                  napLimited = napOutcome.messages as unknown as AgentMessage[];
+                  log.debug(
+                    `dennou-nap: in-memory nap compression before safety valve: ` +
+                      `${napOutcome.stats.tokensBefore} -> ${napOutcome.stats.estimatedAfter} tokens ` +
+                      `(chapters=${napOutcome.stats.chapters}, turns keep=${napOutcome.stats.keepTurns}/` +
+                      `summarize=${napOutcome.stats.summarizeTurns}/drop=${napOutcome.stats.dropTurns}, ` +
+                      `triageFailures=${napOutcome.stats.triageFailures}, targetMissed=${napOutcome.stats.targetMissed}, ` +
+                      `elapsed=${napOutcome.stats.elapsedMs}ms; session file untouched)`,
+                  );
+                }
+              } catch (napErr) {
+                log.warn(
+                  `dennou-nap compression skipped, keeping original history: ${String(napErr)}`,
+                );
+              }
+            }
+          }
           const baseEvictionOptions = resolveEvictionOptionsFromCompaction(
             compactionCfg,
             modelContextTokens,
           );
           const evictionSafetyValve =
             isEvictionSafetyValveEnabled() && !isCompactionDisabled(compactionCfg)
-              ? applyPromptEvictionSafetyValve(limited, {
+              ? applyPromptEvictionSafetyValve(napLimited, {
                   ...baseEvictionOptions,
                   // 明示指定（reserveTokens 由来）があれば優先。未指定時はモデルの 95% で発火
                   // （1M: 950K / 500K: 475K / 200K: 190K）。小規模モデルで 950K 固定のまま
@@ -1341,7 +1385,7 @@ export async function runEmbeddedAttempt(
               `eviction safety valve: temporarily evicted ${evictionSafetyValve.evictedMessageCount} messages (${evictionSafetyValve.evictedTokens} tokens) from prompt; protected ${evictionSafetyValve.protectedTokens} recent tokens (session file untouched)`,
             );
           }
-          activeSession.agent.state.messages = evictionSafetyValve?.messages ?? limited;
+          activeSession.agent.state.messages = evictionSafetyValve?.messages ?? napLimited;
         }
 
         if (params.contextEngine) {

@@ -1,0 +1,120 @@
+{
+  "id": "dennou-nap",
+  "enabledByDefault": true,
+  "name": "Dennou Nap（仮眠圧縮）",
+  "description": "CLMs思想のインテリジェント圧縮プラグイン：時間認識ブロック（章）分割 ＋ System 1 (Jev/Laya) による直感仕分け（維持・要約・落とす）＋ Historian 選抜一括要約。プロンプト先頭へのインメモリ合成のみでセッション JSONL は無傷。",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Master switch for this plugin."
+      },
+      "systemOne": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "default": "https://api.experientiallabs.ai/v1/systemone",
+            "description": "System 1 endpoint (Jev cloud default; Laya local e.g. http://localhost:8888/v1/systemone)."
+          },
+          "model": {
+            "type": "string",
+            "default": "jev-latest",
+            "description": "System 1 model (Jev: jev-latest; Laya: laya-multilingual)."
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "API key for Jev. Optional for local Laya."
+          },
+          "fallback": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "endpoint": { "type": "string" },
+              "model": { "type": "string" },
+              "apiKey": { "type": "string" }
+            }
+          }
+        }
+      },
+      "timeoutMs": {
+        "type": "number",
+        "default": 2000,
+        "description": "Per-request timeout ms for System 1 calls."
+      },
+      "thresholdRatio": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.85,
+        "description": "Auto-compaction trigger: usage tokens / context window at or above this ratio."
+      },
+      "targetRatio": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.6,
+        "description": "Post-compaction target usage ratio."
+      },
+      "maxKeptRatio": {
+        "type": "number",
+        "minimum": 0.05,
+        "maximum": 0.5,
+        "default": 0.25,
+        "description": "Raw-data keep cap as a ratio of the model context window (contextWindow * maxKeptRatio). Oldest kept blocks are escalated to summary when exceeded."
+      },
+      "protectRecentChapters": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 250,
+        "description": "Trailing N chapters are kept 100% raw and excluded from triage/summarization (recent-chapter guard)."
+      },
+      "historian": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model name for Historian summarization (reserved; auto path uses a deterministic excerpt to avoid re-entrant model calls)."
+          }
+        }
+      },
+      "concurrency": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 8,
+        "description": "Max concurrent System 1 requests."
+      },
+      "maGapMs": {
+        "type": "number",
+        "default": 300000,
+        "description": "Silence gap treated as a chapter boundary (\"ma\"). Default 5 minutes."
+      },
+      "confidenceThreshold": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.6,
+        "description": "Minimum System 1 confidence to trust the triage choice as-is."
+      },
+      "failureThreshold": {
+        "type": "number",
+        "default": 3,
+        "description": "Consecutive System 1 failures before the circuit opens."
+      },
+      "cooldownMs": {
+        "type": "number",
+        "default": 60000,
+        "description": "Circuit breaker cooldown ms before half-open."
+      },
+      "historianModel": {
+        "type": "string",
+        "description": "Top-level alias for historian.model."
+      }
+    }
+  }
+}
