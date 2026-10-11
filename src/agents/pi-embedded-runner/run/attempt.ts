@@ -1335,6 +1335,11 @@ export async function runEmbeddedAttempt(
           // 二重の防壁として作動する階層構造。
           // 完全フェイルオープン: 例外が出ても limited をそのまま維持する。
           let napLimited: AgentMessage[] = limited;
+          // 安全弁の計測空間。dennou-nap が圧縮したら下で圧縮比率換算する
+          // （素の resolveMeasuredPromptTokens(napLimited) は末尾メッセージが
+          // 同じ usage スナップショットを保持するため圧縮前の値を返してしまい、
+          // 60% まで下がっても安全弁が「まだ95%超」と誤認して二重退避する）。
+          let napMeasuredTotalTokens = resolveMeasuredPromptTokens(limited);
           if (!isCompactionDisabled(compactionCfg)) {
             const napEntry = params.config?.plugins?.entries?.["dennou-nap"];
             if (napEntry?.enabled !== false) {
@@ -1347,6 +1352,19 @@ export async function runEmbeddedAttempt(
                 });
                 if (napOutcome.applied) {
                   napLimited = napOutcome.messages as unknown as AgentMessage[];
+                  // 計測空間の整合: 圧縮前後の推定比率で measured をスケール換算する。
+                  // プロバイダ実測の校正（prompt cache 等）を保ちながら、実際に
+                  // 削れた分だけ反映させる。estimatedBefore が 0 の極端な入力では
+                  // 比率 1（無変換）に倒して安全側へ寄せる。
+                  if (napMeasuredTotalTokens !== undefined) {
+                    const reductionRatio =
+                      napOutcome.stats.estimatedAfter /
+                      Math.max(1, napOutcome.stats.estimatedBefore);
+                    napMeasuredTotalTokens = Math.max(
+                      0,
+                      Math.floor(napMeasuredTotalTokens * reductionRatio),
+                    );
+                  }
                   log.debug(
                     `dennou-nap: in-memory nap compression before safety valve: ` +
                       `${napOutcome.stats.tokensBefore} -> ${napOutcome.stats.estimatedAfter} tokens ` +
@@ -1377,7 +1395,7 @@ export async function runEmbeddedAttempt(
                   evictionThresholdTokens:
                     baseEvictionOptions.evictionThresholdTokens ??
                     Math.max(1, Math.floor(modelContextTokens * 0.95)),
-                  measuredTotalTokens: resolveMeasuredPromptTokens(limited),
+                  measuredTotalTokens: napMeasuredTotalTokens,
                 })
               : undefined;
           if (evictionSafetyValve?.evicted) {

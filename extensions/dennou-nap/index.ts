@@ -28,6 +28,13 @@ import {
 export * from "./src/index.js";
 
 /**
+ * 1 回の圧縮で使う System 1 呼び出し回数の既定上限（最古ターンから消費）。
+ * ホットパスの最大待機時間をバウンドする。concurrency 8 × timeout 2,000ms で
+ * 最悪 128 / 8 × 2,000ms = 32s に収まり、上限超過分は「維持」で安全側に倒れる。
+ */
+export const DEFAULT_NAP_TRIAGE_BUDGET = 128;
+
+/**
  * 85% 閾値到達時のインメモリ圧縮（プロンプト先頭への要約合成のみ）。
  *
  * 本体ランナー専用。例外は呼び出し側（`attempt.ts`）の `try / catch` で
@@ -42,10 +49,48 @@ export async function compressPromptForNap(params: {
   measuredTokens?: number;
   /** `plugins.entries["dennou-nap"].config`。未指定・不正時は既定値（Jev クラウド）。 */
   config?: Record<string, unknown>;
-  /** 1 回の圧縮で使う System 1 呼び出し回数の上限（最古ターンから消費）。未指定は無制限。 */
+  /** 1 回の圧縮で使う System 1 呼び出し回数の上限。既定は `DEFAULT_NAP_TRIAGE_BUDGET`。 */
   triageBudget?: number;
 }): Promise<CompressOutcome> {
   const cfg: DennouNapConfig = resolveDennouNapConfigFromSection(params.config);
+  const estimated = estimateTokens(params.messages);
+  const usageTokens = params.measuredTokens ?? estimated;
+
+  // config `enabled: false` の遵守: System 1 を一切呼ばずに入力をそのまま返す。
+  // 本体側（attempt.ts）でも entry の enabled を見ているが、ここは単体利用や
+  // 二重配線時の防衛ラインとして自前で貫く（テストで固定する契約）。
+  if (cfg.enabled === false) {
+    return {
+      applied: false,
+      messages: params.messages,
+      stats: {
+        fired: false,
+        tokensBefore: usageTokens,
+        contextWindow: params.contextWindow,
+        usageRatio: params.contextWindow > 0 ? usageTokens / params.contextWindow : 0,
+        estimatedBefore: estimated,
+        estimatedAfter: estimated,
+        chapters: 0,
+        keepTurns: 0,
+        summarizeTurns: 0,
+        dropTurns: 0,
+        evictedChapters: 0,
+        protectedChapters: 0,
+        targetMissed: false,
+        maxKeptTokens: Math.max(1, Math.floor(params.contextWindow * cfg.maxKeptRatio)),
+        keptPastTokens: 0,
+        keptScaledDownTurns: 0,
+        orphanToolResultsRemoved: 0,
+        orphanToolCallsRemoved: 0,
+        triageFailures: 0,
+        summaryFromCache: false,
+        elapsedMs: 0,
+      },
+      summaryText: "",
+      firstKeptInputIndex: -1,
+    };
+  }
+
   const client = new SystemOneClient({
     endpoint: cfg.systemOne.endpoint,
     model: cfg.systemOne.model,
@@ -66,14 +111,14 @@ export async function compressPromptForNap(params: {
   };
   return compressToTarget(params.messages, {
     contextWindow: params.contextWindow,
-    usageTokens: params.measuredTokens ?? estimateTokens(params.messages),
+    usageTokens,
     thresholdRatio: cfg.thresholdRatio,
     targetRatio: cfg.targetRatio,
     maGapMs: cfg.maGapMs,
     maxKeptRatio: cfg.maxKeptRatio,
     protectRecentChapters: cfg.protectRecentChapters,
     triage,
-    ...(params.triageBudget !== undefined ? { triageBudget: params.triageBudget } : {}),
+    triageBudget: params.triageBudget ?? DEFAULT_NAP_TRIAGE_BUDGET,
   });
 }
 

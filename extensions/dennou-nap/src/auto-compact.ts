@@ -401,6 +401,24 @@ export function hashText(text: string): string {
 const triageCache = new Map<string, TriageChoice>();
 /** 章要約のキャッシュ（要約対象全体ハッシュ→要約文）。 */
 const summaryCache = new Map<string, string>();
+/**
+ * キャッシュの上限件数。超過時は挿入順の最古（先頭）から削除する。
+ * LRU ではないが、長期稼働（Kasou の常駐セッション）でのメモリ増加を
+ * 抑えるためだけの単純な上限。削除コストは削除件数分のみ。
+ */
+const MAX_AUTO_COMPACT_CACHE_ENTRIES = 2000;
+
+/** Map の挿入順を利用して最古エントリから削除し、上限内に収める。 */
+function capAutoCompactCache(cache: Map<string, unknown>): void {
+  if (cache.size <= MAX_AUTO_COMPACT_CACHE_ENTRIES) return;
+  const excess = cache.size - MAX_AUTO_COMPACT_CACHE_ENTRIES;
+  const keys = cache.keys();
+  for (let i = 0; i < excess; i++) {
+    const oldest = keys.next();
+    if (oldest.done) break;
+    cache.delete(oldest.value);
+  }
+}
 
 export function clearAutoCompactCache(): void {
   triageCache.clear();
@@ -593,6 +611,7 @@ async function resolveChoicesForTurns(
     const turn = turns.find((t) => t.id === p.id);
     if (turn) triageCache.set(hashText(turn.text), c);
   }
+  capAutoCompactCache(triageCache);
   return { decided, failed };
 }
 
@@ -615,6 +634,7 @@ async function resolveSummary(
   }
   if (!summary) summary = deterministicSummary(targets);
   summaryCache.set(key, summary);
+  capAutoCompactCache(summaryCache);
   return { summary, fromCache: false };
 }
 
