@@ -118,6 +118,31 @@ describe("storage: save and load", () => {
     expect(alarms[0]!.id).toBe("alarm_1");
     expect(alarms[0]!.task).toBe("test task");
   });
+
+  it("keeps the .bak backup intact when flushing after a corrupt-file restore", () => {
+    const file = tempStorePath();
+    const store = new AlarmStore(file);
+    store.upsert(oneShot(NOW_MS + 60_000));
+    store.update("alarm_1", { task: "updated" });
+    // .bak = update 前の健全な内容（task: "test task"）
+    fs.writeFileSync(file, "{not json", "utf-8"); // 本体を破損
+
+    // 破損ファイルから .bak で復元
+    const reopened = new AlarmStore(file);
+    expect(reopened.get("alarm_1")!.task).toBe("test task");
+
+    // 復元後の初回 flush: 破損本体は .bak にコピーされない
+    reopened.update("alarm_1", { task: "second-update" });
+
+    const backup = JSON.parse(fs.readFileSync(`${file}.bak`, "utf-8")) as {
+      alarms: { id: string; task: string }[];
+    };
+    expect(backup.alarms).toHaveLength(1);
+    expect(backup.alarms[0]!.id).toBe("alarm_1");
+    expect(backup.alarms[0]!.task).toBe("test task"); // 破損データで上書きされていない
+    // 本体は新しい状態で書き直されている
+    expect(reopened.get("alarm_1")!.task).toBe("second-update");
+  });
 });
 
 describe("storage: catch-up policy", () => {

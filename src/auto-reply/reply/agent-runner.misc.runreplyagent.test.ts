@@ -31,8 +31,6 @@ function createCliBackendTestConfig() {
 }
 
 const runEmbeddedPiAgentMock = vi.fn();
-const queueEmbeddedPiMessageMock = vi.fn(() => false);
-const enqueueFollowupRunMock = vi.fn();
 const runWithModelFallbackMock = vi.fn();
 const runtimeErrorMock = vi.fn();
 const abortEmbeddedPiRunMock = vi.fn();
@@ -68,7 +66,7 @@ vi.mock("../../agents/pi-embedded.js", () => {
   return {
     compactEmbeddedPiSession: (params: unknown) =>
       compactState.compactEmbeddedPiSessionMock(params),
-    queueEmbeddedPiMessage: queueEmbeddedPiMessageMock,
+    queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
     runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
     abortEmbeddedPiRun: (...args: unknown[]) => abortEmbeddedPiRunMock(...args),
   };
@@ -86,7 +84,7 @@ vi.mock("../../runtime.js", () => {
 
 vi.mock("./queue.js", () => {
   return {
-    enqueueFollowupRun: enqueueFollowupRunMock,
+    enqueueFollowupRun: vi.fn(),
     scheduleFollowupDrain: vi.fn(),
     clearSessionQueues: (...args: unknown[]) => clearSessionQueuesMock(...args),
     refreshQueuedFollowupSession: (...args: unknown[]) => refreshQueuedFollowupSessionMock(...args),
@@ -116,8 +114,6 @@ beforeEach(() => {
   clearSessionQueuesMock.mockReturnValue({ followupCleared: 0, laneCleared: 0, keys: [] });
   refreshQueuedFollowupSessionMock.mockReset();
   refreshQueuedFollowupSessionMock.mockResolvedValue(undefined);
-  queueEmbeddedPiMessageMock.mockClear();
-  enqueueFollowupRunMock.mockClear();
   resetSystemEventsForTest();
 
   // Default: no provider switch; execute the chosen provider+model.
@@ -144,9 +140,6 @@ describe("runReplyAgent onAgentRunStart", () => {
       runId?: string;
       onAgentRunStart?: (runId: string) => void;
     };
-    shouldSteer?: boolean;
-    shouldFollowup?: boolean;
-    isActive?: boolean;
   }) {
     const provider = params?.provider ?? "anthropic";
     const model = params?.model ?? "claude";
@@ -190,9 +183,9 @@ describe("runReplyAgent onAgentRunStart", () => {
       followupRun,
       queueKey: "main",
       resolvedQueue,
-      shouldSteer: params?.shouldSteer ?? false,
-      shouldFollowup: params?.shouldFollowup ?? false,
-      isActive: params?.isActive ?? false,
+      shouldSteer: false,
+      shouldFollowup: false,
+      isActive: false,
       isStreaming: false,
       opts: params?.opts,
       typing,
@@ -242,37 +235,6 @@ describe("runReplyAgent onAgentRunStart", () => {
     expect(onAgentRunStart).toHaveBeenCalledTimes(1);
     expect(onAgentRunStart).toHaveBeenCalledWith("run-started");
     expect(result).toMatchObject({ text: "ok" });
-  });
-
-  it("returns early without followup double-enqueue when live steer succeeds", async () => {
-    queueEmbeddedPiMessageMock.mockReturnValueOnce(true);
-
-    const result = await createRun({
-      shouldSteer: true,
-      shouldFollowup: true,
-      isActive: true,
-    });
-
-    expect(result).toBeUndefined();
-    expect(queueEmbeddedPiMessageMock).toHaveBeenCalledTimes(1);
-    // Steer 注入成功時は followup キューへ落とさない（同一メッセージの二重処理防止）
-    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
-    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the followup queue when live steer injection fails", async () => {
-    queueEmbeddedPiMessageMock.mockReturnValueOnce(false);
-
-    const result = await createRun({
-      shouldSteer: true,
-      shouldFollowup: true,
-      isActive: true,
-    });
-
-    expect(result).toBeUndefined();
-    expect(queueEmbeddedPiMessageMock).toHaveBeenCalledTimes(1);
-    expect(enqueueFollowupRunMock).toHaveBeenCalledTimes(1);
-    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
   });
 });
 

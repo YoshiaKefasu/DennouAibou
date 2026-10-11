@@ -373,10 +373,15 @@ export class AlarmStore {
     } catch {
       // Best-effort: the write below surfaces real failures.
     }
-    // 書き込み前に現行ファイルを .bak として退避（破損時の復元元。ベストエフォート）
+    // 書き込み前に現行ファイルを .bak として退避（破損時の復元元。ベストエフォート）。
+    // 破損ファイルをコピーすると健全な .bak が破損データで上書きされるため、
+    // パース検証を通った場合のみ .bak へコピーする。
     try {
       if (fs.existsSync(this.filePath)) {
-        fs.copyFileSync(this.filePath, `${this.filePath}.bak`);
+        const current = fs.readFileSync(this.filePath, "utf-8");
+        if (parseAlarmStoreFile(current) !== undefined) {
+          fs.copyFileSync(this.filePath, `${this.filePath}.bak`);
+        }
       }
     } catch {
       // Best-effort: backup must never block the live write.
