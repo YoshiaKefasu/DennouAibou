@@ -404,16 +404,26 @@ export function applyPromptEvictionSafetyValve(
   // maxCutIndex: suffixTokens[maxCutIndex..end] >= protectedRecentTokens を満たす
   // 最小 index。cut はこれを超えられない（直近保護ウィンドウは不可侵）。
   const neededEvictionTokens = totalTokens - opts.evictionThresholdTokens;
-  const minProtected = Math.max(1, opts.protectedRecentTokens);
+  // 保護ウィンドウは閾値の 80% にクランプする。protectedRecentTokens が閾値以上だと
+  // 退避可能枠が消え、超過が続いても一切退避できなくなる（コンテキスト上限壁の病理）。
+  const minProtected = Math.max(
+    1,
+    Math.min(opts.protectedRecentTokens, Math.floor(opts.evictionThresholdTokens * 0.8)),
+  );
   let maxCutIndex = messages.length;
   let suffixTokens = 0;
   while (maxCutIndex > 0 && suffixTokens < minProtected) {
     maxCutIndex -= 1;
     suffixTokens += effectiveEstimates[maxCutIndex];
   }
-  // 保護ウィンドウが全体を覆う場合（設定異常など）は退避しない
+  // 保護ウィンドウが全体を覆う場合（単一巨大メッセージ等）: 最低でも直近1ターンより前は
+  // 退避可能にする（maxCutIndex >= 1）。1メッセージのみなら退避のしようがなく返さない。
   if (maxCutIndex === 0) {
-    return noEviction();
+    if (messages.length > 1) {
+      maxCutIndex = Math.max(1, messages.length - 2);
+    } else {
+      return noEviction();
+    }
   }
 
   // 先頭からの累積退避トークン（実測スケール済み推定の prefix sum）。

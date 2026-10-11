@@ -150,7 +150,24 @@ describe("getToolResultTextLength", () => {
       timestamp: nextTimestamp(),
     };
 
-    expect(getToolResultTextLength(msg)).toBe(8);
+    // テキスト 3 + image data 1 + テキスト 5（非テキストの data もサイズ集計へ含める）
+    expect(getToolResultTextLength(msg)).toBe(9);
+  });
+
+  it("counts image data length for non-text blocks", () => {
+    const msg: ToolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call_1",
+      toolName: "read",
+      isError: false,
+      content: [
+        { type: "text", text: "abc" },
+        { type: "image", data: "x".repeat(1_000), mimeType: "image/png" },
+      ],
+      timestamp: nextTimestamp(),
+    };
+
+    expect(getToolResultTextLength(msg)).toBe(1_003);
   });
 
   it("returns zero for non-toolResult messages", () => {
@@ -178,6 +195,56 @@ describe("truncateToolResultMessage", () => {
       throw new Error("expected toolResult");
     }
     expect(getFirstToolResultText(result)).toContain("[persist-truncated]");
+  });
+
+  it("replaces oversized media blocks with a placeholder during context overflow recovery", () => {
+    const msg: ToolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call_1",
+      toolName: "read",
+      isError: false,
+      content: [
+        { type: "text", text: "small" },
+        { type: "image", data: "x".repeat(50_000), mimeType: "image/png" },
+      ],
+      timestamp: nextTimestamp(),
+    };
+
+    const result = truncateToolResultMessage(msg, 10_000);
+    expect(result.role).toBe("toolResult");
+    if (result.role !== "toolResult") {
+      throw new Error("expected toolResult");
+    }
+    const blocks = result.content;
+    expect(blocks[0]).toEqual({ type: "text", text: "small" });
+    expect(blocks[1]).toEqual({
+      type: "text",
+      text: "[Oversized media block omitted during context overflow recovery]",
+    });
+  });
+
+  it("keeps media blocks that fit within the budget while truncating text", () => {
+    const msg: ToolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call_1",
+      toolName: "read",
+      isError: false,
+      content: [
+        { type: "text", text: "x".repeat(50_000) },
+        { type: "image", data: "y".repeat(100), mimeType: "image/png" },
+      ],
+      timestamp: nextTimestamp(),
+    };
+
+    const result = truncateToolResultMessage(msg, 10_000);
+    expect(result.role).toBe("toolResult");
+    if (result.role !== "toolResult") {
+      throw new Error("expected toolResult");
+    }
+    const blocks = result.content;
+    expect(getFirstToolResultText(result).length).toBeLessThan(50_000);
+    // 予算内のメディアブロックはそのまま保持される
+    expect(blocks[1]).toEqual({ type: "image", data: "y".repeat(100), mimeType: "image/png" });
   });
 });
 

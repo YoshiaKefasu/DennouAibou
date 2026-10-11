@@ -132,7 +132,9 @@ export function estimateMessageChars(content: unknown): number {
       if (typeof record.text === "string") {
         total += estimateStringChars(record.text);
       } else if (typeof record.data === "string") {
-        total += estimateStringChars(record.data);
+        // Base64 画像等の高エントロピー data は chars/4 換算だと実トークンの約半分に
+        // 過小評価されるため 2 倍換算（実効 chars/2）で補正する。
+        total += estimateStringChars(record.data) * 2;
       }
     }
     return total;

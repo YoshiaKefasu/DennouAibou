@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   detectTemporalPauses,
+  estimateMessageChars,
   estimateMessageTokens,
   resolveMeasuredPromptTokens,
   partitionHistoryBlocks,
@@ -129,6 +130,18 @@ describe("token estimation", () => {
   it("weights Japanese characters at roughly one token each", () => {
     expect(estimateMessageTokens({ timestamp: BASE_TIME, content: "日本語" })).toBe(3);
     expect(estimateMessageTokens({ timestamp: BASE_TIME, content: "abcd" })).toBe(1);
+  });
+
+  it("counts base64 media data blocks at double chars to avoid token underestimation", () => {
+    // 画像/音声の data（Base64）は高エントロピー ASCII のため chars/4 換算では
+    // 実トークンの約半分に過小評価される。2 倍換算（実効 chars/2）で補正する。
+    const data = "A".repeat(400);
+    expect(estimateMessageChars([{ type: "image", data }])).toBe(800);
+    expect(
+      estimateMessageTokens({ timestamp: BASE_TIME, content: [{ type: "image", data }] }),
+    ).toBe(200);
+    // テキストブロックは従来どおり 1 倍換算（data 補正の影響を受けない）
+    expect(estimateMessageChars([{ type: "text", text: "A".repeat(400) }])).toBe(400);
   });
 
   it("accumulates provider usage across transcript entries", () => {

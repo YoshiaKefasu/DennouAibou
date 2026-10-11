@@ -252,7 +252,10 @@ export async function runReplyAgent(params: {
       (sessionKey ? replyRunRegistry.resolveSessionId(sessionKey) : undefined) ??
       followupRun.run.sessionId;
     const steered = queueEmbeddedPiMessage(steerSessionId, followupRun.prompt);
-    if (steered && !shouldFollowup) {
+    if (steered) {
+      // ライブセッションへの Steer 注入が成功したら早期 return。そのまま followup キューへも
+      // 落とすと同一メッセージが二重処理される。steer 不発（false）の時だけ後続の
+      // shouldFollowup によるフォールバック投入へ進む。
       await touchActiveSessionEntry();
       typing.cleanup();
       return undefined;

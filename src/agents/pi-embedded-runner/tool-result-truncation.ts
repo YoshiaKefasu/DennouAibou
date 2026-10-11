@@ -161,10 +161,19 @@ export function getToolResultTextLength(msg: AgentMessage): number {
   }
   let totalLength = 0;
   for (const block of content) {
-    if (block && typeof block === "object" && (block as { type?: string }).type === "text") {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    if ((block as { type?: string }).type === "text") {
       const text = (block as TextContent).text;
       if (typeof text === "string") {
         totalLength += text.length;
+      }
+    } else {
+      // image/audio 等の非テキストブロック: data（Base64）の文字数もサイズ集計へ含める
+      const data = (block as { data?: unknown }).data;
+      if (typeof data === "string") {
+        totalLength += data.length;
       }
     }
   }
@@ -195,8 +204,20 @@ export function truncateToolResultMessage(
 
   // Distribute the budget proportionally among text blocks
   const newContent = content.map((block: unknown) => {
-    if (!block || typeof block !== "object" || (block as { type?: string }).type !== "text") {
-      return block; // Keep non-text blocks (images) as-is
+    if (!block || typeof block !== "object") {
+      return block;
+    }
+    if ((block as { type?: string }).type !== "text") {
+      // 400 Context Overflow の救済切断: 巨大な image/audio バイナリブロックは
+      // プレースホルダーに置換する（data を素通しすると溢出が解消しない）。
+      const data = (block as { data?: unknown }).data;
+      if (typeof data === "string" && data.length > maxChars) {
+        return {
+          type: "text",
+          text: "[Oversized media block omitted during context overflow recovery]",
+        };
+      }
+      return block;
     }
     const textBlock = block as TextContent;
     if (typeof textBlock.text !== "string") {

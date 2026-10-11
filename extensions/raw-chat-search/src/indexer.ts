@@ -202,6 +202,8 @@ export function indexSessionFile(params: {
       indexed = db.insertMessages(recordsToInsert);
     } catch {
       errors += recordsToInsert.length;
+      // SQLite busy 等: 失敗行を次回スキャンで再試行させるため watermark を進めない
+      return { indexed, skipped, errors };
     }
   }
 

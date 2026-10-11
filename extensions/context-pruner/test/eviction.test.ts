@@ -213,6 +213,39 @@ describe("applyPromptEvictionSafetyValve", () => {
     }
   });
 
+  it("still evicts when a single huge message swallows the protected window", () => {
+    // 先頭に 1 件だけの巨大メッセージ（10,000 トークン）+ 直近 5 トークン。
+    // messages[1..] の合計 5 が保護枠に届かず maxCutIndex が 0 まで逆走査されるが、
+    // 直近1ターンより前が退避できないと prompt が膨張し続ける。
+    const huge = { role: "user", content: "x".repeat(40_000), timestamp: BASE_TIME };
+    const recent = makeEvenUserMessages(1, 5, MINUTE_MS, 1);
+    const input = castMessages([huge, ...recent]);
+
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 100,
+      protectedRecentTokens: 250,
+    });
+
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(1);
+    expect(result.evictedTokens).toBe(10_000);
+    expect(result.protectedTokens).toBe(5);
+    expect(result.messages[1]).toBe(input[1]);
+    expectNoOrphanToolResults(result.messages);
+  });
+
+  it("does not evict a single-message conversation even above the threshold", () => {
+    const input = castMessages([
+      { role: "user", content: "x".repeat(40_000), timestamp: BASE_TIME },
+    ]);
+    const result = applyPromptEvictionSafetyValve(input, {
+      evictionThresholdTokens: 100,
+      protectedRecentTokens: 250,
+    });
+    expect(result.evicted).toBe(false);
+    expect(result.messages).toBe(input);
+  });
+
   it("prepends the system notice as a user-role message when eviction fires", () => {
     const input = castMessages([
       ...makeEvenUserMessages(100, 10),
@@ -249,8 +282,12 @@ describe("applyPromptEvictionSafetyValve", () => {
       evictionThresholdTokens: 1_000,
       protectedRecentTokens: 128_000,
     });
-    // 超過分 250（1250 - 1000）では保護フロア 128K が全体を覆うため退避しない
-    expect(result.evicted).toBe(false);
+    // 保護フロア 128K ≥ 閾値 1000 でも 80%（800）にクランプされるため退避する
+    // （クランプ無しでは保護フロアが全体を覆い一切退避できない）
+    expect(result.evicted).toBe(true);
+    expect(result.evictedMessageCount).toBe(25);
+    expect(result.evictedTokens).toBe(250);
+    expect(result.protectedTokens).toBe(1_000);
 
     const scaled = applyPromptEvictionSafetyValve(input, {
       evictionThresholdTokens: 100,
@@ -332,11 +369,11 @@ describe("applyPromptEvictionSafetyValve", () => {
 
     expect(result.evicted).toBe(true);
     expect(result.totalTokens).toBe(350);
-    // 超過分 250 に届く最小境界は index 100（CJK 1件 = 1トークン）。
-    // 保護フロア（index 100）と同点で切り、第2章以降（日本語 250件）は生保持。
-    expect(result.evictedMessageCount).toBe(100);
-    expect(result.protectedTokens).toBe(250);
-    expect(result.messages[1]).toBe(recent[0]);
+    // 保護 250 は閾値 100 の 80%（80）にクランプされる。超過分 250 に届く最小境界は
+    // index 250（CJK 1件 = 1トークン）。保持テールは 100 トークン（80 を下回らない）。
+    expect(result.evictedMessageCount).toBe(250);
+    expect(result.protectedTokens).toBe(100);
+    expect(result.messages[1]).toBe(recent[150]);
   });
 });
 
@@ -395,8 +432,8 @@ describe("progressive chapter-by-chapter eviction", () => {
 
   it("clamps a huge excess at the protected recent window instead of dropping below it", () => {
     // 合計 1250 に対し閾値 100（超過分 1150 > 退避可能最大 1000）。
-    // 保護 250 のフロアは index 100。どんなに超過が大きくても cut は 100 を超えず、
-    // 保持テールは 250 を下回らない。
+    // 保護 250 は閾値の 80%（80）にクランプされ、フロアは index 134（直近16件 = 80）。
+    // どんなに超過が大きくても cut は 134 を超えず、保持テールは 80 を下回らない。
     const past = makeEvenUserMessages(100, 10);
     const recent = makeEvenUserMessages(50, 5, MINUTE_MS, 100);
     const input = castMessages([...past, ...recent]);
@@ -406,10 +443,11 @@ describe("progressive chapter-by-chapter eviction", () => {
     });
 
     expect(result.evicted).toBe(true);
-    expect(result.evictedMessageCount).toBe(100);
-    expect(result.evictedTokens).toBe(1_000);
-    expect(result.protectedTokens).toBe(250);
-    expect(result.messages[1]).toBe(input[100]);
+    expect(result.evictedMessageCount).toBe(130);
+    expect(result.evictedTokens).toBe(1_150);
+    expect(result.protectedTokens).toBe(100);
+    expect(result.protectedTokens).toBeGreaterThanOrEqual(80);
+    expect(result.messages[1]).toBe(input[130]);
     expectNoOrphanToolResults(result.messages);
   });
 

@@ -32,7 +32,7 @@ afterEach(() => {
 
 function tempStorePath(): string {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "dennou-alarm-")), "alarms.json");
-  tempFiles.push(file);
+  tempFiles.push(file, `${file}.bak`);
   return file;
 }
 
@@ -86,6 +86,37 @@ describe("storage: save and load", () => {
     fs.writeFileSync(file, "{not json", "utf-8");
     const store = new AlarmStore(file);
     expect(store.list()).toHaveLength(0);
+  });
+
+  it("keeps a .bak copy of the previous contents on flush", () => {
+    const file = tempStorePath();
+    const store = new AlarmStore(file);
+    store.upsert(oneShot(NOW_MS + 60_000));
+    store.update("alarm_1", { task: "updated" });
+
+    // update 前の内容（task: "test task"）が .bak に退避されている
+    expect(fs.existsSync(`${file}.bak`)).toBe(true);
+    const backup = JSON.parse(fs.readFileSync(`${file}.bak`, "utf-8")) as {
+      alarms: { id: string; task: string }[];
+    };
+    expect(backup.alarms).toHaveLength(1);
+    expect(backup.alarms[0]!.id).toBe("alarm_1");
+    expect(backup.alarms[0]!.task).toBe("test task");
+  });
+
+  it("restores from the .bak backup when the store file is corrupt", () => {
+    const file = tempStorePath();
+    const store = new AlarmStore(file);
+    store.upsert(oneShot(NOW_MS + 60_000));
+    store.update("alarm_1", { task: "updated" });
+    // 本体を破損させる（.bak には update 前の健全な内容が残っている）
+    fs.writeFileSync(file, "{not json", "utf-8");
+
+    const reopened = new AlarmStore(file);
+    const alarms = reopened.list();
+    expect(alarms).toHaveLength(1);
+    expect(alarms[0]!.id).toBe("alarm_1");
+    expect(alarms[0]!.task).toBe("test task");
   });
 });
 

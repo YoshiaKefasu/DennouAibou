@@ -35,6 +35,30 @@ function emptyStore(): AlarmStoreFile {
   return { version: STORE_VERSION, nextId: 1, alarms: [] };
 }
 
+/** JSON 文字列を AlarmStoreFile としてパースする。パース失敗や不正形状は undefined。 */
+function parseAlarmStoreFile(raw: string): AlarmStoreFile | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return undefined;
+  }
+  const record = parsed as Record<string, unknown>;
+  const alarms = Array.isArray(record.alarms)
+    ? record.alarms
+        .map((entry) => normalizeAlarm(entry))
+        .filter((entry): entry is StoredAlarm => entry !== undefined)
+    : [];
+  const nextId =
+    typeof record.nextId === "number" && Number.isFinite(record.nextId) && record.nextId > 0
+      ? Math.floor(record.nextId)
+      : alarms.length + 1;
+  return { version: STORE_VERSION, nextId, alarms };
+}
+
 function normalizeAlarm(raw: unknown): StoredAlarm | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return undefined;
@@ -327,25 +351,20 @@ export class AlarmStore {
     } catch {
       return emptyStore();
     }
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return emptyStore();
-      }
-      const record = parsed as Record<string, unknown>;
-      const alarms = Array.isArray(record.alarms)
-        ? record.alarms
-            .map((entry) => normalizeAlarm(entry))
-            .filter((entry): entry is StoredAlarm => entry !== undefined)
-        : [];
-      const nextId =
-        typeof record.nextId === "number" && Number.isFinite(record.nextId) && record.nextId > 0
-          ? Math.floor(record.nextId)
-          : alarms.length + 1;
-      return { version: STORE_VERSION, nextId, alarms };
-    } catch {
-      return emptyStore();
+    const parsed = parseAlarmStoreFile(raw);
+    if (parsed !== undefined) {
+      return parsed;
     }
+    // 破損時: .bak からの復元を試みる（バックアップも無い場合は空ストア）
+    try {
+      const restored = parseAlarmStoreFile(fs.readFileSync(`${this.filePath}.bak`, "utf-8"));
+      if (restored !== undefined) {
+        return restored;
+      }
+    } catch {
+      // バックアップが無い/読めない場合は emptyStore へフォールバック
+    }
+    return emptyStore();
   }
 
   private flush(): void {
@@ -353,6 +372,14 @@ export class AlarmStore {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
     } catch {
       // Best-effort: the write below surfaces real failures.
+    }
+    // 書き込み前に現行ファイルを .bak として退避（破損時の復元元。ベストエフォート）
+    try {
+      if (fs.existsSync(this.filePath)) {
+        fs.copyFileSync(this.filePath, `${this.filePath}.bak`);
+      }
+    } catch {
+      // Best-effort: backup must never block the live write.
     }
     const payload = JSON.stringify(this.state, null, 2);
     const tmpPath = `${this.filePath}.tmp`;
