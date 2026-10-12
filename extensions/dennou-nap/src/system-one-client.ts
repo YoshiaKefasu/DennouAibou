@@ -3,7 +3,10 @@
  *
  * - `POST {endpoint}` に `{ model, query: "choice", choices, input }` を送り、
  *   3択（維持・要約・落とす）の判定を受け取る。
- * - タイムアウト 2,000ms / concurrency cap 8。
+ * - タイムアウト 10,000ms / concurrency cap 2（複数プロジェクト共有の Laya で
+ *   キュー待ちが他セッションを潰さないための既定値）。
+ * - 503/429 は「混雑」として即失敗にせず、Retry-After（または 300〜600ms の
+ *   バックオフ）を待って最大 2 回リトライする。予算はタイムアウト内に収める。
  * - サーキットブレーカー: 401・429・5xx・通信/タイムアウト失敗を数え、
  *   連続3回で開放 → 60秒後に半開（次の1発を通し、成功で閉・失敗で再開放）。
  * - 自動フォールバック: `fallback` 設定時はプライマリ失敗（通信エラー・
@@ -60,6 +63,59 @@ export interface SystemOneClientOptions {
 
 function isCountedFailure(status: number): boolean {
   return status === 401 || status === 429 || status >= 500;
+}
+
+/**
+ * 「混んでいて壊れていない」ステータス。GPU に到達する前に門前払いされたので
+ * 判定は未知だが、サーバー自体は生きている。即フェイルオープンせずに
+ * Retry-After / バックオフを待ってリトライする。
+ * 503 = Laya の LAYA_MAX_CONCURRENT 受付拒否、429 = 共有割り当ての拒否。
+ */
+const RETRYABLE_STATUS = new Set([429, 503]);
+/** 503/429 の最大リトライ回数。 */
+export const SYSTEM_ONE_MAX_RETRIES = 2;
+/** Retry-After が無い/使えない時のバックオフ下限。 */
+export const SYSTEM_ONE_RETRY_BACKOFF_MIN_MS = 300;
+/** Retry-After が無い/使えない時のバックオフ上限。 */
+export const SYSTEM_ONE_RETRY_BACKOFF_MAX_MS = 600;
+
+/** `ms` スリープ。abort された場合は false を返す。 */
+function sleepOrAbort(ms: number, signal: AbortSignal): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    if (signal.aborted) {
+      resolve(false);
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** Retry-After ヘッダ（delta-seconds または HTTP-date）を ms に変換する。 */
+export function parseRetryAfterMs(header: string | null | undefined): number | undefined {
+  if (typeof header !== "string") return undefined;
+  const trimmed = header.trim();
+  if (trimmed.length === 0) return undefined;
+  const seconds = Number(trimmed);
+  if (Number.isFinite(seconds)) {
+    return seconds >= 0 ? Math.round(seconds * 1000) : undefined;
+  }
+  const at = Date.parse(trimmed);
+  if (Number.isFinite(at)) return Math.max(0, at - Date.now());
+  return undefined;
+}
+
+/** リトライ `attempt`（0 起点）のバックオフ: 300ms → 600ms。 */
+export function retryBackoffMs(attempt: number): number {
+  const step = Math.max(0, Math.floor(attempt)) + 1;
+  return Math.min(SYSTEM_ONE_RETRY_BACKOFF_MAX_MS, SYSTEM_ONE_RETRY_BACKOFF_MIN_MS * step);
 }
 
 function fallbackResult(reason: string): TriageResult {
@@ -184,8 +240,14 @@ export class SystemOneClient {
     this.model = options.model;
     this.apiKey = options.apiKey;
     this.fallback = options.fallback;
-    this.timeoutMs = options.timeoutMs ?? 2000;
-    this.concurrency = Math.max(1, Math.floor(options.concurrency ?? 8));
+    // 既定 10 秒: Laya は GPU 上で 1 件ずつ（約 80ms/件）処理するため、他プロジェクトの
+    // バッチの後ろに並ぶと 2 秒では待ちきれずタイムアウトしていた。10 秒あれば
+    // 相手のバッチが流れきるまでのキュー待ちを吸収できる。
+    this.timeoutMs = options.timeoutMs ?? 10_000;
+    // 既定 2: Laya の受付枠は全プロジェクトで共有で、処理は 1 件ずつ。1 セッションが
+    // 8 並列で投げると他プロジェクトの前に割り込んでキュー待ちが膨らむため、
+    // 複数プロジェクトが同時に動いても行儀よく順番に流れる値まで下げる。
+    this.concurrency = Math.max(1, Math.floor(options.concurrency ?? 2));
     this.failureThreshold = options.failureThreshold ?? 3;
     this.cooldownMs = options.cooldownMs ?? 60_000;
     this.fetchFn = options.fetchFn ?? ((url, init) => fetch(url, init));
@@ -352,35 +414,33 @@ export class SystemOneClient {
 
   private async request(text: string, outerSignal?: AbortSignal): Promise<TriageResult> {
     const { signal, dispose } = this.createLinkedSignal(outerSignal);
+    // `timeoutMs` はリトライを含めた 1 リクエスト全体の予算。混雑時の 503 は
+    // ミリ秒で返るのでバックオフ分は常に収まるし、本当に詰まっている時は
+    // 予定通り打ち切られる（リトライ × タイムアウト で伸びない）。
+    const deadline = Date.now() + this.timeoutMs;
     try {
-      const headers: Record<string, string> = {
-        "content-type": "application/json",
-      };
-      if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
-      const response = await this.fetchFn(this.endpoint, {
-        method: "POST",
-        headers,
-        body: buildSystemOnePayload(this.model, text),
-        signal,
-      });
-      if (!response.ok) {
-        if (isCountedFailure(response.status)) this.recordFailure();
-        return fallbackResult(`fail-open: http ${response.status}`);
+      for (let attempt = 0; ; attempt += 1) {
+        const outcome = await this.attemptRequest(text, signal);
+        if ("verdict" in outcome) return outcome.verdict;
+        const remainingMs = deadline - Date.now();
+        if (
+          attempt >= SYSTEM_ONE_MAX_RETRIES ||
+          remainingMs <= 0 ||
+          signal.aborted
+        ) {
+          // 混雑ではなく「もう予算が無い」ので、他の失敗と同じく breaker に数える。
+          this.recordFailure();
+          return fallbackResult(`fail-open: http ${outcome.status}`);
+        }
+        // `Retry-After: 0` は「今すぐリトライ」の正当な値。ヒントが無い時だけ
+        // バックオフ段階を使う。
+        const hintMs = parseRetryAfterMs(outcome.retryAfter);
+        const waitMs = Math.max(0, Math.min(hintMs ?? retryBackoffMs(attempt), remainingMs));
+        if (!(await sleepOrAbort(waitMs, signal))) {
+          this.recordFailure();
+          return fallbackResult(`fail-open: http ${outcome.status}`);
+        }
       }
-      let data: unknown;
-      try {
-        data = (await response.json()) as unknown;
-      } catch {
-        this.recordFailure();
-        return fallbackResult("fail-open: invalid json");
-      }
-      const parsed = normalizeResponse(data);
-      if (!parsed) {
-        this.recordFailure();
-        return fallbackResult("fail-open: bad response shape");
-      }
-      this.recordSuccess();
-      return parsed;
     } catch (error) {
       this.recordFailure();
       const detail = error instanceof Error ? error.message : String(error);
@@ -388,5 +448,43 @@ export class SystemOneClient {
     } finally {
       dispose();
     }
+  }
+
+  /** 1 回分の fetch + 解釈。`busy` はリトライ可能な 429/503。 */
+  private async attemptRequest(
+    text: string,
+    signal: AbortSignal,
+  ): Promise<{ verdict: TriageResult } | { status: number; retryAfter: string | null }> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
+    const response = await this.fetchFn(this.endpoint, {
+      method: "POST",
+      headers,
+      body: buildSystemOnePayload(this.model, text),
+      signal,
+    });
+    if (!response.ok) {
+      if (RETRYABLE_STATUS.has(response.status)) {
+        return { status: response.status, retryAfter: response.headers.get("retry-after") };
+      }
+      if (isCountedFailure(response.status)) this.recordFailure();
+      return { verdict: fallbackResult(`fail-open: http ${response.status}`) };
+    }
+    let data: unknown;
+    try {
+      data = (await response.json()) as unknown;
+    } catch {
+      this.recordFailure();
+      return { verdict: fallbackResult("fail-open: invalid json") };
+    }
+    const parsed = normalizeResponse(data);
+    if (!parsed) {
+      this.recordFailure();
+      return { verdict: fallbackResult("fail-open: bad response shape") };
+    }
+    this.recordSuccess();
+    return { verdict: parsed };
   }
 }

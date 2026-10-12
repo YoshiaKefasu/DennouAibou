@@ -43,8 +43,8 @@
       },
       "timeoutMs": {
         "type": "number",
-        "default": 2000,
-        "description": "Per-request timeout ms for System 1 calls."
+        "default": 10000,
+        "description": "Per-request timeout ms for System 1 calls. Covers the whole call including 503/429 retries; 10 s absorbs the queue wait behind another project's batch."
       },
       "thresholdRatio": {
         "type": "number",
@@ -86,8 +86,8 @@
       "concurrency": {
         "type": "integer",
         "minimum": 1,
-        "default": 8,
-        "description": "Max concurrent System 1 requests."
+        "default": 2,
+        "description": "Max concurrent System 1 requests. Laya resolves one at a time and the admission ceiling is shared across projects, so a single session stays polite at 2."
       },
       "maGapMs": {
         "type": "number",

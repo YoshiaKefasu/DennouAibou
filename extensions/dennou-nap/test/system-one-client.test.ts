@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { isConfident, SystemOneClient } from "../src/system-one-client.js";
+import {
+  parseRetryAfterMs,
+  retryBackoffMs,
+  SYSTEM_ONE_MAX_RETRIES,
+} from "../src/system-one-client.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -222,5 +227,118 @@ describe("system-one-client", () => {
     expect(r.choice).toBe("要約");
     expect(primaryCalls).toBe(before); // プライマリを叩いていない
     expect(fbCalls).toBe(4);
+  });
+});
+
+describe("system-one-client busy retry (503/429)", () => {
+  const baseOpts = {
+    endpoint: "http://localhost:8888/v1/systemone",
+    model: "laya-multilingual",
+  };
+
+  it("リトライ可能な最大回数は2回", () => {
+    expect(SYSTEM_ONE_MAX_RETRIES).toBe(2);
+  });
+
+  it("503 は Retry-After を待ってリトライし、実判定を返す", async () => {
+    let calls = 0;
+    const client = new SystemOneClient({
+      ...baseOpts,
+      fetchFn: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return new Response("busy", { status: 503, headers: { "retry-after": "0" } });
+        }
+        return jsonResponse({ choice: "要約", confidence: 0.8 });
+      },
+    });
+    const result = await client.judge("hello");
+    expect(result.choice).toBe("要約");
+    expect(result.fallback).toBeUndefined();
+    expect(calls).toBe(2);
+  });
+
+  it("429 はバックオフを待って最大2回リトライする", async () => {
+    let calls = 0;
+    const client = new SystemOneClient({
+      ...baseOpts,
+      fetchFn: async () => {
+        calls += 1;
+        if (calls <= 2) return new Response("slow down", { status: 429 });
+        return jsonResponse({ choice: "維持", confidence: 0.9 });
+      },
+    });
+    const result = await client.judge("hello");
+    expect(result.choice).toBe("維持");
+    expect(result.fallback).toBeUndefined();
+    expect(calls).toBe(1 + SYSTEM_ONE_MAX_RETRIES);
+  });
+
+  it("503 が続く場合は最大2回で諦めてフェイルオープンする", async () => {
+    let calls = 0;
+    const client = new SystemOneClient({
+      ...baseOpts,
+      failureThreshold: 10,
+      fetchFn: async () => {
+        calls += 1;
+        return new Response("busy", { status: 503 });
+      },
+    });
+    const result = await client.judge("hello");
+    expect(result.choice).toBe("維持");
+    expect(result.fallback).toBe(true);
+    expect(calls).toBe(1 + SYSTEM_ONE_MAX_RETRIES);
+  });
+
+  it("リトライで解消した busy はサーキットの失敗に数えない", async () => {
+    const script = [503, 200, 200, 500];
+    let calls = 0;
+    const client = new SystemOneClient({
+      ...baseOpts,
+      failureThreshold: 2,
+      cooldownMs: 60_000,
+      fetchFn: async () => {
+        const status = script[Math.min(calls, script.length - 1)] ?? 500;
+        calls += 1;
+        if (status === 503) return new Response("busy", { status: 503 });
+        if (status === 500) return new Response("boom", { status: 500 });
+        return jsonResponse({ choice: "維持", confidence: 0.9 });
+      },
+    });
+    await client.judge("a"); // 503 → リトライ → 200
+    // 503 はリトライで解消したので breaker の失敗カウントは 0 のまま。
+    expect(client.getState().failures).toBe(0);
+    await client.judge("b"); // 200
+    expect(client.getState().circuitOpen).toBe(false);
+    await client.judge("c"); // 本当の 500 が1件
+    expect(client.getState().failures).toBe(1);
+    // busy が失敗として数えられていれば 500 で failures=2 → 回路が開いている。
+    expect(client.getState().circuitOpen).toBe(false);
+  });
+
+  it("busy 以外のステータスはリトライしない", async () => {
+    let calls = 0;
+    const client = new SystemOneClient({
+      ...baseOpts,
+      fetchFn: async () => {
+        calls += 1;
+        return new Response("boom", { status: 500 });
+      },
+    });
+    const result = await client.judge("hello");
+    expect(result.fallback).toBe(true);
+    expect(calls).toBe(1);
+  });
+
+  it("Retry-After の解析とバックオフ段階", () => {
+    expect(parseRetryAfterMs("1")).toBe(1000);
+    expect(parseRetryAfterMs(" 0 ")).toBe(0);
+    expect(parseRetryAfterMs("-5")).toBeUndefined();
+    expect(parseRetryAfterMs(null)).toBeUndefined();
+    expect(parseRetryAfterMs("garbage")).toBeUndefined();
+    expect(parseRetryAfterMs(new Date(Date.now() + 2000).toUTCString())).toBeGreaterThan(0);
+    expect(retryBackoffMs(0)).toBe(300);
+    expect(retryBackoffMs(1)).toBe(600);
+    expect(retryBackoffMs(9)).toBe(600);
   });
 });

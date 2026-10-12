@@ -40,8 +40,8 @@ describe("config-loader", () => {
     expect(cfg.source).toBe("default");
     expect(cfg.systemOne.endpoint).toBe(DEFAULT_SYSTEM_ONE_ENDPOINT);
     expect(cfg.systemOne.model).toBe(DEFAULT_SYSTEM_ONE_MODEL);
-    expect(cfg.timeoutMs).toBe(2000);
-    expect(cfg.concurrency).toBe(8);
+    expect(cfg.timeoutMs).toBe(10_000);
+    expect(cfg.concurrency).toBe(2);
     expect(cfg.confidenceThreshold).toBe(0.6);
   });
 
