@@ -18,9 +18,7 @@ type ResolvedWindowsPortPidsDeps = {
   parseCmdScriptCommandLine: typeof parseCmdScriptCommandLine;
 };
 
-function resolveWindowsPortPidsDeps(
-  deps: WindowsPortPidsDeps = {},
-): ResolvedWindowsPortPidsDeps {
+function resolveWindowsPortPidsDeps(deps: WindowsPortPidsDeps = {}): ResolvedWindowsPortPidsDeps {
   return {
     spawnSync: deps.spawnSync ?? spawnSync,
     parseCmdScriptCommandLine: deps.parseCmdScriptCommandLine ?? parseCmdScriptCommandLine,

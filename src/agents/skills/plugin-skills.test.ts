@@ -17,7 +17,10 @@ let resolvePluginSkillDirs: typeof import("./plugin-skills.js").resolvePluginSki
 
 const tempDirs = createTrackedTempDirs();
 
-function buildRegistry(params: { helperRoot: string; helper2Root: string }): PluginManifestRegistry {
+function buildRegistry(params: {
+  helperRoot: string;
+  helper2Root: string;
+}): PluginManifestRegistry {
   return {
     diagnostics: [],
     plugins: [

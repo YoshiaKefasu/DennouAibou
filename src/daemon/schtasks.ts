@@ -359,11 +359,15 @@ async function isRegisteredScheduledTask(env: GatewayServiceEnv): Promise<boolea
 }
 
 function launchFallbackTaskScript(scriptPath: string): void {
-  const child = resolveSchtasksDeps().spawn("cmd.exe", ["/d", "/s", "/c", quoteCmdScriptArg(scriptPath)], {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
-  });
+  const child = resolveSchtasksDeps().spawn(
+    "cmd.exe",
+    ["/d", "/s", "/c", quoteCmdScriptArg(scriptPath)],
+    {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
   child.unref();
 }
 

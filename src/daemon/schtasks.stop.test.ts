@@ -17,7 +17,8 @@ const sleepMock = vi.fn(async (ms: number) => {
   timeState.now += ms;
 });
 
-const { restartScheduledTask, setSchtasksTestDeps, stopScheduledTask } = await import("./schtasks.js");
+const { restartScheduledTask, setSchtasksTestDeps, stopScheduledTask } =
+  await import("./schtasks.js");
 type SchtasksDeps = NonNullable<Parameters<typeof setSchtasksTestDeps>[0]>;
 const GATEWAY_PORT = 18789;
 const SUCCESS_RESPONSE = { code: 0, stdout: "", stderr: "" } as const;

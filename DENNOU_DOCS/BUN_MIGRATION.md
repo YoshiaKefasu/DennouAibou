@@ -9,20 +9,21 @@
 
 ## 1. 結論サマリ
 
-| 項目 | 結果 |
-| --- | --- |
-| **`bun dist/index.js gateway --port 18799 --allow-unconfigured` 起動** | **成功** (cold start 25.8s, warm 7.6-8.4s) |
-| **`node dist/index.js gateway --port 18799 --allow-unconfigured` 起動** | **成功** (cold start 34.6s) |
-| **HTTP 200 (Bun)** | **15/15** サンプル (15 分 soak 全部 OK) |
-| **HTTP 200 (Node)** | **3/3** サンプル (3 分 soak 全部 OK) |
-| **Bun RSS 推移 (15 min)** | **434.3 MB → 425.2 MB (-9.1 MB、リークなし、GC 正常)** |
-| **Node RSS 推移 (3 min)** | **369.1 MB → 369.1 MB (±0、リークなし)** |
-| **クリーンシャットダウン (Bun, taskkill)** | **1.14 秒で終了、stderr error 0** |
-| **Bun 起動時間 vs Node** | **Bun が 8.8 秒速い (25% 短縮)** |
-| **Bun RSS vs Node RSS** | **Bun が +65 MB 多い** (V8 ヒープより JSC の方がランタイム各層でメモリを食う、Bun 既知の挙動) |
-| **KASOU 投入判定** | **conditional-go** (DAVE ネイティブバイナリ Linux 移植が前提) |
+| 項目                                                                    | 結果                                                                                          |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **`bun dist/index.js gateway --port 18799 --allow-unconfigured` 起動**  | **成功** (cold start 25.8s, warm 7.6-8.4s)                                                    |
+| **`node dist/index.js gateway --port 18799 --allow-unconfigured` 起動** | **成功** (cold start 34.6s)                                                                   |
+| **HTTP 200 (Bun)**                                                      | **15/15** サンプル (15 分 soak 全部 OK)                                                       |
+| **HTTP 200 (Node)**                                                     | **3/3** サンプル (3 分 soak 全部 OK)                                                          |
+| **Bun RSS 推移 (15 min)**                                               | **434.3 MB → 425.2 MB (-9.1 MB、リークなし、GC 正常)**                                        |
+| **Node RSS 推移 (3 min)**                                               | **369.1 MB → 369.1 MB (±0、リークなし)**                                                      |
+| **クリーンシャットダウン (Bun, taskkill)**                              | **1.14 秒で終了、stderr error 0**                                                             |
+| **Bun 起動時間 vs Node**                                                | **Bun が 8.8 秒速い (25% 短縮)**                                                              |
+| **Bun RSS vs Node RSS**                                                 | **Bun が +65 MB 多い** (V8 ヒープより JSC の方がランタイム各層でメモリを食う、Bun 既知の挙動) |
+| **KASOU 投入判定**                                                      | **conditional-go** (DAVE ネイティブバイナリ Linux 移植が前提)                                 |
 
 > **B2 で観測した起動時 warnings**:
+>
 > - `plugins.allow is empty; discovered non-bundled plugins may auto-load: raw-chat-search` ← **意図通り**。`plugins.allow` 設定で明示許可する方が安全だが、デフォルトでも raw-chat-search が見つかる。
 > - Bun/Node どちらでも同じ警告が出る。Bun 起因ではない。
 
@@ -30,21 +31,21 @@
 
 ## 2. 検証環境
 
-| 項目 | 値 |
-| --- | --- |
-| ローカル Bun | 1.4.0 (`C:\Users\yosia\.bun\bin\bun.exe`) |
-| ローカル Node | v24.19.0 |
-| Bun 内蔵 Node | 報告値 26.3.0 (`process.versions.node`) |
-| Bun 内蔵 SQLite | 3.53.2 / Node 内蔵 3.53.3 |
-| リポジトリ HEAD | `e4026f09f8b` (feature/pi-sdk-update, +4 ahead of origin) |
-| ビルド済み dist | e4026f09f8b 同梱 (B1 修復後の最新) |
-| テスト用ポート | 18799 (本番 18789 と隔離) |
-| stateDir | `Y:\home\kasou_yoshia\.openclaw\workspace\.openclaw` |
-| sessions.json | `Y:\...\agents\main\sessions\sessions.json` |
-| raw-chat.sqlite | `Y:\...\agents\main\raw-chat.sqlite` (サンドボックス初回起動時に作られた同 schema 空DB・4KB。本番実データ DB 14.6MB とは別物) |
-| ソーク時間 (Bun) | 15 分 / 60 秒間隔 (15 サンプル) |
-| ソーク時間 (Node) | 3 分 / 60 秒間隔 (3 サンプル) — Bun との比較目的のみ |
-| ソークハーネス | `DennouAibou/.bun-soak-tmp/soak.ps1` (B2 で作成、`.bun-soak-tmp/` は .gitignore 登録済み) |
+| 項目              | 値                                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ローカル Bun      | 1.4.0 (`C:\Users\yosia\.bun\bin\bun.exe`)                                                                                     |
+| ローカル Node     | v24.19.0                                                                                                                      |
+| Bun 内蔵 Node     | 報告値 26.3.0 (`process.versions.node`)                                                                                       |
+| Bun 内蔵 SQLite   | 3.53.2 / Node 内蔵 3.53.3                                                                                                     |
+| リポジトリ HEAD   | `e4026f09f8b` (feature/pi-sdk-update, +4 ahead of origin)                                                                     |
+| ビルド済み dist   | e4026f09f8b 同梱 (B1 修復後の最新)                                                                                            |
+| テスト用ポート    | 18799 (本番 18789 と隔離)                                                                                                     |
+| stateDir          | `Y:\home\kasou_yoshia\.openclaw\workspace\.openclaw`                                                                          |
+| sessions.json     | `Y:\...\agents\main\sessions\sessions.json`                                                                                   |
+| raw-chat.sqlite   | `Y:\...\agents\main\raw-chat.sqlite` (サンドボックス初回起動時に作られた同 schema 空DB・4KB。本番実データ DB 14.6MB とは別物) |
+| ソーク時間 (Bun)  | 15 分 / 60 秒間隔 (15 サンプル)                                                                                               |
+| ソーク時間 (Node) | 3 分 / 60 秒間隔 (3 サンプル) — Bun との比較目的のみ                                                                          |
+| ソークハーネス    | `DennouAibou/.bun-soak-tmp/soak.ps1` (B2 で作成、`.bun-soak-tmp/` は .gitignore 登録済み)                                     |
 
 ---
 
@@ -52,17 +53,17 @@
 
 KASOU 実機 (AMD GX-217GA, AVX2 非搭載) で SSH ログインし、Bun 1.4.0 バイナリを直接実行して以下を実証 (2026-08-28 実施、実行ホスト: KASOU minipc、バイナリは /tmp にダウンロードして検証後削除。旧版ドキュメントはコミット未実施のため上書き消滅 — 本表が一次証拠):
 
-| プローブ | 結果 |
-| --- | --- |
-| `bun --version` | `1.4.0` |
-| `node:sqlite` `DatabaseSync` | OK (2 rows) |
-| `node:sqlite` FTS5 | OK (MATCH クエリ動作・日本語データ含む) |
-| `node:sqlite` `PRAGMA threads` | OK (`{"threads":0}` プロセス既定) |
-| JIT ループ (1000 万回加算) | OK (`49999995000000`) |
-| `module.enableCompileCache` | OK (`dennou-aibou.mjs:42` で呼び出し `:44`) |
-| 起動時間 (KASOU) | 5 ms (`--version`) |
-| 起動 RSS (KASOU) | 14 MB |
-| AVX2 検出 | 非搭載だが Bun は動作 (AVX のみ) |
+| プローブ                       | 結果                                        |
+| ------------------------------ | ------------------------------------------- |
+| `bun --version`                | `1.4.0`                                     |
+| `node:sqlite` `DatabaseSync`   | OK (2 rows)                                 |
+| `node:sqlite` FTS5             | OK (MATCH クエリ動作・日本語データ含む)     |
+| `node:sqlite` `PRAGMA threads` | OK (`{"threads":0}` プロセス既定)           |
+| JIT ループ (1000 万回加算)     | OK (`49999995000000`)                       |
+| `module.enableCompileCache`    | OK (`dennou-aibou.mjs:42` で呼び出し `:44`) |
+| 起動時間 (KASOU)               | 5 ms (`--version`)                          |
+| 起動 RSS (KASOU)               | 14 MB                                       |
+| AVX2 検出                      | 非搭載だが Bun は動作 (AVX のみ)            |
 
 → **KASOU 実機での Bun 動作は前提条件として確立済み**。
 
@@ -105,16 +106,16 @@ TTS 撤去コミットで `src/plugin-sdk/speech.ts` は消えたが、entrypoin
 
 ### 5.1 検証項目と結果
 
-| # | 項目 | Bun 結果 | Node 結果 | 備考 |
-| --- | --- | --- | --- | --- |
-| 1 | HTTP 200 取得 (起動 30 秒以内) | ✅ cold 25.8s / warm 7.6-8.4s | ✅ cold 34.6s | Bun の方が起動速い |
-| 2 | セッション永続化 (sessions.json atomic write/roundtrip) | ✅ writeMs 39ms, roundtrip OK | ✅ writeMs 36ms, roundtrip OK | 両ランタイム同一動作 |
-| 3 | raw-chat FTS5 (node:sqlite + FTS5) | ✅ FTS5 テーブル読込 + MATCH OK | ✅ 同上 | production DB 22 テーブル、PRAGMA threads 動作 |
-| 4 | jiti プラグインローダ + bundled plugin ロード | ✅ 4 hook handlers + `Registered plugin command: /dreaming (plugin: memory-core)` | ✅ 同上 + `Registered plugin command: /dreaming` | `ready (0 plugins, Ns)` の "0 plugins" は dynamic (plugins.allow 経由) のみカウント。bundled (internal) は別カウント |
-| 4' | raw-chat-search 自動検出 | ✅ `discovered non-bundled plugins may auto-load: raw-chat-search` 警告 | ✅ 同上 | plugins.allow 設定が空のため、extensions ディレクトリから自動検出。意図通り |
-| 5 | 15 分 soak (Bun) / 3 分 (Node) | ✅ 15/15 HTTP 200, RSS 434.3→425.2 MB (-9.1MB) | ✅ 3/3 HTTP 200, RSS 369.1→369.1 MB (±0) | 両者ともリークなし。メモリは Bun の方が多い (V8 < JSC のランタイム層コスト差) |
-| 6 | クリーンシャットダウン (taskkill graceful) | ✅ 1.14 秒で exit, stderr error 0 | n/a | Bun は SIGTERM/Windows taskkill できれいに終了。`CloseMainWindow` (WM_CLOSE) は Hidden window には無効 (Bun 以外の Windows プロセス一般の制約) |
-| 7 | Node 比較基準 (起動時間差) | 25.8s | 34.6s | Bun 8.8s 速い (25% 短縮) |
+| #   | 項目                                                    | Bun 結果                                                                          | Node 結果                                        | 備考                                                                                                                                           |
+| --- | ------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | HTTP 200 取得 (起動 30 秒以内)                          | ✅ cold 25.8s / warm 7.6-8.4s                                                     | ✅ cold 34.6s                                    | Bun の方が起動速い                                                                                                                             |
+| 2   | セッション永続化 (sessions.json atomic write/roundtrip) | ✅ writeMs 39ms, roundtrip OK                                                     | ✅ writeMs 36ms, roundtrip OK                    | 両ランタイム同一動作                                                                                                                           |
+| 3   | raw-chat FTS5 (node:sqlite + FTS5)                      | ✅ FTS5 テーブル読込 + MATCH OK                                                   | ✅ 同上                                          | production DB 22 テーブル、PRAGMA threads 動作                                                                                                 |
+| 4   | jiti プラグインローダ + bundled plugin ロード           | ✅ 4 hook handlers + `Registered plugin command: /dreaming (plugin: memory-core)` | ✅ 同上 + `Registered plugin command: /dreaming` | `ready (0 plugins, Ns)` の "0 plugins" は dynamic (plugins.allow 経由) のみカウント。bundled (internal) は別カウント                           |
+| 4'  | raw-chat-search 自動検出                                | ✅ `discovered non-bundled plugins may auto-load: raw-chat-search` 警告           | ✅ 同上                                          | plugins.allow 設定が空のため、extensions ディレクトリから自動検出。意図通り                                                                    |
+| 5   | 15 分 soak (Bun) / 3 分 (Node)                          | ✅ 15/15 HTTP 200, RSS 434.3→425.2 MB (-9.1MB)                                    | ✅ 3/3 HTTP 200, RSS 369.1→369.1 MB (±0)         | 両者ともリークなし。メモリは Bun の方が多い (V8 < JSC のランタイム層コスト差)                                                                  |
+| 6   | クリーンシャットダウン (taskkill graceful)              | ✅ 1.14 秒で exit, stderr error 0                                                 | n/a                                              | Bun は SIGTERM/Windows taskkill できれいに終了。`CloseMainWindow` (WM_CLOSE) は Hidden window には無効 (Bun 以外の Windows プロセス一般の制約) |
+| 7   | Node 比較基準 (起動時間差)                              | 25.8s                                                                             | 34.6s                                            | Bun 8.8s 速い (25% 短縮)                                                                                                                       |
 
 ### 5.2 Bun 15 分 soak 詳細
 
@@ -146,32 +147,32 @@ T+21.66s liveness marker tick=1
 
 **liveness tick** (5 分間隔で heartbeat):
 
-| 時刻 (t=0 = ready 時点) | tick | logAge | 備考 |
-| --- | --- | --- | --- |
-| T+0    | 1 | 0s    | ready 直後 (起動シーケンスの T+21.6s 相当) |
-| T+300s | 2 | 300s  | 正常 |
-| T+600s | 3 | 300s  | 正常 |
-| T+900s | 4 | 300s  | 正常 (15 分 soak 終了時点) |
+| 時刻 (t=0 = ready 時点) | tick | logAge | 備考                                       |
+| ----------------------- | ---- | ------ | ------------------------------------------ |
+| T+0                     | 1    | 0s     | ready 直後 (起動シーケンスの T+21.6s 相当) |
+| T+300s                  | 2    | 300s   | 正常                                       |
+| T+600s                  | 3    | 300s   | 正常                                       |
+| T+900s                  | 4    | 300s   | 正常 (15 分 soak 終了時点)                 |
 
 **メモリ推移 (5 分間隔、15 サンプル)**:
 
 | t (s) | RSS (MB) | CPU (s) | Threads | Handles | HTTP |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 60   | 434.3 | 17.2 | 37 | 284 | 200 |
-| 120  | 434.4 | 17.6 | 36 | 282 | 200 |
-| 180  | 435.0 | 17.9 | 38 | 285 | 200 |
-| 240  | 434.8 | 18.2 | 36 | 283 | 200 |
-| 300  | 436.0 | 18.5 | 37 | 283 | 200 |
-| 360  | 435.5 | 18.8 | 38 | 284 | 200 |
-| 420  | 435.8 | 19.3 | 36 | 281 | 200 |
-| 480  | 435.9 | 19.6 | 36 | 283 | 200 |
-| 540  | 436.4 | 20.0 | 37 | 282 | 200 |
-| 600  | 424.0 | 20.4 | 37 | 282 | 200 | ← GC サイクル (12 MB 回収)
-| 660  | 424.2 | 20.8 | 36 | 282 | 200 |
-| 720  | 424.3 | 21.3 | 37 | 284 | 200 |
-| 780  | 424.5 | 21.7 | 36 | 283 | 200 |
-| 840  | 424.6 | 22.0 | 34 | 281 | 200 |
-| 900  | 425.2 | 22.3 | 35 | 282 | 200 |
+| ----: | -------: | ------: | ------: | ------: | ---: |
+|    60 |    434.3 |    17.2 |      37 |     284 |  200 |
+|   120 |    434.4 |    17.6 |      36 |     282 |  200 |
+|   180 |    435.0 |    17.9 |      38 |     285 |  200 |
+|   240 |    434.8 |    18.2 |      36 |     283 |  200 |
+|   300 |    436.0 |    18.5 |      37 |     283 |  200 |
+|   360 |    435.5 |    18.8 |      38 |     284 |  200 |
+|   420 |    435.8 |    19.3 |      36 |     281 |  200 |
+|   480 |    435.9 |    19.6 |      36 |     283 |  200 |
+|   540 |    436.4 |    20.0 |      37 |     282 |  200 |
+|   600 |    424.0 |    20.4 |      37 |     282 |  200 | ← GC サイクル (12 MB 回収) |
+|   660 |    424.2 |    20.8 |      36 |     282 |  200 |
+|   720 |    424.3 |    21.3 |      37 |     284 |  200 |
+|   780 |    424.5 |    21.7 |      36 |     283 |  200 |
+|   840 |    424.6 |    22.0 |      34 |     281 |  200 |
+|   900 |    425.2 |    22.3 |      35 |     282 |  200 |
 
 → **単調増加なし、GC サイクルが観測される (T+600 で 12 MB 解放)、リークなし**。
 
@@ -179,15 +180,15 @@ T+21.66s liveness marker tick=1
 
 サンドボックス同 schema DB (`raw-chat.sqlite`、プラグイン初回起動時に自動生成された空DB) に対して bun と node で同一クエリを実行:
 
-| 項目 | Bun 1.4.0 | Node v24.19.0 |
-| --- | --- | --- |
-| DB サイズ | 4096 B (header) | 4096 B |
-| テーブル総数 | 22 (本体 2 + FTS5 内部 5 + トリガー 3 + インデックス 7 + meta + sequence + 自動 index 3) | 同上 |
-| `chat_messages_fts` 存在 | ✅ | ✅ |
-| `PRAGMA threads` | `{"threads": 0}` | `{"threads": 0}` |
-| `PRAGMA table_info(chat_messages)` | 18 カラム全部読める | 同上 |
-| `SELECT count(*) FROM chat_messages_fts WHERE chat_messages_fts MATCH ?` | OK | OK |
-| 読み込み readonly モード | OK | OK |
+| 項目                                                                     | Bun 1.4.0                                                                                | Node v24.19.0    |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------- |
+| DB サイズ                                                                | 4096 B (header)                                                                          | 4096 B           |
+| テーブル総数                                                             | 22 (本体 2 + FTS5 内部 5 + トリガー 3 + インデックス 7 + meta + sequence + 自動 index 3) | 同上             |
+| `chat_messages_fts` 存在                                                 | ✅                                                                                       | ✅               |
+| `PRAGMA threads`                                                         | `{"threads": 0}`                                                                         | `{"threads": 0}` |
+| `PRAGMA table_info(chat_messages)`                                       | 18 カラム全部読める                                                                      | 同上             |
+| `SELECT count(*) FROM chat_messages_fts WHERE chat_messages_fts MATCH ?` | OK                                                                                       | OK               |
+| 読み込み readonly モード                                                 | OK                                                                                       | OK               |
 
 → **Bun の node:sqlite は同 schema DB 上で Node と完全に同じ動作**。ただし **空 index 上の検証**であるため、実データ入りの本番 DB (14.6MB) に対する FTS5 検索正確性は B3 条件 2 に追加(§7.4 参照)。
 
@@ -195,13 +196,13 @@ T+21.66s liveness marker tick=1
 
 `sessions.json` (stateDir 配下) に対する atomic write + roundtrip テスト:
 
-| 項目 | Bun 1.4.0 | Node v24.19.0 |
-| --- | --- | --- |
-| 初期 keys | 1 (`agent:main:telegram:group:42`) | 1 |
-| `agent:main:main` 存在 | 無 (起動時自動作成なし、初回メッセージで作成) | 同 |
-| write + copy (atomic-ish) | 39.02 ms | 36.41 ms |
-| roundtrip (`_b2Probe: true` 再読込) | ✅ | ✅ |
-| テストデータ除去後 keys | 1 | 1 |
+| 項目                                | Bun 1.4.0                                     | Node v24.19.0 |
+| ----------------------------------- | --------------------------------------------- | ------------- |
+| 初期 keys                           | 1 (`agent:main:telegram:group:42`)            | 1             |
+| `agent:main:main` 存在              | 無 (起動時自動作成なし、初回メッセージで作成) | 同            |
+| write + copy (atomic-ish)           | 39.02 ms                                      | 36.41 ms      |
+| roundtrip (`_b2Probe: true` 再読込) | ✅                                            | ✅            |
+| テストデータ除去後 keys             | 1                                             | 1             |
 
 → **Bun の sessions.json 読み書きは Node と完全互換**。Bun での初回 1 回目テストデータは `node` で除去 (Node 側でも roundtrip 動作確認後、テスト前の状態に戻した)。
 
@@ -211,11 +212,11 @@ T+21.66s liveness marker tick=1
 
 3 通りの終了方法を試行:
 
-| 方法 | 結果 | 経過秒数 | stderr error |
-| --- | --- | ---: | ---: |
-| `taskkill /PID` (graceful) | ✅ exit | 1.14s | 0 |
-| `taskkill /F /PID` (force, SIGKILL 相当) | ✅ exit | 2.13s | 0 |
-| `CloseMainWindow` (WM_CLOSE 相当) | ❌ 効果なし (15s タイムアウト) | n/a | n/a |
+| 方法                                     | 結果                           | 経過秒数 | stderr error |
+| ---------------------------------------- | ------------------------------ | -------: | -----------: |
+| `taskkill /PID` (graceful)               | ✅ exit                        |    1.14s |            0 |
+| `taskkill /F /PID` (force, SIGKILL 相当) | ✅ exit                        |    2.13s |            0 |
+| `CloseMainWindow` (WM_CLOSE 相当)        | ❌ 効果なし (15s タイムアウト) |      n/a |          n/a |
 
 → **`taskkill` (graceful) は Bun の Windows ハンドラできれいに拾われる**。`CloseMainWindow` が効かないのは WindowStyle=Hidden で起動したためで、Bun 固有の制約ではなく Windows GUI メッセージング一般の制約 (Hidden ウィンドウには WM_CLOSE キューが回らない)。**KASOU systemd の `ExecStop` から `kill -TERM` 相当を送れば問題ない** (B3 で検証予定)。
 
@@ -223,24 +224,26 @@ T+21.66s liveness marker tick=1
 
 ## 6. 観測された差異 (Bun vs Node)
 
-| 観点 | Bun | Node | コメント |
-| --- | --- | --- | --- |
-| 起動時間 (cold) | 25.8s | 34.6s | Bun 8.8s (25%) 速い |
-| 起動時間 (warm, 2 回目以降) | 7.6-8.4s | (未計測) | 1 度起動した dist は OS キャッシュに乗る |
-| RSS (idle 5 分経過後) | ~425-435 MB | ~369 MB | Bun の方が +65 MB 多い。JSCore ランタイム層が V8 よりメモリを食う、Bun 既知の挙動。KASOU (本番) 8GB マシンでは問題なし |
-| RSS リーク | なし (15 分で -9.1 MB、GC サイクル観測) | なし (3 分で ±0) | 両者とも健全 |
-| HTTP 200 成功率 | 15/15 (15 分) | 3/3 (3 分) | 100% |
-| 起動時の `[reload] config watcher error: UNKNOWN: unknown error, watch` | 出ない | 出る | Bun の chokidar 内 fs.watch が Node と挙動差。bun で観測されない理由は不明 (chokidar の Node 用 fs.watch ハンドラが Windows で UNKNOWN を返す既知 issue と思われる)。KASOU 実機でも要確認 |
-| 起動時の bonjour hostname conflict 警告 | 出ない | 出る (2 度目以降) | 前回 Node プロセスの残骸 Bonjour 登録が検出された名残。Bun は clean start だったため衝突なし。**機能差ではない** |
-| Bun 起動時 plugins.allow 警告 | 1 件 (`raw-chat-search auto-load`) | 1 件 (同) | 両者同じ |
-| シャットダウン | 1.14s (graceful) | n/a (計測なし、Bun のみ) | 両者とも 127.0.0.1 バインドの WS をきれいに閉じる |
+| 観点                                                                    | Bun                                     | Node                     | コメント                                                                                                                                                                                  |
+| ----------------------------------------------------------------------- | --------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 起動時間 (cold)                                                         | 25.8s                                   | 34.6s                    | Bun 8.8s (25%) 速い                                                                                                                                                                       |
+| 起動時間 (warm, 2 回目以降)                                             | 7.6-8.4s                                | (未計測)                 | 1 度起動した dist は OS キャッシュに乗る                                                                                                                                                  |
+| RSS (idle 5 分経過後)                                                   | ~425-435 MB                             | ~369 MB                  | Bun の方が +65 MB 多い。JSCore ランタイム層が V8 よりメモリを食う、Bun 既知の挙動。KASOU (本番) 8GB マシンでは問題なし                                                                    |
+| RSS リーク                                                              | なし (15 分で -9.1 MB、GC サイクル観測) | なし (3 分で ±0)         | 両者とも健全                                                                                                                                                                              |
+| HTTP 200 成功率                                                         | 15/15 (15 分)                           | 3/3 (3 分)               | 100%                                                                                                                                                                                      |
+| 起動時の `[reload] config watcher error: UNKNOWN: unknown error, watch` | 出ない                                  | 出る                     | Bun の chokidar 内 fs.watch が Node と挙動差。bun で観測されない理由は不明 (chokidar の Node 用 fs.watch ハンドラが Windows で UNKNOWN を返す既知 issue と思われる)。KASOU 実機でも要確認 |
+| 起動時の bonjour hostname conflict 警告                                 | 出ない                                  | 出る (2 度目以降)        | 前回 Node プロセスの残骸 Bonjour 登録が検出された名残。Bun は clean start だったため衝突なし。**機能差ではない**                                                                          |
+| Bun 起動時 plugins.allow 警告                                           | 1 件 (`raw-chat-search auto-load`)      | 1 件 (同)                | 両者同じ                                                                                                                                                                                  |
+| シャットダウン                                                          | 1.14s (graceful)                        | n/a (計測なし、Bun のみ) | 両者とも 127.0.0.1 バインドの WS をきれいに閉じる                                                                                                                                         |
 
 **Bun 優位点**:
+
 - 起動が 25% 速い
 - `config watcher error: UNKNOWN` が出ない
 - chokidar 関連の Windows fs.watch 問題が回避されるらしい
 
 **Bun 劣位点**:
+
 - RSS が +65 MB 多い (JSCore のオーバーヘッド)
 - Windows では SIGINT ハンドリングが Node と挙動が違う (ただし taskkill graceful は正常)
 
@@ -253,6 +256,7 @@ T+21.66s liveness marker tick=1
 **発見**: `node_modules/@snazzah/davey-win32-x64-msvc/davey.win32-x64-msvc.node` のみが Windows ビルド機でステージングされている。KASOU は Linux x64 (`x86_64-unknown-linux-gnu` ターゲットが必要)。**DAVE プロトコル (Discord E2EE 暗号化) が KASOU 上で動かない可能性大**。
 
 **対処案**:
+
 1. **Windows ビルド機で `pnpm install --os=linux --cpu=x64 --libc=glibc` で Linux 用バイナリだけ追加ステージング** (推奨: 既存の「tgz を Windows で作って転送」運用と整合し、KASOU 側に pnpm/npm registry 到達性を要求しない)
 2. **KASOU 上で `pnpm install` し直す**: davey の optional dep が `process.platform` を見て Linux 版を取得する (KASOU から npm registry への到達性が要る。過去に KASOU 側依存解決で失敗経験あり → フォールバック案)
 3. **postinstall で `npm rebuild @snazzah/davey --build-from-source`**: Rust ツールチェイン要、依存重い
@@ -317,19 +321,19 @@ KASOU `~/.config/systemd/user/dennou-aibou.service` (仮) の `ExecStart` を `n
 
 すべて `DennouAibou/.bun-soak-tmp/` 配下 (gitignore 対象):
 
-| ファイル | 内容 |
-| --- | --- |
-| `soak.ps1` | Bun/Node soak 汎用ハーネス (任意の runtime / duration / port) |
-| `sigint-test.ps1` | taskkill graceful / force / CloseMainWindow の比較テスト |
-| `verify-runtime.mjs` | sessions.json atomic write + roundtrip テスト |
-| `fts5-probe.mjs` | 一時 FTS5 テーブルでの INSERT + MATCH + readonly 再オープン |
-| `raw-chat-prod-probe.mjs` | KASOU の実 raw-chat.sqlite に対する node:sqlite 動作確認 |
-| `BUN-soak-20260828-185904.{out,err}.log` | 15 分 Bun soak の stdout/stderr |
-| `BUN-soak-20260828-185604.*` | 中断された先行 soak 実行 (起動成功後 2 サンプル目で手動中断 — ポート再利用のため再起動) |
-| `BUN-soak-20260828-185904.samples.csv` | 60 秒間隔 15 サンプルの RSS / CPU / HTTP 結果 |
-| `BUN-soak-20260828-185904.{meta,summary}.json` | 起動時刻 / 結果集計 |
-| `NODE-soak-20260828-191840.*` | Node 3 分 soak の同類成果物 (比較用) |
-| `BUN-sigint-20260828-192339.*` | SIGINT/タスクキル/CloseMainWindow 比較テスト |
+| ファイル                                       | 内容                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `soak.ps1`                                     | Bun/Node soak 汎用ハーネス (任意の runtime / duration / port)                           |
+| `sigint-test.ps1`                              | taskkill graceful / force / CloseMainWindow の比較テスト                                |
+| `verify-runtime.mjs`                           | sessions.json atomic write + roundtrip テスト                                           |
+| `fts5-probe.mjs`                               | 一時 FTS5 テーブルでの INSERT + MATCH + readonly 再オープン                             |
+| `raw-chat-prod-probe.mjs`                      | KASOU の実 raw-chat.sqlite に対する node:sqlite 動作確認                                |
+| `BUN-soak-20260828-185904.{out,err}.log`       | 15 分 Bun soak の stdout/stderr                                                         |
+| `BUN-soak-20260828-185604.*`                   | 中断された先行 soak 実行 (起動成功後 2 サンプル目で手動中断 — ポート再利用のため再起動) |
+| `BUN-soak-20260828-185904.samples.csv`         | 60 秒間隔 15 サンプルの RSS / CPU / HTTP 結果                                           |
+| `BUN-soak-20260828-185904.{meta,summary}.json` | 起動時刻 / 結果集計                                                                     |
+| `NODE-soak-20260828-191840.*`                  | Node 3 分 soak の同類成果物 (比較用)                                                    |
+| `BUN-sigint-20260828-192339.*`                 | SIGINT/タスクキル/CloseMainWindow 比較テスト                                            |
 
 ハーネス (`soak.ps1`, `sigint-test.ps1`) は B3 以降の soak テストや systemd 移行検証で再利用可能。ただし `verify-runtime.mjs` は検証前の `sessions.json` 自動退避・復元処理を持たないため、B3 (KASOU 本番) で再利用する前に cleanup 処理の追加が必須 (master session 保護対象キーを書くため)。
 

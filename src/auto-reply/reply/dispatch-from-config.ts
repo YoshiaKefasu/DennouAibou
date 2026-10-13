@@ -266,8 +266,7 @@ export async function dispatchReplyFromConfig(params: {
   // Do not read thread ids from the normalised session store here: `origin.threadId` can be
   // folded back into lastThreadId/deliveryContext during store normalisation and resurrect a
   // stale route after thread delivery was intentionally cleared.
-  const routeThreadId =
-    ctx.MessageThreadId ?? parseSessionThreadInfo(dispatchSessionKey).threadId;
+  const routeThreadId = ctx.MessageThreadId ?? parseSessionThreadInfo(dispatchSessionKey).threadId;
   const inboundAudio = isInboundAudioContext(ctx);
   const hookRunner = getGlobalHookRunner();
 
@@ -861,35 +860,35 @@ export async function dispatchReplyFromConfig(params: {
     );
 
     if (hookRunner?.hasHooks("reply_dispatch")) {
-        const tailDispatchResult = await hookRunner.runReplyDispatch(
-          {
-            ctx,
-            runId: params.replyOptions?.runId,
-            sessionKey: dispatchSessionKey,
-            inboundAudio,
-            shouldRouteToOriginating,
-            originatingChannel,
-            originatingTo,
-            shouldSendToolSummaries,
-            sendPolicy: "allow",
-            isTailDispatch: true,
-          },
-          {
-            cfg,
-            dispatcher,
-            abortSignal: params.replyOptions?.abortSignal,
-            onReplyStart: params.replyOptions?.onReplyStart,
-            recordProcessed,
-            markIdle,
-          },
-        );
-        if (tailDispatchResult?.handled) {
-          return {
-            queuedFinal: tailDispatchResult.queuedFinal,
-            counts: tailDispatchResult.counts,
-          };
-        }
+      const tailDispatchResult = await hookRunner.runReplyDispatch(
+        {
+          ctx,
+          runId: params.replyOptions?.runId,
+          sessionKey: dispatchSessionKey,
+          inboundAudio,
+          shouldRouteToOriginating,
+          originatingChannel,
+          originatingTo,
+          shouldSendToolSummaries,
+          sendPolicy: "allow",
+          isTailDispatch: true,
+        },
+        {
+          cfg,
+          dispatcher,
+          abortSignal: params.replyOptions?.abortSignal,
+          onReplyStart: params.replyOptions?.onReplyStart,
+          recordProcessed,
+          markIdle,
+        },
+      );
+      if (tailDispatchResult?.handled) {
+        return {
+          queuedFinal: tailDispatchResult.queuedFinal,
+          counts: tailDispatchResult.counts,
+        };
       }
+    }
 
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
 

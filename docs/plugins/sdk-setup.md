@@ -383,8 +383,8 @@ Use `buildChannelConfigSchema` from `openclaw/plugin-sdk/core` to convert a
 Zod schema into the `ChannelConfigSchema` wrapper that DennouAibou validates:
 
 ```typescript
-import { z } from "zod";
 import { buildChannelConfigSchema } from "openclaw/plugin-sdk/core";
+import { z } from "zod";
 
 const accountSchema = z.object({
   token: z.string().optional(),

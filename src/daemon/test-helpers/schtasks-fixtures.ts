@@ -18,8 +18,9 @@ async function defaultExecSchtasks(args: string[]) {
   return schtasksResponses.shift() ?? { code: 0, stdout: "", stderr: "" };
 }
 
-export const execSchtasks: MockFn<(args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>> =
-  vi.fn(defaultExecSchtasks);
+export const execSchtasks: MockFn<
+  (args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>
+> = vi.fn(defaultExecSchtasks);
 
 /** The scheduler/port/process stubs every schtasks suite starts from. */
 export function baseSchtasksTestDeps() {

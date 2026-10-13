@@ -81,14 +81,18 @@ export function renderNostrCard(params: {
           <div>
             <span class="label">${t("common.lastInbound")}</span>
             <span
-              >${account.lastInboundAt
-                ? formatRelativeTimestamp(account.lastInboundAt)
-                : t("common.na")}</span
+              >${
+                account.lastInboundAt
+                  ? formatRelativeTimestamp(account.lastInboundAt)
+                  : t("common.na")
+              }</span
             >
           </div>
-          ${account.lastError
-            ? html` <div class="account-card-error">${account.lastError}</div> `
-            : nothing}
+          ${
+            account.lastError
+              ? html` <div class="account-card-error">${account.lastError}</div> `
+              : nothing
+          }
         </div>
       </div>
     `;
@@ -129,64 +133,79 @@ export function renderNostrCard(params: {
           style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
         >
           <div style="font-weight: 500;">${t("channels.nostr.profile")}</div>
-          ${summaryConfigured
-            ? html`
-                <button
-                  class="btn btn--sm"
-                  @click=${onEditProfile}
-                  style="font-size: 12px; padding: 4px 8px;"
-                >
-                  ${t("channels.nostr.editProfile")}
-                </button>
-              `
-            : nothing}
+          ${
+            summaryConfigured
+              ? html`
+                  <button
+                    class="btn btn--sm"
+                    @click=${onEditProfile}
+                    style="font-size: 12px; padding: 4px 8px;"
+                  >
+                    ${t("channels.nostr.editProfile")}
+                  </button>
+                `
+              : nothing
+          }
         </div>
-        ${hasAnyProfileData
-          ? html`
-              <div class="status-list">
-                ${picture
-                  ? html`
-                      <div style="margin-bottom: 8px;">
-                        <img
-                          src=${picture}
-                          alt=${t("channels.nostr.profilePicture")}
-                          style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color);"
-                          @error=${(e: Event) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      </div>
-                    `
-                  : nothing}
-                ${name
-                  ? html`<div>
-                      <span class="label">${t("channels.nostr.name")}</span><span>${name}</span>
-                    </div>`
-                  : nothing}
-                ${displayName
-                  ? html`<div>
-                      <span class="label">${t("channels.nostr.displayName")}</span
-                      ><span>${displayName}</span>
-                    </div>`
-                  : nothing}
-                ${about
-                  ? html`<div>
-                      <span class="label">${t("channels.nostr.about")}</span
-                      ><span style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;"
-                        >${about}</span
-                      >
-                    </div>`
-                  : nothing}
-                ${nip05
-                  ? html`<div><span class="label">NIP-05</span><span>${nip05}</span></div>`
-                  : nothing}
-              </div>
-            `
-          : html`
-              <div style="color: var(--text-muted); font-size: 13px">
-                ${t("channels.nostr.noProfile")} ${t("channels.nostr.noProfileHint")}
-              </div>
-            `}
+        ${
+          hasAnyProfileData
+            ? html`
+                <div class="status-list">
+                  ${
+                    picture
+                      ? html`
+                          <div style="margin-bottom: 8px;">
+                            <img
+                              src=${picture}
+                              alt=${t("channels.nostr.profilePicture")}
+                              style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color);"
+                              @error=${(e: Event) => {
+                                (e.target as HTMLImageElement).style.display = "none";
+                              }}
+                            />
+                          </div>
+                        `
+                      : nothing
+                  }
+                  ${
+                    name
+                      ? html`<div>
+                          <span class="label">${t("channels.nostr.name")}</span><span>${name}</span>
+                        </div>`
+                      : nothing
+                  }
+                  ${
+                    displayName
+                      ? html`<div>
+                          <span class="label">${t("channels.nostr.displayName")}</span
+                          ><span>${displayName}</span>
+                        </div>`
+                      : nothing
+                  }
+                  ${
+                    about
+                      ? html`<div>
+                          <span class="label">${t("channels.nostr.about")}</span
+                          ><span
+                            style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;"
+                            >${about}</span
+                          >
+                        </div>`
+                      : nothing
+                  }
+                  ${
+                    nip05
+                      ? html`<div><span class="label">NIP-05</span><span>${nip05}</span></div>`
+                      : nothing
+                  }
+                </div>
+              `
+            : html`
+                <div style="color: var(--text-muted); font-size: 13px">
+                  ${t("channels.nostr.noProfile")} ${t("channels.nostr.noProfileHint")}
+                </div>
+              `
+        }
       </div>
     `;
   };
@@ -196,41 +215,47 @@ export function renderNostrCard(params: {
       <div class="card-title">Nostr</div>
       <div class="card-sub">Decentralized DMs via Nostr relays (NIP-04).</div>
       ${accountCountLabel}
-      ${hasMultipleAccounts
-        ? html`
-            <div class="account-card-list">
-              ${nostrAccounts.map((account) => renderAccountCard(account))}
-            </div>
-          `
-        : html`
-            <div class="status-list" style="margin-top: 16px;">
-              <div>
-                <span class="label">${t("common.configured")}</span>
-                <span>${summaryConfigured ? t("common.yes") : t("common.no")}</span>
+      ${
+        hasMultipleAccounts
+          ? html`
+              <div class="account-card-list">
+                ${nostrAccounts.map((account) => renderAccountCard(account))}
               </div>
-              <div>
-                <span class="label">${t("common.running")}</span>
-                <span>${summaryRunning ? t("common.yes") : t("common.no")}</span>
+            `
+          : html`
+              <div class="status-list" style="margin-top: 16px;">
+                <div>
+                  <span class="label">${t("common.configured")}</span>
+                  <span>${summaryConfigured ? t("common.yes") : t("common.no")}</span>
+                </div>
+                <div>
+                  <span class="label">${t("common.running")}</span>
+                  <span>${summaryRunning ? t("common.yes") : t("common.no")}</span>
+                </div>
+                <div>
+                  <span class="label">${t("common.publicKey")}</span>
+                  <span class="monospace" title="${summaryPublicKey ?? ""}"
+                    >${truncatePubkey(summaryPublicKey)}</span
+                  >
+                </div>
+                <div>
+                  <span class="label">${t("common.lastStart")}</span>
+                  <span>
+                    ${
+                      summaryLastStartAt
+                        ? formatRelativeTimestamp(summaryLastStartAt)
+                        : t("common.na")
+                    }
+                  </span>
+                </div>
               </div>
-              <div>
-                <span class="label">${t("common.publicKey")}</span>
-                <span class="monospace" title="${summaryPublicKey ?? ""}"
-                  >${truncatePubkey(summaryPublicKey)}</span
-                >
-              </div>
-              <div>
-                <span class="label">${t("common.lastStart")}</span>
-                <span>
-                  ${summaryLastStartAt
-                    ? formatRelativeTimestamp(summaryLastStartAt)
-                    : t("common.na")}
-                </span>
-              </div>
-            </div>
-          `}
-      ${summaryLastError
-        ? html`<div class="callout danger" style="margin-top: 12px;">${summaryLastError}</div>`
-        : nothing}
+            `
+      }
+      ${
+        summaryLastError
+          ? html`<div class="callout danger" style="margin-top: 12px;">${summaryLastError}</div>`
+          : nothing
+      }
       ${renderProfileSection()} ${renderChannelConfigSection({ channelId: "nostr", props })}
 
       <div class="row" style="margin-top: 12px;">

@@ -24,11 +24,7 @@ import { createInternalHookEvent, triggerInternalHook } from "../hooks/internal-
 import { getSessionBindingService } from "../infra/outbound/session-binding-service.js";
 import { closeTrackedBrowserTabsForSessions } from "../plugin-sdk/browser-maintenance.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
-import {
-  
-  normalizeAgentId,
-  parseAgentSessionKey,
-} from "../routing/session-key.js";
+import { normalizeAgentId, parseAgentSessionKey } from "../routing/session-key.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import {
   archiveSessionTranscriptsDetailed,
@@ -42,8 +38,6 @@ import {
   resolveGatewaySessionStoreTarget,
   resolveSessionModelRef,
 } from "./session-utils.js";
-
-
 
 function stripRuntimeModelState(entry?: SessionEntry): SessionEntry | undefined {
   if (!entry) {
@@ -231,8 +225,6 @@ async function ensureSessionRuntimeCleanup(params: {
     `Session ${params.key} is still active; try again in a moment.`,
   );
 }
-
-
 
 export async function cleanupSessionBeforeMutation(params: {
   cfg: ReturnType<typeof loadConfig>;

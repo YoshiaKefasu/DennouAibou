@@ -8,9 +8,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/sessions.js", async () => {
-  const actual = await import(
-    "../../config/sessions.js",
-  );
+  const actual = await import("../../config/sessions.js");
   return {
     ...actual,
     loadSessionStore: (storePath: string) => hoisted.loadSessionStoreMock(storePath),

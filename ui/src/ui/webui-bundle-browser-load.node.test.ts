@@ -486,8 +486,6 @@ function containsNodeOnlyLeak(outcome: Outcome): boolean {
 // are deferred until the caller actually invokes them.
 // ---------------------------------------------------------------------------
 
-
-
 const NODE_ONLY_PROCESS_PROPERTIES = new Set([
   "env",
   "cwd",
@@ -561,7 +559,11 @@ function normalizeSourceForScan(source: string, fileLabel: string): string {
         return out.stdout;
       }
     } finally {
-      try { fs.unlinkSync(inputPath); } catch { /* best-effort */ }
+      try {
+        fs.unlinkSync(inputPath);
+      } catch {
+        /* best-effort */
+      }
     }
   } catch {
     // fall through to raw source
@@ -727,34 +729,35 @@ describe("WebUI bundle does not leak Node-only references during module load (br
     "static AST scan finds zero Node-only references in any emitted bundle chunk",
     { timeout: 60_000 },
     () => {
-    const chunks = listBundleChunks();
-    if (chunks.length === 0) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[webui-bundle-browser-load] no bundle chunks under ${distDir}; ` +
-          `run \`pnpm ui:build\` before running this test if you want the assertion executed.`,
-      );
-      return;
-    }
-    const allHits: StaticScanHit[] = [];
-    for (const chunk of chunks) {
-      const filePath = path.join(distDir, chunk);
-      const source = fs.readFileSync(filePath, "utf8");
-      const hits = scanChunkForNodeOnlyRefs(source, chunk);
-      allHits.push(...hits);
-    }
-    if (allHits.length > 0) {
-      const formatted = allHits
-        .map((hit) => `  - ${hit.file} :: ${hit.identifier} (${hit.context})`)
-        .join("\n");
-      expect.fail(
-        `WebUI bundle contains Node-only references at module-load scope:\n${formatted}\n` +
-          `Move the call into a function body that the UI never invokes, or guard it with ` +
-          `typeof process === "undefined" / try/catch.`,
-      );
-    }
-    expect(allHits).toEqual([]);
-  });
+      const chunks = listBundleChunks();
+      if (chunks.length === 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[webui-bundle-browser-load] no bundle chunks under ${distDir}; ` +
+            `run \`pnpm ui:build\` before running this test if you want the assertion executed.`,
+        );
+        return;
+      }
+      const allHits: StaticScanHit[] = [];
+      for (const chunk of chunks) {
+        const filePath = path.join(distDir, chunk);
+        const source = fs.readFileSync(filePath, "utf8");
+        const hits = scanChunkForNodeOnlyRefs(source, chunk);
+        allHits.push(...hits);
+      }
+      if (allHits.length > 0) {
+        const formatted = allHits
+          .map((hit) => `  - ${hit.file} :: ${hit.identifier} (${hit.context})`)
+          .join("\n");
+        expect.fail(
+          `WebUI bundle contains Node-only references at module-load scope:\n${formatted}\n` +
+            `Move the call into a function body that the UI never invokes, or guard it with ` +
+            `typeof process === "undefined" / try/catch.`,
+        );
+      }
+      expect(allHits).toEqual([]);
+    },
+  );
 
   it("negative control: detects a fixture module that evaluates process.cwd at module scope", async () => {
     // Sanity-check the detector itself. We synthesize a fixture module that
@@ -783,20 +786,21 @@ describe("WebUI bundle does not leak Node-only references during module load (br
     "negative control: static AST scan flags a fixture with node:fs + process.cwd at module scope",
     { timeout: 30_000 },
     () => {
-    const fixtureDir = path.join(repoRoot, ".tmp-webui-bundle-fixture");
-    const fixtureFile = path.join(fixtureDir, "leaky-fixture.mjs");
-    const fixtureSource = [
-      "// Intentionally references Node-only APIs at module scope.",
-      `import { readFileSync } from "node:fs";`,
-      `export const cwd = process.cwd();`,
-      `export const tmp = (() => { try { return readFileSync("/etc/hosts"); } catch { return ""; } })();`,
-    ].join("\n");
-    // We do not actually write the file because we are scanning source
-    // text directly. The static scan takes a string, so we exercise the
-    // scan on this synthetic source without touching disk.
-    const hits = scanChunkForNodeOnlyRefs(fixtureSource, "leaky-fixture.mjs");
-    const identifiers = new Set(hits.map((hit) => hit.identifier));
-    expect(identifiers.has("node:fs")).toBe(true);
-    expect(identifiers.has("process.cwd")).toBe(true);
-  });
+      const fixtureDir = path.join(repoRoot, ".tmp-webui-bundle-fixture");
+      const fixtureFile = path.join(fixtureDir, "leaky-fixture.mjs");
+      const fixtureSource = [
+        "// Intentionally references Node-only APIs at module scope.",
+        `import { readFileSync } from "node:fs";`,
+        `export const cwd = process.cwd();`,
+        `export const tmp = (() => { try { return readFileSync("/etc/hosts"); } catch { return ""; } })();`,
+      ].join("\n");
+      // We do not actually write the file because we are scanning source
+      // text directly. The static scan takes a string, so we exercise the
+      // scan on this synthetic source without touching disk.
+      const hits = scanChunkForNodeOnlyRefs(fixtureSource, "leaky-fixture.mjs");
+      const identifiers = new Set(hits.map((hit) => hit.identifier));
+      expect(identifiers.has("node:fs")).toBe(true);
+      expect(identifiers.has("process.cwd")).toBe(true);
+    },
+  );
 });

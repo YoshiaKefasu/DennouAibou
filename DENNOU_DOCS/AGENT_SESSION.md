@@ -11,10 +11,10 @@
 
 Kasou の記憶を守る仕組みは、目的の異なる **2 層** で構成される。片方だけでは守れない。
 
-| 層 | 守るもの | 問い | 実装主体 | 状態 |
-| --- | --- | --- | --- | --- |
-| **L1: 不滅マスター保護**（§1〜§3） | セッションの **存在そのもの**（消える／リセットされる） | 「マスターセッションは消えていないか？」 | カーネル（`src/config/sessions/` ほか chokepoint 群） | ✅ 実装・実証済み（commit `50af3a2b`） |
-| **L2: セッション整合性ガード**（§4） | セッション JSONL の **構造**（親子リンクが壊れる） | 「ツリーは壊れていないか？」 | カーネル（post-append 検証）＋ プラグイン（cron ヘルスチェック＋自動修復） | ✅ Phase 1 / 2 / 3 実装・テスト・レビュー完了（※ 通知配線に未解決事項 → §4.4.7） |
+| 層                                   | 守るもの                                                | 問い                                     | 実装主体                                                                   | 状態                                                                             |
+| ------------------------------------ | ------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **L1: 不滅マスター保護**（§1〜§3）   | セッションの **存在そのもの**（消える／リセットされる） | 「マスターセッションは消えていないか？」 | カーネル（`src/config/sessions/` ほか chokepoint 群）                      | ✅ 実装・実証済み（commit `50af3a2b`）                                           |
+| **L2: セッション整合性ガード**（§4） | セッション JSONL の **構造**（親子リンクが壊れる）      | 「ツリーは壊れていないか？」             | カーネル（post-append 検証）＋ プラグイン（cron ヘルスチェック＋自動修復） | ✅ Phase 1 / 2 / 3 実装・テスト・レビュー完了（※ 通知配線に未解決事項 → §4.4.7） |
 
 - L1 は「玄関の鍵を増やす」仕事、L2 は「持ち込まれる荷物を検査し、ときどき見回り、壊れていたら直す」仕事。
 - L1 は **予防**（操作を拒否する）。L2 は **検知＋回復**（書き込みは取り消さず、後段で直す）。両者は独立して動作し、互いを必要としない。
@@ -46,24 +46,26 @@ DennouAibou において、AI（Kasou）は複数の使い捨てセッション�
 
 ### 1.2 不変条件（Invariants）
 
-| # | 不変条件 | 破ったときに起きること | 守っている仕組み |
-| --- | --- | --- | --- |
-| I-1 | マスターセッションは絶対に消えない | Kasou の人格・記憶の断絶（＝事実上の死） | §3 の 7 chokepoint |
-| I-2 | マスターセッションは自動ローテーションしない | 無自覚な記憶リセット | 自動リセット機構そのものを撤去済み（§3.2 表） |
-| I-3 | セッション JSONL の親子リンクは壊れない | コンテキスト欠落・孤児ノード蓄積 | §4 の二段構え（書き込み検証＋定期ヘルスチェック） |
-| I-4 | 壊れた場合でも `user` / `assistant` メッセージ行は失われない | 会話そのものの消失 | §4.4.5 の修復ルール（型レベルで選択不可能） |
-| I-5 | すべてのガードにキルスイッチがある | 誤作動時にシステムを止められない | §4.3.2 の `DENNOU_SKIP_INTEGRITY_GUARD=1` |
+| #   | 不変条件                                                     | 破ったときに起きること                   | 守っている仕組み                                  |
+| --- | ------------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------- |
+| I-1 | マスターセッションは絶対に消えない                           | Kasou の人格・記憶の断絶（＝事実上の死） | §3 の 7 chokepoint                                |
+| I-2 | マスターセッションは自動ローテーションしない                 | 無自覚な記憶リセット                     | 自動リセット機構そのものを撤去済み（§3.2 表）     |
+| I-3 | セッション JSONL の親子リンクは壊れない                      | コンテキスト欠落・孤児ノード蓄積         | §4 の二段構え（書き込み検証＋定期ヘルスチェック） |
+| I-4 | 壊れた場合でも `user` / `assistant` メッセージ行は失われない | 会話そのものの消失                       | §4.4.5 の修復ルール（型レベルで選択不可能）       |
+| I-5 | すべてのガードにキルスイッチがある                           | 誤作動時にシステムを止められない         | §4.3.2 の `DENNOU_SKIP_INTEGRITY_GUARD=1`         |
 
 ---
 
 ## 2. 単一エージェント化（Multi-Agent クリーンアップ方針）
 
 ### 2.1 撤去・簡素化する領域
+
 - `agents.list` による複数エージェント定義とそれぞれのルーティング判定。
 - エージェント別の設定オーバーライド（`agents.list[].*`）の複雑なマージ処理を `agents.defaults` 単一設定へ平坦化。
 - サブエージェント専用の孤立セッション生成・同期の複雑なランタイムコード。
 
 ### 2.2 温存・集約する領域
+
 - 単一のメインエージェント実行基盤（`agentId: "main"` / "Kasou"）。
 - ツール呼び出し・LLM 実行・イベントポンプとの単一パイプライン。
 
@@ -76,9 +78,7 @@ DennouAibou において、AI（Kasou）は複数の使い捨てセッション�
 ```json
 {
   "session": {
-    "protectedKeys": [
-      "agent:main:main"
-    ]
+    "protectedKeys": ["agent:main:main"]
   }
 }
 ```
@@ -92,15 +92,15 @@ DennouAibou において、AI（Kasou）は複数の使い捨てセッション�
 マスターセッションを壊し得る経路を列挙し、**全経路**に `isProtectedSessionKey()` 判定を設置している。
 （静的検証: `grep -rn "isProtectedSessionKey(" src/` → テストを除き 9 call site、定義本体 `protected-session.ts` を除いて 6 ファイル。）
 
-| # | 操作系統 | 発生経路 | 防御メカニズム |
-| --- | --- | --- | --- |
-| 1 | **手動リセット（Gateway サービス層）** | RPC（`sessions.reset`）／エージェント（`runSessionResetFromAgent` → `performGatewaySessionReset`） | `src/gateway/session-reset-service.ts` で `isProtectedSessionKey(params.key, cfg)` を判定し、あらゆる mutation より前に拒否 |
-| 2 | **手動リセット（RPC chokepoint）** | RPC（`sessions.reset`）直呼び（ACP / TUI 経由） | `src/gateway/server-methods/sessions.ts` で保護キーを判定し `Cannot reset protected session` を返却 |
-| 3 | **手動削除** | RPC（`sessions.delete`） | `src/gateway/server-methods/sessions.ts` で保護キーを判定し `Cannot delete protected session` を返却 |
-| 4 | **本文パース型リセット** | Discord / Telegram 等が本文中の `/reset`, `/new` を自前パースしてローテーション | `src/auto-reply/reply/session.ts` の loop 前 + canonicalize 後の **2 段ガード**。保護セッションでは `resetTriggered = false` にして通常メッセージ扱いにする（本文も保持） |
-| 5 | **自動リセット** | `session.reset` ポリシー（daily / idle） | **機構そのものを撤去済み**（`src/config/sessions/reset.ts`）。旧 config キーは後方互換のため zod schema に残るが実行時効果なし |
-| 6 | **ストア自動メンテ** | `src/config/sessions/store.ts` の毎セーブ時メンテ | `pruneStaleEntries` / `capEntryCount` / `enforceSessionDiskBudget` から保護キーを完全除外（`store-maintenance.ts` / `disk-budget.ts`） |
-| 7 | **idle prune（DennouAibou 独自）** | `src/dennou-soul/idle-prune-watcher.ts:81` のアイドル時アクティブセッションツール prune | idle イベント冒頭で保護キーを判定し **SKIP** |
+| #   | 操作系統                               | 発生経路                                                                                           | 防御メカニズム                                                                                                                                                            |
+| --- | -------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **手動リセット（Gateway サービス層）** | RPC（`sessions.reset`）／エージェント（`runSessionResetFromAgent` → `performGatewaySessionReset`） | `src/gateway/session-reset-service.ts` で `isProtectedSessionKey(params.key, cfg)` を判定し、あらゆる mutation より前に拒否                                               |
+| 2   | **手動リセット（RPC chokepoint）**     | RPC（`sessions.reset`）直呼び（ACP / TUI 経由）                                                    | `src/gateway/server-methods/sessions.ts` で保護キーを判定し `Cannot reset protected session` を返却                                                                       |
+| 3   | **手動削除**                           | RPC（`sessions.delete`）                                                                           | `src/gateway/server-methods/sessions.ts` で保護キーを判定し `Cannot delete protected session` を返却                                                                      |
+| 4   | **本文パース型リセット**               | Discord / Telegram 等が本文中の `/reset`, `/new` を自前パースしてローテーション                    | `src/auto-reply/reply/session.ts` の loop 前 + canonicalize 後の **2 段ガード**。保護セッションでは `resetTriggered = false` にして通常メッセージ扱いにする（本文も保持） |
+| 5   | **自動リセット**                       | `session.reset` ポリシー（daily / idle）                                                           | **機構そのものを撤去済み**（`src/config/sessions/reset.ts`）。旧 config キーは後方互換のため zod schema に残るが実行時効果なし                                            |
+| 6   | **ストア自動メンテ**                   | `src/config/sessions/store.ts` の毎セーブ時メンテ                                                  | `pruneStaleEntries` / `capEntryCount` / `enforceSessionDiskBudget` から保護キーを完全除外（`store-maintenance.ts` / `disk-budget.ts`）                                    |
+| 7   | **idle prune（DennouAibou 独自）**     | `src/dennou-soul/idle-prune-watcher.ts:81` のアイドル時アクティブセッションツール prune            | idle イベント冒頭で保護キーを判定し **SKIP**                                                                                                                              |
 
 call site 内訳: 行 1〜3 は `session-reset-service.ts:313` / `sessions.ts:1021`（reset） / `sessions.ts:1068`（delete）、行 6 は `store-maintenance.ts:173`（`pruneStaleEntries`）と `:261`（`capEntryCount`）、行 7 は `idle-prune-watcher.ts:81`、行 4 は `auto-reply/reply/session.ts:330,351`。ディスク予算は `disk-budget.ts:298`。
 
@@ -139,17 +139,18 @@ export function isProtectedSessionKey(key: string, cfg?: ProtectedSessionConfig)
 ```
 
 要点:
+
 - **大文字小文字の正規化** — `MAIN` / `AGENT:MAIN:MAIN` のような表記ゆれでガードをすり抜けられない。
 - **エイリアス解決** — 素の `main` や旧形式 `agent:main:<mainKey>` も同一のメインセッションに collapse する。
 - **チャンネル系キーは素通し** — メインエイリアスでないキー（DM / グループ等）は小文字化のみで比較される。
 
 ### 3.4 実装状況・テスト証跡
 
-| 項目 | 内容 |
-| --- | --- |
-| 主要 commit | `50af3a2b`（設計・一次実装）、`b4ceab38f9`（単一 Kasou エージェント／不滅マスター対応で文書更新） |
-| テスト | `src/config/sessions/master-session-immutability.test.ts` — 検証軸 A) 単一 Kasou 集約 / B) `isProtectedSessionKey` 真理値表 / C) 自動リセット機構の完全撤去 / D) ストアメンテ除外 / E) 攻撃的一斉投入 E2E（マスターセッションが 1 バイトも消えない） / F) 各 chokepoint が `isProtectedSessionKey` を経由する静的アーキテクチャ不変条件 |
-| 関連テスト | `src/config/sessions/protected-session.test.ts` / `disk-budget.test.ts` / `phase3-auto-cleanup-exclusion.test.ts` / `store.pruning*.test.ts` |
+| 項目        | 内容                                                                                                                                                                                                                                                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 主要 commit | `50af3a2b`（設計・一次実装）、`b4ceab38f9`（単一 Kasou エージェント／不滅マスター対応で文書更新）                                                                                                                                                                                                                                       |
+| テスト      | `src/config/sessions/master-session-immutability.test.ts` — 検証軸 A) 単一 Kasou 集約 / B) `isProtectedSessionKey` 真理値表 / C) 自動リセット機構の完全撤去 / D) ストアメンテ除外 / E) 攻撃的一斉投入 E2E（マスターセッションが 1 バイトも消えない） / F) 各 chokepoint が `isProtectedSessionKey` を経由する静的アーキテクチャ不変条件 |
+| 関連テスト  | `src/config/sessions/protected-session.test.ts` / `disk-budget.test.ts` / `phase3-auto-cleanup-exclusion.test.ts` / `store.pruning*.test.ts`                                                                                                                                                                                            |
 
 > **Note**: `master-session-immutability.test.ts` のファイル先頭コメントには旧表記「5 系統」が残っているが、`describe` 名は `every chokepoint` であり、実際の検証は上表の全系統を対象にしている。
 
@@ -193,7 +194,7 @@ KASOU 本番セッション `93fcc1a8-7563-4cf2-b9f1-e4552e7e444f.jsonl` で、*
 | 対象     | KASOU の記憶（セッション jsonl）=「玄関をちゃんと守る」                                             |
 | 主眼     | **書き込み時点でのガード**（事後修復より優先）                                                      |
 | 構成     | **ハイブリッド**: 書き込みガードのみカーネル最小組み込み / ヘルスチェック＋自動修復はプラグイン分離 |
-| 方針整合 | Phase F「カーネルは細く」を維持（`DENNOU_DOCS/PHASE_F_SLIM_KERNEL.md` §2 参照）                      |
+| 方針整合 | Phase F「カーネルは細く」を維持（`DENNOU_DOCS/PHASE_F_SLIM_KERNEL.md` §2 参照）                     |
 
 > **書き込みガードの射程**: ガードは **append 系**経路のみを観測する。コンパクション / 切り捨て / `_rewriteFile()` など **書き換え系**では JSONL ツリー構造が直接破壊され得るが、検知は §4.3.1 経路表 / §4.4 プラグイン仕様 に委ねる。
 
@@ -293,20 +294,20 @@ KASOU 本番セッション `93fcc1a8-7563-4cf2-b9f1-e4552e7e444f.jsonl` で、*
 
 > 行番号は 2026-09-10 時点の main を基準に更新済み。
 
-| 分類 | ファイル:行 | 概要 |
-| --- | --- | --- |
-| **append 系（ガートの主射程・raw `SessionManager.open()` を要置換）** | `src/gateway/server-methods/chat-transcript-inject.ts:74` | Gateway からの transcript 注入。`:78` で `sessionManager.appendMessage(messageBody)`。`guardSessionManager(SessionManager.open(params.transcriptPath), …)` に置換済み |
-| append 系（ミラー） | `src/config/sessions/transcript.ts:165` | `appendAssistantMessageToSessionTranscript`（delivery mirror）。`:169` で `sessionManager.appendMessage(message)`。`guardSessionManager(...)` に置換済み |
-| **間接書き込み経路（seam 経由で wrapped instance が流入するため自動カバー）** | `src/agents/pi-embedded-runner/replay-history.ts:300,328,357` | `MODEL_SNAPSHOT_CUSTOM_TYPE = "model-snapshot"`（`:42`）。`createProviderReplaySessionState(sessionManager)`（`:300`）を介した `appendCustomEntry`（`:328`）と `appendModelSnapshot()`（`:355`）内の `appendCustomEntry`（`:357`）。呼び出し元 `run/attempt.ts:1205` / `compact.ts:821` の `sanitizeSessionHistory()` は wrapped instance を受け継ぐ（孤児 146 件中 112 件を占めた行を書き込む経路） |
-| 間接書き込み経路 | `src/plugins/provider-replay-helpers.ts:116` | `markGoogleTurnOrderingMarker()` 内の `sessionState.appendCustomEntry(GOOGLE_TURN_ORDERING_CUSTOM_TYPE, …)`（呼び出し元 `:165`）。`sessionState` は `replay-history.ts:300` で wrapped instance から構築されるため自動カバー |
-| 間接書き込み経路 | `src/agents/pi-embedded-runner/run/attempt.ts:1941` | `appendCustomEntry("openclaw:prompt-error", …)`（孤児 146 件中 31 件を占めた行を書き込む経路）。`attempt.ts:826` の `guardSessionManager()` 済み instance を使うため自動カバー |
-| **書き換え系（ガートの射程外 → §4.4 のヘルスチェックが担当）** | `src/agents/pi-embedded-runner/run/attempt.sessions-yield.ts:219` | 唯一の `_rewriteFile?.()` 呼び出し元。`sessionManager?._rewriteFile?.()` で JSONL を直接書き換える |
-| 書き換え系 | `src/agents/pi-embedded-runner/transcript-rewrite.ts:159-166,205` | raw `SessionManager.open(params.sessionFile)`（`:205`）→ `resetLeaf()`（`:159`）/ `branch()`（`:161`）で枝分かれをリセット → `getRawSessionAppendMessage(params.sessionManager)`（`:166`）で分岐末尾を `appendMessage` 再 append して JSONL を書き換える |
-| 書き換え系 | `src/gateway/server-methods/chat.ts:445` | チャット送信ホットパスのメディアパス書き換え（`rewriteChatSendUserTurnMediaPaths`、呼び出し元 `:1676`）。`SessionManager.open(params.transcriptPath)`（`:445`）で開き `MediaPath` / `MediaPaths` を上書きして `branch()` で leaf を付け替える |
-| 書き換え系 | `src/agents/pi-embedded-runner/context-engine-maintenance.ts:25-32` | `buildContextEngineMaintenanceRuntimeContext()` の `rewriteTranscriptEntries` クロージャから `transcript-rewrite.ts` の書き換え関数を呼び出す独立した入口 |
-| 書き換え系 | `src/agents/pi-embedded-runner/tool-result-truncation.ts:215,227` | raw `SessionManager.open(sessionFile)`（`:227`）→ oversized tool result を `branch()` 上で切り詰めて再構成。呼び出し元 `run.ts:1032` の `truncateOversizedToolResultsInSession()`（`:215`） |
-| 書き換え系 | `src/agents/pi-embedded-runner/session-truncation.ts:42` | raw `SessionManager.open(sessionFile)`（`:42`）→ コンパクション後の切り捨て。呼び出し元 `compact.ts:118` の `truncateSessionAfterCompaction()` |
-| 書き換え系 | SDK 側 `_rewriteFile()` | pi-coding-agent の内部実装。`SessionManager._rewriteFile()` は private。`transcript-rewrite.ts` / `session-truncation.ts` / `tool-result-truncation.ts` は直接の `_rewriteFile` 呼び出しを持たず、`attempt.sessions-yield.ts:219` を唯一の侵入口とする |
+| 分類                                                                          | ファイル:行                                                         | 概要                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **append 系（ガートの主射程・raw `SessionManager.open()` を要置換）**         | `src/gateway/server-methods/chat-transcript-inject.ts:74`           | Gateway からの transcript 注入。`:78` で `sessionManager.appendMessage(messageBody)`。`guardSessionManager(SessionManager.open(params.transcriptPath), …)` に置換済み                                                                                                                                                                                                                                |
+| append 系（ミラー）                                                           | `src/config/sessions/transcript.ts:165`                             | `appendAssistantMessageToSessionTranscript`（delivery mirror）。`:169` で `sessionManager.appendMessage(message)`。`guardSessionManager(...)` に置換済み                                                                                                                                                                                                                                             |
+| **間接書き込み経路（seam 経由で wrapped instance が流入するため自動カバー）** | `src/agents/pi-embedded-runner/replay-history.ts:300,328,357`       | `MODEL_SNAPSHOT_CUSTOM_TYPE = "model-snapshot"`（`:42`）。`createProviderReplaySessionState(sessionManager)`（`:300`）を介した `appendCustomEntry`（`:328`）と `appendModelSnapshot()`（`:355`）内の `appendCustomEntry`（`:357`）。呼び出し元 `run/attempt.ts:1205` / `compact.ts:821` の `sanitizeSessionHistory()` は wrapped instance を受け継ぐ（孤児 146 件中 112 件を占めた行を書き込む経路） |
+| 間接書き込み経路                                                              | `src/plugins/provider-replay-helpers.ts:116`                        | `markGoogleTurnOrderingMarker()` 内の `sessionState.appendCustomEntry(GOOGLE_TURN_ORDERING_CUSTOM_TYPE, …)`（呼び出し元 `:165`）。`sessionState` は `replay-history.ts:300` で wrapped instance から構築されるため自動カバー                                                                                                                                                                         |
+| 間接書き込み経路                                                              | `src/agents/pi-embedded-runner/run/attempt.ts:1941`                 | `appendCustomEntry("openclaw:prompt-error", …)`（孤児 146 件中 31 件を占めた行を書き込む経路）。`attempt.ts:826` の `guardSessionManager()` 済み instance を使うため自動カバー                                                                                                                                                                                                                       |
+| **書き換え系（ガートの射程外 → §4.4 のヘルスチェックが担当）**                | `src/agents/pi-embedded-runner/run/attempt.sessions-yield.ts:219`   | 唯一の `_rewriteFile?.()` 呼び出し元。`sessionManager?._rewriteFile?.()` で JSONL を直接書き換える                                                                                                                                                                                                                                                                                                   |
+| 書き換え系                                                                    | `src/agents/pi-embedded-runner/transcript-rewrite.ts:159-166,205`   | raw `SessionManager.open(params.sessionFile)`（`:205`）→ `resetLeaf()`（`:159`）/ `branch()`（`:161`）で枝分かれをリセット → `getRawSessionAppendMessage(params.sessionManager)`（`:166`）で分岐末尾を `appendMessage` 再 append して JSONL を書き換える                                                                                                                                             |
+| 書き換え系                                                                    | `src/gateway/server-methods/chat.ts:445`                            | チャット送信ホットパスのメディアパス書き換え（`rewriteChatSendUserTurnMediaPaths`、呼び出し元 `:1676`）。`SessionManager.open(params.transcriptPath)`（`:445`）で開き `MediaPath` / `MediaPaths` を上書きして `branch()` で leaf を付け替える                                                                                                                                                        |
+| 書き換え系                                                                    | `src/agents/pi-embedded-runner/context-engine-maintenance.ts:25-32` | `buildContextEngineMaintenanceRuntimeContext()` の `rewriteTranscriptEntries` クロージャから `transcript-rewrite.ts` の書き換え関数を呼び出す独立した入口                                                                                                                                                                                                                                            |
+| 書き換え系                                                                    | `src/agents/pi-embedded-runner/tool-result-truncation.ts:215,227`   | raw `SessionManager.open(sessionFile)`（`:227`）→ oversized tool result を `branch()` 上で切り詰めて再構成。呼び出し元 `run.ts:1032` の `truncateOversizedToolResultsInSession()`（`:215`）                                                                                                                                                                                                          |
+| 書き換え系                                                                    | `src/agents/pi-embedded-runner/session-truncation.ts:42`            | raw `SessionManager.open(sessionFile)`（`:42`）→ コンパクション後の切り捨て。呼び出し元 `compact.ts:118` の `truncateSessionAfterCompaction()`                                                                                                                                                                                                                                                       |
+| 書き換え系                                                                    | SDK 側 `_rewriteFile()`                                             | pi-coding-agent の内部実装。`SessionManager._rewriteFile()` は private。`transcript-rewrite.ts` / `session-truncation.ts` / `tool-result-truncation.ts` は直接の `_rewriteFile` 呼び出しを持たず、`attempt.sessions-yield.ts:219` を唯一の侵入口とする                                                                                                                                               |
 
 > **カーネル側ラッパの観測範囲に関する注意**: ガート射程は (a) カーネルが所有する raw `SessionManager.open()` 経路と (b) `guardSessionManager()` 済み instance を介した間接経路のみ。SDK 内部からの append 呼び出しはカーネル側ラッパでは観測できない。具体的には `@earendil-works/pi-coding-agent` の `agent-session` 系（`appendModelChange` / `appendThinkingLevelChange` / `appendCompaction`）と `appendSessionInfo` が該当し、これらは SDK 内で `SessionManager` を直接操作するためガードを迂回する。検知は §4.4 のプラグイン側ヘルスチェックが担う。
 
@@ -314,13 +315,13 @@ KASOU 本番セッション `93fcc1a8-7563-4cf2-b9f1-e4552e7e444f.jsonl` で、*
 
 `guardSessionManager()` は冪等（`flushPendingToolResults` の存在チェック: `src/agents/session-tool-result-guard-wrapper.ts:41`）なので二重装着は安全。
 
-| # | ファイル:行（現在） | 状態 |
-| --- | --- | --- |
-| 1 | `src/agents/pi-embedded-runner/run/attempt.ts:826` | ✅ `guardSessionManager(SessionManager.open(params.sessionFile), …)` 装着済み |
-| 2 | `src/agents/pi-embedded-runner/compact.ts:729` | ✅ 同上 |
-| 3 | `src/gateway/server-methods/chat-transcript-inject.ts:74` | ✅ 同上（Phase 1 で新規置換） |
-| 4 | `src/config/sessions/transcript.ts:165` | ✅ 同上（Phase 1 で新規置換） |
-| 5 | `src/agents/command/attempt-execution.ts`（旧 `:263`） | ⚪ **経路自体が消滅** — `[DEBLOAT]` commit `e712a726fa`（ACP harness/runtime/session-manager 撤去）で `SessionManager` 経路ごと削除された。現在このファイルに `SessionManager` 依存はなし |
+| #   | ファイル:行（現在）                                       | 状態                                                                                                                                                                                      |
+| --- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/agents/pi-embedded-runner/run/attempt.ts:826`        | ✅ `guardSessionManager(SessionManager.open(params.sessionFile), …)` 装着済み                                                                                                             |
+| 2   | `src/agents/pi-embedded-runner/compact.ts:729`            | ✅ 同上                                                                                                                                                                                   |
+| 3   | `src/gateway/server-methods/chat-transcript-inject.ts:74` | ✅ 同上（Phase 1 で新規置換）                                                                                                                                                             |
+| 4   | `src/config/sessions/transcript.ts:165`                   | ✅ 同上（Phase 1 で新規置換）                                                                                                                                                             |
+| 5   | `src/agents/command/attempt-execution.ts`（旧 `:263`）    | ⚪ **経路自体が消滅** — `[DEBLOAT]` commit `e712a726fa`（ACP harness/runtime/session-manager 撤去）で `SessionManager` 経路ごと削除された。現在このファイルに `SessionManager` 依存はなし |
 
 > **Note（as-built）**: 設計時は「raw `SessionManager.open()` 3 箇所を置換」だったが、そのうち `attempt-execution.ts` の経路は後続のデブロートで消滅した。結果として現在の生きた append 主射程は **4 箇所**（上表 1〜4）である。
 
@@ -413,15 +414,15 @@ extensions/session-integrity-guard/
 
 **プラグイン設定スキーマ**（`openclaw.plugin.json`）:
 
-| キー | 型 | 既定 | 意味 |
-| --- | --- | --- | --- |
-| `enabled` | boolean | `true` | ガード全体の有効／無効 |
-| `frequency` | string | `"0 3 * * *"` | ヘルスチェック cron 式 |
-| `timezone` | string | （ホストローカル） | cron のタイムゾーン |
-| `autoRepair` | boolean | `false` | 孤児（`type !== "message"`）の自動除去を有効化 |
-| `notify.enabled` | boolean | `false` | Discord / Telegram 通知の有効化 |
-| `notify.channel` | `"discord"` \| `"telegram"` | `"discord"` | 通知先チャンネル |
-| `notify.to` / `notify.accountId` / `notify.bestEffort` | string / string / boolean | 任意 | 通知先の詳細指定 |
+| キー                                                   | 型                          | 既定               | 意味                                           |
+| ------------------------------------------------------ | --------------------------- | ------------------ | ---------------------------------------------- |
+| `enabled`                                              | boolean                     | `true`             | ガード全体の有効／無効                         |
+| `frequency`                                            | string                      | `"0 3 * * *"`      | ヘルスチェック cron 式                         |
+| `timezone`                                             | string                      | （ホストローカル） | cron のタイムゾーン                            |
+| `autoRepair`                                           | boolean                     | `false`            | 孤児（`type !== "message"`）の自動除去を有効化 |
+| `notify.enabled`                                       | boolean                     | `false`            | Discord / Telegram 通知の有効化                |
+| `notify.channel`                                       | `"discord"` \| `"telegram"` | `"discord"`        | 通知先チャンネル                               |
+| `notify.to` / `notify.accountId` / `notify.bestEffort` | string / string / boolean   | 任意               | 通知先の詳細指定                               |
 
 > **安全側の既定**: `autoRepair` と `notify.enabled` は **既定 `false`**。既存デプロイを勝手に書き換えない。
 
@@ -429,12 +430,12 @@ extensions/session-integrity-guard/
 
 実体は `extensions/session-integrity-guard/src/health-check.ts` の純関数 `runHealthCheck(content)`。
 
-| 項目         | 計測方法（実装の述語）                                                                                                  | 閾値（推奨）        |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| 孤児ノード数 | `parentId !== null` かつ `parentId` が他のエントリに存在しない行数（`byId.has(parentId)` が false）                     | **> 0 で警告**      |
-| JSON 構文    | `JSON.parse()` 失敗行に加え、`id` 欠落 / `parentId` が非 null かつ非 string の行も `jsonErrorCount` に算入               | エラー 1 件でも警告 |
-| 重複 ID      | `id` の集合（unique）と全出現数の不一致。重複した id の件数を報告                                                       | エラーで警告        |
-| leaf node 数 | `parentId` として他行から**一度も参照されない**ノード数。ヘッダ行（`type: "session"`）は `parseLine` で短絡され除外    | > 1 で警告          |
+| 項目         | 計測方法（実装の述語）                                                                                              | 閾値（推奨）        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 孤児ノード数 | `parentId !== null` かつ `parentId` が他のエントリに存在しない行数（`byId.has(parentId)` が false）                 | **> 0 で警告**      |
+| JSON 構文    | `JSON.parse()` 失敗行に加え、`id` 欠落 / `parentId` が非 null かつ非 string の行も `jsonErrorCount` に算入          | エラー 1 件でも警告 |
+| 重複 ID      | `id` の集合（unique）と全出現数の不一致。重複した id の件数を報告                                                   | エラーで警告        |
+| leaf node 数 | `parentId` として他行から**一度も参照されない**ノード数。ヘッダ行（`type: "session"`）は `parseLine` で短絡され除外 | > 1 で警告          |
 
 補足:
 
@@ -479,21 +480,21 @@ extensions/session-integrity-guard/
 
 通知は cron の `delivery` フィールドを使用する（`buildNotifyDelivery()`）。
 
-| 設定 | 生成される delivery |
-| --- | --- |
-| `notify.enabled: true` | `{ mode: "announce", channel: "discord" \| "telegram", to?, accountId?, bestEffort? }` |
-| `notify.enabled: false` | `{ mode: "none" }`（ジョブは store に残るが送信しない） |
+| 設定                    | 生成される delivery                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `notify.enabled: true`  | `{ mode: "announce", channel: "discord" \| "telegram", to?, accountId?, bestEffort? }` |
+| `notify.enabled: false` | `{ mode: "none" }`（ジョブは store に残るが送信しない）                                |
 
 `mode: "announce"` には `channel` が必須。`to` / `accountId` / `bestEffort` は任意。
 
 #### 4.4.5 自動修復ルール
 
-| 区分             | 内容                                                                                                                                                        |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 区分             | 内容                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | **除去してよい** | 親不在かつ **`type !== "message"` の行のみ**（toolResult を含む message 行のツリー文脈復元への影響を考慮し、安全側で message 行を全て除外する） |
-| **絶対触らない** | `user` / `assistant` メッセージ行、`session` ヘッダ、ルート（`parentId: null`）、`type === "message"` の行全般                                              |
-| **修復前に必ず** | `<file>.bak.YYYYMMDD-HHmmss` としてバックアップ取得（`flag: "wx"` の新規作成。失敗時は partial artifact を掃除して fail-closed） |
-| **判断ロジック** | `parentId !== null && !byId.has(parentId) && entry.type !== "message"` で孤児判定し、除去対象を限定する                                                     |
+| **絶対触らない** | `user` / `assistant` メッセージ行、`session` ヘッダ、ルート（`parentId: null`）、`type === "message"` の行全般                                  |
+| **修復前に必ず** | `<file>.bak.YYYYMMDD-HHmmss` としてバックアップ取得（`flag: "wx"` の新規作成。失敗時は partial artifact を掃除して fail-closed）                |
+| **判断ロジック** | `parentId !== null && !byId.has(parentId) && entry.type !== "message"` で孤児判定し、除去対象を限定する                                         |
 
 > **統一方針（設計時 MED 1 対応）**: アーキテクチャ図・データフロー・リスク表・本表および `isRemovableOrphan` の判定を **`type !== "message"` である孤児行のみ除去** に統一する。「`type !== "message"` の孤児行」は `type: "custom"` / `type: "model_change"` / `type: "compaction"` / `type: "label"` 等の非 message エントリにヒットする。`type === "message"` 行（user / assistant / toolResult / system 等）は **`isRemovableOrphan` で `false` を返す**ことで、ツール結果のツリー文脈復元に必要な行を誤って削除しないようにする。
 
@@ -513,6 +514,7 @@ function isRemovableOrphan(entry: RepairEntrySnapshot): boolean {
 
 > **Note（`model-snapshot` / `prompt-error` の行型について・設計時 MED 4 補足を精密化）**: セッション JSONL 上では、これらの行の `type` は **`"custom"`** であり、識別子は別フィールド **`customType: "model-snapshot"` / `customType: "openclaw:prompt-error"`** に入る（SDK の `appendCustomEntry(customType, data)` が `{ type: "custom", customType, data, … }` を書く。`session-manager.d.ts` の `CustomEntry` 参照）。
 > したがって:
+>
 > - 健康チェックの孤児内訳に現れる `type` は `custom` と表示される（`model-snapshot` の文字列ではない）。
 > - 旧ランタイムの `model_snapshot` / `prompt_error`（アンダースコア）は別のレガシー型名だが、修復モジュールはどちらでも分岐しない。`type !== "message"` という単一述語で等価に除去対象になる（未定義カスタム型を将来追加する余地を残す）。
 
@@ -526,11 +528,11 @@ function isRemovableOrphan(entry: RepairEntrySnapshot): boolean {
 
 #### 4.4.6 実装状態・テスト証跡
 
-| Phase | 内容 | 主な commit | テスト |
-| --- | --- | --- | --- |
-| **Phase 1** | カーネル post-append 検証（`session-integrity-guard.ts` 新規 + `guardSessionManager` への装着 + raw `SessionManager.open()` 経路の置換） | `393f7fdfcd` / レビュー指摘修正 `230724fd4a` | `src/agents/session-integrity-guard.test.ts` — **11 passed** |
-| **Phase 2** | プラグイン雛形 + 日次 cron 登録 + ヘルスチェック | `03b9185540` | `extensions/session-integrity-guard/test/{cron-job,health-check}.test.ts` |
-| **Phase 3** | Discord / Telegram 通知 + バックアップ付き自動修復（dry-run → apply） | `dc03f1097e` | `extensions/session-integrity-guard/test/{notify,repair}.test.ts` — プラグイン全体 **39 passed** |
+| Phase       | 内容                                                                                                                                     | 主な commit                                  | テスト                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Phase 1** | カーネル post-append 検証（`session-integrity-guard.ts` 新規 + `guardSessionManager` への装着 + raw `SessionManager.open()` 経路の置換） | `393f7fdfcd` / レビュー指摘修正 `230724fd4a` | `src/agents/session-integrity-guard.test.ts` — **11 passed**                                     |
+| **Phase 2** | プラグイン雛形 + 日次 cron 登録 + ヘルスチェック                                                                                         | `03b9185540`                                 | `extensions/session-integrity-guard/test/{cron-job,health-check}.test.ts`                        |
+| **Phase 3** | Discord / Telegram 通知 + バックアップ付き自動修復（dry-run → apply）                                                                    | `dc03f1097e`                                 | `extensions/session-integrity-guard/test/{notify,repair}.test.ts` — プラグイン全体 **39 passed** |
 
 実行確認（2026-09-10 時点の main）:
 
@@ -543,10 +545,10 @@ function isRemovableOrphan(entry: RepairEntrySnapshot): boolean {
 
 本節はドキュメント統合作業中に行ったコード突き合わせで見つかった事項であり、**ユーザー裁定を待つ未修正の項目**である。ヘルスチェックと自動修復の本体処理は影響を受けない。
 
-| # | 症状 | 証拠 | 影響 |
-| --- | --- | --- | --- |
+| #       | 症状                                                                                                                                                                   | 証拠                                                                                                                                                                                                                                                                                                                                                           | 影響                                                                                                                                                                             |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **G-1** | `reconcileIntegrityNotifyCronJob()` が登録するジョブ仕様（`sessionTarget: "main"` + `delivery: { mode: "announce", … }`）を、カーネルの cron バリデータが **拒否**する | `src/cron/service/jobs.ts:189` が `throw new Error('cron channel delivery config is only supported for sessionTarget="isolated"')`。実測（一時検証テストで `createJob()` に同仕様を投入）: `THREW: cron channel delivery config is only supported for sessionTarget="isolated"`。既存の回帰テスト `src/cron/service.jobs.test.ts:508` も同制約を固定化している | announce cron が登録されず、起動時に `session-integrity-guard: startup reconciliation failed: …` が ERROR ログに出る（`index.ts` の try/catch が吞む）。検知結果が外部に届かない |
-| **G-2** | `runIntegrityHealthCheck()` が生成する `notifyMessage` を **誰も購読していない** | `extensions/session-integrity-guard/index.ts` のハンドラは `gateway:startup` と `before_agent_reply`（`INTEGRITY_EVENT_TEXT` 用）の 2 つのみ。`INTEGRITY_NOTIFY_EVENT_TEXT`（`__openclaw_session_integrity_notify_publish__`）のハンドラは存在せず、`notifyMessage` の参照箇所も `cron-job.ts` 内の return のみ | 仮に G-1 が解消されても、通知文面がチャンネルへ publish される経路がない |
+| **G-2** | `runIntegrityHealthCheck()` が生成する `notifyMessage` を **誰も購読していない**                                                                                       | `extensions/session-integrity-guard/index.ts` のハンドラは `gateway:startup` と `before_agent_reply`（`INTEGRITY_EVENT_TEXT` 用）の 2 つのみ。`INTEGRITY_NOTIFY_EVENT_TEXT`（`__openclaw_session_integrity_notify_publish__`）のハンドラは存在せず、`notifyMessage` の参照箇所も `cron-job.ts` 内の return のみ                                                | 仮に G-1 が解消されても、通知文面がチャンネルへ publish される経路がない                                                                                                         |
 
 背景: announce delivery はカーネル cron の仕様上 **isolated agentTurn ジョブ専用**である（`payload.kind: "agentTurn"` + `sessionTarget: "isolated"`。`docs/automation/cron-jobs.md` の Delivery and output 節）。プラグインは従来の main + systemEvent パターンを流用したため、delivery を伴う通知ジョブだけが成立していない。
 
@@ -670,20 +672,20 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 `describe("installSessionIntegrityGuard")`:
 
-| ケース                                                   | 期待結果                                          |
-| -------------------------------------------------------- | ------------------------------------------------- |
-| キルスイッチ `DENNOU_SKIP_INTEGRITY_GUARD=1`             | `appendMessage` をラップしない                    |
-| 冪等性（繰り返し装着）                                   | ラッパが二重化しない                              |
-| `[RAW_APPEND_MESSAGE]` シンボル継承                      | tool-result ガードと同一の生 append を共有        |
-| `appendCustomEntry` のラップと検証                       | append ごとに検証が走る                          |
+| ケース                                       | 期待結果                                   |
+| -------------------------------------------- | ------------------------------------------ |
+| キルスイッチ `DENNOU_SKIP_INTEGRITY_GUARD=1` | `appendMessage` をラップしない             |
+| 冪等性（繰り返し装着）                       | ラッパが二重化しない                       |
+| `[RAW_APPEND_MESSAGE]` シンボル継承          | tool-result ガードと同一の生 append を共有 |
+| `appendCustomEntry` のラップと検証           | append ごとに検証が走る                    |
 
 `describe("guardSessionManager + integrity integration")`:
 
-| ケース                                                   | 期待結果                                                    |
-| -------------------------------------------------------- | ----------------------------------------------------------- |
-| tool-result ガードと積んだ状態                          | 検証が生き続ける（tool-result 変換後の状態を検証）          |
-| 検証失敗時（leaf 消失）                                  | `sessions/integrity` に ERROR ログが出る                    |
-| 装着順序                                                 | `integrity → toolResult → raw` が成立                        |
+| ケース                         | 期待結果                                           |
+| ------------------------------ | -------------------------------------------------- |
+| tool-result ガードと積んだ状態 | 検証が生き続ける（tool-result 変換後の状態を検証） |
+| 検証失敗時（leaf 消失）        | `sessions/integrity` に ERROR ログが出る           |
+| 装着順序                       | `integrity → toolResult → raw` が成立              |
 
 #### 4.6.2 統合テスト（プラグイン側）
 
@@ -705,11 +707,11 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 #### 4.6.3 負荷想定
 
-| 規模                            | 想定挙動                                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| セッション 1000 行              | ガード追加レイテンシ < 1ms                                                                       |
-| セッション 10⁴ 行               | ガード追加レイテンシ < 5ms                                                                       |
-| セッション 10⁵ 行（異常ケース） | ガードで**検知**され、ERROR ログが残る（書き込みは既に行われている。修復は別経路）               |
+| 規模                            | 想定挙動                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| セッション 1000 行              | ガード追加レイテンシ < 1ms                                                         |
+| セッション 10⁴ 行               | ガード追加レイテンシ < 5ms                                                         |
+| セッション 10⁵ 行（異常ケース） | ガードで**検知**され、ERROR ログが残る（書き込みは既に行われている。修復は別経路） |
 
 ベンチは `vitest.performance-config.ts` の既存パターン（`experimental.fsModuleCache` / `experimental.importDurations` 設定ヘルパー）に乗せる。
 
@@ -717,11 +719,11 @@ cron: 0 3 * * *  →  systemEvent payload で main セッション起床
 
 ### 4.7 実装フェーズと完了状況
 
-| フェーズ | 内容 | 完了条件 | 状態 |
-| --- | --- | --- | --- |
-| **Phase 1** | カーネル側ガード最小実装（`session-integrity-guard.ts` 新規 + `guardSessionManager` への appendMessage ラッパ装着 + §4.3.1 表の raw `SessionManager.open()` 経路の `guardSessionManager` 置換） | (a) ユニットテスト全件 PASS、(b) 既存 `transcript.test.ts` 全件 PASS、(c) ガード有効化後に既存セッションへの追加書き込みで副作用なし、(d) §4.3.1 表の全 append 経路が `guardSessionManager()` 経由の wrapped instance になっている | ✅ **完了**（`393f7fdfcd` + レビュー修正 `230724fd4a`） |
-| **Phase 2** | プラグイン雛形作成 + cron 登録 | (a) `extensions/session-integrity-guard/` パッケージ生成、(b) 起動時 startup イベントで cron 取得 → 日次ジョブ登録、(c) ヘルスチェック関数のみ有効 | ✅ **完了**（`03b9185540`） |
-| **Phase 3** | 通知 + 自動修復 | (a) Discord / Telegram への異常通知、(b) ドライラン→実適用の 2 段階が意図通り動作、(c) 修復後の再パースで孤児 0 件 かつ 修復前と user/assistant 行のハッシュが一致 かつ バックアップファイルが存在、の 3 点を検証ログに記録 | ✅ **実装・テスト完了**（`dc03f1097e`）。⚠️ (a) の**配線に未解決事項あり** → §4.4.7 |
+| フェーズ    | 内容                                                                                                                                                                                            | 完了条件                                                                                                                                                                                                                           | 状態                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Phase 1** | カーネル側ガード最小実装（`session-integrity-guard.ts` 新規 + `guardSessionManager` への appendMessage ラッパ装着 + §4.3.1 表の raw `SessionManager.open()` 経路の `guardSessionManager` 置換） | (a) ユニットテスト全件 PASS、(b) 既存 `transcript.test.ts` 全件 PASS、(c) ガード有効化後に既存セッションへの追加書き込みで副作用なし、(d) §4.3.1 表の全 append 経路が `guardSessionManager()` 経由の wrapped instance になっている | ✅ **完了**（`393f7fdfcd` + レビュー修正 `230724fd4a`）                             |
+| **Phase 2** | プラグイン雛形作成 + cron 登録                                                                                                                                                                  | (a) `extensions/session-integrity-guard/` パッケージ生成、(b) 起動時 startup イベントで cron 取得 → 日次ジョブ登録、(c) ヘルスチェック関数のみ有効                                                                                 | ✅ **完了**（`03b9185540`）                                                         |
+| **Phase 3** | 通知 + 自動修復                                                                                                                                                                                 | (a) Discord / Telegram への異常通知、(b) ドライラン→実適用の 2 段階が意図通り動作、(c) 修復後の再パースで孤児 0 件 かつ 修復前と user/assistant 行のハッシュが一致 かつ バックアップファイルが存在、の 3 点を検証ログに記録        | ✅ **実装・テスト完了**（`dc03f1097e`）。⚠️ (a) の**配線に未解決事項あり** → §4.4.7 |
 
 > **レビュー履歴**: Phase 1 は実装後にレビューを受け、指摘（単一 emit / hook-block ハンドリング / 共有シンボル）を `230724fd4a` で修正済み。Phase 2 / Phase 3 も実装＋テストを伴って完了している。
 >
@@ -815,32 +817,32 @@ Gatekeeper は「誰が変更したか」を保証する監査層であり、JSO
 
 本番の強制ルールは **Reject Unknown** とする。
 
-| 判定 | 動作 |
-| --- | --- |
-| actor が登録済み、action / op / sessionId が妥当 | チェックインログを出力して変更を許可 |
-| actor が空、未登録、または action が不明 | 変更前に拒否し、`lines=0` の拒否ログを出力 |
-| sessionId または op を解決できない | 変更前に拒否し、対象不明として記録 |
-| Gatekeeper を迂回する直接書き込みを検出 | §4 のヘルスチェックで異常化し、経路を登録対象へ戻す |
+| 判定                                             | 動作                                                |
+| ------------------------------------------------ | --------------------------------------------------- |
+| actor が登録済み、action / op / sessionId が妥当 | チェックインログを出力して変更を許可                |
+| actor が空、未登録、または action が不明         | 変更前に拒否し、`lines=0` の拒否ログを出力          |
+| sessionId または op を解決できない               | 変更前に拒否し、対象不明として記録                  |
+| Gatekeeper を迂回する直接書き込みを検出          | §4 のヘルスチェックで異常化し、経路を登録対象へ戻す |
 
 「警告ログだけで通す」扱いは、既存 caller を棚卸しする Phase A の移行期間に限る。Phase B 以降は、誰が変更したか明確でない書き込みを通さない。
 
 ### 5.5 実装フェーズ
 
-| フェーズ | 内容 | 完了条件 |
-| --- | --- | --- |
+| フェーズ              | 内容                                                                                                                                                                              | 完了条件                                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | **Phase A: ログのみ** | 全 append / prune / rewrite / repair / compact 経路を Gatekeeper に接続し、caller identity とチェックインログを記録する。既存挙動は維持し、未登録 caller は警告付きで棚卸しする。 | journal / gateway ログから actor・action・op・lines・sessionId を追跡でき、全変更経路の一覧が得られる |
-| **Phase B: 未知却下** | Phase A で確定した allowlist を登録し、空・未知・不完全な caller の変更を実行前に拒否する。詳細は §5.7。 | 未知 caller の JSONL が 1 行も変更されず、拒否ログ（`lines=0`）から理由を特定できる |
+| **Phase B: 未知却下** | Phase A で確定した allowlist を登録し、空・未知・不完全な caller の変更を実行前に拒否する。詳細は §5.7。                                                                          | 未知 caller の JSONL が 1 行も変更されず、拒否ログ（`lines=0`）から理由を特定できる                   |
 
 ### 5.6 §4 既存ガードとの関係
 
 門番は §4 の Phase 1〜3 と競合しない。役割を次のように分離する。
 
-| 層 | 主な問い | 動作 |
-| --- | --- | --- |
-| **§5 Gatekeeper** | 「誰が変更しようとしているか」 | 変更前に identity を確認し、記録または拒否 |
-| **§4 Phase 1** | 「追加後のエントリ構造は成立しているか」 | post-append 検証で異常を記録 |
-| **§4 Phase 2** | 「JSONL 全体に孤児・重複・構文異常がないか」 | cron ヘルスチェックで検知 |
-| **§4 Phase 3** | 「検知した安全な孤児をどう戻すか」 | バックアップ後に限定的な自動修復 |
+| 層                | 主な問い                                     | 動作                                       |
+| ----------------- | -------------------------------------------- | ------------------------------------------ |
+| **§5 Gatekeeper** | 「誰が変更しようとしているか」               | 変更前に identity を確認し、記録または拒否 |
+| **§4 Phase 1**    | 「追加後のエントリ構造は成立しているか」     | post-append 検証で異常を記録               |
+| **§4 Phase 2**    | 「JSONL 全体に孤児・重複・構文異常がないか」 | cron ヘルスチェックで検知                  |
+| **§4 Phase 3**    | 「検知した安全な孤児をどう戻すか」           | バックアップ後に限定的な自動修復           |
 
 したがって、§5 が身元と変更履歴を担い、§4 は構造の検知と回復を担う。Gatekeeper が拒否した変更は §4 の修復対象にせず、許可された変更だけが既存の整合性ガードへ進む。直接書き換えや SDK 内部経路など、Phase A で発見した未接続経路は、Phase B の allowlist 登録または Gatekeeper 接続を完了するまで本番の書き込み主体として扱わない。
 
@@ -858,7 +860,7 @@ requestSessionWrite({
   sessionId,
   targetLines,
   reason,
-})
+});
 ```
 
 #### 申請フロー
@@ -871,14 +873,14 @@ requestSessionWrite({
 
 #### 必須フィールド
 
-| フィールド | 要件 |
-| --- | --- |
-| `actor` | 誰が実行するか。登録済み caller identity であること。 |
-| `action` | `append` / `prune` / `rewrite` / `repair` / `compact` のいずれか。 |
-| `op` | 申請を一意に識別する操作 ID。同一 ID の再利用は却下する。 |
-| `sessionId` | 対象セッションを省略しない。解決できない場合は申請を却下する。 |
-| `targetLines` | 変更対象の行範囲。対象が明確な非空の範囲であること。 |
-| `reason` | 何のために実行するか。空欄・曖昧な説明は不可。 |
+| フィールド    | 要件                                                               |
+| ------------- | ------------------------------------------------------------------ |
+| `actor`       | 誰が実行するか。登録済み caller identity であること。              |
+| `action`      | `append` / `prune` / `rewrite` / `repair` / `compact` のいずれか。 |
+| `op`          | 申請を一意に識別する操作 ID。同一 ID の再利用は却下する。          |
+| `sessionId`   | 対象セッションを省略しない。解決できない場合は申請を却下する。     |
+| `targetLines` | 変更対象の行範囲。対象が明確な非空の範囲であること。               |
+| `reason`      | 何のために実行するか。空欄・曖昧な説明は不可。                     |
 
 上記のいずれか1つでも欠ける、空である、または「誰が・何を・何行・なぜ」が特定できない申請は門前払いとする。申請の承認結果は Gatekeeper の事前記録に残し、caller が `granted` を自己発行したり、承認後に対象範囲を変更したりしてはならない。範囲や操作を変更する場合は、新しい `op` で再申請する。
 
@@ -917,22 +919,22 @@ requestSessionWrite({
 
 旧ファイルを参照しているコメント・コミットメッセージ・過去ログの `§N` は、以下のように読み替える。
 
-| 旧 `SESSION_INTEGRITY_GUARD.md` | 本書 `AGENT_SESSION.md` |
-| --- | --- |
-| §1 背景と目的 | §4.1 |
-| §2 アーキテクチャ | §4.2 |
-| §3 カーネル側ガード仕様 | §4.3 |
-| §3.1 対象 API（介入経路一覧） | §4.3.1 |
-| §3.2 ガード関数の責務 | §4.3.2 |
-| §3.3 拒否時の動作 | §4.3.3 |
-| §3.4 性能影響 | §4.3.4 |
-| §4 プラグイン側仕様 | §4.4 |
+| 旧 `SESSION_INTEGRITY_GUARD.md`                                                                    | 本書 `AGENT_SESSION.md`                    |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| §1 背景と目的                                                                                      | §4.1                                       |
+| §2 アーキテクチャ                                                                                  | §4.2                                       |
+| §3 カーネル側ガード仕様                                                                            | §4.3                                       |
+| §3.1 対象 API（介入経路一覧）                                                                      | §4.3.1                                     |
+| §3.2 ガード関数の責務                                                                              | §4.3.2                                     |
+| §3.3 拒否時の動作                                                                                  | §4.3.3                                     |
+| §3.4 性能影響                                                                                      | §4.3.4                                     |
+| §4 プラグイン側仕様                                                                                | §4.4                                       |
 | §4.1 配置 / §4.2 ヘルスチェック項目 / §4.3 cron 実行間隔 / §4.4 異常時の通知 / §4.5 自動修復ルール | §4.4.1 / §4.4.2 / §4.4.3 / §4.4.4 / §4.4.5 |
-| §5 データフロー図（§5.1〜§5.4） | §4.5.1〜§4.5.4 |
-| §6 テスト計画 | §4.6 |
-| §7 実装フェーズ | §4.7 |
-| §8 リスクと非スコープ（§8.1 / §8.2） | §4.8.1 / §4.8.2 |
-| §9 関連参照 | §4.9 |
+| §5 データフロー図（§5.1〜§5.4）                                                                    | §4.5.1〜§4.5.4                             |
+| §6 テスト計画                                                                                      | §4.6                                       |
+| §7 実装フェーズ                                                                                    | §4.7                                       |
+| §8 リスクと非スコープ（§8.1 / §8.2）                                                               | §4.8.1 / §4.8.2                            |
+| §9 関連参照                                                                                        | §4.9                                       |
 
 ---
 

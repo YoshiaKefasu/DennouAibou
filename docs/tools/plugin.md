@@ -279,15 +279,9 @@ export default definePluginEntry({
   id: "my-plugin",
   name: "My Plugin",
   register(api) {
-    api.registerProvider({
-      /* ... */
-    });
-    api.registerTool({
-      /* ... */
-    });
-    api.registerChannel({
-      /* ... */
-    });
+    api.registerProvider({/* ... */});
+    api.registerTool({/* ... */});
+    api.registerChannel({/* ... */});
   },
 });
 ```

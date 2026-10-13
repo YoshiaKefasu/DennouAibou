@@ -21,19 +21,17 @@ type MockResolvedDiscordAccount = {
 };
 
 const hookMocks = vi.hoisted(() => ({
-  resolveDiscordAccount: vi.fn(
-    (params?: { accountId?: string }): MockResolvedDiscordAccount => ({
-      accountId: params?.accountId?.trim() || "default",
-      config: {
-        threadBindings: {
-          spawnSubagentSessions: true,
-        },
+  resolveDiscordAccount: vi.fn((params?: { accountId?: string }): MockResolvedDiscordAccount => ({
+    accountId: params?.accountId?.trim() || "default",
+    config: {
+      threadBindings: {
+        spawnSubagentSessions: true,
       },
-    }),
-  ),
-  autoBindSpawnedDiscordSubagent: vi.fn(
-    async (): Promise<{ threadId: string } | null> => ({ threadId: "thread-1" }),
-  ),
+    },
+  })),
+  autoBindSpawnedDiscordSubagent: vi.fn(async (): Promise<{ threadId: string } | null> => ({
+    threadId: "thread-1",
+  })),
   listThreadBindingsBySessionKey: vi.fn((_params?: unknown): ThreadBindingRecord[] => []),
   unbindThreadBindingsBySessionKey: vi.fn(() => []),
 }));

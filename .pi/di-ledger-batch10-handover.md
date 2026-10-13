@@ -11,15 +11,15 @@ and the uncommitted WIP (`src/config/validation.channel-metadata.test.ts`,
 
 ## Completed (all pass on BOTH runners: 50 tests, 0 failures)
 
-| File | Production seam |
-| --- | --- |
-| `src/infra/outbound/format.test.ts` | `OutboundFormatDeps.getChannelPlugin` in `src/infra/outbound/format.ts` |
-| `src/agents/pi-tools.read.workspace-root-guard.test.ts` | `WrapToolWorkspaceRootGuardDeps.assertSandboxPath` in `src/agents/pi-tools.read.ts` |
+| File                                                     | Production seam                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `src/infra/outbound/format.test.ts`                      | `OutboundFormatDeps.getChannelPlugin` in `src/infra/outbound/format.ts`               |
+| `src/agents/pi-tools.read.workspace-root-guard.test.ts`  | `WrapToolWorkspaceRootGuardDeps.assertSandboxPath` in `src/agents/pi-tools.read.ts`   |
 | `src/auto-reply/reply/session-updates.lifecycle.test.ts` | `SessionUpdatesDeps.getGlobalHookRunner` in `src/auto-reply/reply/session-updates.ts` |
-| `src/commands/doctor-security.test.ts` | `DoctorSecurityDeps` (`note`, `listChannelPlugins`, `loadExecApprovals`) |
-| `src/gateway/server-session-key.test.ts` | `ResolveSessionKeyForRunDeps` (`loadConfig`, `loadCombinedSessionStoreForGateway`) |
-| `src/gateway/sessions-resolve.test.ts` | `SessionsResolveDeps` (session store + gateway session helpers) |
-| `src/gateway/server-methods/config.test.ts` | `setConfigOpenFileRunnerForTests` seam for `config.openFile` |
+| `src/commands/doctor-security.test.ts`                   | `DoctorSecurityDeps` (`note`, `listChannelPlugins`, `loadExecApprovals`)              |
+| `src/gateway/server-session-key.test.ts`                 | `ResolveSessionKeyForRunDeps` (`loadConfig`, `loadCombinedSessionStoreForGateway`)    |
+| `src/gateway/sessions-resolve.test.ts`                   | `SessionsResolveDeps` (session store + gateway session helpers)                       |
+| `src/gateway/server-methods/config.test.ts`              | `setConfigOpenFileRunnerForTests` seam for `config.openFile`                          |
 
 Verification commands used per file (and for the whole set):
 

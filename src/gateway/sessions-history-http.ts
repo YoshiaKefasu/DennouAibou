@@ -6,8 +6,6 @@ import { loadSessionStore } from "../config/sessions.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
-import { DEFAULT_CHAT_HISTORY_TEXT_MAX_CHARS, sanitizeChatHistoryMessages } from "./server-methods/chat.js";
-import { SessionHistorySseState } from "./session-history-state.js";
 import {
   sendInvalidRequest,
   sendJson,
@@ -20,6 +18,11 @@ import {
   resolveTrustedHttpOperatorScopes,
 } from "./http-utils.js";
 import { authorizeOperatorScopesForMethod } from "./method-scopes.js";
+import {
+  DEFAULT_CHAT_HISTORY_TEXT_MAX_CHARS,
+  sanitizeChatHistoryMessages,
+} from "./server-methods/chat.js";
+import { SessionHistorySseState } from "./session-history-state.js";
 import {
   attachOpenClawTranscriptMeta,
   readSessionMessages,

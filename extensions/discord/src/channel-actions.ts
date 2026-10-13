@@ -1,4 +1,3 @@
-import { Type } from "typebox";
 import {
   createUnionActionGate,
   listTokenSourcedAccounts,
@@ -9,6 +8,7 @@ import type {
   ChannelMessageToolDiscovery,
 } from "openclaw/plugin-sdk/channel-contract";
 import type { DiscordActionConfig } from "openclaw/plugin-sdk/config-runtime";
+import { Type } from "typebox";
 import {
   createDiscordActionGate,
   listEnabledDiscordAccounts,

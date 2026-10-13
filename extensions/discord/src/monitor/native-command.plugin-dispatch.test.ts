@@ -13,13 +13,13 @@ import {
   setActivePluginRegistry,
 } from "../../../../test/helpers/plugins/plugin-registry.js";
 import {
-  createMockCommandInteraction,
-  type MockCommandInteraction,
-} from "./native-command.test-helpers.js";
-import {
   __testing as discordNativeCommandTesting,
   createDiscordNativeCommand,
 } from "./native-command.js";
+import {
+  createMockCommandInteraction,
+  type MockCommandInteraction,
+} from "./native-command.test-helpers.js";
 import { createNoopThreadBindingManager } from "./thread-bindings.js";
 // Inject the plugin-dispatch boundaries through the module's existing
 // `__testing` seams instead of mocking `openclaw/plugin-sdk/plugin-runtime` and

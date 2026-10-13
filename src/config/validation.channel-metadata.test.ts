@@ -5,9 +5,10 @@ import {
   validateConfigObjectWithPlugins,
 } from "./validation.js";
 
-const mockLoadPluginManifestRegistry = vi.fn(
-  (): PluginManifestRegistry => ({ diagnostics: [], plugins: [] }),
-);
+const mockLoadPluginManifestRegistry = vi.fn((): PluginManifestRegistry => ({
+  diagnostics: [],
+  plugins: [],
+}));
 const mockListPluginDoctorLegacyConfigRules = vi.fn(() => []);
 const previousDisableBundledPlugins = process.env.DENNOU_DISABLE_BUNDLED_PLUGINS;
 

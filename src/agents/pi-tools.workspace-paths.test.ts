@@ -9,8 +9,7 @@ import { createOpenClawCodingTools } from "./pi-tools.js";
 import { expectReadWriteEditTools, getTextContent } from "./test-helpers/pi-tools-fs-helpers.js";
 
 vi.mock("../infra/shell-env.js", async () => {
-  const mod =
-    await import("../infra/shell-env.js");
+  const mod = await import("../infra/shell-env.js");
   return { ...mod, getShellPathFromLoginShell: () => null };
 });
 async function withTempDir<T>(prefix: string, fn: (dir: string) => Promise<T>) {
@@ -217,4 +216,3 @@ describe("workspace path resolution", () => {
     });
   });
 });
-

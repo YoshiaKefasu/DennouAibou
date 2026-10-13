@@ -38,7 +38,7 @@ openclaw cron runs --id <job-id>
 - Isolated cron runs best-effort close tracked browser tabs/processes for their `cron:<jobId>` session when the run completes, so detached browser automation does not leave orphaned processes behind.
 - Isolated cron runs also guard against stale acknowledgement replies. If the
   first result is just an interim status update (`on it`, `pulling everything
-together`, and similar hints) and no descendant subagent run is still
+  together`, and similar hints) and no descendant subagent run is still
   responsible for the final answer, DennouAibou re-prompts once for the actual
   result before delivery.
 

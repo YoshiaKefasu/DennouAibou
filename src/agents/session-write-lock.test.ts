@@ -11,8 +11,7 @@ let resetSessionWriteLockStateForTest: typeof import("./session-write-lock.js").
 let resolveSessionLockMaxHoldFromTimeout: typeof import("./session-write-lock.js").resolveSessionLockMaxHoldFromTimeout;
 
 vi.mock("../shared/pid-alive.js", async () => {
-  const original =
-    await import("../shared/pid-alive.js");
+  const original = await import("../shared/pid-alive.js");
   return {
     ...original,
     // Keep liveness checks real; only pin process start time for PID recycle coverage.

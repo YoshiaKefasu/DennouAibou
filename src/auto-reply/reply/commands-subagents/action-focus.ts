@@ -12,8 +12,8 @@ import {
   resolveThreadBindingSpawnPolicy,
 } from "../../../channels/thread-bindings-policy.js";
 import { getSessionBindingService } from "../../../infra/outbound/session-binding-service.js";
-import { resolveConversationBindingContextFromAcpCommand } from "../conversation-binding-input.js";
 import type { CommandHandlerResult } from "../commands-types.js";
+import { resolveConversationBindingContextFromAcpCommand } from "../conversation-binding-input.js";
 import { type SubagentsCommandContext, resolveFocusTargetSession, stopWithText } from "./shared.js";
 
 type FocusBindingContext = {

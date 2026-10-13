@@ -423,11 +423,7 @@ export class SystemOneClient {
         const outcome = await this.attemptRequest(text, signal);
         if ("verdict" in outcome) return outcome.verdict;
         const remainingMs = deadline - Date.now();
-        if (
-          attempt >= SYSTEM_ONE_MAX_RETRIES ||
-          remainingMs <= 0 ||
-          signal.aborted
-        ) {
+        if (attempt >= SYSTEM_ONE_MAX_RETRIES || remainingMs <= 0 || signal.aborted) {
           // 混雑ではなく「もう予算が無い」ので、他の失敗と同じく breaker に数える。
           this.recordFailure();
           return fallbackResult(`fail-open: http ${outcome.status}`);

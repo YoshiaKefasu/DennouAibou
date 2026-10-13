@@ -1,8 +1,6 @@
 import type { OpenClawConfig } from "../../../src/config/config.js";
 
-export const DEFAULT_IMESSAGE_ATTACHMENT_ROOTS = [
-  "/Users/*/Library/Messages/Attachments",
-] as const;
+export const DEFAULT_IMESSAGE_ATTACHMENT_ROOTS = ["/Users/*/Library/Messages/Attachments"] as const;
 
 interface ImessageAccountConfig {
   attachmentRoots?: string[];
@@ -34,9 +32,7 @@ function resolveIMessageAccountConfig(params: {
   return {};
 }
 
-function mergeInboundPathRoots(
-  ...arrays: (string[] | undefined)[]
-): string[] {
+function mergeInboundPathRoots(...arrays: (string[] | undefined)[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const arr of arrays) {
@@ -58,11 +54,9 @@ export function resolveIMessageAttachmentRoots(params: {
   const account = resolveIMessageAccountConfig(params);
   const channelRoots = (params.cfg.channels?.imessage as { attachmentRoots?: string[] } | undefined)
     ?.attachmentRoots;
-  return mergeInboundPathRoots(
-    account.attachmentRoots,
-    channelRoots,
-    [...DEFAULT_IMESSAGE_ATTACHMENT_ROOTS],
-  );
+  return mergeInboundPathRoots(account.attachmentRoots, channelRoots, [
+    ...DEFAULT_IMESSAGE_ATTACHMENT_ROOTS,
+  ]);
 }
 
 export function resolveIMessageRemoteAttachmentRoots(params: {

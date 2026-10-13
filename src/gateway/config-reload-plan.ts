@@ -97,39 +97,29 @@ function listReloadRules(): ReloadRule[] {
   }
   // Channel docking: plugins contribute hot reload/no-op prefixes here.
   const channelReloadRules: ReloadRule[] = listChannelPlugins().flatMap((plugin) => [
-    ...(plugin.reload?.configPrefixes ?? []).map(
-      (prefix): ReloadRule => ({
-        prefix,
-        kind: "hot",
-        actions: [`restart-channel:${plugin.id}` as ReloadAction],
-      }),
-    ),
-    ...(plugin.reload?.noopPrefixes ?? []).map(
-      (prefix): ReloadRule => ({
-        prefix,
-        kind: "none",
-      }),
-    ),
+    ...(plugin.reload?.configPrefixes ?? []).map((prefix): ReloadRule => ({
+      prefix,
+      kind: "hot",
+      actions: [`restart-channel:${plugin.id}` as ReloadAction],
+    })),
+    ...(plugin.reload?.noopPrefixes ?? []).map((prefix): ReloadRule => ({
+      prefix,
+      kind: "none",
+    })),
   ]);
   const pluginReloadRules: ReloadRule[] = (registry?.reloads ?? []).flatMap((entry) => [
-    ...(entry.registration.restartPrefixes ?? []).map(
-      (prefix): ReloadRule => ({
-        prefix,
-        kind: "restart",
-      }),
-    ),
-    ...(entry.registration.hotPrefixes ?? []).map(
-      (prefix): ReloadRule => ({
-        prefix,
-        kind: "hot",
-      }),
-    ),
-    ...(entry.registration.noopPrefixes ?? []).map(
-      (prefix): ReloadRule => ({
-        prefix,
-        kind: "none",
-      }),
-    ),
+    ...(entry.registration.restartPrefixes ?? []).map((prefix): ReloadRule => ({
+      prefix,
+      kind: "restart",
+    })),
+    ...(entry.registration.hotPrefixes ?? []).map((prefix): ReloadRule => ({
+      prefix,
+      kind: "hot",
+    })),
+    ...(entry.registration.noopPrefixes ?? []).map((prefix): ReloadRule => ({
+      prefix,
+      kind: "none",
+    })),
   ]);
   const rules = [
     ...BASE_RELOAD_RULES,

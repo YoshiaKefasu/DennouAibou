@@ -54,20 +54,14 @@ If understanding fails or is disabled, **the reply flow continues** with the ori
 {
   tools: {
     media: {
-      models: [
-        /* shared list */
-      ],
-      image: {
-        /* optional overrides */
-      },
+      models: [/* shared list */],
+      image: {/* optional overrides */},
       audio: {
         /* optional overrides */
         echoTranscript: true,
         echoFormat: '📝 "{transcript}"',
       },
-      video: {
-        /* optional overrides */
-      },
+      video: {/* optional overrides */},
     },
   },
 }

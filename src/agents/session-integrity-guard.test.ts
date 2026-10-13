@@ -10,8 +10,7 @@ import { guardSessionManager } from "./session-tool-result-guard-wrapper.js";
 const subsystemErrorLog = vi.hoisted(() => vi.fn());
 
 vi.mock("../logging/subsystem.js", async () => {
-  const actual =
-    await import("../logging/subsystem.js");
+  const actual = await import("../logging/subsystem.js");
   const mockLogger: import("../logging/subsystem.js").SubsystemLogger = (() => {
     const passthrough = (level: string) => (message: string, meta?: Record<string, unknown>) => {
       if (level === "error") {

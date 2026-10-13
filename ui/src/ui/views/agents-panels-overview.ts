@@ -127,13 +127,15 @@ export function renderAgentOverview(params: {
         </div>
       </div>
 
-      ${configDirty
-        ? html`
-            <div class="callout warn" style="margin-top: 16px">
-              You have unsaved config changes.
-            </div>
-          `
-        : nothing}
+      ${
+        configDirty
+          ? html`
+              <div class="callout warn" style="margin-top: 16px">
+                You have unsaved config changes.
+              </div>
+            `
+          : nothing
+      }
 
       <div class="agent-model-select" style="margin-top: 20px;">
         <div class="label">Model Selection</div>
@@ -146,13 +148,15 @@ export function renderAgentOverview(params: {
               @change=${(e: Event) =>
                 onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
             >
-              ${isDefault
-                ? html` <option value="">Not set</option> `
-                : html`
-                    <option value="">
-                      ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
-                    </option>
-                  `}
+              ${
+                isDefault
+                  ? html` <option value="">Not set</option> `
+                  : html`
+                      <option value="">
+                        ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
+                      </option>
+                    `
+              }
               ${buildModelOptions(configForm, effectivePrimary ?? undefined, params.modelCatalog)}
             </select>
           </label>

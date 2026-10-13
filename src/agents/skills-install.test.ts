@@ -20,9 +20,7 @@ vi.mock("../process/exec.js", () => ({
 }));
 
 vi.mock("../security/skill-scanner.js", async () => ({
-  ...(await import(
-    "../security/skill-scanner.js",
-  )),
+  ...(await import("../security/skill-scanner.js")),
   scanDirectoryWithSummary: (...args: unknown[]) => scanDirectoryWithSummaryMock(...args),
 }));
 

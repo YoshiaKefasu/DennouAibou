@@ -251,8 +251,6 @@ function resolveMutableSessionStoreKey(
   return Object.keys(store).find((key) => normalizeStoreSessionKey(key) === normalized);
 }
 
-
-
 async function saveSessionStoreUnlocked(
   storePath: string,
   store: Record<string, SessionEntry>,

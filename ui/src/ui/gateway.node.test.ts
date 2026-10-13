@@ -5,13 +5,11 @@ import type { DeviceIdentity } from "./device-identity.ts";
 
 const wsInstances = vi.hoisted((): MockWebSocket[] => []);
 const loadOrCreateDeviceIdentityMock = vi.hoisted(() =>
-  vi.fn(
-    async (): Promise<DeviceIdentity> => ({
-      deviceId: "device-1",
-      privateKey: "private-key", // pragma: allowlist secret
-      publicKey: "public-key", // pragma: allowlist secret
-    }),
-  ),
+  vi.fn(async (): Promise<DeviceIdentity> => ({
+    deviceId: "device-1",
+    privateKey: "private-key", // pragma: allowlist secret
+    publicKey: "public-key", // pragma: allowlist secret
+  })),
 );
 const signDevicePayloadMock = vi.hoisted(() =>
   vi.fn(async (_privateKeyBase64Url: string, _payload: string) => "signature"),

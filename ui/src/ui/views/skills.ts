@@ -162,34 +162,40 @@ export function renderSkills(props: SkillsProps) {
         <div class="muted">${filtered.length} shown</div>
       </div>
 
-      ${props.error
-        ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
-        : nothing}
-      ${filtered.length === 0
-        ? html`
-            <div class="muted" style="margin-top: 16px">
-              ${!props.connected && !props.report
-                ? "Not connected to gateway."
-                : "No skills found."}
-            </div>
-          `
-        : html`
-            <div class="agent-skills-groups" style="margin-top: 16px;">
-              ${groups.map((group) => {
-                return html`
-                  <details class="agent-skills-group" open>
-                    <summary class="agent-skills-header">
-                      <span>${group.label}</span>
-                      <span class="muted">${group.skills.length}</span>
-                    </summary>
-                    <div class="list skills-grid">
-                      ${group.skills.map((skill) => renderSkill(skill, props))}
-                    </div>
-                  </details>
-                `;
-              })}
-            </div>
-          `}
+      ${
+        props.error
+          ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
+          : nothing
+      }
+      ${
+        filtered.length === 0
+          ? html`
+              <div class="muted" style="margin-top: 16px">
+                ${
+                  !props.connected && !props.report
+                    ? "Not connected to gateway."
+                    : "No skills found."
+                }
+              </div>
+            `
+          : html`
+              <div class="agent-skills-groups" style="margin-top: 16px;">
+                ${groups.map((group) => {
+                  return html`
+                    <details class="agent-skills-group" open>
+                      <summary class="agent-skills-header">
+                        <span>${group.label}</span>
+                        <span class="muted">${group.skills.length}</span>
+                      </summary>
+                      <div class="list skills-grid">
+                        ${group.skills.map((skill) => renderSkill(skill, props))}
+                      </div>
+                    </details>
+                  `;
+                })}
+              </div>
+            `
+      }
     </section>
 
     ${detailSkill ? renderSkillDetail(detailSkill, props) : nothing}
@@ -283,93 +289,107 @@ function renderSkillDetail(skill: SkillStatusEntry, props: SkillsProps) {
           <div class="list-sub" style="display: grid; gap: 4px;">
             <div><strong>Source:</strong> ${skill.source}</div>
             <div><strong>Path:</strong> <code>${skill.filePath}</code></div>
-            ${skill.primaryEnv
-              ? html`<div><strong>Primary env:</strong> <code>${skill.primaryEnv}</code></div>`
-              : nothing}
-            ${homepage
-              ? html`
-                  <div>
-                    <strong>Homepage:</strong>
-                    <a href=${homepage} target="_blank" rel="noreferrer noopener">
-                      ${skill.homepage}
-                    </a>
-                  </div>
-                `
-              : nothing}
+            ${
+              skill.primaryEnv
+                ? html`<div><strong>Primary env:</strong> <code>${skill.primaryEnv}</code></div>`
+                : nothing
+            }
+            ${
+              homepage
+                ? html`
+                    <div>
+                      <strong>Homepage:</strong>
+                      <a href=${homepage} target="_blank" rel="noreferrer noopener">
+                        ${skill.homepage}
+                      </a>
+                    </div>
+                  `
+                : nothing
+            }
           </div>
 
-          ${missing.length > 0
-            ? html`
-                <div class="callout warn">
-                  <strong>Missing requirements:</strong>
-                  <div style="margin-top: 4px;">${missing.join(", ")}</div>
-                </div>
-              `
-            : nothing}
-          ${reasons.length > 0
-            ? html`
-                <div class="callout muted">
-                  <strong>Status details:</strong>
-                  <div style="margin-top: 4px;">${reasons.join(", ")}</div>
-                </div>
-              `
-            : nothing}
-          ${skill.primaryEnv
-            ? html`
-                <div class="card" style="padding: 12px; margin: 0;">
-                  <div class="list-title" style="font-size: 13px;">
-                    API Key (${skill.primaryEnv})
+          ${
+            missing.length > 0
+              ? html`
+                  <div class="callout warn">
+                    <strong>Missing requirements:</strong>
+                    <div style="margin-top: 4px;">${missing.join(", ")}</div>
                   </div>
-                  <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <input
-                      type="password"
-                      class="field"
-                      style="flex: 1;"
-                      placeholder="Enter API key"
-                      .value=${editValue}
-                      @input=${(e: Event) =>
-                        props.onEdit(skill.skillKey, (e.target as HTMLInputElement).value)}
-                    />
-                    <button
-                      class="btn btn--sm primary"
-                      ?disabled=${busy || !editValue.trim()}
-                      @click=${() => props.onSaveKey(skill.skillKey)}
-                    >
-                      ${busy ? t("common.saving") : t("common.save")}
-                    </button>
+                `
+              : nothing
+          }
+          ${
+            reasons.length > 0
+              ? html`
+                  <div class="callout muted">
+                    <strong>Status details:</strong>
+                    <div style="margin-top: 4px;">${reasons.join(", ")}</div>
                   </div>
-                </div>
-              `
-            : nothing}
-          ${skill.install && skill.install.length > 0
-            ? html`
-                <div>
-                  <div class="list-title" style="font-size: 13px; margin-bottom: 6px;">
-                    Install Options
+                `
+              : nothing
+          }
+          ${
+            skill.primaryEnv
+              ? html`
+                  <div class="card" style="padding: 12px; margin: 0;">
+                    <div class="list-title" style="font-size: 13px;">
+                      API Key (${skill.primaryEnv})
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                      <input
+                        type="password"
+                        class="field"
+                        style="flex: 1;"
+                        placeholder="Enter API key"
+                        .value=${editValue}
+                        @input=${(e: Event) =>
+                          props.onEdit(skill.skillKey, (e.target as HTMLInputElement).value)}
+                      />
+                      <button
+                        class="btn btn--sm primary"
+                        ?disabled=${busy || !editValue.trim()}
+                        @click=${() => props.onSaveKey(skill.skillKey)}
+                      >
+                        ${busy ? t("common.saving") : t("common.save")}
+                      </button>
+                    </div>
                   </div>
-                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    ${skill.install.map(
-                      (opt) => html`
-                        <button
-                          class="btn btn--sm"
-                          ?disabled=${busy}
-                          @click=${() => props.onInstall(skill.skillKey, skill.name, opt.id)}
-                        >
-                          ${opt.label || opt.id}
-                        </button>
-                      `,
-                    )}
+                `
+              : nothing
+          }
+          ${
+            skill.install && skill.install.length > 0
+              ? html`
+                  <div>
+                    <div class="list-title" style="font-size: 13px; margin-bottom: 6px;">
+                      Install Options
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      ${skill.install.map(
+                        (opt) => html`
+                          <button
+                            class="btn btn--sm"
+                            ?disabled=${busy}
+                            @click=${() => props.onInstall(skill.skillKey, skill.name, opt.id)}
+                          >
+                            ${opt.label || opt.id}
+                          </button>
+                        `,
+                      )}
+                    </div>
                   </div>
-                </div>
-              `
-            : nothing}
-          ${msg
-            ? html`
-                <div class="callout ${msg.kind === "error" ? "danger" : "success"}">
-                  ${msg.message}
-                </div>
-              `
-            : nothing}
+                `
+              : nothing
+          }
+          ${
+            msg
+              ? html`
+                  <div class="callout ${msg.kind === "error" ? "danger" : "success"}">
+                    ${msg.message}
+                  </div>
+                `
+              : nothing
+          }
         </div>
       </div>
     </dialog>

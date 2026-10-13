@@ -84,9 +84,7 @@
       "Transcript shows the action lifecycle correctly."
     ],
     "docsRefs": ["docs/channels/qa-channel.md"],
-    "codeRefs": [
-      "extensions/qa-channel/src/channel-actions.ts"
-    ]
+    "codeRefs": ["extensions/qa-channel/src/channel-actions.ts"]
   },
   {
     "id": "source-docs-discovery-report",
@@ -99,9 +97,7 @@
       "Agent ends with a worked or failed QA report."
     ],
     "docsRefs": ["docs/help/testing.md", "docs/web/dashboard.md", "docs/channels/qa-channel.md"],
-    "codeRefs": [
-      "src/agents/system-prompt.ts"
-    ]
+    "codeRefs": ["src/agents/system-prompt.ts"]
   },
   {
     "id": "subagent-handoff",
@@ -216,9 +212,7 @@
       "Tool output returns a saved MEDIA path and the file exists."
     ],
     "docsRefs": ["docs/tools/image-generation.md", "docs/providers/openai.md"],
-    "codeRefs": [
-      "src/agents/tools/image-generate-tool.ts"
-    ]
+    "codeRefs": ["src/agents/tools/image-generate-tool.ts"]
   },
   {
     "id": "config-patch-hot-apply",

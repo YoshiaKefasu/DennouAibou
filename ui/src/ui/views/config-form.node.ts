@@ -168,16 +168,20 @@ function renderSensitiveToggleButton(params: {
       type="button"
       class="btn btn--icon ${state.isRevealed ? "active" : ""}"
       style="width:28px;height:28px;padding:0;"
-      title=${state.canReveal
-        ? state.isRevealed
-          ? "Hide value"
-          : "Reveal value"
-        : "Disable stream mode to reveal value"}
-      aria-label=${state.canReveal
-        ? state.isRevealed
-          ? "Hide value"
-          : "Reveal value"
-        : "Disable stream mode to reveal value"}
+      title=${
+        state.canReveal
+          ? state.isRevealed
+            ? "Hide value"
+            : "Reveal value"
+          : "Disable stream mode to reveal value"
+      }
+      aria-label=${
+        state.canReveal
+          ? state.isRevealed
+            ? "Hide value"
+            : "Reveal value"
+          : "Disable stream mode to reveal value"
+      }
       aria-pressed=${state.isRevealed}
       ?disabled=${params.disabled || !state.canReveal}
       @click=${() => params.onToggleSensitivePath?.(params.path)}
@@ -553,10 +557,9 @@ export function renderNode(params: {
               (opt) => html`
                 <button
                   type="button"
-                  class="cfg-segmented__btn ${opt === resolvedValue ||
-                  String(opt) === String(resolvedValue)
-                    ? "active"
-                    : ""}"
+                  class="cfg-segmented__btn ${
+                    opt === resolvedValue || String(opt) === String(resolvedValue) ? "active" : ""
+                  }"
                   ?disabled=${disabled}
                   @click=${() => onPatch(path, opt)}
                 >
@@ -720,27 +723,31 @@ function renderTextInput(params: {
             onPatch(path, raw.trim());
           }}
         />
-        ${isStructuredSecretRef
-          ? nothing
-          : renderSensitiveToggleButton({
-              path,
-              state: sensitiveState,
-              disabled,
-              onToggleSensitivePath: params.onToggleSensitivePath,
-            })}
-        ${schema.default !== undefined
-          ? html`
-              <button
-                type="button"
-                class="cfg-input__reset"
-                title="Reset to default"
-                ?disabled=${disabled || effectiveRedacted}
-                @click=${() => onPatch(path, schema.default)}
-              >
-                ↺
-              </button>
-            `
-          : nothing}
+        ${
+          isStructuredSecretRef
+            ? nothing
+            : renderSensitiveToggleButton({
+                path,
+                state: sensitiveState,
+                disabled,
+                onToggleSensitivePath: params.onToggleSensitivePath,
+              })
+        }
+        ${
+          schema.default !== undefined
+            ? html`
+                <button
+                  type="button"
+                  class="cfg-input__reset"
+                  title="Reset to default"
+                  ?disabled=${disabled || effectiveRedacted}
+                  @click=${() => onPatch(path, schema.default)}
+                >
+                  ↺
+                </button>
+              `
+            : nothing
+        }
       </div>
     </div>
   `;
@@ -985,23 +992,25 @@ function renderObject(params: {
         onPatch,
       }),
     )}
-    ${allowExtra
-      ? renderMapField({
-          schema: additional,
-          value: obj,
-          path,
-          hints,
-          rawAvailable,
-          unsupported,
-          disabled,
-          reservedKeys: reserved,
-          searchCriteria: childSearchCriteria,
-          revealSensitive,
-          isSensitivePathRevealed,
-          onToggleSensitivePath,
-          onPatch,
-        })
-      : nothing}
+    ${
+      allowExtra
+        ? renderMapField({
+            schema: additional,
+            value: obj,
+            path,
+            hints,
+            rawAvailable,
+            unsupported,
+            disabled,
+            reservedKeys: reserved,
+            searchCriteria: childSearchCriteria,
+            revealSensitive,
+            isSensitivePathRevealed,
+            onToggleSensitivePath,
+            onPatch,
+          })
+        : nothing
+    }
   `;
 
   // For top-level, don't wrap in collapsible
@@ -1100,51 +1109,53 @@ function renderArray(params: {
         </button>
       </div>
       ${help ? html`<div class="cfg-array__help">${help}</div>` : nothing}
-      ${arr.length === 0
-        ? html` <div class="cfg-array__empty">No items yet. Click "Add" to create one.</div> `
-        : html`
-            <div class="cfg-array__items">
-              ${arr.map(
-                (item, idx) => html`
-                  <div class="cfg-array__item">
-                    <div class="cfg-array__item-header">
-                      <span class="cfg-array__item-index">#${idx + 1}</span>
-                      <button
-                        type="button"
-                        class="cfg-array__item-remove"
-                        title="Remove item"
-                        ?disabled=${disabled}
-                        @click=${() => {
-                          const next = [...arr];
-                          next.splice(idx, 1);
-                          onPatch(path, next);
-                        }}
-                      >
-                        ${icons.trash}
-                      </button>
+      ${
+        arr.length === 0
+          ? html` <div class="cfg-array__empty">No items yet. Click "Add" to create one.</div> `
+          : html`
+              <div class="cfg-array__items">
+                ${arr.map(
+                  (item, idx) => html`
+                    <div class="cfg-array__item">
+                      <div class="cfg-array__item-header">
+                        <span class="cfg-array__item-index">#${idx + 1}</span>
+                        <button
+                          type="button"
+                          class="cfg-array__item-remove"
+                          title="Remove item"
+                          ?disabled=${disabled}
+                          @click=${() => {
+                            const next = [...arr];
+                            next.splice(idx, 1);
+                            onPatch(path, next);
+                          }}
+                        >
+                          ${icons.trash}
+                        </button>
+                      </div>
+                      <div class="cfg-array__item-content">
+                        ${renderNode({
+                          schema: itemsSchema,
+                          value: item,
+                          path: [...path, idx],
+                          hints,
+                          rawAvailable,
+                          unsupported,
+                          disabled,
+                          searchCriteria: childSearchCriteria,
+                          showLabel: false,
+                          revealSensitive,
+                          isSensitivePathRevealed,
+                          onToggleSensitivePath,
+                          onPatch,
+                        })}
+                      </div>
                     </div>
-                    <div class="cfg-array__item-content">
-                      ${renderNode({
-                        schema: itemsSchema,
-                        value: item,
-                        path: [...path, idx],
-                        hints,
-                        rawAvailable,
-                        unsupported,
-                        disabled,
-                        searchCriteria: childSearchCriteria,
-                        showLabel: false,
-                        revealSensitive,
-                        isSensitivePathRevealed,
-                        onToggleSensitivePath,
-                        onPatch,
-                      })}
-                    </div>
-                  </div>
-                `,
-              )}
-            </div>
-          `}
+                  `,
+                )}
+              </div>
+            `
+      }
     </div>
   `;
 }
@@ -1219,125 +1230,131 @@ function renderMapField(params: {
         </button>
       </div>
 
-      ${visibleEntries.length === 0
-        ? html` <div class="cfg-map__empty">No custom entries.</div> `
-        : html`
-            <div class="cfg-map__items">
-              ${visibleEntries.map(([key, entryValue]) => {
-                const valuePath = [...path, key];
-                const fallback = jsonValue(entryValue);
-                const sensitiveState = getSensitiveRenderState({
-                  path: valuePath,
-                  value: entryValue,
-                  hints,
-                  revealSensitive: revealSensitive ?? false,
-                  isSensitivePathRevealed,
-                });
-                return html`
-                  <div class="cfg-map__item">
-                    <div class="cfg-map__item-header">
-                      <div class="cfg-map__item-key">
-                        <input
-                          type="text"
-                          class="cfg-input cfg-input--sm"
-                          placeholder="Key"
-                          .value=${key}
+      ${
+        visibleEntries.length === 0
+          ? html` <div class="cfg-map__empty">No custom entries.</div> `
+          : html`
+              <div class="cfg-map__items">
+                ${visibleEntries.map(([key, entryValue]) => {
+                  const valuePath = [...path, key];
+                  const fallback = jsonValue(entryValue);
+                  const sensitiveState = getSensitiveRenderState({
+                    path: valuePath,
+                    value: entryValue,
+                    hints,
+                    revealSensitive: revealSensitive ?? false,
+                    isSensitivePathRevealed,
+                  });
+                  return html`
+                    <div class="cfg-map__item">
+                      <div class="cfg-map__item-header">
+                        <div class="cfg-map__item-key">
+                          <input
+                            type="text"
+                            class="cfg-input cfg-input--sm"
+                            placeholder="Key"
+                            .value=${key}
+                            ?disabled=${disabled}
+                            @change=${(e: Event) => {
+                              const nextKey = (e.target as HTMLInputElement).value.trim();
+                              if (!nextKey || nextKey === key) {
+                                return;
+                              }
+                              const next = { ...value };
+                              if (nextKey in next) {
+                                return;
+                              }
+                              next[nextKey] = next[key];
+                              delete next[key];
+                              onPatch(path, next);
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          class="cfg-map__item-remove"
+                          title="Remove entry"
                           ?disabled=${disabled}
-                          @change=${(e: Event) => {
-                            const nextKey = (e.target as HTMLInputElement).value.trim();
-                            if (!nextKey || nextKey === key) {
-                              return;
-                            }
+                          @click=${() => {
                             const next = { ...value };
-                            if (nextKey in next) {
-                              return;
-                            }
-                            next[nextKey] = next[key];
                             delete next[key];
                             onPatch(path, next);
                           }}
-                        />
+                        >
+                          ${icons.trash}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        class="cfg-map__item-remove"
-                        title="Remove entry"
-                        ?disabled=${disabled}
-                        @click=${() => {
-                          const next = { ...value };
-                          delete next[key];
-                          onPatch(path, next);
-                        }}
-                      >
-                        ${icons.trash}
-                      </button>
-                    </div>
-                    <div class="cfg-map__item-value">
-                      ${anySchema
-                        ? html`
-                            <div class="cfg-input-wrap">
-                              <textarea
-                                class="cfg-textarea cfg-textarea--sm${sensitiveState.isRedacted
-                                  ? " cfg-textarea--redacted"
-                                  : ""}"
-                                placeholder=${sensitiveState.isRedacted
-                                  ? REDACTED_PLACEHOLDER
-                                  : "JSON value"}
-                                rows="2"
-                                .value=${sensitiveState.isRedacted ? "" : fallback}
-                                ?disabled=${disabled}
-                                ?readonly=${sensitiveState.isRedacted}
-                                @click=${() => {
-                                  if (sensitiveState.isRedacted && onToggleSensitivePath) {
-                                    onToggleSensitivePath(valuePath);
-                                  }
-                                }}
-                                @change=${(e: Event) => {
-                                  if (sensitiveState.isRedacted) {
-                                    return;
-                                  }
-                                  const target = e.target as HTMLTextAreaElement;
-                                  const raw = target.value.trim();
-                                  if (!raw) {
-                                    onPatch(valuePath, undefined);
-                                    return;
-                                  }
-                                  try {
-                                    onPatch(valuePath, JSON.parse(raw));
-                                  } catch {
-                                    target.value = fallback;
-                                  }
-                                }}
-                              ></textarea>
-                              ${renderSensitiveToggleButton({
+                      <div class="cfg-map__item-value">
+                        ${
+                          anySchema
+                            ? html`
+                                <div class="cfg-input-wrap">
+                                  <textarea
+                                    class="cfg-textarea cfg-textarea--sm${
+                                      sensitiveState.isRedacted ? " cfg-textarea--redacted" : ""
+                                    }"
+                                    placeholder=${
+                                      sensitiveState.isRedacted
+                                        ? REDACTED_PLACEHOLDER
+                                        : "JSON value"
+                                    }
+                                    rows="2"
+                                    .value=${sensitiveState.isRedacted ? "" : fallback}
+                                    ?disabled=${disabled}
+                                    ?readonly=${sensitiveState.isRedacted}
+                                    @click=${() => {
+                                      if (sensitiveState.isRedacted && onToggleSensitivePath) {
+                                        onToggleSensitivePath(valuePath);
+                                      }
+                                    }}
+                                    @change=${(e: Event) => {
+                                      if (sensitiveState.isRedacted) {
+                                        return;
+                                      }
+                                      const target = e.target as HTMLTextAreaElement;
+                                      const raw = target.value.trim();
+                                      if (!raw) {
+                                        onPatch(valuePath, undefined);
+                                        return;
+                                      }
+                                      try {
+                                        onPatch(valuePath, JSON.parse(raw));
+                                      } catch {
+                                        target.value = fallback;
+                                      }
+                                    }}
+                                  ></textarea>
+                                  ${renderSensitiveToggleButton({
+                                    path: valuePath,
+                                    state: sensitiveState,
+                                    disabled,
+                                    onToggleSensitivePath,
+                                  })}
+                                </div>
+                              `
+                            : renderNode({
+                                schema,
+                                value: entryValue,
                                 path: valuePath,
-                                state: sensitiveState,
+                                hints,
+                                rawAvailable,
+                                unsupported,
                                 disabled,
+                                searchCriteria,
+                                showLabel: false,
+                                revealSensitive,
+                                isSensitivePathRevealed,
                                 onToggleSensitivePath,
-                              })}
-                            </div>
-                          `
-                        : renderNode({
-                            schema,
-                            value: entryValue,
-                            path: valuePath,
-                            hints,
-                            rawAvailable,
-                            unsupported,
-                            disabled,
-                            searchCriteria,
-                            showLabel: false,
-                            revealSensitive,
-                            isSensitivePathRevealed,
-                            onToggleSensitivePath,
-                            onPatch,
-                          })}
+                                onPatch,
+                              })
+                        }
+                      </div>
                     </div>
-                  </div>
-                `;
-              })}
-            </div>
-          `}
+                  `;
+                })}
+              </div>
+            `
+      }
     </div>
   `;
 }

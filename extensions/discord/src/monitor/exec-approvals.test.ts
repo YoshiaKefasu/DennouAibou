@@ -73,9 +73,7 @@ vi.mock("../send.shared.js", async () => {
 });
 
 vi.mock("openclaw/plugin-sdk/config-runtime", async () => {
-  const actual = await import(
-    "openclaw/plugin-sdk/config-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/config-runtime");
   return {
     ...actual,
     loadSessionStore: () => mockSessionStoreEntries.value,
@@ -151,9 +149,7 @@ vi.mock("../../../../src/gateway/client.js", () => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/text-runtime", async () => {
-  const actual = await import(
-    "openclaw/plugin-sdk/text-runtime",
-  );
+  const actual = await import("openclaw/plugin-sdk/text-runtime");
   return {
     ...actual,
     logDebug: vi.fn(),

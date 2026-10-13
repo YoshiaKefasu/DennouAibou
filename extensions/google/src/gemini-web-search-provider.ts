@@ -1,5 +1,3 @@
-import { Type } from "typebox";
-import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import {
   buildSearchCacheKey,
   buildUnsupportedSearchFilterResponse,
@@ -26,6 +24,8 @@ import {
   wrapWebContent,
   writeCachedSearchPayload,
 } from "openclaw/plugin-sdk/provider-web-search";
+import { Type } from "typebox";
+import { asSchemaJson } from "../../../src/agents/schema/typebox.js";
 import { DEFAULT_GOOGLE_API_BASE_URL } from "../api.js";
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";

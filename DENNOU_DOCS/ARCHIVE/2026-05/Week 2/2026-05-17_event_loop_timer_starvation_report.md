@@ -86,11 +86,12 @@ HTTP応答はするがタイマー（setTimeout/setInterval）が発火しなく
 ### Step 5: 上流Issueの特定
 
 3つの上流Issueが症状と完全一致:
-| Issue | 内容 | 状態 |
-|-------|------|------|
+
+| Issue                                                       | 内容                                                            | 状態                 |
+| ----------------------------------------------------------- | --------------------------------------------------------------- | -------------------- |
 | [#31139](https://github.com/openclaw/openclaw/issues/31139) | `scheduleNext()` の `.unref()` 原因でタイマーが再アームされない | 修正済み (PR #31226) |
-| [#23020](https://github.com/openclaw/openclaw/issues/23020) | 長時間アイドル後ハートビートが静かに止まる | 同一原因 |
-| [#62294](https://github.com/openclaw/openclaw/issues/62294) | macOS App Nap / process suspension でのタイマー停止 | 関連現象 |
+| [#23020](https://github.com/openclaw/openclaw/issues/23020) | 長時間アイドル後ハートビートが静かに止まる                      | 同一原因             |
+| [#62294](https://github.com/openclaw/openclaw/issues/62294) | macOS App Nap / process suspension でのタイマー停止             | 関連現象             |
 
 ### Step 6: 原因特定
 
@@ -165,16 +166,17 @@ PR #31226 は 2026-03-27 にマージされたが、`2026.4.x` のどのリリ�
 - `isRestarting` ガードで二重再起動防止
 
 **code-reviewer指摘対応**:
-| # | 指摘 | 修正 |
-|---|------|------|
-| 1 | ログファイル不在で0を返す → 検出バイパス | `Infinity` を返す |
-| 2 | `restartGateway()` に再入防止なし | `isRestarting` ガード追加 |
-| 3 | `import * as os` 未使用 | 削除 |
-| 4 | `require("node:child_process")` dynamic import | 先頭で static import |
-| 5 | 初回tickでファイル outdated 誤検出 | `tickCount === 1` でスキップ |
-| 6 | `spawnSync` 30秒タイムアウト | 10秒に短縮 |
-| 7 | `hrtimeOk` が無意味（初回以降常にtrue） | `elapsedMs` に差し替え |
-| 8 | 重複コードの残骸 | 削除 |
+
+| #   | 指摘                                           | 修正                         |
+| --- | ---------------------------------------------- | ---------------------------- |
+| 1   | ログファイル不在で0を返す → 検出バイパス       | `Infinity` を返す            |
+| 2   | `restartGateway()` に再入防止なし              | `isRestarting` ガード追加    |
+| 3   | `import * as os` 未使用                        | 削除                         |
+| 4   | `require("node:child_process")` dynamic import | 先頭で static import         |
+| 5   | 初回tickでファイル outdated 誤検出             | `tickCount === 1` でスキップ |
+| 6   | `spawnSync` 30秒タイムアウト                   | 10秒に短縮                   |
+| 7   | `hrtimeOk` が無意味（初回以降常にtrue）        | `elapsedMs` に差し替え       |
+| 8   | 重複コードの残骸                               | 削除                         |
 
 ### Layer 3: heartbeat-runner 上流修正バックポート（根本治療）
 
@@ -206,13 +208,14 @@ PR #31226 は 2026-03-27 にマージされたが、`2026.4.x` のどのリリ�
 - `cleanup` で watchdog も解放
 
 **code-reviewer指摘対応**:
-| # | 指摘 | 修正 |
-|---|------|------|
-| 1 | watchdog がagent削除時に止まらない | updateConfig で都度停止＋再起動 |
-| 2 | poll間隔が設定変更に追従しない | 同上（停止→再起動で再計算） |
-| 3 | `Math.min(...spread)` が多数agentで非推奨 | `reduce` に変更 |
-| 4 | primary timer と watchdog の競合 | `WATCHDOG_GRACE_MS = 2000` |
-| 5 | 定数の rationale 未記載 | コメント追加 |
+
+| #   | 指摘                                      | 修正                            |
+| --- | ----------------------------------------- | ------------------------------- |
+| 1   | watchdog がagent削除時に止まらない        | updateConfig で都度停止＋再起動 |
+| 2   | poll間隔が設定変更に追従しない            | 同上（停止→再起動で再計算）     |
+| 3   | `Math.min(...spread)` が多数agentで非推奨 | `reduce` に変更                 |
+| 4   | primary timer と watchdog の競合          | `WATCHDOG_GRACE_MS = 2000`      |
+| 5   | 定数の rationale 未記載                   | コメント追加                    |
 
 ---
 

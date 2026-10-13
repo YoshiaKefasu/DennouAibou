@@ -2430,29 +2430,29 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 
 ### 39.2 変更対象と責務
 
-| 対象領域 | ファイル | 変更内容 |
-|---|---|---|
-| プラグイン新設 | `extensions/dennou-websearch/openclaw.plugin.json`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/src/*` | 新規プラグイン `dennou-websearch` を作成。<br>エントリポイント（`index.ts`）で `api.registerTool` を用いて `web_search` と `web_fetch` の2つのツールを登録。<br>`src/agents/tools/web-search.ts`, `web-fetch.ts`, `web-tools.ts` のツールファクトリロジックをプラグイン配下へ移設。<br>※プラグイン内からの import は `openclaw/plugin-sdk/*` 経由とし、相対 `../../../src/...` は禁止。<br>※`ctx.config` は optional であり、ファクトリ側で `config?` 受け・null許容とする。 |
-| カーネル側ツール登録解除 | `src/agents/openclaw-tools.ts`<br>`src/agents/test-helpers/fast-tool-stubs.ts` | `createWebSearchTool`, `createWebFetchTool` のインポートおよび `tools` 配列への直書き登録を削除。プラグインツールとして `resolvePluginTools` 経由で供給されるようにする。<br>`fast-tool-stubs.ts` の mock パスを整理。 |
-| カーネル基盤温存（移設除外） | `src/web-search/runtime.ts`<br>`src/web-fetch/runtime.ts`<br>`src/plugin-sdk/provider-web-*.ts`<br>`src/agents/tools/web-guarded-fetch.ts`<br>`src/agents/tools/web-search-provider-*.ts`<br>`src/agents/tools/web-shared.ts`<br>`src/agents/tools/web-fetch-utils.ts`<br>`src/agents/tools/web-fetch-visibility.ts`<br>`src/config/config.web-search-provider.test.ts` | 他の bundled 拡張（Brave, Google 等）やカーネル runtime（`src/plugins/runtime/index.ts`）が依存する共有基盤・公開SDKエクスポートは本体に温存し、依存逆転を完全に防止。<br>`config.web-search-provider.test.ts` の参照パスを整合。 |
-| ツールカタログ・HTTP呼出整合 | `src/agents/tool-catalog.ts`<br>`src/gateway/tools-invoke-http.ts` | `web_search`, `web_fetch` のカタログエントリは据え置き維持とし、`tools-invoke-http.ts` の汎用プラグインツール解決（`resolveGatewayScopedTools` 経由）で正常にディスパッチされることを確認。 |
-| 設定・許可配線 | `dennou-aibou.json`<br>`openclaw.json` (サンプル) | `plugins.entries.dennou-websearch`（`enabled: true`）および `plugins.allow`（`dennou-websearch`）を追記。設定は `ctx.config.tools.web` を直接消費。 |
-| 境界・テスト整合 | `scripts/check-*-provider-boundaries.mjs`<br>`test/fixtures/plugin-extension-import-boundary-inventory.json`<br>`test/bun-tier-*-known-failing.txt` | boundary lint 検査スクリプトおよび import boundary インベントリに対象パスの更新を反映。移設テストのパスを known-failing リストと同期。 |
-| テスト | `extensions/dennou-websearch/test/*` | ツールレベルのテスト（`web-search.test.ts`, `web-fetch.*.test.ts`, `web-tools.*.test.ts`）をプラグイン配下に配置・配線し、`bun test` で全緑化。 |
+| 対象領域                     | ファイル                                                                                                                                                                                                                                                                                                                                                                | 変更内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| プラグイン新設               | `extensions/dennou-websearch/openclaw.plugin.json`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/src/*`                                                                                                                                                                                                                                     | 新規プラグイン `dennou-websearch` を作成。<br>エントリポイント（`index.ts`）で `api.registerTool` を用いて `web_search` と `web_fetch` の2つのツールを登録。<br>`src/agents/tools/web-search.ts`, `web-fetch.ts`, `web-tools.ts` のツールファクトリロジックをプラグイン配下へ移設。<br>※プラグイン内からの import は `openclaw/plugin-sdk/*` 経由とし、相対 `../../../src/...` は禁止。<br>※`ctx.config` は optional であり、ファクトリ側で `config?` 受け・null許容とする。 |
+| カーネル側ツール登録解除     | `src/agents/openclaw-tools.ts`<br>`src/agents/test-helpers/fast-tool-stubs.ts`                                                                                                                                                                                                                                                                                          | `createWebSearchTool`, `createWebFetchTool` のインポートおよび `tools` 配列への直書き登録を削除。プラグインツールとして `resolvePluginTools` 経由で供給されるようにする。<br>`fast-tool-stubs.ts` の mock パスを整理。                                                                                                                                                                                                                                                       |
+| カーネル基盤温存（移設除外） | `src/web-search/runtime.ts`<br>`src/web-fetch/runtime.ts`<br>`src/plugin-sdk/provider-web-*.ts`<br>`src/agents/tools/web-guarded-fetch.ts`<br>`src/agents/tools/web-search-provider-*.ts`<br>`src/agents/tools/web-shared.ts`<br>`src/agents/tools/web-fetch-utils.ts`<br>`src/agents/tools/web-fetch-visibility.ts`<br>`src/config/config.web-search-provider.test.ts` | 他の bundled 拡張（Brave, Google 等）やカーネル runtime（`src/plugins/runtime/index.ts`）が依存する共有基盤・公開SDKエクスポートは本体に温存し、依存逆転を完全に防止。<br>`config.web-search-provider.test.ts` の参照パスを整合。                                                                                                                                                                                                                                            |
+| ツールカタログ・HTTP呼出整合 | `src/agents/tool-catalog.ts`<br>`src/gateway/tools-invoke-http.ts`                                                                                                                                                                                                                                                                                                      | `web_search`, `web_fetch` のカタログエントリは据え置き維持とし、`tools-invoke-http.ts` の汎用プラグインツール解決（`resolveGatewayScopedTools` 経由）で正常にディスパッチされることを確認。                                                                                                                                                                                                                                                                                  |
+| 設定・許可配線               | `dennou-aibou.json`<br>`openclaw.json` (サンプル)                                                                                                                                                                                                                                                                                                                       | `plugins.entries.dennou-websearch`（`enabled: true`）および `plugins.allow`（`dennou-websearch`）を追記。設定は `ctx.config.tools.web` を直接消費。                                                                                                                                                                                                                                                                                                                          |
+| 境界・テスト整合             | `scripts/check-*-provider-boundaries.mjs`<br>`test/fixtures/plugin-extension-import-boundary-inventory.json`<br>`test/bun-tier-*-known-failing.txt`                                                                                                                                                                                                                     | boundary lint 検査スクリプトおよび import boundary インベントリに対象パスの更新を反映。移設テストのパスを known-failing リストと同期。                                                                                                                                                                                                                                                                                                                                       |
+| テスト                       | `extensions/dennou-websearch/test/*`                                                                                                                                                                                                                                                                                                                                    | ツールレベルのテスト（`web-search.test.ts`, `web-fetch.*.test.ts`, `web-tools.*.test.ts`）をプラグイン配下に配置・配線し、`bun test` で全緑化。                                                                                                                                                                                                                                                                                                                              |
 
 ### 39.3 検証ゲート
 
-| ゲート | 判定基準 |
-|---|---|
-| `bun check` | **0 errors（型検査全合格）** |
-| `bun run ui:build` | **pass** |
-| `npm run lint:web-search-provider-boundaries` | **pass** |
-| `npm run lint:web-fetch-provider-boundaries` | **pass** |
-| `npm run lint:extensions:no-src-outside-plugin-sdk` | **pass** |
-| `npm run lint:extensions:no-relative-outside-package` | **pass** |
-| `bun test test/plugin-extension-import-boundary.test.ts` | **pass** |
-| `bun test` 関連テスト | `extensions/dennou-websearch/` 配下および既存テスト全 pass |
-| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+| ゲート                                                   | 判定基準                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| `bun check`                                              | **0 errors（型検査全合格）**                               |
+| `bun run ui:build`                                       | **pass**                                                   |
+| `npm run lint:web-search-provider-boundaries`            | **pass**                                                   |
+| `npm run lint:web-fetch-provider-boundaries`             | **pass**                                                   |
+| `npm run lint:extensions:no-src-outside-plugin-sdk`      | **pass**                                                   |
+| `npm run lint:extensions:no-relative-outside-package`    | **pass**                                                   |
+| `bun test test/plugin-extension-import-boundary.test.ts` | **pass**                                                   |
+| `bun test` 関連テスト                                    | `extensions/dennou-websearch/` 配下および既存テスト全 pass |
+| `pnpm exec oxfmt --check <changed_files>`                | **pass**                                                   |
 
 ---
 
@@ -2472,26 +2472,25 @@ DennouAibou は唯一無二のパートナー Kasou（`agent:main:main`）専用
 
 ### 41.2 変更対象と責務
 
-| 対象領域 | ファイル | 変更内容 |
-|---|---|---|
-| プロバイダ移設・統合 | `extensions/dennou-websearch/src/providers/exa.ts`<br>`extensions/dennou-websearch/src/providers/brave.ts`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/web-search-provider.ts` | `extensions/exa/src/exa-web-search-provider.ts` と `extensions/brave/src/brave-web-search-provider.ts` を移設（相対 import 階層を調整）。<br>`credentialPath` 等を `plugins.entries.dennou-websearch.config.{exa,brave}.apiKey` へ更新（旧パスも読み取りフォールバック維持）。<br>`index.ts` で `api.registerWebSearchProvider` を呼んで両プロバイダを登録。 |
-| プラグインスキーマ拡張 | `extensions/dennou-websearch/openclaw.plugin.json` | `contracts.webSearchProviders: ["exa", "brave"]`、`providerAuthEnvVars: { "exa": ["EXA_API_KEY"], "brave": ["BRAVE_API_KEY"] }` を追加。<br>`configSchema.properties` に `exa: { apiKey }`, `brave: { apiKey, mode }`, `webSearch`（互換用）を追加。 |
-| 旧プラグイン物理削除 | `extensions/exa/**`<br>`extensions/brave/**` | 独立プラグイン 2 つを完全削除。 |
-| コア・契約テスト・境界整理 | `src/plugins/contracts/*.{brave,exa}.contract.test.ts`<br>`test/helpers/plugins/plugin-registration-contract-cases.ts`<br>`src/commands/doctor/shared/legacy-web-search-migrate.ts`<br>`src/secrets/target-registry-data.ts`<br>`scripts/check-*-boundaries.mjs`<br>`test/bun-tier-*-known-failing.txt` | 旧 `exa` / `brave` プラグインID前提の契約テスト・登録ケース・doctor移行先・secret target・境界lintスクリプト・known-failing リストを `dennou-websearch` に統合または整理。 |
-| テスト移設・整合 | `extensions/dennou-websearch/test/exa-web-search-provider.test.ts`<br>`extensions/dennou-websearch/test/brave-web-search-provider.test.ts` | 旧プロバイダの単体テストを `dennou-websearch/test/` 配下へ移設し `bun test` で全緑化。 |
-| KASOU運用設定（デプロイ時） | `Y:/.openclaw/dennou-aibou.json`（リポジトリ外） | `plugins.allow` から `exa`, `brave` を削除し `dennou-websearch` に一本化。<br>`plugins.entries` の `exa`, `brave` の apiKey を `plugins.entries.dennou-websearch.config` 内へ統合し、旧エントリを削除。 |
+| 対象領域                    | ファイル                                                                                                                                                                                                                                                                                                | 変更内容                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| プロバイダ移設・統合        | `extensions/dennou-websearch/src/providers/exa.ts`<br>`extensions/dennou-websearch/src/providers/brave.ts`<br>`extensions/dennou-websearch/index.ts`<br>`extensions/dennou-websearch/web-search-provider.ts`                                                                                            | `extensions/exa/src/exa-web-search-provider.ts` と `extensions/brave/src/brave-web-search-provider.ts` を移設（相対 import 階層を調整）。<br>`credentialPath` 等を `plugins.entries.dennou-websearch.config.{exa,brave}.apiKey` へ更新（旧パスも読み取りフォールバック維持）。<br>`index.ts` で `api.registerWebSearchProvider` を呼んで両プロバイダを登録。 |
+| プラグインスキーマ拡張      | `extensions/dennou-websearch/openclaw.plugin.json`                                                                                                                                                                                                                                                      | `contracts.webSearchProviders: ["exa", "brave"]`、`providerAuthEnvVars: { "exa": ["EXA_API_KEY"], "brave": ["BRAVE_API_KEY"] }` を追加。<br>`configSchema.properties` に `exa: { apiKey }`, `brave: { apiKey, mode }`, `webSearch`（互換用）を追加。                                                                                                         |
+| 旧プラグイン物理削除        | `extensions/exa/**`<br>`extensions/brave/**`                                                                                                                                                                                                                                                            | 独立プラグイン 2 つを完全削除。                                                                                                                                                                                                                                                                                                                              |
+| コア・契約テスト・境界整理  | `src/plugins/contracts/*.{brave,exa}.contract.test.ts`<br>`test/helpers/plugins/plugin-registration-contract-cases.ts`<br>`src/commands/doctor/shared/legacy-web-search-migrate.ts`<br>`src/secrets/target-registry-data.ts`<br>`scripts/check-*-boundaries.mjs`<br>`test/bun-tier-*-known-failing.txt` | 旧 `exa` / `brave` プラグインID前提の契約テスト・登録ケース・doctor移行先・secret target・境界lintスクリプト・known-failing リストを `dennou-websearch` に統合または整理。                                                                                                                                                                                   |
+| テスト移設・整合            | `extensions/dennou-websearch/test/exa-web-search-provider.test.ts`<br>`extensions/dennou-websearch/test/brave-web-search-provider.test.ts`                                                                                                                                                              | 旧プロバイダの単体テストを `dennou-websearch/test/` 配下へ移設し `bun test` で全緑化。                                                                                                                                                                                                                                                                       |
+| KASOU運用設定（デプロイ時） | `Y:/.openclaw/dennou-aibou.json`（リポジトリ外）                                                                                                                                                                                                                                                        | `plugins.allow` から `exa`, `brave` を削除し `dennou-websearch` に一本化。<br>`plugins.entries` の `exa`, `brave` の apiKey を `plugins.entries.dennou-websearch.config` 内へ統合し、旧エントリを削除。                                                                                                                                                      |
 
 ### 41.3 検証ゲート
 
-| ゲート | 判定基準 |
-|---|---|
-| `bun run tsgo` | **0 errors（型検査全合格）** |
-| `bun run ui:build` | **pass** |
-| `npm run lint:web-search-provider-boundaries` | **pass** |
-| `npm run lint:web-fetch-provider-boundaries` | **pass** |
-| `bun test extensions/dennou-websearch` | **全 pass（移設テスト含む）** |
-| `pnpm exec oxfmt --check <changed_files>` | **pass** |
-
+| ゲート                                        | 判定基準                      |
+| --------------------------------------------- | ----------------------------- |
+| `bun run tsgo`                                | **0 errors（型検査全合格）**  |
+| `bun run ui:build`                            | **pass**                      |
+| `npm run lint:web-search-provider-boundaries` | **pass**                      |
+| `npm run lint:web-fetch-provider-boundaries`  | **pass**                      |
+| `bun test extensions/dennou-websearch`        | **全 pass（移設テスト含む）** |
+| `pnpm exec oxfmt --check <changed_files>`     | **pass**                      |
 
 ---
 
@@ -2561,21 +2560,21 @@ Reference:
 
 ### 40.4 変更対象と責務
 
-| 対象領域 | ファイル | 変更内容 |
-|---|---|---|
-| 要約コア | `extensions/dennou-websearch/src/web-search-summarizer.ts` | 新規作成。<br>1. プロバイダ別（Exa, Brave, Google等）の生結果（title, url, snippet/summary/description）を正規化アダプタで抽出。<br>2. 要約モデルへ説明段落の生成を要求（タイムアウト 10s、インジェクション無視指示）。<br>3. コード側で決定論的に `Reference:\n[N] URL \| Title` を生成して結合。<br>4. `wrapWebContent` で安全ラップ。<br>5. タイムアウト・エラー時の生結果フェイルオープン。 |
-| ツールファクトリ統合 | `extensions/dennou-websearch/src/web-search.ts` | `createWebSearchTool` の `execute` 内で、生検索結果取得後に `summarizer` を呼び出すパイプラインを配線。プラグイン config（`ctx.config`）から `summarizer` オプションを取得。 |
-| プラグインスキーマ | `extensions/dennou-websearch/openclaw.plugin.json` | `configSchema.properties` に `summarizer` 設定定義（enabled, model, endpoint, apiKey, referenceLimit, timeoutMs）を追加。 |
-| 単体テスト | `extensions/dennou-websearch/test/web-search-summarizer.test.ts` | 正常系（要約＋決定論的Reference形式生成）、エラー時生結果フォールバック、0件時ハンドリング、各プロバイダ形式の正規化検証。 |
+| 対象領域             | ファイル                                                         | 変更内容                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 要約コア             | `extensions/dennou-websearch/src/web-search-summarizer.ts`       | 新規作成。<br>1. プロバイダ別（Exa, Brave, Google等）の生結果（title, url, snippet/summary/description）を正規化アダプタで抽出。<br>2. 要約モデルへ説明段落の生成を要求（タイムアウト 10s、インジェクション無視指示）。<br>3. コード側で決定論的に `Reference:\n[N] URL \| Title` を生成して結合。<br>4. `wrapWebContent` で安全ラップ。<br>5. タイムアウト・エラー時の生結果フェイルオープン。 |
+| ツールファクトリ統合 | `extensions/dennou-websearch/src/web-search.ts`                  | `createWebSearchTool` の `execute` 内で、生検索結果取得後に `summarizer` を呼び出すパイプラインを配線。プラグイン config（`ctx.config`）から `summarizer` オプションを取得。                                                                                                                                                                                                                    |
+| プラグインスキーマ   | `extensions/dennou-websearch/openclaw.plugin.json`               | `configSchema.properties` に `summarizer` 設定定義（enabled, model, endpoint, apiKey, referenceLimit, timeoutMs）を追加。                                                                                                                                                                                                                                                                       |
+| 単体テスト           | `extensions/dennou-websearch/test/web-search-summarizer.test.ts` | 正常系（要約＋決定論的Reference形式生成）、エラー時生結果フォールバック、0件時ハンドリング、各プロバイダ形式の正規化検証。                                                                                                                                                                                                                                                                      |
 
 ### 40.5 検証ゲート
 
-| ゲート | 判定基準 |
-|---|---|
-| `bun check` | **0 errors（型検査全合格）** |
-| `bun run ui:build` | **pass** |
-| `bun test extensions/dennou-websearch` | **全 pass（新規テスト含む）** |
-| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+| ゲート                                    | 判定基準                      |
+| ----------------------------------------- | ----------------------------- |
+| `bun check`                               | **0 errors（型検査全合格）**  |
+| `bun run ui:build`                        | **pass**                      |
+| `bun test extensions/dennou-websearch`    | **全 pass（新規テスト含む）** |
+| `pnpm exec oxfmt --check <changed_files>` | **pass**                      |
 
 ---
 
@@ -2592,20 +2591,20 @@ Reference:
 
 ### 42.2 変更対象と責務
 
-| 対象領域 | ファイル | 変更内容 |
-|---|---|---|
+| 対象領域         | ファイル                                                                                                                                                                                    | 変更内容                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | プラグイン内蔵化 | `extensions/dennou-nap/openclaw.plugin.json`<br>`extensions/dennou-nap/package.json`<br>`extensions/dennou-nap/index.ts`<br>`extensions/dennou-nap/src/*`<br>`extensions/dennou-nap/test/*` | `dennou-nap` のコア実装（`types.ts`, `compartment.ts`, `system-one-client.ts`, `historian.ts`, `compactor.ts`, `auto-compact.ts`, `config-loader.ts`, `index.ts`）および単体テスト一式（53 tests）を `DennouAibou/extensions/dennou-nap/` 配下へ移設。<br>`openclaw.plugin.json` に `"enabledByDefault": true` を付与し、`definePluginEntry` で正式登録。 |
-| ランナー配線 | `src/agents/pi-embedded-runner/run/attempt.ts` | プロンプト履歴構築時（`limited` メッセージ列確定後、`applyPromptEvictionSafetyValve` の直前）に、`plugins.entries["dennou-nap"]` の設定を解決し、有効時は `compressToTarget` を実行してインメモリ圧縮を適用（失敗時は無傷で元の `limited` を維持するフェイルオープン）。 |
-| KASOU設定 | `Y:/.openclaw/dennou-aibou.json`（デプロイ時） | `plugins.allow` に `"dennou-nap"` を追加（`plugins.entries["dennou-nap"]` は既に設定済み）。 |
+| ランナー配線     | `src/agents/pi-embedded-runner/run/attempt.ts`                                                                                                                                              | プロンプト履歴構築時（`limited` メッセージ列確定後、`applyPromptEvictionSafetyValve` の直前）に、`plugins.entries["dennou-nap"]` の設定を解決し、有効時は `compressToTarget` を実行してインメモリ圧縮を適用（失敗時は無傷で元の `limited` を維持するフェイルオープン）。                                                                                  |
+| KASOU設定        | `Y:/.openclaw/dennou-aibou.json`（デプロイ時）                                                                                                                                              | `plugins.allow` に `"dennou-nap"` を追加（`plugins.entries["dennou-nap"]` は既に設定済み）。                                                                                                                                                                                                                                                              |
 
 ### 42.3 検証ゲート
 
-| ゲート | 判定基準 |
-|---|---|
-| `bun run tsgo` | **0 errors（型検査全合格）** |
-| `bun run ui:build` | **pass** |
-| `bun test extensions/dennou-nap` | **53/53 全 pass** |
-| `pnpm exec oxfmt --check <changed_files>` | **pass** |
+| ゲート                                    | 判定基準                     |
+| ----------------------------------------- | ---------------------------- |
+| `bun run tsgo`                            | **0 errors（型検査全合格）** |
+| `bun run ui:build`                        | **pass**                     |
+| `bun test extensions/dennou-nap`          | **53/53 全 pass**            |
+| `pnpm exec oxfmt --check <changed_files>` | **pass**                     |
 
 ---
 
@@ -2622,20 +2621,17 @@ Reference:
 
 ### 43.2 変更対象と責務
 
-| 対象領域 | ファイル | 変更内容 |
-|---|---|---|
-| 型エラー解消 | `src/plugins/uninstall.ts` | computed-key 分割代入による TS7022 (implicit any) を明示的なプロパティ削除にリファクタリング。 |
-| テスト型キャスト是正 | `extensions/telegram/src/bot-native-command-menu.test.ts`<br>`extensions/telegram/src/bot.media.test-utils.ts` | モック関数の代入における TS2352 エラーを `as unknown as` を経由して解消。 |
-| スクリプト統合 | `package.json` | `"check"` を `"check:all"` にリネーム。<br>`"typecheck": "bun --check"` を追加。<br>`"tsgo": "bun --check"` に更新。<br>フォーマット系スクリプト（`format`, `format:check`, `format:diff`, `format:docs`, `format:docs:check`, `format:fix`）を `bun fmt` に更新。 |
+| 対象領域             | ファイル                                                                                                       | 変更内容                                                                                                                                                                                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 型エラー解消         | `src/plugins/uninstall.ts`                                                                                     | computed-key 分割代入による TS7022 (implicit any) を明示的なプロパティ削除にリファクタリング。                                                                                                                                                                     |
+| テスト型キャスト是正 | `extensions/telegram/src/bot-native-command-menu.test.ts`<br>`extensions/telegram/src/bot.media.test-utils.ts` | モック関数の代入における TS2352 エラーを `as unknown as` を経由して解消。                                                                                                                                                                                          |
+| スクリプト統合       | `package.json`                                                                                                 | `"check"` を `"check:all"` にリネーム。<br>`"typecheck": "bun --check"` を追加。<br>`"tsgo": "bun --check"` に更新。<br>フォーマット系スクリプト（`format`, `format:check`, `format:diff`, `format:docs`, `format:docs:check`, `format:fix`）を `bun fmt` に更新。 |
 
 ### 43.3 検証ゲート
 
-| ゲート | 判定基準 |
-|---|---|
-| `bun --check` | **0 errors（全 5,855 ファイル型検査合格）** |
-| `bun run typecheck` | **exit 0** |
-| `bun run ui:build` | **pass** |
-| `bun fmt --check <changed_files>` | **pass** |
-
-
-
+| ゲート                            | 判定基準                                    |
+| --------------------------------- | ------------------------------------------- |
+| `bun --check`                     | **0 errors（全 5,855 ファイル型検査合格）** |
+| `bun run typecheck`               | **exit 0**                                  |
+| `bun run ui:build`                | **pass**                                    |
+| `bun fmt --check <changed_files>` | **pass**                                    |

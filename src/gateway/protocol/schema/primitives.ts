@@ -35,17 +35,11 @@ export const InputProvenanceSchema = Type.Object(
 // the literal tuple instead (values are fixed constants in client-info.ts).
 export const GatewayClientIdSchema = Type.Union([
   ...Object.values(GATEWAY_CLIENT_IDS).map((value) => Type.Literal(value)),
-] as [
-  ReturnType<typeof Type.Literal<string>>,
-  ...(ReturnType<typeof Type.Literal<string>>[]),
-]);
+] as [ReturnType<typeof Type.Literal<string>>, ...ReturnType<typeof Type.Literal<string>>[]]);
 
 export const GatewayClientModeSchema = Type.Union([
   ...Object.values(GATEWAY_CLIENT_MODES).map((value) => Type.Literal(value)),
-] as [
-  ReturnType<typeof Type.Literal<string>>,
-  ...(ReturnType<typeof Type.Literal<string>>[]),
-]);
+] as [ReturnType<typeof Type.Literal<string>>, ...ReturnType<typeof Type.Literal<string>>[]]);
 
 export const SecretRefSourceSchema = Type.Union([
   Type.Literal("env"),

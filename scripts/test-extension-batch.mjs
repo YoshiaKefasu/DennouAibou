@@ -13,12 +13,11 @@ const bun = "bun";
 async function runBunBatch(params) {
   return await new Promise((resolve, reject) => {
     const child = spawn(bun, ["test", ...params.targets, ...params.args], {
-        cwd: repoRoot,
-        stdio: "inherit",
-        shell: process.platform === "win32",
-        env: params.env,
-      },
-    );
+      cwd: repoRoot,
+      stdio: "inherit",
+      shell: process.platform === "win32",
+      env: params.env,
+    });
 
     child.on("error", reject);
     child.on("exit", (code, signal) => {

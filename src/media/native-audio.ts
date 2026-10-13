@@ -1,9 +1,9 @@
-import { loadWebMediaRaw } from "./web-media.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { isInboundPathAllowed, mergeInboundPathRoots } from "./inbound-path-policy.js";
-import { isAudioFileName } from "./mime.js";
 import { getDefaultMediaLocalRoots } from "./local-roots.js";
+import { isAudioFileName } from "./mime.js";
+import { loadWebMediaRaw } from "./web-media.js";
 
 export const MAX_NATIVE_AUDIO_BYTES = 10 * 1024 * 1024;
 
@@ -42,16 +42,11 @@ export function resolveNativeAudioMimeType(params: {
   return AUDIO_MIME_BY_EXTENSION[extension] ?? (isAudioFileName(params.path) ? mime : undefined);
 }
 
-export function isNativeAudioAttachment(params: {
-  path?: string;
-  mimeType?: string;
-}): boolean {
+export function isNativeAudioAttachment(params: { path?: string; mimeType?: string }): boolean {
   if (!params.path?.trim()) {
     return false;
   }
-  return Boolean(
-    resolveNativeAudioMimeType({ path: params.path, mimeType: params.mimeType }),
-  );
+  return Boolean(resolveNativeAudioMimeType({ path: params.path, mimeType: params.mimeType }));
 }
 
 export function selectNativeAudioAttachments(params: {
@@ -65,7 +60,8 @@ export function selectNativeAudioAttachments(params: {
     if (!path) {
       return [];
     }
-    const mimeType = params.types?.[index] ?? (paths.length === 1 ? params.fallbackType : undefined);
+    const mimeType =
+      params.types?.[index] ?? (paths.length === 1 ? params.fallbackType : undefined);
     return isNativeAudioAttachment({ path, mimeType }) ? [{ path, mimeType }] : [];
   });
 }

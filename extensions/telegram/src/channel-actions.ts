@@ -1,4 +1,3 @@
-import { Type } from "typebox";
 import {
   createUnionActionGate,
   listTokenSourcedAccounts,
@@ -13,6 +12,7 @@ import type {
 } from "openclaw/plugin-sdk/channel-contract";
 import type { TelegramActionConfig } from "openclaw/plugin-sdk/config-runtime";
 import { extractToolSend } from "openclaw/plugin-sdk/tool-send";
+import { Type } from "typebox";
 import {
   createTelegramActionGate,
   listEnabledTelegramAccounts,

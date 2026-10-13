@@ -276,7 +276,6 @@ describe("session store lock (Promise chain mutex)", () => {
     expect(store[key]?.modelProvider).toBeUndefined();
     expect(store[key]?.model).toBeUndefined();
   });
-
 });
 
 describe("resolveAndPersistSessionFile", () => {

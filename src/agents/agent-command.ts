@@ -1,4 +1,12 @@
-import { formatMaxModelHint, formatThinkingLevels, formatXHighModelHint, isElevatedThinkingDenied, normalizeThinkLevel, normalizeVerboseLevel, type VerboseLevel, } from "../auto-reply/thinking.js";
+import {
+  formatMaxModelHint,
+  formatThinkingLevels,
+  formatXHighModelHint,
+  isElevatedThinkingDenied,
+  normalizeThinkLevel,
+  normalizeVerboseLevel,
+  type VerboseLevel,
+} from "../auto-reply/thinking.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveCommandSecretRefsViaGateway } from "../cli/command-secret-gateway.js";
 import { getAgentRuntimeCommandSecretTargetIds } from "../cli/command-secret-targets.js";

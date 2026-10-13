@@ -62,8 +62,8 @@ Use `installCommonResolveTargetErrorCases` to add standard error cases for
 channel target resolution:
 
 ```typescript
-import { describe } from "vitest";
 import { installCommonResolveTargetErrorCases } from "openclaw/plugin-sdk/testing";
+import { describe } from "vitest";
 
 describe("my-channel target resolution", () => {
   installCommonResolveTargetErrorCases({

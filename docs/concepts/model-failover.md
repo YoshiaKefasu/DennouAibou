@@ -258,9 +258,9 @@ Model fallback does not continue on:
 - explicit aborts that are not timeout/failover-shaped
 - context overflow errors that should stay inside compaction/retry logic
   (for example `request_too_large`, `INVALID_ARGUMENT: input exceeds the maximum
-number of tokens`, `input token count exceeds the maximum number of input
-tokens`, `The input is too long for the model`, or `ollama error: context
-length exceeded`)
+  number of tokens`, `input token count exceeds the maximum number of input
+  tokens`, `The input is too long for the model`, or `ollama error: context
+  length exceeded`)
 - a final unknown error when there are no candidates left
 
 ### Cooldown skip vs probe behavior

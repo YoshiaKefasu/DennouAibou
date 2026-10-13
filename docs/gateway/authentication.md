@@ -143,7 +143,7 @@ hits a provider rate limit.
 - The same key list is deduplicated before use.
 - DennouAibou retries with the next key only for rate-limit errors (for example
   `429`, `rate_limit`, `quota`, `resource exhausted`, `Too many concurrent
-requests`, `ThrottlingException`, `concurrency limit reached`, or
+  requests`, `ThrottlingException`, `concurrency limit reached`, or
   `workers_ai ... quota limit exceeded`).
 - Non-rate-limit errors are not retried with alternate keys.
 - If all keys fail, the final error from the last attempt is returned.

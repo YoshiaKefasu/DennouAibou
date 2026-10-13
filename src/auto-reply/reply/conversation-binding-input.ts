@@ -42,11 +42,7 @@ function resolveBindingAccountId(params: {
     (entry) => entry.plugin.id === channel,
   )?.plugin;
   const accountId = trimText(params.ctx.AccountId);
-  return (
-    accountId ||
-    trimText(plugin?.config.defaultAccountId?.(params.cfg)) ||
-    "default"
-  );
+  return accountId || trimText(plugin?.config.defaultAccountId?.(params.cfg)) || "default";
 }
 
 function resolveBindingThreadId(threadId: string | number | null | undefined): string | undefined {

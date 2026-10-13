@@ -40,11 +40,12 @@ function renderExecBody(request: ExecApprovalRequestPayload) {
 
 function renderPluginBody(active: ExecApprovalRequest) {
   return html`
-    ${active.pluginDescription
-      ? html`<pre class="exec-approval-command mono" style="white-space:pre-wrap">
-${active.pluginDescription}</pre
-        >`
-      : nothing}
+    ${
+      active.pluginDescription
+        ? html`<pre class="exec-approval-command mono" style="white-space:pre-wrap">
+${active.pluginDescription}</pre>`
+        : nothing
+    }
     <div class="exec-approval-meta">
       ${renderMetaRow("Severity", active.pluginSeverity)}
       ${renderMetaRow("Plugin", active.pluginId)} ${renderMetaRow("Agent", active.request.agentId)}
@@ -74,14 +75,18 @@ export function renderExecApprovalPrompt(state: AppViewState) {
             <div class="exec-approval-title">${title}</div>
             <div class="exec-approval-sub">${remaining}</div>
           </div>
-          ${queueCount > 1
-            ? html`<div class="exec-approval-queue">${queueCount} pending</div>`
-            : nothing}
+          ${
+            queueCount > 1
+              ? html`<div class="exec-approval-queue">${queueCount} pending</div>`
+              : nothing
+          }
         </div>
         ${isPlugin ? renderPluginBody(active) : renderExecBody(request)}
-        ${state.execApprovalError
-          ? html`<div class="exec-approval-error">${state.execApprovalError}</div>`
-          : nothing}
+        ${
+          state.execApprovalError
+            ? html`<div class="exec-approval-error">${state.execApprovalError}</div>`
+            : nothing
+        }
         <div class="exec-approval-actions">
           <button
             class="btn primary"

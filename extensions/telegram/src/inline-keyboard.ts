@@ -11,13 +11,11 @@ export function buildInlineKeyboard(
     .map((row) =>
       row
         .filter((button) => button?.text && button?.callback_data)
-        .map(
-          (button): InlineKeyboardButton => ({
-            text: button.text,
-            callback_data: button.callback_data,
-            ...(button.style ? { style: button.style } : {}),
-          }),
-        ),
+        .map((button): InlineKeyboardButton => ({
+          text: button.text,
+          callback_data: button.callback_data,
+          ...(button.style ? { style: button.style } : {}),
+        })),
     )
     .filter((row) => row.length > 0);
   if (rows.length === 0) {

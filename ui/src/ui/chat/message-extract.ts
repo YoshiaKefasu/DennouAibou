@@ -1,6 +1,6 @@
-import { stripInboundMetadata } from "../_shared/strip-inbound-meta.ts";
 import { stripEnvelope } from "../_shared/chat-envelope.ts";
 import { extractAssistantVisibleText as extractSharedAssistantVisibleText } from "../_shared/chat-message-content.ts";
+import { stripInboundMetadata } from "../_shared/strip-inbound-meta.ts";
 import { stripThinkingTags } from "../format.ts";
 
 const textCache = new WeakMap<object, string | null>();

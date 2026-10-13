@@ -305,11 +305,11 @@ understanding, image generation, video generation, web fetch, and web search,
 a vendor can own all of its surfaces in one place:
 
 ```ts
-import type { DennouAibouPluginDefinition } from "openclaw/plugin-sdk/plugin-entry";
 import {
   describeImageWithModel,
   transcribeOpenAiCompatibleAudio,
 } from "openclaw/plugin-sdk/media-understanding";
+import type { DennouAibouPluginDefinition } from "openclaw/plugin-sdk/plugin-entry";
 
 const plugin: DennouAibouPluginDefinition = {
   id: "exampleai",

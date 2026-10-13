@@ -8,21 +8,21 @@
 
 ## 1. 現状（移行完了後）
 
-| 項目 | 移行前 (D0開始時) | 移行後 (D5完了時) |
-| -------------------- | ------------------------------- | -------------------------------- |
-| **パッケージスコープ** | `@mariozechner/*` | `@earendil-works/*` |
-| **SDK バージョン** | `0.65.2` | `0.84.2` |
-| **SessionManager バージョン** | `CURRENT_SESSION_VERSION = 3` | `CURRENT_SESSION_VERSION = 3` (維持・互換立証) |
-| **import 箇所** | ソースコード内 68箇所 | スコープ移管リネームによりソース全域 338ファイル更新完了 |
+| 項目                          | 移行前 (D0開始時)             | 移行後 (D5完了時)                                        |
+| ----------------------------- | ----------------------------- | -------------------------------------------------------- |
+| **パッケージスコープ**        | `@mariozechner/*`             | `@earendil-works/*`                                      |
+| **SDK バージョン**            | `0.65.2`                      | `0.84.2`                                                 |
+| **SessionManager バージョン** | `CURRENT_SESSION_VERSION = 3` | `CURRENT_SESSION_VERSION = 3` (維持・互換立証)           |
+| **import 箇所**               | ソースコード内 68箇所         | スコープ移管リネームによりソース全域 338ファイル更新完了 |
 
 ### 同期パッケージ
 
-| パッケージ | 移行前 | 移行後 | 備考 |
-| ----------------------------- | ------ | ------ | ------------------ |
-| `@earendil-works/pi-agent-core` | 0.65.2 | 0.84.2 | エージェントループ |
-| `@earendil-works/pi-ai` | 0.65.2 | 0.84.2 | LLM抽象化 (/compat 経由) |
-| `@earendil-works/pi-tui` | 0.65.2 | 0.84.2 | TUIコンポーネント (TuiMainScreen) |
-| `@earendil-works/pi-coding-agent` | 0.65.2 | 0.84.2 | コーディングエージェント本体 |
+| パッケージ                        | 移行前 | 移行後 | 備考                              |
+| --------------------------------- | ------ | ------ | --------------------------------- |
+| `@earendil-works/pi-agent-core`   | 0.65.2 | 0.84.2 | エージェントループ                |
+| `@earendil-works/pi-ai`           | 0.65.2 | 0.84.2 | LLM抽象化 (/compat 経由)          |
+| `@earendil-works/pi-tui`          | 0.65.2 | 0.84.2 | TUIコンポーネント (TuiMainScreen) |
+| `@earendil-works/pi-coding-agent` | 0.65.2 | 0.84.2 | コーディングエージェント本体      |
 
 ---
 
@@ -60,13 +60,13 @@
 
 ### 主要な使用箇所
 
-| ファイル群 | 用途 |
+| ファイル群                           | 用途                             |
 | ------------------------------------ | -------------------------------- |
-| `src/agents/pi-embedded-runner/` | エージェント実行のメインエントリ |
-| `src/gateway/server-methods/chat.ts` | チャットメッセージ処理 |
-| `src/agents/compaction.ts` | セッション圧縮 |
-| `src/config/sessions/` | セッション管理 |
-| `src/agents/command/` | コマンド実行 |
+| `src/agents/pi-embedded-runner/`     | エージェント実行のメインエントリ |
+| `src/gateway/server-methods/chat.ts` | チャットメッセージ処理           |
+| `src/agents/compaction.ts`           | セッション圧縮                   |
+| `src/config/sessions/`               | セッション管理                   |
+| `src/agents/command/`                | コマンド実行                     |
 
 ---
 
@@ -139,17 +139,17 @@ pnpm vitest run src/agents/pi-embedded-runner/kasou-session-compat.test.ts
 
 ### 5.1 確認・吸収した主な破壊的変更
 
-| バージョン範囲 | 破壊的変更内容 | DennouAibou での対応 |
-| --------------- | --------------------------------------- | ------------------------------------ |
-| 0.65.x → 0.68.x | `codingTools`/`readTool` 事前エクスポート廃止 | `createCodingTools(cwd)` ファクトリ方式へ移行 |
-| 0.68.x | `createAgentSession` の `tools` が allow-list 化 | `noTools: "builtin"` を導入し旧 builtInTools セマンティクス復元 |
-| 0.69.x | TypeBox 移行 (`@sinclair/typebox` → `typebox`) | 77ファイルの import 置換、`asSchemaJson()` 導入、Static ナローイング対応 |
-| 0.73.x → 0.74.x | パッケージスコープ移管 | `@mariozechner/*` → `@earendil-works/*` へ全域リネーム |
-| 0.74.x → 0.84.x | `pi-ai` ルートエクスポート廃止 | `@earendil-works/pi-ai/compat` サブパスへ移行 |
-| 0.74.x → 0.84.x | `AuthStorage` 廃止、`CredentialStore` 導入 | `auth-storage-adapter.ts` 新設、非同期事前投入ミラーパターン |
-| 0.74.x → 0.84.x | `ModelRegistry` の非同期化 | `await ModelRuntime.create()` 経由で `discoverModels` 非同期化 |
-| 0.74.x → 0.84.x | Agent の `streamFn` リネーム | `streamFunction` へ全域リネーム |
-| 0.74.x → 0.84.x | TUI クラス名変更 | `TUI` → `TuiMainScreen`、`clearApiProviders` → `resetApiProviders` |
+| バージョン範囲  | 破壊的変更内容                                   | DennouAibou での対応                                                     |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
+| 0.65.x → 0.68.x | `codingTools`/`readTool` 事前エクスポート廃止    | `createCodingTools(cwd)` ファクトリ方式へ移行                            |
+| 0.68.x          | `createAgentSession` の `tools` が allow-list 化 | `noTools: "builtin"` を導入し旧 builtInTools セマンティクス復元          |
+| 0.69.x          | TypeBox 移行 (`@sinclair/typebox` → `typebox`)   | 77ファイルの import 置換、`asSchemaJson()` 導入、Static ナローイング対応 |
+| 0.73.x → 0.74.x | パッケージスコープ移管                           | `@mariozechner/*` → `@earendil-works/*` へ全域リネーム                   |
+| 0.74.x → 0.84.x | `pi-ai` ルートエクスポート廃止                   | `@earendil-works/pi-ai/compat` サブパスへ移行                            |
+| 0.74.x → 0.84.x | `AuthStorage` 廃止、`CredentialStore` 導入       | `auth-storage-adapter.ts` 新設、非同期事前投入ミラーパターン             |
+| 0.74.x → 0.84.x | `ModelRegistry` の非同期化                       | `await ModelRuntime.create()` 経由で `discoverModels` 非同期化           |
+| 0.74.x → 0.84.x | Agent の `streamFn` リネーム                     | `streamFunction` へ全域リネーム                                          |
+| 0.74.x → 0.84.x | TUI クラス名変更                                 | `TUI` → `TuiMainScreen`、`clearApiProviders` → `resetApiProviders`       |
 
 ### 5.2 回退戦略
 
@@ -177,12 +177,12 @@ pnpm add @mariozechner/pi-agent-core@0.65.2 @mariozechner/pi-ai@0.65.2 @mariozec
 
 ## 7. リスクと検証結果
 
-| リスク | 想定された対策 | 実際の検証結果 |
-| -------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| PI SDK の API 変更でコンパイルエラー | CHANGELOG で事前確認、型エラーを個別修正 | D1〜D3 で段階的に吸収。`tsgo` 0 errors を全ホップで維持 ✅ |
+| リスク                                             | 想定された対策                             | 実際の検証結果                                                                                      |
+| -------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| PI SDK の API 変更でコンパイルエラー               | CHANGELOG で事前確認、型エラーを個別修正   | D1〜D3 で段階的に吸収。`tsgo` 0 errors を全ホップで維持 ✅                                          |
 | セッション形式の変更で既存セッションが読めなくなる | 更新前にバックアップ、形式変更の有無を確認 | `SessionManager` は v3 を維持。自動マイグレーション+破損行スキップにより完全な互換性を立証（D4） ✅ |
-| プロバイダー互換性の問題 | Google Gemini / OpenAI 動作を重点テスト | `/compat` 移行 + `ThinkingLevel` effort マッピング復元により正常動作確認 ✅ |
-| 同期パッケージのバージョン不整合 | 4パッケージを同時に更新 | 4パッケージすべて `@earendil-works/* 0.84.2` に統一 ✅ |
+| プロバイダー互換性の問題                           | Google Gemini / OpenAI 動作を重点テスト    | `/compat` 移行 + `ThinkingLevel` effort マッピング復元により正常動作確認 ✅                         |
+| 同期パッケージのバージョン不整合                   | 4パッケージを同時に更新                    | 4パッケージすべて `@earendil-works/* 0.84.2` に統一 ✅                                              |
 
 ---
 
@@ -192,19 +192,21 @@ pnpm add @mariozechner/pi-agent-core@0.65.2 @mariozechner/pi-ai@0.65.2 @mariozec
 
 **ベースライン記録** (2026-08-23, SDK 0.65.2 確認):
 
-| チェック | 結果 |
-| --- | --- |
-| `tsgo --noEmit --singleThreaded --checkers 1` | **0 errors** ✅ |
-| channels contracts (`vitest.contracts.config.ts` / `src/channels/plugins/contracts/`) | **37 files / 129 tests — all green** ✅（plugins 側 `src/plugins/contracts/` 40 files はゲート対象外） |
-| followup-runner (`vitest.auto-reply.config.ts` / `followup-runner.test.ts`) | **1 file / 28 tests — all green** ✅ |
-| plugin-activation-boundary (`vitest.unit.config.ts` / `plugin-activation-boundary.test.ts`) | **1 file / 7 tests — all green** ✅ |
+| チェック                                                                                    | 結果                                                                                                   |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `tsgo --noEmit --singleThreaded --checkers 1`                                               | **0 errors** ✅                                                                                        |
+| channels contracts (`vitest.contracts.config.ts` / `src/channels/plugins/contracts/`)       | **37 files / 129 tests — all green** ✅（plugins 側 `src/plugins/contracts/` 40 files はゲート対象外） |
+| followup-runner (`vitest.auto-reply.config.ts` / `followup-runner.test.ts`)                 | **1 file / 28 tests — all green** ✅                                                                   |
+| plugin-activation-boundary (`vitest.unit.config.ts` / `plugin-activation-boundary.test.ts`) | **1 file / 7 tests — all green** ✅                                                                    |
 
 **セッション互換テスト**: `src/agents/pi-embedded-runner/session-compatibility.test.ts` を新規作成。
+
 - 方法: SDK 0.65.2 の CURRENT_SESSION_VERSION (=3) で書いた最小 JSONL (header + user + assistant) を `SessionManager.open()` で開き、header/entries/branch/buildSessionContext が正しく読めることを検証。
 - 4 テスト: 古いセッション読み込み / バージョン定数安定性 / 旧JSONLへのappend / in-memory session append。
 - D1-D4 の各ゲートでこのテストを再実行し、互換性を監視。
 
 **D0 実施記録**:
+
 - `pnpm install` 変更なし（D0 は基盤確認のみ）。
 - テスト環境: Kasou mount 上の session lock が一時的に warning を発したが、テスト結果には影響なし。
 
@@ -355,14 +357,14 @@ pnpm add @mariozechner/pi-agent-core@0.65.2 @mariozechner/pi-ai@0.65.2 @mariozec
 
 ## 10. 実施記録
 
-| 日付 | コミット | 内容 | 状態 |
-| ---- | -------- | ---- | ---- |
-| 2026-08-23 | - | D0: 基盤固定。ベースライン全green確認、セッション互換テスト新規作成(4/4 pass) | ✅ 完了 |
-| 2026-08-24 | `0f15c7bac76` | D1: @mariozechner/* 0.65.2 → 0.73.1 (TypeBox移行、noTools対応、互換テスト新設) | ✅ 完了 |
-| 2026-08-24 | `aa92cc17dee`<br>`6c4c8c1abf8` | D2: スコープ移行 @mariozechner/* → @earendil-works/* 0.74.2 (import 一括置換、node_modules 参照修正) | ✅ 完了 |
-| 2026-08-25 | `cd30fe9dda9` | D3: @earendil-works/* 0.84.2 へ移行 (97 files, /compat 移行, CredentialStore アダプタ, ModelRuntime 非同期化, streamFunction, xhigh 復元, Codex OAuth) | ✅ 完了 |
-| 2026-08-25 | `33b461a1195` | D4: KASOU 形状セッション互換性テスト・フィクスチャ追加 (7/7 pass, SessionManager v3 維持の立証) | ✅ 完了 |
-| 2026-08-25 | - | D5: Phase D ドキュメント更新・総括・残項目整理 | ✅ 完了 |
+| 日付       | コミット                       | 内容                                                                                                                                                   | 状態    |
+| ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| 2026-08-23 | -                              | D0: 基盤固定。ベースライン全green確認、セッション互換テスト新規作成(4/4 pass)                                                                          | ✅ 完了 |
+| 2026-08-24 | `0f15c7bac76`                  | D1: @mariozechner/* 0.65.2 → 0.73.1 (TypeBox移行、noTools対応、互換テスト新設)                                                                         | ✅ 完了 |
+| 2026-08-24 | `aa92cc17dee`<br>`6c4c8c1abf8` | D2: スコープ移行 @mariozechner/* → @earendil-works/* 0.74.2 (import 一括置換、node_modules 参照修正)                                                   | ✅ 完了 |
+| 2026-08-25 | `cd30fe9dda9`                  | D3: @earendil-works/* 0.84.2 へ移行 (97 files, /compat 移行, CredentialStore アダプタ, ModelRuntime 非同期化, streamFunction, xhigh 復元, Codex OAuth) | ✅ 完了 |
+| 2026-08-25 | `33b461a1195`                  | D4: KASOU 形状セッション互換性テスト・フィクスチャ追加 (7/7 pass, SessionManager v3 維持の立証)                                                        | ✅ 完了 |
+| 2026-08-25 | -                              | D5: Phase D ドキュメント更新・総括・残項目整理                                                                                                         | ✅ 完了 |
 
 ---
 

@@ -40,8 +40,8 @@ async function expectInitialForumSend(
   api: ReturnType<typeof createMockDraftApi>,
   text = "Hello",
 ): Promise<void> {
-  await vi.waitFor(() =>
-    expect(api.sendMessage).toHaveBeenCalledWith(123, text, { message_thread_id: 99 }),
+  await vi.waitFor(
+    () => expect(api.sendMessage).toHaveBeenCalledWith(123, text, { message_thread_id: 99 }),
     { timeout: 3_000 },
   );
 }
@@ -135,7 +135,9 @@ describe("createTelegramDraftStream", () => {
 
     stream.update("Hello");
 
-    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith(123, "Hello", undefined), { timeout: 3_000 });
+    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith(123, "Hello", undefined), {
+      timeout: 3_000,
+    });
   });
 
   it("uses sendMessageDraft for dm threads and does not create a preview message", async () => {
@@ -143,10 +145,11 @@ describe("createTelegramDraftStream", () => {
     const stream = createThreadedDraftStream(api, { id: 42, scope: "dm" });
 
     stream.update("Hello");
-    await vi.waitFor(() =>
-      expect(api.sendMessageDraft).toHaveBeenCalledWith(123, expect.any(Number), "Hello", {
-        message_thread_id: 42,
-      }),
+    await vi.waitFor(
+      () =>
+        expect(api.sendMessageDraft).toHaveBeenCalledWith(123, expect.any(Number), "Hello", {
+          message_thread_id: 42,
+        }),
       { timeout: 3_000 },
     );
     expect(api.sendMessage).not.toHaveBeenCalled();
@@ -356,7 +359,9 @@ describe("createTelegramDraftStream", () => {
     );
 
     stream.update("Message A");
-    await vi.waitFor(() => expect(api.sendMessageDraft).toHaveBeenCalledTimes(1), { timeout: 3_000 });
+    await vi.waitFor(() => expect(api.sendMessageDraft).toHaveBeenCalledTimes(1), {
+      timeout: 3_000,
+    });
 
     stream.forceNewMessage();
     stream.update("Message B");

@@ -62,9 +62,7 @@ const matrixNamedAccountPromotionKeys = [
 const singleAccountKeysToMove = [...matrixSingleAccountKeysToMove];
 const namedAccountPromotionKeys = [...matrixNamedAccountPromotionKeys];
 
-function resolveSingleAccountPromotionTarget(params: {
-  channel: Record<string, unknown>;
-}): string {
+function resolveSingleAccountPromotionTarget(params: { channel: Record<string, unknown> }): string {
   const accounts =
     typeof params.channel.accounts === "object" && params.channel.accounts
       ? (params.channel.accounts as Record<string, unknown>)
