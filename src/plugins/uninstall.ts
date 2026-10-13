@@ -192,8 +192,9 @@ export function removePluginFromConfig(
       if (!Object.hasOwn(channels, key)) {
         continue;
       }
-      const { [key]: _removed, ...rest } = channels;
-      channels = Object.keys(rest).length > 0 ? rest : undefined;
+      const remaining: Record<string, unknown> = { ...channels };
+      delete remaining[key];
+      channels = Object.keys(remaining).length > 0 ? remaining : undefined;
       actions.channelConfig = true;
       if (!channels) {
         break;

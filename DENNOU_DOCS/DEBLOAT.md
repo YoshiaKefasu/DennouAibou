@@ -2607,4 +2607,35 @@ Reference:
 | `bun test extensions/dennou-nap` | **53/53 全 pass** |
 | `pnpm exec oxfmt --check <changed_files>` | **pass** |
 
+---
+
+## 43. 型チェック `bun --check` およびコード整形 `bun fmt` への完全ネイティブ移行（DEBLOAT 2026-10-13）
+
+### 43.1 目的と背景
+
+- **Bun 1.4.3+ ネイティブツールチェーンへの統合**:
+  - これまで外部スクリプト（`node scripts/run-tsgo.mjs`）として呼び出していた Go 製の `tsgo` を引退させ、Bun v1.4.3+ に組み込まれた高速型チェッカー `bun --check`（Rust 実装、マルチコア並列）へ完全移行する。
+  - 同様にコードフォーマッターも外部パッケージ `oxfmt` から、Bun 組み込みの `bun fmt`（Prettier 互換・Prettier 比 320 倍・oxfmt 比 2 倍速）へ一本化する。
+- **型安全性の向上と DEBLOAT**:
+  - `bun --check` で検出された 4 箇所の型エラー（`src/plugins/uninstall.ts` の TS7022 implicit any、Telegram テストのモック型キャスト TS2352）を是正。
+  - `package.json` のスクリプトから外部ツール依存を整理し、`"typecheck": "bun --check"`、`"format": "bun fmt"`、`"format:check": "bun fmt --check"` へ一本化する。
+
+### 43.2 変更対象と責務
+
+| 対象領域 | ファイル | 変更内容 |
+|---|---|---|
+| 型エラー解消 | `src/plugins/uninstall.ts` | computed-key 分割代入による TS7022 (implicit any) を明示的なプロパティ削除にリファクタリング。 |
+| テスト型キャスト是正 | `extensions/telegram/src/bot-native-command-menu.test.ts`<br>`extensions/telegram/src/bot.media.test-utils.ts` | モック関数の代入における TS2352 エラーを `as unknown as` を経由して解消。 |
+| スクリプト統合 | `package.json` | `"check"` を `"check:all"` にリネーム。<br>`"typecheck": "bun --check"` を追加。<br>`"tsgo": "bun --check"` に更新。<br>フォーマット系スクリプト（`format`, `format:check`, `format:diff`, `format:docs`, `format:docs:check`, `format:fix`）を `bun fmt` に更新。 |
+
+### 43.3 検証ゲート
+
+| ゲート | 判定基準 |
+|---|---|
+| `bun --check` | **0 errors（全 5,855 ファイル型検査合格）** |
+| `bun run typecheck` | **exit 0** |
+| `bun run ui:build` | **pass** |
+| `bun fmt --check <changed_files>` | **pass** |
+
+
 

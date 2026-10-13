@@ -64,8 +64,8 @@ export async function createBotHandlerWithOptions(options: {
     testTimings: TELEGRAM_TEST_TIMINGS,
     ...(effectiveProxyFetch ? { proxyFetch: effectiveProxyFetch } : {}),
     runtime: {
-      log: runtimeLog as (...data: unknown[]) => void,
-      error: runtimeError as (...data: unknown[]) => void,
+      log: runtimeLog as unknown as (...data: unknown[]) => void,
+      error: runtimeError as unknown as (...data: unknown[]) => void,
       exit: () => {
         throw new Error("exit");
       },

@@ -26,7 +26,7 @@ function syncMenuCommandsWithMocks(options: SyncMenuOptions): void {
       log: options.runtimeLog ?? vi.fn(),
       error: options.runtimeError ?? vi.fn(),
       exit: vi.fn(),
-    } as Parameters<typeof syncTelegramMenuCommands>[0]["runtime"],
+    } as unknown as Parameters<typeof syncTelegramMenuCommands>[0]["runtime"],
     commandsToRegister: options.commandsToRegister,
     accountId: options.accountId,
     botIdentity: options.botIdentity,
