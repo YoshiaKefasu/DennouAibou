@@ -118,6 +118,7 @@ DennouAibou のプラグイン（`api.registerTool`）で登録されるツー�
 | ----------------------------------- | ---------------------------- |
 | `bun --check` / `bun run typecheck` | **0 errors（型検査全合格）** |
 | `bun fmt --check`                   | **pass**                     |
+| `bun run config:schema:gen --check` | **pass（生成差分なし）**     |
 | `bun test spikes/pi-durable`        | **全 pass（5/5）**           |
 | `bun test` 関連テスト               | **既存テスト破損なし**       |
 | `bun run ui:build`                  | **pass**                     |
