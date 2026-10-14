@@ -7,7 +7,7 @@ import {
 } from "../../context-engine/index.js";
 import { emitAgentPlanEvent } from "../../infra/agent-events.js";
 import { sleepWithAbort } from "../../infra/backoff.js";
-import { runDurableKernelAgent } from "../../kernel/durable/runner-bridge.js";
+import type { runDurableKernelAgent } from "../../kernel/durable/runner-bridge.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import type { AuthProfileFailureReason } from "../../plugins/types.js";
 import { enqueueCommandInLane } from "../../process/command-queue.js";
@@ -190,9 +190,12 @@ export async function runEmbeddedPiAgent(
     const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
     const enqueueSession =
       params.enqueue ?? ((task, opts) => enqueueCommandInLane(sessionLane, task, opts));
-    return await enqueueSession(
-      async () => await (deps.runDurableKernelAgent ?? runDurableKernelAgent)(params),
-    );
+    return await enqueueSession(async () => {
+      const runner =
+        deps.runDurableKernelAgent ??
+        (await import("../../kernel/durable/runner-bridge.js")).runDurableKernelAgent;
+      return await runner(params);
+    });
   }
   const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
   const globalLane = resolveGlobalLane(params.lane);
