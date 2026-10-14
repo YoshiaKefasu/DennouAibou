@@ -103,6 +103,7 @@ export class DurableKernel {
     input: DurableTurnInput,
     context: Context = this.#defaultContext,
   ): Promise<DurableTurnSubmission> {
+    if (this.#closed) throw new Error("durable kernel is closed");
     const submission = await this.#root.submit(
       { type: "input", content: toUserInput(input), requestId: input.requestId },
       context,

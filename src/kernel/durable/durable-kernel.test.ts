@@ -175,7 +175,36 @@ describe("DurableKernel", () => {
   it("再オープンしたカーネルが前のターンを覚えている", async () => {
     await withStateDir(async (stateDir) => {
       const faux = fauxProvider();
-      faux.setResponses([fauxAssistantMessage("first"), fauxAssistantMessage("second")]);
+      const messageText = (
+        message: Parameters<FauxResponseFactory>[0]["messages"][number],
+      ): string => {
+        const content = message.content;
+        if (typeof content === "string") return content;
+        if (Array.isArray(content)) {
+          return content
+            .filter(
+              (b): b is { type: "text"; text: string } =>
+                b &&
+                typeof b === "object" &&
+                b.type === "text" &&
+                typeof (b as { text?: unknown }).text === "string",
+            )
+            .map((b) => b.text)
+            .join(" ");
+        }
+        return "";
+      };
+
+      const secondResponse: FauxResponseFactory = (context) => {
+        const sawPriorUser = context.messages.some(
+          (m) => m.role === "user" && messageText(m).includes("one"),
+        );
+        const sawPriorAssistant = context.messages.some(
+          (m) => m.role === "assistant" && messageText(m).includes("first"),
+        );
+        return fauxAssistantMessage(sawPriorUser && sawPriorAssistant ? "remembered" : "forgot");
+      };
+      faux.setResponses([fauxAssistantMessage("first"), secondResponse]);
 
       let firstAnswer = "";
       const kernel1 = await openKernel(stateDir, faux);
@@ -189,10 +218,21 @@ describe("DurableKernel", () => {
       const kernel2 = await openKernel(stateDir, faux);
       try {
         const second = await kernel2.submitTurn({ text: "two" });
-        expect(second.answer).toBe("second");
+        expect(second.answer).toBe("remembered");
       } finally {
         await kernel2.close();
       }
+    });
+  });
+
+  it("close 後の submit は即座にエラーになる", async () => {
+    await withStateDir(async (stateDir) => {
+      const faux = fauxProvider();
+      const kernel = await openKernel(stateDir, faux);
+      await kernel.close();
+      await expect(kernel.submitTurn({ text: "after close" })).rejects.toThrow(
+        "durable kernel is closed",
+      );
     });
   });
 });
