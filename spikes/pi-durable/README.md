@@ -9,20 +9,20 @@
 cd spikes/pi-durable
 bun install      # 初回のみ
 bun test         # 5 tests
-bun --check      # 型チェック（tsgo）
+bun --check      # 型チェック（Bun native）
 ```
 
 リポジトリルートから `bun test spikes/pi-durable` でも同じく PASS する。
 
 ## 検証結果（2026-08-20, Bun v1.4.4-canary.1）
 
-| # | 検証項目 | 結果 |
-|---|---------|------|
-| 1 | `MemoryStorage` + `Harness.open()` + `root.submit()`/`wait()` で単発会話が完走 | PASS |
-| 2 | `defineTool`/`defineExtension`/`createRegistry` でカスタムツールを登録し、モデルからの呼び出しと `pi.tool-result` の履歴格納 | PASS |
-| 3 | SQLite ストレージ（`openNodeSqliteStorage`）でプロセス中断 →  reopen → `harness.resume()` → 完了（durability） | PASS |
-| 4 | ユーザー入力の `ImageContent`（base64 PNG）が provider まで到達 | PASS |
-| 5 | `createCodingTools()` の `read` ツールが PNG を `ImageContent` として返す（`env` = `NodeExecutionEnv` 経由） | PASS |
+| #   | 検証項目                                                                                                                     | 結果 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 1   | `MemoryStorage` + `Harness.open()` + `root.submit()`/`wait()` で単発会話が完走                                               | PASS |
+| 2   | `defineTool`/`defineExtension`/`createRegistry` でカスタムツールを登録し、モデルからの呼び出しと `pi.tool-result` の履歴格納 | PASS |
+| 3   | SQLite ストレージ（`openNodeSqliteStorage`）でプロセス中断 → reopen → `harness.resume()` → 完了（durability）                | PASS |
+| 4   | ユーザー入力の `ImageContent`（base64 PNG）が provider まで到達                                                              | PASS |
+| 5   | `createCodingTools()` の `read` ツールが PNG を `ImageContent` として返す（`env` = `NodeExecutionEnv` 経由）                 | PASS |
 
 ## 実APIの要点（v1.2.0 実物から確認）
 

@@ -2,8 +2,8 @@
   "name": "spike-pi-durable",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Spike: @earendil-works/pi-durable v1.2.0 behavior verification for the future slim-kernel migration.",
+  "type": "module",
   "scripts": {
     "test": "bun test",
     "typecheck": "bun --check"

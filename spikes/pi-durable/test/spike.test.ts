@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -11,18 +11,18 @@ import {
   type FauxResponseFactory,
 } from "@earendil-works/pi-ai";
 import type { Message, TextContent, ToolResultMessage } from "@earendil-works/pi-ai";
+import { Type } from "@earendil-works/pi-ai";
+import type { Provider } from "@earendil-works/pi-ai/models";
 import {
   createRegistry,
   defineExtension,
   defineTool,
   type Conversation,
 } from "@earendil-works/pi-durable";
-import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { FAUX_MODEL, openMemoryHarness, openSqliteHarness } from "../src/harness";
-import { Type } from "@earendil-works/pi-ai";
-import type { Provider } from "@earendil-works/pi-ai/models";
 
 /** A valid 1x1 RGBA PNG, generated with node:zlib (see spike notes). */
 const PNG_1X1_BASE64 =
@@ -74,7 +74,10 @@ describe("pi-durable spike", () => {
     faux.setResponses([fauxAssistantMessage("Paris")]);
 
     const root = await openRoot(faux.provider);
-    const submission = await root.submit({ type: "input", content: "What is the capital of France?" }, CONTEXT);
+    const submission = await root.submit(
+      { type: "input", content: "What is the capital of France?" },
+      CONTEXT,
+    );
     const settled = await submission.wait(CONTEXT);
 
     expect(settled.status).toBe("done");
@@ -139,8 +142,10 @@ describe("pi-durable spike", () => {
       const harness1 = await openSqliteHarness(dbPath, faux.provider);
       const root1 = await harness1.harness.root(CONTEXT, { agent: { model: { ...FAUX_MODEL } } });
       const submission = await root1.submit({ type: "input", content: "durable ping" }, CONTEXT);
-      await delay(300); // generation が provider リクエスト中であることを待つ
-
+      const startWait = Date.now();
+      while (faux.state.callCount === 0 && Date.now() - startWait < 5000) {
+        await delay(20);
+      }
       expect(faux.state.callCount).toBe(1);
       expect((await submission.status(CONTEXT)).status).not.toBe("done");
 
