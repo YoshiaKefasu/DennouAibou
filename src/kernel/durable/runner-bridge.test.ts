@@ -140,6 +140,43 @@ describe("runDurableKernelAgent", () => {
     });
   });
 
+  it("does not fail the turn when streaming notification callbacks throw", async () => {
+    await withStateDir(async (stateDir) => {
+      const { models } = openFauxModels("safe-answer");
+
+      const result = await runDurableKernelAgent(
+        {
+          ...baseKernelParams(stateDir),
+          onPartialReply: () => {
+            throw new Error("partial callback explosion");
+          },
+          onBlockReply: () => {
+            throw new Error("block callback explosion");
+          },
+        },
+        { resolveSessionStateDir: () => stateDir, createModels: () => models },
+      );
+
+      expect(result.payloads?.[0]?.text).toBe("safe-answer");
+      expect(result.payloads?.[0]?.isError).toBeUndefined();
+    });
+  });
+
+  it("returns aborted payload early when abortSignal is already aborted", async () => {
+    await withStateDir(async (stateDir) => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await runDurableKernelAgent({
+        ...baseKernelParams(stateDir),
+        abortSignal: controller.signal,
+      });
+
+      expect(result.payloads?.[0]?.isError).toBe(true);
+      expect(result.meta.aborted).toBe(true);
+    });
+  });
+
   it("returns an isError payload instead of throwing when the kernel fails", async () => {
     await withStateDir(async (stateDir) => {
       const result = await runDurableKernelAgent(baseKernelParams(stateDir), {

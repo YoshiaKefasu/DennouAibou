@@ -187,7 +187,12 @@ export async function runEmbeddedPiAgent(
   // through to the legacy pi-embedded-runner pipeline below, byte-for-byte unchanged.
   const kernelMode = params.config?.agents?.defaults?.kernel ?? process.env.DENNOU_KERNEL;
   if (kernelMode === "durable") {
-    return await (deps.runDurableKernelAgent ?? runDurableKernelAgent)(params);
+    const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
+    const enqueueSession =
+      params.enqueue ?? ((task, opts) => enqueueCommandInLane(sessionLane, task, opts));
+    return await enqueueSession(
+      async () => await (deps.runDurableKernelAgent ?? runDurableKernelAgent)(params),
+    );
   }
   const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
   const globalLane = resolveGlobalLane(params.lane);

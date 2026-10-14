@@ -1,4 +1,6 @@
 import { join } from "node:path";
+import type { Context } from "@earendil-works/chord";
+import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { createModels, type Models } from "@earendil-works/pi-ai/models";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
 import { log } from "../../agents/pi-embedded-runner/logger.js";
@@ -61,6 +63,13 @@ export async function runDurableKernelAgent(
     model: modelId,
   };
 
+  if (params.abortSignal?.aborted) {
+    return {
+      payloads: [{ text: "Operation aborted", isError: true }],
+      meta: { durationMs: now() - started, agentMeta, aborted: true },
+    };
+  }
+
   let kernel: DurableKernel | undefined;
   try {
     const models = (deps.createModels ?? createModels)();
@@ -70,17 +79,27 @@ export async function runDurableKernelAgent(
       defaultModel: { provider, modelId },
     });
     await kernel.resume();
-    const result = await kernel.submitTurn(toTurnInput(params));
+
+    // Propagate abortSignal into the Chord context so cancellation works.
+    let turnContext: Context = BACKGROUND_CONTEXT;
+    if (params.abortSignal) {
+      turnContext = withAbortSignal(params.abortSignal, turnContext);
+    }
+    const result = await kernel.submitTurn(toTurnInput(params), turnContext);
+
+    // Reply notification is best-effort: failure must not turn a successful turn into an error payload.
     await notifyAnswer(params, result.answer);
+
     return {
       payloads: [{ text: result.answer }],
       meta: { durationMs: now() - started, agentMeta },
     };
   } catch (err) {
+    const aborted = params.abortSignal?.aborted === true;
     log.warn(`[durable-kernel] run failed: ${describeUnknownError(err)}`);
     return {
       payloads: [{ text: describeUnknownError(err), isError: true }],
-      meta: { durationMs: now() - started, agentMeta },
+      meta: { durationMs: now() - started, agentMeta, aborted },
     };
   } finally {
     if (kernel) {
@@ -107,6 +126,10 @@ async function notifyAnswer(params: RunEmbeddedPiAgentParams, answer: string): P
   if (!answer) {
     return;
   }
-  await params.onPartialReply?.({ text: answer });
-  await params.onBlockReply?.({ text: answer });
+  try {
+    await params.onPartialReply?.({ text: answer });
+    await params.onBlockReply?.({ text: answer });
+  } catch (notifyErr) {
+    log.warn(`[durable-kernel] reply notification failed: ${describeUnknownError(notifyErr)}`);
+  }
 }
