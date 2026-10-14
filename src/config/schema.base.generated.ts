@@ -4178,6 +4178,13 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
                 description:
                   "Embedded Pi runner hardening controls for how workspace-local Pi settings are trusted and applied in OpenClaw sessions.",
               },
+              kernel: {
+                description:
+                  'Execution kernel for embedded agent runs: "legacy" (default, the existing pi-embedded-runner pipeline) or "durable" (DurableKernel bridge with crash-recoverable session.sqlite turns). Overridable per process with DENNOU_KERNEL=durable.',
+                type: "string",
+                enum: ["legacy", "durable"],
+                title: "Execution Kernel",
+              },
               thinkingDefault: {
                 anyOf: [
                   {
@@ -23536,6 +23543,11 @@ export const GENERATED_BASE_CONFIG_SCHEMA: BaseConfigSchemaResponse = {
       label: "Embedded Pi Project Settings Policy",
       help: 'How embedded Pi handles workspace-local `.pi/config/settings.json`: "sanitize" (default) strips shellPath/shellCommandPrefix, "ignore" disables project settings entirely, and "trusted" applies project settings as-is.',
       tags: ["access"],
+    },
+    "agents.defaults.kernel": {
+      label: "Execution Kernel",
+      help: 'Selects the execution kernel for embedded agent runs: "legacy" (default) keeps the existing pi-embedded-runner pipeline, while "durable" routes each turn through the DurableKernel bridge that admits turns to session.sqlite and resumes unfinished work after a restart. Set DENNOU_KERNEL=durable to override this per process.',
+      tags: ["advanced"],
     },
     "agents.defaults.heartbeat.includeSystemPromptSection": {
       label: "Heartbeat Include System Prompt Section",

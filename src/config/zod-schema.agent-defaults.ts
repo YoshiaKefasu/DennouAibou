@@ -157,6 +157,12 @@ export const AgentDefaultsSchema = z
       })
       .strict()
       .optional(),
+    kernel: z
+      .enum(["legacy", "durable"])
+      .optional()
+      .describe(
+        'Execution kernel for embedded agent runs: "legacy" (default, the existing pi-embedded-runner pipeline) or "durable" (DurableKernel bridge with crash-recoverable session.sqlite turns). Overridable per process with DENNOU_KERNEL=durable.',
+      ),
     thinkingDefault: z
       .union([
         z.literal("off"),

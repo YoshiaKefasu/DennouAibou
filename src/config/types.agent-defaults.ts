@@ -114,6 +114,13 @@ export type AgentDefaultsConfig = {
      */
     projectSettingsPolicy?: "trusted" | "sanitize" | "ignore";
   };
+  /**
+   * Execution kernel for embedded agent runs.
+   * - legacy (default): the existing pi-embedded-runner pipeline.
+   * - durable: the DurableKernel bridge (crash-recoverable turns in session.sqlite).
+   * Overridable per process with the `DENNOU_KERNEL` environment variable.
+   */
+  kernel?: "legacy" | "durable";
   /** Vector memory search configuration (per-agent overrides supported). */
   memorySearch?: MemorySearchConfig;
   /** Default thinking level when no /think directive is present. */
