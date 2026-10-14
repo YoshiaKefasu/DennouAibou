@@ -7,6 +7,7 @@ import {
 } from "../../context-engine/index.js";
 import { emitAgentPlanEvent } from "../../infra/agent-events.js";
 import { sleepWithAbort } from "../../infra/backoff.js";
+import { runDurableKernelAgent } from "../../kernel/durable/runner-bridge.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import type { AuthProfileFailureReason } from "../../plugins/types.js";
 import { enqueueCommandInLane } from "../../process/command-queue.js";
@@ -151,6 +152,8 @@ export type RunEmbeddedPiAgentDeps = {
   resolveModelAsync?: typeof resolveModelAsync;
   runEmbeddedAttempt?: typeof runEmbeddedAttempt;
   ensureRuntimePluginsLoaded?: typeof ensureRuntimePluginsLoaded;
+  /** Durable kernel bridge used when the run selects `kernel: "durable"`. */
+  runDurableKernelAgent?: typeof runDurableKernelAgent;
   prepareProviderRuntimeAuth?: EmbeddedRunAuthControllerDeps["prepareProviderRuntimeAuth"];
 };
 
@@ -178,6 +181,13 @@ export async function runEmbeddedPiAgent(
   });
   if (effectiveSessionKey !== params.sessionKey) {
     params = { ...params, sessionKey: effectiveSessionKey };
+  }
+  // Durable kernel switch: `agents.defaults.kernel: "durable"` (or DENNOU_KERNEL=durable)
+  // routes the whole run through the DurableKernel bridge. Unset / "legacy" falls
+  // through to the legacy pi-embedded-runner pipeline below, byte-for-byte unchanged.
+  const kernelMode = params.config?.agents?.defaults?.kernel ?? process.env.DENNOU_KERNEL;
+  if (kernelMode === "durable") {
+    return await (deps.runDurableKernelAgent ?? runDurableKernelAgent)(params);
   }
   const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
   const globalLane = resolveGlobalLane(params.lane);

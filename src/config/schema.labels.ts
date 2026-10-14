@@ -558,6 +558,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.compaction.memoryFlush.systemPrompt": "Compaction Memory Flush System Prompt",
   "agents.defaults.embeddedPi": "Embedded Pi",
   "agents.defaults.embeddedPi.projectSettingsPolicy": "Embedded Pi Project Settings Policy",
+  "agents.defaults.kernel": "Execution Kernel",
   "agents.defaults.heartbeat.includeSystemPromptSection": "Heartbeat Include System Prompt Section",
   "agents.list.*.heartbeat.includeSystemPromptSection": "Heartbeat Include System Prompt Section",
   "agents.defaults.heartbeat.directPolicy": "Heartbeat Direct Policy",
