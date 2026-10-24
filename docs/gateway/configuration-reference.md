@@ -1013,7 +1013,7 @@ Time format in system prompt. Default: `auto` (OS preference).
   - String form sets only the primary model.
   - Object form sets primary plus ordered failover models.
 - `imageModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
-  - Used by the `image` tool path as its vision-model config.
+  - Used by the `read` tool's image analysis path as its vision-model config.
   - Also used as fallback routing when the selected/default model cannot accept image input.
 - `imageGenerationModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the shared image-generation capability and any future tool/plugin surface that generates images.
@@ -1535,12 +1535,12 @@ Defaults for Talk mode (macOS/iOS/Android).
 
 Local onboarding defaults new local configs to `tools.profile: "coding"` when unset (existing explicit profiles are preserved).
 
-| Profile     | Includes                                                                                    |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| `minimal`   | `session_status` only                                                                       |
-| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`, `image` |
-| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status`   |
-| `full`      | No restriction (same as unset)                                                              |
+| Profile     | Includes                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| `minimal`   | `session_status` only                                                                     |
+| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`        |
+| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status` |
+| `full`      | No restriction (same as unset)                                                            |
 
 ### Tool groups
 
@@ -1549,14 +1549,13 @@ Local onboarding defaults new local configs to `tools.profile: "coding"` when un
 | `group:runtime`    | `exec`, `process`, `code_execution` (`bash` is accepted as an alias for `exec`)                                         |
 | `group:fs`         | `read`, `write`, `edit`, `apply_patch`                                                                                  |
 | `group:sessions`   | `sessions_list`, `sessions_history`, `sessions_send`, `sessions_spawn`, `sessions_yield`, `subagents`, `session_status` |
-| `group:memory`     | `memory_search`, `memory_get`                                                                                           |
+| `group:memory`     | `memory_search`, `memory_get`, `chat_search`                                                                            |
 | `group:web`        | `web_search`, `x_search`, `web_fetch`                                                                                   |
 | `group:ui`         | `browser`, `canvas`                                                                                                     |
 | `group:automation` | `cron`, `gateway`                                                                                                       |
 | `group:messaging`  | `message`                                                                                                               |
 | `group:nodes`      | `nodes`                                                                                                                 |
-| `group:agents`     | `agents_list`                                                                                                           |
-| `group:media`      | `image`                                                                                                                 |
+| `group:agents`     | `agents_list`, `update_plan`                                                                                            |
 | `group:openclaw`   | All built-in tools (excludes provider plugins)                                                                          |
 
 ### `tools.allow` / `tools.deny`

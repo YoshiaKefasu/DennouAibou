@@ -142,7 +142,6 @@ const TRUSTED_TOOL_RESULT_MEDIA = new Set([
   "edit",
   "exec",
   "gateway",
-  "image",
   "memory_get",
   "memory_search",
   "message",

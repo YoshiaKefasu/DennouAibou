@@ -47,7 +47,6 @@ const CORE_TOOL_SECTION_ORDER: Array<{ id: string; label: string }> = [
   { id: "automation", label: "Automation" },
   { id: "nodes", label: "Nodes" },
   { id: "agents", label: "Agents" },
-  { id: "media", label: "Media" },
 ];
 
 const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
@@ -266,14 +265,6 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     label: "update_plan",
     description: UPDATE_PLAN_TOOL_DISPLAY_SUMMARY,
     sectionId: "agents",
-    profiles: ["coding"],
-    includeInOpenClawGroup: true,
-  },
-  {
-    id: "image",
-    label: "image",
-    description: "Image understanding",
-    sectionId: "media",
     profiles: ["coding"],
     includeInOpenClawGroup: true,
   },
