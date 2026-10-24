@@ -64,6 +64,7 @@ export const FALLBACK_TOOL_SECTIONS: AgentToolSection[] = [
     tools: [
       { id: "memory_search", label: "memory_search", description: "Semantic search" },
       { id: "memory_get", label: "memory_get", description: "Read memory files" },
+      { id: "chat_search", label: "chat_search", description: "Search chat history" },
     ],
   },
   {
@@ -103,12 +104,10 @@ export const FALLBACK_TOOL_SECTIONS: AgentToolSection[] = [
   {
     id: "agents",
     label: "Agents",
-    tools: [{ id: "agents_list", label: "agents_list", description: "List agents" }],
-  },
-  {
-    id: "media",
-    label: "Media",
-    tools: [{ id: "image", label: "image", description: "Image understanding" }],
+    tools: [
+      { id: "agents_list", label: "agents_list", description: "List agents" },
+      { id: "update_plan", label: "update_plan", description: "Update task plan" },
+    ],
   },
 ];
 

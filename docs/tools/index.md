@@ -116,12 +116,12 @@ config. Deny always wins over allow.
 `tools.profile` sets a base allowlist before `allow`/`deny` is applied.
 Per-agent override: `agents.list[].tools.profile`.
 
-| Profile     | What it includes                                                                          |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| `full`      | No restriction (same as unset)                                                            |
-| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`        |
-| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status` |
-| `minimal`   | `session_status` only                                                                     |
+| Profile     | What it includes                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| `full`      | No restriction (same as unset)                                                                    |
+| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`, `update_plan` |
+| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status`         |
+| `minimal`   | `session_status` only                                                                             |
 
 ### Tool groups
 

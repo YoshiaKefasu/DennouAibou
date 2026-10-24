@@ -1013,8 +1013,7 @@ Time format in system prompt. Default: `auto` (OS preference).
   - String form sets only the primary model.
   - Object form sets primary plus ordered failover models.
 - `imageModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
-  - Used by the `read` tool's image analysis path as its vision-model config.
-  - Also used as fallback routing when the selected/default model cannot accept image input.
+  - Used by the inbound media-understanding path as its vision-model config when the primary model cannot accept image input.
 - `imageGenerationModel`: accepts either a string (`"provider/model"`) or an object (`{ primary, fallbacks }`).
   - Used by the shared image-generation capability and any future tool/plugin surface that generates images.
   - Typical values: `google/gemini-3.1-flash-image-preview` for native Gemini image generation, or `openai/gpt-image-1` for OpenAI Images.
@@ -1535,12 +1534,12 @@ Defaults for Talk mode (macOS/iOS/Android).
 
 Local onboarding defaults new local configs to `tools.profile: "coding"` when unset (existing explicit profiles are preserved).
 
-| Profile     | Includes                                                                                  |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| `minimal`   | `session_status` only                                                                     |
-| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`        |
-| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status` |
-| `full`      | No restriction (same as unset)                                                            |
+| Profile     | Includes                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| `minimal`   | `session_status` only                                                                             |
+| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`, `update_plan` |
+| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status`         |
+| `full`      | No restriction (same as unset)                                                                    |
 
 ### Tool groups
 
