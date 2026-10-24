@@ -67,9 +67,6 @@ These tools ship with DennouAibou and are available without installing any plugi
 | `sessions_*` / `subagents` / `agents_list` | Session management, status, and sub-agent orchestration                                          | [Sub-agents](/tools/subagents)          |
 | `session_status`                           | Lightweight `/status`-style readback and session model override                                  | [Session Tools](/concepts/session-tool) |
 
-For image work, use `read` for analysis (images, PDFs, audio) and the `image` tool
-for image understanding.
-
 `session_status` is the lightweight status/readback tool in the sessions group.
 It answers `/status`-style questions about the current session and can
 optionally set a per-session model override; `model=default` clears that
@@ -119,12 +116,12 @@ config. Deny always wins over allow.
 `tools.profile` sets a base allowlist before `allow`/`deny` is applied.
 Per-agent override: `agents.list[].tools.profile`.
 
-| Profile     | What it includes                                                                          |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| `full`      | No restriction (same as unset)                                                            |
-| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`        |
-| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status` |
-| `minimal`   | `session_status` only                                                                     |
+| Profile     | What it includes                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------- |
+| `full`      | No restriction (same as unset)                                                              |
+| `coding`    | `group:fs`, `group:runtime`, `group:web`, `group:sessions`, `group:memory`, `cron`, `image` |
+| `messaging` | `group:messaging`, `sessions_list`, `sessions_history`, `sessions_send`, `session_status`   |
+| `minimal`   | `session_status` only                                                                       |
 
 ### Tool groups
 
