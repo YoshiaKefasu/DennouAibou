@@ -113,10 +113,6 @@
       "destination": "/tools/web"
     },
     {
-      "source": "/tts",
-      "destination": "/tools/tts"
-    },
-    {
       "source": "/messages",
       "destination": "/concepts/messages"
     },
@@ -355,18 +351,6 @@
     {
       "source": "/start/pairing",
       "destination": "/channels/pairing"
-    },
-    {
-      "source": "/clawhub",
-      "destination": "/tools/clawhub"
-    },
-    {
-      "source": "/clawdhub",
-      "destination": "/tools/clawhub"
-    },
-    {
-      "source": "/tools/clawdhub",
-      "destination": "/tools/clawhub"
     },
     {
       "source": "/configuration",
@@ -1135,7 +1119,6 @@
                   "tools/creating-skills",
                   "tools/skills-config",
                   "tools/slash-commands",
-                  "tools/clawhub",
                   "prose"
                 ]
               },
@@ -1180,21 +1163,16 @@
                   "tools/diffs",
                   "tools/elevated",
                   "tools/exec",
-                  "tools/exec-approvals",
-                  "tools/image-generation",
-                  "tools/music-generation",
                   "tools/llm-task",
                   "tools/lobster",
                   "tools/loop-detection",
-                  "tools/pdf",
                   "tools/reactions",
-                  "tools/thinking",
-                  "tools/video-generation"
+                  "tools/thinking"
                 ]
               },
               {
                 "group": "Agent coordination",
-                "pages": ["tools/agent-send", "tools/subagents", "tools/acp-agents"]
+                "pages": ["tools/agent-send", "tools/subagents"]
               }
             ]
           },
@@ -1341,8 +1319,7 @@
                       "nodes/media-understanding",
                       "nodes/images",
                       "nodes/audio",
-                      "nodes/camera",
-                      "tools/tts"
+                      "nodes/camera"
                     ]
                   },
                   {
@@ -1425,14 +1402,7 @@
                   },
                   {
                     "group": "Utility",
-                    "pages": [
-                      "cli/acp",
-                      "cli/clawbot",
-                      "cli/completion",
-                      "cli/dns",
-                      "cli/docs",
-                      "cli/mcp"
-                    ]
+                    "pages": ["cli/clawbot", "cli/completion", "cli/dns", "cli/docs", "cli/mcp"]
                   }
                 ]
               },
