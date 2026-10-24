@@ -146,6 +146,25 @@ Use the two controls for different jobs:
 - `tools.exec.safeBinProfiles`: explicit argv policy for custom safe bins.
 - allowlist: explicit trust for executable paths.
 
+Default safe bins:
+
+[//]: # "SAFE_BIN_DEFAULTS:START"
+
+`cut`, `uniq`, `head`, `tail`, `tr`, `wc`
+
+[//]: # "SAFE_BIN_DEFAULTS:END"
+
+Denied flags by safe-bin profile:
+
+[//]: # "SAFE_BIN_DENIED_FLAGS:START"
+
+- `grep`: `--dereference-recursive`, `--directories`, `--exclude-from`, `--file`, `--recursive`, `-R`, `-d`, `-f`, `-r`
+- `jq`: `--argfile`, `--from-file`, `--library-path`, `--rawfile`, `--slurpfile`, `-L`, `-f`
+- `sort`: `--compress-program`, `--files0-from`, `--output`, `--random-source`, `--temporary-directory`, `-T`, `-o`
+- `wc`: `--files0-from`
+
+[//]: # "SAFE_BIN_DENIED_FLAGS:END"
+
 Do not treat `safeBins` as a generic allowlist, and do not add interpreter/runtime binaries (for example `python3`, `node`, `ruby`, `bash`). If you need those, use explicit allowlist entries and keep approval prompts enabled.
 `openclaw security audit` warns when interpreter/runtime `safeBins` entries are missing explicit profiles, and `openclaw doctor --fix` can scaffold missing custom `safeBinProfiles` entries.
 `openclaw security audit` and `openclaw doctor` also warn when you explicitly add broad-behavior bins such as `jq` back into `safeBins`.
