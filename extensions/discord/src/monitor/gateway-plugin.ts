@@ -7,6 +7,7 @@ import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 import * as undici from "undici";
 import * as ws from "ws";
 import { validateDiscordProxyUrl } from "../proxy-fetch.js";
+import { resolveDiscordPresenceUpdate } from "./presence.js";
 
 const DISCORD_GATEWAY_BOT_URL = "https://discord.com/api/v10/gateway/bot";
 const DEFAULT_DISCORD_GATEWAY_URL = "wss://gateway.discord.gg/";
@@ -226,6 +227,8 @@ function createGatewayPlugin(params: {
     intents: number;
     autoInteractions: boolean;
   };
+  /** Initial presence injected into the identify payload so the bot is never stuck offline. */
+  presence?: carbonGateway.UpdatePresenceData | null;
   fetchImpl: DiscordGatewayFetch;
   fetchInit?: DiscordGatewayFetchInit;
   wsAgent?: InstanceType<typeof httpsProxyAgent.HttpsProxyAgent<string>>;
@@ -243,6 +246,21 @@ function createGatewayPlugin(params: {
 
     constructor() {
       super(params.options);
+    }
+
+    // Carbon's identify payload carries no presence, so the bot only turns green after a
+    // post-READY op:3 that can be silently dropped. Inject it into the handshake instead.
+    override send(payload: carbonGateway.GatewayPayload, skipRateLimit?: boolean) {
+      const presence = params.presence;
+      if (
+        presence &&
+        payload.op === carbonGateway.GatewayOpcodes.Identify &&
+        payload.d &&
+        typeof payload.d === "object"
+      ) {
+        (payload.d as Record<string, unknown>).presence = presence;
+      }
+      return super.send(payload, skipRateLimit);
     }
 
     override async registerClient(
@@ -296,6 +314,7 @@ export function createDiscordGatewayPlugin(params: {
   };
 }): carbonGateway.GatewayPlugin {
   const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);
+  const presence = resolveDiscordPresenceUpdate(params.discordConfig ?? {});
   const proxy = params.discordConfig?.proxy?.trim();
   const options = {
     reconnect: { maxAttempts: 50 },
@@ -306,6 +325,7 @@ export function createDiscordGatewayPlugin(params: {
   if (!proxy) {
     return createGatewayPlugin({
       options,
+      presence,
       fetchImpl: (input, init) => fetch(input, init as RequestInit),
       runtime: params.runtime,
       testing: params.__testing
@@ -329,6 +349,7 @@ export function createDiscordGatewayPlugin(params: {
 
     return createGatewayPlugin({
       options,
+      presence,
       fetchImpl: (input, init) => (params.__testing?.undiciFetch ?? undici.fetch)(input, init),
       fetchInit: { dispatcher: fetchAgent },
       wsAgent,
@@ -344,6 +365,7 @@ export function createDiscordGatewayPlugin(params: {
     params.runtime.error?.(danger(`discord: invalid gateway proxy: ${String(err)}`));
     return createGatewayPlugin({
       options,
+      presence,
       fetchImpl: (input, init) => fetch(input, init as RequestInit),
       runtime: params.runtime,
       testing: params.__testing

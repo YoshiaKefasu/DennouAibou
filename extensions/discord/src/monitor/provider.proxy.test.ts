@@ -2,7 +2,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   GatewayIntents,
+  GatewayOpcodes,
   baseRegisterClientSpy,
+  baseSendSpy,
   GatewayPlugin,
   globalFetchMock,
   HttpsProxyAgent,
@@ -20,6 +22,7 @@ const {
   const undiciFetchMock = vi.fn();
   const globalFetchMock = vi.fn();
   const baseRegisterClientSpy = vi.fn();
+  const baseSendSpy = vi.fn();
   const webSocketSpy = vi.fn();
 
   const GatewayIntents = {
@@ -33,6 +36,13 @@ const {
     GuildMembers: 1 << 7,
   } as const;
 
+  const GatewayOpcodes = {
+    Heartbeat: 1,
+    Identify: 2,
+    PresenceUpdate: 3,
+    Resume: 6,
+  } as const;
+
   class GatewayPlugin {
     options: unknown;
     gatewayInfo: unknown;
@@ -42,6 +52,9 @@ const {
     }
     async registerClient(client: unknown) {
       baseRegisterClientSpy(client);
+    }
+    send(payload: unknown, skipRateLimit?: boolean) {
+      baseSendSpy(payload, skipRateLimit);
     }
   }
 
@@ -60,7 +73,9 @@ const {
 
   return {
     baseRegisterClientSpy,
+    baseSendSpy,
     GatewayIntents,
+    GatewayOpcodes,
     GatewayPlugin,
     globalFetchMock,
     HttpsProxyAgent,
@@ -79,36 +94,18 @@ const {
 // Unit test: don't import Carbon just to check the prototype chain.
 vi.mock("@buape/carbon/gateway", () => ({
   GatewayIntents,
+  GatewayOpcodes,
   GatewayPlugin,
 }));
 
 vi.mock("@buape/carbon/dist/src/plugins/gateway/index.js", () => ({
   GatewayIntents,
+  GatewayOpcodes,
   GatewayPlugin,
 }));
 
 vi.mock("https-proxy-agent", () => ({
   HttpsProxyAgent,
-}));
-
-vi.mock("undici", () => ({
-  ProxyAgent: class {
-    proxyUrl: string;
-    constructor(proxyUrl: string) {
-      this.proxyUrl = proxyUrl;
-      undiciProxyAgentSpy(proxyUrl);
-      restProxyAgentSpy(proxyUrl);
-    }
-  },
-  fetch: undiciFetchMock,
-}));
-
-vi.mock("ws", () => ({
-  default: class MockWebSocket {
-    constructor(url: string, options?: { agent?: unknown }) {
-      webSocketSpy(url, options);
-    }
-  },
 }));
 
 describe("createDiscordGatewayPlugin", () => {
@@ -217,6 +214,7 @@ describe("createDiscordGatewayPlugin", () => {
     setTestGlobal("fetch", globalFetchMock);
     vi.useRealTimers();
     baseRegisterClientSpy.mockClear();
+    baseSendSpy.mockClear();
     globalFetchMock.mockClear();
     restProxyAgentSpy.mockClear();
     undiciFetchMock.mockClear();
@@ -242,6 +240,73 @@ describe("createDiscordGatewayPlugin", () => {
       }),
     );
     expect(baseRegisterClientSpy).toHaveBeenCalledTimes(1);
+  });
+
+  function sendGatewayPayload(plugin: unknown, payload: { op: number; d?: unknown }) {
+    (plugin as { send: (payload: unknown, skipRateLimit?: boolean) => void }).send(payload, true);
+  }
+
+  it("injects the configured presence into the identify payload", () => {
+    const runtime = createRuntime();
+    const plugin = createDiscordGatewayPlugin({
+      discordConfig: { status: "idle", activity: "Reading docs" },
+      runtime,
+    });
+
+    const payload: { op: number; d?: Record<string, unknown> } = {
+      op: GatewayOpcodes.Identify,
+      d: { token: "token-123", properties: {}, intents: 1 },
+    };
+    sendGatewayPayload(plugin, payload);
+
+    expect(baseSendSpy).toHaveBeenCalledTimes(1);
+    expect(payload.d?.presence).toEqual({
+      since: null,
+      activities: [{ name: "Custom Status", type: 4, state: "Reading docs" }],
+      status: "idle",
+      afk: false,
+    });
+  });
+
+  it("defaults to an online presence in the identify payload when presence is unconfigured", () => {
+    const runtime = createRuntime();
+    const plugin = createDiscordGatewayPlugin({
+      discordConfig: {},
+      runtime,
+    });
+
+    const payload: { op: number; d?: Record<string, unknown> } = {
+      op: GatewayOpcodes.Identify,
+      d: { token: "token-123", properties: {}, intents: 1 },
+    };
+    sendGatewayPayload(plugin, payload);
+
+    expect(payload.d?.presence).toEqual({
+      since: null,
+      activities: [],
+      status: "online",
+      afk: false,
+    });
+  });
+
+  it("leaves non-identify payloads untouched", () => {
+    const runtime = createRuntime();
+    const plugin = createDiscordGatewayPlugin({
+      discordConfig: {},
+      runtime,
+    });
+
+    const presenceUpdate: { op: number; d?: Record<string, unknown> } = {
+      op: GatewayOpcodes.PresenceUpdate,
+      d: { since: null, activities: [], status: "dnd", afk: false },
+    };
+    sendGatewayPayload(plugin, presenceUpdate);
+    const heartbeat: { op: number; d?: unknown } = { op: GatewayOpcodes.Heartbeat, d: null };
+    sendGatewayPayload(plugin, heartbeat);
+
+    expect(baseSendSpy).toHaveBeenCalledTimes(2);
+    expect(presenceUpdate.d).toEqual({ since: null, activities: [], status: "dnd", afk: false });
+    expect(heartbeat.d).toBeNull();
   });
 
   it("maps plain-text Discord 503 responses to fetch failed", async () => {
@@ -370,7 +435,7 @@ describe("createDiscordGatewayPlugin", () => {
     });
 
     const registerPromise = registerGatewayClient(plugin);
-    await vi.advanceTimersByTimeAsync(10_000);
+    vi.advanceTimersByTime(10_000);
     await registerPromise;
 
     expect(baseRegisterClientSpy).toHaveBeenCalledTimes(1);
