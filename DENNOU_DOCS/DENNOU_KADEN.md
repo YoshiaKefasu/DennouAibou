@@ -53,18 +53,18 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。
   - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers` ガード通過後）に **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**。
   - プレイヤーが再生中の場合は既存の `entry.player.stop(true)` も同時に実行する。
-  - `processSegment` 冒頭および STT 完了直後（`manager.ts:581` 直後）にも `if (entry.generation !== segmentGeneration) return;` で早期リターンし、無駄な LLM 呼び出しや TTS 合成をスキップする。
+  - `processSegment` 冒頭（STT 前）および STT 完了直後（`manager.ts:581` 直後）の両方で `if (entry.generation !== segmentGeneration) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
 - **TTS 音声生成（OpenRouter）**:
-  - 返答テキスト（最大 1,500 文字程度で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる：
+  - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる：
     - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバック、それ以外の 4xx エラーは即テキストフォールバック）
     - パラメータ: `response_format: "mp3"`, `input: replyText`
     - voice ID: `channels.discord.voice.tts.providers.openrouter.voice` を参照（設定されている場合は付与）。
-    - ネットワーク: `fetchWithSsrFGuard` を使用し、タイムアウトは合計 15 秒（1試行最大 8 秒）。
+    - ネットワーク: `fetchWithSsrFGuard` を使用し、タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)`。
       ```ts
       let response: Response | undefined;
       let release: (() => Promise<void>) | undefined;
       try {
-        const res = await fetchWithSsrFGuard({ url, init, timeoutMs: 8_000 });
+        const res = await fetchWithSsrFGuard({ url, init, timeoutMs });
         response = res.response;
         release = res.release;
         if (!response.ok) { ... }
@@ -74,7 +74,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
         await release?.();
       }
       ```
-    - API キー: `normalizeSecretInputString(channels.discord.voice.tts.providers.openrouter.apiKey) ?? process.env.OPENROUTER_API_KEY?.trim()` から安全に解決（SecretRef 対応）。
+    - API キー: `normalizeSecretInputString(channels.discord.voice.tts.providers.openrouter.apiKey) ?? process.env.OPENROUTER_API_KEY?.trim()` から解決（※ `normalizeSecretInputString` は素の文字列のみ解決し、未設定時は環境変数へフォールバック）。
 - **再生と破棄**:
   - 生成した MP3（`mkdtemp` 30分後自動クリーンアップ）の再生直前に、セッション破棄チェック（`this.sessions.get(entry.guildId) !== entry`）および世代不一致チェック（`entry.generation !== segmentGeneration`）を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する。有効時のみ `createAudioResource` で再生する。
 - **フェイルオープン**:
@@ -87,7 +87,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
 - `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、TTS 音声生成・再生パイプライン、テキストフォールバック
-- `extensions/discord/src/voice/manager.e2e.test.ts`: ルーティング、再生モック、新規ガード（世代不一致破棄・セッション破棄・フォールバック）のテスト同期
+- `extensions/discord/src/voice/manager.e2e.test.ts`: ルーティング、再生モック、新規ガード（世代不一致破棄・セッション破棄・429フォールバック・400即テキスト）のテスト同期（テストフィクスチャに `generation: 0`, `segmentGeneration: 0` を補完）
 
 ---
 
