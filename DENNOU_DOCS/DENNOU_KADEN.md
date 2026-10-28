@@ -50,17 +50,19 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 ### 3.3 音声返答（Egress）とバージイン
 
 - **世代カウンタの管理**:
-  - `VoiceSessionEntry` に `generation: number` を追加する。
-  - ユーザーの発話開始時（`handleSpeakingStart` 冒頭、`botUserId` 自己フィルタ直後・無条件）に **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**（STT 中に発話された場合でも遅延破棄を確実に機能させる）。
+  - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。
+  - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers` ガード通過後）に **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**。
   - プレイヤーが再生中の場合は既存の `entry.player.stop(true)` も同時に実行する。
+  - STT 完了直後（`manager.ts:581` 付近）にも `if (entry.generation !== segmentGeneration) return;` で早期リターンし、無駄な LLM 呼び出しや TTS 合成をスキップする。
 - **TTS 音声生成（OpenRouter）**:
   - 返答テキストを OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる：
-    - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバック）
-    - パラメータ: `response_format: "mp3"`, `input: replyText`（voice ID が指定されている場合は付与）
-    - ネットワーク: `fetchWithSsrFGuard` を使用し、タイムアウトは `timeoutMs: 15_000`。**`await response.arrayBuffer()` でボディ受信完了後に `finally` で `release()` を確実に呼ぶ（エラー時も `response.body?.cancel()` 等で接続を解放）**。
+    - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバック、それ以外の 4xx エラーは即テキストフォールバック）
+    - パラメータ: `response_format: "mp3"`, `input: replyText`
+    - voice ID: `channels.discord.voice.tts.providers.openrouter.voice` を参照（設定されている場合は付与）。
+    - ネットワーク: `fetchWithSsrFGuard` を使用し、タイムアウトは `timeoutMs: 15_000`。エラー経路も含め `await response.body?.cancel().catch(() => {});` を実行した上で、**`await response.arrayBuffer()` でボディ受信完了後に `finally` で `release()` を確実に呼ぶ**。
     - API キー: `channels.discord.voice.tts.providers.openrouter.apiKey ?? process.env.OPENROUTER_API_KEY` から解決。
 - **再生と破棄**:
-  - 生成した MP3（`mkdtemp` 30分後自動クリーンアップ）の再生直前（同一同期ブロック内・`await` を挟まない）に `entry.generation !== segmentGeneration` を判定し、不一致（STT 中または TTS 合成中にユーザーが話し始めた）なら再生せず破棄する。一致時のみ `createAudioResource` で再生する。
+  - 生成した MP3（`mkdtemp` 30分後自動クリーンアップ）の再生直前に、セッション破棄チェック（`this.sessions.get(entry.guildId) !== entry`）および世代不一致チェック（`entry.generation !== segmentGeneration`）を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する。有効時のみ `createAudioResource` で再生する。
 - **フェイルオープン**:
   - TTS や音声再生が失敗した場合は、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
 
