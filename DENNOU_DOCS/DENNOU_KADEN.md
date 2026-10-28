@@ -4,7 +4,7 @@
 
 Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yosia が双方向音声通話（電話）を行えるシステムを構築する。
 複雑な独自インフラや外部アプリ新設を避け、すでに存在する Discord 公式通話機能（`@discordjs/voice`）と、既存の単一不滅マスターセッション（`agent:main:main`）を KISS（Keep It Simple, Stupid）原則で結合する。
-通話経路自体は Discord 標準機能のみで自立して動作し、重い音声認識（ASR）のオフロードは既存の `tools.media.audio.baseUrl` を活用した任意の低遅延オプションとして位置づける。
+通話経路自体は Discord 標準機能のみで自立して動作し、重い音声認識（ASR）のオフロードは既存の `tools.media.audio.models[]` エントリ単位の `baseUrl` を活用した任意の低遅延オプションとして位置づける。
 
 ---
 
@@ -18,8 +18,8 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
          │
          ▼ (WAV 一時ファイル: mkdtemp 30分TTL)
 [STT: mediaUnderstanding.transcribeAudioFile]
- (tools.media.audio.baseUrl 設定時は Windows RTX 2060 サーバーへオフロード、
-  未設定または失敗時は既存プロバイダへ安全にフェイルオープン)
+ (tools.media.audio.models[] のエントリ単位 baseUrl で Windows RTX 2060 へオフロード、
+  未設定または失敗時は次エントリのクラウドプロバイダへ安全にフェイルオープン)
          │
          ▼ (テキストプロンプト)
 [in-process: agentCommandFromIngress]
@@ -44,9 +44,23 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
   - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
 - **低遅延 ASR オフロード (KISS 設計)**:
-  - 新規の独自設定スキーマや新トランスポートを発明せず、既存のコア機能 `tools.media.audio.baseUrl`（OpenAI 互換 `/audio/transcriptions` エンドポイント、LAN 内プライベート IP 許可 `allowPrivateNetwork: true` 内蔵）を活用する。
-  - Windows RTX 2060 側のサーバー（例: `http://192.168.100.32:9000/v1`）が稼働している場合は、WAV セグメントが自動で LAN 直通オフロードされ、クラウド往復遅延や外部送出を回避して超高速にテキスト化される。
-  - 外部サーバーが未設定、または接続拒否・5xx エラー等で失敗した場合は、既存の `transcribeAudioFile` クラウドプロバイダ（Deepgram / OpenAI 等）へ透過的にフォールバックし、通話を一切停止させない（フェイルオープン）。
+  - 新規設定スキーマを発明せず、既存のコア機能 `tools.media.audio.models[]` でエントリ単位の `baseUrl` を指定する（※トップレベルの `tools.media.audio.baseUrl` は全エントリ共通の既定値となってフォールバック先も書き換えてしまうため、必ずモデルエントリ単位で定義する）。
+  - 設定例（KASOU 側の `dennou-aibou.json`）:
+    ```jsonc
+    "tools": {
+      "media": {
+        "audio": {
+          "models": [
+            { "provider": "openai", "model": "whisper-1", "baseUrl": "http://192.168.100.32:9000/v1" },
+            { "provider": "deepgram", "model": "nova-3" }
+          ]
+        }
+      }
+    }
+    ```
+  - Windows RTX 2060 側の OpenAI 互換サーバー（`/audio/transcriptions`、`allowPrivateNetwork: true` 内蔵）が稼働している場合は、WAV セグメントが自動で LAN 直通オフロードされ、クラウド往復遅延を回避して高速にテキスト化される。
+  - 外部サーバーが未設定、または接続拒否・5xx エラー等で失敗した場合は、既存の `runner.ts` エラー時継続ループ（`outcome: "failed"`）により、次のクラウドプロバイダ（Deepgram / OpenAI 等）へ自動でフォールバックする（フェイルオープン）。
+  - 万が一全 STT エントリが失敗した場合は、`manager.ts` で警告ログ（試行結果 `attempts` 付き）を出力し、無言のまま通話が停止しないようにする。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
 
@@ -109,7 +123,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
 - `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（`@noble/hashes` の直前に昇順で追加）
-- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック、STT 失敗時 warn ログ
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
