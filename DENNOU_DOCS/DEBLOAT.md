@@ -2629,9 +2629,63 @@ Reference:
 
 ### 43.3 検証ゲート
 
-| ゲート                            | 判定基準                                    |
-| --------------------------------- | ------------------------------------------- |
-| `bun --check`                     | **0 errors（全 5,855 ファイル型検査合格）** |
-| `bun run typecheck`               | **exit 0**                                  |
-| `bun run ui:build`                | **pass**                                    |
-| `bun fmt --check <changed_files>` | **pass**                                    |
+| ゲート             | 判定基準                                     |
+| ------------------ | -------------------------------------------- |
+| `bun --check`      | **0 errors（全 5,855 ファイル型検査合格）**  |
+| `bun run ui:build` | **pass**                                     |
+| `bun fmt --check`  | **All matched files use the correct format** |
+
+---
+
+## 44. コアプラグイン基盤の全面刷新（`dennou.plugin.json` 昇格 ＋ Bun Native 優先化 ＋ Go バイナリプラグイン対応）（DEBLOAT 2026-10-14）
+
+### 44.1 目的と背景
+
+- **上流 OpenClaw 規約からの完全脱却**:
+  - これまでマニフェストファイル名として引きずってきた `openclaw.plugin.json` を、電脳相棒の正式規約である `dennou.plugin.json` へ昇格させる（既存プラグインの互換のため旧名も受容）。
+- **Jiti のバイパスと Bun Native TypeScript/JSX 直接実行の最優先化**:
+  - 昔のパッチ（`cf10183389`）によって Bun 環境下でわざわざ Jiti のトランスパイルを通すよう強制されていた足かせを解除する。
+  - Bun ランタイム本来の能力（`.ts` / `.tsx` 直接実行、`paths` マッピング）を活かし、ゼロトランスパイルでプラグインを爆速起動・メモリ削減させる。
+- **Go 言語製プラグイン（`kind: "binary"`）のネイティブサポート**:
+  - TypeScript だけでなく、コンパイル済み Go バイナリを直接プラグインとして起動・接続できるアーキテクチャを確立する。
+  - 今後の電脳架電（低遅延リアルタイム音声通話デーモン）などを、余計な Node/TS ラッパーなしで直接 Core に組み込める土台を整える。
+
+### 44.2 アーキテクチャとライフサイクル仕様
+
+1. **マニフェスト解決 (`src/plugins/manifest.ts`)**:
+   - `PLUGIN_MANIFEST_FILENAMES = ["dennou.plugin.json", "openclaw.plugin.json"]` とし、`dennou.plugin.json` を最優先で探索。
+   - `bundle-manifest.ts`、`install.ts`、およびビルドスクリプト群（`copy-bundled-plugin-metadata.mjs` 等）の直書きを新マニフェスト名に対応。
+
+2. **Bun Native 優先実行 (`src/plugins/sdk-alias.ts`, `loader.ts`)**:
+   - `shouldPreferNativeJiti()` における `process.versions.bun` 時の強制 `false` を見直し、Bun 実行時はネイティブ直接実行（`tryNative: true`）を優先化。
+   - `openclaw/plugin-sdk/*` への参照は Bun のパス解決および実行中パッケージルートへのアンカーで解決し、Jiti のオーバーヘッドを排除。
+
+3. **Go バイナリプラグイン (`kind: "binary"`)**:
+   - マニフェストスキーマに `kind: "binary"`、`executable: string`（実行可能ファイルへの相対パス）を追加。
+   - ライフサイクルは 2 段階で Core に結合：
+     - `register()`: 同期的にツール定義（名前・引数スキーマ）およびサービス `registerService({ id, start, stop })` を宣言。
+     - `start()` / `stop()`: Gateway 起動時にサブプロセスを起動（stdio JSON-RPC または内部 IPC 通信）、Gateway 終了時に `service.stop()` で安全に正常終了（graceful shutdown）。
+     - `execute()`: `AgentTool.execute` 呼び出しを JSON-RPC でバイナリへ中継し、結果を返す。
+
+### 44.3 変更対象と責務
+
+| 対象領域                       | ファイル                                                                                                                                                                                    | 変更内容                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| マニフェスト探索               | `src/plugins/manifest.ts`<br>`src/plugins/bundle-manifest.ts`<br>`src/plugins/install.ts`                                                                                                   | `dennou.plugin.json` を第一優先探索に追加し、旧名も後方互換で受容。                                            |
+| スクリプト同期                 | `scripts/copy-bundled-plugin-metadata.mjs`<br>`scripts/lib/bundled-plugin-build-entries.mjs`<br>`scripts/lib/bundled-plugin-source-utils.mjs`<br>`scripts/stage-bundled-plugin-runtime.mjs` | ビルド・ステージング処理で `dennou.plugin.json` を最優先でコピー・同期。                                       |
+| Bun Native 優先化              | `src/plugins/sdk-alias.ts`<br>`src/plugins/loader.ts`                                                                                                                                       | Bun 実行時に `shouldPreferNativeJiti` でネイティブ直接実行を有効化。                                           |
+| バイナリプラグイン型・スキーマ | `src/plugins/types.ts`<br>`src/plugins/manifest.ts`<br>`src/plugins/slots.ts`                                                                                                               | `PluginKind` に `"binary"` を追加し、バイナリ実行パス定義を受容。                                              |
+| バイナリローダー・ブリッジ     | `src/plugins/loader.ts`<br>`src/plugins/binary-runner.ts`（新規）                                                                                                                           | `kind: "binary"` のバイナリ起動、stdio/JSON-RPC ツール中継、`registerService` によるライフサイクル管理を実装。 |
+
+### 44.4 検証ゲート
+
+| ゲート                  | 判定基準                                              |
+| ----------------------- | ----------------------------------------------------- |
+| `bun --check`           | **0 errors（全ファイル型検査合格）**                  |
+| `bun run ui:build`      | **pass**                                              |
+| `bun test src/plugins/` | **プラグインマニフェスト・ローダー関連テスト全 pass** |
+| `bun fmt --check`       | **All matched files use the correct format**          |
+
+| `bun run typecheck` | **exit 0** |
+| `bun run ui:build` | **pass** |
+| `bun fmt --check <changed_files>` | **pass** |
