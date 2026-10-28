@@ -262,6 +262,40 @@ describe("createBinaryPluginDefinition", () => {
     }
   });
 
+  it("resolves the .exe sibling so platform-neutral manifests spawn on Windows", async () => {
+    if (process.platform !== "win32") {
+      return; // Windows-only: other platforms use the manifest path as-is.
+    }
+    const rootDir = makeTempDir();
+    mkdirSafe(path.join(rootDir, "bin"));
+    // `go build -o bin/kaden` writes `bin/kaden.exe` on Windows, and
+    // child_process.spawn cannot start a PE file without the extension.
+    const executablePath = path.join(rootDir, "bin", "kaden.exe");
+    fs.writeFileSync(executablePath, "", "utf-8");
+    const fake = createFakeBinary();
+    fake.respond("initialize", () => ({}));
+    const spawned: string[] = [];
+    const spawn: BinarySpawn = (command) => {
+      spawned.push(command);
+      return fake.child;
+    };
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable: "bin/kaden",
+      logger: silentLogger,
+      spawn,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture();
+    result.definition.register?.(capture.api);
+    await capture.services[0].start(serviceContext);
+    expect(spawned).toEqual([executablePath]);
+  });
+
   it("builds a binary definition that declares tools and one service", () => {
     const { rootDir, executable } = createExecutableFixture();
     const result = createBinaryPluginDefinition({

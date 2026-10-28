@@ -468,6 +468,25 @@ export type BinaryPluginDefinitionResult =
   | { ok: false; error: string };
 
 /**
+ * Resolves the on-disk executable for a manifest `executable` path.
+ *
+ * Manifests stay platform-neutral (for example `./bin/kaden`), so on Windows the
+ * `.exe` sibling that `go build` produces is preferred over the
+ * extension-less file, which `child_process.spawn` cannot start.
+ */
+function resolveExecutablePath(executablePath: string): string | null {
+  const candidates =
+    process.platform === "win32" ? [`${executablePath}.exe`, executablePath] : [executablePath];
+  for (const candidate of candidates) {
+    const stat = safeStatSync(candidate);
+    if (stat?.isFile()) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
  * Builds a synthetic plugin definition for a `kind: "binary"` manifest entry.
  *
  * `register()` only declares tools and the service; the subprocess is spawned
@@ -498,8 +517,8 @@ export function createBinaryPluginDefinition(params: {
       error: `binary plugin executable escapes plugin root: ${rawExecutable}`,
     };
   }
-  const stat = safeStatSync(executablePath);
-  if (!stat || !stat.isFile()) {
+  const resolvedExecutablePath = resolveExecutablePath(executablePath);
+  if (!resolvedExecutablePath) {
     return {
       ok: false,
       error: `binary plugin executable not found: ${rawExecutable}`,
@@ -510,7 +529,7 @@ export function createBinaryPluginDefinition(params: {
   const timeouts = resolveTimeouts(params.timeouts);
   const bridge = new BinaryPluginBridge({
     pluginId: params.pluginId,
-    executablePath,
+    executablePath: resolvedExecutablePath,
     cwd: params.rootDir,
     env: params.env ?? process.env,
     toolNames: tools.map((tool) => tool.name),
@@ -545,7 +564,7 @@ export function createBinaryPluginDefinition(params: {
           async start(ctx) {
             await bridge.start();
             ctx.logger.info(
-              `[plugins] ${params.pluginId} binary plugin started (${executablePath})`,
+              `[plugins] ${params.pluginId} binary plugin started (${resolvedExecutablePath})`,
             );
           },
           async stop() {

@@ -1,0 +1,40 @@
+{
+  "id": "dennou-kaden",
+  "name": "電脳架電 (Dennou Kaden)",
+  "description": "Go native low-latency voice call daemon and tools",
+  "kind": "binary",
+  "executable": "./bin/kaden",
+  "tools": [
+    {
+      "name": "kaden_status",
+      "description": "Get current status of dennou-kaden voice daemon",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "kaden_call",
+      "description": "Trigger or manage voice call session",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Call action: status, ping"
+          }
+        },
+        "required": ["action"]
+      }
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "port": { "type": "integer" }
+    }
+  }
+}

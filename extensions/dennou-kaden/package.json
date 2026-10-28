@@ -1,0 +1,16 @@
+{
+  "name": "@openclaw/dennou-kaden",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "Go native low-latency voice call daemon (電脳架電) for DennouAibou",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "go test ./..."
+  },
+  "openclaw": {
+    "extensions": [
+      "./bin/kaden"
+    ]
+  }
+}
