@@ -55,6 +55,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
               "provider": "openai",
               "model": "whisper-1",
               "baseUrl": "http://192.168.100.32:9000/v1",
+              "timeoutSeconds": 10,
               "headers": { "Authorization": "Bearer local" }
             },
             { "provider": "deepgram", "model": "nova-3" }
@@ -63,9 +64,10 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
       }
     }
     ```
-  - Windows RTX 2060 側の OpenAI 互換サーバー（`/audio/transcriptions`、`headers` によるダミー認証で本物キーの LAN 漏洩と未解決エラーを防止、`allowPrivateNetwork: true` 内蔵）が稼働している場合は、WAV セグメントが自動で LAN 直通オフロードされ、クラウド往復遅延を回避して高速にテキスト化される。
+  - `openai` プロバイダは事前認証チェックが必須のため、Gateway の環境変数 `OPENAI_API_KEY=local-offload`（または `models.providers.openai.apiKey`）にプレースホルダ値を設定する。LAN 内送信時はエントリ側の `"headers": { "Authorization": "Bearer local" }` が優先（caller-wins）されるため、本物のキーが LAN 平文で送信されることはない。
+  - エントリの `baseUrl` が解決されている場合、内蔵の `allowPrivateNetwork: true` が自動で有効化される。
   - 外部サーバーが未設定、または接続拒否・4xx/5xx エラー・モデル不一致等で失敗した場合は、既存の `runner.ts` 継続ループ（`outcome: "failed"`）により、次のクラウドプロバイダ（Deepgram / OpenAI 等）へ自動でフォールバックする（フェイルオープン）。
-  - 万が一全 STT エントリが失敗した場合は、`manager.ts` で警告ログ（`STT failed across all configured providers`）を出力し、原因追跡を可能にする。
+  - 万が一全 STT エントリが失敗、または空の transcript となった場合は、`manager.ts` で警告ログ（`discord voice: no transcript produced (all providers failed or returned empty)`）を出力し、原因追跡を可能にする。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
 
