@@ -51,12 +51,13 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 - **世代カウンタとセッション生存の管理**:
   - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。
-  - セッション生存と世代を判定するヘルパー `isStaleSegment(entry, segmentGeneration)`（`this.sessions.get(entry.guildId) !== entry || entry.generation !== segmentGeneration`）を定義する。
-  - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers` 重複ガード通過後）に即座に `entry.player.stop(true)` を実行する。セグメントが有効に成立した段階（`MIN_SEGMENT_SECONDS` 通過後・`enqueueProcessing` 直前）で **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**。
+  - セッション生存と世代を判定するプライベートメソッド `isStaleSegment(entry: VoiceSessionEntry, segmentGeneration: number): boolean`（`this.sessions.get(entry.guildId) !== entry || entry.generation !== segmentGeneration`）を定義する。
+  - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers.add()` 直後）に、既存の `entry.player.stop(true)` と同時に **`entry.generation++`** をインクリメントして先行セグメントの遅延再生を即時無効化する。
+  - セグメント成立時（`MIN_SEGMENT_SECONDS` 通過後・`enqueueProcessing` 直前）に、その時点の最新世代を **`const segmentGeneration = entry.generation;`** として捕捉し、`processSegment` へ引数として渡す。
   - `processSegment` 冒頭（STT 前）、`transcribeAudio` 完了直後（`if (!transcript)` 直前）、および `agentCommandFromIngress` 完了直後（TTS 合成前）の 3 箇所で `if (this.isStaleSegment(entry, segmentGeneration)) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
 - **TTS 音声生成（OpenRouter）**:
   - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる。
-  - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（総所要時間の上限は `timeoutMs + 1_000ms`）。
+  - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（総所要時間の上限は `timeoutMs + 2_000ms`）。
   - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバックし、2試行目も失敗なら即テキストフォールバック。それ以外の 4xx エラーは即テキストフォールバック）。
   - パラメータ: `response_format: "mp3"`, `input: replyText`（`typeof voice === "string" && voice.trim()` の場合のみ `voice` を付与）。
   - ネットワーク: `fetchWithSsrFGuard` を使用。
@@ -103,7 +104,8 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
-  - `entry` は `sessions.set("g1", entry)` で登録された本物の参照を使用し、`generation: 0`, `player: { play: vi.fn(), stop: vi.fn(), state: { status: "idle" } }` を補完する。
+  - `createAudioResourceMock` を `vi.hoisted` へ引き上げ、テスト側から検証可能にする。
+  - `entry` は `manager.sessions.set("g1", entry)` に登録したオブジェクトと同一参照を使用し、`generation: 0`, `player: { play: vi.fn(), stop: vi.fn(), state: { status: "idle" } }` を補完する。
   - `ProcessSegmentInvoker` 型および `processSegment(...)` 呼び出しに `segmentGeneration: number` を追加。
   - `openclaw/plugin-sdk/ssrf-runtime` を `importOriginal` 併用で部分モックし、正常系再生テスト（TTS 成功 → `createAudioResource` / `player.play` 呼び出し）および新規ガードケース（発話検知時 generation++ ＆ バージイン、世代不一致破棄、セッション破棄、429→有料モデルフォールバック、400即テキスト、`maxTextLength` 切り詰め、`mainSessionKey` 優先ルーティング）をテスト検証。
 
