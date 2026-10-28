@@ -4,7 +4,7 @@
 
 Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yosia が双方向音声通話（電話）を行えるシステムを構築する。
 複雑な独自インフラや外部サーバー新設を避け、すでに存在する Discord 公式通話機能（`@discordjs/voice`）と、既存の単一不滅マスターセッション（`agent:main:main`）を KISS（Keep It Simple, Stupid）原則で結合する。
-通話経路は Discord 標準機能のみで自立し、音声認識（STT）は Groq Whisper（一次・超爆速）と Google Gemini 3.5 Transcribe（二次・高精度フォールバック）を組み合わせ、自前サーバー負荷ゼロの完全クラウド低遅延パイプラインとする。
+通話経路は Discord 標準機能のみで自立し、音声認識（STT）は Groq Whisper（一次・超爆速）と Google Gemini 3.5 Transcribe Live（二次・高精度フォールバック）を組み合わせ、自前サーバー負荷ゼロの完全クラウド低遅延パイプラインとする。
 
 ---
 
@@ -19,7 +19,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
          ▼ (WAV 一時ファイル: mkdtemp 30分TTL)
 [STT: mediaUnderstanding.transcribeAudioFile]
  (一次: Groq whisper-large-v3-turbo / 0.1〜0.3秒
-  二次: Google gemini-3.5-transcribe / 高精度フェイルオープン)
+  二次: Google gemini-3.5-transcribe-live / 高精度フェイルオープン)
          │
          ▼ (テキストプロンプト)
 [in-process: agentCommandFromIngress]
@@ -44,7 +44,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
   - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
 - **超高速 STT 2段構え (KISS 設計)**:
-  - 自前サーバーを一切立てず、既存の `tools.media.audio.models[]` で一次に Groq Whisper、二次に Google Gemini 3.5 Transcribe を設定する。
+  - 自前サーバーを一切立てず、既存の `tools.media.audio.models[]` で一次に Groq Whisper、二次に Google Gemini 3.5 Transcribe Live を設定する。
   - 設定例（KASOU 側の `dennou-aibou.json`）:
     ```jsonc
     "tools": {
@@ -52,13 +52,13 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
         "audio": {
           "models": [
             { "provider": "groq", "model": "whisper-large-v3-turbo" },
-            { "provider": "google", "model": "gemini-3.5-transcribe" }
+            { "provider": "google", "model": "gemini-3.5-transcribe-live" }
           ]
         }
       }
     }
     ```
-  - 一次（Groq）が 0.1〜0.3秒で爆速文字起こしを行い、万が一 Groq がレート制限（429）やエラーで失敗した場合は、既存の `runner.ts` 継続ループ（`outcome: "failed"`）により、二次の Google（`gemini-3.5-transcribe`）へ自動でフォールバックする（フェイルオープン）。
+  - 一次（Groq）が 0.1〜0.3秒で爆速文字起こしを行い、万が一 Groq がレート制限（429）やエラーで失敗した場合は、既存の `runner.ts` 継続ループ（`outcome: "failed"`）により、二次の Google（`gemini-3.5-transcribe-live`）へ自動でフォールバックする（フェイルオープン）。
   - 万が一全 STT エントリが失敗、または空の transcript となった場合は、`manager.ts` で警告ログ（`discord voice: no transcript produced (all providers failed or returned empty)`）を出力し、原因追跡を可能にする。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
