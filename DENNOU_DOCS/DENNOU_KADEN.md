@@ -3,8 +3,8 @@
 ## 1. 目的と概要
 
 Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yosia が双方向音声通話（電話）を行えるシステムを構築する。
-複雑な独自インフラや外部アプリ新設を避け、すでに存在する Discord 公式通話機能（`@discordjs/voice`）と、既存の単一不滅マスターセッション（`agent:main:main`）を KISS（Keep It Simple, Stupid）原則で結合する。
-通話経路自体は Discord 標準機能のみで自立して動作し、重い音声認識（ASR）のオフロードは既存の `tools.media.audio.models[]` エントリ単位の `baseUrl` を活用した任意の低遅延オプションとして位置づける。
+複雑な独自インフラや外部サーバー新設を避け、すでに存在する Discord 公式通話機能（`@discordjs/voice`）と、既存の単一不滅マスターセッション（`agent:main:main`）を KISS（Keep It Simple, Stupid）原則で結合する。
+通話経路は Discord 標準機能のみで自立し、音声認識（STT）は Groq Whisper（一次・超爆速）と Google Gemini 3.5 Transcribe（二次・高精度フォールバック）を組み合わせ、自前サーバー負荷ゼロの完全クラウド低遅延パイプラインとする。
 
 ---
 
@@ -18,8 +18,8 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
          │
          ▼ (WAV 一時ファイル: mkdtemp 30分TTL)
 [STT: mediaUnderstanding.transcribeAudioFile]
- (tools.media.audio.models[] のエントリ単位 baseUrl で Windows RTX 2060 へオフロード、
-  未設定または失敗時は次エントリのクラウドプロバイダへ安全にフェイルオープン)
+ (一次: Groq whisper-large-v3-turbo / 0.1〜0.3秒
+  二次: Google gemini-3.5-transcribe / 高精度フェイルオープン)
          │
          ▼ (テキストプロンプト)
 [in-process: agentCommandFromIngress]
@@ -38,35 +38,27 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ## 3. 実装の要件と技術的解決（KISS 原則）
 
-### 3.1 依存ライブラリの補強と ASR オフロード設計
+### 3.1 依存ライブラリの補強と STT 2段構え設計
 
 - **暗号化と FFmpeg**:
   - `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
   - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
-- **低遅延 ASR オフロード (KISS 設計)**:
-  - 新規設定スキーマを発明せず、既存のコア機能 `tools.media.audio.models[]` でエントリ単位の `baseUrl` を指定する（※トップレベルの `tools.media.audio.baseUrl` は全エントリ共通の既定値となってフォールバック先も書き換えてしまうため、必ずモデルエントリ単位で定義する）。
+- **超高速 STT 2段構え (KISS 設計)**:
+  - 自前サーバーを一切立てず、既存の `tools.media.audio.models[]` で一次に Groq Whisper、二次に Google Gemini 3.5 Transcribe を設定する。
   - 設定例（KASOU 側の `dennou-aibou.json`）:
     ```jsonc
     "tools": {
       "media": {
         "audio": {
           "models": [
-            {
-              "provider": "openai",
-              "model": "whisper-1",
-              "baseUrl": "http://192.168.100.32:9000/v1",
-              "timeoutSeconds": 10,
-              "headers": { "Authorization": "Bearer local" }
-            },
-            { "provider": "deepgram", "model": "nova-3" }
+            { "provider": "groq", "model": "whisper-large-v3-turbo" },
+            { "provider": "google", "model": "gemini-3.5-transcribe" }
           ]
         }
       }
     }
     ```
-  - `openai` プロバイダは事前認証チェックが必須のため、Gateway の環境変数 `OPENAI_API_KEY=local-offload`（または `models.providers.openai.apiKey`）にプレースホルダ値を設定する。LAN 内送信時はエントリ側の `"headers": { "Authorization": "Bearer local" }` が優先（caller-wins）されるため、本物のキーが LAN 平文で送信されることはない。
-  - エントリの `baseUrl` が解決されている場合、内蔵の `allowPrivateNetwork: true` が自動で有効化される。
-  - 外部サーバーが未設定、または接続拒否・4xx/5xx エラー・モデル不一致等で失敗した場合は、既存の `runner.ts` 継続ループ（`outcome: "failed"`）により、次のクラウドプロバイダ（Deepgram / OpenAI 等）へ自動でフォールバックする（フェイルオープン）。
+  - 一次（Groq）が 0.1〜0.3秒で爆速文字起こしを行い、万が一 Groq がレート制限（429）やエラーで失敗した場合は、既存の `runner.ts` 継続ループ（`outcome: "failed"`）により、二次の Google（`gemini-3.5-transcribe`）へ自動でフォールバックする（フェイルオープン）。
   - 万が一全 STT エントリが失敗、または空の transcript となった場合は、`manager.ts` で警告ログ（`discord voice: no transcript produced (all providers failed or returned empty)`）を出力し、原因追跡を可能にする。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
@@ -130,7 +122,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
 - `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（`@noble/hashes` の直前に昇順で追加）
-- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック、STT 失敗時 warn ログ
+- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` / `resolveConfiguredSecretInputWithFallback` の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック、STT 失敗時 warn ログ
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
