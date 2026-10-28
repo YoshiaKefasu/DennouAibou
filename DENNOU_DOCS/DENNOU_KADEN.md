@@ -4,6 +4,7 @@
 
 Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yosia が双方向音声通話（電話）を行えるシステムを構築する。
 複雑な独自インフラや外部アプリ新設を避け、すでに存在する Discord 公式通話機能（`@discordjs/voice`）と、既存の単一不滅マスターセッション（`agent:main:main`）を KISS（Keep It Simple, Stupid）原則で結合する。
+通話経路自体は Discord 標準機能のみで自立して動作し、重い音声認識（ASR）のオフロードは既存の `tools.media.audio.baseUrl` を活用した任意の低遅延オプションとして位置づける。
 
 ---
 
@@ -12,13 +13,13 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 ```text
 [Yosia のマイク入力 (Discord Voice)]
          │
-         ├───▶ [外部 ASR/Diarization サーバー (Windows RTX 2060 / HTTP)]
-         │      (Nemotron-3-Diarization / 10ms低遅延ストリーミング)
-         │      ・話者分離（Yosia の声を識別）
-         │      ・発話終了の高速エンドポインティング（約 200〜300ms）
+         ▼
+[DiscordVoiceManager (受信 & 1000ms無音検知)]
          │
-         ▼ (確定した音声セグメント WAV: mkdtemp 30分TTL)
-[STT: mediaUnderstanding.transcribeAudioFile または外部エンドポイント]
+         ▼ (WAV 一時ファイル: mkdtemp 30分TTL)
+[STT: mediaUnderstanding.transcribeAudioFile]
+ (tools.media.audio.baseUrl 設定時は Windows RTX 2060 サーバーへオフロード、
+  未設定または失敗時は既存プロバイダへ安全にフェイルオープン)
          │
          ▼ (テキストプロンプト)
 [in-process: agentCommandFromIngress]
@@ -37,14 +38,15 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ## 3. 実装の要件と技術的解決（KISS 原則）
 
-### 3.1 依存ライブラリの補強と外部 ASR/Diarization エンドポイント
+### 3.1 依存ライブラリの補強と ASR オフロード設計
 
 - **暗号化と FFmpeg**:
   - `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
   - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
-- **低遅延 ASR / Diarization（外部 HTTP エンドポイント連携）**:
-  - Kasou ミニPC側の負荷を極小化し、超低遅延（RTF ≪ 0.2）を実現するため、ASR / Diarization は外部 HTTP エンドポイント（Windows RTX 2060 サーバー: 例 `http://192.168.100.32:9000/v1/...`）へオフロード可能とする。
-  - 設定 `channels.discord.voice.asr.endpoint`（または `tools.media.audio.baseUrl`）が設定されている場合は外部エンドポイントへリクエストを投げ、未設定時はローカルの `transcribeAudioFile` / 既存無音検知へ透過的にフォールバックする（フェイルオープン）。
+- **低遅延 ASR オフロード (KISS 設計)**:
+  - 新規の独自設定スキーマや新トランスポートを発明せず、既存のコア機能 `tools.media.audio.baseUrl`（OpenAI 互換 `/audio/transcriptions` エンドポイント、LAN 内プライベート IP 許可 `allowPrivateNetwork: true` 内蔵）を活用する。
+  - Windows RTX 2060 側のサーバー（例: `http://192.168.100.32:9000/v1`）が稼働している場合は、WAV セグメントが自動で LAN 直通オフロードされ、クラウド往復遅延や外部送出を回避して超高速にテキスト化される。
+  - 外部サーバーが未設定、または接続拒否・5xx エラー等で失敗した場合は、既存の `transcribeAudioFile` クラウドプロバイダ（Deepgram / OpenAI 等）へ透過的にフォールバックし、通話を一切停止させない（フェイルオープン）。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
 
@@ -64,8 +66,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる。
   - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（2 試行固定かつ最小 1,000ms を前提とし、総所要時間の上限は `Math.max(1_000, timeoutMs) + 1_000ms`）。
   - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバックし、2試行目も失敗なら即テキストフォールバック。それ以外の 4xx エラーは即テキストフォールバック）。
-  - パラメータ: `response_format: "mp3"`, `input: replyText`
-  - voice ID: `const voice = this.params.discordConfig.voice?.tts?.providers?.openrouter?.voice;` を解決し、`typeof voice === "string" && voice.trim()` の場合のみ payload に `voice` を付与する。
+  - パラメータ: `response_format: "mp3"`, `input: replyText`（`typeof voice === "string" && voice.trim()` の場合のみ `voice` を付与）。
   - ネットワーク: `fetchWithSsrFGuard` を使用。
     ```ts
     let response: Response | undefined;
@@ -108,9 +109,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
 - `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（`@noble/hashes` の直前に昇順で追加）
-- `extensions/discord/src/voice/manager.ts`:
-  - import 追加: `Routes`（`discord-api-types/v10`）、`fetchWithSsrFGuard`（`openclaw/plugin-sdk/ssrf-runtime`）、`resolveConfiguredSecretInputWithFallback`（`openclaw/plugin-sdk/config-runtime`）
-  - `mainSessionKey` ルーティング、世代管理（entry 生成箇所への `generation: 0` 追加）、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
