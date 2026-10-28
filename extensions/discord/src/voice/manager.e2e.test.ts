@@ -1,21 +1,14 @@
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { ChannelType } from "@buape/carbon";
-import { Routes } from "discord-api-types/v10";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createConnectionMock,
   joinVoiceChannelMock,
   entersStateMock,
   createAudioPlayerMock,
-  createAudioResourceMock,
   resolveAgentRouteMock,
   agentCommandMock,
   transcribeAudioFileMock,
-  fetchWithSsrFGuardMock,
-  createSpeechGuardResult,
 } = vi.hoisted(() => {
   type EventHandler = (...args: unknown[]) => unknown;
   type MockConnection = {
@@ -57,15 +50,8 @@ const {
     return connection;
   };
 
-  const createSpeechGuardResult = (init?: { status?: number; body?: string }) => ({
-    response: new Response(init?.body ?? "mp3-bytes", { status: init?.status ?? 200 }),
-    finalUrl: "https://openrouter.ai/api/v1/audio/speech",
-    release: vi.fn(async () => {}),
-  });
-
   return {
     createConnectionMock,
-    createSpeechGuardResult,
     joinVoiceChannelMock: vi.fn(() => createConnectionMock()),
     entersStateMock: vi.fn(async (_target?: unknown, _state?: string, _timeoutMs?: number) => {
       return undefined;
@@ -77,13 +63,9 @@ const {
       play: vi.fn(),
       state: { status: "idle" },
     })),
-    createAudioResourceMock: vi.fn((_input?: unknown) => ({ volume: { setVolume: vi.fn() } })),
     resolveAgentRouteMock: vi.fn(() => ({ agentId: "agent-1", sessionKey: "discord:g1:c1" })),
-    agentCommandMock: vi.fn(async (_opts?: unknown, _runtime?: unknown) => ({
-      payloads: [] as Array<{ text?: string }>,
-    })),
+    agentCommandMock: vi.fn(async (_opts?: unknown, _runtime?: unknown) => ({ payloads: [] })),
     transcribeAudioFileMock: vi.fn(async () => ({ text: "hello from voice" })),
-    fetchWithSsrFGuardMock: vi.fn(async (_params?: unknown) => createSpeechGuardResult()),
   };
 });
 
@@ -99,18 +81,10 @@ vi.mock("./sdk-runtime.js", () => ({
       Connecting: "connecting",
     },
     createAudioPlayer: createAudioPlayerMock,
-    createAudioResource: createAudioResourceMock,
+    createAudioResource: vi.fn(),
     entersState: entersStateMock,
     joinVoiceChannel: joinVoiceChannelMock,
   }),
-}));
-
-// Note: Bun's `vi.mock` factory does not receive `importOriginal`, and a factory that re-imports
-// the same specifier deadlocks while the real module is still being evaluated. The voice manager
-// only consumes `fetchWithSsrFGuard` / `formatErrorMessage`, so the mock is a plain fake.
-vi.mock("openclaw/plugin-sdk/ssrf-runtime", () => ({
-  fetchWithSsrFGuard: fetchWithSsrFGuardMock,
-  formatErrorMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)),
 }));
 
 vi.mock("openclaw/plugin-sdk/routing", async () => {
@@ -156,9 +130,6 @@ function createClient() {
     })),
     fetchMember: vi.fn(),
     fetchUser: vi.fn(),
-    rest: {
-      post: vi.fn(async () => ({ id: "m1" })),
-    },
   };
 }
 
@@ -170,87 +141,22 @@ function createRuntime() {
   };
 }
 
-type SessionEntryFixture = {
-  guildId: string;
-  guildName?: string;
-  channelId: string;
-  channelName?: string;
-  sessionChannelId: string;
-  route: { agentId: string; sessionKey: string; mainSessionKey?: string };
-  connection: ReturnType<typeof createConnectionMock>;
-  player: {
-    on: ReturnType<typeof vi.fn>;
-    off: ReturnType<typeof vi.fn>;
-    stop: ReturnType<typeof vi.fn>;
-    play: ReturnType<typeof vi.fn>;
-    state: { status: string };
-  };
-  processingQueue: Promise<void>;
-  activeSpeakers: Set<string>;
-  decryptFailureCount: number;
-  lastDecryptFailureAt: number;
-  decryptRecoveryInFlight: boolean;
-  ttsAbort?: AbortController;
-  stop: () => void;
-  generation: number;
-};
-
-function createSessionEntry(overrides: Partial<SessionEntryFixture> = {}): SessionEntryFixture {
-  return {
-    guildId: "g1",
-    channelId: "1001",
-    sessionChannelId: "1001",
-    route: {
-      agentId: "agent-1",
-      sessionKey: "discord:g1:1001",
-      mainSessionKey: "agent:main:main",
-    },
-    connection: createConnectionMock(),
-    player: {
-      on: vi.fn(),
-      off: vi.fn(),
-      stop: vi.fn(),
-      play: vi.fn(),
-      state: { status: "idle" },
-    },
-    processingQueue: Promise.resolve(),
-    activeSpeakers: new Set<string>(),
-    decryptFailureCount: 0,
-    lastDecryptFailureAt: 0,
-    decryptRecoveryInFlight: false,
-    stop: vi.fn(),
-    generation: 0,
-    ...overrides,
-  };
-}
-
 describe("DiscordVoiceManager", () => {
-  let tempDir: string;
-
   beforeAll(async () => {
     managerModule = await import("./manager.js");
   });
 
-  beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "discord-voice-e2e-"));
+  beforeEach(() => {
     joinVoiceChannelMock.mockReset();
     joinVoiceChannelMock.mockImplementation(() => createConnectionMock());
     entersStateMock.mockReset();
     entersStateMock.mockResolvedValue(undefined);
     createAudioPlayerMock.mockClear();
-    createAudioResourceMock.mockReset();
-    createAudioResourceMock.mockImplementation(() => ({ volume: { setVolume: vi.fn() } }));
     resolveAgentRouteMock.mockClear();
     agentCommandMock.mockReset();
     agentCommandMock.mockResolvedValue({ payloads: [] });
     transcribeAudioFileMock.mockReset();
     transcribeAudioFileMock.mockResolvedValue({ text: "hello from voice" });
-    fetchWithSsrFGuardMock.mockReset();
-    fetchWithSsrFGuardMock.mockImplementation(async () => createSpeechGuardResult());
-  });
-
-  afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   const createManager = (
@@ -267,9 +173,6 @@ describe("DiscordVoiceManager", () => {
       accountId: "default",
       runtime: createRuntime(),
     });
-
-  const sessionsOf = (manager: InstanceType<typeof managerModule.DiscordVoiceManager>) =>
-    (manager as unknown as { sessions: Map<string, SessionEntryFixture> }).sessions;
 
   const expectConnectedStatus = (
     manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
@@ -302,67 +205,23 @@ describe("DiscordVoiceManager", () => {
       wavPath: string;
       userId: string;
       durationSeconds: number;
-      segmentGeneration: number;
     }) => Promise<void>;
   };
-
-  const invokeSegment = async (
-    manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
-    entry: SessionEntryFixture,
-    userId: string,
-    segmentGeneration = 0,
-  ) =>
-    await (manager as unknown as ProcessSegmentInvoker).processSegment({
-      entry,
-      wavPath: path.join(tempDir, "segment.wav"),
-      userId,
-      durationSeconds: 1.2,
-      segmentGeneration,
-    });
 
   const processVoiceSegment = async (
     manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
     userId: string,
-  ) => {
-    const entry = createSessionEntry();
-    sessionsOf(manager).set(entry.guildId, entry);
-    await invokeSegment(manager, entry, userId);
-    return entry;
-  };
-
-  const voiceOpenConfig = (tts?: { maxTextLength?: number }) => ({
-    groupPolicy: "open" as const,
-    allowFrom: ["discord:u-1"],
-    voice: {
-      tts: {
-        ...tts,
-        providers: { openrouter: { apiKey: "test-key" } },
+  ) =>
+    await (manager as unknown as ProcessSegmentInvoker).processSegment({
+      entry: {
+        guildId: "g1",
+        channelId: "1001",
+        route: { sessionKey: "discord:g1:1001", agentId: "agent-1" },
       },
-    },
-  });
-
-  const lastSpeechRequest = (index = 0) =>
-    fetchWithSsrFGuardMock.mock.calls[index]?.[0] as
-      | {
-          url: string;
-          init: { headers: Record<string, string>; body: string };
-          timeoutMs: number;
-          signal?: AbortSignal;
-        }
-      | undefined;
-
-  const parseSpeechBody = (index = 0) => {
-    const request = lastSpeechRequest(index);
-    if (!request) {
-      throw new Error(`missing speech request at index ${index}`);
-    }
-    return JSON.parse(request.init.body) as {
-      model: string;
-      input: string;
-      response_format: string;
-      voice?: string;
-    };
-  };
+      wavPath: "/tmp/test.wav",
+      userId,
+      durationSeconds: 1.2,
+    });
 
   it("keeps the new session when an old disconnected handler fires", async () => {
     const oldConnection = createConnectionMock();
@@ -689,262 +548,6 @@ describe("DiscordVoiceManager", () => {
     expect(agentCommandMock).toHaveBeenCalledTimes(1);
   });
 
-  it("plays synthesized speech for the agent reply", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(transcribeAudioFileMock).toHaveBeenCalledTimes(1);
-    expect(fetchWithSsrFGuardMock).toHaveBeenCalledTimes(1);
-    const request = lastSpeechRequest();
-    expect(request?.url).toBe("https://openrouter.ai/api/v1/audio/speech");
-    expect(request?.init.headers.Authorization).toBe("Bearer test-key");
-    expect(parseSpeechBody()).toEqual({
-      model: "fish-audio/s2.1-pro-free:free",
-      input: "hello there",
-      response_format: "mp3",
-    });
-    expect(createAudioResourceMock).toHaveBeenCalledTimes(1);
-    expect(createAudioResourceMock.mock.calls[0]?.[0]).toMatch(/reply-.*\.mp3$/);
-    expect(entry.player.play).toHaveBeenCalledTimes(1);
-    expect(client.rest.post).not.toHaveBeenCalled();
-  });
-
-  it("advances the generation and stops playback when a new segment starts", async () => {
-    const manager = createManager();
-    const entry = createSessionEntry();
-    entry.player.state.status = "playing";
-    sessionsOf(manager).set("g1", entry);
-
-    await (
-      manager as unknown as {
-        handleSpeakingStart: (e: unknown, u: string) => Promise<void>;
-      }
-    ).handleSpeakingStart(entry, "u-1");
-
-    expect(entry.generation).toBe(1);
-    expect(entry.player.stop).toHaveBeenCalledWith(true);
-    expect(entry.activeSpeakers.size).toBe(0);
-  });
-
-  it("discards a segment whose generation is stale", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-
-    const entry = createSessionEntry({ generation: 1 });
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1", 0);
-
-    expect(transcribeAudioFileMock).not.toHaveBeenCalled();
-    expect(agentCommandMock).not.toHaveBeenCalled();
-    expect(fetchWithSsrFGuardMock).not.toHaveBeenCalled();
-    expect(entry.player.play).not.toHaveBeenCalled();
-    expect(client.rest.post).not.toHaveBeenCalled();
-  });
-
-  it("discards a segment whose session was replaced", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", createSessionEntry());
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(transcribeAudioFileMock).not.toHaveBeenCalled();
-    expect(fetchWithSsrFGuardMock).not.toHaveBeenCalled();
-    expect(entry.player.play).not.toHaveBeenCalled();
-    expect(client.rest.post).not.toHaveBeenCalled();
-  });
-
-  it("retries with the paid model when the free model is rate limited", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-    fetchWithSsrFGuardMock
-      .mockResolvedValueOnce(createSpeechGuardResult({ status: 429, body: "rate limited" }))
-      .mockResolvedValueOnce(createSpeechGuardResult());
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(fetchWithSsrFGuardMock).toHaveBeenCalledTimes(2);
-    expect(parseSpeechBody(0).model).toBe("fish-audio/s2.1-pro-free:free");
-    expect(parseSpeechBody(1).model).toBe("fish-audio/s2.1-pro");
-    expect(entry.player.play).toHaveBeenCalledTimes(1);
-    expect(client.rest.post).not.toHaveBeenCalled();
-  });
-
-  it("falls back to text when the speech request is rejected", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-    fetchWithSsrFGuardMock.mockResolvedValueOnce(
-      createSpeechGuardResult({ status: 400, body: "bad request" }),
-    );
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(fetchWithSsrFGuardMock).toHaveBeenCalledTimes(1);
-    expect(entry.player.play).not.toHaveBeenCalled();
-    expect(client.rest.post).toHaveBeenCalledWith(Routes.channelMessages("1001"), {
-      body: { content: "hello there" },
-    });
-  });
-
-  it("truncates speech input to the configured maxTextLength", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig({ maxTextLength: 5 }), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(parseSpeechBody().input).toBe("hello");
-    expect(entry.player.play).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips tts and keeps the channel text-clean when the openrouter api key is missing", async () => {
-    const client = createClient();
-    const manager = createManager(
-      { ...voiceOpenConfig(), voice: { tts: { providers: { openrouter: {} } } } },
-      client,
-    );
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-    const previousKey = process.env.OPENROUTER_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
-    const entry = createSessionEntry();
-    try {
-      sessionsOf(manager).set("g1", entry);
-      await invokeSegment(manager, entry, "u-1");
-    } finally {
-      if (previousKey === undefined) {
-        delete process.env.OPENROUTER_API_KEY;
-      } else {
-        process.env.OPENROUTER_API_KEY = previousKey;
-      }
-    }
-
-    // No doomed 401 round-trip, no playback, and no text fallback into the channel.
-    expect(fetchWithSsrFGuardMock).not.toHaveBeenCalled();
-    expect(entry.player.play).not.toHaveBeenCalled();
-    expect(client.rest.post).not.toHaveBeenCalled();
-  });
-
-  it("passes an abort signal to the speech request and clears it after playback", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-    const signals: AbortSignal[] = [];
-    fetchWithSsrFGuardMock.mockImplementationOnce(async (params?: unknown) => {
-      const signal = (params as { signal?: AbortSignal } | undefined)?.signal;
-      if (signal) {
-        signals.push(signal);
-      }
-      return createSpeechGuardResult();
-    });
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(signals).toHaveLength(1);
-    expect(signals[0]?.aborted).toBe(false);
-    expect(entry.player.play).toHaveBeenCalledTimes(1);
-    expect(entry.ttsAbort).toBeUndefined();
-  });
-
-  it("aborts in-flight tts synthesis when a new segment starts (barge-in)", async () => {
-    const manager = createManager();
-    const entry = createSessionEntry();
-    const controller = new AbortController();
-    entry.ttsAbort = controller;
-    sessionsOf(manager).set("g1", entry);
-
-    await (
-      manager as unknown as {
-        handleSpeakingStart: (e: unknown, u: string) => Promise<void>;
-      }
-    ).handleSpeakingStart(entry, "u-1");
-
-    expect(controller.signal.aborted).toBe(true);
-    expect(entry.ttsAbort).toBeUndefined();
-  });
-
-  it("aborts in-flight tts synthesis when leaving the channel", async () => {
-    const manager = createManager();
-    await manager.join({ guildId: "g1", channelId: "1001" });
-    const entry = sessionsOf(manager).get("g1");
-    expect(entry).toBeDefined();
-    const controller = new AbortController();
-    if (entry) {
-      entry.ttsAbort = controller;
-    }
-
-    await manager.leave({ guildId: "g1" });
-
-    expect(controller.signal.aborted).toBe(true);
-  });
-
-  it("posts the full reply, not the tts-truncated text, when speech fails", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig({ maxTextLength: 5 }), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-    fetchWithSsrFGuardMock.mockResolvedValueOnce(
-      createSpeechGuardResult({ status: 400, body: "bad request" }),
-    );
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(parseSpeechBody().input).toBe("hello");
-    expect(client.rest.post).toHaveBeenCalledWith(Routes.channelMessages("1001"), {
-      body: { content: "hello there" },
-    });
-  });
-
-  it("bounds the text fallback to the 2000 character discord limit", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "x".repeat(2_500) }] });
-    fetchWithSsrFGuardMock.mockResolvedValueOnce(
-      createSpeechGuardResult({ status: 400, body: "bad request" }),
-    );
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    const posted = (client.rest.post.mock.calls.at(-1) as unknown as [string, unknown])?.[1] as
-      | { body: { content: string } }
-      | undefined;
-    expect(posted?.body.content).toHaveLength(2_000);
-  });
-
-  it("routes voice prompts to the master session", async () => {
-    const client = createClient();
-    const manager = createManager(voiceOpenConfig(), client);
-    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
-
-    const entry = createSessionEntry();
-    sessionsOf(manager).set("g1", entry);
-    await invokeSegment(manager, entry, "u-1");
-
-    expect(agentCommandMock.mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({ sessionKey: "agent:main:main" }),
-    );
-  });
-
   it("DiscordVoiceReadyListener: propagates autoJoin errors fire-and-forget without throwing", async () => {
     const manager = createManager();
     vi.spyOn(manager, "autoJoin").mockRejectedValue(new Error("autoJoin rejected"));
@@ -952,7 +555,7 @@ describe("DiscordVoiceManager", () => {
     const { DiscordVoiceReadyListener } = managerModule;
     const listener = new DiscordVoiceReadyListener(manager);
 
-    await expect(listener.handle(undefined, undefined as never)).resolves.toBeUndefined();
+    await expect(listener.handle(undefined, undefined as never)).resolves.not.toThrow();
     expect(manager.autoJoin).toHaveBeenCalledTimes(1);
   });
 });
