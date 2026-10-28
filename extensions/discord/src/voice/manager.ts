@@ -46,6 +46,8 @@ const TTS_MODEL_ATTEMPTS = [TTS_MODEL_PRIMARY, TTS_MODEL_FALLBACK] as const;
 const DEFAULT_TTS_TIMEOUT_MS = 15_000;
 const MIN_TTS_TIMEOUT_MS = 1_000;
 const DEFAULT_TTS_MAX_TEXT_LENGTH = 1_500;
+/** Discord hard limit for a single message body. */
+const DISCORD_MESSAGE_MAX_LENGTH = 2_000;
 
 const logger = createSubsystemLogger("discord/voice");
 
@@ -161,6 +163,7 @@ async function requestSpeechAudio(params: {
   voice?: string;
   apiKey?: string;
   timeoutMs: number;
+  signal?: AbortSignal;
 }): Promise<SpeechAttempt> {
   const body: Record<string, unknown> = {
     model: params.model,
@@ -181,6 +184,7 @@ async function requestSpeechAudio(params: {
       url: OPENROUTER_SPEECH_URL,
       init: { method: "POST", headers, body: JSON.stringify(body) },
       timeoutMs: params.timeoutMs,
+      ...(params.signal ? { signal: params.signal } : {}),
     });
     response = guarded.response;
     release = guarded.release;
@@ -211,7 +215,9 @@ async function requestSpeechAudio(params: {
     };
   } finally {
     await response?.body?.cancel().catch(() => {});
-    await release?.();
+    // Never let a release failure surface as a TTS error: the audio buffer is
+    // already returned at this point and must not be discarded.
+    await release?.().catch(() => {});
   }
 }
 
@@ -236,6 +242,8 @@ type VoiceSessionEntry = {
   decryptFailureCount: number;
   lastDecryptFailureAt: number;
   decryptRecoveryInFlight: boolean;
+  /** Aborts the in-flight TTS synthesis request on barge-in. */
+  ttsAbort?: AbortController;
   stop: () => void;
   generation: number;
 };
@@ -471,6 +479,10 @@ export class DiscordVoiceManager {
       decryptRecoveryInFlight: false,
       generation: 0,
       stop: () => {
+        // Cancel any in-flight TTS synthesis so leaving the channel does not keep a
+        // dangling OpenRouter request alive.
+        entry.ttsAbort?.abort();
+        entry.ttsAbort = undefined;
         if (speakingHandler) {
           connection.receiver.speaking.off("start", speakingHandler);
         }
@@ -573,6 +585,15 @@ export class DiscordVoiceManager {
     logVoiceVerbose(
       `capture start: guild ${entry.guildId} channel ${entry.channelId} user ${userId} generation ${segmentGeneration}`,
     );
+    // Barge-in: cancel any TTS synthesis still in flight for the previous segment so the
+    // new utterance is not stuck behind a pending OpenRouter request.
+    if (entry.ttsAbort) {
+      logVoiceVerbose(
+        `barge-in: aborting in-flight tts synthesis: guild ${entry.guildId} channel ${entry.channelId}`,
+      );
+      entry.ttsAbort.abort();
+      entry.ttsAbort = undefined;
+    }
     const voiceSdk = loadDiscordVoiceSdk();
     if (entry.player.state.status === voiceSdk.AudioPlayerStatus.Playing) {
       entry.player.stop(true);
@@ -732,6 +753,10 @@ export class DiscordVoiceManager {
     const { entry, wavPath, replyText, segmentGeneration } = params;
     const ttsConfig = this.params.discordConfig.voice?.tts;
     const speakText = replyText.slice(0, ttsConfig?.maxTextLength ?? DEFAULT_TTS_MAX_TEXT_LENGTH);
+    // The text fallback is a Discord message, not TTS input: send the full reply bounded by
+    // the Discord message limit instead of the (much shorter) TTS-truncated text.
+    const fallbackText = replyText.slice(0, DISCORD_MESSAGE_MAX_LENGTH);
+    let abortController: AbortController | undefined;
     try {
       const providerConfig = ttsConfig?.providers?.openrouter;
       const apiKey = (
@@ -743,14 +768,26 @@ export class DiscordVoiceManager {
           readFallback: () => process.env.OPENROUTER_API_KEY?.trim(),
         })
       ).value;
+      if (!apiKey) {
+        // Without a key every attempt is a guaranteed 401. Skip TTS quietly instead of
+        // retrying and then polluting the text channel with the reply.
+        logVoiceVerbose("tts skipped: no openrouter api key");
+        return;
+      }
       const rawVoice = providerConfig?.voice;
       const voice = typeof rawVoice === "string" && rawVoice.trim() ? rawVoice.trim() : undefined;
+
+      abortController = new AbortController();
+      entry.ttsAbort = abortController;
 
       const startedAt = Date.now();
       const totalTimeoutMs = ttsConfig?.timeoutMs ?? DEFAULT_TTS_TIMEOUT_MS;
       let audio: Buffer | undefined;
       let lastError = "openrouter speech produced no audio";
       for (const model of TTS_MODEL_ATTEMPTS) {
+        if (abortController.signal.aborted) {
+          break;
+        }
         const elapsed = Date.now() - startedAt;
         const attempt = await requestSpeechAudio({
           model,
@@ -758,15 +795,22 @@ export class DiscordVoiceManager {
           voice,
           apiKey,
           timeoutMs: Math.max(MIN_TTS_TIMEOUT_MS, totalTimeoutMs - elapsed),
+          signal: abortController.signal,
         });
         if (attempt.ok) {
           audio = attempt.mp3;
           break;
         }
         lastError = attempt.error;
-        if (!attempt.retryWithFallbackModel) {
+        if (!attempt.retryWithFallbackModel || abortController.signal.aborted) {
           break;
         }
+      }
+      if (abortController.signal.aborted) {
+        logVoiceVerbose(
+          `tts aborted (barge-in): guild ${entry.guildId} channel ${entry.channelId}`,
+        );
+        return;
       }
       if (!audio) {
         throw new Error(lastError);
@@ -789,11 +833,22 @@ export class DiscordVoiceManager {
         `tts playing (${audio.length} bytes): guild ${entry.guildId} channel ${entry.channelId}`,
       );
     } catch (err) {
+      if (abortController?.signal.aborted) {
+        logVoiceVerbose(
+          `tts aborted (barge-in): guild ${entry.guildId} channel ${entry.channelId}`,
+        );
+        return;
+      }
       logger.warn(`discord voice: tts failed: ${formatErrorMessage(err)}`);
       if (this.isStaleSegment(entry, segmentGeneration)) {
         return;
       }
-      await this.postTextFallback(entry, speakText);
+      await this.postTextFallback(entry, fallbackText);
+    } finally {
+      // Synthesis finished (played, discarded, skipped or failed): nothing left to abort.
+      if (entry.ttsAbort === abortController) {
+        entry.ttsAbort = undefined;
+      }
     }
   }
 

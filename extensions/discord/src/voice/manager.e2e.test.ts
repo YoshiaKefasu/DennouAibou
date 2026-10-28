@@ -190,6 +190,7 @@ type SessionEntryFixture = {
   decryptFailureCount: number;
   lastDecryptFailureAt: number;
   decryptRecoveryInFlight: boolean;
+  ttsAbort?: AbortController;
   stop: () => void;
   generation: number;
 };
@@ -342,7 +343,12 @@ describe("DiscordVoiceManager", () => {
 
   const lastSpeechRequest = (index = 0) =>
     fetchWithSsrFGuardMock.mock.calls[index]?.[0] as
-      | { url: string; init: { headers: Record<string, string>; body: string }; timeoutMs: number }
+      | {
+          url: string;
+          init: { headers: Record<string, string>; body: string };
+          timeoutMs: number;
+          signal?: AbortSignal;
+        }
       | undefined;
 
   const parseSpeechBody = (index = 0) => {
@@ -805,6 +811,124 @@ describe("DiscordVoiceManager", () => {
 
     expect(parseSpeechBody().input).toBe("hello");
     expect(entry.player.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips tts and keeps the channel text-clean when the openrouter api key is missing", async () => {
+    const client = createClient();
+    const manager = createManager(
+      { ...voiceOpenConfig(), voice: { tts: { providers: { openrouter: {} } } } },
+      client,
+    );
+    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
+    const previousKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    const entry = createSessionEntry();
+    try {
+      sessionsOf(manager).set("g1", entry);
+      await invokeSegment(manager, entry, "u-1");
+    } finally {
+      if (previousKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = previousKey;
+      }
+    }
+
+    // No doomed 401 round-trip, no playback, and no text fallback into the channel.
+    expect(fetchWithSsrFGuardMock).not.toHaveBeenCalled();
+    expect(entry.player.play).not.toHaveBeenCalled();
+    expect(client.rest.post).not.toHaveBeenCalled();
+  });
+
+  it("passes an abort signal to the speech request and clears it after playback", async () => {
+    const client = createClient();
+    const manager = createManager(voiceOpenConfig(), client);
+    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
+    const signals: AbortSignal[] = [];
+    fetchWithSsrFGuardMock.mockImplementationOnce(async (params?: unknown) => {
+      const signal = (params as { signal?: AbortSignal } | undefined)?.signal;
+      if (signal) {
+        signals.push(signal);
+      }
+      return createSpeechGuardResult();
+    });
+
+    const entry = createSessionEntry();
+    sessionsOf(manager).set("g1", entry);
+    await invokeSegment(manager, entry, "u-1");
+
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+    expect(entry.player.play).toHaveBeenCalledTimes(1);
+    expect(entry.ttsAbort).toBeUndefined();
+  });
+
+  it("aborts in-flight tts synthesis when a new segment starts (barge-in)", async () => {
+    const manager = createManager();
+    const entry = createSessionEntry();
+    const controller = new AbortController();
+    entry.ttsAbort = controller;
+    sessionsOf(manager).set("g1", entry);
+
+    await (
+      manager as unknown as {
+        handleSpeakingStart: (e: unknown, u: string) => Promise<void>;
+      }
+    ).handleSpeakingStart(entry, "u-1");
+
+    expect(controller.signal.aborted).toBe(true);
+    expect(entry.ttsAbort).toBeUndefined();
+  });
+
+  it("aborts in-flight tts synthesis when leaving the channel", async () => {
+    const manager = createManager();
+    await manager.join({ guildId: "g1", channelId: "1001" });
+    const entry = sessionsOf(manager).get("g1");
+    expect(entry).toBeDefined();
+    const controller = new AbortController();
+    if (entry) {
+      entry.ttsAbort = controller;
+    }
+
+    await manager.leave({ guildId: "g1" });
+
+    expect(controller.signal.aborted).toBe(true);
+  });
+
+  it("posts the full reply, not the tts-truncated text, when speech fails", async () => {
+    const client = createClient();
+    const manager = createManager(voiceOpenConfig({ maxTextLength: 5 }), client);
+    agentCommandMock.mockResolvedValue({ payloads: [{ text: "hello there" }] });
+    fetchWithSsrFGuardMock.mockResolvedValueOnce(
+      createSpeechGuardResult({ status: 400, body: "bad request" }),
+    );
+
+    const entry = createSessionEntry();
+    sessionsOf(manager).set("g1", entry);
+    await invokeSegment(manager, entry, "u-1");
+
+    expect(parseSpeechBody().input).toBe("hello");
+    expect(client.rest.post).toHaveBeenCalledWith(Routes.channelMessages("1001"), {
+      body: { content: "hello there" },
+    });
+  });
+
+  it("bounds the text fallback to the 2000 character discord limit", async () => {
+    const client = createClient();
+    const manager = createManager(voiceOpenConfig(), client);
+    agentCommandMock.mockResolvedValue({ payloads: [{ text: "x".repeat(2_500) }] });
+    fetchWithSsrFGuardMock.mockResolvedValueOnce(
+      createSpeechGuardResult({ status: 400, body: "bad request" }),
+    );
+
+    const entry = createSessionEntry();
+    sessionsOf(manager).set("g1", entry);
+    await invokeSegment(manager, entry, "u-1");
+
+    const posted = (client.rest.post.mock.calls.at(-1) as unknown as [string, unknown])?.[1] as
+      | { body: { content: string } }
+      | undefined;
+    expect(posted?.body.content).toHaveLength(2_000);
   });
 
   it("routes voice prompts to the master session", async () => {
