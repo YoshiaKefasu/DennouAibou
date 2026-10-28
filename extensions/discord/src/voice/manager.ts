@@ -5,15 +5,17 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 import { ChannelType, type Client, ReadyListener } from "@buape/carbon";
 import type { VoicePlugin } from "@buape/carbon/voice";
+import { Routes } from "discord-api-types/v10";
 import { resolveAgentDir } from "openclaw/plugin-sdk/agent-runtime";
 import { agentCommandFromIngress } from "openclaw/plugin-sdk/agent-runtime";
+import { resolveConfiguredSecretInputWithFallback } from "openclaw/plugin-sdk/config-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { DiscordAccountConfig } from "openclaw/plugin-sdk/config-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { logVerbose, shouldLogVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
-import { formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
+import { fetchWithSsrFGuard, formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { formatMention } from "../mentions.js";
 import { normalizeDiscordSlug, resolveDiscordOwnerAccess } from "../monitor/allow-list.js";
@@ -36,6 +38,14 @@ const SPEAKER_CONTEXT_CACHE_TTL_MS = 60_000;
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const BIT_DEPTH = 16;
+
+const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
+const TTS_MODEL_PRIMARY = "fish-audio/s2.1-pro-free:free";
+const TTS_MODEL_FALLBACK = "fish-audio/s2.1-pro";
+const TTS_MODEL_ATTEMPTS = [TTS_MODEL_PRIMARY, TTS_MODEL_FALLBACK] as const;
+const DEFAULT_TTS_TIMEOUT_MS = 15_000;
+const MIN_TTS_TIMEOUT_MS = 1_000;
+const DEFAULT_TTS_MAX_TEXT_LENGTH = 1_500;
 
 const logger = createSubsystemLogger("discord/voice");
 
@@ -137,6 +147,74 @@ function scheduleTempCleanup(tempDir: string, delayMs: number = 30 * 60 * 1000):
   timer.unref();
 }
 
+type SpeechAttempt =
+  | { ok: true; mp3: Buffer }
+  | { ok: false; error: string; retryWithFallbackModel: boolean };
+
+function isRetryableSpeechStatus(status: number): boolean {
+  return status === 402 || status === 429 || status >= 500;
+}
+
+async function requestSpeechAudio(params: {
+  model: string;
+  text: string;
+  voice?: string;
+  apiKey?: string;
+  timeoutMs: number;
+}): Promise<SpeechAttempt> {
+  const body: Record<string, unknown> = {
+    model: params.model,
+    input: params.text,
+    response_format: "mp3",
+  };
+  if (params.voice) {
+    body.voice = params.voice;
+  }
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (params.apiKey) {
+    headers.Authorization = `Bearer ${params.apiKey}`;
+  }
+  let response: Response | undefined;
+  let release: (() => Promise<void>) | undefined;
+  try {
+    const guarded = await fetchWithSsrFGuard({
+      url: OPENROUTER_SPEECH_URL,
+      init: { method: "POST", headers, body: JSON.stringify(body) },
+      timeoutMs: params.timeoutMs,
+    });
+    response = guarded.response;
+    release = guarded.release;
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      return {
+        ok: false,
+        error: `openrouter speech ${params.model} -> ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`,
+        retryWithFallbackModel: isRetryableSpeechStatus(response.status),
+      };
+    }
+    const mp3 = Buffer.from(await response.arrayBuffer());
+    if (mp3.length === 0) {
+      return {
+        ok: false,
+        error: `openrouter speech ${params.model} returned empty audio`,
+        retryWithFallbackModel: true,
+      };
+    }
+    return { ok: true, mp3 };
+  } catch (err) {
+    // Note: transport failures (timeout / network) are retried once on the paid model so a
+    // single blip does not drop the spoken reply. Worst case is bounded by the 2-attempt budget.
+    return {
+      ok: false,
+      error: `openrouter speech ${params.model} failed: ${formatErrorMessage(err)}`,
+      retryWithFallbackModel: true,
+    };
+  } finally {
+    await response?.body?.cancel().catch(() => {});
+    await release?.();
+  }
+}
+
 type VoiceOperationResult = {
   ok: boolean;
   message: string;
@@ -159,6 +237,7 @@ type VoiceSessionEntry = {
   lastDecryptFailureAt: number;
   decryptRecoveryInFlight: boolean;
   stop: () => void;
+  generation: number;
 };
 
 async function transcribeAudio(params: {
@@ -390,6 +469,7 @@ export class DiscordVoiceManager {
       decryptFailureCount: 0,
       lastDecryptFailureAt: 0,
       decryptRecoveryInFlight: false,
+      generation: 0,
       stop: () => {
         if (speakingHandler) {
           connection.receiver.speaking.off("start", speakingHandler);
@@ -489,8 +569,9 @@ export class DiscordVoiceManager {
     }
 
     entry.activeSpeakers.add(userId);
+    const segmentGeneration = ++entry.generation;
     logVoiceVerbose(
-      `capture start: guild ${entry.guildId} channel ${entry.channelId} user ${userId}`,
+      `capture start: guild ${entry.guildId} channel ${entry.channelId} user ${userId} generation ${segmentGeneration}`,
     );
     const voiceSdk = loadDiscordVoiceSdk();
     if (entry.player.state.status === voiceSdk.AudioPlayerStatus.Playing) {
@@ -527,11 +608,21 @@ export class DiscordVoiceManager {
         `capture ready (${durationSeconds.toFixed(2)}s): guild ${entry.guildId} channel ${entry.channelId} user ${userId}`,
       );
       this.enqueueProcessing(entry, async () => {
-        await this.processSegment({ entry, wavPath, userId, durationSeconds });
+        await this.processSegment({
+          entry,
+          wavPath,
+          userId,
+          durationSeconds,
+          segmentGeneration,
+        });
       });
     } finally {
       entry.activeSpeakers.delete(userId);
     }
+  }
+
+  private isStaleSegment(entry: VoiceSessionEntry, segmentGeneration: number): boolean {
+    return this.sessions.get(entry.guildId) !== entry || entry.generation !== segmentGeneration;
   }
 
   private async processSegment(params: {
@@ -539,8 +630,9 @@ export class DiscordVoiceManager {
     wavPath: string;
     userId: string;
     durationSeconds: number;
+    segmentGeneration: number;
   }) {
-    const { entry, wavPath, userId, durationSeconds } = params;
+    const { entry, wavPath, userId, durationSeconds, segmentGeneration } = params;
     logVoiceVerbose(
       `segment processing (${durationSeconds.toFixed(2)}s): guild ${entry.guildId} channel ${entry.channelId}`,
     );
@@ -574,14 +666,20 @@ export class DiscordVoiceManager {
       );
       return;
     }
+    if (this.isStaleSegment(entry, segmentGeneration)) {
+      return;
+    }
     const transcript = await transcribeAudio({
       cfg: this.params.cfg,
       agentId: entry.route.agentId,
       filePath: wavPath,
     });
+    if (this.isStaleSegment(entry, segmentGeneration)) {
+      return;
+    }
     if (!transcript) {
-      logVoiceVerbose(
-        `transcription empty: guild ${entry.guildId} channel ${entry.channelId} user ${userId}`,
+      logger.warn(
+        `discord voice: no transcript produced (all providers failed or returned empty) guild=${entry.guildId} channel=${entry.channelId} user=${userId}`,
       );
       return;
     }
@@ -594,7 +692,7 @@ export class DiscordVoiceManager {
     const result = await agentCommandFromIngress(
       {
         message: prompt,
-        sessionKey: entry.route.sessionKey,
+        sessionKey: entry.route.mainSessionKey ?? entry.route.sessionKey,
         agentId: entry.route.agentId,
         messageChannel: "discord",
         senderIsOwner: speaker.senderIsOwner,
@@ -604,6 +702,9 @@ export class DiscordVoiceManager {
       this.params.runtime,
     );
 
+    if (this.isStaleSegment(entry, segmentGeneration)) {
+      return;
+    }
     const replyText = (result.payloads ?? [])
       .map((payload) => payload.text)
       .filter((text) => typeof text === "string" && text.trim())
@@ -619,7 +720,91 @@ export class DiscordVoiceManager {
     logVoiceVerbose(
       `reply ok (${replyText.length} chars): guild ${entry.guildId} channel ${entry.channelId}`,
     );
-    // Text reply is delivered as text only.
+    await this.speakReply({ entry, wavPath, replyText, segmentGeneration });
+  }
+
+  private async speakReply(params: {
+    entry: VoiceSessionEntry;
+    wavPath: string;
+    replyText: string;
+    segmentGeneration: number;
+  }): Promise<void> {
+    const { entry, wavPath, replyText, segmentGeneration } = params;
+    const ttsConfig = this.params.discordConfig.voice?.tts;
+    const speakText = replyText.slice(0, ttsConfig?.maxTextLength ?? DEFAULT_TTS_MAX_TEXT_LENGTH);
+    try {
+      const providerConfig = ttsConfig?.providers?.openrouter;
+      const apiKey = (
+        await resolveConfiguredSecretInputWithFallback({
+          config: this.params.cfg,
+          env: process.env,
+          value: providerConfig?.apiKey,
+          path: "channels.discord.voice.tts.providers.openrouter.apiKey",
+          readFallback: () => process.env.OPENROUTER_API_KEY?.trim(),
+        })
+      ).value;
+      const rawVoice = providerConfig?.voice;
+      const voice = typeof rawVoice === "string" && rawVoice.trim() ? rawVoice.trim() : undefined;
+
+      const startedAt = Date.now();
+      const totalTimeoutMs = ttsConfig?.timeoutMs ?? DEFAULT_TTS_TIMEOUT_MS;
+      let audio: Buffer | undefined;
+      let lastError = "openrouter speech produced no audio";
+      for (const model of TTS_MODEL_ATTEMPTS) {
+        const elapsed = Date.now() - startedAt;
+        const attempt = await requestSpeechAudio({
+          model,
+          text: speakText,
+          voice,
+          apiKey,
+          timeoutMs: Math.max(MIN_TTS_TIMEOUT_MS, totalTimeoutMs - elapsed),
+        });
+        if (attempt.ok) {
+          audio = attempt.mp3;
+          break;
+        }
+        lastError = attempt.error;
+        if (!attempt.retryWithFallbackModel) {
+          break;
+        }
+      }
+      if (!audio) {
+        throw new Error(lastError);
+      }
+
+      const mp3Path = path.join(path.dirname(wavPath), `reply-${randomUUID()}.mp3`);
+      await fs.writeFile(mp3Path, audio);
+      // Barge-in guard: check + play must stay in one synchronous block so a newer segment
+      // cannot slip in between the staleness check and playback.
+      if (this.isStaleSegment(entry, segmentGeneration)) {
+        logVoiceVerbose(
+          `tts discarded (stale segment): guild ${entry.guildId} channel ${entry.channelId}`,
+        );
+        return;
+      }
+      const voiceSdk = loadDiscordVoiceSdk();
+      const resource = voiceSdk.createAudioResource(mp3Path);
+      entry.player.play(resource);
+      logVoiceVerbose(
+        `tts playing (${audio.length} bytes): guild ${entry.guildId} channel ${entry.channelId}`,
+      );
+    } catch (err) {
+      logger.warn(`discord voice: tts failed: ${formatErrorMessage(err)}`);
+      if (this.isStaleSegment(entry, segmentGeneration)) {
+        return;
+      }
+      await this.postTextFallback(entry, speakText);
+    }
+  }
+
+  private async postTextFallback(entry: VoiceSessionEntry, text: string): Promise<void> {
+    try {
+      await this.params.client.rest.post(Routes.channelMessages(entry.channelId), {
+        body: { content: text },
+      });
+    } catch (err) {
+      logger.warn(`discord voice: text fallback failed: ${formatErrorMessage(err)}`);
+    }
   }
 
   private handleReceiveError(entry: VoiceSessionEntry, err: unknown) {
