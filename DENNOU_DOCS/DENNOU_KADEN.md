@@ -12,11 +12,13 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 ```text
 [Yosia のマイク入力 (Discord Voice)]
          │
-         ▼
-[DiscordVoiceManager (受信 & 1000ms無音検知)]
+         ├───▶ [外部 ASR/Diarization サーバー (Windows RTX 2060 / HTTP)]
+         │      (Nemotron-3-Diarization / 10ms低遅延ストリーミング)
+         │      ・話者分離（Yosia の声を識別）
+         │      ・発話終了の高速エンドポインティング（約 200〜300ms）
          │
-         ▼ (WAV 一時ファイル: mkdtemp 30分TTL)
-[STT: mediaUnderstanding.transcribeAudioFile]
+         ▼ (確定した音声セグメント WAV: mkdtemp 30分TTL)
+[STT: mediaUnderstanding.transcribeAudioFile または外部エンドポイント]
          │
          ▼ (テキストプロンプト)
 [in-process: agentCommandFromIngress]
@@ -35,10 +37,14 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ## 3. 実装の要件と技術的解決（KISS 原則）
 
-### 3.1 依存ライブラリの補強（音声暗号化と FFmpeg）
+### 3.1 依存ライブラリの補強と外部 ASR/Diarization エンドポイント
 
-- `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
-- 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
+- **暗号化と FFmpeg**:
+  - `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
+  - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
+- **低遅延 ASR / Diarization（外部 HTTP エンドポイント連携）**:
+  - Kasou ミニPC側の負荷を極小化し、超低遅延（RTF ≪ 0.2）を実現するため、ASR / Diarization は外部 HTTP エンドポイント（Windows RTX 2060 サーバー: 例 `http://192.168.100.32:9000/v1/...`）へオフロード可能とする。
+  - 設定 `channels.discord.voice.asr.endpoint`（または `tools.media.audio.baseUrl`）が設定されている場合は外部エンドポイントへリクエストを投げ、未設定時はローカルの `transcribeAudioFile` / 既存無音検知へ透過的にフォールバックする（フェイルオープン）。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
 
