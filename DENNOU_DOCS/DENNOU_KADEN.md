@@ -49,16 +49,16 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ### 3.3 音声返答（Egress）とバージイン
 
-- **世代カウンタの管理**:
-  - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。世代はセッション（ギルド）単位とし、1:1 通話を前提とする（連続発話時は最新セグメントのみ処理し、それ以前は意図的に破棄する）。
-  - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers` ガード通過後）に **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**。
-  - プレイヤーが再生中の場合は既存の `entry.player.stop(true)` も同時に実行する。
-  - `processSegment` 冒頭（STT 前）、`transcribeAudio` 完了直後（`if (!transcript)` 直前）、および `agentCommandFromIngress` 完了直後（TTS 合成前）の 3 箇所で `if (entry.generation !== segmentGeneration) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
+- **世代カウンタとセッション生存の管理**:
+  - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。
+  - セッション生存と世代を判定するヘルパー `isStaleSegment(entry, segmentGeneration)`（`this.sessions.get(entry.guildId) !== entry || entry.generation !== segmentGeneration`）を定義する。
+  - ユーザーの発話開始時（`handleSpeakingStart` 内、`botUserId` 自己フィルタ直後・`activeSpeakers` 重複ガード通過後）に即座に `entry.player.stop(true)` を実行する。セグメントが有効に成立した段階（`MIN_SEGMENT_SECONDS` 通過後・`enqueueProcessing` 直前）で **`entry.generation++`** をインクリメントし、**発話開始時点の世代（`const segmentGeneration = entry.generation`）を `processSegment` へ引数として渡す**。
+  - `processSegment` 冒頭（STT 前）、`transcribeAudio` 完了直後（`if (!transcript)` 直前）、および `agentCommandFromIngress` 完了直後（TTS 合成前）の 3 箇所で `if (this.isStaleSegment(entry, segmentGeneration)) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
 - **TTS 音声生成（OpenRouter）**:
   - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる。
   - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（総所要時間の上限は `timeoutMs + 1_000ms`）。
   - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバックし、2試行目も失敗なら即テキストフォールバック。それ以外の 4xx エラーは即テキストフォールバック）。
-  - パラメータ: `response_format: "mp3"`, `input: replyText`（`channels.discord.voice.tts.providers.openrouter.voice` が設定されている場合は付与）。
+  - パラメータ: `response_format: "mp3"`, `input: replyText`（`typeof voice === "string" && voice.trim()` の場合のみ `voice` を付与）。
   - ネットワーク: `fetchWithSsrFGuard` を使用。
     ```ts
     let response: Response | undefined;
@@ -90,7 +90,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - **再生と破棄**:
   - 生成した MP3 は WAV と同一の `path.dirname(wavPath)` に保存する（WAV 作成時に設定済みの既存 30 分タイマーが両方を削除するため、`scheduleTempCleanup` の追加呼び出しは行わない）。
   - 音声リソースの生成には `loadDiscordVoiceSdk().createAudioResource` を使用する。
-  - 再生直前に、セッション破棄チェック（`this.sessions.get(entry.guildId) !== entry`）および世代不一致チェック（`entry.generation !== segmentGeneration`）を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する。有効時のみ `entry.player.play(resource)` で再生する。
+  - 再生直前に、`this.isStaleSegment(entry, segmentGeneration)` を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する。有効時のみ `entry.player.play(resource)` で再生する。
 - **フェイルオープン**:
   - TTS や音声再生が失敗した場合は、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
 
@@ -100,12 +100,12 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
-- `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
-  - `entry` オブジェクトに `generation: 0`, `player: { play: vi.fn(), stop: vi.fn(), state: { status: "idle" } }` を補完。
+  - `entry` は `sessions.set("g1", entry)` で登録された本物の参照を使用し、`generation: 0`, `player: { play: vi.fn(), stop: vi.fn(), state: { status: "idle" } }` を補完する。
   - `ProcessSegmentInvoker` 型および `processSegment(...)` 呼び出しに `segmentGeneration: number` を追加。
-  - `openclaw/plugin-sdk/ssrf-runtime` を `importOriginal` 併用で部分モックし（`formatErrorMessage` 等を維持）、新規ガード 7 ケース（発話検知時 generation++ ＆ バージイン、世代不一致破棄、セッション破棄、429フォールバック、400即テキスト、`maxTextLength` 切り詰め、`mainSessionKey` 優先ルーティング）をテスト検証。
+  - `openclaw/plugin-sdk/ssrf-runtime` を `importOriginal` 併用で部分モックし、正常系再生テスト（TTS 成功 → `createAudioResource` / `player.play` 呼び出し）および新規ガードケース（発話検知時 generation++ ＆ バージイン、世代不一致破棄、セッション破棄、429→有料モデルフォールバック、400即テキスト、`maxTextLength` 切り詰め、`mainSessionKey` 優先ルーティング）をテスト検証。
 
 ---
 
