@@ -1,5 +1,6 @@
 import { spawn as spawnChildProcess } from "node:child_process";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { TSchema } from "typebox";
 import type { AnyAgentTool } from "../agents/tools/common.js";
@@ -52,6 +53,7 @@ function resolveTimeouts(timeouts?: BinaryPluginTimeouts): ResolvedTimeouts {
 type BinaryStream = {
   write?: (chunk: string) => unknown;
   end?: () => unknown;
+  setEncoding?: (encoding: BufferEncoding) => unknown;
   on?: (event: "data" | "error", listener: (payload: unknown) => void) => void;
 };
 
@@ -155,7 +157,13 @@ function toToolResult(payload: unknown): AgentToolResult<unknown> {
 
 class BinaryPluginBridge {
   private child: BinaryChildProcess | null = null;
+  // UTF-8 decoders keep multi-byte characters intact when a chunk boundary
+  // splits them (for example a 3-byte Japanese character split 1|2).
+  private readonly stdoutDecoder = new StringDecoder("utf8");
+  private readonly stderrDecoder = new StringDecoder("utf8");
   private stdoutBuffer = "";
+  private pluginConfig: Record<string, unknown> = {};
+  private startFailed: Error | null = null;
   private nextRequestId = 1;
   private readonly pending = new Map<number, PendingRequest>();
   private startPromise: Promise<void> | null = null;
@@ -175,16 +183,29 @@ class BinaryPluginBridge {
     },
   ) {}
 
+  /** Validated plugin config forwarded to the binary on `initialize`. */
+  setPluginConfig(config: Record<string, unknown> | undefined): void {
+    this.pluginConfig = config ?? {};
+  }
+
   async start(): Promise<void> {
     if (this.startPromise) {
       return this.startPromise;
     }
-    this.startPromise = this.startInternal();
+    this.startPromise = this.startInternal().catch((error: unknown) => {
+      // Allow a later retry instead of caching the rejected promise forever.
+      this.startPromise = null;
+      throw error;
+    });
     return this.startPromise;
   }
 
   private async startInternal(): Promise<void> {
     this.stdoutBuffer = "";
+    // Drop any incomplete trailing bytes left over from a previous run.
+    this.stdoutDecoder.end();
+    this.stderrDecoder.end();
+    this.startFailed = null;
     this.exitPromise = new Promise<void>((resolve) => {
       this.resolveExit = resolve;
     });
@@ -195,15 +216,41 @@ class BinaryPluginBridge {
       windowsHide: true,
     });
     this.child = child;
+    // Prefer the stream's own UTF-8 decoder when the stream supports it; the
+    // StringDecoder below still covers streams that emit raw bytes.
+    child.stdout?.setEncoding?.("utf8");
+    child.stderr?.setEncoding?.("utf8");
+    const logStreamError = (streamName: "stdin" | "stdout" | "stderr") => (error: unknown) => {
+      // EPIPE / ERR_STREAM_DESTROYED must never crash the gateway.
+      this.params.logger.warn(
+        `[plugins] ${this.params.pluginId} binary plugin ${streamName} error: ${readRpcErrorMessage(error)}`,
+      );
+    };
+    child.stdin?.on?.("error", logStreamError("stdin"));
+    child.stdout?.on?.("error", logStreamError("stdout"));
+    child.stderr?.on?.("error", logStreamError("stderr"));
     child.stdout?.on?.("data", (chunk) => this.onStdout(chunk));
     child.stderr?.on?.("data", (chunk) => this.onStderr(chunk));
     child.on("error", (error) => {
+      // Ignore events from a superseded child process.
+      if (this.child !== child) {
+        return;
+      }
+      const message = readRpcErrorMessage(error);
       this.params.logger.warn(
-        `[plugins] ${this.params.pluginId} binary plugin process error: ${readRpcErrorMessage(error)}`,
+        `[plugins] ${this.params.pluginId} binary plugin process error: ${message}`,
       );
-      this.failAll(new Error(`binary plugin process error: ${readRpcErrorMessage(error)}`));
+      this.child = null;
+      this.resolveExit?.();
+      this.resolveExit = null;
+      this.startFailed = new Error(`binary plugin failed to start: ${message}`);
+      this.failAll(this.startFailed);
     });
     child.on("exit", (code, signal) => {
+      // Ignore events from a superseded child process.
+      if (this.child !== child) {
+        return;
+      }
       this.child = null;
       this.resolveExit?.();
       this.resolveExit = null;
@@ -227,6 +274,7 @@ class BinaryPluginBridge {
           protocolVersion: BINARY_PLUGIN_PROTOCOL_VERSION,
           pluginId: this.params.pluginId,
           tools: [...this.params.toolNames],
+          config: this.pluginConfig,
         },
         this.params.timeouts.initializeMs,
       );
@@ -234,6 +282,9 @@ class BinaryPluginBridge {
       this.params.logger.debug?.(
         `[plugins] ${this.params.pluginId} binary plugin initialize skipped: ${readRpcErrorMessage(error)}`,
       );
+    }
+    if (this.startFailed) {
+      throw this.startFailed;
     }
   }
 
@@ -310,8 +361,19 @@ class BinaryPluginBridge {
     return result;
   }
 
+  private decodeChunk(decoder: StringDecoder, chunk: unknown): string {
+    if (typeof chunk === "string") {
+      // The stream already decoded (setEncoding) or the test seam sent text.
+      return chunk;
+    }
+    if (chunk instanceof Uint8Array) {
+      return decoder.write(chunk);
+    }
+    return String(chunk);
+  }
+
   private onStdout(chunk: unknown): void {
-    this.stdoutBuffer += typeof chunk === "string" ? chunk : String(chunk);
+    this.stdoutBuffer += this.decodeChunk(this.stdoutDecoder, chunk);
     let newlineIndex = this.stdoutBuffer.indexOf("\n");
     while (newlineIndex >= 0) {
       const line = this.stdoutBuffer.slice(0, newlineIndex).trim();
@@ -324,7 +386,7 @@ class BinaryPluginBridge {
   }
 
   private onStderr(chunk: unknown): void {
-    const text = (typeof chunk === "string" ? chunk : String(chunk)).trimEnd();
+    const text = this.decodeChunk(this.stderrDecoder, chunk).trimEnd();
     if (text) {
       this.params.logger.warn(`[plugins] ${this.params.pluginId} binary stderr: ${text}`);
     }
@@ -464,7 +526,11 @@ export function createBinaryPluginDefinition(params: {
       name: params.name ?? params.pluginId,
       kind: "binary",
       register(api) {
+        // Forward the validated plugin config to the binary on `initialize`.
+        bridge.setPluginConfig(api.pluginConfig);
         for (const tool of tools) {
+          // The registry adopts `tool.name` automatically; passing `names` here
+          // would register the name twice.
           api.registerTool(
             createBinaryTool({
               bridge,
@@ -472,7 +538,6 @@ export function createBinaryPluginDefinition(params: {
               definition: tool,
               timeouts,
             }),
-            { names: [tool.name] },
           );
         }
         api.registerService({

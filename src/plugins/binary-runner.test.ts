@@ -28,56 +28,72 @@ type RpcRequest = { id: number; method: string; params?: unknown };
 type FakeStream = {
   written: string[];
   ended: boolean;
+  encoding: string | undefined;
   write: (chunk: string) => boolean;
   end: () => void;
+  setEncoding: (encoding: string) => void;
   on: (event: "data" | "error", listener: (payload: unknown) => void) => void;
   emit: (payload: unknown) => void;
+  emitError: (error: unknown) => void;
 };
 
 function createFakeStream(): FakeStream {
-  const listeners: Array<(payload: unknown) => void> = [];
-  return {
+  const listeners = new Map<string, Array<(payload: unknown) => void>>();
+  const stream: FakeStream = {
     written: [],
     ended: false,
+    encoding: undefined,
     write(chunk: string) {
-      this.written.push(chunk);
+      stream.written.push(chunk);
       return true;
     },
     end() {
-      this.ended = true;
+      stream.ended = true;
+    },
+    setEncoding(encoding: string) {
+      stream.encoding = encoding;
     },
     on(event, listener) {
-      if (event === "data") {
-        listeners.push(listener);
-      }
+      const bucket = listeners.get(event) ?? [];
+      bucket.push(listener);
+      listeners.set(event, bucket);
     },
     emit(payload: unknown) {
-      for (const listener of listeners) {
+      for (const listener of listeners.get("data") ?? []) {
         listener(payload);
       }
     },
+    emitError(error: unknown) {
+      for (const listener of listeners.get("error") ?? []) {
+        listener(error);
+      }
+    },
   };
+  return stream;
 }
 
-type FakeBinary = {
+type FakeChild = {
   child: BinaryChildProcess;
-  spawn: BinarySpawn;
   requests: RpcRequest[];
   stdin: FakeStream;
   stdout: FakeStream;
   stderr: FakeStream;
   exit: (code?: number) => void;
-  /** Respond to a request method; return false to leave it unanswered. */
+  fail: (error: unknown) => void;
+  /** Respond to a request method; return null to leave it unanswered. */
   respond: (method: string, handler: (request: RpcRequest) => unknown | null) => void;
 };
 
-function createFakeBinary(): FakeBinary {
+type FakeBinary = FakeChild & { spawn: BinarySpawn };
+
+function createFakeChild(): FakeChild {
   const stdin = createFakeStream();
   const stdout = createFakeStream();
   const stderr = createFakeStream();
   const requests: RpcRequest[] = [];
   const responders = new Map<string, (request: RpcRequest) => unknown | null>();
   const exitHandlers: Array<(...args: unknown[]) => void> = [];
+  const errorHandlers: Array<(...args: unknown[]) => void> = [];
 
   const reply = (payload: unknown) => {
     stdout.emit(`${JSON.stringify(payload)}\n`);
@@ -108,7 +124,9 @@ function createFakeBinary(): FakeBinary {
     on(event: "exit" | "error", listener: (...args: unknown[]) => void) {
       if (event === "exit") {
         exitHandlers.push(listener);
+        return;
       }
+      errorHandlers.push(listener);
     },
     kill() {
       for (const handler of exitHandlers) {
@@ -120,7 +138,6 @@ function createFakeBinary(): FakeBinary {
 
   return {
     child,
-    spawn: () => child,
     requests,
     stdin,
     stdout,
@@ -130,10 +147,33 @@ function createFakeBinary(): FakeBinary {
         handler(code, null);
       }
     },
+    fail(error: unknown) {
+      for (const handler of errorHandlers) {
+        handler(error);
+      }
+    },
     respond(method, handler) {
       responders.set(method, handler);
     },
   };
+}
+
+function createFakeBinary(): FakeBinary {
+  const fakeChild = createFakeChild();
+  return { ...fakeChild, spawn: () => fakeChild.child };
+}
+
+function createCaptureLogger() {
+  const warnings: string[] = [];
+  const logger: PluginLogger = {
+    debug: () => {},
+    info: () => {},
+    warn: (message) => {
+      warnings.push(message);
+    },
+    error: () => {},
+  };
+  return { logger, warnings };
 }
 
 function createExecutableFixture(): { rootDir: string; executable: string } {
@@ -144,7 +184,7 @@ function createExecutableFixture(): { rootDir: string; executable: string } {
   return { rootDir, executable };
 }
 
-function createApiCapture() {
+function createApiCapture(params: { pluginConfig?: Record<string, unknown> } = {}) {
   const tools: Array<{ tool: unknown; opts?: { names?: string[] } }> = [];
   const services: OpenClawPluginService[] = [];
   const api = {
@@ -153,6 +193,7 @@ function createApiCapture() {
     source: "fixture",
     registrationMode: "full",
     config: {},
+    pluginConfig: params.pluginConfig,
     runtime: {},
     logger: silentLogger,
     registerTool(tool: unknown, opts?: { names?: string[] }) {
@@ -241,8 +282,85 @@ describe("createBinaryPluginDefinition", () => {
 
     const capture = createApiCapture();
     result.definition.register?.(capture.api);
-    expect(capture.tools.map((entry) => entry.opts?.names?.[0])).toEqual(["demo_ping"]);
+    expect(capture.tools.map((entry) => (entry.tool as { name: string }).name)).toEqual([
+      "demo_ping",
+    ]);
+    // The registry adopts `tool.name`; passing an explicit `names` array would
+    // register the same tool name twice.
+    expect(capture.tools[0].opts).toBeUndefined();
     expect(capture.services.map((service) => service.id)).toEqual(["demo-binary-binary"]);
+  });
+
+  it("forwards the validated plugin config to the binary on initialize", async () => {
+    const { rootDir, executable } = createExecutableFixture();
+    const fake = createFakeBinary();
+    fake.respond("initialize", () => ({}));
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable,
+      logger: silentLogger,
+      spawn: fake.spawn,
+      timeouts: { initializeMs: 50, toolMs: 50, shutdownMs: 20, shutdownGraceMs: 20 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture({ pluginConfig: { voiceId: "aoi", retries: 3 } });
+    result.definition.register?.(capture.api);
+    await capture.services[0].start(serviceContext);
+
+    const initialize = fake.requests.find((request) => request.method === "initialize");
+    expect(initialize?.params).toMatchObject({
+      pluginId: "demo-binary",
+      config: { voiceId: "aoi", retries: 3 },
+    });
+  });
+
+  it("decodes multi-byte UTF-8 split across stream chunks without mojibake", async () => {
+    const { rootDir, executable } = createExecutableFixture();
+    const fake = createFakeBinary();
+    fake.respond("initialize", () => ({}));
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable,
+      tools: [{ name: "demo_ping" }],
+      logger: silentLogger,
+      spawn: fake.spawn,
+      timeouts: { initializeMs: 50, toolMs: 50, shutdownMs: 20, shutdownGraceMs: 20 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture();
+    result.definition.register?.(capture.api);
+    await capture.services[0].start(serviceContext);
+    expect(fake.stdout.encoding).toBe("utf8");
+
+    const tool = capture.tools[0].tool as {
+      execute: (id: string, args: unknown) => Promise<{ content: Array<{ text?: string }> }>;
+    };
+    const pending = tool.execute("call-1", {});
+    const requestId = fake.requests.at(-1)?.id;
+    expect(requestId).toBeTypeOf("number");
+
+    const text = "こんにちは世界";
+    const payload = `${JSON.stringify({ jsonrpc: "2.0", id: requestId, result: { text } })}\n`;
+    const bytes = Buffer.from(payload, "utf8");
+    // Split inside the first 3-byte character so the first chunk ends with an
+    // incomplete UTF-8 sequence.
+    const splitAt = bytes.indexOf(Buffer.from("こ", "utf8")) + 1;
+    expect(splitAt).toBeGreaterThan(0);
+    fake.stdout.emit(bytes.subarray(0, splitAt));
+    fake.stdout.emit(bytes.subarray(splitAt, splitAt + 2));
+    fake.stdout.emit(bytes.subarray(splitAt + 2));
+
+    const toolResult = await pending;
+    expect(toolResult.content[0]?.text).toBe(text);
+    expect(toolResult.content[0]?.text).not.toContain("\uFFFD");
   });
 
   it("round-trips tool calls over stdio JSON-RPC", async () => {
@@ -400,6 +518,104 @@ describe("createBinaryPluginDefinition", () => {
     const toolResult = await tool.execute("call-1", {});
     expect(toolResult.content[0]?.text).toBe("ok");
   });
+
+  it("rejects start() when the process cannot be spawned and clears the child", async () => {
+    const { rootDir, executable } = createExecutableFixture();
+    const fake = createFakeBinary();
+    const { logger } = createCaptureLogger();
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable,
+      tools: [{ name: "demo_ping" }],
+      logger,
+      spawn: fake.spawn,
+      timeouts: { initializeMs: 20, toolMs: 20, shutdownMs: 20, shutdownGraceMs: 20 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture();
+    result.definition.register?.(capture.api);
+
+    const startPromise = capture.services[0].start(serviceContext);
+    fake.fail(new Error("spawn ENOENT"));
+
+    await expect(startPromise).rejects.toThrow(/failed to start.*spawn ENOENT/);
+    // The failed child must not stay registered as the live process.
+    const tool = capture.tools[0].tool as {
+      execute: (id: string, args: unknown) => Promise<unknown>;
+    };
+    await expect(tool.execute("call-1", {})).rejects.toThrow(/not running/);
+  });
+
+  it("logs stream errors instead of crashing on EPIPE", async () => {
+    const { rootDir, executable } = createExecutableFixture();
+    const fake = createFakeBinary();
+    fake.respond("initialize", () => ({}));
+    const { logger, warnings } = createCaptureLogger();
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable,
+      logger,
+      spawn: fake.spawn,
+      timeouts: { initializeMs: 20, toolMs: 20, shutdownMs: 20, shutdownGraceMs: 20 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture();
+    result.definition.register?.(capture.api);
+    await capture.services[0].start(serviceContext);
+
+    const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+    expect(() => fake.stdin.emitError(epipe)).not.toThrow();
+    expect(() => fake.stdout.emitError(epipe)).not.toThrow();
+    expect(warnings.some((message) => message.includes("stdin error"))).toBe(true);
+  });
+
+  it("ignores exit events from a superseded child process", async () => {
+    const { rootDir, executable } = createExecutableFixture();
+    const first = createFakeChild();
+    const second = createFakeChild();
+    for (const fakeChild of [first, second]) {
+      fakeChild.respond("initialize", () => ({}));
+      fakeChild.respond("tool.execute", () => ({ text: "second-child" }));
+      fakeChild.respond("shutdown", () => ({}));
+    }
+    const queue = [first, second];
+    const spawn: BinarySpawn = () => (queue.shift() ?? second).child;
+    const result = createBinaryPluginDefinition({
+      pluginId: "demo-binary",
+      rootDir,
+      executable,
+      tools: [{ name: "demo_ping" }],
+      logger: silentLogger,
+      spawn,
+      timeouts: { initializeMs: 20, toolMs: 50, shutdownMs: 20, shutdownGraceMs: 20 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const capture = createApiCapture();
+    result.definition.register?.(capture.api);
+    const service = capture.services[0];
+    await service.start(serviceContext);
+    await service.stop?.(serviceContext);
+    await service.start(serviceContext);
+
+    // The first child's late exit must not tear down the restarted process.
+    first.exit(1);
+    const tool = capture.tools[0].tool as {
+      execute: (id: string, args: unknown) => Promise<{ content: Array<{ text?: string }> }>;
+    };
+    const toolResult = await tool.execute("call-1", {});
+    expect(toolResult.content[0]?.text).toBe("second-child");
+  });
 });
 
 describe("binary plugin loading", () => {
@@ -448,7 +664,7 @@ describe("binary plugin loading", () => {
 
     const record = registry.plugins.find((plugin) => plugin.id === "demo-binary");
     expect(record?.status).toBe("loaded");
-    expect(registry.tools.map((entry) => entry.names).flat()).toContain("demo_ping");
+    expect(registry.tools.flatMap((entry) => entry.names)).toContain("demo_ping");
     expect(registry.services.map((entry) => entry.service.id)).toEqual(["demo-binary-binary"]);
   });
 
