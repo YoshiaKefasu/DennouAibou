@@ -16,12 +16,13 @@
     },
     {
       "name": "kaden_call",
-      "description": "Trigger or manage voice call session",
+      "description": "Report daemon status or ping it",
       "parameters": {
         "type": "object",
         "properties": {
           "action": {
             "type": "string",
+            "enum": ["status", "ping"],
             "description": "Call action: status, ping"
           }
         },

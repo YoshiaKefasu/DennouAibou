@@ -44,7 +44,11 @@ const (
 var supportedActions = []string{"status", "ping"}
 
 // capabilities is advertised on `initialize`.
-var capabilities = []string{"voice", "tools"}
+//
+// TODO(dennou-kaden): add "voice" here once the audio send/receive and
+// STT/TTS streaming pipeline is actually implemented. Advertising it earlier
+// would make the host assume capabilities this daemon does not serve yet.
+var capabilities = []string{"tools"}
 
 // request is one host -> binary JSON-RPC 2.0 request.
 type request struct {
@@ -136,13 +140,13 @@ func main() {
 }
 
 // installSignalHandler exits cleanly on SIGINT/SIGTERM so the host never sees a
-// crashed child process.
+// crashed child process. Normal termination stays silent: the host promotes any
+// stderr line to a warn log, and a clean shutdown is not a warning.
 func (s *server) installSignalHandler() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		received := <-signals
-		s.logf("received %s, shutting down", received)
+		<-signals
 		os.Exit(0)
 	}()
 }
@@ -211,7 +215,7 @@ func (s *server) dispatch(req request) (any, *rpcError, bool) {
 	case "tool.execute":
 		return s.handleToolExecute(req.Params)
 	case "shutdown":
-		s.logf("shutdown requested")
+		// Normal exit path: keep stderr silent so the host does not log a warning.
 		return map[string]any{"ok": true}, nil, true
 	case "ping":
 		return map[string]any{"pong": true}, nil, false

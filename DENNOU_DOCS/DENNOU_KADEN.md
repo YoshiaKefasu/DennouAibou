@@ -1,5 +1,29 @@
 # 電脳架電（Dennou Kaden）通話パイプライン設計仕様書
 
+## 0. 実装状況（2026-10-29 時点）
+
+### 0.1 実装済み
+
+- **完全 Go 言語製バイナリプラグイン基盤（`extensions/dennou-kaden`）** の scaffold。
+  - `dennou.plugin.json`（`kind: "binary"`, `executable: "./bin/kaden"`）＋ `main.go`（stdio JSON-RPC 2.0 デーモン）＋ `build.mjs`（クロスビルド）。
+  - ホスト側は `src/plugins/binary-runner.ts` の stdio JSON-RPC ブリッジで接続し、`registerService` による起動・正常終了と、ツール呼び出しの中継を行う。
+  - `initialize` が広告する capabilities は現時点では `["tools"]` のみ（音声パイプライン実装時に `"voice"` を追加する）。
+- **ツール 2 種**（実装済みの範囲のみを公開）:
+  - `kaden_status`: デーモン状態・Go ランタイム情報・設定値のレポート。
+  - `kaden_call`: `action: "status" | "ping"`（JSON Schema の `enum` で制限）。未知の action はエラーにせず案内メッセージを返す。
+
+### 0.2 今後の実装計画
+
+音声送受信・STT/TTS ストリーミングパイプラインは**未実装**であり、以下を段階的に Go デーモン完結型へ移行する計画とする。
+
+1. **音声入出力の Go 側移行**: Discord voice の受信（Opus デコード）・送信（Opus エンコード）を Go デーモン内に取り込み、`@discordjs/voice` 依存を縮小する。
+2. **STT/TTS ストリーミング**: 無音検知 → STT（Groq Whisper 一次 / Gemini Transcribe Live 二次）→ マスターセッション → TTS（OpenRouter Fish Audio）を、WAV/MP3 の一時ファイル経由ではなくストリームで接続する。
+3. **capabilities の更新**: 上記が動作した時点で `initialize` の capabilities に `"voice"` を追加する。
+
+> 以降の §2〜§5 は、**初回実装時に Discord 拡張（`extensions/discord`）側で試作したパイプラインの参照設計**である。当該試作は Go デーモン完結型へ移行するため revert 済み（commit `b7a75086f8`）であり、§4 の Discord 側変更対象ファイルは将来の移行フェーズで再適用する際の設計メモとして扱う。
+
+---
+
 ## 1. 目的と概要
 
 Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yosia が双方向音声通話（電話）を行えるシステムを構築する。

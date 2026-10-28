@@ -29,8 +29,8 @@ func TestInitializeReportsReadyProtocol(t *testing.T) {
 	if reply.Status != "ready" {
 		t.Fatalf("status = %q, want ready", reply.Status)
 	}
-	if strings.Join(reply.Capabilities, ",") != "voice,tools" {
-		t.Fatalf("capabilities = %v", reply.Capabilities)
+	if strings.Join(reply.Capabilities, ",") != "tools" {
+		t.Fatalf("capabilities = %v, want [tools] until the voice pipeline exists", reply.Capabilities)
 	}
 	if srv.port() != 4321 {
 		t.Fatalf("port = %d, want 4321", srv.port())

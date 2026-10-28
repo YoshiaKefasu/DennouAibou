@@ -120,7 +120,7 @@ afterAll(() => {
 });
 
 describe("dennou-kaden manifest", () => {
-  it("declares a binary plugin with the voice tools and config schema", () => {
+  it("declares a binary plugin with the daemon tools and config schema", () => {
     const manifest = readManifest();
     expect(manifest.id).toBe("dennou-kaden");
     expect(manifest.kind).toBe("binary");
@@ -131,6 +131,14 @@ describe("dennou-kaden manifest", () => {
       expect(tool.description?.length ?? 0).toBeGreaterThan(0);
       expect(tool.parameters?.type).toBe("object");
     }
+  });
+
+  it("publishes only the implemented kaden_call actions", () => {
+    const manifest = readManifest();
+    const call = manifest.tools.find((tool) => tool.name === "kaden_call");
+    const properties = call?.parameters?.properties as { action?: { enum?: string[] } } | undefined;
+    expect(call?.description).toBe("Report daemon status or ping it");
+    expect(properties?.action?.enum).toEqual(["status", "ping"]);
   });
 
   it("ships a workspace package that points discovery at the daemon binary", () => {
