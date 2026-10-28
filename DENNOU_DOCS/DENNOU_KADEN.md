@@ -37,7 +37,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ### 3.1 依存ライブラリの補強（音声暗号化と FFmpeg）
 
-- `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json` を更新する。
+- `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json`（`@noble/hashes` の直前）を更新する。
 - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
@@ -92,7 +92,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - 音声リソースの生成には `loadDiscordVoiceSdk().createAudioResource` を使用する。
   - 再生直前に、`this.isStaleSegment(entry, segmentGeneration)` を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する（※世代不一致による破棄時はバージインのためテキストフォールバックは行わない）。有効時のみ `entry.player.play(resource)` で再生する。
 - **フェイルオープン**:
-  - TTS や音声再生が失敗（エラー）した場合は、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
+  - TTS や音声再生が失敗（エラー）した場合は、直前に世代破棄判定 `if (this.isStaleSegment(entry, segmentGeneration)) return;` を行った上で、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
 
 ---
 
@@ -100,15 +100,15 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
-- `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（KASOU デプロイ用の依存クロージャ）追加
-- `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（`@noble/hashes` の直前に昇順で追加）
+- `extensions/discord/src/voice/manager.ts`: `Routes`（`discord-api-types/v10`）および `fetchWithSsrFGuard`（`openclaw/plugin-sdk/ssrf-runtime`）の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
   - `createAudioResourceMock` を `vi.hoisted` へ引き上げ、テスト側から検証可能にする。
   - `client.rest: { post: vi.fn(async () => ({ id: "m1" })) }` モックを追加。
   - `entry` は `(manager as unknown as { sessions: Map<string, unknown> }).sessions.set("g1", entry)` に登録したオブジェクトと同一参照を使用し、`generation: 0`, `player: { play: vi.fn(), stop: vi.fn(), state: { status: "idle" } }`, `activeSpeakers: new Set<string>()`, `connection: createConnectionMock()`, `route: { mainSessionKey: "agent:main:main", ... }` を補完する（バージイン検証時は `entry.player.state.status = "playing"` に差し替えて `player.stop(true)` を検証）。
-  - `ProcessSegmentInvoker` 型および `processSegment(...)` 呼び出しに `segmentGeneration: number` を追加。
+  - `ProcessSegmentInvoker` 型および `processSegment(...)` 呼び出しに `segmentGeneration: number`（通常テスト時は `0`）を追加。
   - `openclaw/plugin-sdk/ssrf-runtime` を `importOriginal` 併用で部分モックし、正常系再生テスト（TTS 成功 → `createAudioResource` / `player.play` 呼び出し）および新規ガードケース（発話検知時 generation++ ＆ バージイン、世代不一致破棄、セッション破棄、429→有料モデルフォールバック、400即テキスト、`maxTextLength` 切り詰め、`mainSessionKey` 優先ルーティング）をテスト検証。
 
 ---
