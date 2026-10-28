@@ -37,7 +37,7 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ### 3.1 依存ライブラリの補強（音声暗号化と FFmpeg）
 
-- `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` を更新する。
+- `@discordjs/voice` の音声送信（`player.play()`）において、Discord サーバーが要求する暗号化モード（`aead_xchacha20_poly1305_rtpsize` 等）に対応するため、純 JS 製の `@noble/ciphers`（`^2.1.1`）を `extensions/discord/package.json` の `dependencies` に追加し、`pnpm-lock.yaml` および `scripts/lib/kasou-nm-closure.json` を更新する。
 - 音声変換には環境上の `ffmpeg`（KASOU 実機 `/usr/bin/ffmpeg` 確認済み）を使用する。
 
 ### 3.2 セッションと記憶の一本化（マスターセッション直接ルーティング）
@@ -50,10 +50,10 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 ### 3.3 音声返答（Egress）とバージイン
 
 - **世代カウンタとセッション生存の管理**:
-  - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。世代はセッション（ギルド `manager.ts:179` の `sessions` Map）単位とし、1:1 通話を前提とする。
+  - `VoiceSessionEntry` に `generation: number`（初期値 `0`）を追加する。世代はセッション（ギルド `DiscordVoiceManager#sessions` Map）単位とし、1:1 通話を前提とする。
   - プライベートメソッド `private isStaleSegment(entry: VoiceSessionEntry, segmentGeneration: number): boolean`（`this.sessions.get(entry.guildId) !== entry || entry.generation !== segmentGeneration`）を定義する。
   - ユーザーの発話開始時（`handleSpeakingStart` 内、`activeSpeakers.add(userId)` 直後・`const voiceSdk` 宣言より前）で無条件に **`const segmentGeneration = ++entry.generation;`** を同期実行して世代を進めつつ捕捉し（プレイヤー再生中なら `entry.player.stop(true)` も実行）、その `segmentGeneration` を `processSegment` へ引数として渡す（※ `MIN_SEGMENT_SECONDS` 未満の短い物音でも先行セグメントの遅延再生は確実に破棄される設計トレードオフとする）。
-  - `processSegment` 内 3 箇所（冒頭 STT 前、`transcribeAudio` 完了直後の `if (!transcript)` 直前、`agentCommandFromIngress` 完了直後）で `if (this.isStaleSegment(entry, segmentGeneration)) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
+  - `processSegment` 内 3 箇所（`authorizeDiscordVoiceIngress` 完了後の STT 直前、`transcribeAudio` 完了直後の `if (!transcript)` 直前、`agentCommandFromIngress` 完了直後の `const replyText` 直前）で `if (this.isStaleSegment(entry, segmentGeneration)) return;` を検証し、早期リターンにより無駄な STT・LLM 呼び出しや TTS 合成をスキップする。
 - **TTS 音声生成（OpenRouter）**:
   - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる。
   - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（2 試行固定かつ最小 1,000ms を前提とし、総所要時間の上限は `Math.max(1_000, timeoutMs) + 1_000ms`）。
@@ -90,9 +90,9 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - **再生と破棄**:
   - 生成した MP3 は WAV と同一の `path.dirname(wavPath)` に保存する（WAV 作成時に設定済みの既存 30 分タイマーが両方を削除するため、`scheduleTempCleanup` の追加呼び出しは行わない）。
   - 音声リソースの生成には `loadDiscordVoiceSdk().createAudioResource` を使用する。
-  - 再生直前に、`this.isStaleSegment(entry, segmentGeneration)` を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する。有効時のみ `entry.player.play(resource)` で再生する。
+  - 再生直前に、`this.isStaleSegment(entry, segmentGeneration)` を同一同期ブロック内（`await` を挟まない）で判定し、無効なら再生せず破棄する（※世代不一致による破棄時はバージインのためテキストフォールバックは行わない）。有効時のみ `entry.player.play(resource)` で再生する。
 - **フェイルオープン**:
-  - TTS や音声再生が失敗した場合は、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
+  - TTS や音声再生が失敗（エラー）した場合は、チャンネルへのテキスト投稿（`this.params.client.rest.post(Routes.channelMessages(entry.channelId), ...)`）に安全にフォールバックし、通話キューを停止させない。
 
 ---
 
@@ -100,8 +100,10 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
-- `extensions/discord/src/voice/manager.ts`: `Routes` / `fetchWithSsrFGuard` の import、`mainSessionKey` ルーティング、世代管理（entry 生成箇所への `generation: 0` 追加）、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（KASOU デプロイ用の依存クロージャ）追加
+- `extensions/discord/src/voice/manager.ts`: `mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
+  - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
   - `createAudioResourceMock` を `vi.hoisted` へ引き上げ、テスト側から検証可能にする。
   - `client.rest: { post: vi.fn(async () => ({ id: "m1" })) }` モックを追加。
@@ -115,5 +117,5 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 1. `bun --check`: 型エラー 0 件。
 2. 機械判定: リポジトリルートで `bun -e 'const r=require("@discordjs/voice").generateDependencyReport(); if(r.includes("@noble/ciphers: not found")) process.exit(1)'`: 暗号化ライブラリが正常認識されること。
-3. `bun test extensions/discord`: ボイス関連テストおよび TTS 失敗時テキストフォールバックの通過。
+3. `bun test extensions/discord/src/voice/`: ボイス関連テストおよび TTS 失敗時テキストフォールバックの全通過。
 4. `bun fmt --check`: フォーマット準拠。
