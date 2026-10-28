@@ -58,7 +58,8 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
   - 返答テキスト（`channels.discord.voice.tts.maxTextLength ?? 1_500` 文字で打ち切り）を OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる。
   - 試行ループ前に `const startedAt = Date.now()` を記録し、各試行直前に `const elapsed = Date.now() - startedAt;` を計算。タイムアウトは `timeoutMs: Math.max(1_000, (channels.discord.voice.tts.timeoutMs ?? 15_000) - elapsed)` とする（2 試行固定かつ最小 1,000ms を前提とし、総所要時間の上限は `Math.max(1_000, timeoutMs) + 1_000ms`）。
   - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバックし、2試行目も失敗なら即テキストフォールバック。それ以外の 4xx エラーは即テキストフォールバック）。
-  - パラメータ: `response_format: "mp3"`, `input: replyText`（`typeof voice === "string" && voice.trim()` の場合のみ `voice` を付与）。
+  - パラメータ: `response_format: "mp3"`, `input: replyText`
+  - voice ID: `const voice = this.params.discordConfig.voice?.tts?.providers?.openrouter?.voice;` を解決し、`typeof voice === "string" && voice.trim()` の場合のみ payload に `voice` を付与する。
   - ネットワーク: `fetchWithSsrFGuard` を使用。
     ```ts
     let response: Response | undefined;
@@ -101,7 +102,9 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `extensions/discord/package.json`: `@noble/ciphers`（`^2.1.1`）追加
 - `pnpm-lock.yaml`: 依存関係のロック
 - `scripts/lib/kasou-nm-closure.json`: `@noble/ciphers`（`@noble/hashes` の直前に昇順で追加）
-- `extensions/discord/src/voice/manager.ts`: `Routes`（`discord-api-types/v10`）および `fetchWithSsrFGuard`（`openclaw/plugin-sdk/ssrf-runtime`）の import、`mainSessionKey` ルーティング、世代管理、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
+- `extensions/discord/src/voice/manager.ts`:
+  - import 追加: `Routes`（`discord-api-types/v10`）、`fetchWithSsrFGuard`（`openclaw/plugin-sdk/ssrf-runtime`）、`resolveConfiguredSecretInputWithFallback`（`openclaw/plugin-sdk/config-runtime`）
+  - `mainSessionKey` ルーティング、世代管理（entry 生成箇所への `generation: 0` 追加）、`isStaleSegment`、TTS 音声生成・再生パイプライン、テキストフォールバック
 - `extensions/discord/src/voice/manager.e2e.test.ts`:
   - 既存の `resolves.not.toThrow()` を Bun 互換の `resolves.toBeUndefined()` に修正。
   - テスト用 `wavPath` は一時ディレクトリ（`fs.mkdtemp`）配下の安全なパスを使用し `afterEach` で後始末を行う。
