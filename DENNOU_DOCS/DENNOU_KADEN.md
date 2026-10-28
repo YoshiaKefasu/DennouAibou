@@ -49,15 +49,20 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 
 ### 3.3 音声返答（Egress）とバージイン
 
-- `DiscordVoiceManager.processSegment` において、`agentCommandFromIngress`（`manager.ts:594`）の直前で `const generationAtStart = entry.generation` を捕捉する。
-- 返答テキストを OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる：
-  - モデル: `fish-audio/s2.1-pro-free:free`（429/エラー時は `fish-audio/s2.1-pro` へフォールバック）
-  - パラメータ: `response_format: "mp3"`, `input: replyText`（voice ID 指定対応）
-  - ネットワーク: `fetchWithSsrFGuard` を使用し、`finally` で確実に `release()` を呼んでリソースリークを防ぐ。タイムアウトは `timeoutMs: 15_000`。
-  - API キー: `channels.discord.voice.tts.providers.openrouter.apiKey ?? process.env.OPENROUTER_API_KEY` から解決。
-- 生成した MP3（`mkdtemp` 30分後自動クリーンアップ）の再生直前に、`entry.generation !== generationAtStart` を検証し、不一致（すでにユーザーが発話を開始している）なら破棄する。一致時のみ `createAudioResource` で再生する。
-- ユーザーの発話が始まった場合は、既存の `entry.player.stop(true)`（`manager.ts:497`）に加え、`entry.generation++` をインクリメントして遅延再生の被りを完全に防ぐ。
-- 万が一 TTS や音声再生が失敗した場合は、チャンネルへのテキスト投稿に安全にフォールバックし、通話キューを停止させない（フェイルオープン）。
+- **世代カウンタの管理**:
+  - `VoiceSessionEntry` に `generation: number` を追加する。
+  - ユーザーの発話開始時（`handleSpeakingStart` 冒頭、`botUserId` 自己フィルタ直後・無条件）に **`entry.generation++`** をインクリメントする。プレイヤーが再生中の場合は既存の `entry.player.stop(true)` も同時に実行する。
+  - `processSegment` 内で `agentCommandFromIngress`（`manager.ts:594`）を呼ぶ直前に `const generationAtStart = entry.generation` を捕捉する。
+- **TTS 音声生成（OpenRouter）**:
+  - 返答テキストを OpenRouter 音声合成 API（`https://openrouter.ai/api/v1/audio/speech`）へ投げる：
+    - モデル: `fish-audio/s2.1-pro-free:free`（429/402/5xx エラー時は `fish-audio/s2.1-pro` へフォールバック）
+    - パラメータ: `response_format: "mp3"`, `input: replyText`
+    - ネットワーク: `fetchWithSsrFGuard` を使用し、タイムアウトは `timeoutMs: 15_000`。**`await response.arrayBuffer()` でボディ受信完了後に `finally` で `release()` を確実に呼ぶ**。
+    - API キー: `channels.discord.voice.tts.providers.openrouter.apiKey ?? process.env.OPENROUTER_API_KEY` から解決。
+- **再生と破棄**:
+  - 生成した MP3（`mkdtemp` 30分後自動クリーンアップ）の再生直前に `entry.generation !== generationAtStart` を判定し、不一致（TTS 合成中にユーザーが話し始めた）なら再生せず破棄する。一致時のみ `createAudioResource` で再生する。
+- **フェイルオープン**:
+  - TTS や音声再生が失敗した場合は、チャンネルへのテキスト投稿（`sendMessageDiscord` または REST API）に安全にフォールバックし、通話キューを停止させない。
 
 ---
 
