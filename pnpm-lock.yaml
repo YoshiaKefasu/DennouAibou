@@ -277,6 +277,9 @@ importers:
       '@discordjs/voice':
         specifier: ^0.19.2
         version: 0.19.2(@discordjs/opus@0.10.0)(@emnapi/core@1.8.1)(@emnapi/runtime@1.9.1)(opusscript@0.1.1)
+      '@noble/ciphers':
+        specifier: ^2.1.1
+        version: 2.4.0
       discord-api-types:
         specifier: ^0.38.44
         version: 0.38.44
@@ -1433,6 +1436,10 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@noble/ciphers@2.4.0':
+    resolution: {integrity: sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==}
+    engines: {node: '>= 20.19.0'}
 
   '@noble/ed25519@3.0.1':
     resolution: {integrity: sha512-t/T8LuK0ym8ALQudCCQCtrRdMSxBnRgHXw+wg+YsSlE6d+on7sX3flqlSJ2mOs9xEuchM36kj9SuX5MG7pXQMA==}
@@ -6469,6 +6476,8 @@ snapshots:
       '@emnapi/runtime': 1.9.1
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@noble/ciphers@2.4.0': {}
 
   '@noble/ed25519@3.0.1': {}
 

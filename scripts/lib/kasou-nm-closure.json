@@ -72,6 +72,7 @@
   "@mozilla/readability",
   "@napi-rs/canvas",
   "@napi-rs/canvas-win32-x64-msvc",
+  "@noble/ciphers",
   "@noble/hashes",
   "@node-llama-cpp/win-arm64",
   "@node-llama-cpp/win-x64",

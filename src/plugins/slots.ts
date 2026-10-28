@@ -9,7 +9,11 @@ type SlotPluginRecord = {
   kind?: PluginKind | PluginKind[];
 };
 
-const SLOT_BY_KIND: Record<PluginKind, PluginSlotKey> = {
+/**
+ * Kind => exclusive slot key. Kinds without a slot (for example `binary`) are
+ * intentionally absent: they are generic plugins that never own a slot.
+ */
+const SLOT_BY_KIND: Partial<Record<PluginKind, PluginSlotKey>> = {
   memory: "memory",
   "context-engine": "contextEngine",
 };
@@ -116,7 +120,7 @@ export function applyExclusiveSlotSelection(params: {
         // Don't disable a plugin that still owns another slot (explicit or default).
         const stillOwnsOtherSlot = (Object.keys(SLOT_BY_KIND) as PluginKind[])
           .map((k) => SLOT_BY_KIND[k])
-          .filter((sk) => sk !== slotKey)
+          .filter((sk): sk is PluginSlotKey => sk != null && sk !== slotKey)
           .some((sk) => (slots[sk] ?? defaultSlotIdForKey(sk)) === plugin.id);
         if (stillOwnsOtherSlot) {
           continue;

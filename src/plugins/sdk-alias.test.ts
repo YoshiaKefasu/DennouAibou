@@ -34,6 +34,32 @@ const fixtureTempDirs: string[] = [];
 const fixtureRoot = makeTrackedTempDir("openclaw-sdk-alias-root", fixtureTempDirs);
 let tempDirIndex = 0;
 
+function withProcessVersions<T>(value: Record<string, unknown>, run: () => T): T {
+  const original = process.versions;
+  Object.defineProperty(process, "versions", { configurable: true, value });
+  try {
+    return run();
+  } finally {
+    Object.defineProperty(process, "versions", { configurable: true, value: original });
+  }
+}
+
+/** Simulates a plain Node runtime even when the suite itself runs under Bun. */
+function withoutBunVersions(): Record<string, unknown> {
+  const { bun: _bun, ...rest } = process.versions as Record<string, unknown> & { bun?: string };
+  return rest;
+}
+
+function withPlatform<T>(value: NodeJS.Platform, run: () => T): T {
+  const original = process.platform;
+  Object.defineProperty(process, "platform", { configurable: true, value });
+  try {
+    return run();
+  } finally {
+    Object.defineProperty(process, "platform", { configurable: true, value: original });
+  }
+}
+
 function makeTempDir() {
   const dir = path.join(fixtureRoot, `case-${tempDirIndex++}`);
   mkdirSafeDir(dir);
@@ -633,53 +659,37 @@ describe("plugin sdk alias helpers", () => {
   });
 
   it("uses transpiled Jiti loads for source TypeScript plugin entries", () => {
-    expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(true);
-    expect(
-      shouldPreferNativeJiti(`/repo/${bundledPluginFile("discord", "src/channel.runtime.ts")}`),
-    ).toBe(false);
+    withPlatform("linux", () =>
+      withProcessVersions(withoutBunVersions(), () => {
+        expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(true);
+        expect(
+          shouldPreferNativeJiti(`/repo/${bundledPluginFile("discord", "src/channel.runtime.ts")}`),
+        ).toBe(false);
+      }),
+    );
   });
 
-  it("disables native Jiti loads under Bun even for built JavaScript entries", () => {
-    const originalVersions = process.versions;
-    Object.defineProperty(process, "versions", {
-      configurable: true,
-      value: {
-        ...originalVersions,
-        bun: "1.2.0",
-      },
-    });
-
-    try {
-      expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(false);
+  it("prefers native execution under Bun for both built and source entries", () => {
+    withProcessVersions({ ...process.versions, bun: "1.2.0" }, () => {
+      expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(true);
       expect(shouldPreferNativeJiti(`/repo/${bundledDistPluginFile("browser", "index.js")}`)).toBe(
-        false,
+        true,
       );
-    } finally {
-      Object.defineProperty(process, "versions", {
-        configurable: true,
-        value: originalVersions,
-      });
-    }
+      expect(
+        shouldPreferNativeJiti(`/repo/${bundledPluginFile("discord", "src/channel.runtime.ts")}`),
+      ).toBe(true);
+    });
   });
 
   it("disables native Jiti loads on Windows even for built JavaScript entries", () => {
-    const originalPlatform = process.platform;
-    Object.defineProperty(process, "platform", {
-      configurable: true,
-      value: "win32",
-    });
-
-    try {
-      expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(false);
-      expect(shouldPreferNativeJiti(`/repo/${bundledDistPluginFile("browser", "index.js")}`)).toBe(
-        false,
-      );
-    } finally {
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: originalPlatform,
-      });
-    }
+    withPlatform("win32", () =>
+      withProcessVersions(withoutBunVersions(), () => {
+        expect(shouldPreferNativeJiti("/repo/dist/plugins/runtime/index.js")).toBe(false);
+        expect(
+          shouldPreferNativeJiti(`/repo/${bundledDistPluginFile("browser", "index.js")}`),
+        ).toBe(false);
+      }),
+    );
   });
 
   it("normalizes Windows alias targets before handing them to Jiti", () => {

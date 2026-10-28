@@ -450,7 +450,10 @@ export function buildPluginLoaderJitiOptions(aliasMap: Record<string, string>) {
 export function shouldPreferNativeJiti(modulePath: string): boolean {
   const versions = process.versions as { bun?: string };
   if (typeof versions.bun === "string") {
-    return false;
+    // Bun runs TypeScript/JSX/JS natively with zero transpilation, so routing
+    // plugin entries through Jiti's transform pipeline only adds startup and
+    // memory overhead. Prefer native execution for every entry extension.
+    return true;
   }
   if (process.platform === "win32") {
     return false;

@@ -5,10 +5,12 @@ import {
   copyBundledPluginMetadata,
   rewritePackageExtensions,
 } from "../../scripts/copy-bundled-plugin-metadata.mjs";
+import { OPTIONAL_BUNDLED_BUILD_ENV } from "../../scripts/lib/optional-bundled-clusters.mjs";
 import { cleanupTempDirs, makeTempRepoRoot, writeJsonFile } from "../../test/helpers/temp-repo.js";
 
 const tempDirs: string[] = [];
-const excludeOptionalEnv = { DENNOU_INCLUDE_OPTIONAL_BUNDLED: "0" } as const;
+// Use the build-script-owned env name so a rename cannot silently stop opting out.
+const excludeOptionalEnv: NodeJS.ProcessEnv = { [OPTIONAL_BUNDLED_BUILD_ENV]: "0" };
 const copyBundledPluginMetadataWithEnv = copyBundledPluginMetadata as (params?: {
   repoRoot?: string;
   env?: NodeJS.ProcessEnv;
@@ -124,6 +126,35 @@ describe("copyBundledPluginMetadata", () => {
     expectBundledSkills(repoRoot, "acpx", ["./skills"]);
     const packageJson = readBundledPackageJson(repoRoot, "acpx");
     expect(packageJson.openclaw?.extensions).toEqual(["./index.js"]);
+  });
+
+  it("keeps the dennou.plugin.json manifest name and drops stale legacy manifests", () => {
+    const repoRoot = makeRepoRoot("openclaw-bundled-plugin-dennou-manifest-");
+    const pluginDir = path.join(repoRoot, "extensions", "dennou-demo");
+    fs.mkdirSync(pluginDir, { recursive: true });
+    writeJson(path.join(pluginDir, "dennou.plugin.json"), {
+      id: "dennou-demo",
+      configSchema: { type: "object" },
+    });
+    writeJson(path.join(pluginDir, "package.json"), {
+      name: "@openclaw/dennou-demo",
+      openclaw: { extensions: ["./index.ts"] },
+    });
+    // Stale output from an earlier openclaw.plugin.json-based build.
+    fs.mkdirSync(bundledPluginDir(repoRoot, "dennou-demo"), { recursive: true });
+    writeJson(path.join(bundledPluginDir(repoRoot, "dennou-demo"), "openclaw.plugin.json"), {
+      id: "stale",
+      configSchema: { type: "object" },
+    });
+
+    copyBundledPluginMetadata({ repoRoot });
+
+    expect(
+      fs.existsSync(path.join(bundledPluginDir(repoRoot, "dennou-demo"), "dennou.plugin.json")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(bundledPluginDir(repoRoot, "dennou-demo"), "openclaw.plugin.json")),
+    ).toBe(false);
   });
 
   it("relocates node_modules-backed skill paths into bundled-skills and rewrites the manifest", () => {

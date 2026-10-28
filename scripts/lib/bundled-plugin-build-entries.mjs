@@ -6,6 +6,7 @@ import {
   bundledPluginFile,
 } from "./bundled-plugin-paths.mjs";
 import { shouldBuildBundledCluster } from "./optional-bundled-clusters.mjs";
+import { resolvePluginManifestFilename } from "./plugin-manifest-filenames.mjs";
 
 const TOP_LEVEL_PUBLIC_SURFACE_EXTENSIONS = new Set([".ts", ".js", ".mts", ".cts", ".mjs", ".cjs"]);
 const toPosixPath = (value) => value.replaceAll("\\", "/");
@@ -96,8 +97,8 @@ export function collectBundledPluginBuildEntries(params = {}) {
     }
 
     const pluginDir = path.join(extensionsRoot, dirent.name);
-    const manifestPath = path.join(pluginDir, "openclaw.plugin.json");
-    const hasManifest = fs.existsSync(manifestPath);
+    const manifestFilename = resolvePluginManifestFilename(pluginDir);
+    const hasManifest = manifestFilename !== null;
     const packageJsonPath = path.join(pluginDir, "package.json");
     const packageJson = readBundledPluginPackageJson(packageJsonPath);
     const topLevelPublicSurfaceEntries = collectTopLevelPublicSurfaceEntries(pluginDir);
@@ -118,6 +119,7 @@ export function collectBundledPluginBuildEntries(params = {}) {
     entries.push({
       id: dirent.name,
       hasManifest,
+      manifestFilename,
       hasPackageJson: packageJson !== null,
       packageJson,
       sourceEntries: Array.from(
@@ -148,9 +150,9 @@ export function listBundledPluginPackArtifacts(params = {}) {
   const entries = collectBundledPluginBuildEntries(params);
   const artifacts = new Set();
 
-  for (const { id, hasManifest, hasPackageJson, sourceEntries } of entries) {
+  for (const { id, hasManifest, manifestFilename, hasPackageJson, sourceEntries } of entries) {
     if (hasManifest) {
-      artifacts.add(bundledDistPluginFile(id, "openclaw.plugin.json"));
+      artifacts.add(bundledDistPluginFile(id, manifestFilename));
     }
     if (hasPackageJson) {
       artifacts.add(bundledDistPluginFile(id, "package.json"));

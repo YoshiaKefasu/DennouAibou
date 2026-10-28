@@ -314,6 +314,26 @@ describe("slotKeysForPluginKind", () => {
       "contextEngine",
     ]);
   });
+
+  it("returns no slot key for the generic binary kind", () => {
+    expect(slotKeysForPluginKind("binary")).toEqual([]);
+    expect(slotKeysForPluginKind(["binary", "memory"])).toEqual(["memory"]);
+  });
+});
+
+describe("applyExclusiveSlotSelection with generic kinds", () => {
+  it("does not touch slots when the selected plugin has no slot kind", () => {
+    const config: OpenClawConfig = { plugins: { slots: { memory: "memory-core" } } };
+    const result = applyExclusiveSlotSelection({
+      config,
+      selectedId: "demo-binary",
+      selectedKind: "binary",
+      registry: { plugins: [{ id: "memory-core", kind: "memory" }] },
+    });
+    expect(result.changed).toBe(false);
+    expect(result.config).toBe(config);
+    expect(result.warnings).toEqual([]);
+  });
 });
 
 describe("kindsEqual", () => {

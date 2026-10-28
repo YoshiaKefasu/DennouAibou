@@ -82,6 +82,8 @@ export type PluginManifestRecord = {
   configUiHints?: Record<string, PluginConfigUiHint>;
   contracts?: PluginManifestContracts;
   channelConfigs?: Record<string, PluginManifestChannelConfig>;
+  executable?: string;
+  tools?: PluginManifest["tools"];
   channelCatalogMeta?: {
     id: string;
     label?: string;
@@ -301,6 +303,8 @@ function buildRecord(params: {
     configUiHints: params.manifest.uiHints,
     contracts: params.manifest.contracts,
     channelConfigs,
+    executable: params.manifest.executable,
+    tools: params.manifest.tools,
     ...(params.candidate.packageManifest?.channel?.id
       ? {
           channelCatalogMeta: {

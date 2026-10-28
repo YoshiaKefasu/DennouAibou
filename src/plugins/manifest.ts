@@ -7,8 +7,17 @@ import { matchBoundaryFileOpenFailure, openBoundaryFileSync } from "../infra/bou
 import { isRecord } from "../utils.js";
 import type { PluginConfigUiHint, PluginKind } from "./types.js";
 
-export const PLUGIN_MANIFEST_FILENAME = "openclaw.plugin.json";
-export const PLUGIN_MANIFEST_FILENAMES = [PLUGIN_MANIFEST_FILENAME] as const;
+/**
+ * Canonical DennouAibou plugin manifest filename. Probed first.
+ */
+export const PLUGIN_MANIFEST_FILENAME = "dennou.plugin.json";
+/**
+ * Accepted plugin manifest filenames in probe order.
+ *
+ * `dennou.plugin.json` is the DennouAibou-native name; `openclaw.plugin.json`
+ * stays supported so existing plugins keep loading unchanged.
+ */
+export const PLUGIN_MANIFEST_FILENAMES = ["dennou.plugin.json", "openclaw.plugin.json"] as const;
 
 export type PluginManifestChannelConfig = {
   schema: Record<string, unknown>;
@@ -66,6 +75,23 @@ export type PluginManifest = {
    */
   contracts?: PluginManifestContracts;
   channelConfigs?: Record<string, PluginManifestChannelConfig>;
+  /**
+   * Relative path (from the plugin root) of the executable for
+   * `kind: "binary"` plugins. The host spawns it and talks stdio JSON-RPC.
+   */
+  executable?: string;
+  /**
+   * Tools exposed by a `kind: "binary"` plugin. The host registers these
+   * declaratively at `register()` time and forwards calls to the binary.
+   */
+  tools?: PluginManifestToolDefinition[];
+};
+
+export type PluginManifestToolDefinition = {
+  name: string;
+  description?: string;
+  /** JSON Schema object describing the tool parameters. */
+  parameters?: Record<string, unknown>;
 };
 
 export type PluginManifestContracts = {
@@ -241,6 +267,32 @@ function normalizeProviderAuthChoices(
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeManifestToolDefinitions(
+  value: unknown,
+): PluginManifestToolDefinition[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const normalized: PluginManifestToolDefinition[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (!name) {
+      continue;
+    }
+    const description = typeof entry.description === "string" ? entry.description.trim() : "";
+    const parameters = isRecord(entry.parameters) ? entry.parameters : undefined;
+    normalized.push({
+      name,
+      ...(description ? { description } : {}),
+      ...(parameters ? { parameters } : {}),
+    });
+  }
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeChannelConfigs(
   value: unknown,
 ): Record<string, PluginManifestChannelConfig> | undefined {
@@ -365,6 +417,8 @@ export function loadPluginManifest(
   const skills = normalizeStringList(raw.skills);
   const contracts = normalizeManifestContracts(raw.contracts);
   const channelConfigs = normalizeChannelConfigs(raw.channelConfigs);
+  const executable = typeof raw.executable === "string" ? raw.executable.trim() : undefined;
+  const tools = normalizeManifestToolDefinitions(raw.tools);
 
   let uiHints: Record<string, PluginConfigUiHint> | undefined;
   if (isRecord(raw.uiHints)) {
@@ -394,6 +448,8 @@ export function loadPluginManifest(
       uiHints,
       contracts,
       channelConfigs,
+      ...(executable ? { executable } : {}),
+      ...(tools ? { tools } : {}),
     },
     manifestPath,
   };

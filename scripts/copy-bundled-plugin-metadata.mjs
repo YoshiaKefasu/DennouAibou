@@ -3,6 +3,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { shouldBuildBundledCluster } from "./lib/optional-bundled-clusters.mjs";
 import {
+  PLUGIN_MANIFEST_FILENAMES,
+  resolvePluginManifestFilename,
+} from "./lib/plugin-manifest-filenames.mjs";
+import {
   removeFileIfExists,
   removePathIfExists,
   writeTextFileIfChanged,
@@ -227,7 +231,8 @@ export function copyBundledPluginMetadata(params = {}) {
     }
 
     const pluginDir = path.join(extensionsRoot, dirent.name);
-    const manifestPath = path.join(pluginDir, "openclaw.plugin.json");
+    const manifestFilename = resolvePluginManifestFilename(pluginDir);
+    const manifestPath = path.join(pluginDir, manifestFilename ?? PLUGIN_MANIFEST_FILENAMES[0]);
     const distPluginDir = path.join(distExtensionsRoot, dirent.name);
     const packageJsonPath = path.join(pluginDir, "package.json");
     const packageJson = fs.existsSync(packageJsonPath)
@@ -249,7 +254,10 @@ export function copyBundledPluginMetadata(params = {}) {
 
     sourcePluginDirs.add(dirent.name);
 
-    const distManifestPath = path.join(distPluginDir, "openclaw.plugin.json");
+    const distManifestPath = path.join(
+      distPluginDir,
+      manifestFilename ?? PLUGIN_MANIFEST_FILENAMES[0],
+    );
     const distPackageJsonPath = path.join(distPluginDir, "package.json");
     if (!fs.existsSync(manifestPath) && !isManifestlessSupportPackage) {
       removePathIfExists(distPluginDir);
@@ -271,9 +279,18 @@ export function copyBundledPluginMetadata(params = {}) {
       const bundledManifest = Array.isArray(manifest.skills)
         ? { ...manifest, skills: copiedSkills }
         : manifest;
+      // Drop the other accepted manifest names so a renamed manifest cannot leave
+      // two manifests (and two ids) in the same dist plugin root.
+      for (const filename of PLUGIN_MANIFEST_FILENAMES) {
+        if (filename !== manifestFilename) {
+          removeFileIfExists(path.join(distPluginDir, filename));
+        }
+      }
       writeTextFileIfChanged(distManifestPath, `${JSON.stringify(bundledManifest, null, 2)}\n`);
     } else {
-      removeFileIfExists(distManifestPath);
+      for (const filename of PLUGIN_MANIFEST_FILENAMES) {
+        removeFileIfExists(path.join(distPluginDir, filename));
+      }
     }
 
     if (!fs.existsSync(packageJsonPath)) {

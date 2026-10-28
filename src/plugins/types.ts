@@ -63,7 +63,7 @@ export type PluginConfigUiHint = {
   placeholder?: string;
 };
 
-export type PluginKind = "memory" | "context-engine";
+export type PluginKind = "memory" | "context-engine" | "binary";
 
 export type PluginConfigValidation =
   | { ok: true; value?: unknown }

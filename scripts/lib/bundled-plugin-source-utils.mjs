@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { resolvePluginManifestFilename } from "./plugin-manifest-filenames.mjs";
 
 export function readIfExists(filePath) {
   try {
@@ -24,11 +25,12 @@ export function collectBundledPluginSources(params = {}) {
     }
 
     const pluginDir = path.join(extensionsRoot, dirent.name);
-    const manifestPath = path.join(pluginDir, "openclaw.plugin.json");
-    const packageJsonPath = path.join(pluginDir, "package.json");
-    if (!fs.existsSync(manifestPath)) {
+    const manifestFilename = resolvePluginManifestFilename(pluginDir);
+    if (!manifestFilename) {
       continue;
     }
+    const manifestPath = path.join(pluginDir, manifestFilename);
+    const packageJsonPath = path.join(pluginDir, "package.json");
     if (requirePackageJson && !fs.existsSync(packageJsonPath)) {
       continue;
     }
@@ -36,6 +38,7 @@ export function collectBundledPluginSources(params = {}) {
     entries.push({
       dirName: dirent.name,
       pluginDir,
+      manifestFilename,
       manifestPath,
       manifest: JSON.parse(fs.readFileSync(manifestPath, "utf8")),
       ...(fs.existsSync(packageJsonPath)

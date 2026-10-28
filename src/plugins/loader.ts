@@ -11,6 +11,7 @@ import { openBoundaryFileSync } from "../infra/boundary-file-read.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveUserPath } from "../utils.js";
 import { buildPluginApi } from "./api-builder.js";
+import { createBinaryPluginDefinition } from "./binary-runner.js";
 import { inspectBundleMcpRuntimeSupport } from "./bundle-mcp.js";
 import { clearPluginCommands } from "./command-registry-state.js";
 import {
@@ -1416,45 +1417,65 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     }
 
     const pluginRoot = safeRealpathOrResolve(candidate.rootDir);
-    const loadSource =
-      (registrationMode === "setup-only" || registrationMode === "setup-runtime") &&
-      manifestRecord.setupSource
-        ? manifestRecord.setupSource
-        : candidate.source;
-    const opened = openBoundaryFileSync({
-      absolutePath: loadSource,
-      rootPath: pluginRoot,
-      boundaryLabel: "plugin root",
-      rejectHardlinks: candidate.origin !== "bundled",
-      skipLexicalRootCheck: true,
-    });
-    if (!opened.ok) {
-      pushPluginLoadError("plugin entry path escapes plugin root or fails alias checks");
-      continue;
-    }
-    const safeSource = opened.path;
-    fs.closeSync(opened.fd);
-
     let mod: OpenClawPluginModule | null = null;
-    try {
-      // Track the plugin as imported once module evaluation begins. Top-level
-      // code may have already executed even if evaluation later throws.
-      recordImportedPluginId(record.id);
-      mod = getJiti(safeSource)(safeSource) as OpenClawPluginModule;
-    } catch (err) {
-      recordPluginError({
+    if (hasKind(manifestRecord.kind, "binary")) {
+      // Binary plugins ship an executable, not a TypeScript entry: build the
+      // definition from the manifest and bridge tool calls over stdio JSON-RPC.
+      const binaryDefinition = createBinaryPluginDefinition({
+        pluginId: record.id,
+        name: record.name,
+        rootDir: pluginRoot,
+        executable: manifestRecord.executable,
+        tools: manifestRecord.tools,
         logger,
-        registry,
-        record,
-        seenIds,
-        pluginId,
-        origin: candidate.origin,
-        phase: "load",
-        error: err,
-        logPrefix: `[plugins] ${record.id} failed to load from ${record.source}: `,
-        diagnosticMessagePrefix: "failed to load plugin: ",
+        env,
       });
-      continue;
+      if (!binaryDefinition.ok) {
+        pushPluginLoadError(binaryDefinition.error);
+        continue;
+      }
+      recordImportedPluginId(record.id);
+      mod = binaryDefinition.definition;
+    } else {
+      const loadSource =
+        (registrationMode === "setup-only" || registrationMode === "setup-runtime") &&
+        manifestRecord.setupSource
+          ? manifestRecord.setupSource
+          : candidate.source;
+      const opened = openBoundaryFileSync({
+        absolutePath: loadSource,
+        rootPath: pluginRoot,
+        boundaryLabel: "plugin root",
+        rejectHardlinks: candidate.origin !== "bundled",
+        skipLexicalRootCheck: true,
+      });
+      if (!opened.ok) {
+        pushPluginLoadError("plugin entry path escapes plugin root or fails alias checks");
+        continue;
+      }
+      const safeSource = opened.path;
+      fs.closeSync(opened.fd);
+
+      try {
+        // Track the plugin as imported once module evaluation begins. Top-level
+        // code may have already executed even if evaluation later throws.
+        recordImportedPluginId(record.id);
+        mod = getJiti(safeSource)(safeSource) as OpenClawPluginModule;
+      } catch (err) {
+        recordPluginError({
+          logger,
+          registry,
+          record,
+          seenIds,
+          pluginId,
+          origin: candidate.origin,
+          phase: "load",
+          error: err,
+          logPrefix: `[plugins] ${record.id} failed to load from ${record.source}: `,
+          diagnosticMessagePrefix: "failed to load plugin: ",
+        });
+        continue;
+      }
     }
 
     if (
