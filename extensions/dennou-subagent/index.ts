@@ -29,6 +29,10 @@ import {
   DEFAULT_SUBAGENT_TIMEOUT_MS,
   MAX_LOG_LINES,
   MAX_RETAINED_RUNS,
+  isCallSessionKey,
+  MAX_CONCURRENT_SUBAGENTS_CALL,
+  MAX_CONCURRENT_SUBAGENTS_DEFAULT,
+  CALL_SESSION_KEY_PREFIX,
 } from "./src/runner.js";
 import {
   createGetSubagentResultTool,
@@ -41,6 +45,7 @@ import {
 export {
   AGENTS_SUBDIR,
   BUILTIN_AGENT_DEFINITIONS,
+  CALL_SESSION_KEY_PREFIX,
   createEmbeddedSubagentRunner,
   createGetSubagentResultTool,
   createSubagentManager,
@@ -50,7 +55,10 @@ export {
   formatSubagentCompletionText,
   formatSubagentResult,
   GetSubagentResultToolSchema,
+  isCallSessionKey,
   loadAgentDefinitions,
+  MAX_CONCURRENT_SUBAGENTS_CALL,
+  MAX_CONCURRENT_SUBAGENTS_DEFAULT,
   MAX_LOG_LINES,
   MAX_RETAINED_RUNS,
   parseAgentDefinition,

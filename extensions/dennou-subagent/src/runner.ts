@@ -3,6 +3,8 @@
  *
  * `subagent` ツールから渡されたタスクを非同期で起動し、`agent_id` を即座に返す。
  * 進捗（最新ログ）と最終結果は `get_subagent_result` から取得する。
+ * 並列度の安全弁として、通常セッションは最大 7 体、
+ * 通話セッション（`call:` 接頭辞）は最大 1 体までに制限する。
  * 実際のモデルセッション実行は `runAgent` 依存として注入する
  * （本番実装は `./agent-run.ts`、テストはフェイク）。
  */
@@ -128,6 +130,12 @@ export const DEFAULT_SUBAGENT_TIMEOUT_MS = 10 * 60_000;
 export const MAX_LOG_LINES = 20;
 /** 保持する実行履歴の上限（超過分は古い完了済み実行から破棄）。 */
 export const MAX_RETAINED_RUNS = 50;
+/** 通常セッション（メインセッション等）で同時に走らせられるサブエージェント数。 */
+export const MAX_CONCURRENT_SUBAGENTS_DEFAULT = 7;
+/** 通話セッション（`call:` 接頭辞）で同時に走らせられるサブエージェント数。 */
+export const MAX_CONCURRENT_SUBAGENTS_CALL = 1;
+/** 通話（電脳架電）セッションを見分けるセッションキー接頭辞。 */
+export const CALL_SESSION_KEY_PREFIX = "call:";
 
 type InternalRun = {
   run: SubagentRun;
@@ -149,6 +157,11 @@ function describeError(error: unknown): string {
 
 function snapshot(run: SubagentRun): SubagentRun {
   return { ...run, log: [...run.log] };
+}
+
+/** 通話（電脳架電）セッションかどうか。 */
+export function isCallSessionKey(sessionKey?: string): boolean {
+  return typeof sessionKey === "string" && sessionKey.trim().startsWith(CALL_SESSION_KEY_PREFIX);
 }
 
 export function createSubagentManager(options: SubagentManagerOptions): SubagentManager {
@@ -266,7 +279,37 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     }
   };
 
+  /** 現在実行中（`running`）のサブエージェント数。 */
+  const countRunningRuns = (): number => {
+    let running = 0;
+    for (const internal of runs.values()) {
+      if (internal.run.status === "running") {
+        running += 1;
+      }
+    }
+    return running;
+  };
+
+  /** 並列度の安全弁。通話セッションは1体、通常セッションは7体まで。 */
+  const assertConcurrencyAvailable = (sessionKey?: string): void => {
+    const running = countRunningRuns();
+    if (isCallSessionKey(sessionKey)) {
+      if (running >= MAX_CONCURRENT_SUBAGENTS_CALL) {
+        throw new Error(
+          "通話セッションでは並列サブエージェントは1体までです。実行中のサブエージェントが完了するのをお待ちください。",
+        );
+      }
+      return;
+    }
+    if (running >= MAX_CONCURRENT_SUBAGENTS_DEFAULT) {
+      throw new Error(
+        `同時実行可能なサブエージェントの上限（${MAX_CONCURRENT_SUBAGENTS_DEFAULT}体）に達しています。いずれかの完了をお待ちください。`,
+      );
+    }
+  };
+
   const start = (params: SubagentStartParams): SubagentStartResult => {
+    assertConcurrencyAvailable(params.context.sessionKey);
     const agentName = (params.agent ?? "").trim().toLowerCase();
     if (!agentName) {
       throw new Error("サブエージェント名 'agent' は必須です。");

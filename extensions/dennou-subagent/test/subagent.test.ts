@@ -22,6 +22,7 @@ import {
 import { createSystemEventNotifier, formatSubagentCompletionText } from "../src/notify.js";
 import {
   createSubagentManager,
+  MAX_CONCURRENT_SUBAGENTS_DEFAULT,
   type SubagentNotifyParams,
   type SubagentRunFn,
   type SubagentRunOutcome,
@@ -350,6 +351,97 @@ describe("subagent lifecycle", () => {
   });
 });
 
+function createHangingRunner(): {
+  runAgent: SubagentRunFn;
+  deferreds: Deferred<SubagentRunOutcome>[];
+} {
+  const deferreds: Deferred<SubagentRunOutcome>[] = [];
+  const runAgent: SubagentRunFn = async () => {
+    const deferred = createDeferred<SubagentRunOutcome>();
+    deferreds.push(deferred);
+    return await deferred.promise;
+  };
+  return { runAgent, deferreds };
+}
+
+describe("concurrency guard", () => {
+  it("allows up to 7 concurrent subagents in a normal session and rejects the 8th", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent });
+    const tool = createSubagentTool({
+      manager,
+      context: { workspaceDir, sessionKey: "agent:main:main" },
+    });
+
+    for (let index = 0; index < MAX_CONCURRENT_SUBAGENTS_DEFAULT; index += 1) {
+      const started = await callTool(tool, { agent: "executor", task: `task-${index}` });
+      expect(toolDetails<SubagentStartResult>(started).status).toBe("running");
+    }
+    expect(manager.list()).toHaveLength(MAX_CONCURRENT_SUBAGENTS_DEFAULT);
+
+    await expect(callTool(tool, { agent: "executor", task: "8体目" })).rejects.toThrow(
+      /同時実行可能なサブエージェントの上限（7体）に達しています/,
+    );
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("limits call sessions to a single concurrent subagent", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent });
+    const tool = createSubagentTool({
+      manager,
+      context: { workspaceDir, sessionKey: "call:123456" },
+    });
+
+    const started = await callTool(tool, { agent: "executor", task: "通話中の作業" });
+    expect(toolDetails<SubagentStartResult>(started).status).toBe("running");
+
+    await expect(callTool(tool, { agent: "executor", task: "2体目" })).rejects.toThrow(
+      /通話セッションでは並列サブエージェントは1体までです/,
+    );
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("frees the slot when a running subagent completes", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent });
+    const tool = createSubagentTool({
+      manager,
+      context: { workspaceDir, sessionKey: "agent:main:main" },
+    });
+
+    for (let index = 0; index < MAX_CONCURRENT_SUBAGENTS_DEFAULT; index += 1) {
+      await callTool(tool, { agent: "executor", task: `task-${index}` });
+    }
+    await expect(callTool(tool, { agent: "executor", task: "満杯" })).rejects.toThrow(/上限/);
+
+    deferreds[0]?.resolve({ output: "1体目完了" });
+    await flushAsync();
+
+    const started = await callTool(tool, { agent: "executor", task: "空いた枠" });
+    expect(toolDetails<SubagentStartResult>(started).status).toBe("running");
+
+    // 枠が埋まり直したので、さらに1体は拒否される。
+    await expect(callTool(tool, { agent: "executor", task: "さらに" })).rejects.toThrow(/上限/);
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+});
+
 describe("subagent error handling", () => {
   it("rejects an unknown agent and lists the available ones", async () => {
     const workspaceDir = makeWorkspace({});
@@ -622,6 +714,29 @@ describe("agent-run: embedded run wiring", () => {
 
     expect(calls[0]?.toolsAllow).toBeUndefined();
     expect(calls[0]?.extraSystemPrompt).toBeUndefined();
+  });
+
+  it("filters out 'memo' tool from toolsAllow for subagents", async () => {
+    const { request } = makeRunRequest({
+      definition: {
+        name: "custom",
+        description: "",
+        tools: ["bash", "memo", "read"],
+        systemPrompt: "",
+        source: "workspace",
+      },
+    });
+    const calls: RunEmbeddedPiAgentParams[] = [];
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async (params) => {
+        calls.push(params);
+        return { payloads: [{ text: "ok" }], meta: { durationMs: 1 } };
+      },
+    });
+
+    await runner(request);
+
+    expect(calls[0]?.toolsAllow).toEqual(["bash", "read"]);
   });
 
   it("maps a run error into a failed outcome", async () => {

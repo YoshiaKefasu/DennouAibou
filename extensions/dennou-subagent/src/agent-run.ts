@@ -76,9 +76,10 @@ export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = 
         provider,
         model,
         extraSystemPrompt: request.definition.systemPrompt || undefined,
+        // サブエージェントにはメモツール（memo）は不要（同期させない）
         toolsAllow:
           request.definition.tools && request.definition.tools.length > 0
-            ? request.definition.tools
+            ? request.definition.tools.filter((name) => name !== "memo")
             : undefined,
         timeoutMs: request.timeoutMs,
         runId: request.runId,

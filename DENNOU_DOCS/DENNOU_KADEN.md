@@ -90,6 +90,10 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 - `DiscordVoiceManager.processSegment` における `agentCommandFromIngress` の呼び出し時、`sessionKey` に `entry.route.mainSessionKey ?? entry.route.sessionKey` を指定し、最初から Kasou のマスターセッション（`agent:main:main`）へ直接ルーティングする（プロジェクト規則 #2032 準拠）。
   - ※ `entry.route.mainSessionKey` は本番では常に存在するが、テストダブル互換（フィクスチャは unknown キャストで型を外すため）のためにフォールバックを残す。
 - これにより、ボイスチャンネルテキストとのセッション共有は放棄しつつ、Telegram DM や Discord DM のテキストと完全に連続した文脈を保つ。JSONL の事後合体や親リンク破損リスクを構造的に排除する。
+- **能動記憶（memo）と過去ログ検索（chat_search）の同期**:
+  - メインセッションに蓄積されている `<active-memos>`（能動記憶）は、通話セッション（`entry.route.mainSessionKey`）にも完全に自動同期・注入される（Kasou は通話中でも約束や大事なメモを把握できる）。
+  - 通話中のド忘れを防ぐため、過去ログ検索ツール（`chat_search`）は通話セッションでも利用可能とする。
+  - サブエージェント側は独立した作業セッションとなるため `memo` は同期せず、勝手な書き換えを防ぐため `memo` ツールも除外される。
 - テストフィクスチャ（`manager.e2e.test.ts`）にも `mainSessionKey` を反映する。
 
 ### 3.3 音声返答（Egress）とバージイン
