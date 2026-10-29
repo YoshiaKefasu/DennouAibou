@@ -2,7 +2,7 @@
  * 電脳サブエージェント — エージェントツール (DENNOU_SUBAGENT.md §4).
  *
  * - `subagent(agent, task)`: 非同期で起動し、即座に `agent_id` を返す。
- * - `get_subagent_result(agent_id, wait?)`: 状態・最新ログ・最終結果を返す。
+ * - `get_subagent_result(agent_id)`: 待機せず現在の状態・最新ログ・最終結果を即座に返す。
  */
 
 import { Type } from "typebox";
@@ -43,11 +43,6 @@ export const GetSubagentResultToolSchema = Type.Object({
   agent_id: Type.String({
     description: "subagent ツールが返したサブエージェントID（例: 'sub-1730000000000-a1b2c3'）。",
   }),
-  wait: Type.Optional(
-    Type.Boolean({
-      description: "true なら完了まで待機する（既定: false、待機上限は120秒）。",
-    }),
-  ),
 });
 
 function resolveWorkspaceDir(context: SubagentToolContext): string {
@@ -75,17 +70,6 @@ function resolveAgentDirFor(context: SubagentToolContext): string | undefined {
     return undefined;
   }
   return resolveAgentDir(config, context.agentId?.trim() || resolveDefaultAgentId(config));
-}
-
-function readWaitFlag(params: Record<string, unknown>): boolean {
-  const raw = params.wait;
-  if (typeof raw === "boolean") {
-    return raw;
-  }
-  if (typeof raw === "string") {
-    return raw.trim().toLowerCase() === "true";
-  }
-  return false;
 }
 
 /** `get_subagent_result` のテキスト表現。 */
@@ -151,7 +135,7 @@ export function createGetSubagentResultTool(options: { manager: SubagentManager 
     label: "Get Subagent Result",
     name: "get_subagent_result",
     description:
-      "実行中または完了したサブエージェントの状態・最新ログ・最終結果を取得する。wait=true で完了まで待機できる。",
+      "実行中または完了したサブエージェントの状態・最新ログ・最終結果を待機せず即座に返す。",
     parameters: GetSubagentResultToolSchema,
     execute: async (_toolCallId, args) => {
       const params = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
@@ -159,7 +143,7 @@ export function createGetSubagentResultTool(options: { manager: SubagentManager 
       if (!agentId) {
         throw new Error("'agent_id' は必須です。");
       }
-      const result = await options.manager.get(agentId, { wait: readWaitFlag(params) });
+      const result = await options.manager.get(agentId);
       return textResult(formatSubagentResult(result), result);
     },
   };

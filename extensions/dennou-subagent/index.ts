@@ -13,7 +13,7 @@
  */
 
 import { definePluginEntry } from "../../src/plugin-sdk/plugin-entry.js";
-import { createEmbeddedSubagentRunner } from "./src/agent-run.js";
+import { createEmbeddedSubagentRunner, resolveSubagentModel } from "./src/agent-run.js";
 import {
   AGENTS_SUBDIR,
   BUILTIN_AGENT_DEFINITIONS,
@@ -27,7 +27,6 @@ import { createSystemEventNotifier, formatSubagentCompletionText } from "./src/n
 import {
   createSubagentManager,
   DEFAULT_SUBAGENT_TIMEOUT_MS,
-  DEFAULT_WAIT_TIMEOUT_MS,
   MAX_LOG_LINES,
   MAX_RETAINED_RUNS,
 } from "./src/runner.js";
@@ -48,7 +47,6 @@ export {
   createSubagentTool,
   createSystemEventNotifier,
   DEFAULT_SUBAGENT_TIMEOUT_MS,
-  DEFAULT_WAIT_TIMEOUT_MS,
   formatSubagentCompletionText,
   formatSubagentResult,
   GetSubagentResultToolSchema,
@@ -57,14 +55,15 @@ export {
   MAX_RETAINED_RUNS,
   parseAgentDefinition,
   resolveAgentsDir,
+  resolveSubagentModel,
   scanAgentDefinitions,
   splitFrontmatter,
   SubagentToolSchema,
 };
 
 export type { AgentDefinition, AgentDefinitionSource } from "./src/agent-scanner.js";
+export type { EmbeddedSubagentRunnerDeps, RunEmbeddedAgentFn } from "./src/agent-run.js";
 export type {
-  SubagentGetOptions,
   SubagentManager,
   SubagentManagerOptions,
   SubagentNotifier,
@@ -85,6 +84,11 @@ export default definePluginEntry({
   name: "電脳サブエージェント",
   description: "ワークスペース定義型 自律サブエージェント実行・管理プラグイン",
   register(api) {
+    if (api.pluginConfig?.enabled === false) {
+      api.logger.info("dennou-subagent: disabled by config");
+      return;
+    }
+
     const manager = createSubagentManager({
       runAgent: createEmbeddedSubagentRunner(),
       notify: createSystemEventNotifier(),
@@ -103,9 +107,9 @@ export default definePluginEntry({
       start(ctx) {
         const workspaceDir = ctx.workspaceDir?.trim();
         const definitions = loadAgentDefinitions({ workspaceDir });
-        const workspaceCount = workspaceDir
-          ? scanAgentDefinitions(resolveAgentsDir(workspaceDir)).length
-          : 0;
+        const workspaceCount = [...definitions.values()].filter(
+          (definition) => definition.source === "workspace",
+        ).length;
         api.logger.info(
           `dennou-subagent: 準備完了 — 利用可能なサブエージェント ${definitions.size} 件` +
             `（workspace/${AGENTS_SUBDIR}: ${workspaceCount} 件、ビルトイン: ${BUILTIN_AGENT_DEFINITIONS.length} 件）`,

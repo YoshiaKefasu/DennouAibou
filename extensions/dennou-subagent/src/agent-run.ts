@@ -16,10 +16,25 @@ import path from "node:path";
 import { resolveAgentEffectiveModelPrimary } from "../../../src/agents/agent-scope.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../src/agents/defaults.js";
 import { parseModelRef } from "../../../src/agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../../../src/agents/pi-embedded.js";
+import type { RunEmbeddedPiAgentParams } from "../../../src/agents/pi-embedded-runner/run/params.js";
+import { runEmbeddedPiAgent, type EmbeddedPiRunResult } from "../../../src/agents/pi-embedded.js";
 import type { SubagentRunFn, SubagentRunOutcome, SubagentRunRequest } from "./runner.js";
 
-function resolveModel(request: SubagentRunRequest): { provider: string; model: string } {
+/** 1ターンの組み込みエージェント実行関数（テストで差し替え可能）。 */
+export type RunEmbeddedAgentFn = (params: RunEmbeddedPiAgentParams) => Promise<EmbeddedPiRunResult>;
+
+export type EmbeddedSubagentRunnerDeps = {
+  /** 既定は本物の `runEmbeddedPiAgent`。 */
+  runEmbedded?: RunEmbeddedAgentFn;
+};
+
+/**
+ * 使用モデルを解決する。
+ * 優先順: 定義の `model` → 呼び出し元エージェントの実効モデル → 既定プロバイダ/モデル。
+ */
+export function resolveSubagentModel(
+  request: Pick<SubagentRunRequest, "definition" | "config" | "configAgentId">,
+): { provider: string; model: string } {
   const explicit = request.definition.model?.trim();
   const inherited =
     explicit ||
@@ -41,14 +56,15 @@ function collectOutput(payloads: readonly { text?: string }[] | undefined): stri
 }
 
 /** 本番用 `SubagentRunFn`。1タスク = 1独立モデルセッション。 */
-export function createEmbeddedSubagentRunner(): SubagentRunFn {
+export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = {}): SubagentRunFn {
+  const runEmbedded = deps.runEmbedded ?? runEmbeddedPiAgent;
   return async (request) => {
     const sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), "dennou-subagent-"));
     const sessionFile = path.join(sessionDir, "session.jsonl");
-    const { provider, model } = resolveModel(request);
+    const { provider, model } = resolveSubagentModel(request);
     request.onLog(`▶ 開始 (${provider}/${model})`);
     try {
-      const result = await runEmbeddedPiAgent({
+      const result = await runEmbedded({
         sessionId: request.runId,
         sessionKey: request.sessionKey,
         agentId: request.configAgentId,

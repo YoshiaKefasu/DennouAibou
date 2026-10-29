@@ -115,22 +115,16 @@ export type SubagentResult = {
   endedAt?: number;
 };
 
-export type SubagentGetOptions = {
-  wait?: boolean;
-  waitTimeoutMs?: number;
-};
-
 export type SubagentManager = {
   start: (params: SubagentStartParams) => SubagentStartResult;
-  get: (agentId: string, options?: SubagentGetOptions) => Promise<SubagentResult>;
+  /** 常に即座に現在のステータス・ログ・結果を返す（ブロッキング待機はしない）。 */
+  get: (agentId: string) => Promise<SubagentResult>;
   list: () => SubagentRun[];
   stopAll: (reason?: string) => void;
 };
 
 /** 1実行あたりの既定タイムアウト（10分）。 */
 export const DEFAULT_SUBAGENT_TIMEOUT_MS = 10 * 60_000;
-/** `wait: true` の既定待機上限（2分）。超過時は running のまま現在値を返す。 */
-export const DEFAULT_WAIT_TIMEOUT_MS = 120_000;
 export const MAX_LOG_LINES = 20;
 /** 保持する実行履歴の上限（超過分は古い完了済み実行から破棄）。 */
 export const MAX_RETAINED_RUNS = 50;
@@ -141,7 +135,6 @@ type InternalRun = {
   notifySessionKey?: string;
   config?: OpenClawConfig;
   controller: AbortController;
-  done: Promise<void>;
 };
 
 function describeError(error: unknown): string {
@@ -156,21 +149,6 @@ function describeError(error: unknown): string {
 
 function snapshot(run: SubagentRun): SubagentRun {
   return { ...run, log: [...run.log] };
-}
-
-function waitWithTimeout(done: Promise<void>, timeoutMs: number): Promise<void> {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return done.then(() => undefined);
-  }
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, timeoutMs);
-  });
-  return Promise.race([done.then(() => undefined), timeout]).finally(() => {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  });
 }
 
 export function createSubagentManager(options: SubagentManagerOptions): SubagentManager {
@@ -258,10 +236,13 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
         onLog: (text) => appendLog(run, text),
       });
       if (outcome.error) {
-        run.status = "failed";
-        run.error = outcome.error;
-        run.output = outcome.output;
-      } else {
+        // stopAll で中断済みの場合は中断理由を保持する。
+        if (run.status === "running") {
+          run.status = "failed";
+          run.error = outcome.error;
+          run.output = outcome.output;
+        }
+      } else if (run.status === "running") {
         run.status = "completed";
         run.output = outcome.output ?? "";
       }
@@ -325,10 +306,9 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
       notifySessionKey: params.context.sessionKey,
       config: params.context.config,
       controller: new AbortController(),
-      done: Promise.resolve(),
     };
     runs.set(agentId, internal);
-    internal.done = execute(internal, {
+    void execute(internal, {
       definition,
       workspaceDir,
       agentDir: params.context.agentDir,
@@ -354,10 +334,7 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     endedAt: run.endedAt,
   });
 
-  const get = async (
-    agentId: string,
-    getOptions: SubagentGetOptions = {},
-  ): Promise<SubagentResult> => {
+  const get = async (agentId: string): Promise<SubagentResult> => {
     const key = agentId.trim();
     const internal = runs.get(key);
     if (!internal) {
@@ -370,9 +347,6 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
             : "まだ実行されたサブエージェントはありません。"
         }`,
       );
-    }
-    if (getOptions.wait === true && internal.run.status === "running") {
-      await waitWithTimeout(internal.done, getOptions.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS);
     }
     return toResult(internal.run);
   };

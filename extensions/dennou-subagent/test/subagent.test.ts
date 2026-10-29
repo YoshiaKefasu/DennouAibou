@@ -2,7 +2,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../src/agents/defaults.js";
+import type { RunEmbeddedPiAgentParams } from "../../../src/agents/pi-embedded-runner/run/params.js";
 import type { AnyAgentTool } from "../../../src/agents/tools/common.js";
+import type { OpenClawConfig } from "../../../src/config/config.js";
+import pluginEntry from "../index.js";
+import {
+  createEmbeddedSubagentRunner,
+  resolveSubagentModel,
+  type RunEmbeddedAgentFn,
+} from "../src/agent-run.js";
 import {
   loadAgentDefinitions,
   parseAgentDefinition,
@@ -97,6 +106,11 @@ function createDeferred<T>(): Deferred<T> {
     reject = rejectFn;
   });
   return { promise, resolve, reject };
+}
+
+/** バックグラウンド実行のマイクロタスクを確実に消化させる。 */
+async function flushAsync(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
 
 describe("agent-scanner: frontmatter", () => {
@@ -220,7 +234,7 @@ describe("subagent lifecycle", () => {
     expect(toolText(running)).toContain("🔧 read");
 
     deferred.resolve({ output: "実装完了しました" });
-    await manager.get(agentId, { wait: true, waitTimeoutMs: 2_000 });
+    await flushAsync();
 
     const completed = await callTool(getResultTool, { agent_id: agentId });
     expect(toolText(completed)).toContain("status: completed");
@@ -253,14 +267,15 @@ describe("subagent lifecycle", () => {
       task: "調査して",
     });
     const agentId = toolDetails<SubagentStartResult>(started).agentId;
-    const result = await manager.get(agentId, { wait: true, waitTimeoutMs: 2_000 });
+    await flushAsync();
+    const result = await manager.get(agentId);
 
     expect(result.status).toBe("failed");
     expect(result.error).toContain("モデルが応答しませんでした");
     expect(formatSubagentResult(result)).toContain("status: failed");
   });
 
-  it("waits for completion when wait=true is passed to the tool", async () => {
+  it("returns immediately while the run is still in progress (no blocking wait)", async () => {
     const workspaceDir = makeWorkspace({});
     const deferred = createDeferred<SubagentRunOutcome>();
     const manager = createSubagentManager({ runAgent: async () => await deferred.promise });
@@ -272,12 +287,44 @@ describe("subagent lifecycle", () => {
     const agentId = toolDetails<SubagentStartResult>(started).agentId;
     const getResultTool = createGetSubagentResultTool({ manager });
 
-    const pending = callTool(getResultTool, { agent_id: agentId, wait: true });
-    deferred.resolve({ output: "APPROVE" });
-    const completed = await pending;
+    // 未完了でもブロックせず即座に running を返す。
+    const running = await callTool(getResultTool, { agent_id: agentId });
+    expect(toolText(running)).toContain("status: running");
 
+    deferred.resolve({ output: "APPROVE" });
+    await flushAsync();
+
+    const completed = await callTool(getResultTool, { agent_id: agentId });
     expect(toolText(completed)).toContain("status: completed");
     expect(toolText(completed)).toContain("APPROVE");
+  });
+
+  it("keeps the interruption reason when stopAll aborts a run", async () => {
+    const workspaceDir = makeWorkspace({});
+    const deferred = createDeferred<SubagentRunOutcome>();
+    const manager = createSubagentManager({ runAgent: async () => await deferred.promise });
+
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "長い作業",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+
+    manager.stopAll("gateway 停止により中断されました");
+    deferred.resolve({ error: "後から届いた別のエラー" });
+    await flushAsync();
+
+    const result = await manager.get(agentId);
+    expect(result.status).toBe("failed");
+    expect(result.error).toBe("gateway 停止により中断されました");
+  });
+
+  it("exposes only agent_id in the get_subagent_result schema", () => {
+    const manager = createSubagentManager({ runAgent: async () => ({ output: "unused" }) });
+    const tool = createGetSubagentResultTool({ manager });
+    const properties = (tool.parameters as { properties?: Record<string, unknown> }).properties;
+
+    expect(Object.keys(properties ?? {})).toEqual(["agent_id"]);
   });
   it("prunes the oldest finished runs beyond maxRuns", async () => {
     const workspaceDir = makeWorkspace({});
@@ -294,7 +341,7 @@ describe("subagent lifecycle", () => {
       const started = await callTool(tool, { agent: "executor", task });
       const agentId = toolDetails<SubagentStartResult>(started).agentId;
       agentIds.push(agentId);
-      await manager.get(agentId, { wait: true, waitTimeoutMs: 2_000 });
+      await flushAsync();
     }
 
     expect(manager.list()).toHaveLength(2);
@@ -439,5 +486,237 @@ describe("completion notification", () => {
     });
 
     expect(wakes).toEqual(["dennou-subagent:sub-4-abcdef"]);
+  });
+});
+
+type CapturedRequest = {
+  request: SubagentRunRequest;
+  logs: string[];
+};
+
+function makeRunRequest(overrides: Partial<SubagentRunRequest> = {}): CapturedRequest {
+  const logs: string[] = [];
+  const request: SubagentRunRequest = {
+    runId: "sub-test-1",
+    agent: "executor",
+    task: "テストを書く",
+    definition: {
+      name: "executor",
+      description: "実装担当",
+      model: "cli-router/kios-deepseek-v4.1-flash",
+      tools: ["bash", "read"],
+      systemPrompt: "あなたは Executor です。",
+      source: "workspace",
+    },
+    sessionKey: "dennou-subagent:sub-test-1",
+    workspaceDir: os.tmpdir(),
+    timeoutMs: 1_234,
+    signal: new AbortController().signal,
+    onLog: (text) => logs.push(text),
+    ...overrides,
+  };
+  return { request, logs };
+}
+
+describe("agent-run: model resolution", () => {
+  it("prefers the model declared in the agent definition", () => {
+    const { request } = makeRunRequest();
+
+    expect(resolveSubagentModel(request)).toEqual({
+      provider: "cli-router",
+      model: "kios-deepseek-v4.1-flash",
+    });
+  });
+
+  it("inherits the caller agent model when the definition omits one", () => {
+    const { request } = makeRunRequest({
+      definition: {
+        name: "explore",
+        description: "",
+        systemPrompt: "調査担当",
+        source: "builtin",
+      },
+      config: {
+        agents: { defaults: { model: "cli-router/kios-gemini-3.8-flash" } },
+      } as unknown as OpenClawConfig,
+      configAgentId: "main",
+    });
+
+    expect(resolveSubagentModel(request)).toEqual({
+      provider: "cli-router",
+      model: "kios-gemini-3.8-flash",
+    });
+  });
+
+  it("falls back to the default provider and model", () => {
+    const { request } = makeRunRequest({
+      definition: {
+        name: "explore",
+        description: "",
+        systemPrompt: "調査担当",
+        source: "builtin",
+      },
+      config: undefined,
+      configAgentId: undefined,
+    });
+
+    expect(resolveSubagentModel(request)).toEqual({
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+    });
+  });
+});
+
+describe("agent-run: embedded run wiring", () => {
+  it("runs the definition as an independent embedded session", async () => {
+    const { request, logs } = makeRunRequest();
+    const calls: RunEmbeddedPiAgentParams[] = [];
+    const runEmbedded: RunEmbeddedAgentFn = async (params) => {
+      calls.push(params);
+      params.onAgentEvent?.({ stream: "tool", data: { phase: "start", name: "bash" } });
+      params.onAgentEvent?.({ stream: "tool", data: { phase: "end", name: "bash" } });
+      params.onAgentEvent?.({ stream: "lifecycle", data: { phase: "end" } });
+      return {
+        payloads: [{ text: "実装しました" }, { text: "テストも pass" }],
+        meta: { durationMs: 5 },
+      };
+    };
+    const runner = createEmbeddedSubagentRunner({ runEmbedded });
+
+    const outcome = await runner(request);
+
+    expect(outcome).toEqual({ output: "実装しました\nテストも pass" });
+    expect(calls).toHaveLength(1);
+    const params = calls[0]!;
+    expect(params.prompt).toBe("テストを書く");
+    expect(params.sessionKey).toBe("dennou-subagent:sub-test-1");
+    expect(params.sessionId).toBe("sub-test-1");
+    expect(params.runId).toBe("sub-test-1");
+    expect(params.provider).toBe("cli-router");
+    expect(params.model).toBe("kios-deepseek-v4.1-flash");
+    expect(params.extraSystemPrompt).toBe("あなたは Executor です。");
+    expect(params.toolsAllow).toEqual(["bash", "read"]);
+    expect(params.timeoutMs).toBe(1_234);
+    expect(params.abortSignal).toBe(request.signal);
+    expect(logs).toEqual(["▶ 開始 (cli-router/kios-deepseek-v4.1-flash)", "🔧 bash"]);
+  });
+
+  it("passes undefined toolsAllow when the definition lists no tools", async () => {
+    const { request } = makeRunRequest({
+      definition: {
+        name: "explore",
+        description: "",
+        systemPrompt: "",
+        source: "builtin",
+      },
+    });
+    const calls: RunEmbeddedPiAgentParams[] = [];
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async (params) => {
+        calls.push(params);
+        return { payloads: [{ text: "ok" }], meta: { durationMs: 1 } };
+      },
+    });
+
+    await runner(request);
+
+    expect(calls[0]?.toolsAllow).toBeUndefined();
+    expect(calls[0]?.extraSystemPrompt).toBeUndefined();
+  });
+
+  it("maps a run error into a failed outcome", async () => {
+    const { request } = makeRunRequest();
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async () => ({
+        payloads: [{ text: "途中まで" }],
+        meta: {
+          durationMs: 5,
+          error: { kind: "retry_limit", message: "レート制限に達しました" },
+        },
+      }),
+    });
+
+    const outcome = await runner(request);
+
+    expect(outcome.error).toBe("レート制限に達しました");
+    expect(outcome.output).toBe("途中まで");
+  });
+
+  it("reports an aborted run as an error", async () => {
+    const { request } = makeRunRequest();
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async () => ({ payloads: [], meta: { durationMs: 5, aborted: true } }),
+    });
+
+    const outcome = await runner(request);
+
+    expect(outcome.error).toContain("中断されました");
+    expect(outcome.output).toBeUndefined();
+  });
+
+  it("falls back to a placeholder when the run produced no text", async () => {
+    const { request } = makeRunRequest();
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async () => ({ payloads: [], meta: { durationMs: 1 } }),
+    });
+
+    const outcome = await runner(request);
+
+    expect(outcome.output).toBe("(サブエージェントからのテキスト出力はありません)");
+  });
+});
+
+type RegisterApi = Parameters<typeof pluginEntry.register>[0];
+
+function makeRegisterApi(overrides: Partial<RegisterApi>): RegisterApi {
+  return {
+    logger: { info: () => {}, warn: () => {}, error: () => {} },
+    registerTool: () => {},
+    registerService: () => {},
+    ...overrides,
+  } as unknown as RegisterApi;
+}
+
+describe("plugin registration", () => {
+  it("registers both tools and the background manager service", () => {
+    const toolNames: string[] = [];
+    const serviceIds: string[] = [];
+    pluginEntry.register(
+      makeRegisterApi({
+        registerTool: (_tool, opts) => {
+          toolNames.push(...(opts?.names ?? []));
+        },
+        registerService: (service) => {
+          serviceIds.push(service.id);
+        },
+      }),
+    );
+
+    expect(toolNames).toEqual(["subagent", "get_subagent_result"]);
+    expect(serviceIds).toEqual(["dennou-subagent"]);
+  });
+
+  it("skips registration when disabled by config", () => {
+    const logs: string[] = [];
+    let registered = 0;
+    pluginEntry.register(
+      makeRegisterApi({
+        pluginConfig: { enabled: false },
+        logger: {
+          info: (message) => logs.push(message),
+          warn: () => {},
+          error: () => {},
+        },
+        registerTool: () => {
+          registered += 1;
+        },
+        registerService: () => {
+          registered += 1;
+        },
+      }),
+    );
+
+    expect(registered).toBe(0);
+    expect(logs).toEqual(["dennou-subagent: disabled by config"]);
   });
 });
