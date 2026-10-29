@@ -18,7 +18,21 @@ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../src/agents/defaults.js
 import { parseModelRef } from "../../../src/agents/model-selection.js";
 import type { RunEmbeddedPiAgentParams } from "../../../src/agents/pi-embedded-runner/run/params.js";
 import { runEmbeddedPiAgent, type EmbeddedPiRunResult } from "../../../src/agents/pi-embedded.js";
+import type { AgentDefinition } from "./agent-scanner.js";
 import type { SubagentRunFn, SubagentRunOutcome, SubagentRunRequest } from "./runner.js";
+
+/**
+ * サブエージェントに常時禁止するツール。
+ * サブエージェントは使い捨ての独立セッションなので、メインの能動記憶 `memo` を
+ * 同期させない（メモリ污染の構造的遮断）。
+ */
+export const SUBAGENT_EXCLUDED_TOOLS = ["memo"] as const;
+
+/** 除外対象のツール名かどうか（大文字小文字は無視）。 */
+export function isExcludedSubagentTool(toolName: string): boolean {
+  const normalized = toolName.trim().toLowerCase();
+  return SUBAGENT_EXCLUDED_TOOLS.some((excluded) => excluded === normalized);
+}
 
 /** 1ターンの組み込みエージェント実行関数（テストで差し替え可能）。 */
 export type RunEmbeddedAgentFn = (params: RunEmbeddedPiAgentParams) => Promise<EmbeddedPiRunResult>;
@@ -55,6 +69,40 @@ function collectOutput(payloads: readonly { text?: string }[] | undefined): stri
     .join("\n");
 }
 
+/** `runEmbedded` に渡すツール制御。 */
+export type ResolvedSubagentTools = {
+  /** 明示許可リスト。`undefined` は「制限なし（全ツール）」を意味する。 */
+  toolsAllow?: string[];
+  /** ツールを完全に無効化する（空配列の代わりに使う）。 */
+  disableTools?: boolean;
+};
+
+/**
+ * エージェント定義の `tools` から実際のツール制御を組み立てる。
+ *
+ * 重要な落とし穴: `runEmbeddedPiAgent` は `toolsAllow` が**空配列**のとき
+ * 「指定なし」と同じく全ツール許可として扱う（`attempt.ts` の `length > 0` 判定）。
+ * したがって `tools: ["memo"]` のように全部除外されて空になるケースで `[]` を渡すと
+ * fail-open（memo 含む全ツール許可）に化ける。空になる場合は `disableTools: true` で
+ * 「ツール 0 件」を明示する。
+ *
+ * Note: `tools` 未指定（全ツール許可）のときの memo 遮断は `toolsAllow` では表現できないため、
+ * `before_tool_call` フック（`index.ts`）でサブエージェントセッションからの `memo` を実行時に拒否する。
+ */
+export function resolveSubagentTools(
+  definition: Pick<AgentDefinition, "tools">,
+): ResolvedSubagentTools {
+  const declared = (definition.tools ?? []).map((name) => name.trim()).filter(Boolean);
+  if (declared.length === 0) {
+    return {};
+  }
+  const allowed = declared.filter((name) => !isExcludedSubagentTool(name));
+  if (allowed.length === 0) {
+    return { disableTools: true };
+  }
+  return { toolsAllow: allowed };
+}
+
 /** 本番用 `SubagentRunFn`。1タスク = 1独立モデルセッション。 */
 export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = {}): SubagentRunFn {
   const runEmbedded = deps.runEmbedded ?? runEmbeddedPiAgent;
@@ -62,6 +110,7 @@ export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = 
     const sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), "dennou-subagent-"));
     const sessionFile = path.join(sessionDir, "session.jsonl");
     const { provider, model } = resolveSubagentModel(request);
+    const tools = resolveSubagentTools(request.definition);
     request.onLog(`▶ 開始 (${provider}/${model})`);
     try {
       const result = await runEmbedded({
@@ -76,11 +125,9 @@ export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = 
         provider,
         model,
         extraSystemPrompt: request.definition.systemPrompt || undefined,
-        // サブエージェントにはメモツール（memo）は不要（同期させない）
-        toolsAllow:
-          request.definition.tools && request.definition.tools.length > 0
-            ? request.definition.tools.filter((name) => name !== "memo")
-            : undefined,
+        // memo はサブエージェントに不要（同期させない）。空になったら disableTools で 0 件にする。
+        toolsAllow: tools.toolsAllow,
+        disableTools: tools.disableTools,
         timeoutMs: request.timeoutMs,
         runId: request.runId,
         abortSignal: request.signal,

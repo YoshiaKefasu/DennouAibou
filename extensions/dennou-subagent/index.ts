@@ -13,7 +13,13 @@
  */
 
 import { definePluginEntry } from "../../src/plugin-sdk/plugin-entry.js";
-import { createEmbeddedSubagentRunner, resolveSubagentModel } from "./src/agent-run.js";
+import {
+  createEmbeddedSubagentRunner,
+  isExcludedSubagentTool,
+  resolveSubagentModel,
+  resolveSubagentTools,
+  SUBAGENT_EXCLUDED_TOOLS,
+} from "./src/agent-run.js";
 import {
   AGENTS_SUBDIR,
   BUILTIN_AGENT_DEFINITIONS,
@@ -26,13 +32,16 @@ import {
 import { createSystemEventNotifier, formatSubagentCompletionText } from "./src/notify.js";
 import {
   createSubagentManager,
+  CALL_SESSION_KEY_PREFIX,
   DEFAULT_SUBAGENT_TIMEOUT_MS,
-  MAX_LOG_LINES,
-  MAX_RETAINED_RUNS,
+  DEFAULT_TIMEOUT_GUARD_GRACE_MS,
   isCallSessionKey,
+  isSubagentSessionKey,
   MAX_CONCURRENT_SUBAGENTS_CALL,
   MAX_CONCURRENT_SUBAGENTS_DEFAULT,
-  CALL_SESSION_KEY_PREFIX,
+  MAX_LOG_LINES,
+  MAX_RETAINED_RUNS,
+  SUBAGENT_SESSION_KEY_PREFIX,
 } from "./src/runner.js";
 import {
   createGetSubagentResultTool,
@@ -52,10 +61,13 @@ export {
   createSubagentTool,
   createSystemEventNotifier,
   DEFAULT_SUBAGENT_TIMEOUT_MS,
+  DEFAULT_TIMEOUT_GUARD_GRACE_MS,
   formatSubagentCompletionText,
   formatSubagentResult,
   GetSubagentResultToolSchema,
   isCallSessionKey,
+  isExcludedSubagentTool,
+  isSubagentSessionKey,
   loadAgentDefinitions,
   MAX_CONCURRENT_SUBAGENTS_CALL,
   MAX_CONCURRENT_SUBAGENTS_DEFAULT,
@@ -64,13 +76,20 @@ export {
   parseAgentDefinition,
   resolveAgentsDir,
   resolveSubagentModel,
+  resolveSubagentTools,
   scanAgentDefinitions,
   splitFrontmatter,
+  SUBAGENT_EXCLUDED_TOOLS,
+  SUBAGENT_SESSION_KEY_PREFIX,
   SubagentToolSchema,
 };
 
 export type { AgentDefinition, AgentDefinitionSource } from "./src/agent-scanner.js";
-export type { EmbeddedSubagentRunnerDeps, RunEmbeddedAgentFn } from "./src/agent-run.js";
+export type {
+  EmbeddedSubagentRunnerDeps,
+  ResolvedSubagentTools,
+  RunEmbeddedAgentFn,
+} from "./src/agent-run.js";
 export type {
   SubagentManager,
   SubagentManagerOptions,
@@ -108,6 +127,23 @@ export default definePluginEntry({
     });
     api.registerTool(() => createGetSubagentResultTool({ manager }), {
       names: ["get_subagent_result"],
+    });
+
+    // memo の構造的遮断（BLOCKER 3 の堅牢化）。
+    // `tools` 未指定の定義（全ツール許可）でも memo が実行されないよう、
+    // サブエージェントセッションからの呼び出しをランタイムで拒否する。
+    api.on("before_tool_call", (event, ctx) => {
+      if (!isSubagentSessionKey(ctx.sessionKey)) {
+        return undefined;
+      }
+      if (!isExcludedSubagentTool(event.toolName)) {
+        return undefined;
+      }
+      return {
+        block: true,
+        blockReason:
+          "サブエージェントセッションでは memo ツールを使用できません（メモリ汚染防止）。",
+      };
     });
 
     api.registerService({

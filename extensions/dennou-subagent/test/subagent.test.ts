@@ -10,6 +10,7 @@ import pluginEntry from "../index.js";
 import {
   createEmbeddedSubagentRunner,
   resolveSubagentModel,
+  resolveSubagentTools,
   type RunEmbeddedAgentFn,
 } from "../src/agent-run.js";
 import {
@@ -22,7 +23,9 @@ import {
 import { createSystemEventNotifier, formatSubagentCompletionText } from "../src/notify.js";
 import {
   createSubagentManager,
+  DEFAULT_TIMEOUT_GUARD_GRACE_MS,
   MAX_CONCURRENT_SUBAGENTS_DEFAULT,
+  SUBAGENT_SESSION_KEY_PREFIX,
   type SubagentNotifyParams,
   type SubagentRunFn,
   type SubagentRunOutcome,
@@ -442,6 +445,58 @@ describe("concurrency guard", () => {
   });
 });
 
+describe("concurrency guard: validation order and timeout", () => {
+  it("reports argument errors before the concurrency limit", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent });
+    const tool = createSubagentTool({
+      manager,
+      context: { workspaceDir, sessionKey: "agent:main:main" },
+    });
+
+    for (let index = 0; index < MAX_CONCURRENT_SUBAGENTS_DEFAULT; index += 1) {
+      await callTool(tool, { agent: "executor", task: `task-${index}` });
+    }
+
+    // 上限到達中でも、不正なエージェント名は「未定義」エラーが優先される。
+    await expect(callTool(tool, { agent: "ghost", task: "x" })).rejects.toThrow(
+      /'ghost' は未定義です/,
+    );
+    // 未定義エージェントの後でも、正しい引数なら上限エラーになる。
+    await expect(callTool(tool, { agent: "executor", task: "x" })).rejects.toThrow(/上限（7体）/);
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("fails a hung run by the timeout guard and frees the slot", async () => {
+    const workspaceDir = makeWorkspace({});
+    const manager = createSubagentManager({
+      // テストでは監視を極端に短くする。
+      runAgent: () => new Promise<SubagentRunOutcome>(() => {}),
+      defaultTimeoutMs: 5,
+      timeoutGuardGraceMs: 0,
+    });
+    const tool = createSubagentTool({ manager, context: { workspaceDir } });
+
+    const started = await callTool(tool, { agent: "executor", task: "ハングする作業" });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+    const result = await manager.get(agentId);
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("タイムアウトしました");
+
+    // 枠が解放されているので次が起動できる。
+    const next = await callTool(tool, { agent: "executor", task: "次の作業" });
+    expect(toolDetails<SubagentStartResult>(next).status).toBe("running");
+  });
+});
+
 describe("subagent error handling", () => {
   it("rejects an unknown agent and lists the available ones", async () => {
     const workspaceDir = makeWorkspace({});
@@ -609,6 +664,56 @@ function makeRunRequest(overrides: Partial<SubagentRunRequest> = {}): CapturedRe
   };
   return { request, logs };
 }
+
+describe("agent-run: memo exclusion (fail-closed)", () => {
+  it("turns a memo-only tool list into zero tools instead of all tools", () => {
+    const resolved = resolveSubagentTools({ tools: ["memo"] });
+
+    // 空配列は runner 側で「全許可」に化けるため、disableTools で 0 件を表現する。
+    expect(resolved).toEqual({ disableTools: true });
+    expect(resolved.toolsAllow).toBeUndefined();
+  });
+
+  it("filters memo out of a mixed tool list", () => {
+    expect(resolveSubagentTools({ tools: ["memo", "bash", "read"] })).toEqual({
+      toolsAllow: ["bash", "read"],
+    });
+  });
+
+  it("is case insensitive and ignores blank entries", () => {
+    expect(resolveSubagentTools({ tools: [" MEMO ", "  ", "bash"] })).toEqual({
+      toolsAllow: ["bash"],
+    });
+  });
+
+  it("keeps the unrestricted default when tools is omitted", () => {
+    expect(resolveSubagentTools({})).toEqual({});
+  });
+
+  it("passes disableTools (never an empty toolsAllow) to the embedded run", async () => {
+    const { request } = makeRunRequest({
+      definition: {
+        name: "executor",
+        description: "",
+        systemPrompt: "実装担当",
+        tools: ["memo"],
+        source: "workspace",
+      },
+    });
+    const calls: RunEmbeddedPiAgentParams[] = [];
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async (params) => {
+        calls.push(params);
+        return { payloads: [{ text: "ok" }], meta: { durationMs: 1 } };
+      },
+    });
+
+    await runner(request);
+
+    expect(calls[0]?.toolsAllow).toBeUndefined();
+    expect(calls[0]?.disableTools).toBe(true);
+  });
+});
 
 describe("agent-run: model resolution", () => {
   it("prefers the model declared in the agent definition", () => {
@@ -788,6 +893,7 @@ function makeRegisterApi(overrides: Partial<RegisterApi>): RegisterApi {
     logger: { info: () => {}, warn: () => {}, error: () => {} },
     registerTool: () => {},
     registerService: () => {},
+    on: () => {},
     ...overrides,
   } as unknown as RegisterApi;
 }
@@ -833,5 +939,55 @@ describe("plugin registration", () => {
 
     expect(registered).toBe(0);
     expect(logs).toEqual(["dennou-subagent: disabled by config"]);
+  });
+});
+
+type ToolHookHandler = (
+  event: { toolName: string },
+  ctx: { sessionKey?: string },
+) => { block?: boolean; blockReason?: string } | undefined;
+
+function captureToolHook(): ToolHookHandler {
+  let handler: ToolHookHandler | undefined;
+  pluginEntry.register(
+    makeRegisterApi({
+      on: ((hookName: string, fn: ToolHookHandler) => {
+        if (hookName === "before_tool_call") {
+          handler = fn;
+        }
+      }) as unknown as RegisterApi["on"],
+    }),
+  );
+  if (!handler) {
+    throw new Error("before_tool_call フックが登録されていません");
+  }
+  return handler;
+}
+
+describe("memo guard (before_tool_call)", () => {
+  it("blocks memo inside subagent sessions", () => {
+    const handler = captureToolHook();
+    const result = handler(
+      { toolName: "memo" },
+      { sessionKey: `${SUBAGENT_SESSION_KEY_PREFIX}sub-1-abcdef` },
+    );
+
+    expect(result?.block).toBe(true);
+    expect(result?.blockReason).toContain("memo");
+  });
+
+  it("allows memo outside subagent sessions", () => {
+    const handler = captureToolHook();
+
+    expect(handler({ toolName: "memo" }, { sessionKey: "agent:main:main" })).toBeUndefined();
+    expect(handler({ toolName: "memo" }, {})).toBeUndefined();
+  });
+
+  it("allows other tools inside subagent sessions", () => {
+    const handler = captureToolHook();
+
+    expect(
+      handler({ toolName: "bash" }, { sessionKey: `${SUBAGENT_SESSION_KEY_PREFIX}sub-1-abcdef` }),
+    ).toBeUndefined();
   });
 });

@@ -77,6 +77,8 @@ export type SubagentManagerOptions = {
   notify?: SubagentNotifier;
   now?: () => number;
   defaultTimeoutMs?: number;
+  /** タイムアウト監視の余裕（既定 30秒）。 */
+  timeoutGuardGraceMs?: number;
   maxLogLines?: number;
   maxRuns?: number;
   logger?: SubagentLogger;
@@ -127,15 +129,32 @@ export type SubagentManager = {
 
 /** 1実行あたりの既定タイムアウト（10分）。 */
 export const DEFAULT_SUBAGENT_TIMEOUT_MS = 10 * 60_000;
+/** タイムアウト監視がランナーの自己中断より先に発火しないための余裕。 */
+export const DEFAULT_TIMEOUT_GUARD_GRACE_MS = 30_000;
 export const MAX_LOG_LINES = 20;
 /** 保持する実行履歴の上限（超過分は古い完了済み実行から破棄）。 */
 export const MAX_RETAINED_RUNS = 50;
-/** 通常セッション（メインセッション等）で同時に走らせられるサブエージェント数。 */
+/**
+ * 通常セッション（メインセッション等）で同時に走らせられるサブエージェント数。
+ * カウントはマネージャー全体（セッション横断）で行う。
+ */
 export const MAX_CONCURRENT_SUBAGENTS_DEFAULT = 7;
-/** 通話セッション（`call:` 接頭辞）で同時に走らせられるサブエージェント数。 */
+/**
+ * 通話セッション（`call:` 接頭辞）から起動する場合の上限。
+ * 通話中は全体で 1 体に厳格化する（他に実行中が 1 体でもあれば拒否）。
+ */
 export const MAX_CONCURRENT_SUBAGENTS_CALL = 1;
-/** 通話（電脳架電）セッションを見分けるセッションキー接頭辞。 */
+/**
+ * 通話（電脳架電）セッションを見分けるセッションキー接頭辞。
+ *
+ * 判定契約: 呼び出し元 `sessionKey` が `call:` で始まる場合のみ「通話セッション」と見なす。
+ * メインセッション（例: `agent:main:main`）から通話中に起動された場合は通常セッション扱い
+ * （＝7体上限）になるため、通話中に厳格制限を効かせたい場合は電脳架電側が
+ * `call:<callId>` 形式のセッションキーを渡す必要がある。
+ */
 export const CALL_SESSION_KEY_PREFIX = "call:";
+/** サブエージェントが使う独立セッションキーの接頭辞（`dennou-subagent:<agentId>`）。 */
+export const SUBAGENT_SESSION_KEY_PREFIX = "dennou-subagent:";
 
 type InternalRun = {
   run: SubagentRun;
@@ -159,9 +178,16 @@ function snapshot(run: SubagentRun): SubagentRun {
   return { ...run, log: [...run.log] };
 }
 
-/** 通話（電脳架電）セッションかどうか。 */
+/** 通話（電脳架電）セッションかどうか。判定は `call:` 接頭辞のみで行う。 */
 export function isCallSessionKey(sessionKey?: string): boolean {
   return typeof sessionKey === "string" && sessionKey.trim().startsWith(CALL_SESSION_KEY_PREFIX);
+}
+
+/** サブエージェントの独立セッションキーかどうか（`memo` 遮断フックの判定に使う）。 */
+export function isSubagentSessionKey(sessionKey?: string): boolean {
+  return (
+    typeof sessionKey === "string" && sessionKey.trim().startsWith(SUBAGENT_SESSION_KEY_PREFIX)
+  );
 }
 
 export function createSubagentManager(options: SubagentManagerOptions): SubagentManager {
@@ -169,6 +195,7 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
   const maxLogLines = options.maxLogLines ?? MAX_LOG_LINES;
   const maxRuns = options.maxRuns ?? MAX_RETAINED_RUNS;
   const defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_SUBAGENT_TIMEOUT_MS;
+  const timeoutGuardGraceMs = options.timeoutGuardGraceMs ?? DEFAULT_TIMEOUT_GUARD_GRACE_MS;
   const runs = new Map<string, InternalRun>();
 
   const generateAgentId = (): string => {
@@ -233,13 +260,27 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     },
   ): Promise<void> => {
     const { run } = internal;
+    // タイムアウト監視（安全弁）。ランナーがハングしても枠を永久占有しないよう、
+    // `defaultTimeoutMs + grace` を超えたら強制失敗にする。
+    const guardMs = defaultTimeoutMs + timeoutGuardGraceMs;
+    let guardTimer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutGuard = new Promise<never>((_resolve, reject) => {
+      guardTimer = setTimeout(() => {
+        internal.controller.abort("dennou-subagent: timeout");
+        reject(
+          new Error(`サブエージェントがタイムアウトしました（${Math.round(guardMs / 1000)}秒）。`),
+        );
+      }, guardMs);
+      // 監視タイマーだけでプロセスを生かし続けない。
+      guardTimer.unref?.();
+    });
     try {
-      const outcome = await options.runAgent({
+      const runPromise = options.runAgent({
         runId: run.agentId,
         agent: run.agent,
         task: run.task,
         definition: params.definition,
-        sessionKey: `dennou-subagent:${run.agentId}`,
+        sessionKey: `${SUBAGENT_SESSION_KEY_PREFIX}${run.agentId}`,
         workspaceDir: params.workspaceDir,
         agentDir: params.agentDir,
         configAgentId: params.configAgentId,
@@ -248,6 +289,9 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
         signal: internal.controller.signal,
         onLog: (text) => appendLog(run, text),
       });
+      // ガードが先に落ちた場合に未処理拒否を出さない。
+      runPromise.catch(() => {});
+      const outcome = await Promise.race([runPromise, timeoutGuard]);
       if (outcome.error) {
         // stopAll で中断済みの場合は中断理由を保持する。
         if (run.status === "running") {
@@ -266,6 +310,9 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
         run.error = describeError(error);
       }
     } finally {
+      if (guardTimer) {
+        clearTimeout(guardTimer);
+      }
       run.endedAt = now();
       options.logger?.info?.(
         `dennou-subagent: ${run.agentId} (${run.agent}) -> ${run.status}${
@@ -290,7 +337,13 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     return running;
   };
 
-  /** 並列度の安全弁。通話セッションは1体、通常セッションは7体まで。 */
+  /**
+   * 並列度の安全弁。
+   *
+   * - カウントはマネージャー全体（セッション横断）の `running` 数。
+   * - 通話セッション（`call:`）からの起動は全体で 1 体に厳格化（他に実行中があれば拒否）。
+   * - 通常セッションからの起動は全体で 7 体まで。
+   */
   const assertConcurrencyAvailable = (sessionKey?: string): void => {
     const running = countRunningRuns();
     if (isCallSessionKey(sessionKey)) {
@@ -309,7 +362,6 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
   };
 
   const start = (params: SubagentStartParams): SubagentStartResult => {
-    assertConcurrencyAvailable(params.context.sessionKey);
     const agentName = (params.agent ?? "").trim().toLowerCase();
     if (!agentName) {
       throw new Error("サブエージェント名 'agent' は必須です。");
@@ -333,6 +385,9 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     if (!workspaceDir) {
       throw new Error("サブエージェントのワークスペースが解決できません。");
     }
+
+    // 引数バリデーション通過後に並列度を判定する（不正な引数で上限エラーを出さない）。
+    assertConcurrencyAvailable(params.context.sessionKey);
 
     const agentId = generateAgentId();
     const run: SubagentRun = {
