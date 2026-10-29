@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { isConfident, SystemOneClient } from "../src/system-one-client.js";
 import {
+  buildRespanPayload,
+  isConfident,
+  isRespanEndpoint,
+  isRespanModel,
+  normalizeRespanResponse,
   parseRetryAfterMs,
+  resolveRespanUrl,
+  RESPAN_BEHAVIORS,
+  RESPAN_EVAL_INSTRUCTION,
   retryBackoffMs,
+  SystemOneClient,
   SYSTEM_ONE_MAX_RETRIES,
+  usesRespanProtocol,
 } from "../src/system-one-client.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -340,5 +349,214 @@ describe("system-one-client busy retry (503/429)", () => {
     expect(retryBackoffMs(0)).toBe(300);
     expect(retryBackoffMs(1)).toBe(600);
     expect(retryBackoffMs(9)).toBe(600);
+  });
+});
+
+describe("system-one-client: respan scores protocol", () => {
+  const respanEndpoint = "https://api.respan.ai/api/v1/scores";
+  const respanModel = "span-01-free";
+
+  function respanResponse(results: Array<{ id: string; p_present: number }>): Response {
+    return jsonResponse({
+      model: respanModel,
+      results: results.map((row) => ({
+        ...row,
+        p_absent: Number((1 - row.p_present).toFixed(3)),
+      })),
+    });
+  }
+
+  it("判別ヘルパーがエンドポイントとモデルの両方で Respan を検出する", () => {
+    expect(isRespanEndpoint(respanEndpoint)).toBe(true);
+    expect(isRespanEndpoint("https://API.RESPAN.AI/api/v1/scores")).toBe(true);
+    expect(isRespanEndpoint("http://localhost:8888/v1/systemone")).toBe(false);
+    expect(isRespanModel(respanModel)).toBe(true);
+    expect(isRespanModel(" SPAN-01-FREE ")).toBe(true);
+    expect(isRespanModel("laya-multilingual")).toBe(false);
+    expect(usesRespanProtocol({ endpoint: respanEndpoint, model: "x" })).toBe(true);
+    expect(
+      usesRespanProtocol({ endpoint: "http://localhost:8888/v1/systemone", model: respanModel }),
+    ).toBe(true);
+    expect(
+      usesRespanProtocol({ endpoint: "http://localhost:8888/v1/systemone", model: "laya" }),
+    ).toBe(false);
+  });
+
+  it("ホストのみのエンドポイントは公式 scores URL に補正する", () => {
+    expect(resolveRespanUrl("https://api.respan.ai")).toBe(respanEndpoint);
+    expect(resolveRespanUrl("https://api.respan.ai/")).toBe(respanEndpoint);
+    expect(resolveRespanUrl(`${respanEndpoint}/`)).toBe(respanEndpoint);
+    expect(resolveRespanUrl(respanEndpoint)).toBe(respanEndpoint);
+  });
+
+  it("Respan エンドポイントでは scores ペイロードを送る", async () => {
+    let seenUrl = "";
+    let seenInit: RequestInit | undefined;
+    const client = new SystemOneClient({
+      endpoint: respanEndpoint,
+      model: respanModel,
+      apiKey: "sk-respan-test",
+      fetchFn: async (url, init) => {
+        seenUrl = url;
+        seenInit = init;
+        return respanResponse([
+          { id: "drop", p_present: 0.818 },
+          { id: "summarize", p_present: 0.611 },
+          { id: "keep", p_present: 0.191 },
+        ]);
+      },
+    });
+
+    const result = await client.judge("巨大なツールログ…");
+
+    expect(seenUrl).toBe(respanEndpoint);
+    expect(seenInit?.method).toBe("POST");
+    const headers = seenInit?.headers as Record<string, string>;
+    expect(headers["authorization"]).toBe("Bearer sk-respan-test");
+    expect(headers["content-type"]).toBe("application/json");
+
+    const body = JSON.parse(String(seenInit?.body)) as Record<string, any>;
+    expect(body.model).toBe(respanModel);
+    expect(body.span.input).toEqual([{ role: "user", content: RESPAN_EVAL_INSTRUCTION }]);
+    expect(body.span.output).toEqual({ role: "assistant", content: "巨大なツールログ…" });
+    expect(body.behaviors.map((b: { id: string }) => b.id)).toEqual(["drop", "summarize", "keep"]);
+    expect(body.behaviors).toEqual(RESPAN_BEHAVIORS.map((b) => ({ ...b })));
+    // 従来の systemone 形式は含まれない。
+    expect(body.state).toBeUndefined();
+    expect(body.questions).toBeUndefined();
+
+    // drop が最大なので「落とす」。
+    expect(result.choice).toBe("落とす");
+    expect(result.confidence).toBeCloseTo(0.818, 5);
+    expect(result.fallback).toBeUndefined();
+  });
+
+  it("モデル名が span- なら従来エンドポイントでも scores ペイロードを送る", async () => {
+    let seenBody = "";
+    const client = new SystemOneClient({
+      endpoint: "http://localhost:8888/v1/systemone",
+      model: respanModel,
+      fetchFn: async (_url, init) => {
+        seenBody = String(init.body);
+        return respanResponse([{ id: "keep", p_present: 0.9 }]);
+      },
+    });
+
+    await client.judge("重要な決定");
+
+    const body = JSON.parse(seenBody) as Record<string, unknown>;
+    expect(body["span"]).toBeDefined();
+    expect(body["state"]).toBeUndefined();
+  });
+
+  it("drop が高ければ「落とす」、keep が高ければ「維持」、summarize なら「要約」", () => {
+    const drop = normalizeRespanResponse({
+      results: [
+        { id: "drop", p_present: 0.818 },
+        { id: "summarize", p_present: 0.611 },
+        { id: "keep", p_present: 0.191 },
+      ],
+    });
+    expect(drop?.choice).toBe("落とす");
+    expect(drop?.confidence).toBeCloseTo(0.818, 5);
+
+    const keep = normalizeRespanResponse({
+      results: [
+        { id: "drop", p_present: 0.05 },
+        { id: "summarize", p_present: 0.25 },
+        { id: "keep", p_present: 0.7 },
+      ],
+    });
+    expect(keep?.choice).toBe("維持");
+    expect(keep?.confidence).toBeCloseTo(0.7, 5);
+
+    const summarize = normalizeRespanResponse({
+      results: [
+        { id: "drop", p_present: 0.2 },
+        { id: "summarize", p_present: 0.65 },
+        { id: "keep", p_present: 0.15 },
+      ],
+    });
+    expect(summarize?.choice).toBe("要約");
+    expect(summarize?.confidence).toBeCloseTo(0.65, 5);
+  });
+
+  it("確率を合計 1.0 に正規化し、内部ラベルへ写像する", () => {
+    const result = normalizeRespanResponse({
+      results: [
+        { id: "drop", p_present: 0.818 },
+        { id: "summarize", p_present: 0.611 },
+        { id: "keep", p_present: 0.191 },
+      ],
+    });
+
+    expect(result).toBeDefined();
+    const probabilities = result!.probabilities;
+    const sum = probabilities["維持"] + probabilities["要約"] + probabilities["落とす"];
+    expect(sum).toBeCloseTo(1, 10);
+    expect(probabilities["落とす"]).toBeCloseTo(0.818 / 1.62, 5);
+    expect(probabilities["要約"]).toBeCloseTo(0.611 / 1.62, 5);
+    expect(probabilities["維持"]).toBeCloseTo(0.191 / 1.62, 5);
+  });
+
+  it("欠損した behavior は 0 として扱う", () => {
+    const result = normalizeRespanResponse({
+      results: [{ id: "keep", p_present: 0.4 }],
+    });
+
+    expect(result?.choice).toBe("維持");
+    expect(result?.probabilities).toEqual({ 維持: 1, 要約: 0, 落とす: 0 });
+    expect(result?.confidence).toBeCloseTo(0.4, 5);
+  });
+
+  it("Respan 形式でないレスポンスは undefined を返す", () => {
+    expect(normalizeRespanResponse({ choice: "要約", confidence: 0.8 })).toBeUndefined();
+    expect(normalizeRespanResponse({ results: [] })).toBeUndefined();
+    expect(normalizeRespanResponse({ results: [{ id: "unknown", p_present: 1 }] })).toBeUndefined();
+    expect(normalizeRespanResponse(null)).toBeUndefined();
+  });
+
+  it("従来の Jev/Laya レスポンスはそのまま解釈する（後方互換）", async () => {
+    const client = new SystemOneClient({
+      ...baseOpts,
+      fetchFn: async () => jsonResponse({ choice: "要約", confidence: 0.85 }),
+    });
+    const result = await client.judge("長い作業ログ…");
+    expect(result.choice).toBe("要約");
+    expect(result.confidence).toBe(0.85);
+    expect(result.fallback).toBeUndefined();
+  });
+
+  it("Laya プライマリ失敗時は Respan フォールバックへ scores で転送する", async () => {
+    const bodies: string[] = [];
+    const client = new SystemOneClient({
+      ...baseOpts,
+      fallback: { endpoint: "https://api.respan.ai", model: respanModel },
+      fetchFn: async (url, init) => {
+        if (url.includes("api.respan.ai")) {
+          bodies.push(String(init.body));
+          return respanResponse([
+            { id: "drop", p_present: 0.1 },
+            { id: "summarize", p_present: 0.2 },
+            { id: "keep", p_present: 0.9 },
+          ]);
+        }
+        return new Response("boom", { status: 500 });
+      },
+    });
+
+    const result = await client.judge("重要な設定");
+
+    expect(bodies).toHaveLength(1);
+    const body = JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>;
+    expect(body["span"]).toBeDefined();
+    expect(result.choice).toBe("維持");
+    expect(result.fallbackEndpoint).toBe("https://api.respan.ai");
+  });
+
+  it("buildRespanPayload は text を span.output に載せる", () => {
+    const body = JSON.parse(buildRespanPayload(respanModel, "本文テキスト")) as Record<string, any>;
+    expect(body.span.output.content).toBe("本文テキスト");
+    expect(body.span.input[0].content).toBe(RESPAN_EVAL_INSTRUCTION);
   });
 });

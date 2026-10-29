@@ -130,6 +130,55 @@ Jev の `choice` 型クエリを使用し、確率分布（probabilities）付�
    - OPEN 状態の間は System 1 を完全スキップし、既存の **`COMPACTION_FEATURE.md` §7.5 のレガシー安全弁パス（章全体の退避 ＆ 章要約目次）へ自動フェイルオープン** する。
    - **自動復旧（HALF_OPEN）**: 60秒のクールダウン経過後、1リクエストのみ試験的に実行（HALF_OPEN）。成功すれば正常復帰（CLOSED）し、失敗すれば再度 60秒 OPEN を維持する。
 
+### 3.5 Respan（scores API）プロトコル対応
+
+`SystemOneClient` は判定先に応じて送信プロトコルを自動で切り替える（`extensions/dennou-nap/src/system-one-client.ts`）。
+
+**切替条件（どちらかを満たせば Respan）**
+
+- `endpoint` に `api.respan.ai` を含む
+- `model` が `span-` で始まる（例: `span-01-free`）
+
+**送信形式**
+
+- `POST https://api.respan.ai/api/v1/scores`（endpoint がホストのみなら `/api/v1/scores` を自動補完。明示パスは尊重）
+- ヘッダー: `Authorization: Bearer <apiKey>`, `Content-Type: application/json`
+
+```json
+{
+  "model": "span-01-free",
+  "span": {
+    "input": [{ "role": "user", "content": "コンテキストの一部を評価してください" }],
+    "output": { "role": "assistant", "content": "<判定対象テキスト>" }
+  },
+  "behaviors": [
+    {
+      "id": "drop",
+      "definition": "一時的なツール実行ログや中間データで、今後の会話や意思決定に不要なため落とせる情報"
+    },
+    {
+      "id": "summarize",
+      "definition": "細部は不要だが全体の作業の流れや文脈として要約して残すべき情報"
+    },
+    { "id": "keep", "definition": "今後大事な決断や設定情報として正確に記憶しておくべき重要な情報" }
+  ]
+}
+```
+
+**レスポンス変換（`normalizeRespanResponse`）**
+
+- `results[].id` を内部ラベルへ写像: `drop` → `落とす`、`summarize` → `要約`、`keep` → `維持`
+- 各 `p_present` を合計 1.0 に正規化して `probabilities` に格納（欠損 behavior は 0）
+- `choice` = 正規化後の最大確率のラベル
+- `confidence` = 生の `p_present` の最大値
+- 出力は従来の `TriageResult` と同一形式（`fallback` / `fallbackEndpoint` の扱いも同じ）
+
+**後方互換性**
+
+- 上記条件に該当しない Jev / Laya（`/v1/systemone` 形式）は従来と 1 バイトも変わらず送信・解釈される。
+- レスポンス側は形状（`results` 配列の有無）でも判別するため、エンドポイント判別が外れても Respan 形式は正しく解釈される。
+- フォールバック先のプロトコルも個別に判定するため、Laya プライマリ → Respan フォールバックの混在構成が可能。
+
 ---
 
 ## 4. フェーズ 2: 選抜一括要約 (Historian) の仕様

@@ -61,6 +61,89 @@ export interface SystemOneClientOptions {
   fetchFn?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
+/** Respan（scores API）の既定 URL。 */
+export const RESPAN_SCORES_URL = "https://api.respan.ai/api/v1/scores";
+/** Respan モデル ID の接頭辞。 */
+export const RESPAN_MODEL_PREFIX = "span-";
+/** Respan の `span.input` に載せる評価指示文。 */
+export const RESPAN_EVAL_INSTRUCTION = "コンテキストの一部を評価してください";
+
+/**
+ * Respan の behaviors 定義（`drop` / `summarize` / `keep`）。
+ * 内部の 3 択ラベルとの対応は `RESPAN_BEHAVIOR_CHOICES` で表す。
+ */
+export const RESPAN_BEHAVIORS: readonly { id: string; definition: string }[] = [
+  {
+    id: "drop",
+    definition:
+      "一時的なツール実行ログや中間データで、今後の会話や意思決定に不要なため落とせる情報",
+  },
+  {
+    id: "summarize",
+    definition: "細部は不要だが全体の作業の流れや文脈として要約して残すべき情報",
+  },
+  {
+    id: "keep",
+    definition: "今後大事な決断や設定情報として正確に記憶しておくべき重要な情報",
+  },
+];
+
+/** Respan の behavior id → 内部の 3 択ラベル。 */
+export const RESPAN_BEHAVIOR_CHOICES: Readonly<Record<string, TriageChoice>> = {
+  drop: "落とす",
+  summarize: "要約",
+  keep: "維持",
+};
+
+/** エンドポイントが Respan（`api.respan.ai`）か。 */
+export function isRespanEndpoint(endpoint: string): boolean {
+  return typeof endpoint === "string" && endpoint.toLowerCase().includes("api.respan.ai");
+}
+
+/** モデル ID が Respan の `span-` 接頭辞か。 */
+export function isRespanModel(model: string): boolean {
+  return typeof model === "string" && model.trim().toLowerCase().startsWith(RESPAN_MODEL_PREFIX);
+}
+
+/** Respan の scores プロトコルで送るべきか（エンドポイントまたはモデルで判別）。 */
+export function usesRespanProtocol(params: { endpoint: string; model: string }): boolean {
+  return isRespanEndpoint(params.endpoint) || isRespanModel(params.model);
+}
+
+/**
+ * Respan の送信 URL を決める。パスが空（ホストのみ）の場合は公式の
+ * `/api/v1/scores` を補う。明示的なパスはそのまま尊重する。
+ */
+export function resolveRespanUrl(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  const withoutTrailing = trimmed.replace(/\/+$/, "");
+  try {
+    const url = new URL(withoutTrailing);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = new URL(RESPAN_SCORES_URL).pathname;
+      return url.toString();
+    }
+  } catch {
+    return trimmed;
+  }
+  return withoutTrailing;
+}
+
+/** Respan の scores ペイロードを組み立てる。 */
+export function buildRespanPayload(model: string, text: string): string {
+  return JSON.stringify({
+    model,
+    span: {
+      input: [{ role: "user", content: RESPAN_EVAL_INSTRUCTION }],
+      output: { role: "assistant", content: text },
+    },
+    behaviors: RESPAN_BEHAVIORS.map((behavior) => ({
+      id: behavior.id,
+      definition: behavior.definition,
+    })),
+  });
+}
+
 function isCountedFailure(status: number): boolean {
   return status === 401 || status === 429 || status >= 500;
 }
@@ -163,7 +246,49 @@ function normalizeProbabilities(raw: unknown, choice: TriageChoice): TriageProba
   return base;
 }
 
+/**
+ * Respan（scores API）のレスポンスを `TriageResult` に変換する。
+ *
+ * `{ results: [{ id: "drop" | "summarize" | "keep", p_present, p_absent }] }` を
+ * `{ 落とす | 要約 | 維持 }` の確率へ写像し、合計 1.0 に正規化する。
+ * `confidence` は生の `p_present` の最大値。Respan 形式でなければ `undefined`。
+ */
+export function normalizeRespanResponse(data: unknown): TriageResult | undefined {
+  if (typeof data !== "object" || data === null) return undefined;
+  const record = data as Record<string, unknown>;
+  const results = record["results"];
+  if (!Array.isArray(results)) return undefined;
+
+  const present: Partial<Record<TriageChoice, number>> = {};
+  for (const entry of results) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const row = entry as Record<string, unknown>;
+    const id = typeof row["id"] === "string" ? row["id"].trim().toLowerCase() : "";
+    const choice = RESPAN_BEHAVIOR_CHOICES[id];
+    if (!choice) continue;
+    present[choice] = clamp01(row["p_present"], 0);
+  }
+  if (Object.keys(present).length === 0) return undefined;
+
+  // 最大の p_present をそのまま確信度にする（正規化前の公式スコア）。
+  const confidence = Math.max(...Object.values(present).map((value) => value ?? 0));
+  // 全確率の合計が 1.0 になるよう正規化し、最大のものを choice にする。
+  const probabilities = normalizeProbabilities(present, "維持");
+  let choice: TriageChoice = "維持";
+  for (const candidate of ["維持", "要約", "落とす"] as const) {
+    if (probabilities[candidate] > probabilities[choice]) {
+      choice = candidate;
+    }
+  }
+  return { choice, confidence, probabilities };
+}
+
 function normalizeResponse(data: unknown): TriageResult | undefined {
+  // Respan 形式は形状（results 配列）で判別して先に変換する。
+  // エンドポイント判別が外れてもレスポンス側で正しく解釈できる。
+  const respan = normalizeRespanResponse(data);
+  if (respan) return respan;
+
   if (typeof data !== "object" || data === null) return undefined;
   const record = data as Record<string, unknown>;
 
@@ -215,6 +340,20 @@ function buildSystemOnePayload(model: string, text: string): string {
       },
     },
   });
+}
+
+/**
+ * 送信先のプロトコルに応じたペイロードを組み立てる。
+ * Respan（`api.respan.ai` / `span-*`）なら scores 形式、それ以外は従来の
+ * `/v1/systemone` 形式（Jev / Laya）。
+ */
+export function buildRequestPayload(
+  params: { endpoint: string; model: string },
+  text: string,
+): string {
+  return usesRespanProtocol(params)
+    ? buildRespanPayload(params.model, text)
+    : buildSystemOnePayload(params.model, text);
 }
 
 export class SystemOneClient {
@@ -317,6 +456,11 @@ export class SystemOneClient {
     return Promise.all(texts.map((text) => this.judge(text)));
   }
 
+  /** Respan のホストのみ指定（パスなし）を公式 scores エンドポイントに補正する。 */
+  private resolveUrl(endpoint: string): string {
+    return isRespanEndpoint(endpoint) ? resolveRespanUrl(endpoint) : endpoint;
+  }
+
   private async withSlot<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.concurrency) {
       await new Promise<void>((resolve) => {
@@ -380,10 +524,10 @@ export class SystemOneClient {
         "content-type": "application/json",
       };
       if (fb.apiKey) headers["authorization"] = `Bearer ${fb.apiKey}`;
-      const response = await this.fetchFn(fb.endpoint, {
+      const response = await this.fetchFn(this.resolveUrl(fb.endpoint), {
         method: "POST",
         headers,
-        body: buildSystemOnePayload(fb.model, text),
+        body: buildRequestPayload({ endpoint: fb.endpoint, model: fb.model }, text),
         signal,
       });
       if (!response.ok) {
@@ -455,10 +599,10 @@ export class SystemOneClient {
       "content-type": "application/json",
     };
     if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
-    const response = await this.fetchFn(this.endpoint, {
+    const response = await this.fetchFn(this.resolveUrl(this.endpoint), {
       method: "POST",
       headers,
-      body: buildSystemOnePayload(this.model, text),
+      body: buildRequestPayload({ endpoint: this.endpoint, model: this.model }, text),
       signal,
     });
     if (!response.ok) {
