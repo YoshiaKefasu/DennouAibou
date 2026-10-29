@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/dennou-subagent",
+  "version": "2026.4.6",
+  "private": true,
+  "description": "DennouAibou workspace-defined autonomous subagent runner plugin",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.6"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

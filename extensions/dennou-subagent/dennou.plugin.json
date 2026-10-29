@@ -1,0 +1,15 @@
+{
+  "id": "dennou-subagent",
+  "name": "電脳サブエージェント",
+  "description": "ワークスペース定義型 自律サブエージェント実行・管理プラグイン",
+  "enabledByDefault": true,
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      }
+    }
+  }
+}
