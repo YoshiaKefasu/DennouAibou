@@ -22,7 +22,11 @@ export type AgentDefinition = {
   description: string;
   /** `provider/model` 形式。未指定なら呼び出し元エージェントのモデルを継承する。 */
   model?: string;
-  /** 許可ツール名。未指定なら全ツール許可（`toolsAllow` を渡さない）。 */
+  /**
+   * 許可ツール名。未指定なら全ツール許可（`toolsAllow` を渡さない）。
+   * Note: ここに制御系（`subagent` / `steer_subagent` / `stop_subagent`）や `memo` を
+   * 書いても、実行時に `SUBAGENT_EXCLUDED_TOOLS` で除去される（再帰・兄弟操作・メモリ污染の遮断）。
+   */
   tools?: string[];
   /** 本文 = 独立セッションのシステムプロンプト。 */
   systemPrompt: string;

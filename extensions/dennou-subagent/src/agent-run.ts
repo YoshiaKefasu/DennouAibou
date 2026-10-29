@@ -29,10 +29,17 @@ import type { SubagentRunFn, SubagentRunOutcome, SubagentRunRequest } from "./ru
 
 /**
  * サブエージェントに常時禁止するツール。
- * サブエージェントは使い捨ての独立セッションなので、メインの能動記憶 `memo` を
- * 同期させない（メモリ污染の構造的遮断）。
+ *
+ * - `memo`: 使い捨ての独立セッションなので、メインの能動記憶を同期させない（メモリ污染の構造的遮断）。
+ * - `subagent` / `steer_subagent` / `stop_subagent`: オーケストレーション制御系。
+ *   サブエージェント自身の再帰起動（無限増殖）や、兄弟エージェントの勝手な操作を防ぐ。
  */
-export const SUBAGENT_EXCLUDED_TOOLS = ["memo"] as const;
+export const SUBAGENT_EXCLUDED_TOOLS: readonly string[] = [
+  "memo",
+  "subagent",
+  "steer_subagent",
+  "stop_subagent",
+];
 
 /** 除外対象のツール名かどうか（大文字小文字は無視）。 */
 export function isExcludedSubagentTool(toolName: string): boolean {
@@ -102,11 +109,12 @@ export type ResolvedSubagentTools = {
  * 重要な落とし穴: `runEmbeddedPiAgent` は `toolsAllow` が**空配列**のとき
  * 「指定なし」と同じく全ツール許可として扱う（`attempt.ts` の `length > 0` 判定）。
  * したがって `tools: ["memo"]` のように全部除外されて空になるケースで `[]` を渡すと
- * fail-open（memo 含む全ツール許可）に化ける。空になる場合は `disableTools: true` で
+ * fail-open（除外ツールを含む全許可）に化ける。空になる場合は `disableTools: true` で
  * 「ツール 0 件」を明示する。
  *
- * Note: `tools` 未指定（全ツール許可）のときの memo 遮断は `toolsAllow` では表現できないため、
- * `before_tool_call` フック（`index.ts`）でサブエージェントセッションからの `memo` を実行時に拒否する。
+ * Note: `tools` 未指定（全ツール許可）のときの除外ツール遮断は `toolsAllow` では表現できないため、
+ * `before_tool_call` フック（`index.ts`）でサブエージェントセッションからの
+ * `SUBAGENT_EXCLUDED_TOOLS`（memo / subagent / steer_subagent / stop_subagent）を実行時に拒否する。
  */
 export function resolveSubagentTools(
   definition: Pick<AgentDefinition, "tools">,

@@ -675,13 +675,28 @@ function makeRunRequest(overrides: Partial<SubagentRunRequest> = {}): CapturedRe
   return { request, logs };
 }
 
-describe("agent-run: memo exclusion (fail-closed)", () => {
+describe("agent-run: excluded tools (fail-closed)", () => {
   it("turns a memo-only tool list into zero tools instead of all tools", () => {
     const resolved = resolveSubagentTools({ tools: ["memo"] });
 
     // 空配列は runner 側で「全許可」に化けるため、disableTools で 0 件を表現する。
     expect(resolved).toEqual({ disableTools: true });
     expect(resolved.toolsAllow).toBeUndefined();
+  });
+
+  it("turns a control-tool-only list into zero tools (no recursion or sibling control)", () => {
+    for (const tool of ["subagent", "steer_subagent", "stop_subagent"]) {
+      expect(resolveSubagentTools({ tools: [tool] })).toEqual({ disableTools: true });
+    }
+    expect(
+      resolveSubagentTools({ tools: ["memo", "subagent", "steer_subagent", "stop_subagent"] }),
+    ).toEqual({ disableTools: true });
+  });
+
+  it("strips control tools from a mixed tool list", () => {
+    expect(
+      resolveSubagentTools({ tools: ["subagent", "bash", "steer_subagent", "stop_subagent"] }),
+    ).toEqual({ toolsAllow: ["bash"] });
   });
 
   it("filters memo out of a mixed tool list", () => {
@@ -948,7 +963,7 @@ function makeRegisterApi(overrides: Partial<RegisterApi>): RegisterApi {
 }
 
 describe("plugin registration", () => {
-  it("registers both tools and the background manager service", () => {
+  it("registers all four tools and the background manager service", () => {
     const toolNames: string[] = [];
     const serviceIds: string[] = [];
     pluginEntry.register(
@@ -1035,6 +1050,25 @@ describe("memo guard (before_tool_call)", () => {
 
     expect(handler({ toolName: "memo" }, { sessionKey: "agent:main:main" })).toBeUndefined();
     expect(handler({ toolName: "memo" }, {})).toBeUndefined();
+  });
+
+  it("blocks the orchestration control tools inside subagent sessions", () => {
+    const handler = captureToolHook();
+    const subagentSession = { sessionKey: `${SUBAGENT_SESSION_KEY_PREFIX}sub-1-abcdef` };
+
+    for (const toolName of ["subagent", "steer_subagent", "stop_subagent"]) {
+      const result = handler({ toolName }, subagentSession);
+      expect(result?.block).toBe(true);
+      expect(result?.blockReason).toContain(toolName);
+    }
+  });
+
+  it("allows the orchestration control tools outside subagent sessions", () => {
+    const handler = captureToolHook();
+
+    for (const toolName of ["subagent", "steer_subagent", "stop_subagent"]) {
+      expect(handler({ toolName }, { sessionKey: "agent:main:main" })).toBeUndefined();
+    }
   });
 
   it("allows other tools inside subagent sessions", () => {

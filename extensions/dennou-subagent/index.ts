@@ -174,8 +174,7 @@ export default definePluginEntry({
       }
       return {
         block: true,
-        blockReason:
-          "サブエージェントセッションでは memo ツールを使用できません（メモリ汚染防止）。",
+        blockReason: `サブエージェントセッションでは ${event.toolName} ツールを使用できません（再帰起動・兄弟エージェント操作・メモリ汚染の防止）。`,
       };
     });
 
