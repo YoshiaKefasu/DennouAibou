@@ -12,6 +12,7 @@
 import crypto from "node:crypto";
 import type { OpenClawConfig } from "../../../src/config/config.js";
 import { AGENTS_SUBDIR, type AgentDefinition } from "./agent-scanner.js";
+import { formatSteerLogLine } from "./log-format.js";
 
 export type SubagentStatus = "running" | "completed" | "failed";
 
@@ -57,6 +58,9 @@ export type SubagentRunOutcome = {
 
 export type SubagentRunFn = (request: SubagentRunRequest) => Promise<SubagentRunOutcome>;
 
+/** 実行中サブエージェントへの割り込み送信関数。送信できたら `true`。 */
+export type SteerAgent = (params: { runId: string; message: string }) => boolean;
+
 export type SubagentNotifyParams = {
   /** 完了/失敗した実行のスナップショット。 */
   run: SubagentRun;
@@ -74,6 +78,8 @@ export type SubagentLogger = {
 
 export type SubagentManagerOptions = {
   runAgent: SubagentRunFn;
+  /** 実行中サブエージェントへの割り込み送信（`steer_subagent`）。 */
+  steerAgent?: SteerAgent;
   notify?: SubagentNotifier;
   now?: () => number;
   defaultTimeoutMs?: number;
@@ -123,8 +129,20 @@ export type SubagentManager = {
   start: (params: SubagentStartParams) => SubagentStartResult;
   /** 常に即座に現在のステータス・ログ・結果を返す（ブロッキング待機はしない）。 */
   get: (agentId: string) => Promise<SubagentResult>;
+  /** 実行中のサブエージェントへ割り込み指示を送る。 */
+  steer: (agentId: string, message: string) => SubagentControlResult;
+  /** 実行中のサブエージェントを即座に中断する。 */
+  stop: (agentId: string) => SubagentControlResult;
   list: () => SubagentRun[];
   stopAll: (reason?: string) => void;
+};
+
+/** `steer` / `stop` の結果。 */
+export type SubagentControlResult = {
+  agentId: string;
+  agent: string;
+  status: SubagentStatus;
+  message: string;
 };
 
 /** 1実行あたりの既定タイムアウト（10分）。 */
@@ -155,6 +173,8 @@ export const MAX_CONCURRENT_SUBAGENTS_CALL = 1;
 export const CALL_SESSION_KEY_PREFIX = "call:";
 /** サブエージェントが使う独立セッションキーの接頭辞（`dennou-subagent:<agentId>`）。 */
 export const SUBAGENT_SESSION_KEY_PREFIX = "dennou-subagent:";
+/** `stop_subagent` で中断したときのステータス理由。 */
+export const SUBAGENT_STOPPED_REASON = "ユーザーまたは親エージェントにより停止されました";
 
 type InternalRun = {
   run: SubagentRun;
@@ -432,7 +452,8 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     endedAt: run.endedAt,
   });
 
-  const get = async (agentId: string): Promise<SubagentResult> => {
+  /** agentId から実行を引く。見つからなければ詳細付きで投げる。 */
+  const requireRun = (agentId: string): InternalRun => {
     const key = agentId.trim();
     const internal = runs.get(key);
     if (!internal) {
@@ -446,7 +467,63 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
         }`,
       );
     }
-    return toResult(internal.run);
+    return internal;
+  };
+
+  const get = async (agentId: string): Promise<SubagentResult> => {
+    return toResult(requireRun(agentId).run);
+  };
+
+  const steer = (agentId: string, message: string): SubagentControlResult => {
+    const internal = requireRun(agentId);
+    const { run } = internal;
+    if (run.status !== "running") {
+      throw new Error(
+        `サブエージェント '${run.agentId}' は実行中ではありません（status: ${run.status}）。`,
+      );
+    }
+    const trimmed = (message ?? "").trim();
+    if (!trimmed) {
+      throw new Error("割り込みメッセージ 'message' は必須です。");
+    }
+    const steerAgent = options.steerAgent;
+    if (!steerAgent) {
+      throw new Error("割り込み送信が構成されていません（steerAgent 未設定）。");
+    }
+    const delivered = steerAgent({ runId: run.agentId, message: trimmed });
+    if (!delivered) {
+      throw new Error(
+        `サブエージェント '${run.agentId}' へ割り込みを送信できませんでした（実行が既に終了したか、コンテキスト圧縮中です）。`,
+      );
+    }
+    appendLog(run, formatSteerLogLine(trimmed));
+    return {
+      agentId: run.agentId,
+      agent: run.agent,
+      status: run.status,
+      message: `サブエージェント ${run.agentId} に割り込み指示を送信しました。`,
+    };
+  };
+
+  const stop = (agentId: string): SubagentControlResult => {
+    const internal = requireRun(agentId);
+    const { run } = internal;
+    if (run.status !== "running") {
+      throw new Error(
+        `サブエージェント '${run.agentId}' は既に終了しています（status: ${run.status}）。`,
+      );
+    }
+    run.status = "failed";
+    run.error = SUBAGENT_STOPPED_REASON;
+    run.endedAt = now();
+    appendLog(run, "🛑 停止しました");
+    internal.controller.abort(SUBAGENT_STOPPED_REASON);
+    return {
+      agentId: run.agentId,
+      agent: run.agent,
+      status: run.status,
+      message: `サブエージェント ${run.agentId} を停止しました。`,
+    };
   };
 
   const list = (): SubagentRun[] =>
@@ -466,5 +543,5 @@ export function createSubagentManager(options: SubagentManagerOptions): Subagent
     }
   };
 
-  return { start, get, list, stopAll };
+  return { start, get, steer, stop, list, stopAll };
 }

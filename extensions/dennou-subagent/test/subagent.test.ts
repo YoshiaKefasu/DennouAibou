@@ -6,6 +6,7 @@ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../src/agents/defaults.js
 import type { RunEmbeddedPiAgentParams } from "../../../src/agents/pi-embedded-runner/run/params.js";
 import type { AnyAgentTool } from "../../../src/agents/tools/common.js";
 import type { OpenClawConfig } from "../../../src/config/config.js";
+import { emitAgentEvent, type AgentEventPayload } from "../../../src/infra/agent-events.js";
 import pluginEntry from "../index.js";
 import {
   createEmbeddedSubagentRunner,
@@ -20,12 +21,19 @@ import {
   scanAgentDefinitions,
   splitFrontmatter,
 } from "../src/agent-scanner.js";
+import {
+  formatSteerLogLine,
+  formatToolLogDetail,
+  formatToolLogLine,
+  MAX_TOOL_LOG_DETAIL_CHARS,
+} from "../src/log-format.js";
 import { createSystemEventNotifier, formatSubagentCompletionText } from "../src/notify.js";
 import {
   createSubagentManager,
   DEFAULT_TIMEOUT_GUARD_GRACE_MS,
   MAX_CONCURRENT_SUBAGENTS_DEFAULT,
   SUBAGENT_SESSION_KEY_PREFIX,
+  SUBAGENT_STOPPED_REASON,
   type SubagentNotifyParams,
   type SubagentRunFn,
   type SubagentRunOutcome,
@@ -34,6 +42,8 @@ import {
 } from "../src/runner.js";
 import {
   createGetSubagentResultTool,
+  createStopSubagentTool,
+  createSteerSubagentTool,
   createSubagentTool,
   formatSubagentResult,
 } from "../src/tools.js";
@@ -768,17 +778,52 @@ describe("agent-run: embedded run wiring", () => {
   it("runs the definition as an independent embedded session", async () => {
     const { request, logs } = makeRunRequest();
     const calls: RunEmbeddedPiAgentParams[] = [];
+    const emitted: AgentEventPayload[] = [];
+    let unsubscribed = 0;
     const runEmbedded: RunEmbeddedAgentFn = async (params) => {
       calls.push(params);
-      params.onAgentEvent?.({ stream: "tool", data: { phase: "start", name: "bash" } });
-      params.onAgentEvent?.({ stream: "tool", data: { phase: "end", name: "bash" } });
-      params.onAgentEvent?.({ stream: "lifecycle", data: { phase: "end" } });
+      // ツール開始イベント（引数付き）はエージェントイベントバス経由で届く。
+      emitted.push(
+        {
+          runId: "sub-test-1",
+          seq: 1,
+          ts: 1,
+          stream: "tool",
+          data: { phase: "start", name: "bash", args: { command: "git status --short" } },
+        },
+        {
+          runId: "sub-test-1",
+          seq: 2,
+          ts: 2,
+          stream: "tool",
+          data: { phase: "end", name: "bash" },
+        },
+        {
+          runId: "other-run",
+          seq: 3,
+          ts: 3,
+          stream: "tool",
+          data: { phase: "start", name: "bash", args: { command: "should be ignored" } },
+        },
+      );
+      for (const event of emitted) {
+        emitToListener(event);
+      }
       return {
         payloads: [{ text: "実装しました" }, { text: "テストも pass" }],
         meta: { durationMs: 5 },
       };
     };
-    const runner = createEmbeddedSubagentRunner({ runEmbedded });
+    let emitToListener: (event: AgentEventPayload) => void = () => {};
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded,
+      subscribeAgentEvents: (listener) => {
+        emitToListener = listener;
+        return () => {
+          unsubscribed += 1;
+        };
+      },
+    });
 
     const outcome = await runner(request);
 
@@ -795,7 +840,11 @@ describe("agent-run: embedded run wiring", () => {
     expect(params.toolsAllow).toEqual(["bash", "read"]);
     expect(params.timeoutMs).toBe(1_234);
     expect(params.abortSignal).toBe(request.signal);
-    expect(logs).toEqual(["▶ 開始 (cli-router/kios-deepseek-v4.1-flash)", "🔧 bash"]);
+    expect(logs).toEqual([
+      "▶ 開始 (cli-router/kios-deepseek-v4.1-flash)",
+      "🔧 bash: git status --short",
+    ]);
+    expect(unsubscribed).toBe(1);
   });
 
   it("passes undefined toolsAllow when the definition lists no tools", async () => {
@@ -913,7 +962,12 @@ describe("plugin registration", () => {
       }),
     );
 
-    expect(toolNames).toEqual(["subagent", "get_subagent_result"]);
+    expect(toolNames).toEqual([
+      "subagent",
+      "get_subagent_result",
+      "steer_subagent",
+      "stop_subagent",
+    ]);
     expect(serviceIds).toEqual(["dennou-subagent"]);
   });
 
@@ -989,5 +1043,244 @@ describe("memo guard (before_tool_call)", () => {
     expect(
       handler({ toolName: "bash" }, { sessionKey: `${SUBAGENT_SESSION_KEY_PREFIX}sub-1-abcdef` }),
     ).toBeUndefined();
+  });
+});
+
+describe("tool log details", () => {
+  it("formats bash commands, file paths and search patterns", () => {
+    expect(formatToolLogLine("bash", { command: "git status --short" })).toBe(
+      "🔧 bash: git status --short",
+    );
+    expect(formatToolLogLine("read", { path: "src/main.ts" })).toBe("🔧 read: src/main.ts");
+    expect(formatToolLogLine("edit", { path: "src/utils.ts" })).toBe("🔧 edit: src/utils.ts");
+    expect(formatToolLogLine("write", { path: "docs/x.md", content: "hi" })).toBe(
+      "🔧 write: docs/x.md",
+    );
+    expect(formatToolLogLine("grep", { pattern: "TODO", path: "src/" })).toBe(
+      "🔧 grep: TODO in src/",
+    );
+    expect(formatToolLogLine("find", { pattern: "*.ts" })).toBe("🔧 find: *.ts");
+  });
+
+  it("falls back to the core tool summary for other tools", () => {
+    expect(formatToolLogDetail("web_search", { query: "dennou subagent" })).toContain(
+      "dennou subagent",
+    );
+    expect(formatToolLogDetail("unknown_tool", { anything: "value-here" })).toBe("value-here");
+  });
+
+  it("keeps a single line and truncates long details", () => {
+    const longCommand = `echo ${"x".repeat(300)}`;
+    const line = formatToolLogLine("bash", { command: `echo line1\nline2 ${longCommand}` });
+
+    expect(line.startsWith("🔧 bash: ")).toBe(true);
+    expect(line).not.toContain("\n");
+    expect(line.length).toBeLessThanOrEqual(MAX_TOOL_LOG_DETAIL_CHARS);
+    expect(line.endsWith("…")).toBe(true);
+  });
+
+  it("omits the detail when the tool has no usable argument", () => {
+    expect(formatToolLogLine("bash", undefined)).toBe("🔧 bash");
+    expect(formatToolLogLine("bash", {})).toBe("🔧 bash");
+  });
+
+  it("formats the steer log line", () => {
+    expect(formatSteerLogLine("設定ファイルを見直して")).toBe(
+      "📨 追加指示: 設定ファイルを見直して",
+    );
+  });
+});
+
+describe("tool log details: real event bus", () => {
+  it("captures tool args from the default onAgentEvent subscription", async () => {
+    const { request, logs } = makeRunRequest();
+    const runner = createEmbeddedSubagentRunner({
+      runEmbedded: async () => {
+        emitAgentEvent({
+          runId: "sub-test-1",
+          stream: "tool",
+          data: { phase: "start", name: "read", args: { path: "src/main.ts" } },
+        });
+        return { payloads: [{ text: "ok" }], meta: { durationMs: 1 } };
+      },
+    });
+
+    await runner(request);
+
+    expect(logs).toContain("🔧 read: src/main.ts");
+  });
+});
+
+describe("steer_subagent", () => {
+  it("delivers a steer message to a running subagent", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const delivered: Array<{ runId: string; message: string }> = [];
+    const manager = createSubagentManager({
+      runAgent,
+      steerAgent: (params) => {
+        delivered.push(params);
+        return true;
+      },
+    });
+    const tool = createSubagentTool({ manager, context: { workspaceDir } });
+    const started = await callTool(tool, { agent: "executor", task: "実装して" });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+
+    const steered = await callTool(createSteerSubagentTool({ manager }), {
+      agent_id: agentId,
+      message: "テストも書いて",
+    });
+
+    expect(toolText(steered)).toContain("割り込み指示を送信しました");
+    expect(delivered).toEqual([{ runId: agentId, message: "テストも書いて" }]);
+
+    // 割り込みは実行ログにも残る。
+    const result = await manager.get(agentId);
+    expect(result.log).toContain("📨 追加指示: テストも書いて");
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("rejects a steer to a completed subagent", async () => {
+    const workspaceDir = makeWorkspace({});
+    const manager = createSubagentManager({
+      runAgent: async () => ({ output: "完了" }),
+      steerAgent: () => true,
+    });
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "実装して",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+    await flushAsync();
+
+    await expect(
+      createSteerSubagentTool({ manager }).execute!("call_1", {
+        agent_id: agentId,
+        message: "追加",
+      }),
+    ).rejects.toThrow(/実行中ではありません/);
+  });
+
+  it("rejects a steer to an unknown subagent", async () => {
+    const manager = createSubagentManager({ runAgent: async () => ({ output: "x" }) });
+
+    await expect(
+      createSteerSubagentTool({ manager }).execute!("call_1", {
+        agent_id: "sub-999",
+        message: "追加",
+      }),
+    ).rejects.toThrow(/が見つかりません/);
+  });
+
+  it("requires a message", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent, steerAgent: () => true });
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "実装して",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+
+    await expect(
+      createSteerSubagentTool({ manager }).execute!("call_1", { agent_id: agentId }),
+    ).rejects.toThrow(/message required/);
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("reports a delivery failure", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const manager = createSubagentManager({ runAgent, steerAgent: () => false });
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "実装して",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+
+    await expect(
+      createSteerSubagentTool({ manager }).execute!("call_1", {
+        agent_id: agentId,
+        message: "追加",
+      }),
+    ).rejects.toThrow(/割り込みを送信できませんでした/);
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+});
+
+describe("stop_subagent", () => {
+  it("aborts a running subagent immediately", async () => {
+    const workspaceDir = makeWorkspace({});
+    const { runAgent, deferreds } = createHangingRunner();
+    const signals: AbortSignal[] = [];
+    const manager = createSubagentManager({
+      runAgent: async (request) => {
+        signals.push(request.signal);
+        return await runAgent(request);
+      },
+    });
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "長い作業",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+    await flushAsync();
+
+    const stopped = await callTool(createStopSubagentTool({ manager }), { agent_id: agentId });
+
+    expect(toolText(stopped)).toContain("停止しました");
+    expect(signals[0]?.aborted).toBe(true);
+
+    const result = await manager.get(agentId);
+    expect(result.status).toBe("failed");
+    expect(result.error).toBe(SUBAGENT_STOPPED_REASON);
+
+    // 中断後は枠が空くので次が起動できる。
+    const next = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "次の作業",
+    });
+    expect(toolDetails<SubagentStartResult>(next).status).toBe("running");
+
+    for (const deferred of deferreds) {
+      deferred.resolve({ output: "done" });
+    }
+    await flushAsync();
+  });
+
+  it("rejects stopping a completed subagent", async () => {
+    const workspaceDir = makeWorkspace({});
+    const manager = createSubagentManager({ runAgent: async () => ({ output: "完了" }) });
+    const started = await callTool(createSubagentTool({ manager, context: { workspaceDir } }), {
+      agent: "executor",
+      task: "実装して",
+    });
+    const agentId = toolDetails<SubagentStartResult>(started).agentId;
+    await flushAsync();
+
+    await expect(
+      createStopSubagentTool({ manager }).execute!("call_1", { agent_id: agentId }),
+    ).rejects.toThrow(/既に終了しています/);
+  });
+
+  it("rejects stopping an unknown subagent", async () => {
+    const manager = createSubagentManager({ runAgent: async () => ({ output: "x" }) });
+
+    await expect(
+      createStopSubagentTool({ manager }).execute!("call_1", { agent_id: "sub-999" }),
+    ).rejects.toThrow(/が見つかりません/);
   });
 });

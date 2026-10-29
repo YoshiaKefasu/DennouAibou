@@ -17,8 +17,14 @@ import { resolveAgentEffectiveModelPrimary } from "../../../src/agents/agent-sco
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../src/agents/defaults.js";
 import { parseModelRef } from "../../../src/agents/model-selection.js";
 import type { RunEmbeddedPiAgentParams } from "../../../src/agents/pi-embedded-runner/run/params.js";
-import { runEmbeddedPiAgent, type EmbeddedPiRunResult } from "../../../src/agents/pi-embedded.js";
+import {
+  queueEmbeddedPiMessage,
+  runEmbeddedPiAgent,
+  type EmbeddedPiRunResult,
+} from "../../../src/agents/pi-embedded.js";
+import { onAgentEvent, type AgentEventPayload } from "../../../src/infra/agent-events.js";
 import type { AgentDefinition } from "./agent-scanner.js";
+import { formatToolLogLine } from "./log-format.js";
 import type { SubagentRunFn, SubagentRunOutcome, SubagentRunRequest } from "./runner.js";
 
 /**
@@ -37,9 +43,17 @@ export function isExcludedSubagentTool(toolName: string): boolean {
 /** 1ターンの組み込みエージェント実行関数（テストで差し替え可能）。 */
 export type RunEmbeddedAgentFn = (params: RunEmbeddedPiAgentParams) => Promise<EmbeddedPiRunResult>;
 
+/** エージェントイベント購読関数（テストで差し替え可能）。 */
+export type SubscribeAgentEventsFn = (listener: (event: AgentEventPayload) => void) => () => void;
+
+/** 実行中サブエージェントへの割り込み送信関数。 */
+export type SteerAgentFn = (params: { runId: string; message: string }) => boolean;
+
 export type EmbeddedSubagentRunnerDeps = {
   /** 既定は本物の `runEmbeddedPiAgent`。 */
   runEmbedded?: RunEmbeddedAgentFn;
+  /** 既定は `onAgentEvent`（ツール実行ログの詳細化に使う）。 */
+  subscribeAgentEvents?: SubscribeAgentEventsFn;
 };
 
 /**
@@ -67,6 +81,11 @@ function collectOutput(payloads: readonly { text?: string }[] | undefined): stri
     .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
     .filter(Boolean)
     .join("\n");
+}
+
+/** 本番用の割り込み送信関数（`queueEmbeddedPiMessage` を runId で引く）。 */
+export function createEmbeddedSteerAgent(): SteerAgentFn {
+  return ({ runId, message }) => queueEmbeddedPiMessage(runId, message);
 }
 
 /** `runEmbedded` に渡すツール制御。 */
@@ -106,12 +125,26 @@ export function resolveSubagentTools(
 /** 本番用 `SubagentRunFn`。1タスク = 1独立モデルセッション。 */
 export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = {}): SubagentRunFn {
   const runEmbedded = deps.runEmbedded ?? runEmbeddedPiAgent;
+  const subscribeAgentEvents = deps.subscribeAgentEvents ?? onAgentEvent;
   return async (request) => {
     const sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), "dennou-subagent-"));
     const sessionFile = path.join(sessionDir, "session.jsonl");
     const { provider, model } = resolveSubagentModel(request);
     const tools = resolveSubagentTools(request.definition);
     request.onLog(`▶ 開始 (${provider}/${model})`);
+    // ツール実行ログの詳細化（DENNOU_SUBAGENT.md §4.2）。
+    // `onAgentEvent` の `tool/start` には引数が含まれないため、引数付きの
+    // エージェントイベントバスを runId で絞って購読する。
+    const unsubscribe = subscribeAgentEvents((event) => {
+      if (event.runId !== request.runId) {
+        return;
+      }
+      if (event.stream !== "tool" || event.data?.phase !== "start") {
+        return;
+      }
+      const name = typeof event.data.name === "string" ? event.data.name : "tool";
+      request.onLog(formatToolLogLine(name, event.data.args));
+    });
     try {
       const result = await runEmbedded({
         sessionId: request.runId,
@@ -131,13 +164,6 @@ export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = 
         timeoutMs: request.timeoutMs,
         runId: request.runId,
         abortSignal: request.signal,
-        onAgentEvent: (event) => {
-          if (event.stream !== "tool" || event.data?.phase !== "start") {
-            return;
-          }
-          const name = typeof event.data.name === "string" ? event.data.name : "tool";
-          request.onLog(`🔧 ${name}`);
-        },
       });
 
       const output = collectOutput(result.payloads);
@@ -157,6 +183,7 @@ export function createEmbeddedSubagentRunner(deps: EmbeddedSubagentRunnerDeps = 
       }
       return { output: output || "(サブエージェントからのテキスト出力はありません)" };
     } finally {
+      unsubscribe();
       try {
         fs.rmSync(sessionDir, { recursive: true, force: true });
       } catch {

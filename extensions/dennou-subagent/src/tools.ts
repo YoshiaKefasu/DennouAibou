@@ -3,6 +3,8 @@
  *
  * - `subagent(agent, task)`: 非同期で起動し、即座に `agent_id` を返す。
  * - `get_subagent_result(agent_id)`: 待機せず現在の状態・最新ログ・最終結果を即座に返す。
+ * - `steer_subagent(agent_id, message)`: 実行中へ割り込み指示を送る。
+ * - `stop_subagent(agent_id)`: 実行中を即座に中断する。
  */
 
 import { Type } from "typebox";
@@ -42,6 +44,21 @@ export const SubagentToolSchema = Type.Object({
 export const GetSubagentResultToolSchema = Type.Object({
   agent_id: Type.String({
     description: "subagent ツールが返したサブエージェントID（例: 'sub-1730000000000-a1b2c3'）。",
+  }),
+});
+
+export const SteerSubagentToolSchema = Type.Object({
+  agent_id: Type.String({
+    description: "割り込み先のサブエージェントID（実行中のみ）。",
+  }),
+  message: Type.String({
+    description: "作業中のサブエージェントへ割り込ませる追加指示・方向転換・フィードバック。",
+  }),
+});
+
+export const StopSubagentToolSchema = Type.Object({
+  agent_id: Type.String({
+    description: "停止するサブエージェントID（実行中のみ）。",
   }),
 });
 
@@ -139,12 +156,50 @@ export function createGetSubagentResultTool(options: { manager: SubagentManager 
     parameters: GetSubagentResultToolSchema,
     execute: async (_toolCallId, args) => {
       const params = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
-      const agentId = readStringParam(params, "agent_id") ?? readStringParam(params, "agentId");
-      if (!agentId) {
-        throw new Error("'agent_id' は必須です。");
-      }
+      const agentId = readAgentId(params);
       const result = await options.manager.get(agentId);
       return textResult(formatSubagentResult(result), result);
+    },
+  };
+}
+
+/** `agent_id`（または `agentId`）を読み出す共通処理。 */
+function readAgentId(params: Record<string, unknown>): string {
+  const agentId = readStringParam(params, "agent_id") ?? readStringParam(params, "agentId");
+  if (!agentId) {
+    throw new Error("'agent_id' は必須です。");
+  }
+  return agentId;
+}
+
+export function createSteerSubagentTool(options: { manager: SubagentManager }): AnyAgentTool {
+  return {
+    label: "Steer Subagent",
+    name: "steer_subagent",
+    description:
+      "実行中のサブエージェントへ追加指示・方向転換を割り込み送信する（完了済みには送れない）。",
+    parameters: SteerSubagentToolSchema,
+    execute: async (_toolCallId, args) => {
+      const params = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+      const agentId = readAgentId(params);
+      const message = readStringParam(params, "message", { required: true });
+      const result = options.manager.steer(agentId, message);
+      return textResult(result.message, result);
+    },
+  };
+}
+
+export function createStopSubagentTool(options: { manager: SubagentManager }): AnyAgentTool {
+  return {
+    label: "Stop Subagent",
+    name: "stop_subagent",
+    description: "実行中のサブエージェントを即座に中断・緊急停止する。",
+    parameters: StopSubagentToolSchema,
+    execute: async (_toolCallId, args) => {
+      const params = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+      const agentId = readAgentId(params);
+      const result = options.manager.stop(agentId);
+      return textResult(result.message, result);
     },
   };
 }
