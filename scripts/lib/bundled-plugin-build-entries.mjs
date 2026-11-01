@@ -99,6 +99,13 @@ export function collectBundledPluginBuildEntries(params = {}) {
     const pluginDir = path.join(extensionsRoot, dirent.name);
     const manifestFilename = resolvePluginManifestFilename(pluginDir);
     const hasManifest = manifestFilename !== null;
+    let isBinaryPlugin = false;
+    if (hasManifest) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(pluginDir, manifestFilename), "utf8"));
+        isBinaryPlugin = raw?.kind === "binary";
+      } catch {}
+    }
     const packageJsonPath = path.join(pluginDir, "package.json");
     const packageJson = readBundledPluginPackageJson(packageJsonPath);
     const topLevelPublicSurfaceEntries = collectTopLevelPublicSurfaceEntries(pluginDir);
@@ -122,12 +129,14 @@ export function collectBundledPluginBuildEntries(params = {}) {
       manifestFilename,
       hasPackageJson: packageJson !== null,
       packageJson,
-      sourceEntries: Array.from(
-        new Set([
-          ...(hasManifest ? collectPluginSourceEntries(packageJson) : []),
-          ...topLevelPublicSurfaceEntries,
-        ]),
-      ),
+      sourceEntries: isBinaryPlugin
+        ? []
+        : Array.from(
+            new Set([
+              ...(hasManifest ? collectPluginSourceEntries(packageJson) : []),
+              ...topLevelPublicSurfaceEntries,
+            ]),
+          ),
     });
   }
 
