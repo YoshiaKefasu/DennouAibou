@@ -8,6 +8,10 @@
   - `dennou.plugin.json`（`kind: "binary"`, `executable: "./bin/kaden"`）＋ `main.go`（stdio JSON-RPC 2.0 デーモン）＋ `build.mjs`（クロスビルド）。
   - ホスト側は `src/plugins/binary-runner.ts` の stdio JSON-RPC ブリッジで接続し、`registerService` による起動・正常終了と、ツール呼び出しの中継を行う。
   - `initialize` が広告する capabilities は現時点では `["tools"]` のみ（音声パイプライン実装時に `"voice"` を追加する）。
+- **パーソナル話者フィルタ（`extensions/dennou-kaden/audio`）** を実装済み。
+  - `audio/personal_filter.go`: 標準ライブラリ（`math` 等）のみ・CGO 不要の純 Go 実装。VAD ＋ 正規化自己相関ピッチ ＋ 話者プロファイル追跡の3段パイプラインを 16 ms フレーム単位で実行する（詳細は §6）。
+  - `audio/personal_filter_test.go`: 合成サイン波（120 Hz / 200 Hz / 帯域外 400 Hz）、ホワイトノイズ、無音、48 kHz ステレオ、登録フェイルクローズ、`Reset()`、`too_far`、アロケーション 0 を検証。
+  - `go test -race ./...` が全パス。ただし**デーモン本体（`main.go`）にはまだ配線していない**（受信音声経路の実装時に接続する）。
 - **ツール 2 種**（実装済みの範囲のみを公開）:
   - `kaden_status`: デーモン状態・Go ランタイム情報・設定値のレポート。
   - `kaden_call`: `action: "status" | "ping"`（JSON Schema の `enum` で制限）。未知の action はエラーにせず案内メッセージを返す。
@@ -16,6 +20,7 @@
 
 音声送受信・STT/TTS ストリーミングパイプラインは**未実装**であり、以下を段階的に Go デーモン完結型へ移行する計画とする。
 
+0. **パーソナル話者フィルタの配線**: `audio.Filter` は完成済みだが未接続。受信音声（PCM）を `Filter.Process` に通し、`Verdict.IsUser == false` のフレームを STT へ流さない（＝他話者・雑音・遠距離音を送信しない）ゲートとして組み込む。
 1. **音声入出力の Go 側移行**: Discord voice の受信（Opus デコード）・送信（Opus エンコード）を Go デーモン内に取り込み、`@discordjs/voice` 依存を縮小する。
 2. **STT/TTS ストリーミング**: 無音検知 → STT（Groq Whisper 一次 / Gemini Transcribe Live 二次）→ マスターセッション → TTS（OpenRouter Fish Audio）を、WAV/MP3 の一時ファイル経由ではなくストリームで接続する。
 3. **capabilities の更新**: 上記が動作した時点で `initialize` の capabilities に `"voice"` を追加する。
@@ -157,3 +162,106 @@ Discord のボイスチャンネルを活用し、Kasou（電脳相棒）と Yos
 2. 機械判定: リポジトリルートで `bun -e 'const r=require("@discordjs/voice").generateDependencyReport(); if(r.includes("@noble/ciphers: not found")) process.exit(1)'`: 暗号化ライブラリが正常認識されること。
 3. `bun test extensions/discord/src/voice/`: ボイス関連テストおよび TTS 失敗時テキストフォールバックの全通過。
 4. `bun fmt --check`: フォーマット準拠。
+
+---
+
+## 6. パーソナル話者フィルタ（`audio` パッケージ）
+
+### 6.1 目的
+
+Krisp のようなノイズ抑制ではなく、**「登録した本人の声だけを通す」** ための軽量ゲート。通話中に混ざる他話者・環境音・遠くの話し声を STT へ渡さないことで、誤認識と無駄な API 課金を構造的に防ぐ。外部依存ゼロ・CGO 不要・純 Go 標準ライブラリのみで、リアルタイム音声経路から呼べることを最優先の設計制約とする。
+
+### 6.2 3段パイプライン
+
+```text
+PCM (int16 interleaved)
+   │  48 kHz → 3:1 平均間引き / ステレオ → (L+R)/2
+   ▼
+[16 kHz モノラル 256 サンプル = 16 ms フレーム]
+   │
+   ├─ ① VAD: RMS ＋ ZCR ＋ 指数移動ノイズフロア
+   │      → Voiced=false なら Reason="silence" で終了
+   ├─ ② ピッチ: 512 サンプル鏡像リングバッファ上の正規化自己相関
+   │      → F0Hz, Periodicity。Periodicity<VoicingMin なら "unvoiced"
+   │      → F0 が 80〜350 Hz の外なら "pitch_out_of_band"
+   └─ ③ 話者追跡: 登録プロファイル（μ・σ・基準音量）との照合
+          → IsUser / Score / Reason ("enrolling" | "too_far" | "pitch_out_of_band" | "user")
+```
+
+#### ① VAD（`RMS` ＋ `ZCR` ＋ ノイズフロア）
+
+- `RMS` はフレームの二乗平均平方根（フルスケール int16 を 1.0 に正規化）。
+- `ZCR` はゼロ交差率。ホワイトノイズは約 0.5 に張り付き、音声ははるかに低い。`zcrNoiseMax = 0.55` を超えるフレームは VAD で落とす。
+- ノイズフロアは指数移動平均で追跡する（`noiseFloorAlpha = 0.12`）。**VAD が棄却したフレームでのみ更新**するため、発話がフロアを押し上げて自分自身を無音判定にする事故が起きない。
+- 有声条件: `RMS >= max(vadAbsMin, noiseFloor*3.0)` かつ `ZCR <= 0.55`。
+
+#### ② ピッチ（正規化自己相関）
+
+- 512 サンプル（32 ms）の鏡像リングバッファ（`ring` は 1024 要素、書き込みは `pos` と `pos+512` の二箇所）により、**コピーなしで**直近 512 サンプルの連続スライスを得る。
+- ラグ範囲は `27〜200` サンプル。下限は `pitchSearchMaxHz = 600 Hz` から決めており、`MaxF0Hz` を超える高い声を「折り返して 1/2 のサブハーモニック（例: 400 Hz → 200 Hz）」と誤認せず、**帯域外として正しく棄却**するための余裕である。
+- 相関は固定長 `corrLen = 512 - maxLag = 312` サンプルで計算する（ラグごとに正規化条件を揃え、長いラグが有利にならないようにする）。
+- 最大ピークだけでなく **「全体最大の 90% 以上ある最も短いラグの局所ピーク」** を採用し、周期の 2 倍・3 倍への誤ロックを防ぐ。
+- ピーク位置は放物線補間するため、120 Hz 付近で ±0.5 Hz 程度の分解能が出る。
+- `Periodicity` は採用ピークの正規化相関値（0〜1）。`VoicingMin = 0.35` 未満は無声として棄却。
+
+#### ③ 話者プロファイル追跡
+
+- **登録フェーズ**: 有声かつ帯域内のフレームを `EnrollFrames = 30` 個集めて候補配列を満たす。ただし登録ウィンドウは `EnrollFrames × enrollSettleFactor(3) = 90` フレーム（約 1.5 秒）まで開いたままで、その間は **「最も静かな候補」をより音量の大きいフレームで置き換え続ける**。90 フレーム目で `finalizeProfile()` が走ってプロファイルが凍結される。この待ち時間があるため、登録プロファイルは自然と至近距離の発話へ寄り、VAD をすり抜けた室内雑音の影響を受けにくい。
+- **プロファイル**: `μ`（F0 平均）、`σ`（F0 標準偏差、`minSigmaHz = 8 Hz` と `μ` の 3% を下限とする）、`refRMS`（音量平均）。
+- **照合**: 許容帯は `max(σ, max(8 Hz, 0.03μ)) × PitchSigmas(2.5)`。外れたら即 `pitch_out_of_band`。音量が `refRMS × 0.12`（−18 dB）未満なら `too_far`。
+- **スコア**: `0.65 × ピッチ近さ ＋ 0.35 × 音量近さ`（各 0〜1）。
+- **ヒステリシス**: 参入 `0.60` / 離脱 `0.45`。境界でのパタパタ切り替えを防ぐ。
+- **EMA 更新**: `IsUser` のフレームのみ `μ`/`σ` を `0.02`、`refRMS` を `0.05` で緩やかに追従させ、声の調子や距離の変化に耐える。
+- **登録はフェイルクローズ**: 登録完了までは `IsUser = false`（`Reason = "enrolling"`）。未検証の声を「本人」と見なさない。
+- 無音・無声・帯域外を検出するとヒステリシス状態を即座にリセットする。
+
+### 6.3 `Verdict`
+
+| フィールド    | 型      | 意味                                                                            |
+| ------------- | ------- | ------------------------------------------------------------------------------- |
+| `Voiced`      | bool    | VAD 段の結果                                                                    |
+| `F0Hz`        | float64 | ピッチ周波数（無声は 0）                                                        |
+| `RMS`         | float64 | 正規化エネルギー                                                                |
+| `ZCR`         | float64 | ゼロ交差率                                                                      |
+| `Periodicity` | float64 | 正規化自己相関ピーク（0〜1）                                                    |
+| `IsUser`      | bool    | 最終パーソナル判定                                                              |
+| `Score`       | float64 | 話者スコア（0〜1）                                                              |
+| `Reason`      | string  | `silence` / `unvoiced` / `pitch_out_of_band` / `too_far` / `user` / `enrolling` |
+
+`Score` がヒステリシス下限を割った場合は、ピッチ成分と音量成分のどちらがより失敗しているかで `pitch_out_of_band` / `too_far` を出し分ける（`Reason` の語彙を増やさずに原因を伝えるため）。
+
+### 6.4 パラメータ表（`Config`）
+
+| フィールド     | 既定値  | 意味                                                                         |
+| -------------- | ------- | ---------------------------------------------------------------------------- |
+| `SampleRate`   | `16000` | 入力レート。`48000` は内部で 3:1 平均間引き。それ以外は `NewFilter` がエラー |
+| `Channels`     | `1`     | インターリーブ数。`2` は `(L+R)/2` でモノラル化。1/2 以外はエラー            |
+| `FrameMS`      | `16`    | 解析フレーム長。16 kHz で 256 サンプル。`16` のみ対応                        |
+| `MinF0Hz`      | `80.0`  | 受理するピッチ帯の下限                                                       |
+| `MaxF0Hz`      | `350.0` | 受理するピッチ帯の上限                                                       |
+| `EnrollFrames` | `30`    | 登録候補配列のサイズ。登録ウィンドウは `×3 = 90` フレーム（約 1.5 秒）       |
+| `PitchSigmas`  | `2.5`   | 登録 `μ` から許容する標準偏差数                                              |
+| `VoicingMin`   | `0.35`  | 有声判定の自己相関下限                                                       |
+
+内部定数（`personal_filter.go`）: `vadAbsMin=0.0035`、`vadFactor=3.0`、`zcrNoiseMax=0.55`、`noiseFloorAlpha=0.12`、`minSigmaHz=8.0`、`sigmaRelativeMin=0.03`、`volumeGateRatio=0.12`、`enterThreshold=0.60`、`exitThreshold=0.45`、`pitchWeight=0.65`、`levelWeight=0.35`、`profileAlphaPitch=0.02`、`profileAlphaLevel=0.05`、`enrollSettleFactor=3`、`ringSize=512`、`pitchSearchMaxHz=600`。
+
+### 6.5 API と性能特性
+
+| 関数                                                     | 役割                                                                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NewFilter(cfg Config) (*Filter, error)`                 | 全バッファを一度に確保。設定検証もここ                                                                                                                       |
+| `(*Filter).Process(samples []int16, emit func(Verdict))` | PCM を流し込み、完成した 16 ms フレームごとに `emit` を呼ぶ。`emit` は nil 可（nil でも 3 段パイプラインは実行され、登録・ノイズフロア・ヒステリシスは進む） |
+| `(*Filter).FrameSamples() int`                           | 1 フレーム分の入力サンプル数（16 kHz モノラル=256、48 kHz ステレオ=1536）                                                                                    |
+| `(*Filter).Reset()`                                      | プロファイル・VAD・ヒステリシスを破棄して再登録待ちに戻す                                                                                                    |
+| `(*Filter).Enrolled() bool` / `Config() Config`          | 状態確認                                                                                                                                                     |
+
+- **アロケーション 0**: バッファは `NewFilter` で確保済み。`Process` は `testing.AllocsPerRun` で 0 回/フレームをテストで固定している（`TestProcessIsAllocationFree`）。
+- **計算量**: 1 フレームあたり自己相関が `312 × 174 ≒ 54k` 回の積和。16 kHz で毎秒 62.5 フレームなので約 340 万積和/秒。単一コアで十分に余裕がある。
+- **窓の遅延**: 自己相関窓は 512 サンプル（32 ms）のため、話者が瞬時に切り替わった場合、切り替え直後の 2 フレームは旧話者のピッチを含む。テストではこの 2 フレームを遷移フレームとして除外している。
+
+### 6.6 検証ゲート
+
+1. `gofmt -l .` が無出力（フォーマット準拠）。
+2. `go vet ./...` がエラー 0。
+3. `go test -race ./...` が全パス（`main` パッケージと `audio` パッケージの双方）。
+4. `node build.mjs` で `bin/kaden`（Windows は `bin/kaden.exe`）が生成され、stdio JSON-RPC の `initialize` / `tool.execute` / `shutdown` が正常応答する。
