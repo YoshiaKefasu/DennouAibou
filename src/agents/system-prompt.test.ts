@@ -813,17 +813,6 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("agent=work");
   });
 
-  it("includes reasoning visibility hint", () => {
-    const prompt = buildAgentSystemPrompt({
-      workspaceDir: "/tmp/openclaw",
-      reasoningLevel: "off",
-    });
-
-    expect(prompt).toContain("Reasoning: off");
-    expect(prompt).toContain("/reasoning");
-    expect(prompt).toContain("/status shows Reasoning");
-  });
-
   it("builds runtime line with agent and channel details", () => {
     const line = buildRuntimeLine(
       {

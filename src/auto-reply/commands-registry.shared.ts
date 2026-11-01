@@ -585,22 +585,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
       argsMenu: "auto",
     }),
     defineChatCommand({
-      key: "reasoning",
-      nativeName: "reasoning",
-      description: "Toggle reasoning visibility.",
-      textAlias: "/reasoning",
-      category: "options",
-      args: [
-        {
-          name: "mode",
-          description: "on, off, or stream",
-          type: "string",
-          choices: ["on", "off", "stream"],
-        },
-      ],
-      argsMenu: "auto",
-    }),
-    defineChatCommand({
       key: "elevated",
       nativeName: "elevated",
       description: "Toggle elevated mode.",
@@ -726,7 +710,6 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
   registerAlias(commands, "whoami", "/id");
   registerAlias(commands, "think", "/thinking", "/t");
   registerAlias(commands, "verbose", "/v");
-  registerAlias(commands, "reasoning", "/reason");
   registerAlias(commands, "elevated", "/elev");
 
   assertCommandRegistry(commands);

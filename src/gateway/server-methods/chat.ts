@@ -1794,6 +1794,10 @@ export function createChatHandlers(overrides: ChatHandlersDeps = {}): GatewayReq
               abortSignal: abortController.signal,
               images: parsedImages.length > 0 ? parsedImages : undefined,
               imageOrder: parsedImageOrder.length > 0 ? parsedImageOrder : undefined,
+              // 電脳屋敷 (webchat) は reasoningLevel 設定に関係なく思考トレースを表示する。
+              // ここで関数を渡すと subscribeEmbeddedPiSession の streamReasoning が有効になり、
+              // `stream: "thinking"` の agent イベントは subscribe 側の emitAgentEvent が送る。
+              onReasoningStream: () => undefined,
               onAgentRunStart: (runId) => {
                 agentRunStarted = true;
                 void emitUserTranscriptUpdate();

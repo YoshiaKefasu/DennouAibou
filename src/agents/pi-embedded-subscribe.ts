@@ -61,7 +61,6 @@ export type {
 } from "./pi-embedded-subscribe.types.js";
 
 export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionParams) {
-  const reasoningMode = params.reasoningMode ?? "off";
   const toolResultFormat = params.toolResultFormat ?? "markdown";
   const useMarkdown = toolResultFormat === "markdown";
   const initialPendingToolMediaUrls = collectPendingMediaFromInternalEvents(params.internalEvents);
@@ -75,10 +74,15 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     itemCompletedCount: 0,
     lastToolError: undefined,
     blockReplyBreak: params.blockReplyBreak ?? "text_end",
-    reasoningMode,
-    includeReasoning: reasoningMode === "on",
-    shouldEmitPartialReplies: !(reasoningMode === "on" && !params.onBlockReply),
-    streamReasoning: reasoningMode === "stream" && typeof params.onReasoningStream === "function",
+    // 思考は本文に混ぜず（includeReasoning 撤去）、agent イベント（stream: "thinking"）だけで流す。
+    reasoningMode: "off",
+    includeReasoning: false,
+    shouldEmitPartialReplies: true,
+    // 思考ストリームは reasoningLevel（off / on / stream）に依存させない。
+    // onReasoningStream は「思考を表示したい呼び出し元」（電脳屋敷 webchat など）だけが
+    // 渡すため、関数の有無だけで stream 可否を決める。
+    // 本文への思考混入（includeReasoning）は従来どおり reasoningMode === "on" のみ。
+    streamReasoning: typeof params.onReasoningStream === "function",
     deltaBuffer: "",
     blockBuffer: "",
     // Track if a streamed chunk opened a <think> block (stateful across chunks).
